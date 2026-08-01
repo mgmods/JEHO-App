@@ -36,10 +36,42 @@
         android:textSize="12sp" />
 
     <TextView
+        android:id="@+id/btnChangeRoomName"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_room_dialog_item"
+        android:drawablePadding="10dp"
+        android:drawableStart="@drawable/icon_room_opera_admin"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="@string/room_change_name"
+        android:textColor="@color/aurora_gold"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/btnChangeRoomPhoto"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_room_dialog_item"
+        android:drawablePadding="10dp"
+        android:drawableStart="@drawable/more_btn_theme"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="@string/room_change_photo"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
         android:id="@+id/btnSeatRequests"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="12dp"
         android:background="@drawable/bg_room_dialog_item"
         android:gravity="center"
         android:text="طلبات الانضمام للمايك"

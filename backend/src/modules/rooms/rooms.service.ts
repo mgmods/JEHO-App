@@ -489,7 +489,8 @@ export class RoomsService implements OnModuleInit {
       const hostCard =
         (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
       Object.assign(existing, {
-        title,
+        // Keep permanent room name/cover once set — don't overwrite with host profile each open.
+        title: (existing.title && String(existing.title).trim()) || title,
         coverUrl: existing.coverUrl || coverUrl,
         backgroundUrl:
           dto.backgroundUrl !== undefined
@@ -604,7 +605,8 @@ export class RoomsService implements OnModuleInit {
       const hostCard =
         (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
       Object.assign(existing, {
-        title,
+        // Keep permanent room name/cover once set — don't overwrite with host profile each open.
+        title: (existing.title && String(existing.title).trim()) || title,
         coverUrl: existing.coverUrl || coverUrl,
         backgroundUrl:
           dto.backgroundUrl !== undefined
@@ -1045,14 +1047,11 @@ export class RoomsService implements OnModuleInit {
       : this.defaultRoomCover(decorated);
     const isAgency =
       decorated.roomKind === RoomKind.AGENCY || !!decorated.agencyId;
-    // Keep personal room list title = live host name (never a stale guest/viewer name).
-    let listTitle = decorated.title;
-    if (!isAgency && decorated.host) {
-      const hostName = String(
-        decorated.host.displayName || decorated.host.username || '',
-      ).trim();
-      if (hostName) listTitle = hostName;
-    }
+    // Room identity is permanent (title + coverUrl), separate from host profile.
+    const listTitle =
+      String(decorated.title || '').trim() ||
+      String(decorated.host?.displayName || decorated.host?.username || '').trim() ||
+      'غرفة';
     return {
       ...decorated,
       title: listTitle,

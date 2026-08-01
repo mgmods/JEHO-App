@@ -187,9 +187,10 @@ public class SearchActivity extends ThemedActivity {
                     row.subtitle = "غرفة · " + typeLabel + " · ID " + roomId
                             + " · " + Math.max(0, r.viewerCount) + " متواجد"
                             + (r.hasPassword ? " · 🔒" : "");
-                    String cover = RoomCardBinder.isGenericServerCoverForList(r.coverUrl)
-                            && r.host != null && r.host.avatarUrl != null
-                            ? r.host.avatarUrl : r.coverUrl;
+                    String cover = r.coverUrl != null ? r.coverUrl.trim() : "";
+                    if (cover.isEmpty() && r.host != null && r.host.avatarUrl != null) {
+                        cover = r.host.avatarUrl;
+                    }
                     row.imageUrl = cover;
                     next.add(row);
                 }

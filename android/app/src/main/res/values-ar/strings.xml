@@ -282,6 +282,10 @@
 <string name="host_mode">مضيف</string>
 <string name="audience_mode">مشاهد</string>
 <string name="room_title">عنوان الغرفة</string>
+<string name="room_change_name">تغيير اسم الروم</string>
+<string name="room_change_photo">تغيير صورة الروم</string>
+<string name="room_photo_updated">تم تحديث صورة الروم</string>
+<string name="room_photo_upload_failed">فشل رفع صورة الروم</string>
 <string name="room_open">مفتوحة</string>
 <string name="room_badge_personal">روم شخصي</string>
 <string name="room_badge_agency">وكالة</string>

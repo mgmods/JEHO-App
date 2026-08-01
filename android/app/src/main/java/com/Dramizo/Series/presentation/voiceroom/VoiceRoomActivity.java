@@ -284,6 +284,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             uri -> {
                 if (uri != null) addLocalMusicAndPlay(uri);
             });
+    private final ActivityResultLauncher<String> roomCoverPicker = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) uploadRoomCover(uri);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -785,7 +790,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             ? room.description : "مرحبًا بكم في الغرفة الصوتية");
             if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
                 lastBoundCoverUrl = room.coverUrl;
-                // Room cover is ONLY the full-screen / banner background — never the header avatar.
+                // Room cover = permanent room photo (list + header face). Banner mirrors it.
                 if (binding.imgRoomBannerCover != null) {
                     Glide.with(this)
                             .load(AssetCatalog.absoluteUrl(room.coverUrl))
@@ -794,6 +799,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             .error(R.drawable.placeholder_cover)
                             .into(binding.imgRoomBannerCover);
                 }
+                // Force header rebind when cover changes from settings.
+                lastBoundHostStageKey = null;
+                bindHeaderHostVisual(room, currentSeats);
             }
             setRoomViewerCount(Math.max(0, room.viewerCount));
             // Always keep the compact dark glass card unless an ornate kenar is active.
@@ -6229,6 +6237,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // Hide non-seat admin rows for a focused seats sheet.
         int[] hideIds = {
+                R.id.btnChangeRoomName,
+                R.id.btnChangeRoomPhoto,
                 R.id.btnSeatRequests,
                 R.id.btnToggleLock,
                 R.id.rowGiftSounds,
@@ -6262,6 +6272,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         TextView title = sheet.findViewById(R.id.tvDialogTitle);
         if (title != null) title.setText(R.string.settings);
+
+        TextView btnChangeName = sheet.findViewById(R.id.btnChangeRoomName);
+        if (btnChangeName != null) {
+            btnChangeName.setVisibility(canManageRoom ? View.VISIBLE : View.GONE);
+            btnChangeName.setOnClickListener(v -> {
+                dialog.dismiss();
+                promptRenameRoomTitle(viewModel != null ? viewModel.getRoom().getValue() : null);
+            });
+        }
+        TextView btnChangePhoto = sheet.findViewById(R.id.btnChangeRoomPhoto);
+        if (btnChangePhoto != null) {
+            btnChangePhoto.setVisibility(canManageRoom ? View.VISIBLE : View.GONE);
+            btnChangePhoto.setOnClickListener(v -> {
+                dialog.dismiss();
+                roomCoverPicker.launch("image/*");
+            });
+        }
+
         TextView requestsBtn = sheet.findViewById(R.id.btnSeatRequests);
         if (requestsBtn != null) {
             boolean showQueue = canInviteMic && !isFreeMicEnabled();
@@ -9203,13 +9231,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             host = sessionUser;
         }
 
-        String avatarUrl = host != null ? host.avatarUrl : null;
+        // Room face = permanent room cover (separate from host profile avatar).
+        String roomFace = room.coverUrl != null ? room.coverUrl.trim() : "";
+        if (roomFace.isEmpty()) {
+            roomFace = host != null && host.avatarUrl != null ? host.avatarUrl : null;
+            if ((roomFace == null || roomFace.isEmpty()) && selfHost && sessionUser != null) {
+                roomFace = sessionUser.avatarUrl;
+            }
+        }
         String vipUrl = host != null ? host.vipBadgeUrl : null;
         String hostBadgeUrl = host != null ? host.hostBadgeUrl : null;
         java.util.Map<String, Object> hostMeta = host != null ? host.hostBadgeMeta : null;
         // Session backfill: join payload often omits equipped wear on host DTO.
         if (selfHost && sessionUser != null) {
-            if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = sessionUser.avatarUrl;
             if (vipUrl == null || vipUrl.isEmpty()) vipUrl = sessionUser.vipBadgeUrl;
             if (hostBadgeUrl == null || hostBadgeUrl.isEmpty()) {
                 hostBadgeUrl = sessionUser.hostBadgeUrl;
@@ -9223,7 +9257,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        String visualKey = hostId + "|" + avatarUrl + "|" + vipUrl + "|" + hostBadgeUrl
+        String visualKey = hostId + "|" + roomFace + "|" + vipUrl + "|" + hostBadgeUrl
                 + "|" + hostMeta + "|" + isAgencyRoom;
         if (!Objects.equals(lastBoundHostStageKey, visualKey)) {
             lastBoundHostStageKey = visualKey;
@@ -9235,7 +9269,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     binding.imgRoomHostAvatar,
                     binding.imgRoomHostFrame,
                     binding.imgRoomHostBadge,
-                    avatarUrl,
+                    roomFace,
                     vipUrl,
                     hostBadgeUrl,
                     hostMeta,
@@ -9413,11 +9447,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String current = room.title != null ? room.title : "";
         final android.widget.EditText input = new android.widget.EditText(this);
         input.setText(current);
-        input.setHint("اسمك / وكالة / اسم الوكالة");
+        input.setHint(RoomUiHelper.isAgencyRoom(room) ? "اسم الوكالة / الغرفة" : "اسم الروم (دائم)");
         input.setSelection(input.getText() != null ? input.getText().length() : 0);
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(RoomUiHelper.isAgencyRoom(room) ? "اسم الوكالة / الغرفة" : "اسم الغرفة")
-                .setMessage("سيظهر للجمهور. لغرف الوكالة يُعرض كـ «وكالة · الاسم».")
+                .setTitle(RoomUiHelper.isAgencyRoom(room) ? "اسم الوكالة / الغرفة" : "اسم الروم")
+                .setMessage(RoomUiHelper.isAgencyRoom(room)
+                        ? "سيظهر للجمهور. لغرف الوكالة يُعرض كـ «وكالة · الاسم»."
+                        : "اسم الروم دائم ومستقل عن اسمك الشخصي — يظهر للجميع.")
                 .setView(input)
                 .setPositiveButton(R.string.save, (d, w) -> {
                     String next = input.getText() != null ? input.getText().toString().trim() : "";
@@ -9432,6 +9468,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void uploadRoomCover(@NonNull android.net.Uri uri) {
+        if (roomId == null || roomId.isEmpty() || viewModel == null) return;
+        if (!canManageRoom) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                okhttp3.MultipartBody.Part part = AvatarImageLoader.multipartFromUri(
+                        getContentResolver(), uri, "cover");
+                retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> resp =
+                        c.getUploadApi().upload(part).execute();
+                if (!resp.isSuccessful() || resp.body() == null || !resp.body().success
+                        || resp.body().data == null || resp.body().data.url == null
+                        || resp.body().data.url.isEmpty()) {
+                    throw new IllegalStateException(getString(R.string.room_photo_upload_failed));
+                }
+                String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+                runOnUiThread(() -> {
+                    if (isFinishing() || viewModel == null) return;
+                    viewModel.updateCover(roomId, url);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(this,
+                            e.getMessage() != null ? e.getMessage() : getString(R.string.room_photo_upload_failed),
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private void onHostStageClick() {

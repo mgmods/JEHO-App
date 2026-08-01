@@ -77,22 +77,17 @@ public final class RoomCardBinder {
 
     private static String displayTitle(RoomDtos.RoomDto room) {
         boolean agency = RoomUiHelper.isAgencyRoom(room);
-        if (!agency) {
-            String hostName = resolveHostName(room);
-            if (hostName != null && !hostName.isEmpty() && !"مضيف".equals(hostName)) {
-                return hostName;
-            }
-        }
-        String title = room.title != null && !room.title.isEmpty() ? room.title.trim() : "غرفة";
+        String title = room.title != null && !room.title.isEmpty() ? room.title.trim() : "";
         if (title.startsWith("وكالة · ")) title = title.substring("وكالة · ".length()).trim();
         if (title.startsWith("وكالة·")) title = title.substring("وكالة·".length()).trim();
-        if (!agency) {
-            String hostName = resolveHostName(room);
-            if (hostName != null && !hostName.isEmpty() && !"مضيف".equals(hostName)) {
-                return hostName;
-            }
+        if (!title.isEmpty()) {
+            return agency ? title : title;
         }
-        return title.isEmpty() ? "غرفة" : title;
+        String hostName = resolveHostName(room);
+        if (hostName != null && !hostName.isEmpty() && !"مضيف".equals(hostName)) {
+            return hostName;
+        }
+        return "غرفة";
     }
 
     /** Mikoo ivRoomLevel — only when room has a real level (>1); default gone like Mikoo XML. */
@@ -301,21 +296,16 @@ public final class RoomCardBinder {
     }
 
     private static String resolveCover(RoomDtos.RoomDto room) {
-        // Personal: host avatar is the card face (Mikoo). Agency: room cover first.
-        if (!RoomUiHelper.isAgencyRoom(room)
-                && room.host != null
-                && room.host.avatarUrl != null
-                && !room.host.avatarUrl.isEmpty()) {
-            return room.host.avatarUrl;
-        }
+        // Room face = permanent room cover (not host profile avatar).
         String cover = room.coverUrl != null ? room.coverUrl.trim() : "";
         if (!cover.isEmpty() && !isGenericServerCover(cover)) {
             return cover;
         }
+        if (!cover.isEmpty()) return cover;
         if (room.host != null && room.host.avatarUrl != null && !room.host.avatarUrl.isEmpty()) {
             return room.host.avatarUrl;
         }
-        return cover.isEmpty() ? null : cover;
+        return null;
     }
 
     public static boolean isGenericServerCoverForList(String url) {

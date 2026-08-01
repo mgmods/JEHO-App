@@ -328,8 +328,10 @@ public class VoiceRoomViewModel extends ViewModel {
     public void updateCover(String roomId, String coverUrl) {
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r = c.getRoomRepository().update(roomId, null, coverUrl);
-            if (r.success) room.postValue(r.data);
-            else error.postValue(r.error);
+            if (r.success) {
+                room.postValue(r.data);
+                info.postValue("تم تحديث صورة الروم");
+            } else error.postValue(r.error);
         });
     }
 

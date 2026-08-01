@@ -326,6 +326,10 @@
 <string name="host_mode">Host</string>
 <string name="audience_mode">Audience</string>
 <string name="room_title">Room title</string>
+<string name="room_change_name">Change room name</string>
+<string name="room_change_photo">Change room photo</string>
+<string name="room_photo_updated">Room photo updated</string>
+<string name="room_photo_upload_failed">Failed to upload room photo</string>
 <string name="room_open">OPEN</string>
 <string name="room_badge_personal">Personal room</string>
 <string name="room_badge_agency">Agency</string>
