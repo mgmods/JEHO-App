@@ -349,6 +349,18 @@ public class BagActivity extends ThemedActivity {
         applyDiamondActionMode(diamondActionMode);
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (c == null) return;
+        c.getIoExecutor().execute(() -> {
+            Result<WalletDtos.WalletDto> w = ApiCall.execute(c.getWalletApi().getWallet());
+            runOnUiThread(() -> {
+                if (!isFinishing() && w.success) applyWallet(w.data);
+            });
+        });
+    }
+
     /** Hub shows balance + menu; each action opens this activity focused on one form. */
     private void applyDiamondActionMode(@Nullable String mode) {
         if (binding == null) return;
@@ -540,23 +552,7 @@ public class BagActivity extends ThemedActivity {
             Toast.makeText(this, "SKU غير صالح — حدّثه من لوحة التحكم", Toast.LENGTH_LONG).show();
             return;
         }
-        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
-        View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_payment_method, null);
-        AuraDialogHelper.applyContent(sheet);
-        dialog.setContentView(sheet);
-        sheet.findViewById(R.id.btnPayGoogle).setOnClickListener(v -> {
-            dialog.dismiss();
-            buyWithGooglePlay(pkg);
-        });
-        sheet.findViewById(R.id.btnPayBinance).setOnClickListener(v -> {
-            dialog.dismiss();
-            showBinanceNetworkDialog(pkg);
-        });
-        sheet.findViewById(R.id.btnPayAgent).setOnClickListener(v -> {
-            dialog.dismiss();
-            startActivity(RechargeAgentDirectoryActivity.intent(this, pkg));
-        });
-        dialog.show();
+        startActivity(RechargePaymentActivity.intent(this, pkg));
     }
 
     private void buyWithGooglePlay(WalletDtos.RechargePackageDto pkg) {

@@ -107,10 +107,17 @@ public class EditProfileActivity extends ThemedActivity {
             pickImage.launch("image/*");
         });
         binding.imgAvatarPreview.setOnClickListener(v -> binding.btnPickAvatar.performClick());
+        if (binding.rowAvatar != null) {
+            binding.rowAvatar.setOnClickListener(v -> binding.btnPickAvatar.performClick());
+        }
         binding.btnPickCover.setOnClickListener(v -> {
             pickingCover = true;
             pickImage.launch("image/*");
         });
+        binding.imgCoverPreview.setOnClickListener(v -> binding.btnPickCover.performClick());
+        if (binding.rowCover != null) {
+            binding.rowCover.setOnClickListener(v -> binding.btnPickCover.performClick());
+        }
         binding.btnSave.setOnClickListener(v -> save());
 
         vm.getSaved().observe(this, saved -> {

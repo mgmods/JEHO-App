@@ -89,6 +89,6 @@
             android:contentDescription="@string/menu"
             android:padding="8dp"
             android:scaleType="fitCenter"
-            android:src="@drawable/p2p_more_dark" />
+            android:src="@drawable/ic_music_more" />
     </LinearLayout>
 </LinearLayout>

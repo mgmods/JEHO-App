@@ -1,7 +1,7 @@
 {
-  "version": "mikoo-import-3-svga",
+  "version": "mikoo-import-3-svga+jeho2-ornate+vip-beast+priced",
   "source": "https://beta.echo.wooyavip.com",
-  "count": 83,
+  "count": 88,
   "digest": "aa26fdbfa70bc8f2",
   "items": [
     {
@@ -681,98 +681,140 @@
     {
       "type": "vip_badge",
       "code": "frame_mikoo_85_vip1",
-      "name": "VIP1",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_85_vip1.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_85_vip1.png?v=mikoo-svga1",
-      "coinPrice": 999,
-      "sortOrder": 2002,
+      "name": "VIP1 · أسد برونزي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_85_vip1.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_85_vip1.svga?v=vip-beast-svga1",
+      "coinPrice": 499,
+      "sortOrder": 201,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 85,
         "mikooGold": 9999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_276_golden_lion_crown.svga",
+        "aristocracy": true,
+        "vipLevel": 1,
+        "hue": 18,
+        "reverseMotion": false,
+        "pricedMall": true
+      },
+      "minVipLevel": 1
     },
     {
       "type": "vip_badge",
       "code": "frame_mikoo_90_vip6",
-      "name": "VIP6",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_90_vip6.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_90_vip6.png?v=mikoo-svga1",
-      "coinPrice": 999,
-      "sortOrder": 2003,
+      "name": "VIP6 · تنين أسود بنفسجي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_90_vip6.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_90_vip6.svga?v=vip-beast-svga1",
+      "coinPrice": 4499,
+      "sortOrder": 206,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 90,
         "mikooGold": 9999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_277_dragon_in_the_clouds.svga",
+        "aristocracy": true,
+        "vipLevel": 6,
+        "hue": 275,
+        "reverseMotion": true,
+        "pricedMall": true
+      },
+      "minVipLevel": 6
     },
     {
       "type": "vip_badge",
       "code": "frame_mikoo_89_vip5",
-      "name": "VIP5",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_89_vip5.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_89_vip5.png?v=mikoo-svga1",
+      "name": "VIP5 · عنقاء قرمزية",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_89_vip5.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_89_vip5.svga?v=vip-beast-svga1",
       "coinPrice": 2999,
-      "sortOrder": 2004,
+      "sortOrder": 205,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 89,
         "mikooGold": 99999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_280_golden_furnace.svga",
+        "aristocracy": true,
+        "vipLevel": 5,
+        "hue": 350,
+        "reverseMotion": false,
+        "pricedMall": true
+      },
+      "minVipLevel": 5
     },
     {
       "type": "vip_badge",
       "code": "frame_mikoo_88_vip4",
-      "name": "VIP4",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_88_vip4.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_88_vip4.png?v=mikoo-svga1",
-      "coinPrice": 2999,
-      "sortOrder": 2005,
+      "name": "VIP4 · ديناصور ياقوتي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_88_vip4.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_88_vip4.svga?v=vip-beast-svga1",
+      "coinPrice": 1999,
+      "sortOrder": 204,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 88,
         "mikooGold": 99999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_343_golden_dragon.svga",
+        "aristocracy": true,
+        "vipLevel": 4,
+        "hue": 215,
+        "reverseMotion": true,
+        "pricedMall": true
+      },
+      "minVipLevel": 4
     },
     {
       "type": "vip_badge",
       "code": "frame_mikoo_87_vip3",
-      "name": "VIP3",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_87_vip3.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_87_vip3.png?v=mikoo-svga1",
-      "coinPrice": 999,
-      "sortOrder": 2006,
+      "name": "VIP3 · تنين زمردي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_87_vip3.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_87_vip3.svga?v=vip-beast-svga1",
+      "coinPrice": 1299,
+      "sortOrder": 203,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 87,
         "mikooGold": 9999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_277_dragon_in_the_clouds.svga",
+        "aristocracy": true,
+        "vipLevel": 3,
+        "hue": 125,
+        "reverseMotion": false,
+        "pricedMall": true
+      },
+      "minVipLevel": 3
     },
     {
       "type": "vip_badge",
       "code": "frame_mikoo_86_vip2",
-      "name": "VIP2",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_86_vip2.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_86_vip2.png?v=mikoo-svga1",
-      "coinPrice": 999,
-      "sortOrder": 2007,
+      "name": "VIP2 · نمر فضي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_86_vip2.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_86_vip2.svga?v=vip-beast-svga1",
+      "coinPrice": 799,
+      "sortOrder": 202,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 86,
         "mikooGold": 9999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_342_world_cup_platinum.svga",
+        "aristocracy": true,
+        "vipLevel": 2,
+        "hue": 200,
+        "reverseMotion": true,
+        "pricedMall": true
+      },
+      "minVipLevel": 2
     },
     {
       "type": "vip_badge",
@@ -969,18 +1011,25 @@
     {
       "type": "vip_badge",
       "code": "frame_mikoo_91_vip7",
-      "name": "VIP7",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_91_vip7.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_91_vip7.png?v=mikoo-svga1",
-      "coinPrice": 999,
-      "sortOrder": 2020,
+      "name": "VIP7 · تنين ذهبي ملوكي",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_91_vip7.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_91_vip7.svga?v=vip-beast-svga1",
+      "coinPrice": 6999,
+      "sortOrder": 207,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 91,
         "mikooGold": 9999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_343_golden_dragon.svga",
+        "aristocracy": true,
+        "vipLevel": 7,
+        "hue": 32,
+        "reverseMotion": false,
+        "pricedMall": true
+      },
+      "minVipLevel": 7
     },
     {
       "type": "vip_badge",
@@ -1081,18 +1130,24 @@
     {
       "type": "vip_badge",
       "code": "frame_mikoo_237_monthly_s2_agency",
-      "name": "Monthly S2 Agency",
-      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_237_monthly_s2_agency.png?v=mikoo-svga1",
-      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_237_monthly_s2_agency.png?v=mikoo-svga1",
-      "coinPrice": 2999,
+      "name": "رتبة S2 · عنقاء سماوية",
+      "previewUrl": "/assets/cosmetics/frames/frame_mikoo_237_monthly_s2_agency.png?v=vip-beast-svga1",
+      "animationUrl": "/assets/cosmetics/frames/frame_mikoo_237_monthly_s2_agency.svga?v=vip-beast-svga1",
+      "coinPrice": 3999,
       "sortOrder": 2027,
       "meta": {
-        "source": "mikoo_headwear",
+        "source": "jeho_vip_beast_svga",
         "mikooId": 237,
         "mikooGold": 99999,
-        "hasSvga": false,
-        "cdnSvga": null
-      }
+        "hasSvga": true,
+        "cdnSvga": null,
+        "basedOn": "frame_mikoo_276_golden_lion_crown.svga",
+        "aristocracy": false,
+        "hue": 175,
+        "reverseMotion": true,
+        "pricedMall": true
+      },
+      "minVipLevel": 0
     },
     {
       "type": "vip_badge",
@@ -1316,6 +1371,96 @@
         "mikooGold": 99999,
         "hasSvga": true,
         "cdnSvga": "https://res.echoliveapp.com/headwear/1780382304654?imageslim"
+      }
+    },
+    {
+      "type": "vip_badge",
+      "code": "frame_jeho_aurora_cyan",
+      "name": "إطار أجنحة بلاتين سماوي",
+      "previewUrl": "/assets/cosmetics/frames/frame_jeho_aurora_cyan.png?v=jeho2",
+      "animationUrl": "/assets/cosmetics/frames/frame_jeho_aurora_cyan.svga?v=jeho2",
+      "coinPrice": 499,
+      "minVipLevel": 0,
+      "minUserLevel": 0,
+      "sortOrder": 9101,
+      "meta": {
+        "source": "jeho_ornate_recolor",
+        "basedOn": "frame_mikoo_342_world_cup_platinum.svga",
+        "hasSvga": true,
+        "hue": 185,
+        "reverseMotion": false
+      }
+    },
+    {
+      "type": "vip_badge",
+      "code": "frame_jeho_ruby_pulse",
+      "name": "إطار تاج أسد ياقوتي",
+      "previewUrl": "/assets/cosmetics/frames/frame_jeho_ruby_pulse.png?v=jeho2",
+      "animationUrl": "/assets/cosmetics/frames/frame_jeho_ruby_pulse.svga?v=jeho2",
+      "coinPrice": 549,
+      "minVipLevel": 0,
+      "minUserLevel": 0,
+      "sortOrder": 9102,
+      "meta": {
+        "source": "jeho_ornate_recolor",
+        "basedOn": "frame_mikoo_276_golden_lion_crown.svga",
+        "hasSvga": true,
+        "hue": 320,
+        "reverseMotion": true
+      }
+    },
+    {
+      "type": "vip_badge",
+      "code": "frame_jeho_emerald_orbit",
+      "name": "إطار تنين الغيوم زمردي",
+      "previewUrl": "/assets/cosmetics/frames/frame_jeho_emerald_orbit.png?v=jeho2",
+      "animationUrl": "/assets/cosmetics/frames/frame_jeho_emerald_orbit.svga?v=jeho2",
+      "coinPrice": 529,
+      "minVipLevel": 0,
+      "minUserLevel": 0,
+      "sortOrder": 9103,
+      "meta": {
+        "source": "jeho_ornate_recolor",
+        "basedOn": "frame_mikoo_277_dragon_in_the_clouds.svga",
+        "hasSvga": true,
+        "hue": 110,
+        "reverseMotion": false
+      }
+    },
+    {
+      "type": "vip_badge",
+      "code": "frame_jeho_gold_spin",
+      "name": "إطار تنين ذهبي ملوكي",
+      "previewUrl": "/assets/cosmetics/frames/frame_jeho_gold_spin.png?v=jeho2",
+      "animationUrl": "/assets/cosmetics/frames/frame_jeho_gold_spin.svga?v=jeho2",
+      "coinPrice": 599,
+      "minVipLevel": 0,
+      "minUserLevel": 0,
+      "sortOrder": 9104,
+      "meta": {
+        "source": "jeho_ornate_recolor",
+        "basedOn": "frame_mikoo_343_golden_dragon.svga",
+        "hasSvga": true,
+        "hue": 25,
+        "reverseMotion": true
+      }
+    },
+    {
+      "type": "vip_badge",
+      "code": "frame_jeho_violet_wave",
+      "name": "إطار فرن ذهبي بنفسجي",
+      "previewUrl": "/assets/cosmetics/frames/frame_jeho_violet_wave.png?v=jeho2",
+      "animationUrl": "/assets/cosmetics/frames/frame_jeho_violet_wave.svga?v=jeho2",
+      "coinPrice": 579,
+      "minVipLevel": 0,
+      "minUserLevel": 0,
+      "sortOrder": 9105,
+      "meta": {
+        "source": "jeho_ornate_recolor",
+        "basedOn": "frame_mikoo_280_golden_furnace.svga",
+        "hasSvga": true,
+        "hue": 265,
+        "reverseMotion": true
       }
     }
   ]

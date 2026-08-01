@@ -50,6 +50,11 @@ public final class WalletDtos {
         /** Prefer Play Console formatted price; fall back to server USD. */
         public String displayPrice() {
             if (playPriceLabel != null && !playPriceLabel.isEmpty()) return playPriceLabel;
+            return usdPriceLabel();
+        }
+
+        /** Always USD from server — use for card / crypto / agent (not Play local currency). */
+        public String usdPriceLabel() {
             return String.format(java.util.Locale.US, "$%.2f", priceUsd);
         }
 
@@ -154,6 +159,30 @@ public final class WalletDtos {
         @SerializedName("expiresAt") public String expiresAt;
     }
 
+    public static class FourthwallCheckoutRequest {
+        @SerializedName("sku") public String sku;
+        public FourthwallCheckoutRequest(String sku) { this.sku = sku; }
+    }
+
+    public static class FourthwallCheckoutResult {
+        @SerializedName("order") public BinanceWalletOrderDto order;
+        @SerializedName("checkoutUrl") public String checkoutUrl;
+        @SerializedName("cartId") public String cartId;
+        @SerializedName("claimCode") public String claimCode;
+        @SerializedName("instruction") public String instruction;
+    }
+
+    public static class FourthwallOrderStatus {
+        @SerializedName("id") public String id;
+        @SerializedName("status") public String status;
+        @SerializedName("sku") public String sku;
+        @SerializedName("coins") public int coins;
+        @SerializedName("bonusCoins") public int bonusCoins;
+        @SerializedName("claimCode") public String claimCode;
+        @SerializedName("checkoutUrl") public String checkoutUrl;
+        @SerializedName("completedAt") public String completedAt;
+    }
+
     public static class ExchangeRequest {
         @SerializedName("diamonds") public int diamonds;
         public ExchangeRequest(int diamonds) { this.diamonds = diamonds; }
@@ -243,5 +272,29 @@ public final class WalletDtos {
         @SerializedName("notes") public String notes;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("coverUrl") public String coverUrl;
+    }
+
+    public static class ShamCashOrderResult {
+        @SerializedName("order") public ShamCashOrderInfo order;
+        @SerializedName("payment") public ShamCashPaymentInfo payment;
+    }
+
+    public static class ShamCashOrderInfo {
+        @SerializedName("id") public String id;
+        @SerializedName("status") public String status;
+        @SerializedName("sku") public String sku;
+        @SerializedName("coins") public int coins;
+        @SerializedName("bonusCoins") public int bonusCoins;
+        @SerializedName("amountFiat") public double amountFiat;
+        @SerializedName("claimCode") public String claimCode;
+    }
+
+    public static class ShamCashPaymentInfo {
+        @SerializedName("accountId") public String accountId;
+        @SerializedName("accountName") public String accountName;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("whatsapp") public String whatsapp;
+        @SerializedName("qrPayload") public String qrPayload;
+        @SerializedName("instructions") public String instructions;
     }
 }

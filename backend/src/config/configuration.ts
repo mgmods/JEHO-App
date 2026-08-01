@@ -66,6 +66,15 @@ export default registerAs('app', () => {
     secretKey: process.env.STRIPE_SECRET_KEY || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   },
+  fourthwall: {
+    apiUser: process.env.FOURTHWALL_API_USER || '',
+    apiPassword: process.env.FOURTHWALL_API_PASSWORD || '',
+    storefrontToken: process.env.FOURTHWALL_STOREFRONT_TOKEN || '',
+    webhookSecret: process.env.FOURTHWALL_WEBHOOK_SECRET || '',
+    shopDomain: process.env.FOURTHWALL_SHOP_DOMAIN || '',
+    /** JSON map: { "coins_1000": "variant-uuid", ... } */
+    variantMapJson: process.env.FOURTHWALL_VARIANT_MAP || '{}',
+  },
   binanceWallet: {
     apiKey: process.env.BINANCE_WALLET_API_KEY || process.env.BINANCE_PAY_API_KEY || '',
     secretKey: process.env.BINANCE_WALLET_SECRET_KEY || process.env.BINANCE_PAY_SECRET_KEY || '',

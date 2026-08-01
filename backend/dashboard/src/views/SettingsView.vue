@@ -41,6 +41,8 @@
 
         <template v-else-if="settingsTab === 'payment'">
           <PaymentSettingsPanel />
+          <FourthwallPaymentPanel />
+          <ShamCashPaymentPanel />
         </template>
 
         <template v-else-if="settingsTab === 'zego'">
@@ -329,6 +331,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
+import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
+import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'
 import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'

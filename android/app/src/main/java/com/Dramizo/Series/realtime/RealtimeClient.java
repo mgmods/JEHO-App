@@ -227,8 +227,21 @@ public class RealtimeClient {
             if (callback != null) callback.onResult(false, "Socket is unavailable", null);
             return;
         }
+        if (!socket.connected()) {
+            if (callback != null) callback.onResult(false, "Socket not connected", null);
+            return;
+        }
         // Always emit room:join — skipping when joinedRooms is stale prevents entry effects
         // and leaves the socket outside the room after process death / incomplete leave.
+        final boolean[] done = {false};
+        final android.os.Handler ackTimeout =
+                new android.os.Handler(android.os.Looper.getMainLooper());
+        final Runnable timeout = () -> {
+            if (done[0]) return;
+            done[0] = true;
+            Log.w(TAG, "room:join ack timeout " + roomId);
+            if (callback != null) callback.onResult(false, "Join timeout", null);
+        };
         try {
             JSONObject body = new JSONObject();
             body.put("roomId", roomId);
@@ -236,7 +249,11 @@ public class RealtimeClient {
             if (avatarUrl != null && !avatarUrl.isEmpty()) body.put("avatarUrl", avatarUrl);
             body.put("vipLevel", Math.max(0, vipLevel));
             body.put("userLevel", Math.max(1, userLevel));
+            ackTimeout.postDelayed(timeout, 12_000L);
             socket.emit("room:join", body, (Ack) args -> {
+                if (done[0]) return;
+                done[0] = true;
+                ackTimeout.removeCallbacks(timeout);
                 JSONObject response =
                         args != null && args.length > 0 && args[0] instanceof JSONObject
                                 ? (JSONObject) args[0] : null;
@@ -250,10 +267,16 @@ public class RealtimeClient {
                     Object raw = response.opt("profile");
                     if (raw instanceof JSONObject) profile = (JSONObject) raw;
                 }
-                if (callback != null) callback.onResult(success, error, profile);
+                if (callback != null) {
+                    callback.onResult(success,
+                            success ? null : (error != null ? error : "Join failed"),
+                            profile);
+                }
             });
             Log.d(TAG, "room:join " + roomId);
         } catch (JSONException e) {
+            done[0] = true;
+            ackTimeout.removeCallbacks(timeout);
             Log.w(TAG, "joinRoom failed", e);
             if (callback != null) callback.onResult(false, e.getMessage(), null);
         }

@@ -482,6 +482,8 @@ public class MainActivity extends ThemedActivity {
         miniRoot.setOnClickListener(v -> {
             Intent room = new Intent(this, VoiceRoomActivity.class);
             room.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, activeRoomId);
+            room.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                    | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(room);
         });
         // Spin only the cover — translation drag stays stable on the root.

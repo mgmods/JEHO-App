@@ -297,6 +297,16 @@ public final class MiscDtos {
         @SerializedName("phone") public String phone;
     }
 
+    /** Sham Cash (Syria) from GET /config/sham-cash — WhatsApp manual top-up. */
+    public static class ShamCashConfigDto {
+        @SerializedName("enabled") public boolean enabled;
+        @SerializedName("whatsapp") public String whatsapp;
+        @SerializedName("displayName") public String displayName;
+        @SerializedName("accountName") public String accountName;
+        @SerializedName("accountId") public String accountId;
+        @SerializedName("instructions") public String instructions;
+    }
+
     public static class ThemeDto {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;

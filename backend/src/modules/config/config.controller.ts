@@ -272,4 +272,39 @@ export class ConfigController {
       phone: await pick('support_phone'),
     };
   }
+
+  @Public()
+  @Get('sham-cash')
+  @ApiOperation({
+    summary: 'Sham Cash config — account QR + WhatsApp proof (Coming soon if no account id)',
+  })
+  async shamCash() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'sham_cash_config' } });
+    let cur: Record<string, any> = {};
+    try {
+      const raw = row?.value as any;
+      cur = typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      cur = {};
+    }
+    const accountId = String(cur.accountId || cur.iban || cur.accountNumber || '')
+      .trim()
+      .toLowerCase();
+    const whatsapp = String(cur.whatsapp || '').trim();
+    const digits = whatsapp.replace(/\D/g, '');
+    const hasAccount = accountId.length >= 8;
+    const displayName = String(cur.displayName || 'شام كاش').trim() || 'شام كاش';
+    const accountName = String(cur.accountName || '').trim() || displayName;
+    return {
+      enabled: hasAccount,
+      whatsapp: digits.length >= 8 ? whatsapp : '',
+      displayName,
+      accountName,
+      accountId: hasAccount ? accountId : '',
+      instructions: hasAccount
+        ? String(cur.instructions || '').trim() ||
+          'حوّل عبر شام كاش بالمسح أو الرقم، ثم أرسل صورة الإثبات على واتساب.'
+        : '',
+    };
+  }
 }

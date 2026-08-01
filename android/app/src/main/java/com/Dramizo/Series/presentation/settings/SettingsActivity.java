@@ -52,7 +52,7 @@ public class SettingsActivity extends ThemedActivity {
         label(binding.rowMessages.getRoot(), R.string.settings_messages);
         label(binding.rowBindAccount.getRoot(), R.string.settings_bind_account);
         label(binding.rowPassword.getRoot(), R.string.settings_password);
-        label(binding.rowFeedback.getRoot(), R.string.settings_feedback);
+        label(binding.rowFeedback.getRoot(), R.string.customer_support);
         label(binding.rowChildSafety.getRoot(), R.string.settings_child_safety);
         label(binding.rowAbout.getRoot(), R.string.about);
         label(binding.rowNetwork.getRoot(), R.string.settings_network);

@@ -453,6 +453,25 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('wallet/recharges/:id/complete')
+  @ApiOperation({ summary: 'Manually complete a pending recharge (e.g. Sham Cash after WhatsApp proof)' })
+  completeRecharge(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body?: { providerPaymentId?: string; note?: string },
+  ) {
+    return this.adminService.completeRechargeOrder(id, body?.providerPaymentId, body?.note);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('wallet/recharges/:id/cancel')
+  @ApiOperation({ summary: 'Cancel a pending recharge order' })
+  cancelRecharge(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.cancelRechargeOrder(id);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('wallet/packages')
   walletPackages() {
     return this.adminService.listRechargePackages();
@@ -999,6 +1018,56 @@ export class AdminController {
   @ApiOperation({ summary: 'Reconcile pending Binance wallet deposits against exchange history' })
   reconcileBinanceWalletDeposits() {
     return this.paymentsService.reconcileBinanceWalletDeposits();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('payment-settings/fourthwall')
+  @ApiOperation({ summary: 'Get masked Fourthwall card-payment settings' })
+  getFourthwallSettings() {
+    return this.paymentsService.getFourthwallAdminSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('payment-settings/fourthwall')
+  @ApiOperation({ summary: 'Update Fourthwall card-payment settings' })
+  patchFourthwallSettings(@Body() body: Record<string, unknown>) {
+    return this.paymentsService.updateFourthwallAdminSettings(body as any);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('payment-settings/fourthwall/test')
+  @ApiOperation({ summary: 'Test Fourthwall Open API credentials' })
+  testFourthwallSettings() {
+    return this.paymentsService.testFourthwallConnection();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('payment-settings/fourthwall/sync-packages')
+  @ApiOperation({
+    summary: 'Auto-create Fourthwall digital products from wallet coin packages',
+  })
+  syncFourthwallPackages() {
+    return this.paymentsService.syncFourthwallPackages();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('payment-settings/sham-cash')
+  @ApiOperation({ summary: 'Get Sham Cash (Syria) WhatsApp recharge settings' })
+  getShamCashSettings() {
+    return this.paymentsService.getShamCashAdminSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('payment-settings/sham-cash')
+  @ApiOperation({ summary: 'Update Sham Cash WhatsApp recharge settings' })
+  patchShamCashSettings(@Body() body: Record<string, unknown>) {
+    return this.paymentsService.updateShamCashAdminSettings(body as any);
   }
 
   // ─── ZEGOCLOUD settings ────────────────────────────────────

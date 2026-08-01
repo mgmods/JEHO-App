@@ -83,8 +83,12 @@ public class ProfileFragment extends Fragment {
                     startActivity(new Intent(requireContext(),
                             com.Dramizo.Series.presentation.invite.InvitationActivity.class)));
         }
-        bindRow(binding.btnEditProfile, v ->
-                startActivity(new Intent(requireContext(), EditProfileActivity.class)));
+        View.OnClickListener openEditProfile = v ->
+                startActivity(new Intent(requireContext(), EditProfileActivity.class));
+        bindRow(binding.btnEditProfile, openEditProfile);
+        if (binding.btnEditProfileIcon != null) {
+            binding.btnEditProfileIcon.setOnClickListener(openEditProfile);
+        }
         bindRow(binding.btnRanking, v ->
                 startActivity(new Intent(requireContext(), RankingActivity.class)));
         bindRow(binding.btnAgency, v ->

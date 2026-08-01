@@ -106,6 +106,10 @@ public class AuraLiveApp extends Application {
         } catch (Exception ignored) {
         }
         createNotificationChannel();
+        try {
+            com.Dramizo.Series.util.LocalEngagementScheduler.ensureScheduled(this);
+        } catch (Exception ignored) {
+        }
         registerRealtimeNotifications();
         try {
             com.Dramizo.Series.util.InviteReferralHelper.captureInstallReferrer(this);
@@ -353,9 +357,9 @@ public class AuraLiveApp extends Application {
                 nm.createNotificationChannel(channel);
                 NotificationChannel roomChannel = new NotificationChannel(
                         com.Dramizo.Series.service.VoiceRoomForegroundService.CHANNEL_ID,
-                        "الغرفة الصوتية النشطة",
-                        NotificationManager.IMPORTANCE_LOW);
-                roomChannel.setDescription("إبقاء صوت الغرفة والرجوع إليها أو الخروج منها");
+                        getString(R.string.notif_room_channel),
+                        NotificationManager.IMPORTANCE_DEFAULT);
+                roomChannel.setDescription(getString(R.string.notif_room_channel_desc));
                 roomChannel.setShowBadge(false);
                 roomChannel.enableVibration(false);
                 roomChannel.setSound(null, null);
@@ -365,9 +369,9 @@ public class AuraLiveApp extends Application {
                 nm.createNotificationChannel(roomChannel);
                 NotificationChannel bubbleChannel = new NotificationChannel(
                         com.Dramizo.Series.service.VoiceRoomForegroundService.BUBBLE_CHANNEL_ID,
-                        "فقاعة الغرفة الصوتية",
+                        getString(R.string.notif_room_bubble_channel),
                         NotificationManager.IMPORTANCE_DEFAULT);
-                bubbleChannel.setDescription("فقاعة اختيارية للرجوع السريع إلى الغرفة");
+                bubbleChannel.setDescription(getString(R.string.notif_room_bubble_channel_desc));
                 bubbleChannel.setShowBadge(false);
                 bubbleChannel.enableVibration(false);
                 bubbleChannel.setSound(null, null);
@@ -375,6 +379,14 @@ public class AuraLiveApp extends Application {
                     bubbleChannel.setAllowBubbles(true);
                 }
                 nm.createNotificationChannel(bubbleChannel);
+                NotificationChannel engageChannel = new NotificationChannel(
+                        com.Dramizo.Series.util.LocalEngagementScheduler.CHANNEL_ID,
+                        getString(R.string.notif_engage_channel),
+                        NotificationManager.IMPORTANCE_DEFAULT);
+                engageChannel.setDescription(getString(R.string.notif_engage_channel_desc));
+                engageChannel.setShowBadge(true);
+                engageChannel.enableVibration(true);
+                nm.createNotificationChannel(engageChannel);
             }
         }
     }

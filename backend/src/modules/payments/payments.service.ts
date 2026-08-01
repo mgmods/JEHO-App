@@ -7,8 +7,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import Stripe from 'stripe';
+import * as crypto from 'crypto';
 import { GoogleAuth } from 'google-auth-library';
 import {
   RechargeOrder,
@@ -17,8 +18,10 @@ import {
 } from '../../database/entities/recharge-order.entity';
 import { PaymentWebhookEvent } from '../../database/entities/payment-webhook-event.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { User } from '../../database/entities/user.entity';
 import { WalletService } from '../wallet/wallet.service';
 import { PaymentSettingsService } from './payment-settings.service';
+import { FourthwallClient } from './fourthwall.client';
 import { STANDARD_RECHARGE_PACKAGES } from '../../common/pricing-catalog';
 import {
   IsInt,
@@ -52,6 +55,18 @@ export class StripeCheckoutDto {
   @IsOptional()
   @IsString()
   cancelUrl?: string;
+}
+
+export class FourthwallCheckoutDto {
+  @ApiProperty({ example: 'coins_70000' })
+  @IsString()
+  @MaxLength(64)
+  sku: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  currency?: string;
 }
 
 export class PaypalCreateDto {
@@ -148,12 +163,15 @@ export class PaymentsService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly dataSource: DataSource,
     @InjectRepository(RechargeOrder)
     private readonly ordersRepo: Repository<RechargeOrder>,
     @InjectRepository(PaymentWebhookEvent)
     private readonly webhookEventsRepo: Repository<PaymentWebhookEvent>,
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
+    @InjectRepository(User)
+    private readonly usersRepo: Repository<User>,
     private readonly walletService: WalletService,
     private readonly paymentSettingsService: PaymentSettingsService,
   ) {
@@ -218,6 +236,895 @@ export class PaymentsService {
     await this.ordersRepo.save(order);
 
     return { order, checkoutUrl: session.url, sessionId: session.id };
+  }
+
+  private async fourthwallClient(): Promise<FourthwallClient> {
+    const cfg = await this.loadFourthwallConfig();
+    return new FourthwallClient(
+      cfg.apiUser,
+      cfg.apiPassword,
+      cfg.storefrontToken,
+      cfg.shopDomain,
+    );
+  }
+
+  private async loadFourthwallConfig(): Promise<{
+    apiUser: string;
+    apiPassword: string;
+    storefrontToken: string;
+    shopDomain: string;
+    webhookSecret: string;
+  }> {
+    const row = await this.settingsRepo.findOne({
+      where: { key: 'fourthwall_config' },
+    });
+    let db: Record<string, any> = {};
+    try {
+      const raw = row?.value as any;
+      db = typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      db = {};
+    }
+    return {
+      apiUser: String(
+        db.apiUser ||
+          this.configService.get<string>('app.fourthwall.apiUser') ||
+          '',
+      ).trim(),
+      apiPassword: String(
+        db.apiPassword ||
+          this.configService.get<string>('app.fourthwall.apiPassword') ||
+          '',
+      ).trim(),
+      storefrontToken: String(
+        db.storefrontToken ||
+          this.configService.get<string>('app.fourthwall.storefrontToken') ||
+          '',
+      ).trim(),
+      shopDomain: String(
+        db.shopDomain ||
+          this.configService.get<string>('app.fourthwall.shopDomain') ||
+          '',
+      ).trim(),
+      webhookSecret: String(
+        db.webhookSecret ||
+          this.configService.get<string>('app.fourthwall.webhookSecret') ||
+          '',
+      ).trim(),
+    };
+  }
+
+  private async ensureFourthwallProviderEnum() {
+    try {
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          ALTER TYPE recharge_orders_provider_enum ADD VALUE IF NOT EXISTS 'fourthwall';
+        EXCEPTION WHEN others THEN
+          BEGIN
+            ALTER TYPE "recharge_orders_provider_enum" ADD VALUE IF NOT EXISTS 'fourthwall';
+          EXCEPTION WHEN others THEN NULL;
+          END;
+        END $$;
+      `);
+    } catch (e) {
+      this.logger.warn(
+        `fourthwall enum ensure skipped: ${(e as Error).message || e}`,
+      );
+    }
+  }
+
+  private async rememberFourthwallVariant(sku: string, variantId: string) {
+    const row = await this.settingsRepo.findOne({
+      where: { key: 'fourthwall_variant_map' },
+    });
+    let map: Record<string, string> = {};
+    try {
+      const raw = row?.value as any;
+      map = typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      map = {};
+    }
+    map[sku] = variantId;
+    const encoded = JSON.stringify(map);
+    if (row) {
+      row.value = encoded;
+      await this.settingsRepo.save(row);
+    } else {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          key: 'fourthwall_variant_map',
+          value: encoded,
+          description: 'Fourthwall variantId per JEHO package SKU',
+        }),
+      );
+    }
+  }
+
+  private claimCodeForOrder(orderId: string): string {
+    return `JEHO-${orderId.replace(/-/g, '').slice(-8).toUpperCase()}`;
+  }
+
+  async createFourthwallCheckout(userId: string, dto: FourthwallCheckoutDto) {
+    await this.ensureFourthwallProviderEnum();
+    const client = await this.fourthwallClient();
+    if (!client.configured) {
+      throw new ServiceUnavailableException(
+        'Fourthwall غير مُعدّ — من لوحة التحكم: الإعدادات → الدفع → Fourthwall',
+      );
+    }
+    const pkg = await this.walletService.resolvePackageBySku(dto.sku);
+    const currency = (dto.currency || 'USD').toUpperCase();
+
+    let product;
+    try {
+      product = await client.ensureCoinPackageProduct({
+        sku: pkg.sku,
+        coins: pkg.coins,
+        bonusCoins: pkg.bonusCoins,
+        priceUsd: Number(pkg.priceUsd),
+      });
+      await this.rememberFourthwallVariant(pkg.sku, product.variantId);
+    } catch (e) {
+      throw new BadRequestException(
+        `تعذر تجهيز باقة البطاقة على Fourthwall: ${(e as Error).message || e}`,
+      );
+    }
+    const variantId = product.variantId;
+
+    // One pending card checkout per user — cancel older open ones.
+    await this.ordersRepo
+      .createQueryBuilder()
+      .update(RechargeOrder)
+      .set({ status: RechargeStatus.CANCELLED })
+      .where('userId = :userId', { userId })
+      .andWhere('provider = :provider', { provider: PaymentProvider.FOURTHWALL })
+      .andWhere('status = :status', { status: RechargeStatus.PENDING })
+      .execute();
+
+    const order = await this.ordersRepo.save(
+      this.ordersRepo.create({
+        userId,
+        sku: pkg.sku,
+        coins: pkg.coins,
+        bonusCoins: pkg.bonusCoins,
+        amountFiat: pkg.priceUsd,
+        currency,
+        provider: PaymentProvider.FOURTHWALL,
+        status: RechargeStatus.PENDING,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      }),
+    );
+    const claimCode = this.claimCodeForOrder(order.id);
+
+    let cart: { id: string };
+    try {
+      cart = await client.createCartWithVariant(variantId, currency);
+    } catch (e) {
+      order.status = RechargeStatus.FAILED;
+      order.providerPayload = {
+        error: (e as Error).message || String(e),
+        variantId,
+        productId: product.productId,
+      };
+      await this.ordersRepo.save(order);
+      throw new BadRequestException(
+        `تعذر إنشاء سلة Fourthwall: ${(e as Error).message || e}`,
+      );
+    }
+
+    let userEmail = '';
+    try {
+      const u = await this.usersRepo.findOne({ where: { id: userId } as any });
+      userEmail = String(u?.email || '').trim().toLowerCase();
+    } catch {
+      userEmail = '';
+    }
+
+    // Prefer cartId + currency=USD so geo local currencies don't confuse the shopper.
+    const checkoutUrl = client.cartHasItems(cart as any)
+      ? client.checkoutUrl(cart.id, currency)
+      : client.checkoutUrlForVariant(variantId, currency);
+    const cartCheckoutUrl = client.checkoutUrl(cart.id, currency);
+    order.providerOrderId = cart.id;
+    order.providerPayload = {
+      cartId: cart.id,
+      variantId,
+      productId: product.productId,
+      claimCode,
+      checkoutUrl,
+      cartCheckoutUrl,
+      cartHasItems: client.cartHasItems(cart as any),
+      userEmail,
+      package: {
+        sku: pkg.sku,
+        coins: pkg.coins,
+        bonusCoins: pkg.bonusCoins,
+        priceUsd: pkg.priceUsd,
+      },
+    };
+    await this.ordersRepo.save(order);
+
+    return {
+      order,
+      checkoutUrl,
+      cartId: cart.id,
+      claimCode,
+      userEmail: userEmail || null,
+    };
+  }
+
+  async getFourthwallAdminSettings() {
+    const cfg = await this.loadFourthwallConfig();
+    const mapRow = await this.settingsRepo.findOne({
+      where: { key: 'fourthwall_variant_map' },
+    });
+    let variantMap: Record<string, string> = {};
+    try {
+      const raw = mapRow?.value as any;
+      variantMap =
+        typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      variantMap = {};
+    }
+    return {
+      apiUserConfigured: !!cfg.apiUser,
+      apiPasswordConfigured: !!cfg.apiPassword,
+      storefrontTokenConfigured: !!cfg.storefrontToken,
+      webhookSecretConfigured: !!cfg.webhookSecret,
+      apiUserHint: cfg.apiUser ? cfg.apiUser.slice(-12) : null,
+      shopDomain: cfg.shopDomain || null,
+      webhookUrl: 'https://api.adnova.bbs.tr/api/v1/payments/fourthwall/webhook',
+      variantMap,
+      configured: !!(
+        cfg.apiUser &&
+        cfg.apiPassword &&
+        cfg.storefrontToken &&
+        cfg.shopDomain
+      ),
+    };
+  }
+
+  async updateFourthwallAdminSettings(body: {
+    apiUser?: string;
+    apiPassword?: string;
+    storefrontToken?: string;
+    shopDomain?: string;
+    webhookSecret?: string;
+    clearApiPassword?: boolean;
+    clearStorefrontToken?: boolean;
+    clearWebhookSecret?: boolean;
+  }) {
+    const row = await this.settingsRepo.findOne({
+      where: { key: 'fourthwall_config' },
+    });
+    let cur: Record<string, any> = {};
+    try {
+      const raw = row?.value as any;
+      cur = typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      cur = {};
+    }
+    if (body.apiUser !== undefined && String(body.apiUser).trim()) {
+      cur.apiUser = String(body.apiUser).trim();
+    }
+    if (body.apiPassword !== undefined && String(body.apiPassword).trim()) {
+      cur.apiPassword = String(body.apiPassword).trim();
+    }
+    if (body.clearApiPassword) cur.apiPassword = '';
+    if (body.storefrontToken !== undefined && String(body.storefrontToken).trim()) {
+      cur.storefrontToken = String(body.storefrontToken).trim();
+    }
+    if (body.clearStorefrontToken) cur.storefrontToken = '';
+    if (body.shopDomain !== undefined && String(body.shopDomain).trim()) {
+      cur.shopDomain = String(body.shopDomain)
+        .trim()
+        .replace(/^https?:\/\//i, '')
+        .replace(/\/+$/, '');
+    }
+    if (body.webhookSecret !== undefined && String(body.webhookSecret).trim()) {
+      cur.webhookSecret = String(body.webhookSecret).trim();
+    }
+    if (body.clearWebhookSecret) cur.webhookSecret = '';
+    cur.updatedAt = new Date().toISOString();
+
+    const encoded = JSON.stringify(cur);
+    if (row) {
+      row.value = encoded;
+      await this.settingsRepo.save(row);
+    } else {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          key: 'fourthwall_config',
+          value: encoded,
+          description: 'Fourthwall card payment credentials',
+        }),
+      );
+    }
+    return this.getFourthwallAdminSettings();
+  }
+
+  /** Sham Cash (Syria): manual account QR + WhatsApp proof — no payment API. */
+  private async loadShamCashConfig(): Promise<{
+    enabled: boolean;
+    whatsapp: string;
+    displayName: string;
+    accountName: string;
+    accountId: string;
+    instructions: string;
+  }> {
+    const row = await this.settingsRepo.findOne({ where: { key: 'sham_cash_config' } });
+    let cur: Record<string, any> = {};
+    try {
+      const raw = row?.value as any;
+      cur = typeof raw === 'string' ? JSON.parse(raw || '{}') : { ...(raw || {}) };
+    } catch {
+      cur = {};
+    }
+    return {
+      enabled: cur.enabled === true || cur.enabled === 'true' || cur.enabled === 1,
+      whatsapp: String(cur.whatsapp || '').trim(),
+      displayName: String(cur.displayName || 'شام كاش').trim() || 'شام كاش',
+      accountName: String(cur.accountName || '').trim(),
+      accountId: String(cur.accountId || cur.iban || cur.accountNumber || '')
+        .trim()
+        .toLowerCase(),
+      instructions: String(cur.instructions || '').trim(),
+    };
+  }
+
+  private async ensureShamCashProviderEnum() {
+    try {
+      await this.dataSource.query(`
+        DO $$ BEGIN
+          ALTER TYPE recharge_orders_provider_enum ADD VALUE IF NOT EXISTS 'sham_cash';
+        EXCEPTION WHEN others THEN
+          BEGIN
+            ALTER TYPE "recharge_orders_provider_enum" ADD VALUE IF NOT EXISTS 'sham_cash';
+          EXCEPTION WHEN others THEN NULL;
+          END;
+        END $$;
+      `);
+    } catch (e) {
+      this.logger.warn(`sham_cash enum ensure skipped: ${(e as Error).message || e}`);
+    }
+  }
+
+  async getShamCashAdminSettings() {
+    const cfg = await this.loadShamCashConfig();
+    const digits = cfg.whatsapp.replace(/\D/g, '');
+    const hasAccount = cfg.accountId.length >= 8;
+    return {
+      enabled: cfg.enabled,
+      whatsapp: cfg.whatsapp,
+      displayName: cfg.displayName,
+      accountName: cfg.accountName,
+      accountId: cfg.accountId,
+      instructions: cfg.instructions,
+      configured: hasAccount && digits.length >= 8,
+    };
+  }
+
+  async updateShamCashAdminSettings(body: {
+    enabled?: boolean;
+    whatsapp?: string;
+    displayName?: string;
+    accountName?: string;
+    accountId?: string;
+    instructions?: string;
+  }) {
+    const cur = await this.loadShamCashConfig();
+    if (body.enabled !== undefined) cur.enabled = !!body.enabled;
+    if (body.whatsapp !== undefined) {
+      cur.whatsapp = String(body.whatsapp || '')
+        .trim()
+        .replace(/[^\d+\s-]/g, '');
+    }
+    if (body.displayName !== undefined) {
+      cur.displayName = String(body.displayName || '').trim() || 'شام كاش';
+    }
+    if (body.accountName !== undefined) {
+      cur.accountName = String(body.accountName || '').trim();
+    }
+    if (body.accountId !== undefined) {
+      cur.accountId = String(body.accountId || '')
+        .trim()
+        .replace(/\s+/g, '')
+        .toLowerCase();
+    }
+    if (body.instructions !== undefined) {
+      cur.instructions = String(body.instructions || '').trim();
+    }
+    const encoded = JSON.stringify({ ...cur, updatedAt: new Date().toISOString() });
+    const row = await this.settingsRepo.findOne({ where: { key: 'sham_cash_config' } });
+    if (row) {
+      row.value = encoded;
+      await this.settingsRepo.save(row);
+    } else {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          key: 'sham_cash_config',
+          value: encoded,
+          description: 'Sham Cash (Syria) account + WhatsApp manual recharge',
+        }),
+      );
+    }
+    return this.getShamCashAdminSettings();
+  }
+
+  /** Public: ready when account id exists (QR). WhatsApp used after payment proof. */
+  async getShamCashPublicConfig() {
+    const cfg = await this.loadShamCashConfig();
+    const hasAccount = cfg.accountId.length >= 8;
+    const digits = cfg.whatsapp.replace(/\D/g, '');
+    return {
+      enabled: hasAccount,
+      whatsapp: digits.length >= 8 ? cfg.whatsapp : '',
+      displayName: cfg.displayName,
+      accountName: cfg.accountName || cfg.displayName,
+      accountId: hasAccount ? cfg.accountId : '',
+      instructions: hasAccount
+        ? cfg.instructions ||
+          'حوّل عبر شام كاش بالمسح أو الرقم، ثم أرسل صورة الإثبات على واتساب.'
+        : '',
+    };
+  }
+
+  async createShamCashOrder(userId: string, dto: { sku: string }) {
+    await this.ensureShamCashProviderEnum();
+    const cfg = await this.loadShamCashConfig();
+    if (cfg.accountId.length < 8) {
+      throw new ServiceUnavailableException(
+        'شام كاش غير مُعدّ — أضف رقم الحساب من لوحة التحكم',
+      );
+    }
+    const pkg = await this.walletService.resolvePackageBySku(dto.sku);
+
+    await this.ordersRepo
+      .createQueryBuilder()
+      .update(RechargeOrder)
+      .set({ status: RechargeStatus.CANCELLED })
+      .where('userId = :userId', { userId })
+      .andWhere('provider = :provider', { provider: PaymentProvider.SHAM_CASH })
+      .andWhere('status = :status', { status: RechargeStatus.PENDING })
+      .execute();
+
+    const order = await this.ordersRepo.save(
+      this.ordersRepo.create({
+        userId,
+        sku: pkg.sku,
+        coins: pkg.coins,
+        bonusCoins: pkg.bonusCoins,
+        amountFiat: pkg.priceUsd,
+        currency: 'USD',
+        provider: PaymentProvider.SHAM_CASH,
+        status: RechargeStatus.PENDING,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        providerPayload: {
+          channel: 'sham_cash',
+          accountId: cfg.accountId,
+          accountName: cfg.accountName || cfg.displayName,
+        },
+      }),
+    );
+    const claimCode = this.claimCodeForOrder(order.id);
+    order.providerOrderId = claimCode;
+    await this.ordersRepo.save(order);
+
+    const digits = cfg.whatsapp.replace(/\D/g, '');
+    return {
+      order: {
+        id: order.id,
+        status: order.status,
+        sku: order.sku,
+        coins: order.coins,
+        bonusCoins: order.bonusCoins,
+        amountFiat: Number(order.amountFiat),
+        claimCode,
+      },
+      payment: {
+        accountId: cfg.accountId,
+        accountName: cfg.accountName || cfg.displayName,
+        displayName: cfg.displayName,
+        whatsapp: digits.length >= 8 ? cfg.whatsapp : '',
+        qrPayload: cfg.accountId,
+        instructions:
+          cfg.instructions ||
+          'حوّل عبر شام كاش ثم أرسل صورة الإثبات على واتساب مع رقم الطلب.',
+      },
+    };
+  }
+
+  async getShamCashOrder(userId: string, orderId: string) {
+    const order = await this.walletService.getOrderForUser(orderId, userId);
+    if (order.provider !== PaymentProvider.SHAM_CASH) {
+      throw new NotFoundException('Order not found');
+    }
+    return {
+      id: order.id,
+      status: order.status,
+      sku: order.sku,
+      coins: order.coins,
+      bonusCoins: order.bonusCoins,
+      amountFiat: Number(order.amountFiat),
+      claimCode: order.providerOrderId || this.claimCodeForOrder(order.id),
+    };
+  }
+
+  async testFourthwallConnection() {
+    const client = await this.fourthwallClient();
+    if (!client.configured) {
+      throw new BadRequestException('Fourthwall credentials incomplete');
+    }
+    const shop = await client.getShop();
+    return {
+      ok: true,
+      name: shop?.name || null,
+      publicDomain: shop?.publicDomain || shop?.domain || null,
+      status: shop?.status || null,
+    };
+  }
+
+  async syncFourthwallPackages() {
+    const client = await this.fourthwallClient();
+    if (!client.configured) {
+      throw new BadRequestException('Fourthwall credentials incomplete');
+    }
+    const results: Array<Record<string, unknown>> = [];
+    for (const pkg of STANDARD_RECHARGE_PACKAGES) {
+      try {
+        const product = await client.ensureCoinPackageProduct({
+          sku: pkg.sku,
+          coins: pkg.coins,
+          bonusCoins: pkg.bonusCoins,
+          priceUsd: pkg.priceUsd,
+        });
+        await this.rememberFourthwallVariant(pkg.sku, product.variantId);
+        results.push({
+          sku: pkg.sku,
+          ok: true,
+          variantId: product.variantId,
+          productId: product.productId,
+          priceUsd: pkg.priceUsd,
+          coins: pkg.coins,
+        });
+      } catch (e) {
+        results.push({
+          sku: pkg.sku,
+          ok: false,
+          error: (e as Error).message || String(e),
+        });
+      }
+    }
+    return { items: results };
+  }
+
+  async getFourthwallOrderStatus(userId: string, orderId: string) {
+    const order = await this.ordersRepo.findOne({ where: { id: orderId } });
+    if (!order || order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
+    if (order.provider !== PaymentProvider.FOURTHWALL) {
+      throw new BadRequestException('Not a Fourthwall order');
+    }
+    return {
+      id: order.id,
+      status: order.status,
+      sku: order.sku,
+      coins: order.coins,
+      bonusCoins: order.bonusCoins,
+      amountFiat: order.amountFiat,
+      currency: order.currency,
+      claimCode: this.claimCodeForOrder(order.id),
+      checkoutUrl: (order.providerPayload as any)?.checkoutUrl || null,
+      completedAt: order.completedAt,
+    };
+  }
+
+  async handleFourthwallWebhook(rawBody: Buffer, signatureHeader?: string) {
+    const cfg = await this.loadFourthwallConfig();
+    const secret = cfg.webhookSecret || '';
+    if (secret) {
+      const expected = crypto
+        .createHmac('sha256', secret)
+        .update(rawBody)
+        .digest('base64');
+      const given = String(signatureHeader || '').trim();
+      const ok =
+        !!given &&
+        given.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+      if (!ok) {
+        this.logger.warn('Fourthwall webhook signature mismatch');
+        throw new BadRequestException('Invalid Fourthwall signature');
+      }
+    } else {
+      this.logger.warn(
+        'Fourthwall webhook secret missing — accepting unsigned (set in dashboard)',
+      );
+    }
+
+    let event: any;
+    try {
+      event = JSON.parse(rawBody.toString('utf8'));
+    } catch {
+      throw new BadRequestException('Invalid JSON');
+    }
+
+    const type = String(event?.type || '');
+    await this.webhookEventsRepo.save(
+      this.webhookEventsRepo.create({
+        provider: 'fourthwall',
+        eventId: String(event?.id || `${type}-${Date.now()}`),
+        eventType: type || 'unknown',
+        payload: event,
+      } as any),
+    ).catch(() => undefined);
+
+    if (type !== 'ORDER_PLACED' && type !== 'ORDER_UPDATED') {
+      return { received: true, type, credited: false };
+    }
+
+    let data = (event?.data || {}) as Record<string, any>;
+    // ORDER_UPDATED nests the order under data.order
+    if (data && data.order && typeof data.order === 'object') {
+      data = { ...data.order, update: data.update, checkoutId: data.order.checkoutId || data.checkoutId };
+    }
+    const fwId = String(data.id || data.orderId || '');
+    if (fwId) {
+      try {
+        const client = await this.fourthwallClient();
+        if (client.configured) {
+          const full = await client.getOrder(fwId);
+          if (full && typeof full === 'object') {
+            data = { ...full, ...data };
+          }
+        }
+      } catch (e) {
+        this.logger.warn(
+          `Fourthwall getOrder enrich failed: ${(e as Error).message || e}`,
+        );
+      }
+    }
+    const credited = await this.creditFourthwallOrder(data);
+    return { received: true, type, credited };
+  }
+
+  private async creditFourthwallOrder(
+    data: Record<string, any>,
+  ): Promise<boolean> {
+    const fwOrderId = String(data.id || data.orderId || '');
+    const blob = JSON.stringify(data).toUpperCase();
+    const claimMatch = blob.match(/JEHO-[A-Z0-9]{6,12}/);
+    const claimCode = claimMatch ? claimMatch[0] : '';
+    const skuFromDesc = (() => {
+      const m = JSON.stringify(data).match(/JEHO_SKU:([a-zA-Z0-9_\-]+)/i);
+      return m ? m[1] : '';
+    })();
+    const friendlyId = String(data.friendlyId || data.number || '').trim();
+    const checkoutId = String(
+      data.checkoutId || data.checkout?.id || '',
+    ).trim();
+
+    const offers: any[] = Array.isArray(data.offers)
+      ? data.offers
+      : Array.isArray(data.items)
+        ? data.items
+        : [];
+    const variantIds = offers
+      .map(
+        (o) =>
+          o?.variant?.id ||
+          o?.variantId ||
+          o?.offerVariantId ||
+          o?.variant?.uuid,
+      )
+      .filter(Boolean)
+      .map(String);
+    const variantSkus = offers
+      .map((o) => o?.variant?.sku || o?.sku)
+      .filter(Boolean)
+      .map(String);
+
+    let order: RechargeOrder | null = null;
+
+    // 0) Already credited for this Fourthwall order / friendly id
+    if (fwOrderId || friendlyId) {
+      const existing = await this.ordersRepo.findOne({
+        where: [
+          ...(fwOrderId
+            ? [{ providerPaymentId: fwOrderId, provider: PaymentProvider.FOURTHWALL } as any]
+            : []),
+          ...(friendlyId
+            ? [{ providerPaymentId: friendlyId, provider: PaymentProvider.FOURTHWALL } as any]
+            : []),
+        ],
+      });
+      if (existing?.status === RechargeStatus.COMPLETED) return true;
+    }
+
+    // 1) cartId stored as providerOrderId (primary — no user note needed)
+    const cartId = String(
+      data.cartId ||
+        data.cart?.id ||
+        data.checkout?.cartId ||
+        data.checkoutCartId ||
+        '',
+    );
+    if (cartId) {
+      order = await this.ordersRepo.findOne({
+        where: {
+          provider: PaymentProvider.FOURTHWALL,
+          providerOrderId: cartId,
+          status: RechargeStatus.PENDING,
+        },
+      });
+      if (!order) {
+        const recent = await this.ordersRepo.find({
+          where: {
+            provider: PaymentProvider.FOURTHWALL,
+            status: RechargeStatus.PENDING,
+          },
+          order: { createdAt: 'DESC' },
+          take: 40,
+        });
+        order =
+          recent.find((o) => {
+            const p = (o.providerPayload || {}) as Record<string, any>;
+            return String(p.cartId || '') === cartId;
+          }) || null;
+      }
+    }
+
+    // 1b) checkoutId stored in payload after redirect / enrich
+    if (!order && checkoutId) {
+      const recent = await this.ordersRepo.find({
+        where: {
+          provider: PaymentProvider.FOURTHWALL,
+          status: RechargeStatus.PENDING,
+        },
+        order: { createdAt: 'DESC' },
+        take: 40,
+      });
+      order =
+        recent.find((o) => {
+          const p = (o.providerPayload || {}) as Record<string, any>;
+          return String(p.checkoutId || '') === checkoutId;
+        }) || null;
+    }
+
+    // 2) Claim code if present anywhere in payload
+    if (!order && claimCode) {
+      const suffix = claimCode.replace(/^JEHO-/i, '').toLowerCase();
+      const candidates = await this.ordersRepo.find({
+        where: {
+          provider: PaymentProvider.FOURTHWALL,
+          status: RechargeStatus.PENDING,
+        },
+        order: { createdAt: 'DESC' },
+        take: 80,
+      });
+      order =
+        candidates.find((o) =>
+          o.id.replace(/-/g, '').toLowerCase().endsWith(suffix),
+        ) || null;
+    }
+
+    // 3) Email match + pending (Google account email when autofilled)
+    if (!order) {
+      const email = String(
+        data.email ||
+          data.customer?.email ||
+          data.supporter?.email ||
+          data.username ||
+          '',
+      )
+        .trim()
+        .toLowerCase();
+      if (email.includes('@')) {
+        const user = await this.usersRepo.findOne({ where: { email } as any });
+        if (user) {
+          const pending = await this.ordersRepo.find({
+            where: {
+              userId: user.id,
+              provider: PaymentProvider.FOURTHWALL,
+              status: RechargeStatus.PENDING,
+            },
+            order: { createdAt: 'DESC' },
+            take: 5,
+          });
+          order = pending[0] || null;
+        }
+      }
+    }
+
+    // 4) SKU from product description JEHO_SKU:coins_10000 (most reliable for digital)
+    if (!order && skuFromDesc) {
+      const hourAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const pending = await this.ordersRepo
+        .createQueryBuilder('o')
+        .where('o.provider = :p', { provider: PaymentProvider.FOURTHWALL })
+        .andWhere('o.status = :s', { status: RechargeStatus.PENDING })
+        .andWhere('o.sku = :sku', { sku: skuFromDesc })
+        .andWhere('o.createdAt >= :since', { since: hourAgo })
+        .orderBy('o.createdAt', 'DESC')
+        .getMany();
+      if (pending.length === 1) order = pending[0];
+      else if (pending.length > 1) {
+        const total = Number(data?.amounts?.total?.value ?? data?.total ?? NaN);
+        const byAmount = Number.isFinite(total)
+          ? pending.filter((o) => Math.abs(Number(o.amountFiat) - total) < 0.02)
+          : [];
+        if (byAmount.length === 1) order = byAmount[0];
+        else order = pending[0];
+      }
+    }
+
+    // 5) Single recent pending matching mapped variant
+    if (!order && variantIds.length) {
+      const mapSetting = await this.settingsRepo.findOne({
+        where: { key: 'fourthwall_variant_map' },
+      });
+      let map: Record<string, string> = {};
+      try {
+        const raw =
+          (mapSetting?.value as any) ||
+          this.configService.get<string>('app.fourthwall.variantMapJson') ||
+          '{}';
+        map = typeof raw === 'string' ? JSON.parse(raw) : (raw as any);
+      } catch {
+        map = {};
+      }
+      const skus = Object.entries(map)
+        .filter(([, v]) => variantIds.includes(String(v)))
+        .map(([k]) => k);
+      if (skus.length) {
+        const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        const allPending = await this.ordersRepo
+          .createQueryBuilder('o')
+          .where('o.provider = :p', { provider: PaymentProvider.FOURTHWALL })
+          .andWhere('o.status = :s', { status: RechargeStatus.PENDING })
+          .andWhere('o.sku = :sku', { sku: skus[0] })
+          .andWhere('o.createdAt >= :since', { since: hourAgo })
+          .orderBy('o.createdAt', 'DESC')
+          .getMany();
+        if (allPending.length >= 1) order = allPending[0];
+      }
+    }
+
+    if (!order) {
+      this.logger.warn(
+        `Fourthwall order unmatched fw=${fwOrderId} cart=${cartId} claim=${claimCode} sku=${skuFromDesc} variants=${variantIds.join(',')}`,
+      );
+      return false;
+    }
+
+    if (order.status === RechargeStatus.COMPLETED) return true;
+
+    const paymentRef =
+      friendlyId ||
+      fwOrderId ||
+      String(order.providerOrderId || '');
+    order.providerPaymentId = paymentRef.slice(0, 240);
+    order.providerPayload = {
+      ...(order.providerPayload || {}),
+      webhook: {
+        fwOrderId,
+        friendlyId,
+        checkoutId,
+        cartId,
+        claimCode,
+        skuFromDesc,
+        variantIds,
+        variantSkus,
+        at: new Date().toISOString(),
+      },
+    };
+    await this.ordersRepo.save(order);
+    await this.walletService.completeRecharge(order.id, paymentRef);
+    this.logger.log(
+      `Fourthwall credited order=${order.id} user=${order.userId} coins=${order.coins} ref=${paymentRef}`,
+    );
+    return true;
   }
 
   async handleStripeWebhook(rawBody: Buffer, signature: string) {

@@ -16,7 +16,7 @@ import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Gift } from '../../database/entities/gift.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
-import { RechargeOrder } from '../../database/entities/recharge-order.entity';
+import { RechargeOrder, RechargeStatus } from '../../database/entities/recharge-order.entity';
 import { WithdrawRequest, WithdrawStatus } from '../../database/entities/withdraw-request.entity';
 import {
   Report,
@@ -1433,11 +1433,48 @@ export class AdminService {
         ...r,
         userName: r.user?.displayName || r.user?.username || '—',
         coins: r.coins ?? r.coinAmount ?? 0,
+        providerLabel:
+          r.provider === 'sham_cash'
+            ? 'شام كاش'
+            : r.provider === 'fourthwall'
+              ? 'بطاقة'
+              : r.provider,
       })),
       total,
       query.page || 1,
       query.limit || 20,
     );
+  }
+
+  async completeRechargeOrder(orderId: string, providerPaymentId?: string, note?: string) {
+    const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('طلب الشحن غير موجود');
+    if (order.status !== RechargeStatus.PENDING) {
+      throw new BadRequestException('الطلب ليس معلّقاً');
+    }
+    const completed = await this.walletService.completeRecharge(
+      orderId,
+      providerPaymentId || `admin_confirm_${Date.now()}`,
+    );
+    if (note) {
+      completed.providerPayload = {
+        ...(completed.providerPayload || {}),
+        adminNote: note,
+        confirmedAt: new Date().toISOString(),
+      };
+      await this.rechargeRepo.save(completed);
+    }
+    return completed;
+  }
+
+  async cancelRechargeOrder(orderId: string) {
+    const order = await this.rechargeRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('طلب الشحن غير موجود');
+    if (order.status !== RechargeStatus.PENDING) {
+      throw new BadRequestException('الطلب ليس معلّقاً');
+    }
+    order.status = RechargeStatus.CANCELLED;
+    return this.rechargeRepo.save(order);
   }
 
   listRechargePackages() {

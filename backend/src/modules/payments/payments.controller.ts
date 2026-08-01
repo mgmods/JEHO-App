@@ -42,6 +42,8 @@ import {
 
   BinanceWalletOrderDto,
 
+  FourthwallCheckoutDto,
+
 } from './payments.service';
 
 import { CurrentUser, Public } from '../../common/decorators';
@@ -67,6 +69,64 @@ export class PaymentsController {
   stripeCheckout(@CurrentUser('sub') userId: string, @Body() dto: StripeCheckoutDto) {
 
     return this.paymentsService.createStripeCheckout(userId, dto);
+
+  }
+
+
+
+  @Post('fourthwall/checkout')
+
+  @ApiOperation({ summary: 'Create Fourthwall card checkout (hosted)' })
+
+  fourthwallCheckout(
+
+    @CurrentUser('sub') userId: string,
+
+    @Body() dto: FourthwallCheckoutDto,
+
+  ) {
+
+    return this.paymentsService.createFourthwallCheckout(userId, dto);
+
+  }
+
+
+
+  @Public()
+
+  @Post('fourthwall/webhook')
+
+  @ApiExcludeEndpoint()
+
+  fourthwallWebhook(
+
+    @Req() req: RawBodyRequest<Request>,
+
+    @Headers('x-fourthwall-hmac-sha256') signature: string,
+
+  ) {
+
+    const raw = req.rawBody || Buffer.from(JSON.stringify(req.body ?? {}));
+
+    return this.paymentsService.handleFourthwallWebhook(raw, signature || '');
+
+  }
+
+
+
+  @Get('fourthwall/orders/:id')
+
+  @ApiOperation({ summary: 'Poll Fourthwall recharge order status' })
+
+  fourthwallStatus(
+
+    @CurrentUser('sub') userId: string,
+
+    @Param('id', ParseUUIDPipe) id: string,
+
+  ) {
+
+    return this.paymentsService.getFourthwallOrderStatus(userId, id);
 
   }
 
@@ -254,6 +314,24 @@ export class PaymentsController {
 
     return this.paymentsService.getBinanceOrderStatus(userId, id);
 
+  }
+
+  @Post('sham-cash/orders')
+  @ApiOperation({ summary: 'Create pending Sham Cash order (manual QR + WhatsApp proof)' })
+  shamCashOrder(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { sku: string },
+  ) {
+    return this.paymentsService.createShamCashOrder(userId, body);
+  }
+
+  @Get('sham-cash/orders/:id')
+  @ApiOperation({ summary: 'Get Sham Cash order status (owner only)' })
+  shamCashStatus(
+    @CurrentUser('sub') userId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.paymentsService.getShamCashOrder(userId, id);
   }
 
 }

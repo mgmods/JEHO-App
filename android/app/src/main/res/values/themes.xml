@@ -39,12 +39,24 @@
         <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
     </style>
 
+    <style name="TextAppearance.AuraLive.PopupMenuItem" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textColor">#FF111827</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
     <style name="ThemeOverlay.AuraLive.PopupMenu" parent="ThemeOverlay.Material3">
+        <item name="popupMenuStyle">@style/Widget.AuraLive.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Widget.AuraLive.PopupMenu</item>
         <item name="colorSurface">@color/white</item>
-        <item name="colorOnSurface">@android:color/black</item>
-        <item name="android:textColorPrimary">@android:color/black</item>
-        <item name="android:textColor">@android:color/black</item>
+        <item name="colorOnSurface">#FF111827</item>
+        <item name="colorOnBackground">#FF111827</item>
         <item name="android:colorBackground">@color/white</item>
+        <item name="android:textColorPrimary">#FF111827</item>
+        <item name="android:textColorSecondary">#FF374151</item>
+        <item name="android:textColor">#FF111827</item>
+        <item name="android:itemTextAppearance">@style/TextAppearance.AuraLive.PopupMenuItem</item>
+        <item name="textAppearanceLargePopupMenu">@style/TextAppearance.AuraLive.PopupMenuItem</item>
+        <item name="textAppearanceSmallPopupMenu">@style/TextAppearance.AuraLive.PopupMenuItem</item>
     </style>
 
     <style name="Theme.AuraLive.Splash" parent="Theme.AuraLive">

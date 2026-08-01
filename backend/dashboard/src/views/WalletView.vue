@@ -201,12 +201,12 @@
           <thead>
             <tr>
               <th v-for="h in headers" :key="h">{{ h }}</th>
-              <th v-if="tab === 'withdraws'"></th>
+              <th v-if="tab === 'withdraws' || tab === 'recharges'"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!rows.length">
-              <td :colspan="headers.length + (tab === 'withdraws' ? 1 : 0)" class="empty-state">{{ t('common.noRecords') }}</td>
+              <td :colspan="headers.length + (tab === 'withdraws' || tab === 'recharges' ? 1 : 0)" class="empty-state">{{ t('common.noRecords') }}</td>
             </tr>
 
             <template v-if="tab === 'transactions'">
@@ -259,9 +259,22 @@
                   {{ formatNumber(r.coins ?? r.credits ?? 0) }}
                   <span v-if="r.bonusCoins" class="text-success small"> +{{ formatNumber(r.bonusCoins) }}</span>
                 </td>
-                <td>{{ r.provider || r.gateway || '—' }}</td>
+                <td>{{ r.providerLabel || r.provider || r.gateway || '—' }}</td>
                 <td><StatusBadge :status="r.status || 'completed'" /></td>
                 <td>{{ formatDate(r.createdAt) }}</td>
+                <td class="text-end">
+                  <div
+                    class="action-btns justify-content-end"
+                    v-if="tab === 'recharges' && (r.status || '').toLowerCase() === 'pending'"
+                  >
+                    <button class="btn btn-sm btn-outline-success" type="button" @click="approveRecharge(r)">
+                      تأكيد الشحن
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" type="button" @click="cancelRecharge(r)">
+                      إلغاء
+                    </button>
+                  </div>
+                </td>
               </tr>
             </template>
           </tbody>
@@ -587,6 +600,32 @@ async function approve(r) {
     toast().danger(err.message)
   } else {
     success.value = t('wallet.withdrawPaid')
+    toast().success(success.value)
+    await load()
+  }
+}
+
+async function approveRecharge(r) {
+  const { error: err } = await walletApi.completeRecharge(r.id, {
+    note: 'تأكيد يدوي بعد إثبات شام كاش / تحويل',
+  })
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    success.value = 'تم شحن الكوينز للمستخدم'
+    toast().success(success.value)
+    await load()
+  }
+}
+
+async function cancelRecharge(r) {
+  const { error: err } = await walletApi.cancelRecharge(r.id)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    success.value = 'تم إلغاء الطلب'
     toast().success(success.value)
     await load()
   }

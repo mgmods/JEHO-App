@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>عارض SVGA — JEHO</title>
+  <style>
+    :root {
+      --bg: #0f1218;
+      --panel: #1a2030;
+      --text: #e8ecf4;
+      --muted: #9aa3b5;
+      --accent: #3d8bfd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: radial-gradient(1200px 600px at 70% -10%, #1c2a44, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.4rem; }
+    p { color: var(--muted); margin: 0 0 20px; line-height: 1.6; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+    button, label.btn {
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    input[type="file"] { display: none; }
+    .stage {
+      width: min(420px, 100%);
+      aspect-ratio: 1;
+      background: #000;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #2a3348;
+      display: grid;
+      place-items: center;
+    }
+    canvas { width: 100%; height: 100%; }
+    .meta {
+      margin-top: 14px;
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      color: #c7d2e5;
+      max-width: 640px;
+    }
+    .hint { font-size: 0.92rem; }
+  </style>
+</head>
+<body>
+  <h1>عارض إطارات SVGA</h1>
+  <p class="hint">
+    ملف <code>.svga</code> مو كود نصي — هو أنيميشن مضغوط.
+    اختر الملف من جهازك وشوف الحركة هنا. لو تبي تشوف الصور كفريمات منفصلة استخدم
+    <code>python tools/svga-viewer/extract_svga.py</code>
+  </p>
+
+  <div class="row">
+    <label class="btn">
+      اختر ملف SVGA
+      <input id="file" type="file" accept=".svga,application/octet-stream" />
+    </label>
+    <button type="button" id="stop">إيقاف</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="canvas" width="300" height="300"></canvas>
+  </div>
+  <div class="meta" id="meta">ما في ملف بعد…</div>
+
+  <script type="module">
+    import { Parser, Player } from 'https://unpkg.com/svga@2.1.1/dist/index.min.js'
+
+    const canvas = document.getElementById('canvas')
+    const meta = document.getElementById('meta')
+    const fileInput = document.getElementById('file')
+    let player = null
+    let parser = null
+
+    function stop() {
+      try { player?.stop?.(); player?.destroy?.() } catch {}
+      try { parser?.destroy?.() } catch {}
+      player = null
+      parser = null
+    }
+
+    async function playBlob(blob, label) {
+      stop()
+      const url = URL.createObjectURL(blob)
+      meta.textContent = `تحميل: ${label}…`
+      try {
+        parser = new Parser({ isDisableWebWorker: true })
+        const videoItem = await parser.load(url)
+        player = new Player({ container: canvas, loop: 0 })
+        await player.mount(videoItem)
+        player.start()
+        const size = videoItem?.size || videoItem?.videoSize || {}
+        meta.textContent =
+          `الملف: ${label}\n` +
+          `حجم الملف: ${(blob.size / 1024).toFixed(1)} KB\n` +
+          `مقاس: ${size?.width || videoItem?.width || '?'} × ${size?.height || videoItem?.height || '?'}\n` +
+          `FPS: ${videoItem?.fps ?? '?'}\n` +
+          `Frames: ${videoItem?.frames ?? '?'}\n` +
+          `ملاحظة: هذا أنيميشن جاهز، مو سورس كود SVG.`
+      } catch (err) {
+        meta.textContent = `فشل التشغيل: ${err?.message || err}`
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+
+    fileInput.addEventListener('change', async () => {
+      const f = fileInput.files?.[0]
+      if (!f) return
+      await playBlob(f, f.name)
+    })
+
+    document.getElementById('stop').addEventListener('click', stop)
+  </script>
+</body>
+</html>

@@ -80,6 +80,7 @@
         <activity
             android:name=".presentation.voiceroom.VoiceRoomActivity"
             android:exported="false"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AuraLive.Fullscreen"
             android:windowSoftInputMode="adjustResize" />
@@ -127,6 +128,15 @@
         <activity android:name=".presentation.cosmetics.CosmeticsActivity" android:exported="false" />
         <activity android:name=".presentation.web.PromoWebActivity" android:exported="false" />
         <activity android:name=".presentation.wallet.BagActivity" android:exported="false" />
+        <activity android:name=".presentation.wallet.RechargePaymentActivity" android:exported="false" />
+        <activity
+            android:name=".presentation.wallet.ShamCashCheckoutActivity"
+            android:exported="false" />
+        <activity
+            android:name=".presentation.wallet.CardCheckoutActivity"
+            android:exported="false"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".presentation.wallet.WalletBillsActivity" android:exported="false" />
         <activity android:name=".presentation.wallet.RechargeAgentDirectoryActivity" android:exported="false" />
         <activity android:name=".presentation.wallet.RechargeAgentActivity" android:exported="false" />
@@ -183,7 +193,7 @@
             android:value="auralive_default" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_notification" />
+            android:resource="@drawable/ic_stat_jeho" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/aurora_teal" />

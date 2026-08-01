@@ -87,7 +87,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/menu"
             android:padding="8dp"
-            android:src="@drawable/p2p_more_dark"
+            android:src="@drawable/ic_music_more"
             app:tint="@color/text_secondary" />
     </LinearLayout>
 </LinearLayout>

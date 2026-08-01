@@ -12,6 +12,21 @@
         android:scaleType="centerCrop"
         android:src="@drawable/bg_mikoo_page" />
 
+    <!-- Always-visible pencil: open edit profile (top-end corner). -->
+    <ImageView
+        android:id="@+id/btnEditProfileIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="42dp"
+        android:layout_marginEnd="14dp"
+        android:background="@drawable/bg_profile_edit_fab"
+        android:contentDescription="@string/edit_profile"
+        android:elevation="4dp"
+        android:padding="9dp"
+        android:src="@drawable/ic_event_edit"
+        app:tint="@color/text_primary" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -373,7 +388,6 @@
                 android:layout_marginHorizontal="16dp"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_wallet_section"
-                android:elevation="2dp"
                 android:foreground="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:minHeight="64dp"

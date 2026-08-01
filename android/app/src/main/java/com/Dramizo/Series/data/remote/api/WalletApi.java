@@ -42,6 +42,22 @@ public interface WalletApi {
     Call<ApiResponse<WalletDtos.BinanceWalletOrderResult>> createBinancePayOrder(
             @Body WalletDtos.BinancePayCreateRequest body);
 
+    @POST("payments/fourthwall/checkout")
+    Call<ApiResponse<WalletDtos.FourthwallCheckoutResult>> createFourthwallCheckout(
+            @Body WalletDtos.FourthwallCheckoutRequest body);
+
+    @GET("payments/fourthwall/orders/{id}")
+    Call<ApiResponse<WalletDtos.FourthwallOrderStatus>> fourthwallOrderStatus(
+            @retrofit2.http.Path("id") String id);
+
+    @POST("payments/sham-cash/orders")
+    Call<ApiResponse<WalletDtos.ShamCashOrderResult>> createShamCashOrder(
+            @Body java.util.Map<String, Object> body);
+
+    @GET("payments/sham-cash/orders/{id}")
+    Call<ApiResponse<WalletDtos.ShamCashOrderInfo>> shamCashOrderStatus(
+            @retrofit2.http.Path("id") String id);
+
     @GET("payments/binance-pay/orders/{id}")
     Call<ApiResponse<WalletDtos.BinanceWalletStatusResult>> binancePayOrderStatus(
             @retrofit2.http.Path("id") String id);

@@ -182,38 +182,7 @@ export class RoomCupController implements OnModuleInit {
           );
         }
       }
-      // Optional VIP prize: { "vipLevel": 3 } or { "vipPlanId": "uuid" }
-      const vipPlanId = String(prize.vipPlanId || '').trim();
-      const vipLevel = Math.max(0, Math.floor(Number(prize.vipLevel) || 0));
-      if (vipPlanId || vipLevel > 0) {
-        let plan = vipPlanId
-          ? await this.vipPlansRepo.findOne({ where: { id: vipPlanId } })
-          : null;
-        if (!plan && vipLevel > 0) {
-          plan = await this.vipPlansRepo.findOne({
-            where: { level: vipLevel, isActive: true },
-          });
-        }
-        if (!plan && vipLevel > 0) {
-          plan = await this.vipPlansRepo.findOne({ where: { level: vipLevel } });
-        }
-        if (plan) {
-          await this.userVipRepo.update({ userId: hostId, isActive: true }, { isActive: false });
-          const startsAt = new Date();
-          const days = Math.max(1, Math.floor(Number(prize.vipDays) || 30));
-          const expiresAt = new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
-          await this.userVipRepo.save(
-            this.userVipRepo.create({
-              userId: hostId,
-              vipPlanId: plan.id,
-              level: plan.level,
-              startsAt,
-              expiresAt,
-              isActive: true,
-            }),
-          );
-        }
-      }
+      // VIP is purchase-only — ignore vipLevel / vipPlanId prizes from room cup.
     }
 
     await this.settingsRepo.save(

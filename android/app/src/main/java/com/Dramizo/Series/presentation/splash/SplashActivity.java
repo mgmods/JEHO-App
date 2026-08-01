@@ -234,10 +234,21 @@ public class SplashActivity extends ThemedActivity {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
+        // Resume voice room after process death / launcher reopen when still in a room.
+        String activeRoom = null;
+        try {
+            activeRoom = com.Dramizo.Series.service.VoiceRoomForegroundService.activeRoomId(this);
+        } catch (Exception ignored) {
+        }
+        if ((pendingRoomId == null || pendingRoomId.isEmpty())
+                && activeRoom != null && !activeRoom.isEmpty()) {
+            pendingRoomId = activeRoom;
+        }
         if (pendingRoomId != null && !pendingRoomId.isEmpty()) {
             Intent i = new Intent(this, VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoomId);
             i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+            i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             putPendingExtras(i);
             startActivity(i);
         } else {

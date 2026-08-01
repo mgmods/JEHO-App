@@ -159,7 +159,7 @@ public final class AuraNotificationHelper {
         // Custom RemoteViews only: one avatar inside the layout.
         // No setLargeIcon / no DecoratedCustomViewStyle — those duplicate the photo / app icon.
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.drawable.ic_notification)
+                .setSmallIcon(R.drawable.ic_stat_jeho)
                 .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
                 .setContentTitle(title)
                 .setContentText(body)

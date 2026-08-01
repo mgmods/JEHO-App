@@ -1669,7 +1669,7 @@
             android:layout_height="48dp"
             android:layout_gravity="center"
             android:background="@drawable/bg_task_float_circle"
-            android:elevation="2dp">
+           >
 
             <ImageView
                 android:id="@+id/imgTaskFloat"

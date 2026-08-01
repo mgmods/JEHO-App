@@ -462,8 +462,8 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   /**
-   * VIP is 1..100, while visual asset families are 10 tiers.
-   * Map each 10 VIP levels to one visual tier (1..10), then grant + equip.
+   * VIP plans are 1..100; Mikoo visual frames/medals are VIP1–7 only.
+   * Map plan level → visual tier 1..7 (same as vipMedalTier), then grant + equip.
    */
   async grantVipAristocracyBundle(userId: string, vipLevel: number) {
     const vip = Math.min(100, Math.max(1, Math.floor(Number(vipLevel) || 1)));
@@ -508,8 +508,8 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   private vipVisualTier(vipLevel: number): number {
-    const vip = Math.min(100, Math.max(1, Math.floor(Number(vipLevel) || 1)));
-    return Math.min(10, Math.max(1, Math.ceil(vip / 10)));
+    // VIP1→frame1 … VIP7→frame7; VIP8+ keep the top VIP7 frame.
+    return Math.min(7, Math.max(1, Math.floor(Number(vipLevel) || 1)));
   }
 
   private async ensureOwned(userId: string, cosmeticId: string) {
@@ -599,6 +599,10 @@ export class CosmeticsService implements OnModuleInit {
           }
           continue;
         }
+        // Keep explicit catalog prices for VIP beast / S2 frames.
+        if (c.meta && (c.meta as any).pricedMall) {
+          continue;
+        }
         const tier = Math.min(ladder.length - 1, i % ladder.length);
         // Spread longer catalogs across the ladder by index bucket
         const bucket = list.length <= ladder.length
@@ -633,6 +637,8 @@ export class CosmeticsService implements OnModuleInit {
 
   /** VIP plan unlocks only — not mall SKUs that happen to contain "_vip_". */
   private isAristocracyFree(c: Cosmetic): boolean {
+    // Explicit mall-priced VIP/S2 frames stay paid even if also VIP-grantable.
+    if (c.meta && (c.meta as any).pricedMall) return false;
     if (c.meta && (c.meta as any).aristocracy) return true;
     const code = String(c.code || '');
     return /^(vip\d+|level_vip_\d+|host_vip_\d+|frame_vip_\d+|toast_vip_\d+|entry_vip_\d+|card_vip_\d+)$/i.test(
@@ -1115,6 +1121,14 @@ export class CosmeticsService implements OnModuleInit {
       }
       if (existing.sortOrder !== sortOrder) {
         existing.sortOrder = sortOrder;
+        dirty = true;
+      }
+      if (Number(existing.minVipLevel || 0) !== minVipLevel) {
+        existing.minVipLevel = minVipLevel;
+        dirty = true;
+      }
+      if (Number(existing.minUserLevel || 0) !== minUserLevel) {
+        existing.minUserLevel = minUserLevel;
         dirty = true;
       }
       if (!existing.isActive) {

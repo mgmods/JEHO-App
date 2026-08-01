@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
@@ -24,6 +24,7 @@ export class PurchaseVipDto {
 
 @Injectable()
 export class VipService {
+  private readonly logger = new Logger(VipService.name);
   private static readonly MAX_VIP_LEVEL = 100;
 
   /** Hard progression curve so VIP100 stays elite. */
@@ -167,36 +168,21 @@ export class VipService {
     return { ...result, cosmetics };
   }
 
-  /** Contest / host-target / task prize — grant VIP for N days without charging coins. */
+  /**
+   * Free VIP grants are disabled — VIP is purchase-only.
+   * Callers (tasks / host-target) may still invoke; we no-op safely.
+   */
   async grantTemporaryVip(userId: string, level: number, days: number) {
-    await this.ensurePlans();
-    const lvl = Math.max(1, Math.min(VipService.MAX_VIP_LEVEL, Math.floor(Number(level) || 1)));
-    const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
-    const plan = await this.plansRepo.findOne({ where: { level: lvl, isActive: true } });
-    if (!plan) throw new NotFoundException(`VIP plan ${lvl} not found`);
-
-    await this.userVipsRepo.update({ userId, isActive: true }, { isActive: false });
-    const startsAt = new Date();
-    const expiresAt = new Date(startsAt.getTime() + daysSafe * 24 * 60 * 60 * 1000);
-    const userVip = await this.userVipsRepo.save(
-      this.userVipsRepo.create({
-        userId,
-        vipPlanId: plan.id,
-        level: plan.level,
-        startsAt,
-        expiresAt,
-        isActive: true,
-      }),
+    this.logger.warn(
+      `Blocked free VIP grant user=${userId} level=${level} days=${days} (VIP is purchase-only)`,
     );
-
-    let cosmetics: unknown = null;
-    if (this.cosmetics) {
-      try {
-        cosmetics = await this.cosmetics.grantVipAristocracyBundle(userId, plan.level);
-      } catch {
-        cosmetics = { error: 'cosmetics_grant_failed' };
-      }
-    }
-    return { userVip, plan, days: daysSafe, cosmetics };
+    return {
+      blocked: true,
+      reason: 'vip_purchase_only',
+      userId,
+      level: Math.max(0, Math.floor(Number(level) || 0)),
+      days: Math.max(0, Math.floor(Number(days) || 0)),
+      cosmetics: null,
+    };
   }
 }

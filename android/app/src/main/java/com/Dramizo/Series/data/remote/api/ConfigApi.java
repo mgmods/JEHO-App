@@ -31,6 +31,9 @@ public interface ConfigApi {
     @GET("config/support")
     Call<ApiResponse<MiscDtos.SupportConfigDto>> support();
 
+    @GET("config/sham-cash")
+    Call<ApiResponse<MiscDtos.ShamCashConfigDto>> shamCash();
+
     @POST("translate")
     Call<ApiResponse<Map<String, Object>>> translate(@Body Map<String, String> body);
 }

@@ -66,8 +66,18 @@ public class ZegoEngineManager {
         default void onPlayerState(String streamId, int state, int errorCode) {}
     }
 
+    /** Fired when host-mixed MediaPlayer reaches PLAY_ENDED (YouTube/local mix). */
+    public interface LocalMusicEndListener {
+        void onLocalMusicEnded();
+    }
+
     private final CopyOnWriteArrayList<RoomListener> roomListeners =
             new CopyOnWriteArrayList<>();
+    @Nullable private LocalMusicEndListener localMusicEndListener;
+
+    public void setLocalMusicEndListener(@Nullable LocalMusicEndListener listener) {
+        localMusicEndListener = listener;
+    }
 
     public static synchronized ZegoEngineManager getInstance() {
         if (instance == null) instance = new ZegoEngineManager();
@@ -540,6 +550,30 @@ public class ZegoEngineManager {
             musicMuteLocalMonitor = muteLocalMonitor;
             localMusicPlayer.enableAux(true);
             localMusicPlayer.enableRepeat(false);
+            try {
+                localMusicPlayer.setEventHandler(
+                        new im.zego.zegoexpress.callback.IZegoMediaPlayerEventHandler() {
+                            @Override
+                            public void onMediaPlayerStateUpdate(
+                                    im.zego.zegoexpress.ZegoMediaPlayer mediaPlayer,
+                                    im.zego.zegoexpress.constants.ZegoMediaPlayerState state,
+                                    int errorCode) {
+                                if (state == im.zego.zegoexpress.constants.ZegoMediaPlayerState
+                                        .PLAY_ENDED) {
+                                    LocalMusicEndListener cb = localMusicEndListener;
+                                    if (cb != null) {
+                                        try {
+                                            cb.onLocalMusicEnded();
+                                        } catch (Throwable t) {
+                                            Log.w(TAG, "local music end callback: " + t.getMessage());
+                                        }
+                                    }
+                                }
+                            }
+                        });
+            } catch (Throwable t) {
+                Log.w(TAG, "media player event handler: " + t.getMessage());
+            }
             try {
                 localMusicPlayer.muteLocal(muteLocalMonitor);
             } catch (Throwable ignored) {

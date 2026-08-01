@@ -29,6 +29,8 @@ export enum PaymentProvider {
   BINANCE_PAY = 'binance_pay',
   BINANCE_WALLET = 'binance_wallet',
   RECHARGE_AGENT = 'recharge_agent',
+  FOURTHWALL = 'fourthwall',
+  SHAM_CASH = 'sham_cash',
 }
 
 @Entity('recharge_orders')

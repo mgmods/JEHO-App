@@ -57,6 +57,9 @@ export const walletApi = {
   approveWithdraw: (id) => safeRequest(() => api.post(`/admin/wallet/withdraws/${id}/approve`)),
   rejectWithdraw: (id, data = {}) => safeRequest(() => api.post(`/admin/wallet/withdraws/${id}/reject`, data)),
   recharges: (params) => safeRequest(() => api.get('/admin/wallet/recharges', { params })),
+  completeRecharge: (id, data = {}) =>
+    safeRequest(() => api.post(`/admin/wallet/recharges/${id}/complete`, data)),
+  cancelRecharge: (id) => safeRequest(() => api.post(`/admin/wallet/recharges/${id}/cancel`)),
   packages: () => safeRequest(() => api.get('/admin/wallet/packages')),
   savePackages: (data) => safeRequest(() => api.put('/admin/wallet/packages', data)),
   withdrawPackages: () => safeRequest(() => api.get('/admin/wallet/withdraw-packages')),
@@ -152,6 +155,13 @@ export const paymentSettingsApi = {
   updateBinancePay: (data) => safeRequest(() => api.patch('/admin/payment-settings/binance-pay', data)),
   testBinancePay: () => safeRequest(() => api.post('/admin/payment-settings/binance-pay/test')),
   reconcileBinanceWallet: () => safeRequest(() => api.post('/admin/payment-settings/binance-pay/reconcile')),
+  getFourthwall: () => safeRequest(() => api.get('/admin/payment-settings/fourthwall')),
+  updateFourthwall: (data) => safeRequest(() => api.patch('/admin/payment-settings/fourthwall', data)),
+  testFourthwall: () => safeRequest(() => api.post('/admin/payment-settings/fourthwall/test')),
+  syncFourthwallPackages: () =>
+    safeRequest(() => api.post('/admin/payment-settings/fourthwall/sync-packages')),
+  getShamCash: () => safeRequest(() => api.get('/admin/payment-settings/sham-cash')),
+  updateShamCash: (data) => safeRequest(() => api.patch('/admin/payment-settings/sham-cash', data)),
 }
 
 export const luckyBoxesApi = {

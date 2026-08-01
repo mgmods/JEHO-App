@@ -7,11 +7,17 @@ import { BinanceWalletReconcileTask } from './binance-wallet-reconcile.task';
 import { RechargeOrder } from '../../database/entities/recharge-order.entity';
 import { PaymentWebhookEvent } from '../../database/entities/payment-webhook-event.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { User } from '../../database/entities/user.entity';
 import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([RechargeOrder, PaymentWebhookEvent, AppSetting]),
+    TypeOrmModule.forFeature([
+      RechargeOrder,
+      PaymentWebhookEvent,
+      AppSetting,
+      User,
+    ]),
     WalletModule,
   ],
   controllers: [PaymentsController],
