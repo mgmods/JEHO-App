@@ -1,0 +1,90 @@
+
+massive-win.png
+size: 824,895
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: false
+  xy: 675, 447
+  size: 146, 146
+  orig: 148, 148
+  offset: 1, 1
+  index: -1
+2
+  rotate: false
+  xy: 680, 595
+  size: 130, 146
+  orig: 132, 148
+  offset: 1, 1
+  index: -1
+3
+  rotate: false
+  xy: 675, 151
+  size: 96, 146
+  orig: 98, 148
+  offset: 1, 1
+  index: -1
+4
+  rotate: false
+  xy: 504, 310
+  size: 32, 146
+  orig: 34, 148
+  offset: 1, 1
+  index: -1
+5
+  rotate: true
+  xy: 2, 20
+  size: 64, 146
+  orig: 66, 148
+  offset: 1, 1
+  index: -1
+6
+  rotate: false
+  xy: 675, 3
+  size: 96, 146
+  orig: 98, 148
+  offset: 1, 1
+  index: -1
+7
+  rotate: false
+  xy: 675, 299
+  size: 130, 146
+  orig: 132, 148
+  offset: 1, 1
+  index: -1
+8
+  rotate: false
+  xy: 667, 743
+  size: 150, 150
+  orig: 152, 152
+  offset: 1, 1
+  index: -1
+BIG WIN
+  rotate: false
+  xy: 2, 458
+  size: 677, 435
+  orig: 677, 435
+  offset: 0, 0
+  index: -1
+光效
+  rotate: false
+  xy: 2, 86
+  size: 500, 370
+  orig: 500, 370
+  offset: 0, 0
+  index: -1
+形状 1
+  rotate: false
+  xy: 543, 20
+  size: 130, 530
+  orig: 130, 530
+  offset: 0, 0
+  index: -1
+闪闪光
+  rotate: false
+  xy: 2, 825
+  size: 76, 68
+  orig: 76, 68
+  offset: 0, 0
+  index: -1

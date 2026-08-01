@@ -1,0 +1,1272 @@
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, IsNull, MoreThan, Repository } from 'typeorm';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+
+/** Resolve Nest public/ whether cwd is backend root or dist/. */
+function resolvePublicDir(): string {
+  const candidates = [
+    join(process.cwd(), 'public'),
+    join(__dirname, '..', '..', '..', 'public'),
+    join(__dirname, '..', '..', 'public'),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return candidates[0];
+}
+import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
+import { UserProfile } from '../../database/entities/user-profile.entity';
+import { User } from '../../database/entities/user.entity';
+import { UserVip } from '../../database/entities/user-vip.entity';
+import { Wallet } from '../../database/entities/wallet.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
+import { MediaCleanupService } from '../uploads/media-cleanup.service';
+import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
+
+type MikooCatalogItem = {
+  type: CosmeticType | string;
+  code: string;
+  name: string;
+  previewUrl: string;
+  animationUrl?: string | null;
+  coinPrice?: number;
+  minVipLevel?: number;
+  minUserLevel?: number;
+  sortOrder?: number;
+  meta?: Record<string, unknown>;
+};
+
+@Injectable()
+export class CosmeticsService implements OnModuleInit {
+  private aristocracyEnsured = false;
+  private mallPricingEnsured = false;
+  private roomBgEnsured = false;
+  private mikooCatalogEnsured = false;
+  private hostBadgeEnsured = false;
+  private readonly logger = new Logger(CosmeticsService.name);
+
+  constructor(
+    @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
+    @InjectRepository(UserCosmetic) private readonly userCosmeticsRepo: Repository<UserCosmetic>,
+    @InjectRepository(UserProfile) private readonly profileRepo: Repository<UserProfile>,
+    @InjectRepository(Wallet) private readonly walletRepo: Repository<Wallet>,
+    @InjectRepository(User) private readonly usersRepo: Repository<User>,
+    @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
+    private readonly mediaCleanup: MediaCleanupService,
+    private readonly dataSource: DataSource,
+  ) {}
+
+  async onModuleInit() {
+    try {
+      await this.ensureRoomBackgroundCatalog();
+      await this.ensureAristocracyCatalog();
+      await this.ensureRoomCardCatalog();
+      await this.ensureHostBadgeCatalog();
+      await this.ensureMikooCosmeticsCatalog();
+      await this.purgeBrokenEntryEffects();
+      await this.ensureMallPricing();
+      await this.ensurePublicBranding();
+    } catch (err) {
+      this.logger.warn(`cosmetics pricing init: ${(err as Error).message}`);
+    }
+  }
+
+  async catalog(type?: CosmeticType) {
+    this.assertSupportedType(type);
+    await this.ensureAristocracyCatalog();
+    await this.ensureRoomCardCatalog();
+    await this.ensureHostBadgeCatalog();
+    await this.ensureMikooCosmeticsCatalog();
+    await this.purgeBrokenEntryEffects();
+    await this.ensureMallPricing();
+    await this.ensurePublicBranding();
+    const where: any = { isActive: true };
+    if (type) where.type = type;
+    return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', coinPrice: 'ASC' } });
+  }
+
+  async adminList(type?: CosmeticType) {
+    this.assertSupportedType(type);
+    await this.ensureAristocracyCatalog();
+    await this.ensureRoomCardCatalog();
+    await this.purgeBrokenEntryEffects();
+    await this.ensurePublicBranding();
+    const where: any = {};
+    if (type) where.type = type;
+    return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+  }
+
+  async adminCreate(dto: Partial<Cosmetic> & { type: CosmeticType; code: string; name: string; previewUrl: string }) {
+    this.assertSupportedType(dto.type);
+    const code = String(dto.code || '').trim();
+    const name = String(dto.name || '').trim();
+    if (!code || !name || !dto.previewUrl) {
+      throw new BadRequestException('type, code, name, previewUrl مطلوبة');
+    }
+    const row = this.cosmeticsRepo.create({
+      type: dto.type,
+      code,
+      name,
+      description: dto.description || null,
+      previewUrl: dto.previewUrl,
+      animationUrl: dto.animationUrl || null,
+      coinPrice: Number(dto.coinPrice || 0),
+      minVipLevel: Number(dto.minVipLevel || 0),
+      minUserLevel: Number(dto.minUserLevel || 0),
+      isActive: dto.isActive !== false,
+      sortOrder: Number(dto.sortOrder || 0),
+      meta: dto.meta || null,
+    });
+    return this.cosmeticsRepo.save(row);
+  }
+
+  private assertSupportedType(type?: CosmeticType) {
+    if (type && !Object.values(CosmeticType).includes(type)) {
+      throw new BadRequestException('Unsupported cosmetic type');
+    }
+  }
+
+  async adminUpdate(id: string, dto: Partial<Cosmetic>) {
+    const row = await this.cosmeticsRepo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('العنصر غير موجود');
+    if (dto.type != null) {
+      this.assertSupportedType(dto.type);
+      row.type = dto.type;
+    }
+    if (dto.code != null) row.code = String(dto.code).trim();
+    if (dto.name != null) row.name = String(dto.name).trim();
+    if (dto.description !== undefined) row.description = dto.description || null;
+    if (dto.previewUrl != null) {
+      this.mediaCleanup.replaceUpload(row.previewUrl, dto.previewUrl);
+      if (
+        String(row.previewUrl || '').startsWith('/assets/') &&
+        String(dto.previewUrl).startsWith('/assets/') &&
+        row.previewUrl !== dto.previewUrl
+      ) {
+        this.mediaCleanup.deletePublicAssetPath(row.previewUrl);
+      }
+      row.previewUrl = dto.previewUrl;
+    }
+    if (dto.animationUrl !== undefined) {
+      this.mediaCleanup.replaceUpload(row.animationUrl, dto.animationUrl || null);
+      row.animationUrl = dto.animationUrl || null;
+    }
+    if (dto.coinPrice != null) row.coinPrice = Number(dto.coinPrice);
+    if (dto.minVipLevel != null) row.minVipLevel = Number(dto.minVipLevel);
+    if (dto.minUserLevel != null) row.minUserLevel = Number(dto.minUserLevel);
+    if (dto.isActive != null) row.isActive = !!dto.isActive;
+    if (dto.sortOrder != null) row.sortOrder = Number(dto.sortOrder);
+    if (dto.meta !== undefined) row.meta = dto.meta;
+    return this.cosmeticsRepo.save(row);
+  }
+
+  async adminDelete(id: string) {
+    const row = await this.cosmeticsRepo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('العنصر غير موجود');
+
+    const urls = [...new Set([row.previewUrl, row.animationUrl].filter(Boolean))] as string[];
+
+    // Clear worn profile / room pointers that still reference these media URLs.
+    for (const url of urls) {
+      const clean = String(url).split('?')[0];
+      await this.dataSource.query(
+        `UPDATE user_profiles
+            SET "hostBadgeUrl" = CASE WHEN "hostBadgeUrl" LIKE $1 THEN NULL ELSE "hostBadgeUrl" END,
+                "vipBadgeUrl" = CASE WHEN "vipBadgeUrl" LIKE $1 THEN NULL ELSE "vipBadgeUrl" END,
+                "levelBadgeUrl" = CASE WHEN "levelBadgeUrl" LIKE $1 THEN NULL ELSE "levelBadgeUrl" END,
+                "entryEffectUrl" = CASE WHEN "entryEffectUrl" LIKE $1 THEN NULL ELSE "entryEffectUrl" END,
+                "entryAnimationUrl" = CASE WHEN "entryAnimationUrl" LIKE $1 THEN NULL ELSE "entryAnimationUrl" END,
+                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END`,
+        [`${clean}%`],
+      ).catch(() => undefined);
+      await this.dataSource.query(
+        `UPDATE rooms
+            SET "roomCardUrl" = NULL, "roomCardEquippedById" = NULL
+          WHERE "roomCardUrl" LIKE $1`,
+        [`${clean}%`],
+      ).catch(() => undefined);
+    }
+
+    // Delete media files from disk when no other cosmetic still references them.
+    for (const url of urls) {
+      const references = await this.cosmeticsRepo
+        .createQueryBuilder('cosmetic')
+        .where('cosmetic.id != :id', { id })
+        .andWhere(
+          '(cosmetic."previewUrl" = :url OR cosmetic."animationUrl" = :url)',
+          { url },
+        )
+        .getCount();
+      if (references === 0) {
+        this.mediaCleanup.deleteUploadUrl(url);
+        this.mediaCleanup.deletePublicAssetPath(url);
+      }
+    }
+
+    await this.userCosmeticsRepo.delete({ cosmeticId: id });
+    await this.cosmeticsRepo.delete(id);
+    this.logger.log(`Hard-deleted cosmetic ${row.code} (${id}) + media`);
+    return { deleted: true, id, code: row.code };
+  }
+
+  async inventory(userId: string) {
+    const now = new Date();
+    return this.userCosmeticsRepo.find({
+      where: [
+        { userId, expiresAt: IsNull() },
+        { userId, expiresAt: MoreThan(now) },
+      ],
+      relations: ['cosmetic'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Grant a cosmetic for a limited number of days (contest prizes, promos).
+   * Extends from max(now, existing expiresAt) when already owned temporarily.
+   * Permanent ownership (expiresAt null) is left permanent.
+   */
+  async grantTemporary(userId: string, cosmeticCode: string, days: number) {
+    const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
+    let cosmetic =
+      (await this.cosmeticsRepo.findOne({
+        where: { code: String(cosmeticCode || '').trim(), isActive: true },
+      })) || null;
+
+    if (!cosmetic) {
+      cosmetic = await this.cosmeticsRepo
+        .createQueryBuilder('c')
+        .where('c.isActive = true')
+        .andWhere('c.type IN (:...types)', {
+          types: [
+            CosmeticType.HOST_BADGE,
+            CosmeticType.VIP_BADGE,
+            CosmeticType.LEVEL_BADGE,
+            CosmeticType.ROOM_CARD,
+          ],
+        })
+        .andWhere(`COALESCE(c.meta->>'aristocracy', 'false') != 'true'`)
+        .andWhere(`c.code NOT ILIKE '%_vip_%'`)
+        .andWhere(`c.code NOT ILIKE 'vip%'`)
+        .orderBy('c.sortOrder', 'ASC')
+        .getOne();
+    }
+    if (!cosmetic) {
+      throw new NotFoundException(`Cosmetic ${cosmeticCode} not found`);
+    }
+
+    const now = new Date();
+    let owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId: cosmetic.id },
+    });
+    if (!owned) {
+      owned = this.userCosmeticsRepo.create({
+        userId,
+        cosmeticId: cosmetic.id,
+        equipped: false,
+        expiresAt: new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
+      });
+    } else if (owned.expiresAt == null) {
+      // Already permanent — keep permanent, still try equip.
+    } else {
+      const base =
+        owned.expiresAt.getTime() > now.getTime() ? owned.expiresAt.getTime() : now.getTime();
+      owned.expiresAt = new Date(base + daysSafe * 24 * 60 * 60 * 1000);
+    }
+    owned = await this.userCosmeticsRepo.save(owned);
+
+    try {
+      await this.equip(userId, cosmetic.id, { skipRequirements: true });
+    } catch {
+      /* equip is best-effort */
+    }
+
+    return {
+      granted: true,
+      cosmetic,
+      expiresAt: owned.expiresAt,
+      days: daysSafe,
+    };
+  }
+
+  private async activeVipLevel(userId: string): Promise<number> {
+    const vip = await this.userVipRepo.findOne({
+      where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
+      order: { level: 'DESC' },
+    });
+    return Number(vip?.level || 0);
+  }
+
+  private async assertCosmeticRequirements(userId: string, cosmetic: Cosmetic) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const userLevel = Math.max(1, Number(user.level || 1));
+    if (cosmetic.minUserLevel > 0 && userLevel < cosmetic.minUserLevel) {
+      throw new BadRequestException(`Requires user level ${cosmetic.minUserLevel}`);
+    }
+
+    if (cosmetic.minVipLevel > 0) {
+      const vipLevel = await this.activeVipLevel(userId);
+      if (vipLevel < cosmetic.minVipLevel) {
+        throw new BadRequestException(`Requires VIP level ${cosmetic.minVipLevel}`);
+      }
+    }
+  }
+
+  async purchase(userId: string, cosmeticId: string) {
+    const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
+    if (!cosmetic) throw new NotFoundException('Cosmetic not found');
+
+    await this.assertCosmeticRequirements(userId, cosmetic);
+
+    const price = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
+    // coinPrice 0 = free claim (mall "مجاني").
+
+    const ownedRow = await this.cosmeticsRepo.manager.transaction(async (manager) => {
+      const wallet = await manager.findOne(Wallet, {
+        where: { userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const owned = await manager.findOne(UserCosmetic, {
+        where: { userId, cosmeticId },
+      });
+      if (owned) throw new BadRequestException('Already owned');
+      if (price > 0) {
+        if (!wallet || wallet.coins < price) {
+          throw new BadRequestException('Insufficient coins');
+        }
+        wallet.coins -= price;
+        await manager.save(Wallet, wallet);
+      }
+      return manager.save(
+        UserCosmetic,
+        manager.create(UserCosmetic, {
+          userId,
+          cosmeticId,
+          equipped: false,
+        }),
+      );
+    });
+
+    // Auto-equip after purchase/claim so the user wears it immediately.
+    try {
+      await this.equip(userId, cosmeticId, { skipRequirements: true });
+    } catch {
+      /* ownership is enough; equip may fail on rare races */
+    }
+    return ownedRow;
+  }
+
+  async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean }) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned) throw new NotFoundException('You do not own this cosmetic');
+    if (owned.expiresAt && owned.expiresAt <= new Date()) {
+      throw new BadRequestException('This cosmetic has expired');
+    }
+
+    if (!opts?.skipRequirements) {
+      await this.assertCosmeticRequirements(userId, owned.cosmetic);
+    }
+
+    const type = owned.cosmetic.type;
+    const sameType = await this.userCosmeticsRepo.find({
+      where: { userId },
+      relations: ['cosmetic'],
+    });
+    for (const row of sameType) {
+      if (row.cosmetic?.type === type) {
+        row.equipped = row.id === owned.id;
+        await this.userCosmeticsRepo.save(row);
+      }
+    }
+
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    if (profile) {
+      if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
+        // Prefer playable ride (GIF/WebP/MP4); keep preview as static fallback.
+        const anim = owned.cosmetic.animationUrl || '';
+        const lower = String(anim).toLowerCase();
+        const playable =
+          !!anim &&
+          !lower.includes('runtime.html') &&
+          !lower.endsWith('.html') &&
+          !lower.endsWith('.json');
+        profile.entryEffectUrl = owned.cosmetic.previewUrl || (playable ? anim : null);
+        profile.entryAnimationUrl = playable
+          ? anim
+          : owned.cosmetic.previewUrl || null;
+      }
+      if (type === CosmeticType.ROOM_CARD) {
+        const anim = owned.cosmetic.animationUrl || '';
+        const lower = String(anim).toLowerCase();
+        const playable =
+          !!anim &&
+          !lower.includes('runtime.html') &&
+          !lower.endsWith('.html') &&
+          !lower.endsWith('.json');
+        const cardUrl = playable
+          ? anim
+          : owned.cosmetic.previewUrl || null;
+        profile.roomCardUrl = cardUrl;
+        // Sync outer list frame onto every room this user hosts.
+        await this.dataSource.query(
+          `UPDATE rooms
+              SET "roomCardUrl" = $1, "roomCardEquippedById" = $2
+            WHERE "hostId" = $2`,
+          [cardUrl, userId],
+        ).catch(() => undefined);
+      }
+      // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
+      if (type === CosmeticType.HOST_BADGE) {
+        // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
+        const anim = owned.cosmetic.animationUrl || '';
+        const lower = String(anim).toLowerCase();
+        const playable =
+          !!anim &&
+          !lower.includes('runtime.html') &&
+          !lower.endsWith('.html') &&
+          !lower.endsWith('.json');
+        profile.hostBadgeUrl = playable
+          ? anim
+          : owned.cosmetic.previewUrl || null;
+      }
+      if (type === CosmeticType.VIP_BADGE) {
+        const anim = owned.cosmetic.animationUrl || '';
+        const lower = String(anim).toLowerCase();
+        const playable =
+          !!anim &&
+          !lower.includes('runtime.html') &&
+          !lower.endsWith('.html') &&
+          !lower.endsWith('.json');
+        // VIP badge doubles as avatar frame wear URL in the Android client.
+        // Prefer SVGA / GIF / MP4 animation when provided (Mikoo headwear).
+        profile.vipBadgeUrl = playable
+          ? anim
+          : owned.cosmetic.previewUrl || null;
+      }
+      if (type === CosmeticType.LEVEL_BADGE) {
+        profile.levelBadgeUrl = owned.cosmetic.previewUrl;
+      }
+      await this.profileRepo.save(profile);
+    }
+
+    return { equipped: true, cosmetic: owned.cosmetic, profile };
+  }
+
+  /**
+   * VIP is 1..100, while visual asset families are 10 tiers.
+   * Map each 10 VIP levels to one visual tier (1..10), then grant + equip.
+   */
+  async grantVipAristocracyBundle(userId: string, vipLevel: number) {
+    const vip = Math.min(100, Math.max(1, Math.floor(Number(vipLevel) || 1)));
+    const level = this.vipVisualTier(vip);
+    await this.ensureAristocracyCatalog();
+
+    const types: CosmeticType[] = [
+      CosmeticType.VIP_BADGE,
+      CosmeticType.LEVEL_BADGE,
+      CosmeticType.HOST_BADGE,
+    ];
+
+    const granted: Array<{ type: CosmeticType; code: string }> = [];
+    let hostId: string | null = null;
+
+    for (const type of types) {
+      const item = await this.pickAristocracyItem(type, level);
+      if (!item) continue;
+      await this.ensureOwned(userId, item.id);
+      granted.push({ type, code: item.code });
+      if (type === CosmeticType.HOST_BADGE) hostId = item.id;
+      else {
+        try {
+          // VIP bundle is a paid grant — equip regardless of account level gates.
+          await this.equip(userId, item.id, { skipRequirements: true });
+        } catch {
+          // ignore rare races
+        }
+      }
+    }
+
+    // The HTML host signal is the only avatar surround in the VIP bundle.
+    if (hostId) {
+      try {
+        await this.equip(userId, hostId, { skipRequirements: true });
+      } catch {
+        /* ignore */
+      }
+    }
+
+    return { vipLevel: vip, visualTier: level, granted };
+  }
+
+  private vipVisualTier(vipLevel: number): number {
+    const vip = Math.min(100, Math.max(1, Math.floor(Number(vipLevel) || 1)));
+    return Math.min(10, Math.max(1, Math.ceil(vip / 10)));
+  }
+
+  private async ensureOwned(userId: string, cosmeticId: string) {
+    const existing = await this.userCosmeticsRepo.findOne({ where: { userId, cosmeticId } });
+    if (existing) return existing;
+    return this.userCosmeticsRepo.save(
+      this.userCosmeticsRepo.create({ userId, cosmeticId, equipped: false }),
+    );
+  }
+
+  private async pickAristocracyItem(type: CosmeticType, level: number): Promise<Cosmetic | null> {
+    const exact = await this.cosmeticsRepo.findOne({
+      where: { type, minVipLevel: level, isActive: true },
+      order: { sortOrder: 'ASC' },
+    });
+    if (exact) return exact;
+
+    const codeHints = [
+      `aristocracy_${type}_${level}`,
+      `host_vip_${level}`,
+      `host_lv${level}`,
+      `vip${level}`,
+      `level_${level}`,
+      `frame_vip_${level}`,
+      `toast_vip_${level}`,
+      `entry_vip_${level}`,
+      `card_vip_${level}`,
+    ];
+    for (const code of codeHints) {
+      const byCode = await this.cosmeticsRepo.findOne({ where: { code, isActive: true } });
+      if (byCode && byCode.type === type) return byCode;
+    }
+
+    if (type === CosmeticType.LEVEL_BADGE) {
+      const byUserLevel = await this.cosmeticsRepo.findOne({
+        where: { type, minUserLevel: level, isActive: true },
+        order: { sortOrder: 'ASC' },
+      });
+      if (byUserLevel) return byUserLevel;
+    }
+
+    const all = await this.cosmeticsRepo.find({
+      where: { type, isActive: true },
+      order: { sortOrder: 'ASC', minVipLevel: 'ASC' },
+    });
+    if (!all.length) return null;
+    const leq = all.filter((c) => Number(c.minVipLevel || 0) <= level && Number(c.minVipLevel || 0) > 0);
+    if (leq.length) return leq[leq.length - 1];
+    return all[Math.min(level - 1, all.length - 1)] || all[0];
+  }
+
+  /** Keep only persistent VIP badges, level badges, and room-card grants. */
+  /**
+   * Reasonable mall prices like major social apps.
+   * Only true VIP-plan aristocracy rows stay coinPrice=0 (unlocked by VIP).
+   * Mall frames whose code merely contains "_vip_" stay paid.
+   */
+  async ensureMallPricing() {
+    if (this.mallPricingEnsured) return;
+    const verKey = 'pricing.cosmetics_version';
+    const row = await this.settingsRepo.findOne({ where: { key: verKey } });
+    if (row?.value === PRICING_VERSION) {
+      this.mallPricingEnsured = true;
+      return;
+    }
+
+    const all = await this.cosmeticsRepo.find({ where: { isActive: true } });
+    const byType: Record<string, Cosmetic[]> = {};
+    for (const c of all) {
+      const key = String(c.type);
+      if (!byType[key]) byType[key] = [];
+      byType[key].push(c);
+    }
+
+    let updated = 0;
+    for (const [type, list] of Object.entries(byType)) {
+      list.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      const ladder = MALL_COSMETIC_PRICES[type];
+      if (!ladder?.length) continue;
+      for (let i = 0; i < list.length; i++) {
+        const c = list[i];
+        if (this.isAristocracyFree(c)) {
+          if (Number(c.coinPrice) !== 0) {
+            c.coinPrice = 0;
+            await this.cosmeticsRepo.save(c);
+            updated += 1;
+          }
+          continue;
+        }
+        const tier = Math.min(ladder.length - 1, i % ladder.length);
+        // Spread longer catalogs across the ladder by index bucket
+        const bucket = list.length <= ladder.length
+          ? i
+          : Math.min(ladder.length - 1, Math.floor((i / list.length) * ladder.length));
+        let price = ladder[bucket] ?? ladder[tier] ?? 999;
+        // Never leave mall wearables at 0 after this sync.
+        if (price <= 0) price = ladder.find((p) => p > 0) ?? 299;
+        if (Number(c.coinPrice) !== price) {
+          c.coinPrice = price;
+          await this.cosmeticsRepo.save(c);
+          updated += 1;
+        }
+      }
+    }
+
+    if (!row) {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          key: verKey,
+          value: PRICING_VERSION,
+          description: 'Mall cosmetics pricing version',
+        }),
+      );
+    } else {
+      row.value = PRICING_VERSION;
+      await this.settingsRepo.save(row);
+    }
+    this.mallPricingEnsured = true;
+    this.logger.log(`Synced mall cosmetic prices (${updated} rows) → ${PRICING_VERSION}`);
+  }
+
+  /** VIP plan unlocks only — not mall SKUs that happen to contain "_vip_". */
+  private isAristocracyFree(c: Cosmetic): boolean {
+    if (c.meta && (c.meta as any).aristocracy) return true;
+    const code = String(c.code || '');
+    return /^(vip\d+|level_vip_\d+|host_vip_\d+|frame_vip_\d+|toast_vip_\d+|entry_vip_\d+|card_vip_\d+)$/i.test(
+      code,
+    );
+  }
+
+  /** Strip competitor brand from user-visible cosmetic copy. */
+  private stripCompetitorBrand(text: string | null | undefined): string {
+    return String(text || '')
+      .replace(/ميكو/gi, '')
+      .replace(/mikoo/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s*·\s*·\s*/g, ' · ')
+      .replace(/^\s*·\s*|\s*·\s*$/g, '')
+      .trim();
+  }
+
+  /** One-shot rename of any leftover brand text in the live catalog. */
+  async ensurePublicBranding() {
+    const verKey = 'cosmetics.public_branding_version';
+    const ver = '20260730-no-mikoo-v1';
+    const row = await this.settingsRepo.findOne({ where: { key: verKey } });
+    if (row?.value === ver) return;
+
+    const all = await this.cosmeticsRepo.find();
+    let updated = 0;
+    for (const c of all) {
+      const nextName = this.stripCompetitorBrand(c.name);
+      const nextDesc = this.stripCompetitorBrand(c.description);
+      let dirty = false;
+      if (nextName && nextName !== c.name) {
+        c.name = nextName;
+        dirty = true;
+      }
+      if ((c.description || '') !== nextDesc) {
+        c.description = nextDesc || null;
+        dirty = true;
+      }
+      if (dirty) {
+        await this.cosmeticsRepo.save(c);
+        updated += 1;
+      }
+    }
+
+    if (!row) {
+      await this.settingsRepo.save(
+        this.settingsRepo.create({
+          key: verKey,
+          value: ver,
+          description: 'Public cosmetic display names branding version',
+        }),
+      );
+    } else {
+      row.value = ver;
+      await this.settingsRepo.save(row);
+    }
+    if (updated > 0) this.logger.log(`Stripped competitor brand from ${updated} cosmetics`);
+  }
+
+  /** 16 professional room wallpapers — all paid in coins (mall ladder). */
+  async ensureRoomBackgroundCatalog() {
+    if (this.roomBgEnsured) return;
+    const v = '20260801';
+    const rows: Array<{
+      code: string;
+      name: string;
+      file: string;
+      coinPrice: number;
+      sortOrder: number;
+    }> = [
+      { code: 'bg_voice_default', name: 'خلفية صوتية', file: 'voice-room-bg.png', coinPrice: 99, sortOrder: 10 },
+      { code: 'bg_aurora_night', name: 'أورورا ليلية', file: 'bg_aurora_night.png', coinPrice: 149, sortOrder: 20 },
+      { code: 'bg_ocean_deep', name: 'أعماق المحيط', file: 'bg_ocean_deep.png', coinPrice: 199, sortOrder: 30 },
+      { code: 'bg_mint_dream', name: 'حلم النعناع', file: 'bg_mint_dream.png', coinPrice: 249, sortOrder: 40 },
+      { code: 'bg_sunset_lounge', name: 'غروب الصالة', file: 'bg_sunset_lounge.png', coinPrice: 299, sortOrder: 50 },
+      { code: 'bg_violet_stage', name: 'منصة بنفسجية', file: 'bg_violet_stage.png', coinPrice: 399, sortOrder: 60 },
+      { code: 'bg_golden_party', name: 'حفلة ذهبية', file: 'bg_golden_party.png', coinPrice: 499, sortOrder: 70 },
+      { code: 'bg_neon_city', name: 'مدينة نيون', file: 'bg_neon_city.png', coinPrice: 599, sortOrder: 80 },
+      { code: 'bg_rose_velvet', name: 'مخمل وردي', file: 'bg_rose_velvet.png', coinPrice: 799, sortOrder: 90 },
+      { code: 'bg_ice_crystal', name: 'بلورة ثلج', file: 'bg_ice_crystal.png', coinPrice: 999, sortOrder: 100 },
+      { code: 'bg_emerald_club', name: 'نادي الزمرد', file: 'bg_emerald_club.png', coinPrice: 1299, sortOrder: 110 },
+      { code: 'bg_cosmic_dust', name: 'غبار كوني', file: 'bg_cosmic_dust.png', coinPrice: 1499, sortOrder: 120 },
+      { code: 'bg_amber_glow', name: 'توهج كهرماني', file: 'bg_amber_glow.png', coinPrice: 1799, sortOrder: 130 },
+      { code: 'bg_sapphire_hall', name: 'قاعة ياقوت', file: 'bg_sapphire_hall.png', coinPrice: 1999, sortOrder: 140 },
+      { code: 'bg_cherry_night', name: 'ليلة الكرز', file: 'bg_cherry_night.png', coinPrice: 1799, sortOrder: 150 },
+      { code: 'bg_royal_indigo', name: 'نيلي ملكي', file: 'bg_royal_indigo.png', coinPrice: 1999, sortOrder: 160 },
+      { code: 'bg_teal_lounge', name: 'صالة فيروزية', file: 'bg_teal_lounge.png', coinPrice: 1299, sortOrder: 170 },
+      { code: 'bg_amber_lounge', name: 'صالة كهرمانية', file: 'bg_amber_lounge.png', coinPrice: 1399, sortOrder: 180 },
+      { code: 'bg_indigo_stage', name: 'منصة نيلي كوني', file: 'bg_indigo_stage.png', coinPrice: 1599, sortOrder: 190 },
+      { code: 'bg_emerald_hall', name: 'قاعة زمرد', file: 'bg_emerald_hall.png', coinPrice: 1699, sortOrder: 200 },
+    ];
+
+    let created = 0;
+    for (const row of rows) {
+      const previewUrl = `/assets/backgrounds/${row.file}?v=${v}`;
+      let existing = await this.cosmeticsRepo.findOne({ where: { code: row.code } });
+      if (!existing) {
+        await this.cosmeticsRepo.save(
+          this.cosmeticsRepo.create({
+            type: CosmeticType.ROOM_BACKGROUND,
+            code: row.code,
+            name: row.name,
+            description: 'خلفية غرفة صوت تظهر للجميع داخل الروم',
+            previewUrl,
+            animationUrl: null,
+            coinPrice: row.coinPrice,
+            minVipLevel: 0,
+            minUserLevel: 0,
+            isActive: true,
+            sortOrder: row.sortOrder,
+            meta: { roomWallpaper: true },
+          } as any),
+        );
+        created += 1;
+        continue;
+      }
+      let dirty = false;
+      if (existing.type !== CosmeticType.ROOM_BACKGROUND) {
+        existing.type = CosmeticType.ROOM_BACKGROUND;
+        dirty = true;
+      }
+      if (existing.previewUrl !== previewUrl) {
+        existing.previewUrl = previewUrl;
+        dirty = true;
+      }
+      if (existing.name !== row.name) {
+        existing.name = row.name;
+        dirty = true;
+      }
+      if (Number(existing.coinPrice) !== row.coinPrice) {
+        existing.coinPrice = row.coinPrice;
+        dirty = true;
+      }
+      if (existing.sortOrder !== row.sortOrder) {
+        existing.sortOrder = row.sortOrder;
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      if (dirty) await this.cosmeticsRepo.save(existing);
+    }
+
+    // Deactivate legacy placeholders that are not in the new pack.
+    for (const legacy of ['bg_night', 'bg_party']) {
+      const row = await this.cosmeticsRepo.findOne({ where: { code: legacy } });
+      if (row && row.isActive) {
+        row.isActive = false;
+        await this.cosmeticsRepo.save(row);
+      }
+    }
+
+    this.roomBgEnsured = true;
+    if (created > 0) this.logger.log(`Seeded ${created} room backgrounds`);
+  }
+
+  async ensureAristocracyCatalog() {
+    if (this.aristocracyEnsured) return;
+
+    // Legacy mall rows vip1..vip10 cluttered the Frames tab and were not Mikoo
+    // headwear — deactivate them. VIP medals stay available as level badges.
+    for (let lvl = 1; lvl <= 10; lvl++) {
+      const legacy = await this.cosmeticsRepo.findOne({ where: { code: `vip${lvl}` } });
+      if (legacy && legacy.isActive) {
+        legacy.isActive = false;
+        await this.cosmeticsRepo.save(legacy);
+      }
+    }
+
+    // Mikoo only ships VIP1–7 medals — keep badges sequential and force URLs.
+    for (let lvl = 1; lvl <= 7; lvl++) {
+      const medalPath = `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`;
+      await this.upsertAristocracyRow({
+        type: CosmeticType.LEVEL_BADGE,
+        code: `level_vip_${lvl}`,
+        name: `شارة VIP${lvl}`,
+        previewUrl: medalPath,
+        animationUrl: null,
+        minVipLevel: lvl,
+        minUserLevel: 0,
+        sortOrder: 100 + lvl,
+        meta: { aristocracy: true, vipLevel: lvl, source: 'vip_level_badge' },
+      });
+      // Also keep catalog code used by Mikoo import in sync.
+      await this.upsertAristocracyRow({
+        type: CosmeticType.LEVEL_BADGE,
+        code: `vip_medal_mikoo_${lvl}`,
+        name: `وسام VIP${lvl}`,
+        previewUrl: medalPath,
+        animationUrl: null,
+        minVipLevel: lvl,
+        minUserLevel: 0,
+        sortOrder: 110 + lvl,
+        meta: { aristocracy: true, vipLevel: lvl, source: 'mikoo_xunzhang' },
+      });
+    }
+
+    // Fix VIP frame sort order to VIP number (not Mikoo catalog index).
+    const frames = await this.cosmeticsRepo.find({
+      where: { type: CosmeticType.VIP_BADGE, isActive: true },
+    });
+    for (const frame of frames) {
+      const code = String(frame.code || '');
+      const name = String(frame.name || '');
+      const m =
+        code.match(/(?:^|_)vip(\d+)$/i) ||
+        code.match(/vip[_-]?(\d+)/i) ||
+        name.match(/VIP\s*(\d+)/i);
+      if (!m) continue;
+      const vip = Math.min(7, Math.max(1, Number(m[1]) || 0));
+      if (vip < 1) continue;
+      const nextSort = 200 + vip;
+      if (frame.sortOrder !== nextSort || frame.minVipLevel !== vip) {
+        frame.sortOrder = nextSort;
+        frame.minVipLevel = vip;
+        frame.meta = { ...(frame.meta || {}), vipLevel: vip, aristocracy: true };
+        await this.cosmeticsRepo.save(frame);
+      }
+    }
+
+    // Deactivate bogus level_vip_8..10 that pointed at missing/non-Mikoo art.
+    for (let lvl = 8; lvl <= 10; lvl++) {
+      const row = await this.cosmeticsRepo.findOne({ where: { code: `level_vip_${lvl}` } });
+      if (row?.isActive) {
+        row.isActive = false;
+        await this.cosmeticsRepo.save(row);
+      }
+    }
+
+    this.aristocracyEnsured = true;
+  }
+
+  /**
+   * Room list cards: keep ONLY original Mikoo rank borders top1–top3.
+   * Do not invent tinted clones of the same art for top4–top10.
+   */
+  async ensureRoomCardCatalog() {
+    const v = '20260801r2';
+    const keepCodes = new Set([
+      'room_mikoo_border_top1',
+      'room_mikoo_border_top2',
+      'room_mikoo_border_top3',
+    ]);
+    const mikooBorders = [
+      { code: 'room_mikoo_border_top1', name: 'إطار الروم · المركز 1', file: 'bg_room_border_top1.webp', price: 299, sortOrder: 50 },
+      { code: 'room_mikoo_border_top2', name: 'إطار الروم · المركز 2', file: 'bg_room_border_top2.webp', price: 199, sortOrder: 51 },
+      { code: 'room_mikoo_border_top3', name: 'إطار الروم · المركز 3', file: 'bg_room_border_top3.webp', price: 149, sortOrder: 52 },
+    ];
+
+    let created = 0;
+    for (const b of mikooBorders) {
+      const previewUrl = `/assets/rooms/mikoo/${b.file}?v=${v}`;
+      const diskRel = previewUrl.split('?')[0].replace(/^\//, '');
+      if (!existsSync(join(resolvePublicDir(), diskRel))) continue;
+
+      let existing = await this.cosmeticsRepo.findOne({ where: { code: b.code } });
+      if (!existing) {
+        await this.cosmeticsRepo.save(
+          this.cosmeticsRepo.create({
+            type: CosmeticType.ROOM_CARD,
+            code: b.code,
+            name: b.name,
+            description: 'إطار يظهر حول بطاقة الغرفة في القائمة وداخل الروم',
+            previewUrl,
+            animationUrl: null,
+            coinPrice: b.price,
+            minVipLevel: 0,
+            minUserLevel: 0,
+            isActive: true,
+            sortOrder: b.sortOrder,
+            meta: { source: 'mikoo_border', kind: 'room_card' },
+          } as any),
+        );
+        created += 1;
+        continue;
+      }
+      let dirty = false;
+      if (existing.type !== CosmeticType.ROOM_CARD) {
+        existing.type = CosmeticType.ROOM_CARD;
+        dirty = true;
+      }
+      if (existing.previewUrl !== previewUrl) {
+        existing.previewUrl = previewUrl;
+        dirty = true;
+      }
+      if (existing.name !== b.name) {
+        existing.name = b.name;
+        dirty = true;
+      }
+      const nextDesc = 'إطار يظهر حول بطاقة الغرفة في القائمة وداخل الروم';
+      if (existing.description !== nextDesc) {
+        existing.description = nextDesc;
+        dirty = true;
+      }
+      if (Number(existing.coinPrice) !== b.price) {
+        existing.coinPrice = b.price;
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      if (dirty) await this.cosmeticsRepo.save(existing);
+    }
+
+    // Deactivate every other room_card (including tinted top4–10 clones / kenar / host-signals).
+    const allCards = await this.cosmeticsRepo.find({ where: { type: CosmeticType.ROOM_CARD } });
+    let retired = 0;
+    for (const row of allCards) {
+      if (keepCodes.has(String(row.code || ''))) continue;
+      if (!row.isActive) continue;
+      row.isActive = false;
+      await this.cosmeticsRepo.save(row);
+      retired += 1;
+    }
+
+    if (created > 0 || retired > 0) {
+      this.logger.log(`Room cards: seeded=${created}, retired=${retired} (kept Mikoo borders only)`);
+    }
+  }
+
+  /**
+   * Hard-remove Host-signals entry_signal_* (الأسد الملكي → أسطوري) and any
+   * non-Mikoo entry art whose files were never shipped / are missing.
+   */
+  async purgeBrokenEntryEffects() {
+    const pub = resolvePublicDir();
+    const rows = await this.cosmeticsRepo.find({
+      where: { type: CosmeticType.ENTRY_EFFECT },
+    });
+    let killed = 0;
+    for (const row of rows) {
+      const code = String(row.code || '');
+      const preview = String(row.previewUrl || '').split('?')[0];
+      // Only remove known-broken legacy host-signal entries — never wipe Mikoo CDN rows
+      // just because a local file check failed (cwd / deploy lag).
+      const isLegacyHostSignals =
+        code.startsWith('entry_signal_') ||
+        code.startsWith('entry_vip_') ||
+        (preview.includes('/visual-system/entry-effects/assets/entry-') &&
+          !preview.includes('entry-mikoo-'));
+      if (isLegacyHostSignals) {
+        await this.cosmeticsRepo.remove(row);
+        killed += 1;
+      }
+    }
+    // Clear equipped profile URLs that still point at missing legacy entry art.
+    await this.dataSource.query(
+      `UPDATE user_profiles
+          SET "entryEffectUrl" = NULL,
+              "entryAnimationUrl" = NULL
+        WHERE ("entryEffectUrl" LIKE '/visual-system/entry-effects/assets/entry-%'
+          AND "entryEffectUrl" NOT LIKE '%entry-mikoo-%')
+           OR "entryEffectUrl" LIKE '%entry-lion%'
+           OR "entryEffectUrl" LIKE '%entry-legend%'
+           OR "entryEffectUrl" LIKE '%entry_signal_%'`,
+    ).catch(() => undefined);
+    if (killed > 0) this.logger.log(`Purged ${killed} broken/legacy entry effects`);
+  }
+
+  /**
+   * Seed host signals (إشارات المضيف) from visual-system PNG frames.
+   */
+  async ensureHostBadgeCatalog() {
+    // Host badges removed — قطاع الراس (vip_badge) is the only headwear channel.
+    try {
+      await this.cosmeticsRepo
+        .createQueryBuilder()
+        .update()
+        .set({ isActive: false })
+        .where('type = :t', { t: CosmeticType.HOST_BADGE })
+        .execute();
+    } catch (e) {
+      this.logger.warn(`host_badge deactivate: ${(e as Error).message}`);
+    }
+    this.hostBadgeEnsured = true;
+  }
+
+  /**
+   * Seed / refresh cosmetics imported from Mikoo CDN
+   * (`public/assets/cosmetics/catalog.json` produced by scripts/import_mikoo_cosmetics.py).
+   */
+  async ensureMikooCosmeticsCatalog() {
+    if (this.mikooCatalogEnsured) return;
+    const catalogPath = join(resolvePublicDir(), 'assets', 'cosmetics', 'catalog.json');
+    if (!existsSync(catalogPath)) {
+      this.logger.warn(`Mikoo cosmetics catalog missing: ${catalogPath}`);
+      return;
+    }
+
+    let items: MikooCatalogItem[] = [];
+    try {
+      const raw = JSON.parse(readFileSync(catalogPath, 'utf8'));
+      items = Array.isArray(raw?.items) ? raw.items : [];
+    } catch (err) {
+      this.logger.warn(`Mikoo cosmetics catalog unreadable: ${(err as Error).message}`);
+      this.mikooCatalogEnsured = true;
+      return;
+    }
+
+    const allowed = new Set(Object.values(CosmeticType));
+    let upserted = 0;
+    for (const item of items) {
+      const type = String(item.type || '') as CosmeticType;
+      const code = String(item.code || '').trim();
+      const name = this.stripCompetitorBrand(String(item.name || '').trim());
+      const previewUrl = String(item.previewUrl || '').trim();
+      if (!code || !name || !previewUrl || !allowed.has(type)) continue;
+
+      const existing = await this.cosmeticsRepo.findOne({ where: { code } });
+      const animationUrl =
+        item.animationUrl === undefined || item.animationUrl === null
+          ? null
+          : String(item.animationUrl);
+      const coinPrice = Math.max(0, Number(item.coinPrice) || 0);
+      const sortOrder = Number(item.sortOrder) || 0;
+      const minVipLevel = Math.max(0, Number(item.minVipLevel) || 0);
+      const minUserLevel = Math.max(0, Number(item.minUserLevel) || 0);
+      const meta = {
+        ...(existing?.meta || {}),
+        ...(item.meta || {}),
+        mikooImport: true,
+      };
+      const publicDesc = 'من متجر المظهر';
+
+      if (!existing) {
+        await this.cosmeticsRepo.save(
+          this.cosmeticsRepo.create({
+            type,
+            code,
+            name,
+            description: publicDesc,
+            previewUrl,
+            animationUrl,
+            coinPrice,
+            minVipLevel,
+            minUserLevel,
+            isActive: true,
+            sortOrder,
+            meta,
+          }),
+        );
+        upserted += 1;
+        continue;
+      }
+
+      let dirty = false;
+      if (existing.type !== type) {
+        existing.type = type;
+        dirty = true;
+      }
+      if (existing.name !== name) {
+        existing.name = name;
+        dirty = true;
+      }
+      if (
+        existing.description !== publicDesc ||
+        /ميكو|mikoo/i.test(String(existing.description || ''))
+      ) {
+        existing.description = publicDesc;
+        dirty = true;
+      }
+      if (existing.previewUrl !== previewUrl) {
+        existing.previewUrl = previewUrl;
+        dirty = true;
+      }
+      if ((existing.animationUrl || null) !== animationUrl) {
+        existing.animationUrl = animationUrl;
+        dirty = true;
+      }
+      // Never re-zero a paid mall item from catalog import (pricing sync owns free→paid).
+      if (coinPrice > 0 && Number(existing.coinPrice) !== coinPrice) {
+        existing.coinPrice = coinPrice;
+        dirty = true;
+      } else if (coinPrice > 0 && Number(existing.coinPrice) <= 0) {
+        existing.coinPrice = coinPrice;
+        dirty = true;
+      }
+      if (existing.sortOrder !== sortOrder) {
+        existing.sortOrder = sortOrder;
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      existing.meta = meta;
+      dirty = true;
+      if (dirty) {
+        await this.cosmeticsRepo.save(existing);
+        upserted += 1;
+      }
+    }
+
+    // Only deactivate legacy /visual-system/ rows with missing files — keep Mikoo assets active.
+    const pub = resolvePublicDir();
+    const legacy = await this.cosmeticsRepo.find({
+      where: { isActive: true },
+    });
+    for (const row of legacy) {
+      const preview = String(row.previewUrl || '').split('?')[0];
+      if (!preview.startsWith('/visual-system/')) continue;
+      if (preview.includes('host-frames')) continue; // host signals seeded separately
+      const rel = preview.replace(/^\//, '');
+      const disk = join(pub, rel);
+      if (!existsSync(disk)) {
+        row.isActive = false;
+        await this.cosmeticsRepo.save(row);
+      }
+    }
+
+    // Join toasts removed — duplicated الدخولية (entry_effect). Deactivate leftovers.
+    try {
+      await this.cosmeticsRepo
+        .createQueryBuilder()
+        .update()
+        .set({ isActive: false })
+        .where('type = :t', { t: CosmeticType.JOIN_TOAST })
+        .execute();
+    } catch (e) {
+      this.logger.warn(`join_toast deactivate: ${(e as Error).message}`);
+    }
+
+    this.mikooCatalogEnsured = true;
+    if (upserted > 0) {
+      this.logger.log(`Mikoo cosmetics catalog synced (${upserted} rows)`);
+      await this.refreshEquippedMikooWearUrls().catch((err) =>
+        this.logger.warn(`Equipped wear URL refresh failed: ${(err as Error).message}`),
+      );
+    }
+  }
+
+  /** After catalog SVGA/MP4 URLs change, push new animationUrl onto equipped profiles. */
+  private async refreshEquippedMikooWearUrls() {
+    const equipped = await this.userCosmeticsRepo.find({
+      where: { equipped: true },
+      relations: ['cosmetic'],
+    });
+    let updated = 0;
+    for (const row of equipped) {
+      const c = row.cosmetic;
+      if (!c || !row.userId) continue;
+      if (c.type !== CosmeticType.VIP_BADGE && c.type !== CosmeticType.HOST_BADGE) continue;
+      const anim = c.animationUrl || '';
+      const lower = String(anim).toLowerCase();
+      const playable =
+        !!anim &&
+        !lower.includes('runtime.html') &&
+        !lower.endsWith('.html') &&
+        !lower.endsWith('.json');
+      const next = playable ? anim : c.previewUrl || null;
+      if (!next) continue;
+      const profile = await this.profileRepo.findOne({ where: { userId: row.userId } });
+      if (!profile) continue;
+      if (c.type === CosmeticType.VIP_BADGE && profile.vipBadgeUrl !== next) {
+        profile.vipBadgeUrl = next;
+        await this.profileRepo.save(profile);
+        updated += 1;
+      } else if (c.type === CosmeticType.HOST_BADGE && profile.hostBadgeUrl !== next) {
+        profile.hostBadgeUrl = next;
+        await this.profileRepo.save(profile);
+        updated += 1;
+      }
+    }
+    if (updated > 0) {
+      this.logger.log(`Refreshed equipped wear URLs (${updated} profiles)`);
+    }
+  }
+
+  private async upsertAristocracyRow(payload: {
+    type: CosmeticType;
+    code: string;
+    name: string;
+    previewUrl: string;
+    animationUrl: string | null;
+    minVipLevel: number;
+    minUserLevel?: number;
+    sortOrder: number;
+    meta?: Record<string, unknown>;
+  }) {
+    const existing = await this.cosmeticsRepo.findOne({ where: { code: payload.code } });
+    if (!existing) {
+      await this.cosmeticsRepo.save(
+        this.cosmeticsRepo.create({
+          type: payload.type,
+          code: payload.code,
+          name: payload.name,
+          previewUrl: payload.previewUrl,
+          animationUrl: payload.animationUrl,
+          coinPrice: 0,
+          minVipLevel: payload.minVipLevel,
+          minUserLevel: payload.minUserLevel || 0,
+          isActive: true,
+          sortOrder: payload.sortOrder,
+          meta: payload.meta || null,
+        }),
+      );
+      return;
+    }
+    existing.type = payload.type;
+    existing.name = payload.name;
+    // Force medal/frame URLs so VIP1–7 stay sequential across redeploys.
+    existing.previewUrl = payload.previewUrl;
+    if (payload.animationUrl) existing.animationUrl = payload.animationUrl;
+    existing.minVipLevel = payload.minVipLevel;
+    if (payload.minUserLevel != null) existing.minUserLevel = payload.minUserLevel;
+    existing.isActive = true;
+    existing.coinPrice = 0;
+    existing.sortOrder = payload.sortOrder;
+    existing.meta = { ...(existing.meta || {}), ...(payload.meta || {}) };
+    await this.cosmeticsRepo.save(existing);
+  }
+
+  entryPayload(
+    displayName: string,
+    avatarUrl: string | null,
+    toastUrl: string | null,
+    toastAnimationUrl: string | null,
+    entryEffectUrl: string | null,
+    entryAnimationUrl: string | null,
+    vipLevel = 0,
+  ) {
+    return {
+      type: 'room_join',
+      displayName,
+      avatarUrl,
+      toastUrl: toastUrl ?? null,
+      toastAnimationUrl: toastAnimationUrl ?? null,
+      entryEffectUrl: entryEffectUrl ?? null,
+      entryAnimationUrl: entryAnimationUrl ?? null,
+      animationUrl: entryAnimationUrl ?? null,
+      vipLevel,
+    };
+  }
+}

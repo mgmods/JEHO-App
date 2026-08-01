@@ -1,0 +1,76 @@
+
+jinsepai.png
+size: 1024,1024
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+majiangguang/mj1
+  rotate: false
+  xy: 576, 728
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj2
+  rotate: false
+  xy: 728, 728
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj3
+  rotate: false
+  xy: 424, 576
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj4
+  rotate: false
+  xy: 0, 526
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj5
+  rotate: false
+  xy: 152, 526
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj6
+  rotate: false
+  xy: 576, 576
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj7
+  rotate: false
+  xy: 728, 576
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+majiangguang/mj8
+  rotate: false
+  xy: 424, 728
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+waifaguang
+  rotate: false
+  xy: 0, 678
+  size: 210, 200
+  orig: 210, 200
+  offset: 0, 0
+  index: -1
+yuanbao
+  rotate: false
+  xy: 212, 678
+  size: 210, 200
+  orig: 210, 200
+  offset: 0, 0
+  index: -1

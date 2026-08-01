@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+
+  <title>Olympians</title>
+
+  <!--http://www.html5rocks.com/en/mobile/mobifying/-->
+  <meta name="viewport"
+    content="width=device-width,user-scalable=no,initial-scale=1, minimum-scale=1,maximum-scale=1" />
+
+  <!--https://developer.apple.com/library/safari/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html-->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- force webkit on 360 -->
+  <meta name="renderer" content="webkit" />
+  <meta name="force-rendering" content="webkit" />
+  <!-- force edge on IE -->
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+  <meta name="msapplication-tap-highlight" content="no">
+
+  <!-- force full screen on some browser -->
+  <!-- <meta name="full-screen" content="yes"/>
+  <meta name="x5-fullscreen" content="true"/>
+  <meta name="360-fullscreen" content="true"/> -->
+
+  <!-- force screen orientation on some browser -->
+  <!-- <meta name="screen-orientation" content="landscape"/>
+  <meta name="x5-orientation" content="landscape"> -->
+
+  <!--fix fireball/issues/3568 -->
+  <!--<meta name="browsermode" content="application">-->
+  <meta name="x5-page-mode" content="app">
+
+  <!--<link rel="apple-touch-icon" href=".png" />-->
+  <!--<link rel="apple-touch-icon-precomposed" href=".png" />-->
+
+  <link rel="stylesheet" type="text/css" href="style-mobile.503e6.css" />
+  <link rel="icon" href="favicon.8de18.ico" />
+</head>
+
+<body>
+  <canvas id="GameCanvas" oncontextmenu="event.preventDefault()" tabindex="0"></canvas>
+
+  <div id="splash">
+    <div class="progress-bar stripes">
+      <span style="width: 0%"></span>
+    </div>
+  </div>
+
+  <div id="log-container">Game loading...</div>
+
+
+  <script src="src/settings.96d88.js" charset="utf-8"></script>
+  <!-- JEHO: disable Firebase/Sentry (Replay froze WebView) but keep setupSentry stub — main.js calls it. -->
+  <script>
+    window.USE_SENTRY = false;
+    window.Sentry = undefined;
+    window.setupSentry = function () {};
+    /* JEHO: win FX + faster Fast mode (no updatePosList cascade — that freezes). */
+    (function jehoOlympiansWinPatch() {
+      function unlockAudio() {
+        try {
+          if (window.cc && cc.game) cc.game.resume();
+          if (window.cc && cc.audioEngine) {
+            if (cc.audioEngine.setMusicVolume) cc.audioEngine.setMusicVolume(1);
+            if (cc.audioEngine.setEffectsVolume) cc.audioEngine.setEffectsVolume(1);
+          }
+        } catch (e) {}
+      }
+      document.addEventListener('touchstart', unlockAudio, true);
+      document.addEventListener('click', unlockAudio, true);
+
+      function playWinTone(big) {
+        try {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          var ctx = window.__jehoAc || (window.__jehoAc = new AC());
+          if (ctx.state === 'suspended') ctx.resume();
+          var freqs = big ? [523, 659, 784, 1046] : [784, 988];
+          freqs.forEach(function (f, i) {
+            var o = ctx.createOscillator();
+            var g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = f;
+            g.gain.value = 0.07;
+            o.connect(g);
+            g.connect(ctx.destination);
+            var t0 = ctx.currentTime + i * 0.08;
+            o.start(t0);
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+            o.stop(t0 + 0.22);
+          });
+        } catch (e) {}
+      }
+
+      function pulseWinLabel(view) {
+        try {
+          var n = view.node || view;
+          if (!n || !n.getChildByName) return;
+          var candidates = ['win', 'winnum', 'winNum', 'lblWin', 'win_label'];
+          for (var i = 0; i < candidates.length; i++) {
+            var c = n.getChildByName(candidates[i]);
+            if (c && cc && cc.tween) {
+              cc.tween(c).to(0.12, { scale: 1.25 }).to(0.12, { scale: 1 }).start();
+              return;
+            }
+          }
+          if (view.UIBindData && cc && cc.tween && view.node) {
+            cc.tween(view.node).to(0.08, { scale: 1.02 }).to(0.08, { scale: 1 }).start();
+          }
+        } catch (e) {}
+      }
+
+      function applyWinFx(view, win) {
+        if (!win || win <= 0) return;
+        try {
+          if (typeof view.setWinVal === 'function') view.setWinVal(String(win));
+          else if (view.UIBindData) view.UIBindData.win = String(win);
+        } catch (e) {}
+
+        var bet = 0;
+        try {
+          bet = Number(view._totalBet) || Number(view.UIBindData && view.UIBindData.bet) || 0;
+          if (!bet && view._betList && view._betList.length) bet = Number(view._betList[0]) || 0;
+        } catch (e) {}
+        var ratio = bet > 0 ? win / bet : (win >= 50 ? 5 : 1);
+
+        try {
+          // Native olympians big-win spine (≥5× bet) — uses real AudioManager + DlgManager.
+          if (ratio >= 5 && typeof view.showFlySpine === 'function') {
+            view.showFlySpine(ratio);
+          } else if (typeof view.showFlySpine === 'function' && win >= 20) {
+            view.showFlySpine(Math.max(ratio, 1));
+          }
+        } catch (e) {}
+
+        pulseWinLabel(view);
+        playWinTone(ratio >= 5);
+      }
+
+      function patchRoomView(c) {
+        if (!c || c.__jehoWinPatch) return;
+        if (typeof c.symbolDataNotUpdatePoslis !== 'function') return;
+        c.__jehoWinPatch = 1;
+        var orig = c.symbolDataNotUpdatePoslis.bind(c);
+        c.symbolDataNotUpdatePoslis = function () {
+          var win = 0;
+          try {
+            var syms = this._symbols;
+            var idx = this._dataSymbolIndex || 0;
+            var sym = syms && syms[idx];
+            win = Number((sym && sym.winMoney) || this._allWinMoney || 0) || 0;
+          } catch (e) {}
+          orig();
+          applyWinFx(this, win);
+          try { this._isgaming = false; } catch (e) {}
+        };
+        if (typeof c.setWinVal === 'function' && !c.__jehoSetWinPatch) {
+          c.__jehoSetWinPatch = 1;
+          var setOrig = c.setWinVal.bind(c);
+          c.setWinVal = function (v) {
+            try {
+              if (String(v) === '0' && this._allWinMoney > 0 && this._isgaming === false) {
+                return setOrig(String(this._allWinMoney));
+              }
+            } catch (e) {}
+            return setOrig(v);
+          };
+        }
+      }
+
+      function patchFast(c) {
+        if (!c || c.__jehoFastPatch) return;
+        if (typeof c.onFastClick !== 'function') return;
+        c.__jehoFastPatch = 1;
+        var fo = c.onFastClick.bind(c);
+        c.onFastClick = function () {
+          fo();
+          try {
+            // Original fast=0.075; make it clearly snappier for JEHO WebView.
+            if (this._isFast) this._itemAniTime = 0.02;
+            else this._itemAniTime = 0.12;
+          } catch (e) {}
+        };
+        // If already toggled before patch, keep current; else ensure normal speed baseline.
+        try {
+          if (this && false) {}
+          if (c._isFast) c._itemAniTime = 0.02;
+        } catch (e) {}
+      }
+
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries++;
+        try {
+          if (!window.cc || !cc.director) return;
+          var scene = cc.director.getScene();
+          if (!scene) return;
+          var comps = scene.getComponentsInChildren(cc.Component);
+          for (var i = 0; i < comps.length; i++) {
+            patchRoomView(comps[i]);
+            patchFast(comps[i]);
+          }
+        } catch (e) {}
+        if (tries > 180) clearInterval(timer);
+      }, 400);
+    })();
+  </script>
+  <script src="main.1ad9e.js" charset="utf-8"></script>
+
+  <script type="text/javascript">
+    (function () {
+      // open web debugger console
+      if (typeof VConsole !== 'undefined') {
+        window.vConsole = new VConsole();
+      }
+
+      var debug = window._CCSettings.debug;
+      var splash = document.getElementById('splash');
+      splash.style.display = 'block';
+
+      function loadScript(moduleName, cb) {
+        function scriptLoaded() {
+          document.body.removeChild(domScript);
+          domScript.removeEventListener('load', scriptLoaded, false);
+          cb && cb();
+        };
+        var domScript = document.createElement('script');
+        domScript.async = true;
+        domScript.src = moduleName;
+        domScript.addEventListener('load', scriptLoaded, false);
+        document.body.appendChild(domScript);
+      }
+
+      loadScript(debug ? 'cocos2d-js.js' : 'cocos2d-js-min.ba940.js', function () {
+        if (CC_PHYSICS_BUILTIN || CC_PHYSICS_CANNON) {
+          loadScript(debug ? 'physics.js' : 'physics-min.js', window.boot);
+        }
+        else {
+          window.boot();
+        }
+      });
+    })();
+  </script>
+</body>
+
+</html>

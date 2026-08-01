@@ -1,0 +1,27 @@
+
+haixing_01.png
+size: 148,116
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+di1
+  rotate: true
+  xy: 91, 0
+  size: 115, 54
+  orig: 115, 54
+  offset: 0, 0
+  index: -1
+xing1
+  rotate: false
+  xy: 0, 24
+  size: 89, 91
+  orig: 89, 91
+  offset: 0, 0
+  index: -1
+ying
+  rotate: false
+  xy: 0, 7
+  size: 46, 15
+  orig: 47, 15
+  offset: 0, 0
+  index: -1

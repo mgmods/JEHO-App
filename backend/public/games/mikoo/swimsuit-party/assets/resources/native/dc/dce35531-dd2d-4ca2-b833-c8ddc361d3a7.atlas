@@ -1,0 +1,62 @@
+
+fg_bg_01.png
+size: 1788,1264
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+ditu
+  rotate: true
+  xy: 0, 657
+  size: 605, 1443
+  orig: 605, 1443
+  offset: 0, 0
+  index: -1
+hai
+  rotate: false
+  xy: 993, 393
+  size: 607, 262
+  orig: 607, 262
+  offset: 0, 0
+  index: -1
+shitou1
+  rotate: false
+  xy: 1576, 172
+  size: 211, 219
+  orig: 212, 219
+  offset: 0, 0
+  index: -1
+shitou2
+  rotate: false
+  xy: 1576, 3
+  size: 192, 167
+  orig: 192, 167
+  offset: 0, 0
+  index: -1
+shu1
+  rotate: false
+  xy: 1602, 472
+  size: 174, 460
+  orig: 174, 460
+  offset: 0, 0
+  index: -1
+shu2
+  rotate: true
+  xy: 1445, 934
+  size: 328, 298
+  orig: 330, 300
+  offset: 2, 2
+  index: -1
+shu34
+  rotate: true
+  xy: 993, 0
+  size: 391, 581
+  orig: 392, 583
+  offset: 1, 2
+  index: -1
+shu42
+  rotate: true
+  xy: 0, 33
+  size: 622, 991
+  orig: 633, 995
+  offset: 0, 4
+  index: -1

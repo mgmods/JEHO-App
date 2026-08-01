@@ -1,0 +1,244 @@
+
+snake.png
+size: 965,806
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: false
+  xy: 2, 497
+  size: 142, 307
+  orig: 142, 307
+  offset: 0, 0
+  index: -1
+snake/snake_013
+  rotate: true
+  xy: 2, 2
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_014
+  rotate: true
+  xy: 136, 2
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_015
+  rotate: true
+  xy: 754, 729
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_016
+  rotate: false
+  xy: 888, 672
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_017
+  rotate: true
+  xy: 754, 652
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_018
+  rotate: false
+  xy: 888, 538
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_019
+  rotate: false
+  xy: 2, 231
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_020
+  rotate: false
+  xy: 146, 540
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_021
+  rotate: true
+  xy: 2, 79
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_022
+  rotate: false
+  xy: 154, 274
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_023
+  rotate: false
+  xy: 298, 540
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_024
+  rotate: false
+  xy: 270, 8
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_025
+  rotate: false
+  xy: 306, 274
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_026
+  rotate: false
+  xy: 450, 540
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_027
+  rotate: false
+  xy: 422, 8
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_028
+  rotate: false
+  xy: 458, 274
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_029
+  rotate: false
+  xy: 602, 540
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_030
+  rotate: false
+  xy: 574, 8
+  size: 150, 264
+  orig: 150, 264
+  offset: 0, 0
+  index: -1
+snake/snake_031
+  rotate: true
+  xy: 754, 575
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_032
+  rotate: true
+  xy: 754, 498
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_033
+  rotate: false
+  xy: 888, 404
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_034
+  rotate: true
+  xy: 610, 463
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_035
+  rotate: true
+  xy: 744, 421
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_036
+  rotate: true
+  xy: 610, 386
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_037
+  rotate: true
+  xy: 744, 344
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_038
+  rotate: true
+  xy: 610, 309
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_039
+  rotate: false
+  xy: 878, 270
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_040
+  rotate: true
+  xy: 744, 267
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_041
+  rotate: false
+  xy: 878, 136
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_042
+  rotate: false
+  xy: 726, 2
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_043
+  rotate: false
+  xy: 803, 2
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_044
+  rotate: false
+  xy: 880, 2
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1
+snake/snake_045
+  rotate: true
+  xy: 726, 190
+  size: 75, 132
+  orig: 75, 132
+  offset: 0, 0
+  index: -1

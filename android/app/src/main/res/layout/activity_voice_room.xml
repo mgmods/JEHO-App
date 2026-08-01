@@ -1,0 +1,1819 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/ios_grouped_bg"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:fitsSystemWindows="false">
+
+    <ImageView
+        android:id="@+id/imgRoomBg"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/voice_room_bg"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@drawable/bg_room_vignette"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Voice-room header: close · more · viewers+count · room card. -->
+    <LinearLayout
+        android:id="@+id/headerRoom"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal"
+        android:paddingStart="2dp"
+        android:paddingEnd="14dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <FrameLayout
+            android:id="@+id/btnClose"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/close"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:id="@+id/imgRoomClose"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_room_close" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnHeaderHome"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/nav_home"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/icon_room_up_micro" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnHeaderMore"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/share_room_title"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="visible">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/icon_room_share" />
+        </FrameLayout>
+
+        <!-- Seat / mic join-request bell for host & moderators -->
+        <FrameLayout
+            android:id="@+id/btnPlusWrap"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="طلبات الانضمام للمايك"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/btnPlus"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_asset_notice"
+               />
+
+            <TextView
+                android:id="@+id/tvSeatRequestBadge"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="2dp"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/bg_offers_badge"
+                android:gravity="center"
+                android:text="0"
+                android:textColor="@color/text_primary"
+                android:textSize="8sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvRoomViewerCount"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginStart="2dp"
+            android:background="@drawable/bg_hiyoo_viewer_count_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:gravity="center"
+            android:paddingHorizontal="10dp"
+            android:text="المشاهدين 1"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="visible" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <FrameLayout
+            android:id="@+id/hostCardWrap"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:layout_marginEnd="4dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:maxWidth="200dp">
+
+            <LinearLayout
+                android:id="@+id/hostCard"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_room_compact_card"
+                android:gravity="center_vertical"
+                android:minWidth="128dp"
+                android:orientation="horizontal"
+                android:paddingStart="4dp"
+                android:paddingEnd="10dp">
+
+                <FrameLayout
+                    android:id="@+id/headerHostAvatarWrap"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="6dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:visibility="visible">
+
+                    <ImageView
+                        android:id="@+id/imgRoomCover"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/voice_room"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/icon_classic_seat_normal"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/imgRoomHostAvatar"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_default_avatar" />
+
+                    <ImageView
+                        android:id="@+id/imgRoomHostFrame"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/imgRoomHostBadge"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <!-- Same HostSignalView path as seats — VIP/SVGA frames show immediately. -->
+                    <com.Dramizo.Series.util.HostSignalView
+                        android:id="@+id/headerHostSignal"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/imgRoomHostReaction"
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:elevation="8dp"
+                        android:scaleType="fitCenter"
+                        android:visibility="gone" />
+
+                    <ImageView
+                        android:id="@+id/imgHeaderMicMuted"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_gravity="bottom|end"
+                        android:layout_marginEnd="2dp"
+                        android:layout_marginBottom="2dp"
+                        android:contentDescription="@null"
+                        android:elevation="10dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_asset_mic_close"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="130dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvHostName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:id="@+id/rowHostRankBadges"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/imgHostLevelBadge"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:contentDescription="@null"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHostLevelChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/imgHostVipBadge"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:contentDescription="@null"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvHostVipChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvRoomTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:maxWidth="110dp"
+                        android:text="@string/voice_room"
+                        android:textColor="@color/white"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvRoomId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#B3FFFFFF"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:id="@+id/tvRoomMutedChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:background="@drawable/bg_hiyoo_viewer_count_chip"
+                        android:paddingHorizontal="6dp"
+                        android:paddingVertical="1dp"
+                        android:text="صوت مكتوم"
+                        android:textColor="#FFFFFF"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/imgHostKenar"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clickable="false"
+                android:contentDescription="@null"
+                android:focusable="false"
+                android:scaleType="fitXY"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/viewerPill"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvViewers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvLevel"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/rowAgencyTop"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:text="الوكالة"
+            android:textColor="#CCFFFFFF"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <FrameLayout
+            android:id="@+id/agencyTopSlot1"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="-8dp">
+            <ImageView
+                android:id="@+id/imgAgencyTop1"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgAgencyTopFrame1"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/agencyTopSlot2"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginEnd="-8dp">
+            <ImageView
+                android:id="@+id/imgAgencyTop2"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgAgencyTopFrame2"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/agencyTopSlot3"
+            android:layout_width="38dp"
+            android:layout_height="38dp">
+            <ImageView
+                android:id="@+id/imgAgencyTop3"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgAgencyTopFrame3"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/roomBanner"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="48dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="48dp"
+        android:background="@drawable/bg_room_header_rose"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
+
+        <ImageView
+            android:id="@+id/imgRoomBannerCover"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_voice_seat_circle"
+            android:contentDescription="@null"
+            android:padding="1dp"
+            android:scaleType="centerCrop" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvRoomBannerTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvRoomBannerSubtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="غرفة صوتية مباشرة"
+                android:textColor="#BFFFFFFF"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/hostStage"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
+
+        <FrameLayout
+            android:id="@+id/hostStageAvatarWrap"
+            android:layout_width="66dp"
+            android:layout_height="66dp"
+            android:background="@android:color/transparent"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <View
+                android:id="@+id/hostRippleOuter"
+                android:layout_width="66dp"
+                android:layout_height="66dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_host_speaking_ripple"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="invisible" />
+
+            <View
+                android:id="@+id/hostRippleMid"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_host_speaking_ripple"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="invisible" />
+
+            <View
+                android:id="@+id/hostRippleInner"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_host_speaking_ripple"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="invisible" />
+
+            <ImageView
+                android:id="@+id/imgHostStageAvatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgHostStageSeat"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/icon_classic_seat_normal"
+                android:visibility="visible" />
+
+            <com.Dramizo.Series.util.HostSignalView
+                android:id="@+id/webHostSignal"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_gravity="center"
+                android:background="@android:color/transparent"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgHostStageReaction"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:background="@android:color/transparent"
+                android:clickable="false"
+                android:contentDescription="@null"
+                android:focusable="false"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgHostStageMuted"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="8dp"
+                android:layout_marginBottom="8dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_mic_close"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvHostStageGiftCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_mikoo_mic_charm"
+            android:gravity="center"
+            android:paddingHorizontal="4dp"
+            android:textColor="#FFFFFF"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvHostStageName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:maxWidth="90dp"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Mikoo yellow room cup chip: rm_gx_ic + dayGold (8.02M) -->
+    <LinearLayout
+        android:id="@+id/rowRoomCupChip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_room_cup_chip"
+        android:gravity="center_vertical"
+        android:minWidth="40dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="7dp"
+        android:paddingVertical="3dp"
+        android:visibility="visible"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:contentDescription="@null"
+            android:src="@drawable/rm_gx_ic" />
+
+        <TextView
+            android:id="@+id/tvRoomCupScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:includeFontPadding="false"
+            android:text="0"
+            android:textColor="#FFE9B53C"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerSeats"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:nestedScrollingEnabled="false"
+        android:overScrollMode="never"
+        android:paddingHorizontal="4dp"
+        android:paddingBottom="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+
+    <!-- Top-3 supporters below seats (above official news) — never over room card. -->
+    <LinearLayout
+        android:id="@+id/rowTopHosts"
+        android:layout_width="0dp"
+        android:layout_height="44dp"
+        android:layout_marginTop="2dp"
+        android:background="@android:color/transparent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recyclerSeats">
+
+            <FrameLayout
+                android:id="@+id/topSlot1"
+                android:layout_width="32dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="-10dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:elevation="8dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/imgTop1"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop" />
+
+                <View
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_top_supporter_ring"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+                <ImageView
+                    android:id="@+id/imgTopFrame1"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvTopRank1"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="0dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_offers_badge"
+                    android:elevation="9dp"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvTopScore1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FFFFD54F"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/topSlot2"
+                android:layout_width="32dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="-10dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:elevation="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/imgTop2"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop" />
+
+                <View
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_top_supporter_ring_silver"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+                <ImageView
+                    android:id="@+id/imgTopFrame2"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvTopRank2"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_offers_badge"
+                    android:elevation="7dp"
+                    android:gravity="center"
+                    android:text="2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvTopScore2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FFCFD8DC"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/topSlot3"
+                android:layout_width="32dp"
+                android:layout_height="40dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:elevation="4dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/imgTop3"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop" />
+
+                <View
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_top_supporter_ring_bronze"
+                    android:clickable="false"
+                    android:focusable="false" />
+
+                <ImageView
+                    android:id="@+id/imgTopFrame3"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center_horizontal|top"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvTopRank3"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_offers_badge"
+                    android:elevation="5dp"
+                    android:gravity="center"
+                    android:text="3"
+                    android:textColor="@color/text_primary"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvTopScore3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FFFFAB91"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+            </FrameLayout>
+    </LinearLayout>
+
+
+
+    <LinearLayout
+        android:id="@+id/rowAudienceStrip"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recyclerSeats">
+
+        <TextView
+            android:id="@+id/tvAudienceCount"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerRecentJoiners"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Mikoo music library chip — opens floating player -->
+    <LinearLayout
+        android:id="@+id/llMusicLibraryChip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="67dp"
+        android:layout_marginEnd="16dp"
+        android:background="@drawable/bg_room_music_library"
+        android:gravity="center"
+        android:minWidth="62dp"
+        android:minHeight="24dp"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="10dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginEnd="3dp"
+            android:contentDescription="@null"
+            android:src="@drawable/icon_room_music_library" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="24dp"
+            android:gravity="center_vertical"
+            android:text="@string/music_library_title"
+            android:textColor="@android:color/white"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Floating music player — Mikoo mc_bg style -->
+    <RelativeLayout
+        android:id="@+id/musicCard"
+        android:layout_width="287dp"
+        android:layout_height="80dp"
+        android:layout_marginTop="100dp"
+        android:background="@drawable/mc_bg"
+        android:clickable="true"
+        android:elevation="28dp"
+        android:focusable="true"
+        android:translationZ="28dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0">
+
+        <FrameLayout
+            android:id="@+id/musicDiscWrap"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_alignParentStart="true"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="6dp"
+            android:clipToOutline="true"
+            android:foreground="@drawable/bg_music_disc_ring">
+
+            <ImageView
+                android:id="@+id/imgMusicDisc"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/music_play"
+                android:scaleType="centerCrop"
+                android:src="@drawable/icon_room_music_voice" />
+
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/musicVideoSurface"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone"
+                app:resize_mode="zoom"
+                app:surface_type="texture_view"
+                app:use_controller="false"
+                app:shutter_background_color="@android:color/transparent" />
+
+            <WebView
+                android:id="@+id/musicYoutubeWeb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvMusicTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="64dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="48dp"
+            android:ellipsize="marquee"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:singleLine="true"
+            android:text="@string/music_play"
+            android:textColor="@color/white"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvMusicArtist"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/musicMetaBlock"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="9dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="@null"
+                android:scaleType="centerInside"
+                android:src="@drawable/icon_room_music_voice" />
+
+            <SeekBar
+                android:id="@+id/seekMusic"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:max="1000"
+                android:maxHeight="6dp"
+                android:minHeight="6dp"
+                android:progressDrawable="@drawable/music_voice_seekbar"
+                android:thumb="@drawable/icon_room_voice_point"
+                android:thumbOffset="0dp" />
+
+            <ImageButton
+                android:id="@+id/btnMusicPlayPause"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginEnd="14dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/music_play"
+                android:padding="0dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/icon_music_play" />
+
+            <ImageButton
+                android:id="@+id/btnMusicSkip"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginEnd="14dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/music_skip"
+                android:padding="0dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/icon_music_next" />
+
+            <ImageButton
+                android:id="@+id/btnMusicStop"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginEnd="8dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/music_library_title"
+                android:padding="0dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/icon_music_list_more" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/btnMusicDismiss"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="4dp"
+            android:background="@android:color/transparent"
+            android:gravity="center"
+            android:text="×"
+            android:textColor="#CCFFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <FrameLayout
+        android:id="@+id/musicFloatWrap"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_room_tool_circle"
+        android:clipToOutline="true"
+        android:contentDescription="@string/music_play"
+        android:elevation="20dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <ImageView
+            android:id="@+id/imgMusicFloatDisc"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:padding="6dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/icon_room_music_voice" />
+
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/musicFloatVideo"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+            app:resize_mode="zoom"
+            app:surface_type="texture_view"
+            app:use_controller="false"
+            app:shutter_background_color="@android:color/transparent" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tvCountdown"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/colSideTools"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <FrameLayout
+            android:id="@+id/btnSideGift"
+            android:layout_width="1dp"
+            android:layout_height="1dp" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/btnRaiseHand"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/chatPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="6dp"
+        android:minHeight="110dp"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowTopHosts"
+        app:layout_constraintWidth_percent="0.72">
+
+        <!-- Fixed full-width official news bar (not a tall chat bubble) -->
+        <LinearLayout
+            android:id="@+id/rowOfficialNews"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_room_official_banner"
+            android:gravity="center_vertical"
+            android:minHeight="32dp"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="5dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="5dp"
+            android:visibility="visible">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/room_notice" />
+
+            <TextView
+                android:id="@+id/tvOfficialNewsLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_room_official_chip"
+                android:paddingHorizontal="7dp"
+                android:paddingVertical="2dp"
+                android:text="@string/official_news"
+                android:textColor="#FFFFFFFF"
+                android:textSize="9sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvRoomRules"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:ellipsize="marquee"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:includeFontPadding="false"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:singleLine="true"
+                android:text="@string/respect_rules"
+                android:textColor="#FFF7E19B"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <ScrollView
+            android:id="@+id/scrollChat"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/chatLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layoutDirection="ltr"
+                android:orientation="vertical" />
+        </ScrollView>
+
+        <TextView
+            android:id="@+id/tvChatLine"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:elevation="12dp"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:minHeight="56dp"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Mikoo idle tip pill — tap opens white composer above keyboard -->
+        <TextView
+            android:id="@+id/tvChatInputTips"
+            android:layout_width="0dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_room_chat_input_tips"
+            android:clickable="true"
+            android:ellipsize="end"
+            android:focusable="true"
+            android:gravity="center_vertical|start"
+            android:maxLines="1"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
+            android:text="@string/room_input_tips"
+            android:textColor="#80FFFFFF"
+            android:textSize="13sp" />
+
+        <!-- Legacy id kept gone; real composer is roomChatComposer -->
+        <LinearLayout
+            android:id="@+id/composeBar"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/btnMic"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="8dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/mic_on"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/imgMicIcon"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_pro_mic" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnGift"
+            android:layout_width="45dp"
+            android:layout_height="45dp"
+            android:layout_marginStart="6dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/send_gift"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:id="@+id/imgRoomGift"
+                android:layout_width="45dp"
+                android:layout_height="45dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_room_send_gift" />
+        </FrameLayout>
+
+        <!-- Seat stickers / reactions — visible on bottom bar (Mikoo-style) -->
+        <FrameLayout
+            android:id="@+id/btnSeatSticker"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="6dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/emoji"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:id="@+id/imgSeatSticker"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_emoji" />
+        </FrameLayout>
+
+        <!-- Mikoo private messages (white inbox while in room) -->
+        <FrameLayout
+            android:id="@+id/btnPrivateMsg"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="6dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chat"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:id="@+id/imgPrivateMsg"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_room_msg" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnLock"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+        <FrameLayout
+            android:id="@+id/btnGames"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="6dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/nav_games">
+
+            <ImageView
+                android:id="@+id/imgRoomGamesButton"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_room_game" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnTools"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
+            android:layout_marginStart="6dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/settings">
+
+            <ImageView
+                android:id="@+id/imgRoomMore"
+                android:layout_width="35dp"
+                android:layout_height="35dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_room_video_more" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Mikoo MultiInputMsgView: full-screen overlay; white bar sits above keyboard -->
+    <FrameLayout
+        android:id="@+id/roomChatComposer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#66000000"
+        android:clickable="true"
+        android:elevation="22dp"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:id="@+id/roomChatComposerBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="@drawable/bg_room_input_msg"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:orientation="horizontal"
+            android:padding="11dp">
+
+            <EditText
+                android:id="@+id/etChat"
+                android:layout_width="0dp"
+                android:layout_height="37dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_room_edit_msg"
+                android:cursorVisible="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:gravity="center_vertical|start"
+                android:hint="@string/room_msg_edit_hint"
+                android:imeOptions="actionSend"
+                android:importantForAutofill="no"
+                android:inputType="textCapSentences"
+                android:maxLines="3"
+                android:paddingHorizontal="16dp"
+                android:textAlignment="viewStart"
+                android:textColor="#FF222222"
+                android:textColorHint="#FFB2B2B2"
+                android:textCursorDrawable="@null"
+                android:textDirection="locale"
+                android:textSize="14sp" />
+
+            <FrameLayout
+                android:id="@+id/btnEmoji"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/emoji">
+
+                <ImageView
+                    android:id="@+id/imgRoomEmoji"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/emoji"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_asset_emoji" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/btnSendChat"
+                android:layout_width="68dp"
+                android:layout_height="37dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_room_send_msg"
+                android:contentDescription="@string/send_btn"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="@string/send_btn"
+                android:textColor="@android:color/white"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/likeHeartsOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <FrameLayout
+        android:id="@+id/giftOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:elevation="28dp"
+        android:focusable="false"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Join toast lane — ~2cm above mic/music bottom bar -->
+    <com.Dramizo.Series.widget.ComingMsgView
+        android:id="@+id/comingMsgView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginBottom="48dp"
+        android:elevation="32dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Mikoo ComboGiftView — center gift toast -->
+    <com.Dramizo.Series.widget.ComboGiftView
+        android:id="@+id/comboGiftView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:elevation="40dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.42" />
+
+    <com.Dramizo.Series.util.NativeRoomEffectsView
+        android:id="@+id/giftChatEffects"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:elevation="31dp"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/chatPanel"
+        app:layout_constraintEnd_toEndOf="@id/chatPanel"
+        app:layout_constraintStart_toStartOf="@id/chatPanel"
+        app:layout_constraintTop_toTopOf="@id/chatPanel" />
+
+    <com.Dramizo.Series.util.NativeRoomEffectsView
+        android:id="@+id/webVisualEffects"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:elevation="30dp"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <FrameLayout
+        android:id="@+id/gameOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:elevation="24dp"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Mikoo BSGameWebDialog: full-screen transparent WebView; H5 sceneMode=0 = half panel -->
+        <FrameLayout
+            android:id="@+id/gamePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom"
+            android:background="@android:color/transparent"
+            android:clipChildren="false"
+            android:elevation="0dp">
+
+            <FrameLayout
+                android:id="@+id/gameStage"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:background="@android:color/transparent">
+
+                <WebView
+                    android:id="@+id/webGame"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/transparent" />
+            </FrameLayout>
+
+            <!-- Loading / close kept gone — Mikoo uses in-game back only -->
+            <FrameLayout
+                android:id="@+id/gameLoadingOverlay"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <FrameLayout
+                android:id="@+id/btnCloseGameOverlay"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </FrameLayout>
+    </FrameLayout>
+
+    <!-- Tasks float hidden for now (profile Task Center remains). -->
+    <FrameLayout
+        android:id="@+id/taskFloatWrap"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="72dp"
+        android:clickable="false"
+        android:contentDescription="المهام"
+        android:elevation="18dp"
+        android:focusable="false"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <FrameLayout
+            android:id="@+id/taskFloatPulse"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_task_float_circle"
+            android:elevation="2dp">
+
+            <ImageView
+                android:id="@+id/imgTaskFloat"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_tasks" />
+        </FrameLayout>
+
+        <ImageView
+            android:id="@+id/btnTaskFloatClose"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/bg_task_float_close"
+            android:clickable="true"
+            android:contentDescription="@string/close"
+            android:elevation="8dp"
+            android:focusable="true"
+            android:padding="5dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_close_simple" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/luckyFloatWrap"
+        android:layout_width="96dp"
+        android:layout_height="112dp"
+        android:layout_marginLeft="14dp"
+        android:clickable="true"
+        android:contentDescription="صندوق الحظ"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.42">
+
+        <FrameLayout
+            android:layout_width="84dp"
+            android:layout_height="84dp"
+            android:layout_gravity="top|center_horizontal"
+            android:background="@drawable/bg_lucky_float"
+            android:padding="10dp">
+
+            <ImageView
+                android:id="@+id/imgLuckyFloat"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_chest_blue" />
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@drawable/bg_lucky_win_card"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:text="حظ"
+            android:textColor="#FFD54F"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/btnLuckyFloatClose"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:background="@drawable/bg_pro_icon_circle"
+            android:contentDescription="@string/close"
+            android:padding="6dp"
+            android:src="@drawable/ic_pro_close" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/luckyWinOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#B3000000"
+        android:clickable="true"
+        android:elevation="24dp"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_lucky_win_card"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingHorizontal="22dp"
+            android:paddingTop="18dp"
+            android:paddingBottom="22dp">
+
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/lottieLuckyWin"
+                android:layout_width="140dp"
+                android:layout_height="140dp"
+                android:scaleType="centerInside"
+                app:lottie_autoPlay="false"
+                app:lottie_fileName="lottie/gift_lucky.json"
+                app:lottie_loop="false" />
+
+            <ImageView
+                android:id="@+id/imgLuckyWinBox"
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_asset_chest_gold"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvLuckyWinTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="صندوق الحظ"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvLuckyWinReward"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:textColor="#FFD54F"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

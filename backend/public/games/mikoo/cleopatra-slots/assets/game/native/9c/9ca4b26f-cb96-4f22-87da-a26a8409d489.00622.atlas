@@ -1,0 +1,69 @@
+
+win.png
+size: 1723,395
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+0
+  rotate: false
+  xy: 1159, 21
+  size: 154, 154
+  orig: 154, 154
+  offset: 0, 0
+  index: -1
+1
+  rotate: false
+  xy: 1159, 177
+  size: 318, 82
+  orig: 318, 82
+  offset: 0, 0
+  index: -1
+4 9
+  rotate: true
+  xy: 761, 27
+  size: 366, 396
+  orig: 366, 396
+  offset: 0, 0
+  index: -1
+light
+  rotate: false
+  xy: 1479, 4
+  size: 200, 199
+  orig: 200, 199
+  offset: 0, 0
+  index: -1
+win2
+  rotate: false
+  xy: 1159, 261
+  size: 357, 66
+  orig: 357, 66
+  offset: 0, 0
+  index: -1
+win3
+  rotate: false
+  xy: 1159, 329
+  size: 365, 64
+  orig: 365, 64
+  offset: 0, 0
+  index: -1
+玛雅
+  rotate: true
+  xy: 1526, 205
+  size: 188, 195
+  orig: 188, 195
+  offset: 0, 0
+  index: -1
+玛雅1
+  rotate: false
+  xy: 384, 5
+  size: 375, 388
+  orig: 375, 388
+  offset: 0, 0
+  index: -1
+金币4
+  rotate: false
+  xy: 2, 2
+  size: 380, 391
+  orig: 380, 391
+  offset: 0, 0
+  index: -1

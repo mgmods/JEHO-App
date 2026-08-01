@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الدعم | JEHO CHAT</title>
+    <link rel="icon" type="image/png" href="/assets/brand/jeho_logo.png">
+    
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" id="bootstrap-rtl">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --primary: #2563EB;
+            --primary-glow: rgba(37, 99, 235, 0.15);
+            --secondary: #06B6D4;
+            --secondary-glow: rgba(6, 182, 212, 0.15);
+            --bg-light: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Tajawal', 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        html[lang="en"] {
+            direction: ltr;
+        }
+        html[lang="en"] body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Glowing Orbs */
+        .glowing-orb {
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            filter: blur(160px);
+            opacity: 0.08;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 { top: 5%; right: -50px; background: var(--primary); }
+        .orb-2 { bottom: 10%; left: -100px; background: var(--secondary); }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            transition: var(--transition);
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 18px 0;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--text-main) !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+        .nav-link {
+            font-weight: 500;
+            color: var(--text-muted) !important;
+            margin: 0 12px;
+            transition: var(--transition);
+        }
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .lang-switch {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Header block */
+        .page-header {
+            padding: 160px 0 60px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .page-header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+        }
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Forms styling */
+        .form-control, .form-select {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: var(--text-main) !important;
+            border-radius: 12px;
+            padding: 14px;
+            transition: var(--transition);
+        }
+        .form-control:focus, .form-select:focus {
+            background: #ffffff;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 0.25rem var(--primary-glow);
+        }
+        .form-select option {
+            background-color: #ffffff;
+            color: var(--text-main);
+        }
+        .form-label {
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            font-size: 0.98rem;
+        }
+
+        .btn-premium {
+            background: var(--gradient);
+            border: none;
+            color: white !important;
+            border-radius: 30px;
+            padding: 12px 35px;
+            font-weight: 600;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px var(--primary-glow);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+        }
+
+        .contact-info-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 35px;
+            height: 100%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.01);
+        }
+        .contact-info-card h3 {
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #0f172a;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+        .contact-item i {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: rgba(37, 99, 235, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 1.1rem;
+            margin-left: 15px;
+        }
+        html[lang="en"] .contact-item i {
+            margin-left: 0;
+            margin-right: 15px;
+        }
+        .contact-item h5 {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #0f172a;
+        }
+        .contact-item p {
+            color: var(--text-muted);
+            margin-bottom: 0;
+            font-size: 0.95rem;
+        }
+
+        /* Language Toggle Display Classes */
+        .show-en, [lang="en"] .show-ar { display: none !important; }
+        [lang="en"] .show-en { display: block !important; }
+        span[lang="en"].show-en { display: inline !important; }
+        .show-ar, [lang="ar"] .show-ar { display: block !important; }
+        span[lang="ar"].show-ar { display: inline !important; }
+
+        /* Footer */
+        footer {
+            background: #0f172a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 60px 0 30px;
+            color: #94a3b8;
+            margin-top: 100px;
+            font-size: 0.95rem;
+            position: relative;
+            z-index: 2;
+        }
+        footer a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        footer a:hover {
+            color: white;
+        }
+    
+        main, .hero, .features, .how-works, .cta-section, footer, .navbar, .container, .page-header, .legal-wrap {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo">
+                <span>JEHO CHAT</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="lang-switch" onclick="toggleLanguage()">
+                    <i class="fas fa-globe"></i>
+                    <span class="show-ar">EN</span>
+                    <span class="show-en">عربي</span>
+                </button>
+                <a href="/" class="btn btn-premium btn-sm">
+                    <span class="show-ar">الرئيسية</span>
+                    <span class="show-en">Home</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="container">
+            <h1 class="show-ar">تواصل معنا</h1>
+            <h1 class="show-en">Contact Us</h1>
+            <p class="show-ar">تطبيق JEHO CHAT (JEHO CHAT) &mdash; نحن هنا لمساعدتك على مدار الساعة</p>
+            <p class="show-en">JEHO CHAT Application &mdash; We are here to help you 24/7</p>
+        </div>
+    </header>
+
+    <!-- Content Panel -->
+    <main class="container">
+        <div class="glass-panel">
+            
+            <div class="row g-4">
+                <!-- Info Column -->
+                <div class="col-lg-5">
+                    <div class="contact-info-card">
+                        <h3 class="show-ar">معلومات الدعم الفني</h3>
+                        <h3 class="show-en">Support Information</h3>
+                        
+                        <div class="contact-item">
+                            <i class="fas fa-envelope"></i>
+                            <div>
+                                <h5 class="show-ar">البريد الإلكتروني</h5>
+                                <h5 class="show-en">Email Support</h5>
+                                <p class="text-lowercase">sf213777@gmail.com</p>
+                            </div>
+                        </div>
+                        
+                        <div class="contact-item">
+                            <i class="fas fa-clock"></i>
+                            <div>
+                                <h5 class="show-ar">ساعات العمل</h5>
+                                <h5 class="show-en">Working Hours</h5>
+                                <p class="show-ar">24 ساعة / 7 أيام في الأسبوع</p>
+                                <p class="show-en">24/7 Availability</p>
+                            </div>
+                        </div>
+                        
+                        <div class="contact-item">
+                            <i class="fas fa-headset"></i>
+                            <div>
+                                <h5 class="show-ar">متوسط سرعة الاستجابة</h5>
+                                <h5 class="show-en">Response Speed</h5>
+                                <p class="show-ar">خلال 24 ساعة كحد أقصى</p>
+                                <p class="show-en">Within 24 hours maximum</p>
+                            </div>
+                        </div>
+                        
+                        <hr style="border-color: var(--border-color); margin: 30px 0;">
+                        
+                        <h5 class="show-ar mb-3">تفاصيل المطور</h5>
+                        <h5 class="show-en mb-3">Developer Credentials</h5>
+                        <p class="show-ar text-muted">الجهة المطورة: JEHO CHAT</p>
+                        <p class="show-en text-muted">Organization: JEHO CHAT</p>
+                    </div>
+                </div>
+                
+                <!-- Form Column -->
+                <div class="col-lg-7">
+                    <div class="p-4" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.02);">
+                        <h3 class="mb-4" style="font-weight: 700; color: #0f172a;">
+                            <span class="show-ar">أرسل لنا رسالة</span>
+                            <span class="show-en">Send Us a Message</span>
+                        </h3>
+                        
+                        <!-- Success and Error Alerts -->
+                        
+                        <div class="alert alert-success border-0 text-white" style="background: #2ecc71;">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <span class="show-ar">تم إرسال رسالتك بنجاح! سنتواصل معك عبر بريدك الإلكتروني قريباً.</span>
+                            <span class="show-en">Your message has been sent successfully! We will contact you soon.</span>
+                        </div>
+                        
+                        
+                        
+                        <div class="alert alert-danger border-0 text-white" style="background: #e74c3c;">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            
+                        </div>
+                        
+                        
+                        <form method="POST" action="contact.php">
+                            <input type="hidden" name="current_lang" id="current_lang" value="ar">
+                            
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        <span class="show-ar">الاسم *</span>
+                                        <span class="show-en">Your Name *</span>
+                                    </label>
+                                    <input type="text" class="form-control" name="name" required 
+                                           value="">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">
+                                        <span class="show-ar">البريد الإلكتروني *</span>
+                                        <span class="show-en">Email Address *</span>
+                                    </label>
+                                    <input type="email" class="form-control" name="email" required
+                                           value="">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">
+                                        <span class="show-ar">نوع الاستفسار</span>
+                                        <span class="show-en">Inquiry Topic</span>
+                                    </label>
+                                    <select class="form-select" name="subject">
+                                        <option value="general" selected>
+                                            <span class="show-ar">استفسار عام</span>
+                                            <span class="show-en">General Inquiry</span>
+                                        </option>
+                                        <option value="technical">
+                                            <span class="show-ar">مشكلة تقنية في التطبيق</span>
+                                            <span class="show-en">Technical App Issue</span>
+                                        </option>
+                                        <option value="account">
+                                            <span class="show-ar">مشكلة في تسجيل الحساب</span>
+                                            <span class="show-en">Account Issues</span>
+                                        </option>
+                                        <option value="payment">
+                                            <span class="show-ar">مشكلة شحن العملات الافتراضية</span>
+                                            <span class="show-en">Coins Purchase Issues</span>
+                                        </option>
+                                        <option value="report">
+                                            <span class="show-ar">الإبلاغ عن مستخدم مسيء</span>
+                                            <span class="show-en">Report Misbehavior / User</span>
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">
+                                        <span class="show-ar">تفاصيل الرسالة *</span>
+                                        <span class="show-en">Message Details *</span>
+                                    </label>
+                                    <textarea class="form-control" name="message" rows="5" required></textarea>
+                                </div>
+                                <div class="col-12 text-center mt-4">
+                                    <button type="submit" class="btn btn-premium w-100 py-3 text-white">
+                                        <span class="show-ar"><i class="fas fa-paper-plane me-2"></i> إرسال الرسالة</span>
+                                        <span class="show-en"><i class="fas fa-paper-plane me-2"></i> Send Message</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <p>&copy;  JEHO CHAT. All rights reserved by JEHO CHAT.</p>
+            <p style="margin: 10px 0 0;">
+                <a href="/privacy.html" class="mx-2"><span class="show-ar">سياسة الخصوصية</span><span class="show-en">Privacy Policy</span></a>
+                <a href="/terms.html" class="mx-2"><span class="show-ar">شروط الخدمة</span><span class="show-en">Terms of Service</span></a>
+                <a href="/data-collection.html" class="mx-2"><span class="show-ar">صفحة جمع البيانات</span><span class="show-en">Data Collection</span></a>
+                <a href="/delete-account.html" class="mx-2"><span class="show-ar">حذف الحساب</span><span class="show-en">Delete Account</span></a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleLanguage() {
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            const langInput = document.getElementById('current_lang');
+            
+            if (htmlTag.getAttribute('lang') === 'ar') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                localStorage.setItem('hams_lang', 'en');
+                if(langInput) langInput.value = 'en';
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                localStorage.setItem('hams_lang', 'ar');
+                if(langInput) langInput.value = 'ar';
+            }
+}
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('hams_lang');
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            const langInput = document.getElementById('current_lang');
+            
+            if (savedLang === 'en') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                if(langInput) langInput.value = 'en';
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                if(langInput) langInput.value = 'ar';
+            }
+        });
+    </script>
+</body>
+</html>

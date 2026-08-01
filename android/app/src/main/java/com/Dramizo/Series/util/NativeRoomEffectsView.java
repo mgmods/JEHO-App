@@ -1,0 +1,1331 @@
+package com.Dramizo.Series.util;
+
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.AnimatorSet;
+import android.animation.Keyframe;
+import android.animation.ObjectAnimator;
+import android.animation.PropertyValuesHolder;
+import android.animation.ValueAnimator;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
+import android.util.AttributeSet;
+import android.util.LruCache;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.AccelerateDecelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LinearInterpolator;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.annotation.Nullable;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
+
+import com.airbnb.lottie.LottieAnimationView;
+import com.airbnb.lottie.LottieDrawable;
+import com.bumptech.glide.Glide;
+import com.Dramizo.Series.R;
+import com.tencent.qgame.animplayer.AnimView;
+import com.tencent.qgame.animplayer.util.ScaleType;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * Transparent, touch-pass-through native renderer for room entries and gifts.
+ * It intentionally owns only one effect tree at a time to keep room memory bounded.
+ */
+public final class NativeRoomEffectsView extends FrameLayout {
+    private static final String[] ENTRY_VARIANTS = {
+            "normal", "vip", "gold", "diamond", "legend", "supporter"
+    };
+    private static final int[] ENTRY_ACCENTS = {
+            0xff5ec8ff, 0xffffd56a, 0xffffb21d, 0xffb7e0ff, 0xffff6a3a, 0xffd39bff
+    };
+    private static final Map<String, GiftSpec> GIFTS = buildGiftCatalog();
+    /** Horizontal sprite strips (9 frames) — same as Host signals / gifts.js. */
+    private static final Map<String, SpriteSpec> SPRITES = buildSpriteCatalog();
+    private static final LruCache<String, Bitmap> BITMAPS =
+            new LruCache<String, Bitmap>(12 * 1024) {
+                @Override protected int sizeOf(String key, Bitmap value) {
+                    return Math.max(1, value.getByteCount() / 1024);
+                }
+            };
+
+    private final Runnable scheduledFinish = this::finishActive;
+    private final List<Animator> looseAnimators = new ArrayList<>();
+    @Nullable private AnimatorSet activeAnimators;
+    @Nullable private Runnable activeCompletion;
+    @Nullable private ExoPlayer giftPlayer;
+    @Nullable private AnimView entryAnimView;
+    @Nullable private AnimView giftAnimView;
+    @Nullable private com.opensource.svgaplayer.SVGAImageView giftSvgaView;
+    @Nullable private SpriteSheetView activeSprite;
+    private int generation;
+
+    public NativeRoomEffectsView(Context context) {
+        this(context, null);
+    }
+
+    public NativeRoomEffectsView(Context context, AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public NativeRoomEffectsView(Context context, AttributeSet attrs, int style) {
+        super(context, attrs, style);
+        setBackgroundColor(Color.TRANSPARENT);
+        setClipChildren(false);
+        setClipToPadding(false);
+        setClickable(false);
+        setFocusable(false);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+        setLayoutDirection(TextUtils.getLayoutDirectionFromLocale(Locale.getDefault()));
+        setVisibility(GONE);
+    }
+
+    public boolean showGift(@Nullable String giftId, @Nullable String remoteIconUrl,
+                            @Nullable String senderName, int quantity,
+                            long durationMs, @Nullable Runnable onComplete) {
+        return showGift(giftId, remoteIconUrl, null, senderName, quantity, durationMs, onComplete);
+    }
+
+    public boolean showGift(@Nullable String giftId, @Nullable String remoteIconUrl,
+                            @Nullable String animationUrl, @Nullable String senderName, int quantity,
+                            long durationMs, @Nullable Runnable onComplete) {
+        GiftSpec spec = giftId == null ? null : GIFTS.get(giftId.toLowerCase(Locale.US));
+        if (spec == null && giftId != null && !giftId.isEmpty()) {
+            // Unknown catalog id — still play with a generic run/burst family.
+            spec = new GiftSpec(giftId.toLowerCase(Locale.US), giftId, "run", "premium");
+        }
+        if (spec == null) return false;
+        interruptActive(false);
+        int token = ++generation;
+        activeCompletion = onComplete;
+        setAlpha(1f);
+        setVisibility(VISIBLE);
+        final GiftSpec finalSpec = spec;
+        post(() -> {
+            if (token != generation) return;
+            renderGift(finalSpec, remoteIconUrl, animationUrl, senderName, Math.max(1, quantity));
+            try {
+                // Gift SFX disabled.
+            } catch (Exception ignored) {
+            }
+            long hold = durationMs > 0 ? durationMs : (quantity > 1 ? 5200 : 4800);
+            if (isCrossingFamily(finalSpec.family)) {
+                hold = Math.max(hold, 4500L);
+            }
+            scheduleFinish(token, hold);
+        });
+        return true;
+    }
+
+    public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
+                             @Nullable String variant, @Nullable String remoteFrameUrl,
+                             long durationMs,
+                             @Nullable Runnable onComplete) {
+        return showEntry(displayName, avatarUrl, variant, remoteFrameUrl, null, durationMs,
+                0, 1, 0L, null, null, null, false, false, onComplete);
+    }
+
+    public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
+                             @Nullable String variant, @Nullable String remoteFrameUrl,
+                             long durationMs,
+                             int vipLevel, int userLevel, long wealthScore,
+                             @Nullable String vipBadgeUrl, @Nullable String levelBadgeUrl,
+                             @Nullable String hostBadgeUrl, boolean isHost,
+                             @Nullable Runnable onComplete) {
+        return showEntry(displayName, avatarUrl, variant, remoteFrameUrl, null, durationMs,
+                vipLevel, userLevel, wealthScore, vipBadgeUrl, levelBadgeUrl,
+                hostBadgeUrl, isHost, false, onComplete);
+    }
+
+    public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
+                             @Nullable String variant, @Nullable String remoteFrameUrl,
+                             long durationMs,
+                             int vipLevel, int userLevel, long wealthScore,
+                             @Nullable String vipBadgeUrl, @Nullable String levelBadgeUrl,
+                             @Nullable String hostBadgeUrl, boolean isHost, boolean showHiBadge,
+                             @Nullable Runnable onComplete) {
+        return showEntry(displayName, avatarUrl, variant, remoteFrameUrl, null, durationMs,
+                vipLevel, userLevel, wealthScore, vipBadgeUrl, levelBadgeUrl,
+                hostBadgeUrl, isHost, showHiBadge, onComplete);
+    }
+
+    public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
+                             @Nullable String variant, @Nullable String remoteFrameUrl,
+                             @Nullable String entryMediaUrl,
+                             long durationMs,
+                             int vipLevel, int userLevel, long wealthScore,
+                             @Nullable String vipBadgeUrl, @Nullable String levelBadgeUrl,
+                             @Nullable String hostBadgeUrl, boolean isHost, boolean showHiBadge,
+                             @Nullable Runnable onComplete) {
+        int variantIndex = indexOfVariant(variant);
+        if (variantIndex < 0) variantIndex = 0;
+        // Interrupt previous without firing its completion — queue owns sequencing.
+        interruptActive(false);
+        int token = ++generation;
+        activeCompletion = onComplete;
+        setAlpha(1f);
+        setVisibility(VISIBLE);
+        final int finalVariant = variantIndex;
+        final String media = CosmeticMedia.playableUrl(entryMediaUrl);
+        post(() -> {
+            if (token != generation) return;
+            renderEntry(displayName, avatarUrl, remoteFrameUrl, media, finalVariant,
+                    vipLevel, userLevel, wealthScore, vipBadgeUrl, levelBadgeUrl,
+                    hostBadgeUrl, isHost, showHiBadge);
+            scheduleFinish(token, durationMs > 0 ? durationMs : (media != null ? 6000 : 2800));
+        });
+        return true;
+    }
+
+    public void showSlotWinBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                   long winCoins, @Nullable String gameTitle) {
+        if (getContext() == null) return;
+        post(() -> showResultBubble(displayName, avatarUrl, winCoins, gameTitle, true));
+    }
+
+    public void showSlotLoseBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                    long betCoins, @Nullable String gameTitle) {
+        if (getContext() == null) return;
+        post(() -> showResultBubble(displayName, avatarUrl, betCoins, gameTitle, false));
+    }
+
+    private void showResultBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                  long coins, @Nullable String gameTitle, boolean won) {
+        showResultBubble(displayName, avatarUrl, coins, gameTitle, null, won);
+    }
+
+    private void showResultBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                  long coins, @Nullable String gameTitle,
+                                  @Nullable String gameIconUrl, boolean won) {
+        setVisibility(VISIBLE);
+        bringToFront();
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        int padH = dp(14), padV = dp(10);
+        card.setPadding(padH, padV, padH, padV);
+        card.setMinimumWidth(dp(220));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(22));
+        bg.setColor(won ? 0xCC1a0a33 : 0xCC1a1218);
+        bg.setStroke(dp(1), won ? 0xFFFFD700 : 0xFFB0B0B0);
+        card.setBackground(bg);
+
+        ImageView img = new ImageView(getContext());
+        int avatarSize = dp(48);
+        LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
+        imgLp.setMarginEnd(dp(10));
+        img.setLayoutParams(imgLp);
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(0xFF2a1a44);
+        img.setBackground(circle);
+        img.setClipToOutline(true);
+        String primaryUrl = avatarUrl;
+        if ((primaryUrl == null || primaryUrl.isEmpty())
+                && gameIconUrl != null && !gameIconUrl.isEmpty()) {
+            primaryUrl = gameIconUrl;
+        }
+        if (primaryUrl != null && !primaryUrl.isEmpty()) {
+            try {
+                Glide.with(getContext()).load(primaryUrl).circleCrop().into(img);
+            } catch (Exception ignored) {
+            }
+        } else {
+            img.setImageResource(R.drawable.jeho_logo);
+        }
+        card.addView(img);
+
+        // Game cover badge (when we also have a player avatar).
+        if (gameIconUrl != null && !gameIconUrl.isEmpty()
+                && avatarUrl != null && !avatarUrl.isEmpty()) {
+            ImageView gameImg = new ImageView(getContext());
+            int gSize = dp(36);
+            LinearLayout.LayoutParams gLp = new LinearLayout.LayoutParams(gSize, gSize);
+            gLp.setMarginEnd(dp(8));
+            gameImg.setLayoutParams(gLp);
+            gameImg.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable gBg = new GradientDrawable();
+            gBg.setCornerRadius(dp(8));
+            gBg.setColor(0xFF2a1a44);
+            gameImg.setBackground(gBg);
+            gameImg.setClipToOutline(true);
+            try {
+                Glide.with(getContext()).load(gameIconUrl).centerCrop().into(gameImg);
+            } catch (Exception ignored) {
+            }
+            card.addView(gameImg);
+        }
+
+        LinearLayout col = new LinearLayout(getContext());
+        col.setOrientation(LinearLayout.VERTICAL);
+        col.setGravity(Gravity.CENTER_VERTICAL);
+        col.setMinimumWidth(dp(140));
+
+        TextView tvName = new TextView(getContext());
+        tvName.setTextColor(0xFFFFFFFF);
+        tvName.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14f);
+        tvName.setMaxLines(1);
+        tvName.setEllipsize(TextUtils.TruncateAt.END);
+        tvName.setText(displayName != null && !displayName.isEmpty() ? displayName : "لاعب");
+        col.addView(tvName, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView tvWin = new TextView(getContext());
+        tvWin.setTextColor(won ? 0xFFFFD700 : 0xFFCCCCCC);
+        tvWin.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f);
+        tvWin.setMaxLines(2);
+        String coinsLine = won
+                ? String.format(Locale.US, "🎉 +%,d كوينز", coins)
+                : String.format(Locale.US, "💔 −%,d كوينز", coins);
+        if (gameTitle != null && !gameTitle.isEmpty()) coinsLine += " · " + gameTitle;
+        tvWin.setText(coinsLine);
+        col.addView(tvWin, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        card.addView(col);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP | Gravity.START);
+        lp.topMargin = dp(72);
+        // Shift bubble toward the right a bit (not stuck on the far left).
+        lp.setMarginStart(dp(36));
+        lp.setMarginEnd(dp(16));
+        addView(card, lp);
+
+        card.setAlpha(0f);
+        card.setTranslationX(-dp(40));
+        card.animate()
+                .alpha(1f).translationX(0f)
+                .setDuration(350)
+                .withEndAction(() ->
+                        card.animate().setStartDelay(won ? 3200 : 2600).alpha(0f).setDuration(400)
+                                .withEndAction(() -> removeView(card))
+                                .start())
+                .start();
+    }
+
+    public void showSlotWinBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                   long winCoins, @Nullable String gameTitle,
+                                   @Nullable String gameIconUrl) {
+        if (getContext() == null) return;
+        post(() -> showResultBubble(displayName, avatarUrl, winCoins, gameTitle, gameIconUrl, true));
+    }
+
+    public void showSlotLoseBubble(@Nullable String displayName, @Nullable String avatarUrl,
+                                    long betCoins, @Nullable String gameTitle,
+                                    @Nullable String gameIconUrl) {
+        if (getContext() == null) return;
+        post(() -> showResultBubble(displayName, avatarUrl, betCoins, gameTitle, gameIconUrl, false));
+    }
+
+    public void stopAll() {
+        interruptActive(true);
+    }
+
+    /** Clears the active effect. When {@code fireCompletion} is true, notifies the queue. */
+    private void interruptActive(boolean fireCompletion) {
+        generation++;
+        removeCallbacks(scheduledFinish);
+        if (activeAnimators != null) {
+            activeAnimators.cancel();
+            activeAnimators = null;
+        }
+        Runnable completion = activeCompletion;
+        activeCompletion = null;
+        clearContent();
+        if (fireCompletion && completion != null) completion.run();
+    }
+
+    public void destroy() {
+        stopAll();
+        removeAllViews();
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        return false;
+    }
+
+    @Override public boolean onTouchEvent(MotionEvent event) {
+        return false;
+    }
+
+    @Override public boolean onInterceptTouchEvent(MotionEvent event) {
+        return false;
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        stopAll();
+        super.onDetachedFromWindow();
+    }
+
+    private void renderGift(GiftSpec spec, @Nullable String remoteIconUrl,
+                            @Nullable String animationUrl, @Nullable String senderName, int quantity) {
+        removeAllViews();
+        releaseGiftPlayer();
+        int width = Math.max(getWidth(), dp(120));
+        int height = Math.max(getHeight(), dp(120));
+        String anim = animationUrl != null ? animationUrl.trim() : "";
+        if (anim.toLowerCase(Locale.US).contains("runtime.html")
+                || anim.toLowerCase(Locale.US).endsWith(".html")) {
+            anim = "";
+        }
+        CosmeticMedia.Kind animKind = CosmeticMedia.kind(anim);
+        // Always fill the chat-panel overlay: GIF / video / SVGA / still — no fly motion.
+        boolean mediaFx = animKind == CosmeticMedia.Kind.SVGA
+                || animKind == CosmeticMedia.Kind.VIDEO
+                || animKind == CosmeticMedia.Kind.GIF
+                || animKind == CosmeticMedia.Kind.IMAGE
+                || (anim != null && !anim.isEmpty());
+
+        View visual = createGiftVisual(spec, remoteIconUrl,
+                mediaFx ? anim : animationUrl, Math.min(width, height));
+        if (visual != null) {
+            if (visual instanceof ImageView) {
+                ((ImageView) visual).setScaleType(ImageView.ScaleType.FIT_CENTER);
+            }
+            addView(visual, new LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER));
+        }
+        TextView label = label(spec.name + (quantity > 1 ? " ×" + quantity : ""),
+                senderName == null || senderName.isEmpty() ? "" : "هدية من " + senderName);
+        LayoutParams labelParams = new LayoutParams(
+                Math.min(dp(430), Math.round(width * .92f)), LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        labelParams.bottomMargin = Math.max(dp(8), Math.round(height * .04f));
+        addView(label, labelParams);
+        ObjectAnimator labelIn = ObjectAnimator.ofPropertyValuesHolder(label,
+                PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
+        labelIn.setDuration(280);
+        activeAnimators = new AnimatorSet();
+        activeAnimators.play(labelIn);
+        activeAnimators.start();
+    }
+
+    /**
+     * Entry rides: same player as Mikoo — Tencent AnimView (VAP RGB|alpha + sound).
+     */
+    @Nullable
+    private View createEntryRideVisual(String url, int width, int height) {
+        String abs = AssetCatalog.absoluteUrl(url);
+        if (abs == null || abs.isEmpty()) return null;
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
+        if (kind == CosmeticMedia.Kind.IMAGE) {
+            String mp4 = abs.replaceAll("(?i)\\.(png|jpe?g|webp)(\\?.*)?$", ".mp4$2");
+            if (!mp4.equals(abs) && CosmeticMedia.kind(mp4) == CosmeticMedia.Kind.VIDEO) {
+                abs = mp4;
+                kind = CosmeticMedia.Kind.VIDEO;
+            }
+        }
+        if (kind != CosmeticMedia.Kind.VIDEO) {
+            if (kind != CosmeticMedia.Kind.GIF) {
+                android.util.Log.w("NativeRoomEffects", "skip static entry ride: " + abs);
+                return null;
+            }
+            ImageView image = new ImageView(getContext());
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setBackgroundColor(Color.TRANSPARENT);
+            try {
+                Glide.with(this).asGif().load(abs).into(image);
+            } catch (Exception ignored) {
+                return null;
+            }
+            image.setLayoutParams(new LayoutParams(
+                    Math.max(1, width), Math.max(1, height), Gravity.CENTER));
+            return image;
+        }
+
+        releaseGiftPlayer();
+        final AnimView anim = new AnimView(getContext());
+        anim.setLayoutParams(new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER));
+        anim.setBackgroundColor(Color.TRANSPARENT);
+        anim.setScaleType(ScaleType.CENTER_CROP);
+        anim.setLoop(1);
+        anim.setMute(true);
+        entryAnimView = anim;
+
+        final String mediaUrl = abs;
+        anim.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override public void onViewAttachedToWindow(View v) {
+                anim.removeOnAttachStateChangeListener(this);
+                new Thread(() -> {
+                    File file = cacheEntryMp4(mediaUrl);
+                    if (file == null || !file.exists()) {
+                        android.util.Log.w("NativeRoomEffects", "entry cache miss: " + mediaUrl);
+                        post(() -> finishActive());
+                        return;
+                    }
+                    post(() -> {
+                        if (entryAnimView != anim || anim.getParent() == null) return;
+                        try {
+                            anim.startPlay(file);
+                        } catch (Exception e) {
+                            android.util.Log.w("NativeRoomEffects", "AnimView start failed", e);
+                        }
+                    });
+                }, "entry-vap").start();
+            }
+            @Override public void onViewDetachedFromWindow(View v) {}
+        });
+        return anim;
+    }
+
+    /** Download entry MP4 once into app cache (AnimView needs a local file). */
+    @Nullable
+    public static File cacheGiftMp4(Context context, String absUrl) {
+        if (context == null || absUrl == null || absUrl.isEmpty()) return null;
+        try {
+            File dir = new File(context.getCacheDir(), "entry_vap");
+            if (!dir.exists() && !dir.mkdirs()) return null;
+            String name = Integer.toHexString(absUrl.split("\\?")[0].hashCode()) + ".mp4";
+            File out = new File(dir, name);
+            if (out.exists() && out.length() > 1024) return out;
+            File tmp = new File(dir, name + ".tmp");
+            java.net.URL url = new java.net.URL(absUrl);
+            try (java.io.InputStream in = url.openStream();
+                 java.io.FileOutputStream fos = new java.io.FileOutputStream(tmp)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) >= 0) fos.write(buf, 0, n);
+            }
+            if (!tmp.renameTo(out)) {
+                //noinspection ResultOfMethodCallIgnored
+                tmp.delete();
+                return null;
+            }
+            return out;
+        } catch (Exception e) {
+            android.util.Log.w("NativeRoomEffects", "cacheGiftMp4 failed", e);
+            return null;
+        }
+    }
+
+    /** Warm gift media so send/play is instant for everyone in the room. */
+    public static void preloadGiftUrls(Context context, @Nullable Iterable<String> urls) {
+        if (context == null || urls == null) return;
+        Context app = context.getApplicationContext();
+        for (String raw : urls) {
+            if (raw == null || raw.isEmpty()) continue;
+            String abs = AssetCatalog.absoluteUrl(raw);
+            if (abs == null || abs.isEmpty()) continue;
+            CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
+            try {
+                if (kind == CosmeticMedia.Kind.VIDEO) {
+                    new Thread(() -> cacheGiftMp4(app, abs), "gift-preload").start();
+                } else if (kind == CosmeticMedia.Kind.GIF
+                        || kind == CosmeticMedia.Kind.IMAGE
+                        || kind == CosmeticMedia.Kind.SVGA) {
+                    Glide.with(app).load(abs).preload();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    /** Download entry MP4 once into app cache (AnimView needs a local file). */
+    @Nullable
+    private File cacheEntryMp4(String absUrl) {
+        return cacheGiftMp4(getContext(), absUrl);
+    }
+
+    private View createGiftVisual(GiftSpec spec, @Nullable String remoteIconUrl,
+                                  @Nullable String animationUrl, int visualSize) {
+        String anim = animationUrl != null ? animationUrl.trim() : "";
+        // Backend stores HTML engine URL for all gifts — native uses catalog assets/sprites.
+        if (anim.toLowerCase(Locale.US).contains("runtime.html")
+                || anim.toLowerCase(Locale.US).endsWith(".html")) {
+            anim = "";
+        }
+        String abs = anim.isEmpty() ? "" : AssetCatalog.absoluteUrl(anim);
+        String lower = abs.toLowerCase(Locale.US);
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
+
+        // Same as Mikoo GiftEffectView: VAP mp4 via AnimView (RGB|alpha + vapc).
+        if (kind == CosmeticMedia.Kind.VIDEO) {
+            View vap = createEntryRideVisual(abs, visualSize, visualSize);
+            if (vap != null) {
+                giftAnimView = entryAnimView;
+                return vap;
+            }
+        }
+
+        // Same as Mikoo: SVGA full-screen gift effect.
+        if (kind == CosmeticMedia.Kind.SVGA) {
+            try {
+                com.opensource.svgaplayer.SVGAImageView svga =
+                        new com.opensource.svgaplayer.SVGAImageView(getContext());
+                svga.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                svga.setClearsAfterStop(true);
+                svga.setLoops(1);
+                giftSvgaView = svga;
+                com.opensource.svgaplayer.SVGAParser parser =
+                        new com.opensource.svgaplayer.SVGAParser(getContext());
+                parser.decodeFromURL(new URL(abs), new com.opensource.svgaplayer.SVGAParser.ParseCompletion() {
+                    @Override
+                    public void onComplete(
+                            @androidx.annotation.NonNull
+                            com.opensource.svgaplayer.SVGAVideoEntity videoItem) {
+                        post(() -> {
+                            if (giftSvgaView != svga) return;
+                            svga.setVideoItem(videoItem);
+                            svga.startAnimation();
+                        });
+                    }
+
+                    @Override
+                    public void onError() {
+                        android.util.Log.w("NativeRoomEffects", "SVGA gift parse failed: " + abs);
+                    }
+                }, null);
+                return svga;
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (lower.contains(".json")) {
+            LottieAnimationView lottie = new LottieAnimationView(getContext());
+            lottie.setRepeatCount(0);
+            lottie.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            try {
+                lottie.setAnimationFromUrl(abs);
+                lottie.playAnimation();
+            } catch (Exception ignored) {
+            }
+            return lottie;
+        }
+
+        SpriteSpec sprite = SPRITES.get(spec.id);
+        if (sprite != null) {
+            Bitmap sheet = decodeAssetFull("visual-system/gifts/sprites/" + sprite.file);
+            if (sheet != null && sheet.getWidth() >= sprite.frames) {
+                SpriteSheetView spriteView = new SpriteSheetView(getContext());
+                spriteView.play(sheet, sprite.frames, sprite.cycleMs);
+                activeSprite = spriteView;
+                return spriteView;
+            }
+        }
+
+        ImageView image = new ImageView(getContext());
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (!abs.isEmpty() && (lower.contains(".gif") || lower.contains(".webp"))) {
+            try {
+                Glide.with(this).asGif().load(abs).into(image);
+            } catch (Exception e) {
+                Glide.with(this).load(abs).into(image);
+            }
+        } else {
+            loadAssetOrRemote(image, "visual-system/gifts/assets/gift-" + spec.id + ".png",
+                    remoteIconUrl, visualSize, visualSize);
+        }
+        return image;
+    }
+
+    private void renderEntry(@Nullable String displayName, @Nullable String avatarUrl,
+                             @Nullable String remoteFrameUrl, @Nullable String entryMediaUrl,
+                             int variantIndex,
+                             int vipLevel, int userLevel, long wealthScore,
+                             @Nullable String vipBadgeUrl, @Nullable String levelBadgeUrl,
+                             @Nullable String hostBadgeUrl, boolean isHost, boolean showHiBadge) {
+        removeAllViews();
+        releaseGiftPlayer();
+        int width = Math.max(getWidth(), getResources().getDisplayMetrics().widthPixels);
+        int height = Math.max(getHeight(), getResources().getDisplayMetrics().heightPixels);
+
+        // Mikoo: full-screen entry ride only. Join name toast is ComingMsgView (single toast).
+        String ride = CosmeticMedia.playableUrl(entryMediaUrl);
+        if (ride == null) return;
+        View rideView = createEntryRideVisual(ride, width, height);
+        if (rideView == null) return;
+        LayoutParams rideLp = new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER);
+        rideView.setLayoutParams(rideLp);
+        rideView.setAlpha(1f);
+        rideView.setTranslationY(0f);
+        rideView.setScaleX(1f);
+        rideView.setScaleY(1f);
+        addView(rideView, rideLp);
+    }
+
+    /** Entry effect: fade + rise from bottom into the room stage.
+     * Animate the wrapper only — never set TextureView alpha (breaks video on many devices). */
+    private AnimatorSet riseEntryEntrance(View image, int height) {
+        float fromY = Math.max(dp(160), height * 0.28f);
+        image.setAlpha(1f);
+        image.setTranslationY(fromY);
+        image.setScaleX(0.92f);
+        image.setScaleY(0.92f);
+        ObjectAnimator enter = ObjectAnimator.ofPropertyValuesHolder(image,
+                PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, fromY, 0f),
+                PropertyValuesHolder.ofFloat(View.SCALE_X, 0.92f, 1f),
+                PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.92f, 1f));
+        enter.setDuration(720);
+        enter.setInterpolator(new DecelerateInterpolator(1.45f));
+        AnimatorSet set = new AnimatorSet();
+        set.play(enter);
+        return set;
+    }
+
+    @Nullable
+    private static String firstNonEmpty(@Nullable String a, @Nullable String b) {
+        if (a != null && !a.trim().isEmpty()) return a.trim();
+        if (b != null && !b.trim().isEmpty()) return b.trim();
+        return null;
+    }
+
+    private static int mixColor(int from, int to, float amount) {
+        float t = Math.max(0f, Math.min(1f, amount));
+        int a = ((from >>> 24) & 0xff) + Math.round((((to >>> 24) & 0xff) - ((from >>> 24) & 0xff)) * t);
+        int r = ((from >>> 16) & 0xff) + Math.round((((to >>> 16) & 0xff) - ((from >>> 16) & 0xff)) * t);
+        int g = ((from >>> 8) & 0xff) + Math.round((((to >>> 8) & 0xff) - ((from >>> 8) & 0xff)) * t);
+        int b = (from & 0xff) + Math.round(((to & 0xff) - (from & 0xff)) * t);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    private TextView chip(String text, int accent) {
+        TextView chip = new TextView(getContext());
+        chip.setText(text);
+        chip.setTextColor(Color.WHITE);
+        chip.setTextSize(8);
+        chip.setTypeface(chip.getTypeface(), android.graphics.Typeface.BOLD);
+        chip.setPadding(dp(5), dp(1), dp(5), dp(1));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(8));
+        bg.setColor((accent & 0x00FFFFFF) | 0x99000000);
+        bg.setStroke(dp(1), (accent & 0x00FFFFFF) | 0xAA000000);
+        chip.setBackground(bg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMarginEnd(dp(3));
+        chip.setLayoutParams(lp);
+        return chip;
+    }
+
+    private static String formatCompact(long value) {
+        if (value >= 1_000_000L) return String.format(Locale.US, "%.1fM", value / 1_000_000f);
+        if (value >= 1_000L) return String.format(Locale.US, "%.1fK", value / 1_000f);
+        return String.valueOf(value);
+    }
+
+    private AnimatorSet giftEntrance(String family, View image, int width, int height) {
+        if (isCrossingFamily(family)) {
+            return crossingEntrance(family, image, width, height);
+        }
+        float startX = 0f, startY = 0f, startScale = .15f, startRotation = 0f;
+        long duration = 1100;
+        switch (family) {
+            case "bounce": startY = -height * .7f; startScale = .5f; startRotation = -12f; break;
+            case "rise": case "crown": case "stomp":
+                startY = height * .65f; startScale = .55f; break;
+            case "fly": case "rocket": case "meteor":
+                startX = -width * .8f; startY = height * .5f; startScale = .25f;
+                startRotation = -28f; break;
+            case "sail": startX = width * 1.1f; startScale = .55f; startRotation = 6f; break;
+            case "swing": startY = -height * .65f; startScale = .6f; startRotation = -28f; break;
+            case "crystal": startY = -height * .35f; startScale = .25f; startRotation = 180f; break;
+            case "dragon": case "phoenix":
+                startScale = .15f; startRotation = -18f; duration = 1250; break;
+            case "orbit": startScale = .15f; startRotation = -190f; break;
+            case "heart": startScale = .1f; break;
+            case "burst": case "box": case "music": startScale = .05f; startRotation = -35f; break;
+            default: startScale = .15f; startRotation = -18f; break;
+        }
+        AnimatorSet set = new AnimatorSet();
+        ObjectAnimator transform = ObjectAnimator.ofPropertyValuesHolder(image,
+                PropertyValuesHolder.ofFloat(View.TRANSLATION_X, startX, 0f),
+                PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, startY, 0f),
+                PropertyValuesHolder.ofFloat(View.SCALE_X, startScale, 1f),
+                PropertyValuesHolder.ofFloat(View.SCALE_Y, startScale, 1f),
+                PropertyValuesHolder.ofFloat(View.ROTATION, startRotation, 0f),
+                PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
+        transform.setDuration(duration);
+        transform.setInterpolator(new DecelerateInterpolator(2f));
+        set.play(transform);
+        return set;
+    }
+
+    /** Full-screen walk/drive matching Host-signals gifts.css cross keyframes. */
+    private AnimatorSet crossingEntrance(String family, View image, int width, int height) {
+        float dir = getLayoutDirection() == LAYOUT_DIRECTION_RTL ? -1f : 1f;
+        Keyframe[] xKeys;
+        Keyframe[] yKeys;
+        Keyframe[] sxKeys;
+        Keyframe[] rotKeys;
+        Keyframe[] aKeys;
+        long duration = 4050;
+        switch (family) {
+            case "train":
+                duration = 4100;
+                xKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, dir * -width * 1.05f),
+                        Keyframe.ofFloat(.5f, dir * -width * .05f),
+                        Keyframe.ofFloat(1f, dir * width * 1.1f)};
+                yKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, height * .08f),
+                        Keyframe.ofFloat(.5f, 0f),
+                        Keyframe.ofFloat(1f, height * .04f)};
+                sxKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, .5f), Keyframe.ofFloat(.5f, 1.05f), Keyframe.ofFloat(1f, .58f)};
+                rotKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(1f, 0f)};
+                aKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(.22f, 1f),
+                        Keyframe.ofFloat(.85f, 1f), Keyframe.ofFloat(1f, 0f)};
+                break;
+            case "tractor":
+                duration = 4100;
+                xKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, dir * -width * .9f),
+                        Keyframe.ofFloat(.36f, dir * -width * .35f),
+                        Keyframe.ofFloat(.52f, dir * -width * .04f),
+                        Keyframe.ofFloat(.7f, dir * width * .34f),
+                        Keyframe.ofFloat(1f, dir * width * .92f)};
+                yKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, height * .07f), Keyframe.ofFloat(.52f, -height * .02f),
+                        Keyframe.ofFloat(1f, height * .06f)};
+                sxKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, .52f), Keyframe.ofFloat(.52f, 1.04f), Keyframe.ofFloat(1f, .55f)};
+                rotKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, -2f), Keyframe.ofFloat(.52f, -1f), Keyframe.ofFloat(1f, 0f)};
+                aKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(.18f, 1f),
+                        Keyframe.ofFloat(.88f, 1f), Keyframe.ofFloat(1f, 0f)};
+                break;
+            case "bird":
+                duration = 4100;
+                xKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, dir * -width * .75f),
+                        Keyframe.ofFloat(.45f, dir * -width * .12f),
+                        Keyframe.ofFloat(.58f, dir * width * .06f),
+                        Keyframe.ofFloat(.76f, dir * width * .36f),
+                        Keyframe.ofFloat(1f, dir * width * .8f)};
+                yKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, height * .45f), Keyframe.ofFloat(.45f, -height * .08f),
+                        Keyframe.ofFloat(.58f, -height * .16f), Keyframe.ofFloat(1f, -height * .48f)};
+                sxKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, .35f), Keyframe.ofFloat(.58f, 1.08f), Keyframe.ofFloat(1f, .42f)};
+                rotKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, -22f), Keyframe.ofFloat(.58f, -3f), Keyframe.ofFloat(1f, 20f)};
+                aKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(.2f, 1f),
+                        Keyframe.ofFloat(.85f, 1f), Keyframe.ofFloat(1f, 0f)};
+                break;
+            case "drive":
+                xKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, dir * -width * .95f),
+                        Keyframe.ofFloat(.48f, dir * -width * .04f),
+                        Keyframe.ofFloat(.64f, dir * width * .12f),
+                        Keyframe.ofFloat(1f, dir * width * .95f)};
+                yKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, height * .14f), Keyframe.ofFloat(.48f, 0f),
+                        Keyframe.ofFloat(1f, height * .08f)};
+                sxKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, .45f), Keyframe.ofFloat(.48f, 1.05f), Keyframe.ofFloat(1f, .52f)};
+                rotKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, -5f), Keyframe.ofFloat(.48f, 0f), Keyframe.ofFloat(1f, 4f)};
+                aKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(.18f, 1f),
+                        Keyframe.ofFloat(.85f, 1f), Keyframe.ofFloat(1f, 0f)};
+                break;
+            case "run":
+            default:
+                xKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, dir * -width * .9f),
+                        Keyframe.ofFloat(.24f, dir * -width * .42f),
+                        Keyframe.ofFloat(.4f, dir * -width * .14f),
+                        Keyframe.ofFloat(.49f, 0f),
+                        Keyframe.ofFloat(.58f, dir * width * .14f),
+                        Keyframe.ofFloat(.78f, dir * width * .5f),
+                        Keyframe.ofFloat(1f, dir * width * .92f)};
+                yKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, height * .16f), Keyframe.ofFloat(.24f, height * .02f),
+                        Keyframe.ofFloat(.49f, -height * .03f), Keyframe.ofFloat(.58f, height * .02f),
+                        Keyframe.ofFloat(1f, -height * .05f)};
+                sxKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, .42f), Keyframe.ofFloat(.49f, 1.06f), Keyframe.ofFloat(1f, .48f)};
+                rotKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, -7f), Keyframe.ofFloat(.4f, 2f),
+                        Keyframe.ofFloat(.58f, 2f), Keyframe.ofFloat(1f, 5f)};
+                aKeys = new Keyframe[]{
+                        Keyframe.ofFloat(0f, 0f), Keyframe.ofFloat(.12f, 1f),
+                        Keyframe.ofFloat(.85f, 1f), Keyframe.ofFloat(1f, 0f)};
+                break;
+        }
+        ObjectAnimator transform = ObjectAnimator.ofPropertyValuesHolder(image,
+                PropertyValuesHolder.ofKeyframe(View.TRANSLATION_X, xKeys),
+                PropertyValuesHolder.ofKeyframe(View.TRANSLATION_Y, yKeys),
+                PropertyValuesHolder.ofKeyframe(View.SCALE_X, sxKeys),
+                PropertyValuesHolder.ofKeyframe(View.SCALE_Y, sxKeys),
+                PropertyValuesHolder.ofKeyframe(View.ROTATION, rotKeys),
+                PropertyValuesHolder.ofKeyframe(View.ALPHA, aKeys));
+        transform.setDuration(duration);
+        transform.setInterpolator(new AccelerateDecelerateInterpolator());
+        AnimatorSet set = new AnimatorSet();
+        set.play(transform);
+        return set;
+    }
+
+    private static boolean isCrossingFamily(String family) {
+        return "run".equals(family) || "drive".equals(family) || "train".equals(family)
+                || "tractor".equals(family) || "bird".equals(family);
+    }
+
+    private AnimatorSet giftAmbient(String family, View image) {
+        AnimatorSet set = new AnimatorSet();
+        if (isCrossingFamily(family)) {
+            return set; // crossing path is the full motion
+        }
+        ObjectAnimator first;
+        ObjectAnimator second;
+        switch (family) {
+            case "orbit":
+                first = repeat(image, View.ROTATION, 0f, 360f, 8000);
+                second = repeat(image, View.SCALE_X, .98f, 1.04f, 1800);
+                break;
+            case "heart":
+                first = repeat(image, View.SCALE_X, 1f, 1.06f, 750);
+                second = repeat(image, View.SCALE_Y, 1f, 1.06f, 750);
+                break;
+            case "swing": case "music":
+                first = repeat(image, View.ROTATION, -3f, 3f, 1000);
+                second = repeat(image, View.TRANSLATION_Y, 0f, -dp(7), 1100);
+                break;
+            case "stomp":
+                first = repeat(image, View.TRANSLATION_Y, 0f, -dp(9), 520);
+                second = repeat(image, View.SCALE_Y, .985f, 1.015f, 520);
+                break;
+            case "dragon": case "phoenix":
+                first = repeat(image, View.TRANSLATION_Y, 0f, -dp(12), 1000);
+                second = repeat(image, View.ROTATION, -2f, 2f, 1200);
+                break;
+            default:
+                first = repeat(image, View.TRANSLATION_Y, 0f, -dp(12), 1200);
+                second = repeat(image, View.ROTATION, -.5f, .5f, 1200);
+                break;
+        }
+        first.setStartDelay(1050);
+        second.setStartDelay(1050);
+        set.playTogether(first, second);
+        return set;
+    }
+
+    private ObjectAnimator repeat(View target, android.util.Property<View, Float> property,
+                                  float from, float to, long duration) {
+        ObjectAnimator animator = ObjectAnimator.ofFloat(target, property, from, to);
+        animator.setDuration(duration);
+        animator.setRepeatCount(ObjectAnimator.INFINITE);
+        animator.setRepeatMode(ObjectAnimator.REVERSE);
+        animator.setInterpolator(new AccelerateDecelerateInterpolator());
+        return animator;
+    }
+
+    private void addParticles(int accent, int count, int width, int height) {
+        for (int index = 0; index < count; index++) {
+            View particle = new View(getContext());
+            int size = dp(index % 3 == 0 ? 6 : 3);
+            particle.setBackground(circle(withAlpha(accent, 230), Color.TRANSPARENT, 0));
+            LayoutParams params = new LayoutParams(size, size);
+            params.gravity = Gravity.BOTTOM | Gravity.START;
+            params.leftMargin = Math.round(width * (.08f + ((index * 37) % 84) / 100f));
+            params.bottomMargin = Math.round(height * .18f);
+            addView(particle, params);
+            ObjectAnimator rise = ObjectAnimator.ofPropertyValuesHolder(particle,
+                    PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, 0f, -height * .42f),
+                    PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f, 0f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_X, .2f, 1f, 0f),
+                    PropertyValuesHolder.ofFloat(View.SCALE_Y, .2f, 1f, 0f));
+            rise.setDuration(1700 + (index % 5) * 120L);
+            rise.setStartDelay((index % 7) * 90L);
+            rise.setRepeatCount(ObjectAnimator.INFINITE);
+            looseAnimators.add(rise);
+            rise.start();
+        }
+    }
+
+    private void loadAssetOrRemote(ImageView target, String assetPath,
+                                   @Nullable String remoteUrl, int width, int height) {
+        Bitmap bitmap = decodeAsset(assetPath, width, height);
+        if (bitmap != null) {
+            target.setImageBitmap(bitmap);
+        } else if (remoteUrl != null && !remoteUrl.isEmpty()) {
+            Glide.with(this).load(AssetCatalog.absoluteUrl(remoteUrl)).into(target);
+        } else {
+            target.setImageResource(ImagePlaceholder.cover());
+        }
+    }
+
+    @Nullable
+    private Bitmap decodeAsset(String path, int width, int height) {
+        String key = path + ":" + width + "x" + height;
+        Bitmap cached = BITMAPS.get(key);
+        if (cached != null && !cached.isRecycled()) return cached;
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream input = getContext().getAssets().open(path)) {
+                BitmapFactory.decodeStream(input, null, bounds);
+            }
+            int sample = 1;
+            while (bounds.outWidth / (sample * 2) >= width
+                    && bounds.outHeight / (sample * 2) >= height) sample *= 2;
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = sample;
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap decoded;
+            try (InputStream input = getContext().getAssets().open(path)) {
+                decoded = BitmapFactory.decodeStream(input, null, options);
+            }
+            if (decoded != null) BITMAPS.put(key, decoded);
+            return decoded;
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
+    private View glow(int color) {
+        View view = new View(getContext());
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        drawable.setGradientRadius(dp(250));
+        drawable.setColors(new int[]{withAlpha(color, 105), withAlpha(color, 35), Color.TRANSPARENT});
+        view.setBackground(drawable);
+        view.setAlpha(0f);
+        return view;
+    }
+
+    private TextView label(String title, String detail) {
+        TextView view = new TextView(getContext());
+        view.setText(detail.isEmpty() ? title : title + "\n" + detail);
+        view.setGravity(Gravity.CENTER);
+        view.setTextColor(Color.WHITE);
+        view.setTextSize(16);
+        view.setTypeface(view.getTypeface(), android.graphics.Typeface.BOLD);
+        view.setPadding(dp(24), dp(10), dp(24), dp(10));
+        GradientDrawable background = new GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{Color.TRANSPARENT, 0xcc080b16, Color.TRANSPARENT});
+        background.setCornerRadius(dp(40));
+        view.setBackground(background);
+        return view;
+    }
+
+    private void scheduleFinish(int token, long duration) {
+        removeCallbacks(scheduledFinish);
+        postDelayed(scheduledFinish, Math.max(1800, duration));
+    }
+
+    private void finishActive() {
+        final int token = generation;
+        animate().cancel();
+        animate().alpha(0f).scaleX(1.05f).scaleY(1.05f).setDuration(420)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override public void onAnimationEnd(Animator animation) {
+                        if (token != generation) return;
+                        Runnable completion = activeCompletion;
+                        activeCompletion = null;
+                        generation++;
+                        clearContent();
+                        if (completion != null) completion.run();
+                    }
+                }).start();
+    }
+
+    private void clearContent() {
+        animate().setListener(null);
+        animate().cancel();
+        if (activeAnimators != null) {
+            activeAnimators.cancel();
+            activeAnimators = null;
+        }
+        for (Animator animator : looseAnimators) animator.cancel();
+        looseAnimators.clear();
+        if (activeSprite != null) {
+            activeSprite.stop();
+            activeSprite = null;
+        }
+        releaseGiftPlayer();
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            child.animate().cancel();
+            if (child instanceof ImageView) {
+                Glide.with(getContext().getApplicationContext()).clear(child);
+            }
+        }
+        removeAllViews();
+        setAlpha(1f);
+        setScaleX(1f);
+        setScaleY(1f);
+        setVisibility(GONE);
+    }
+
+    private void releaseGiftPlayer() {
+        if (giftSvgaView != null) {
+            try {
+                giftSvgaView.stopAnimation(true);
+            } catch (Exception ignored) {
+            }
+            giftSvgaView = null;
+        }
+        if (giftAnimView != null && giftAnimView != entryAnimView) {
+            try {
+                giftAnimView.stopPlay();
+            } catch (Exception ignored) {
+            }
+            giftAnimView = null;
+        } else {
+            giftAnimView = null;
+        }
+        if (entryAnimView != null) {
+            try {
+                entryAnimView.stopPlay();
+            } catch (Exception ignored) {
+            }
+            entryAnimView = null;
+        }
+        if (giftPlayer == null) return;
+        try {
+            giftPlayer.setPlayWhenReady(false);
+            giftPlayer.release();
+        } catch (Exception ignored) {
+        }
+        giftPlayer = null;
+    }
+
+    @Nullable
+    private Bitmap decodeAssetFull(String path) {
+        String key = path + ":full";
+        Bitmap cached = BITMAPS.get(key);
+        if (cached != null && !cached.isRecycled()) return cached;
+        try {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap decoded;
+            try (InputStream input = getContext().getAssets().open(path)) {
+                decoded = BitmapFactory.decodeStream(input, null, options);
+            }
+            if (decoded != null) BITMAPS.put(key, decoded);
+            return decoded;
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
+    private static int indexOfVariant(@Nullable String variant) {
+        if (variant == null) return -1;
+        for (int i = 0; i < ENTRY_VARIANTS.length; i++) {
+            if (ENTRY_VARIANTS[i].equalsIgnoreCase(variant)) return i;
+        }
+        return -1;
+    }
+
+    private static int tierAccent(String tier) {
+        switch (tier) {
+            case "premium": return 0xffbb7cff;
+            case "legendary": return 0xffffb82e;
+            case "mythic": return 0xffff5578;
+            default: return 0xff72d8ff;
+        }
+    }
+
+    private GradientDrawable circle(int fill, int stroke, int strokeWidth) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.OVAL);
+        drawable.setColor(fill);
+        if (strokeWidth > 0) drawable.setStroke(strokeWidth, stroke);
+        return drawable;
+    }
+
+    private static int withAlpha(int color, int alpha) {
+        return (color & 0x00ffffff) | (alpha << 24);
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private static Map<String, GiftSpec> buildGiftCatalog() {
+        Map<String, GiftSpec> result = new HashMap<>();
+        add(result, "ball", "كرة أسطورية", "bounce", "basic");
+        add(result, "car", "سيارة خارقة", "drive", "legendary");
+        add(result, "castle", "قلعة الجليد", "rise", "mythic");
+        add(result, "champagne", "احتفال فاخر", "burst", "premium");
+        add(result, "crown", "التاج الملكي", "crown", "legendary");
+        add(result, "diamond", "ألماسة", "crystal", "premium");
+        add(result, "dragon", "التنين", "dragon", "mythic");
+        add(result, "fireworks", "ألعاب نارية", "burst", "premium");
+        add(result, "galaxy", "المجرة", "orbit", "mythic");
+        add(result, "guitar", "غيتار النجوم", "swing", "premium");
+        add(result, "heart", "قلب كريستالي", "heart", "premium");
+        add(result, "icecream", "آيس كريم", "bounce", "basic");
+        add(result, "lion", "الأسد الملكي", "run", "legendary");
+        add(result, "lucky-box", "صندوق الحظ", "box", "premium");
+        add(result, "meteor", "النيزك", "meteor", "legendary");
+        add(result, "plane", "طائرة خاصة", "fly", "legendary");
+        add(result, "ring", "خاتم الحب", "crystal", "premium");
+        add(result, "rocket", "الصاروخ", "rocket", "legendary");
+        add(result, "rose", "وردة الحب", "heart", "basic");
+        add(result, "teddy", "الدب اللطيف", "bounce", "basic");
+        add(result, "unicorn", "اليونيكورن", "swing", "legendary");
+        add(result, "yacht", "اليخت الملكي", "sail", "mythic");
+        add(result, "microphone", "ميكروفون النجوم", "swing", "premium");
+        add(result, "phoenix", "العنقاء", "phoenix", "mythic");
+        add(result, "royal-tiger", "النمر الملكي", "run", "mythic");
+        add(result, "luxury-watch", "ساعة فاخرة", "crystal", "legendary");
+        add(result, "treasure-chest", "كنز الجواهر", "box", "mythic");
+        add(result, "golden-throne", "العرش الذهبي", "crown", "mythic");
+        add(result, "dire-wolf", "الذئب الجليدي", "run", "mythic");
+        add(result, "royal-train", "القطار الملكي", "train", "legendary");
+        add(result, "golden-tractor", "التراكتور الذهبي", "tractor", "legendary");
+        add(result, "crystal-piano", "البيانو الكريستالي", "music", "mythic");
+        add(result, "superbike", "الدراجة الخارقة", "drive", "legendary");
+        add(result, "royal-drums", "طبول الملوك", "music", "legendary");
+        add(result, "planet-earth", "كوكب الأرض", "orbit", "mythic");
+        add(result, "planet-saturn", "كوكب زحل", "orbit", "mythic");
+        add(result, "royal-eagle", "النسر الملكي", "bird", "mythic");
+        add(result, "royal-elephant", "الفيل الملكي", "stomp", "mythic");
+        add(result, "golden-falcon", "الصقر الذهبي", "bird", "legendary");
+        add(result, "magic-lamp", "المصباح السحري", "orbit", "mythic");
+        add(result, "lucky-coin-100", "حظ برونزي", "burst", "basic");
+        add(result, "lucky-coin-500", "حظ فضي", "burst", "premium");
+        add(result, "lucky-coin-1000", "حظ ذهبي", "burst", "legendary");
+        return Collections.unmodifiableMap(result);
+    }
+
+    private static Map<String, SpriteSpec> buildSpriteCatalog() {
+        Map<String, SpriteSpec> map = new HashMap<>();
+        map.put("lion", new SpriteSpec("gift-lion.png", 9, 950));
+        map.put("royal-tiger", new SpriteSpec("gift-royal-tiger.png", 9, 900));
+        map.put("dire-wolf", new SpriteSpec("gift-dire-wolf.png", 9, 820));
+        map.put("superbike", new SpriteSpec("gift-superbike.png", 9, 660));
+        return Collections.unmodifiableMap(map);
+    }
+
+    private static void add(Map<String, GiftSpec> map, String id, String name,
+                            String family, String tier) {
+        map.put(id, new GiftSpec(id, name, family, tier));
+    }
+
+    private static final class GiftSpec {
+        final String id;
+        final String name;
+        final String family;
+        final String tier;
+
+        GiftSpec(String id, String name, String family, String tier) {
+            this.id = id;
+            this.name = name;
+            this.family = family;
+            this.tier = tier;
+        }
+    }
+
+    private static final class SpriteSpec {
+        final String file;
+        final int frames;
+        final long cycleMs;
+
+        SpriteSpec(String file, int frames, long cycleMs) {
+            this.file = file;
+            this.frames = frames;
+            this.cycleMs = cycleMs;
+        }
+    }
+
+    /** Horizontal strip sprite player (9 frames × square cells). */
+    private static final class SpriteSheetView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Rect src = new Rect();
+        private final Rect dst = new Rect();
+        @Nullable private Bitmap sheet;
+        private int frames = 1;
+        private int frameW;
+        private int frameH;
+        private int frameIndex;
+        @Nullable private ValueAnimator animator;
+
+        SpriteSheetView(Context context) {
+            super(context);
+            setWillNotDraw(false);
+        }
+
+        void play(Bitmap sheet, int frames, long cycleMs) {
+            stop();
+            this.sheet = sheet;
+            this.frames = Math.max(1, frames);
+            this.frameW = Math.max(1, sheet.getWidth() / this.frames);
+            this.frameH = sheet.getHeight();
+            this.frameIndex = 0;
+            animator = ValueAnimator.ofInt(0, this.frames - 1);
+            animator.setDuration(Math.max(200L, cycleMs));
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setInterpolator(new LinearInterpolator());
+            animator.addUpdateListener(a -> {
+                int next = (int) a.getAnimatedValue();
+                if (next != frameIndex) {
+                    frameIndex = next;
+                    invalidate();
+                }
+            });
+            animator.start();
+            invalidate();
+        }
+
+        void stop() {
+            if (animator != null) {
+                animator.cancel();
+                animator = null;
+            }
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            if (sheet == null || sheet.isRecycled()) return;
+            int left = Math.min(frameIndex * frameW, sheet.getWidth() - frameW);
+            src.set(left, 0, left + frameW, frameH);
+            dst.set(0, 0, getWidth(), getHeight());
+            canvas.drawBitmap(sheet, src, dst, paint);
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            stop();
+            super.onDetachedFromWindow();
+        }
+    }
+}

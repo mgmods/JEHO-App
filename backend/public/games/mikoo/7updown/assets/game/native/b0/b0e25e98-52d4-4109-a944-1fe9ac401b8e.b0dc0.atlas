@@ -1,0 +1,27 @@
+
+fanhui.png
+size: 475,299
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+图层 2
+  rotate: true
+  xy: 177, 17
+  size: 280, 149
+  orig: 286, 149
+  offset: 3, 0
+  index: -1
+图层 531
+  rotate: true
+  xy: 328, 70
+  size: 227, 145
+  orig: 227, 145
+  offset: 0, 0
+  index: -1
+椭圆 5128
+  rotate: true
+  xy: 2, 2
+  size: 295, 173
+  orig: 309, 187
+  offset: 7, 7
+  index: -1

@@ -1,0 +1,1161 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEHO CHAT | Jeho</title>
+    <meta name="description" content="تطبيق غرف صوتية ودردشة راقٍ للتواصل مع مجتمعك.">
+    <link rel="icon" type="image/png" href="/assets/brand/jeho_logo.png">
+    
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" id="bootstrap-rtl">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --primary: #EC4899;
+            --primary-glow: rgba(236, 72, 153, 0.18);
+            --secondary: #38BDF8;
+            --secondary-glow: rgba(56, 189, 248, 0.18);
+            --bg-light: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Tajawal', 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Language-specific styling rules */
+        html[lang="en"] {
+            direction: ltr;
+        }
+        html[lang="en"] body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Abstract Glowing Orbs in Background */
+        .glowing-orb {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.08;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 {
+            top: 10%;
+            right: -100px;
+            background: var(--primary);
+        }
+        .orb-2 {
+            top: 50%;
+            left: -150px;
+            background: var(--secondary);
+        }
+
+        /* Glassmorphism general style */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            transition: var(--transition);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-light);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 18px 0;
+            transition: var(--transition);
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--text-main) !important;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 48px;
+            height: 48px;
+            object-fit: contain;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px var(--primary-glow);
+        }
+        .nav-link {
+            font-weight: 600;
+            color: var(--text-muted) !important;
+            margin: 0 12px;
+            font-size: 1.05rem;
+            transition: var(--transition);
+        }
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary) !important;
+        }
+        
+        .btn-premium {
+            background: var(--gradient);
+            border: none;
+            color: white !important;
+            border-radius: 30px;
+            padding: 10px 24px;
+            font-weight: 600;
+            transition: var(--transition);
+            box-shadow: 0 4px 15px var(--primary-glow);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+        }
+
+        /* Lang toggle switch */
+        .lang-switch {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: var(--text-main);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .lang-switch:hover {
+            background: #e2e8f0;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 180px 0 100px;
+            position: relative;
+            z-index: 1;
+        }
+        .hero h1 {
+            font-size: 4.2rem;
+            font-weight: 900;
+            line-height: 1.2;
+            margin-bottom: 24px;
+            color: #0f172a;
+        }
+        .hero h1 span.gradient-text {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero p {
+            font-size: 1.3rem;
+            color: var(--text-muted);
+            line-height: 1.8;
+            margin-bottom: 35px;
+        }
+
+        .store-badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        .store-badge {
+            background: #0f172a;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 8px 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .store-badge:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px var(--primary-glow);
+            color: white;
+        }
+        .store-badge i {
+            font-size: 1.8rem;
+            color: var(--secondary);
+        }
+        .store-badge div {
+            text-align: left;
+            line-height: 1.2;
+        }
+        .store-badge small {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            display: block;
+        }
+        .store-badge strong {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        /* Animated mockup phone */
+        .phone-mockup-wrap {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .phone-glow {
+            position: absolute;
+            width: 280px;
+            height: 520px;
+            background: var(--gradient);
+            border-radius: 40px;
+            filter: blur(45px);
+            opacity: 0.15;
+            animation: orb-rotation 8s infinite alternate;
+        }
+        .phone-mockup {
+            width: 300px;
+            height: 580px;
+            border: 8px solid #cbd5e1;
+            background: #ffffff;
+            border-radius: 44px;
+            padding: 10px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+        }
+        .phone-notch {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 140px;
+            height: 25px;
+            background: #f1f5f9;
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 18px;
+            z-index: 10;
+        }
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            border-radius: 32px;
+            overflow: hidden;
+            background: #0b0618;
+            position: relative;
+        }
+        .phone-shots {
+            position: absolute;
+            inset: 0;
+        }
+        .phone-shots img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.7s ease;
+        }
+        .phone-shots img.active {
+            opacity: 1;
+            z-index: 1;
+        }
+        .phone-shot-dots {
+            position: absolute;
+            bottom: 14px;
+            left: 0;
+            right: 0;
+            z-index: 5;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+        .phone-shot-dots button {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            border: 0;
+            padding: 0;
+            background: rgba(255,255,255,0.45);
+            cursor: pointer;
+        }
+        .phone-shot-dots button.active {
+            background: #fff;
+            width: 16px;
+            border-radius: 99px;
+        }
+
+        /* Stats Section */
+        .stats-bar {
+            margin-top: -40px;
+            position: relative;
+            z-index: 10;
+            padding: 35px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
+        }
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+        }
+        .stat-box h3 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 5px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .stat-box p {
+            color: var(--text-muted);
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 120px 0;
+            position: relative;
+        }
+        .section-header {
+            text-align: center;
+            margin-bottom: 70px;
+        }
+        .section-header h2 {
+            font-size: 2.8rem;
+            font-weight: 800;
+            margin-bottom: 15px;
+            color: #0f172a;
+        }
+        .section-header p {
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .feature-card {
+            padding: 35px 25px;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.02);
+        }
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--gradient);
+            opacity: 0;
+            transition: var(--transition);
+        }
+        .feature-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(37, 99, 235, 0.2);
+            box-shadow: 0 15px 35px var(--primary-glow);
+        }
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+        .feature-icon-box {
+            width: 65px;
+            height: 65px;
+            border-radius: 18px;
+            background: rgba(37, 99, 235, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 25px;
+            transition: var(--transition);
+        }
+        .feature-icon-box i {
+            font-size: 1.8rem;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .feature-card:hover .feature-icon-box {
+            background: var(--gradient);
+        }
+        .feature-card:hover .feature-icon-box i {
+            background: none;
+            -webkit-text-fill-color: white;
+            color: white;
+        }
+        .feature-card h4 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
+        }
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* How it Works */
+        .how-works {
+            padding: 100px 0;
+            background: #f8fafc;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .step-item {
+            text-align: center;
+            padding: 25px;
+            position: relative;
+        }
+        .step-badge {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: white;
+            margin: 0 auto 25px;
+            box-shadow: 0 4px 15px var(--primary-glow);
+        }
+        .step-item h4 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #0f172a;
+        }
+        .step-item p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Coins & In-app products */
+        .coins-section {
+            padding: 120px 0;
+        }
+        .coin-box-item {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.01);
+        }
+        .coin-box-item:hover {
+            transform: scale(1.03);
+            border-color: var(--secondary);
+            box-shadow: 0 10px 25px var(--secondary-glow);
+        }
+        .coin-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 4px 8px rgba(255, 179, 0, 0.2));
+            animation: floating 3s ease-in-out infinite;
+        }
+        .coin-amount {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 5px;
+        }
+        .coin-price {
+            font-size: 1.2rem;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        /* Data Safety Card */
+        .safety-panel {
+            padding: 40px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.03) 0%, rgba(6, 182, 212, 0.03) 100%);
+            border: 1px solid var(--border-color);
+        }
+        .safety-badge-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 2.2rem;
+            box-shadow: 0 5px 20px var(--primary-glow);
+        }
+
+        /* Call to Action */
+        .cta-section {
+            padding: 120px 0;
+            text-align: center;
+            position: relative;
+            background: radial-gradient(circle at center, rgba(37, 99, 235, 0.04) 0%, transparent 70%);
+        }
+        .cta-section h2 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+
+        /* Footer */
+        footer {
+            background: #0f172a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 80px 0 30px;
+            color: #94a3b8;
+        }
+        .footer-logo {
+            font-weight: 800;
+            font-size: 2rem;
+            color: white;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .footer-logo i {
+            color: var(--secondary);
+        }
+        .footer-link-group h5 {
+            color: white;
+            font-weight: 700;
+            margin-bottom: 25px;
+            font-size: 1.1rem;
+        }
+        .footer-link-group ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .footer-link-group ul li {
+            margin-bottom: 12px;
+        }
+        .footer-link-group ul li a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .footer-link-group ul li a:hover {
+            color: white;
+            padding-right: 5px;
+        }
+        html[lang="en"] .footer-link-group ul li a:hover {
+            padding-right: 0;
+            padding-left: 5px;
+        }
+        .footer-social-links {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .footer-social-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        .footer-social-btn:hover {
+            background: var(--gradient);
+            transform: translateY(-3px);
+            color: white;
+        }
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,0.05);
+            margin-top: 50px;
+            padding-top: 25px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Language Toggle Classes */
+
+        /* Language visibility */
+        .show-en { display: none !important; }
+        .show-ar { display: block !important; }
+        span.show-ar, a.show-ar, button .show-ar { display: inline !important; }
+        html[lang="en"] .show-ar { display: none !important; }
+        html[lang="en"] .show-en { display: block !important; }
+        html[lang="en"] span.show-en, html[lang="en"] a.show-en, html[lang="en"] button .show-en { display: inline !important; }
+
+
+        /* Animations */
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 2px var(--primary-glow)); }
+            50% { filter: drop-shadow(0 0 10px var(--primary)); }
+        }
+        @keyframes floating {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-12px); }
+        }
+        @keyframes orb-rotation {
+            0% { transform: rotate(0deg) scale(1); }
+            100% { transform: rotate(180deg) scale(1.05); }
+        }
+        @keyframes radar-pulse {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
+        }
+
+        /* Responsive adaptations */
+        @media (max-width: 991px) {
+            .hero {
+                padding-top: 140px;
+                text-align: center;
+            }
+            .hero h1 {
+                font-size: 3.2rem;
+            }
+            .store-badge-container {
+                justify-content: center;
+            }
+            .phone-mockup-wrap {
+                margin-top: 60px;
+            }
+            .stats-bar {
+                margin-top: 40px;
+            }
+        }
+        @media (max-width: 576px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .stat-box h3 {
+                font-size: 2.2rem;
+            }
+            .section-header h2 {
+                font-size: 2.2rem;
+            }
+        }
+    
+        main, .hero, .features, .how-works, .cta-section, footer, .navbar, .container, .page-header, .legal-wrap {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo">
+                <span>JEHO CHAT</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2 order-lg-3">
+                <!-- Lang Switch Button -->
+                <button class="lang-switch" onclick="toggleLanguage()">
+                    <i class="fas fa-globe"></i>
+                    <span class="show-ar">EN</span>
+                    <span class="show-en">عربي</span>
+                </button>
+                <a href="https://play.google.com/store/apps/details?id=com.Dramizo.Series" target="_blank" class="btn btn-premium">
+                    <i class="fab fa-google-play"></i>
+                    <span class="show-ar">تحميل</span>
+                    <span class="show-en">Download</span>
+                </a>
+            </div>
+
+            <button class="navbar-toggler border-0 text-dark" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="font-size: 1.5rem;">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <div class="collapse navbar-collapse order-lg-2" id="navbarNav">
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#features">
+                            <span class="show-ar">المميزات</span>
+                            <span class="show-en">Features</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#how">
+                            <span class="show-ar">كيف يعمل</span>
+                            <span class="show-en">How it Works</span>
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="/privacy.html">
+                            <span class="show-ar">الخصوصية</span>
+                            <span class="show-en">Privacy Policy</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/support.html">
+                            <span class="show-ar">اتصل بنا</span>
+                            <span class="show-en">Contact</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-7">
+                    <h1>
+                        <span class="show-ar">تطبيق <span class="gradient-text">JEHO CHAT</span></span>
+                        <span class="show-en">Welcome to <span class="gradient-text">JEHO CHAT</span></span>
+                        <br>
+                        <span class="show-ar" style="font-size: 0.75em; font-weight: 700;">غرف صوتية، دردشة، هدايا والمزيد</span>
+                        <span class="show-en" style="font-size: 0.75em; font-weight: 700;">Voice Rooms, Chat, Gifts & More</span>
+                    </h1>
+                    
+                    <p class="show-ar">تطبيق غرف صوتية ودردشة راقٍ للتواصل مع مجتمعك. افتح غرفة صوتية، دردش، وتبادل الهدايا في بيئة عربية أنيقة وآمنة.</p>
+                    <p class="show-en">A premium voice-room and chat application for real communities. Join voice rooms, chat, share gifts, and enjoy a premium Arabic social experience.</p>
+                    
+                    <div class="store-badge-container mt-4">
+                        <a href="https://play.google.com/store/apps/details?id=com.Dramizo.Series" target="_blank" class="store-badge">
+                            <i class="fab fa-google-play"></i>
+                            <div>
+                                <small>GET IT ON</small>
+                                <strong>Google Play</strong>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="col-lg-5 phone-mockup-wrap">
+                    <div class="phone-glow"></div>
+                    <div class="phone-mockup">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <div class="phone-shots" id="phoneShots">
+                                <img class="active" src="/assets/marketing/02-voice-rooms.png" alt="غرف صوتية" />
+                                <img src="/assets/marketing/03-chat.png" alt="دردشة" />
+                                <img src="/assets/marketing/05-gifts-vip.png" alt="هدايا" />
+                            </div>
+                            <div class="phone-shot-dots" id="phoneShotDots" aria-hidden="true"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Stats Banner -->
+    <div class="container">
+        <div class="glass-panel stats-bar">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <h3>10,000+</h3>
+                        <p class="show-ar">مستخدم نشط</p>
+                        <p class="show-en">Active Users</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <h3>50,000+</h3>
+                        <p class="show-ar">جلسة غرفة صوتية</p>
+                        <p class="show-en">Voice Room Sessions</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="stat-box">
+                        <h3>4.8 / 5</h3>
+                        <p class="show-ar">تقييم مستخدمينا</p>
+                        <p class="show-en">Google Play Rating</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Features Grid -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>
+                    <span class="show-ar">اكتشف مميزات <span class="gradient-text">JEHO CHAT</span> الأنيقة</span>
+                    <span class="show-en">Why Choose <span class="gradient-text">JEHO CHAT</span>?</span>
+                </h2>
+                <p class="show-ar">لقد قمنا بتصميم وتطوير التطبيق لتقديم أفضل تجربة تواصل آمنة وتفاعلية مع الناس في كل مكان.</p>
+                <p class="show-en">We designed the platform for responsive voice chat, account prestige, and user security.</p>
+            </div>
+            
+            <div class="row g-4">
+                <!-- Feature 1 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h4 class="show-ar">غرف صوتية عالية الجودة</h4>
+                        <h4 class="show-en">High-Quality Voice Rooms</h4>
+                        <p class="show-ar">افتح غرفة صوتية فوراً وتفاعل مع الأعضاء بالهدايا والدردشة اللحظية.</p>
+                        <p class="show-en">Open a voice room instantly and engage members with gifts and real-time chat.</p>
+                    </div>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-gift"></i>
+                        </div>
+                        <h4 class="show-ar">نظام الهدايا الافتراضية</h4>
+                        <h4 class="show-en">Virtual Gifting System</h4>
+                        <p class="show-ar">عبّر عن مشاعرك وأرسل هدايا افتراضية جذابة للمستخدمين الآخرين أثناء المكالمات لكسب الصداقة والتقدير.</p>
+                        <p class="show-en">Send stylish virtual gifts in voice rooms. Build connections and unlock interactive responses.</p>
+                    </div>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h4 class="show-ar">غرف صوتية تفاعلية</h4>
+                        <h4 class="show-en">Interactive Voice Rooms</h4>
+                        <p class="show-ar">انضم لغرف صوتية بمقاعد ومضيف وردود فعل وأجواء سهرات سهلة الإدارة.</p>
+                        <p class="show-en">Join voice rooms with seats, host controls, reactions, and party vibes.</p>
+                    </div>
+                </div>
+                
+                <!-- Feature 4 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <h4 class="show-ar">إطارات ومستويات VIP</h4>
+                        <h4 class="show-en">VIP Profile Frames & Levels</h4>
+                        <p class="show-ar">تألق في مجتمع JEHO CHAT بزيادة مستواك وشراء إطارات فريدة تحيط بصورتك الشخصية لتمييز ملفك الشخصي.</p>
+                        <p class="show-en">Stand out in the community. Advance your user levels and purchase premium decorative profile frames.</p>
+                    </div>
+                </div>
+                
+                <!-- Feature 5 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h4 class="show-ar">الرسائل النصية والدردشة</h4>
+                        <h4 class="show-en">Instant Messaging</h4>
+                        <p class="show-ar">إذا كنت تفضل الدردشة الكتابية، يمكنك تبادل الرسائل النصية والصور مع أصدقائك في أي وقت لتعزيز العلاقة.</p>
+                        <p class="show-en">Stay in touch via secure text messages. Share photos and follow up with new friends after meeting in voice rooms.</p>
+                    </div>
+                </div>
+                
+                <!-- Feature 6 -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="glass-panel feature-card">
+                        <div class="feature-icon-box">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <h4 class="show-ar">أمان وإشراف</h4>
+                        <h4 class="show-en">Safety & Moderation</h4>
+                        <p class="show-ar">ندعم أمان وإشراف للتأكد من هوية المستخدمين لضمان تفاعلك مع أشخاص حقيقيين 100%.</p>
+                        <p class="show-en">Reports and moderation tools help keep the community safer.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How it Works -->
+    <section class="how-works" id="how">
+        <div class="container">
+            <div class="section-header">
+                <h2>
+                    <span class="show-ar">خطوات بسيطة للبدء</span>
+                    <span class="show-en">How JEHO CHAT Works</span>
+                </h2>
+                <p class="show-ar">ابدأ دردشتك الأولى مع الآخرين بكل سهولة وسرعة.</p>
+                <p class="show-en">Three quick steps to initiate your social discovery journey.</p>
+            </div>
+            
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="step-item">
+                        <div class="step-badge">1</div>
+                        <h4 class="show-ar">حمّل التطبيق</h4>
+                        <h4 class="show-en">Install the App</h4>
+                        <p class="show-ar">نزّل JEHO CHAT من Google Play وأنشئ حسابك خلال دقائق.</p>
+                        <p class="show-en">Download JEHO CHAT from Google Play and create your account in minutes.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-item">
+                        <div class="step-badge">2</div>
+                        <h4 class="show-ar">ابدأ غرفة صوتية</h4>
+                        <h4 class="show-en">Open or Join a Room</h4>
+                        <p class="show-ar">افتح غرفة صوتية أو انضم إلى غرفة وتفاعل مع المجتمع.</p>
+                        <p class="show-en">Open or join a voice room and meet your community.</p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="step-item">
+                        <div class="step-badge">3</div>
+                        <h4 class="show-ar">استمتع وتواصل</h4>
+                        <h4 class="show-en">Connect & Enjoy</h4>
+                        <p class="show-ar">تحدث وعبر عن تقديرك بالهدايا، أو أضف الشخص كصديق للمستقبل.</p>
+                        <p class="show-en">Join conversations, swap gifts, and add users to your friends list.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+
+
+    <!-- Data safety highlighted section (Google Play Requirement Helper) -->
+    <section class="container mb-5">
+        <div class="glass-panel safety-panel">
+            <div class="row align-items-center g-4">
+                <div class="col-md-2 text-center text-md-start d-flex justify-content-center">
+                    <div class="safety-badge-icon">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                </div>
+                <div class="col-md-7 text-center text-md-start">
+                    <h3 class="font-weight-bold mb-2">
+                        <span class="show-ar">سلامة البيانات والخصوصية المعتمدة</span>
+                        <span class="show-en">Verified Data Safety & Transparency</span>
+                    </h3>
+                    <p class="show-ar mb-0 text-muted" style="font-size: 0.95rem;">تطبيق JEHO CHAT متوافق تماماً مع إرشادات متجر Google Play. يمكنك مراجعة كيفية جمعنا للبيانات، وطرق تشفيرها ونقلها وحذفها عبر صفحة الشفافية.</p>
+                    <p class="show-en mb-0 text-muted" style="font-size: 0.95rem;">JEHO CHAT is fully compliant with Google Play Console Data Safety policies. Learn exactly how user information is collected, processed, and deleted.</p>
+                </div>
+                <div class="col-md-3 text-center text-md-end">
+                    <a href="/data-collection.html" class="btn btn-premium btn-sm">
+                        <span class="show-ar"><i class="fas fa-list me-1"></i> تفاصيل جمع البيانات</span>
+                        <span class="show-en"><i class="fas fa-list me-1"></i> Data Collection Page</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Call To Action -->
+    <section class="cta-section">
+        <div class="container">
+            <h2 class="show-ar">هل أنت جاهز لتجربة <span class="gradient-text">JEHO CHAT</span>؟</h2>
+            <h2 class="show-en">Ready to experience <span class="gradient-text">JEHO CHAT</span>?</h2>
+            
+            <p class="show-ar text-muted mb-4" style="font-size: 1.15rem;">حمّل التطبيق الآن واستمتع بالغرف الصوتية والدردشة والهدايا.</p>
+            <p class="show-en text-muted mb-4" style="font-size: 1.15rem;">Get the app on Google Play and enjoy voice rooms, chat, and gifts.</p>
+            
+            <div class="store-badge-container justify-content-center">
+                <a href="https://play.google.com/store/apps/details?id=com.Dramizo.Series" target="_blank" class="store-badge">
+                    <i class="fab fa-google-play"></i>
+                    <div>
+                        <small>DOWNLOAD FOR</small>
+                        <strong>Android Device</strong>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-logo">
+                        <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo me-2">
+                        <span>JEHO CHAT</span>
+                    </div>
+                    <p class="show-ar mb-4">JEHO CHAT منصتك للغرف الصوتية والدردشة والهدايا بتجربة عربية أنيقة.</p>
+                    <p class="show-en mb-4">JEHO CHAT is a premium voice-room and chat platform for Arabic communities.</p>
+                    
+                    <div class="footer-social-links">
+                        <a href="mailto:sf213777@gmail.com" class="footer-social-btn" title="Email"><i class="fas fa-envelope"></i></a>
+                        <a href="https://play.google.com/store/apps/details?id=com.Dramizo.Series" class="footer-social-btn" target="_blank" title="Play Store"><i class="fab fa-google-play"></i></a>
+                    </div>
+                </div>
+                
+                <div class="col-lg-2 col-md-6 footer-link-group">
+                    <h5 class="show-ar">المنصة</h5>
+                    <h5 class="show-en">Platform</h5>
+                    <ul>
+                        <li><a href="#features"><span class="show-ar">المميزات</span><span class="show-en">Features</span></a></li>
+                        <li><a href="#how"><span class="show-ar">كيف يعمل</span><span class="show-en">How it Works</span></a></li>
+                    </ul>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 footer-link-group">
+                    <h5 class="show-ar">الشروط القانونية</h5>
+                    <h5 class="show-en">Legal Policy</h5>
+                    <ul>
+                        <li><a href="/privacy.html"><span class="show-ar">سياسة الخصوصية</span><span class="show-en">Privacy Policy</span></a></li>
+                        <li><a href="/terms.html"><span class="show-ar">شروط الخدمة</span><span class="show-en">Terms of Service</span></a></li>
+                        <li><a href="/data-collection.html"><span class="show-ar">صفحة جمع البيانات</span><span class="show-en">Data Collection Specs</span></a></li>
+                        <li><a href="/delete-account.html"><span class="show-ar">حذف حساب المستخدم</span><span class="show-en">Delete Account</span></a></li>
+                    </ul>
+                </div>
+                
+                <div class="col-lg-3 col-md-6 footer-link-group">
+                    <h5 class="show-ar">التطوير والدعم</h5>
+                    <h5 class="show-en">Support Info</h5>
+                    <ul>
+                        <li>
+                            <i class="fas fa-user-circle me-1 text-white"></i> 
+                            <span class="show-ar">المطور: JEHO CHAT</span>
+                            <span class="show-en">Dev: JEHO CHAT</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-envelope me-1 text-white"></i> 
+                            <a href="mailto:sf213777@gmail.com" class="text-lowercase" style="color:#94a3b8;">sf213777@gmail.com</a>
+                        </li>
+                        <li>
+                            <i class="fas fa-globe me-1 text-white"></i> 
+                            <a href="https://api.adnova.bbs.tr/" style="color:#94a3b8;">api.adnova.bbs.tr</a>
+                        </li>
+                        <li>
+                            <a href="/support.html" class="btn btn-premium btn-sm text-white mt-2" style="padding: 6px 16px;">
+                                <span class="show-ar"><i class="fas fa-paper-plane me-1"></i> تواصل للدعم</span>
+                                <span class="show-en"><i class="fas fa-paper-plane me-1"></i> Support Form</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2026 JEHO CHAT. <span class="show-ar">جميع الحقوق محفوظة لـ JEHO CHAT.</span><span class="show-en">All rights reserved by JEHO CHAT.</span></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Language Switcher Logic (Client side class toggle)
+        function toggleLanguage() {
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (htmlTag.getAttribute('lang') === 'ar') {
+                // Switch to English
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                // Use standard bootstrap
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                localStorage.setItem('hams_lang', 'en');
+            } else {
+                // Switch to Arabic
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                // Use RTL bootstrap
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                localStorage.setItem('hams_lang', 'ar');
+            }
+}
+
+        // Apply saved language on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('hams_lang');
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (savedLang === 'en') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+            }
+        });
+
+        // Navbar scrolling background addition
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 40) {
+                navbar.style.background = 'rgba(255, 255, 255, 0.98)';
+                navbar.style.boxShadow = '0 10px 30px rgba(0,0,0,0.05)';
+            } else {
+                navbar.style.background = 'rgba(255, 255, 255, 0.85)';
+                navbar.style.boxShadow = 'none';
+            }
+        });
+
+        // Phone frame screenshots slideshow
+        (function () {
+            const shots = document.querySelectorAll('#phoneShots img');
+            const dotsWrap = document.getElementById('phoneShotDots');
+            if (!shots.length || !dotsWrap) return;
+            let i = 0;
+            shots.forEach((_, idx) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.setAttribute('aria-label', 'shot ' + (idx + 1));
+                if (idx === 0) b.classList.add('active');
+                b.addEventListener('click', () => show(idx));
+                dotsWrap.appendChild(b);
+            });
+            const dots = dotsWrap.querySelectorAll('button');
+            function show(n) {
+                i = n;
+                shots.forEach((img, idx) => img.classList.toggle('active', idx === i));
+                dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
+            }
+            setInterval(() => show((i + 1) % shots.length), 3200);
+        })();
+    </script>
+</body>
+</html>

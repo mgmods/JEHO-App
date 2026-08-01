@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From Mikoo view_music_play_control -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rl_musicPlayControl"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_alignParentBottom="true"
+    android:background="@color/bg_surface"
+    android:elevation="4dp"
+    android:minHeight="80dp">
+
+    <ImageView
+        android:id="@+id/iv_musicPlayStatus"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="15dp"
+        android:layout_marginEnd="@dimen/dp_20"
+        android:contentDescription="@null"
+        android:src="@drawable/icon_try_listen" />
+
+    <FrameLayout
+        android:id="@+id/fl_report"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tv_report"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginVertical="8dp"
+            android:background="@drawable/bg_music_control_report"
+            android:padding="5dp"
+            android:text="@string/dialog_user_info_report_text"
+            android:textColor="@android:color/white"
+            android:textSize="10sp" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tv_musicName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="10dp"
+        android:layout_toStartOf="@id/fl_report"
+        android:layout_toEndOf="@id/iv_musicPlayStatus"
+        android:ellipsize="end"
+        android:lines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp" />
+
+    <SeekBar
+        android:id="@+id/sb_musicPlayProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_musicName"
+        android:layout_alignStart="@id/tv_musicName"
+        android:layout_alignEnd="@id/tv_musicName"
+        android:layout_marginTop="6dp"
+        android:layout_toEndOf="@id/iv_musicPlayStatus"
+        android:max="100"
+        android:maxHeight="9dp"
+        android:minHeight="1dp"
+        android:paddingStart="0dp"
+        android:paddingEnd="0dp"
+        android:progress="0"
+        android:progressDrawable="@drawable/progress_horizotal_seekbar_music_play_control"
+        android:secondaryProgress="100"
+        android:thumb="@drawable/thumb_seekbar_music_play_control"
+        android:thumbOffset="0dp" />
+
+    <TextView
+        android:id="@+id/tv_totalPlayTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/sb_musicPlayProgress"
+        android:layout_alignEnd="@id/sb_musicPlayProgress"
+        android:layout_marginTop="4dp"
+        android:text="00:00"
+        android:textColor="@color/text_hint"
+        android:textSize="13sp" />
+
+    <TextView
+        android:id="@+id/tv_currPlayTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignTop="@id/tv_totalPlayTime"
+        android:layout_below="@id/sb_musicPlayProgress"
+        android:layout_toStartOf="@id/tv_totalPlayTime"
+        android:text="00:00"
+        android:textColor="@color/text_hint"
+        android:textSize="13sp" />
+
+    <FrameLayout
+        android:id="@+id/fl_musicVoice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/fl_report"
+        android:layout_alignStart="@id/fl_report"
+        android:layout_alignParentEnd="true">
+
+        <ImageView
+            android:id="@+id/iv_musicVoice"
+            android:layout_width="24dp"
+            android:layout_height="22dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="23dp"
+            android:layout_marginBottom="16dp"
+            android:contentDescription="@null"
+            android:src="@drawable/icon_music_play_control_voice" />
+    </FrameLayout>
+</RelativeLayout>

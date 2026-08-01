@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Syrian flag (2025): green / white / black bands with three red stars. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="21dp"
+    android:height="14dp"
+    android:viewportWidth="90"
+    android:viewportHeight="60">
+
+    <path
+        android:fillColor="#007A3D"
+        android:pathData="M0,0h90v20H0z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,20h90v20H0z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M0,40h90v20H0z" />
+
+    <path
+        android:fillColor="#CE1126"
+        android:pathData="M22.5,23 L24.07,27.84 L29.16,27.84 L25.04,30.83 L26.61,35.66 L22.5,32.67 L18.39,35.66 L19.96,30.83 L15.84,27.84 L20.93,27.84 Z" />
+    <path
+        android:fillColor="#CE1126"
+        android:pathData="M45,23 L46.57,27.84 L51.66,27.84 L47.54,30.83 L49.11,35.66 L45,32.67 L40.89,35.66 L42.46,30.83 L38.34,27.84 L43.43,27.84 Z" />
+    <path
+        android:fillColor="#CE1126"
+        android:pathData="M67.5,23 L69.07,27.84 L74.16,27.84 L70.04,30.83 L71.61,35.66 L67.5,32.67 L63.39,35.66 L64.96,30.83 L60.84,27.84 L65.93,27.84 Z" />
+</vector>

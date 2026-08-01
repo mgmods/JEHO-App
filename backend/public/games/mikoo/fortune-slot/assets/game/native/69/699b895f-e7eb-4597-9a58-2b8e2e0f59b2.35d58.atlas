@@ -1,0 +1,146 @@
+
+win.png
+size: 563,459
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+BIG
+  rotate: false
+  xy: 323, 350
+  size: 200, 107
+  orig: 200, 107
+  offset: 0, 0
+  index: -1
+GIGA
+  rotate: true
+  xy: 2, 157
+  size: 300, 119
+  orig: 300, 119
+  offset: 0, 0
+  index: -1
+MEGA
+  rotate: true
+  xy: 123, 157
+  size: 300, 111
+  orig: 300, 111
+  offset: 0, 0
+  index: -1
+WIN2
+  rotate: false
+  xy: 323, 156
+  size: 160, 73
+  orig: 160, 73
+  offset: 0, 0
+  index: -1
+a01
+  rotate: false
+  xy: 525, 341
+  size: 36, 36
+  orig: 36, 36
+  offset: 0, 0
+  index: -1
+a02
+  rotate: false
+  xy: 525, 419
+  size: 36, 38
+  orig: 36, 38
+  offset: 0, 0
+  index: -1
+a03
+  rotate: true
+  xy: 485, 278
+  size: 29, 38
+  orig: 29, 38
+  offset: 0, 0
+  index: -1
+a04
+  rotate: false
+  xy: 306, 117
+  size: 14, 38
+  orig: 14, 38
+  offset: 0, 0
+  index: -1
+a05
+  rotate: false
+  xy: 306, 77
+  size: 14, 38
+  orig: 14, 38
+  offset: 0, 0
+  index: -1
+a06
+  rotate: false
+  xy: 525, 301
+  size: 30, 38
+  orig: 30, 38
+  offset: 0, 0
+  index: -1
+a07
+  rotate: false
+  xy: 525, 379
+  size: 36, 38
+  orig: 36, 38
+  offset: 0, 0
+  index: -1
+blue_line
+  rotate: false
+  xy: 484, 20
+  size: 20, 94
+  orig: 20, 94
+  offset: 0, 0
+  index: -1
+super
+  rotate: true
+  xy: 236, 157
+  size: 300, 85
+  orig: 300, 85
+  offset: 0, 0
+  index: -1
+win
+  rotate: false
+  xy: 322, 90
+  size: 160, 64
+  orig: 160, 64
+  offset: 0, 0
+  index: -1
+win1
+  rotate: false
+  xy: 323, 231
+  size: 160, 76
+  orig: 160, 76
+  offset: 0, 0
+  index: -1
+win3
+  rotate: true
+  xy: 485, 116
+  size: 160, 75
+  orig: 160, 75
+  offset: 0, 0
+  index: -1
+下
+  rotate: false
+  xy: 2, 5
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+光（下)
+  rotate: false
+  xy: 154, 5
+  size: 150, 150
+  orig: 150, 150
+  offset: 0, 0
+  index: -1
+右人
+  rotate: false
+  xy: 322, 2
+  size: 100, 86
+  orig: 100, 90
+  offset: 0, 1
+  index: -1
+横幅
+  rotate: false
+  xy: 323, 309
+  size: 200, 39
+  orig: 200, 39
+  offset: 0, 0
+  index: -1

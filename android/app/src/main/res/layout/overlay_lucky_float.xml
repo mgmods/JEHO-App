@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/luckyFloatWrap"
+    android:layout_width="96dp"
+    android:layout_height="112dp"
+    android:clickable="true"
+    android:contentDescription="صندوق الحظ"
+    android:focusable="true">
+
+    <FrameLayout
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_gravity="top|center_horizontal"
+        android:background="@drawable/bg_lucky_float"
+        android:padding="10dp">
+
+        <ImageView
+            android:id="@+id/imgLuckyFloat"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_screen_chat_lottery" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:background="@drawable/bg_lucky_win_card"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="3dp"
+        android:text="حظ"
+        android:textColor="#FFD54F"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <ImageView
+        android:id="@+id/btnLuckyFloatClose"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="top|end"
+        android:background="@drawable/bg_pro_icon_circle"
+        android:contentDescription="@string/close"
+        android:padding="6dp"
+        android:src="@drawable/ic_pro_close" />
+</FrameLayout>

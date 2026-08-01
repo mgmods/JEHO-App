@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="tag_edge_padded" type="id" />
+    <item name="tag_room_kenar_url" type="id" />
+    <item name="tag_room_cover_url" type="id" />
+</resources>

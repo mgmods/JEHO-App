@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Compact Mikoo charge card — cream fill, no outer white frame -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="118dp"
+    android:layout_marginHorizontal="3dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_mikoo_charge_card"
+    android:clickable="true"
+    android:elevation="0dp"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:stateListAnimator="@null">
+
+    <ImageView
+        android:id="@+id/imgPackageImage"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:src="@drawable/cz_ic1" />
+
+    <TextView
+        android:id="@+id/tvPkgLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:gravity="center"
+        android:maxLines="1"
+        android:textColor="#D8650C"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        tools:text="70000" />
+
+    <TextView
+        android:id="@+id/tvPkgBonus"
+        android:layout_width="wrap_content"
+        android:layout_height="12dp"
+        android:gravity="center"
+        android:textColor="#9A9A9A"
+        android:textSize="10sp"
+        android:visibility="invisible"
+        tools:text="50000"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/tvPkgTotal"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    <TextView
+        android:id="@+id/tvPkgPopular"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    <TextView
+        android:id="@+id/tvPkgSku"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+    <TextView
+        android:id="@+id/tvPkgBuy"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <TextView
+        android:id="@+id/tvPkgPrice"
+        android:layout_width="match_parent"
+        android:layout_height="30dp"
+        android:background="@drawable/bg_mikoo_charge_price"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="$0.99" />
+</LinearLayout>

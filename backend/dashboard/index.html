@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JEHO Live Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html, body, #app { min-height: 100%; margin: 0; font-family: Outfit, system-ui, sans-serif; }
+      .bi, i.bi { font-family: "bootstrap-icons" !important; font-style: normal; font-weight: normal !important; speak: never; }
+      #boot-fallback { display: none; padding: 2rem; max-width: 42rem; margin: 10vh auto; }
+      #boot-fallback.show { display: block; }
+      #boot-fallback a { color: #2ef3e1; }
+    </style>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('auralive_admin_theme');
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', t);
+          document.documentElement.setAttribute('data-bs-theme', t === 'dark' ? 'dark' : 'light');
+          document.documentElement.style.background = t === 'dark' ? '#07111c' : '#eef7f6';
+          document.documentElement.style.color = t === 'dark' ? '#e8f7f6' : '#0b1220';
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="boot-fallback">
+      <h1>JEHO Live Admin</h1>
+      <p>تعذر تحميل اللوحة. امسح الكاش أو افتح الرابط في نافذة خاصة.</p>
+      <p><a href="/admin/?v=20260717c">إعادة فتح /admin/</a></p>
+      <pre id="boot-error" style="white-space:pre-wrap;opacity:.8"></pre>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+    <script>
+      // Only treat fatal boot/script failures — not Vue view render errors
+      window.addEventListener('error', function (e) {
+        var src = (e && e.filename) || '';
+        var isBootAsset = /\/admin\/assets\/|\/src\/main\.js/.test(src);
+        if (!isBootAsset) return;
+        var f = document.getElementById('boot-fallback');
+        var t = document.getElementById('boot-error');
+        if (f) f.classList.add('show');
+        if (t) t.textContent = (e && e.message) ? e.message : 'JS error';
+      });
+      setTimeout(function () {
+        var app = document.getElementById('app');
+        if (app && app.childElementCount === 0) {
+          var f = document.getElementById('boot-fallback');
+          if (f) f.classList.add('show');
+        }
+      }, 8000);
+    </script>
+  </body>
+</html>

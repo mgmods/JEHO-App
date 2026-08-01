@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_host_target_stage"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/tvStageIndex"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_host_target_stage_badge"
+        android:gravity="center"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="1" />
+
+    <ImageView
+        android:id="@+id/imgStageStatus"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_host_target_check"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvStageTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/imgStageStatus"
+        app:layout_constraintStart_toEndOf="@id/tvStageIndex"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="مرحلة 1" />
+
+    <TextView
+        android:id="@+id/tvStageThreshold"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="8dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toStartOf="@id/imgStageStatus"
+        app:layout_constraintStart_toEndOf="@id/tvStageIndex"
+        app:layout_constraintTop_toBottomOf="@id/tvStageTitle"
+        tools:text="الهدف: 1,000 ماسة" />
+
+    <TextView
+        android:id="@+id/tvStageReward"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="2dp"
+        android:layout_marginEnd="8dp"
+        android:textColor="#FF0F766E"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/imgStageStatus"
+        app:layout_constraintStart_toEndOf="@id/tvStageIndex"
+        app:layout_constraintTop_toBottomOf="@id/tvStageThreshold"
+        tools:text="مكافأة: +50 كوينز" />
+
+    <TextView
+        android:id="@+id/tvStageState"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/bg_host_target_state_chip"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:textColor="#FF0F766E"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/imgStageStatus"
+        tools:text="مكتمل ✓" />
+</androidx.constraintlayout.widget.ConstraintLayout>

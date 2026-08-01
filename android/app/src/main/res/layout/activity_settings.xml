@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo activity_setting: flat white rows on gray page, no invented cards. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/contentRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFF0F0F0"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/settingsToolbar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@color/white"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="@string/back"
+            android:padding="10dp"
+            android:src="@drawable/ic_arrow_back"
+            app:tint="#FF333333" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="@string/settings"
+            android:textColor="#FF333333"
+            android:textSize="17sp"
+            android:textStyle="bold" />
+
+        <View
+            android:layout_width="44dp"
+            android:layout_height="44dp" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="33dp">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="10dp" />
+
+            <include
+                android:id="@+id/rowTheme"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowLanguage"
+                layout="@layout/include_setting_row_value"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowNotifications"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowMessages"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="10dp" />
+
+            <include
+                android:id="@+id/rowBindAccount"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowPassword"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="10dp" />
+
+            <include
+                android:id="@+id/rowFeedback"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowChildSafety"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowAbout"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowNetwork"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowUserAgreement"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowChildPolicy"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <include
+                android:id="@+id/rowShare"
+                layout="@layout/include_setting_row"
+                android:layout_width="match_parent"
+                android:layout_height="55dp" />
+
+            <RelativeLayout
+                android:id="@+id/rowVersion"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:background="@color/white"
+                android:foreground="?attr/selectableItemBackground">
+
+                <TextView
+                    android:id="@+id/tvVersionLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_marginStart="28dp"
+                    android:text="@string/settings_version"
+                    android:textColor="#FF333333"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/tvAppVersion"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:layout_centerVertical="true"
+                    android:paddingEnd="28dp"
+                    android:textColor="#FF999999"
+                    android:textSize="13sp" />
+            </RelativeLayout>
+
+            <TextView
+                android:id="@+id/rowSwitchAccount"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:layout_marginTop="25dp"
+                android:background="@color/white"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:text="@string/switch_account"
+                android:textColor="#FF333333"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/btnLogout"
+                android:layout_width="match_parent"
+                android:layout_height="55dp"
+                android:background="@color/white"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:text="@string/logout"
+                android:textColor="#FFFF4343"
+                android:textSize="16sp" />
+
+            <!-- Kept for ViewBinding / ViewModel compile compatibility (hidden). -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+
+                <LinearLayout android:id="@+id/rowEditInfo" android:layout_width="0dp" android:layout_height="0dp" />
+                <LinearLayout android:id="@+id/rowAccountSecurity" android:layout_width="0dp" android:layout_height="0dp" />
+                <LinearLayout android:id="@+id/rowAccountManage" android:layout_width="0dp" android:layout_height="0dp" />
+                <LinearLayout android:id="@+id/rowPrivacy" android:layout_width="0dp" android:layout_height="0dp" />
+                <LinearLayout android:id="@+id/rowCustomerSupport" android:layout_width="0dp" android:layout_height="0dp" />
+                <LinearLayout android:id="@+id/btnLanguagePicker" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView android:id="@+id/tvSelectedLanguage" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView android:id="@+id/tvThemeValue" android:layout_width="0dp" android:layout_height="0dp" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchDark"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchMuteMessageNotifications"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerBlocked"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <TextView android:id="@+id/tvBlockedEmpty" android:layout_width="0dp" android:layout_height="0dp" />
+                <ImageView android:id="@+id/imgThemeBg" android:layout_width="0dp" android:layout_height="0dp" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

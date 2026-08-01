@@ -1,0 +1,27 @@
+
+guangzhou.png
+size: 934,333
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: true
+  xy: 2, 2
+  size: 206, 930
+  orig: 206, 930
+  offset: 0, 0
+  index: -1
+1_000
+  rotate: true
+  xy: 49, 210
+  size: 121, 639
+  orig: 150, 930
+  offset: 19, 279
+  index: -1
+2
+  rotate: false
+  xy: 2, 286
+  size: 45, 45
+  orig: 45, 45
+  offset: 0, 0
+  index: -1

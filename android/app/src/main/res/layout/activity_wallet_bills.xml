@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/imgThemeBg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@color/white" />
+
+    <LinearLayout
+        android:id="@+id/contentRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="12dp">
+
+            <ImageView
+                android:id="@+id/btnBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:contentDescription="@string/back"
+                android:padding="12dp"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:text="@string/wallet_bills"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingBottom="24dp">
+
+                <include
+                    android:id="@+id/rowGiftsIn"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowGiftsOut"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowDiamonds"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowDiamondTransfer"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowGirlCategories"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowDebris"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp" />
+
+                <include
+                    android:id="@+id/rowCoins"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_marginTop="10dp" />
+
+                <include
+                    android:id="@+id/rowRechargeAgent"
+                    layout="@layout/item_wallet_bill_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="60dp"
+                    android:layout_marginTop="10dp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

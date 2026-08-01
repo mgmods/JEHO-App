@@ -1,0 +1,41 @@
+
+becheng_win.png
+size: 816,676
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+cd/cd_005
+  rotate: false
+  xy: 314, 278
+  size: 500, 395
+  orig: 500, 395
+  offset: 0, 0
+  index: -1
+freespinwin
+  rotate: true
+  xy: 0, 14
+  size: 659, 163
+  orig: 659, 163
+  offset: 0, 0
+  index: -1
+guang
+  rotate: false
+  xy: 314, 0
+  size: 276, 276
+  orig: 276, 276
+  offset: 0, 0
+  index: -1
+guangxiao6
+  rotate: false
+  xy: 592, 100
+  size: 182, 176
+  orig: 200, 181
+  offset: 8, 0
+  index: -1
+win
+  rotate: true
+  xy: 165, 18
+  size: 655, 147
+  orig: 655, 147
+  offset: 0, 0
+  index: -1

@@ -1,0 +1,181 @@
+
+scatter.png
+size: 485,194
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1_00000
+  rotate: true
+  xy: 304, 14
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00002
+  rotate: true
+  xy: 304, 14
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00004
+  rotate: true
+  xy: 387, 82
+  size: 66, 30
+  orig: 68, 32
+  offset: 1, 1
+  index: -1
+1_00006
+  rotate: true
+  xy: 370, 13
+  size: 67, 30
+  orig: 69, 32
+  offset: 1, 1
+  index: -1
+1_00008
+  rotate: true
+  xy: 402, 13
+  size: 67, 29
+  orig: 69, 31
+  offset: 1, 1
+  index: -1
+1_00010
+  rotate: true
+  xy: 321, 82
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00012
+  rotate: true
+  xy: 337, 14
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00014
+  rotate: false
+  xy: 314, 151
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00016
+  rotate: true
+  xy: 287, 82
+  size: 67, 32
+  orig: 69, 34
+  offset: 1, 1
+  index: -1
+1_00018
+  rotate: true
+  xy: 354, 82
+  size: 66, 31
+  orig: 68, 33
+  offset: 1, 1
+  index: -1
+1_00020
+  rotate: false
+  xy: 244, 159
+  size: 68, 33
+  orig: 70, 35
+  offset: 1, 1
+  index: -1
+1_00022
+  rotate: false
+  xy: 71, 4
+  size: 67, 31
+  orig: 69, 33
+  offset: 1, 1
+  index: -1
+1_00024
+  rotate: true
+  xy: 223, 12
+  size: 68, 40
+  orig: 70, 42
+  offset: 1, 1
+  index: -1
+1_00026
+  rotate: true
+  xy: 450, 82
+  size: 65, 25
+  orig: 70, 43
+  offset: 3, 8
+  index: -1
+1_00028
+  rotate: true
+  xy: 265, 13
+  size: 67, 37
+  orig: 69, 39
+  offset: 1, 1
+  index: -1
+1_00030
+  rotate: false
+  xy: 2, 3
+  size: 67, 32
+  orig: 69, 34
+  offset: 1, 1
+  index: -1
+1_00032
+  rotate: true
+  xy: 433, 14
+  size: 66, 25
+  orig: 70, 41
+  offset: 2, 7
+  index: -1
+1_00034
+  rotate: false
+  xy: 382, 150
+  size: 66, 27
+  orig: 68, 29
+  offset: 1, 1
+  index: -1
+1_00036
+  rotate: true
+  xy: 419, 82
+  size: 66, 29
+  orig: 68, 31
+  offset: 1, 1
+  index: -1
+1_00038
+  rotate: true
+  xy: 246, 82
+  size: 66, 39
+  orig: 68, 41
+  offset: 1, 1
+  index: -1
+发光闪
+  rotate: false
+  xy: 155, 14
+  size: 66, 66
+  orig: 66, 66
+  offset: 0, 0
+  index: -1
+图层 1
+  rotate: 180
+  xy: 16, 36
+  size: 138, 48
+  orig: 138, 49
+  offset: 0, 1
+  index: -1
+曝光度 1
+  rotate: false
+  xy: 460, 24
+  size: 22, 56
+  orig: 22, 56
+  offset: 0, 0
+  index: -1
+正面头
+  rotate: true
+  xy: 140, 82
+  size: 110, 105
+  orig: 110, 105
+  offset: 0, 0
+  index: -1
+牌
+  rotate: false
+  xy: 2, 83
+  size: 136, 109
+  orig: 136, 109
+  offset: 0, 0
+  index: -1

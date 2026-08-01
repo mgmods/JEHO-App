@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جمع البيانات | JEHO CHAT</title>
+    <link rel="icon" type="image/png" href="/assets/brand/jeho_logo.png">
+    
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" id="bootstrap-rtl">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --primary: #2563EB;
+            --primary-glow: rgba(37, 99, 235, 0.15);
+            --secondary: #06B6D4;
+            --secondary-glow: rgba(6, 182, 212, 0.15);
+            --bg-light: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Tajawal', 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        html[lang="en"] {
+            direction: ltr;
+        }
+        html[lang="en"] body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Glowing Orbs */
+        .glowing-orb {
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            filter: blur(160px);
+            opacity: 0.08;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 { top: 5%; right: -50px; background: var(--primary); }
+        .orb-2 { bottom: 10%; left: -100px; background: var(--secondary); }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            transition: var(--transition);
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 18px 0;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--text-main) !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+        .nav-link {
+            font-weight: 500;
+            color: var(--text-muted) !important;
+            margin: 0 12px;
+            transition: var(--transition);
+        }
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .lang-switch {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Header block */
+        .page-header {
+            padding: 160px 0 60px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .page-header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+        }
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Document Styling */
+        .doc-section {
+            margin-bottom: 40px;
+        }
+        .doc-section h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #0f172a;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .doc-section h2 i {
+            color: var(--primary);
+        }
+        .doc-section p, .doc-section li {
+            color: #475569;
+            font-size: 1.05rem;
+            line-height: 1.8;
+        }
+        .doc-section ul {
+            margin-bottom: 20px;
+        }
+        .doc-section li {
+            margin-bottom: 8px;
+        }
+
+        /* Custom Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0 30px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .data-table th {
+            background: rgba(37, 99, 235, 0.08);
+            color: #1e3a8a;
+            font-weight: 700;
+            padding: 14px 18px;
+            text-align: right;
+            border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+        }
+        html[lang="en"] .data-table th {
+            text-align: left;
+        }
+        .data-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-color);
+            color: #334155;
+            font-size: 0.98rem;
+        }
+        .data-table tr:hover td {
+            background: #f8fafc;
+            color: #0f172a;
+        }
+
+        /* Badge/Check box */
+        .info-pill {
+            background: rgba(37, 99, 235, 0.08);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 15px;
+            border: 1px solid rgba(37, 99, 235, 0.15);
+        }
+        
+        .alert-panel {
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        /* Language Toggle Display Classes */
+        .show-en, [lang="en"] .show-ar { display: none !important; }
+        [lang="en"] .show-en { display: block !important; }
+        span[lang="en"].show-en { display: inline !important; }
+        .show-ar, [lang="ar"] .show-ar { display: block !important; }
+        span[lang="ar"].show-ar { display: inline !important; }
+
+        /* Footer */
+        footer {
+            background: #0f172a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 60px 0 30px;
+            color: #94a3b8;
+            margin-top: 100px;
+            font-size: 0.95rem;
+            position: relative;
+            z-index: 2;
+        }
+        footer a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        footer a:hover {
+            color: white;
+        }
+    
+        main, .hero, .features, .how-works, .cta-section, footer, .navbar, .container, .page-header, .legal-wrap {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo">
+                <span>JEHO CHAT</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="lang-switch" onclick="toggleLanguage()">
+                    <i class="fas fa-globe"></i>
+                    <span class="show-ar">EN</span>
+                    <span class="show-en">عربي</span>
+                </button>
+                <a href="/" class="btn btn-premium btn-sm">
+                    <span class="show-ar">الرئيسية</span>
+                    <span class="show-en">Home</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="container">
+            <h1 class="show-ar">سلامة وجمع البيانات</h1>
+            <h1 class="show-en">Data Safety & Collection</h1>
+            <p class="show-ar">شفافية كاملة حول البيانات التي يجمعها تطبيق JEHO CHAT وكيفية استخدامها وحمايتها.</p>
+            <p class="show-en">Complete transparency regarding the data collected by JEHO CHAT, and how it is protected.</p>
+        </div>
+    </header>
+
+    <!-- Content Panel -->
+    <main class="container">
+        <div class="glass-panel">
+            
+            <!-- Quick Summary -->
+            <div class="doc-section text-center mb-5">
+                <div class="info-pill">
+                    <span class="show-ar"><i class="fas fa-shield-halved me-1"></i> متوافق مع متطلبات متجر Google Play</span>
+                    <span class="show-en"><i class="fas fa-shield-halved me-1"></i> Google Play Compliant</span>
+                </div>
+                <h3 class="show-ar" style="font-weight: 700;">التزامنا بالشفافية</h3>
+                <h3 class="show-en" style="font-weight: 700;">Our Commitment to Data Safety</h3>
+                <p class="show-ar text-muted max-width-600 mx-auto" style="font-size: 1.05rem;">يسعى تطبيق JEHO CHAT لتقديم بيئة آمنة للمستخدمين للتعارف. نحن نجمع فقط البيانات الضرورية لتشغيل التطبيق والتحقق من الهوية لتجنب الاحتيال والحسابات الوهمية. نوضح هنا التفاصيل الكاملة لنماذج سلامة البيانات.</p>
+                <p class="show-en text-muted max-width-600 mx-auto" style="font-size: 1.05rem;">JEHO CHAT is committed to providing a secure live social platform. We only collect details essential to run services, authenticate members, and counter fraud. Below is our formal data safety declarations.</p>
+            </div>
+
+            <!-- Collected Data Table -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-list-check"></i>
+                    <span class="show-ar">ما هي البيانات التي يتم جمعها؟</span>
+                    <span class="show-en">What Data is Collected?</span>
+                </h2>
+                <p class="show-ar">نصرح بكل وضوح عن جمع البيانات التالية واستخدامها وفق الفئات المحددة من متجر جوجل بلاي:</p>
+                <p class="show-en">We explicitly declare collecting and processing the following data classes in compliance with Google Play Developer policies:</p>
+                
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <span class="show-ar">فئة البيانات</span>
+                                    <span class="show-en">Data Type Class</span>
+                                </th>
+                                <th>
+                                    <span class="show-ar">البيانات التفصيلية</span>
+                                    <span class="show-en">Specific Data Element</span>
+                                </th>
+                                <th>
+                                    <span class="show-ar">سبب الجمع والاستخدام</span>
+                                    <span class="show-en">Primary Collection Purpose</span>
+                                </th>
+                                <th>
+                                    <span class="show-ar">حالة المشاركة</span>
+                                    <span class="show-en">Sharing Status</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">معلومات شخصية</span><span class="show-en">Personal Info</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">الاسم، البريد الإلكتروني، العمر/تاريخ الميلاد، الجنس</span>
+                                    <span class="show-en">Name, Email address, Age/Birthdate, Gender</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">إنشاء وإدارة الحساب، التحقق من السن (18+)، وتخصيص الملف الشخصي.</span>
+                                    <span class="show-en">Account creation, age verification (18+), and profile setup.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">لا يتم مشاركتها</span>
+                                    <span class="show-en">Not Shared</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">المراسلات</span><span class="show-en">Messages</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">الرسائل النصية والصور المرسلة في الدردشة الخاصة</span>
+                                    <span class="show-en">In-app chat texts and images sent to other users</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">تمكين المراسلات والدردشة بين الطرفين داخل التطبيق وعرضها.</span>
+                                    <span class="show-en">To enable direct messaging and chat history display between users.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">لا يتم مشاركتها</span>
+                                    <span class="show-en">Not Shared</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">الصور والفيديو</span><span class="show-en">Photos & Videos</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">الصورة الشخصية للمستخدم (Avatar)، وصور تأكيد الحساب</span>
+                                    <span class="show-en">Profile avatar and verification photos</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">تخصيص الملف الشخصي، وإجراء توثيق الهوية لمنع المحتالين.</span>
+                                    <span class="show-en">Account customization and optional profile verification.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">لا يتم مشاركتها</span>
+                                    <span class="show-en">Not Shared</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">الميكروفون</span><span class="show-en">Microphone</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">الوصول المؤقت للصوت أثناء المشاركة في الغرف الصوتية</span>
+                                    <span class="show-en">Temporary audio access while participating in voice rooms</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">تمكين التحدث في الغرف الصوتية. لا يتم تسجيل الصوت أو حفظه.</span>
+                                    <span class="show-en">To enable speaking in voice rooms. Audio is not recorded or saved.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">لا يتم مشاركتها</span>
+                                    <span class="show-en">Not Shared</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">معلومات مالية</span><span class="show-en">Financial Info</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">سجلات عمليات الشراء داخل التطبيق (العملات Coins)</span>
+                                    <span class="show-en">In-app purchase transaction histories</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">معالجة عمليات الشراء، تتبع نقاط وعملات المستخدم داخل النظام.</span>
+                                    <span class="show-en">Processing purchases, logging balance, and verifying transaction status.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">لا يتم مشاركتها</span>
+                                    <span class="show-en">Not Shared</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <strong><span class="show-ar">معرّفات الأجهزة</span><span class="show-en">Device & Other IDs</span></strong>
+                                </td>
+                                <td>
+                                    <span class="show-ar">معرّفات نظام التشغيل (Android ID) ومعرّفات الإعلانات</span>
+                                    <span class="show-en">Android OS Unique ID, Ad-IDs, Firebase FCM tokens</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">إرسال إشعارات المكالمات والرسائل عبر Firebase، مكافحة الاحتيال، وعرض الإعلانات.</span>
+                                    <span class="show-en">Push notification routing via FCM, fraud detection, and advertising diagnostics.</span>
+                                </td>
+                                <td>
+                                    <span class="show-ar">مشاركة معرّف الإعلانات مع شبكات إعلانية مثل AdMob</span>
+                                    <span class="show-en">Ad-ID shared with verified networks (like Google AdMob) for ad serving</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Voice Room Audio Statement -->
+            <div class="alert-panel">
+                <h4 style="font-weight: 700; color: var(--primary);" class="show-ar"><i class="fas fa-microphone-slash me-2"></i>توضيح هام حول صوت الغرف:</h4>
+                <h4 style="font-weight: 700; color: var(--primary);" class="show-en"><i class="fas fa-microphone-slash me-2"></i>Important Notice on Voice Rooms:</h4>
+                <p class="show-ar mb-0" style="font-size: 0.95rem; line-height: 1.6;">يتم نقل الصوت في غرف JEHO CHAT في الزمن الحقيقي لتقديم خدمة المحادثة الصوتية. **تطبيق JEHO CHAT لا يسجل أو يحفظ محتوى صوت الغرف.**</p>
+                <p class="show-en mb-0" style="font-size: 0.95rem; line-height: 1.6;">Voice-room audio is transmitted in real time to provide audio conversation. **JEHO CHAT does not record or store voice-room audio content.**</p>
+            </div>
+
+            <!-- Security Practices -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-lock"></i>
+                    <span class="show-ar">ممارسات الأمان وحماية البيانات</span>
+                    <span class="show-en">Data Security Practices</span>
+                </h2>
+                <ul>
+                    <li class="show-ar"><strong>التشفير أثناء النقل:</strong> يتم نقل جميع البيانات الشخصية وبيانات المراسلات باستخدام بروتوكولات نقل آمنة ومشفرة بالكامل (HTTPS/TLS) لضمان حمايتها من التنصت.</li>
+                    <li class="show-en"><strong>Encrypted in Transit:</strong> All personal data and chat messages are encrypted and sent securely using TLS/HTTPS encryption protocols.</li>
+                    
+                    <li class="show-ar"><strong>تخزين سحابي آمن:</strong> نقوم بتخزين بيانات حسابك والدردشة على خوادم محمية بجدران نارية متطورة وأنظمة مصادقة صارمة.</li>
+                    <li class="show-en"><strong>Secure Storage:</strong> Database systems hosting profile fields and chats run on secure servers featuring firewalls and strict access controls.</li>
+                    
+                    <li class="show-ar"><strong>حذف البيانات المتاح:</strong> نلتزم بتمكين المستخدمين من إزالة بياناتهم بالكامل في أي وقت يشاءون.</li>
+                    <li class="show-en"><strong>Data Erasure:</strong> We guarantee providing direct methods for members to permanently request deletion of their records.</li>
+                </ul>
+            </div>
+
+            <!-- Data Deletion Details -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-user-xmark"></i>
+                    <span class="show-ar">كيفية طلب حذف البيانات</span>
+                    <span class="show-en">How to Request Data Deletion</span>
+                </h2>
+                <p class="show-ar">إذا قررت حذف حسابك، فإننا نحذف جميع بياناتك المرتبطة (الاسم، البريد الإلكتروني، سجل الدردشات، العملات، وإطارات الحساب) نهائياً من خوادمنا النشطة خلال **30 يوماً**. يمكنك طلب الحذف عبر الطرق التالية:</p>
+                <p class="show-en">If you choose to delete your profile, we permanently strip all associated records (Name, Email, Chats, Coin balance, frames) from our active systems within **30 days**. You can request deletion via:</p>
+                
+                <ol>
+                    <li class="show-ar"><strong>من داخل التطبيق مباشرة (أسرع):</strong> اذهب إلى الإعدادات &larr; الحساب &larr; حذف الحساب.</li>
+                    <li class="show-en"><strong>Directly In-App (Recommended):</strong> Navigate to Settings &rarr; Account &rarr; Delete Account.</li>
+                    
+                    <li class="show-ar"><strong>صفحة حذف الحساب الإلكترونية:</strong> تفضل بزيارة نموذج الحذف على موقعنا <a href="/delete-account.html" style="color: var(--primary); font-weight: 600;">صفحة حذف الحساب</a> واملأ البيانات وسنقوم بحذفه خلال 48 ساعة.</li>
+                    <li class="show-en"><strong>Account Deletion Web Portal:</strong> Submit your details using our <a href="/delete-account.html" style="color: var(--primary); font-weight: 600;">Account Deletion Request Form</a>, and we will process it within 48 hours.</li>
+                    
+                    <li class="show-ar"><strong>عبر البريد الإلكتروني:</strong> راسلنا على <a href="mailto:sf213777@gmail.com" style="color: var(--primary);">sf213777@gmail.com</a> وسنقوم بمساعدتك فوراً.</li>
+                    <li class="show-en"><strong>Via Email support:</strong> Contact us at <a href="mailto:sf213777@gmail.com" style="color: var(--primary);">sf213777@gmail.com</a> to request account teardown manually.</li>
+                </ol>
+            </div>
+
+            <!-- Contact -->
+            <div class="doc-section mb-0">
+                <h2>
+                    <i class="fas fa-circle-info"></i>
+                    <span class="show-ar">استفسارات إضافية</span>
+                    <span class="show-en">Questions & Concerns</span>
+                </h2>
+                <p class="show-ar">إذا كان لديك أي أسئلة حول ممارساتنا الأمنية أو كيفية جمعنا للبيانات، يمكنك التواصل معنا مباشرة على البريد الإلكتروني:</p>
+                <p class="show-en">For inquiries or statements concerning data collection details, please reach out to us at our primary email:</p>
+                <div class="p-3" style="background: #f1f5f9; border-radius:15px; display:inline-block; border: 1px solid var(--border-color);">
+                    <strong>Email:</strong> <a href="mailto:sf213777@gmail.com" style="color: var(--primary); text-decoration: none;">sf213777@gmail.com</a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <p>&copy;  JEHO CHAT. All rights reserved by JEHO CHAT.</p>
+            <p style="margin: 10px 0 0;">
+                <a href="/privacy.html" class="mx-2"><span class="show-ar">سياسة الخصوصية</span><span class="show-en">Privacy Policy</span></a>
+                <a href="/terms.html" class="mx-2"><span class="show-ar">شروط الخدمة</span><span class="show-en">Terms of Service</span></a>
+                <a href="/delete-account.html" class="mx-2"><span class="show-ar">حذف الحساب</span><span class="show-en">Delete Account</span></a>
+                <a href="/support.html" class="mx-2"><span class="show-ar">اتصل بنا</span><span class="show-en">Contact</span></a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleLanguage() {
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (htmlTag.getAttribute('lang') === 'ar') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                localStorage.setItem('hams_lang', 'en');
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                localStorage.setItem('hams_lang', 'ar');
+            }
+}
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('hams_lang');
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (savedLang === 'en') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+            }
+        });
+    </script>
+</body>
+</html>

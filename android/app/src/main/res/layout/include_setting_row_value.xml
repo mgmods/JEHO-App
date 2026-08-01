@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Setting row with optional trailing value (language name, etc.). -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="55dp"
+    android:background="@color/white"
+    android:foreground="?attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/tvSettingTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="28dp"
+        android:textColor="#FF333333"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/imgSettingArrow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="15dp"
+        android:text="›"
+        android:textColor="#FFBBBBBB"
+        android:textSize="22sp" />
+
+    <TextView
+        android:id="@+id/tvSettingValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_toStartOf="@id/imgSettingArrow"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:paddingEnd="8dp"
+        android:textColor="#FF999999"
+        android:textSize="13sp" />
+</RelativeLayout>

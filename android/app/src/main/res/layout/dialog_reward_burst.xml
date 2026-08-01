@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rewardBurstRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#CC06101C"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Particle layer: ImageViews added in code -->
+    <FrameLayout
+        android:id="@+id/particleLayer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:id="@+id/heroCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginHorizontal="36dp"
+        android:background="@drawable/bg_profile_panel"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingHorizontal="24dp"
+        android:paddingTop="28dp"
+        android:paddingBottom="24dp">
+
+        <ImageView
+            android:id="@+id/imgHero"
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_chest_gold" />
+
+        <TextView
+            android:id="@+id/tvHeroTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="أحسنت!"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvHeroSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:text="تم استلام المكافأة"
+            android:textColor="@color/aurora_gold"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnHeroOk"
+            style="@style/Widget.AuraLive.Button.Gold"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="18dp"
+            android:text="@string/ok"
+            android:textAllCaps="false" />
+    </LinearLayout>
+</FrameLayout>

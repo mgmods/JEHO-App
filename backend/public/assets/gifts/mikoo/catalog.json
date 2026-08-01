@@ -1,0 +1,24 @@
+{
+  "version": "mikoo-gift-import-2-partial",
+  "count": 1,
+  "items": [
+    {
+      "code": "mikoo_gift_cache_1784286192159",
+      "name": "هدية ميكو · مؤثر VAP",
+      "category": "premium",
+      "type": "premium",
+      "coinPrice": 499,
+      "iconUrl": "/assets/gifts/mikoo/gift_back_lv3.webp",
+      "animationUrl": "/assets/gifts/mikoo/anims/mikoo_gift_cache_1784286192159.mp4",
+      "mikooId": 1784286192159,
+      "hasMp4": true,
+      "hasSvga": false
+    }
+  ],
+  "note": "Partial: full list needs MIKOO_TICKET. This one MP4 came from Mikoo device cache.",
+  "playback": {
+    "mp4Field": "mp4Url",
+    "svgaField": "vggUrl",
+    "android": "AnimView+.svga"
+  }
+}

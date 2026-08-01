@@ -1,0 +1,90 @@
+
+leiji.png
+size: 1114,964
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1_00000
+  rotate: 180
+  xy: 858, 499
+  size: 79, 421
+  orig: 257, 774
+  offset: 101, 353
+  index: -1
+1_00001
+  rotate: true
+  xy: 2, 32
+  size: 92, 422
+  orig: 257, 774
+  offset: 91, 352
+  index: -1
+1_00002
+  rotate: false
+  xy: 932, 188
+  size: 174, 775
+  orig: 257, 775
+  offset: 46, 0
+  index: -1
+1_00003
+  rotate: false
+  xy: 565, 187
+  size: 214, 775
+  orig: 257, 775
+  offset: 40, 0
+  index: -1
+1_00004
+  rotate: false
+  xy: 2, 188
+  size: 257, 775
+  orig: 257, 775
+  offset: 0, 0
+  index: -1
+1_00005
+  rotate: 180
+  xy: 701, 187
+  size: 247, 775
+  orig: 257, 775
+  offset: 10, 0
+  index: -1
+1_00006
+  rotate: 180
+  xy: 395, 190
+  size: 208, 773
+  orig: 257, 775
+  offset: 49, 0
+  index: -1
+1_00007
+  rotate: true
+  xy: 361, 4
+  size: 252, 752
+  orig: 257, 775
+  offset: 5, 0
+  index: -1
+1_00008
+  rotate: false
+  xy: 244, 240
+  size: 152, 693
+  orig: 257, 775
+  offset: 105, 0
+  index: -1
+1_00009
+  rotate: false
+  xy: 394, 843
+  size: 83, 121
+  orig: 257, 775
+  offset: 75, 355
+  index: -1
+1_00010
+  rotate: false
+  xy: 2, 670
+  size: 70, 116
+  orig: 257, 775
+  offset: 101, 339
+  index: -1
+1_00011
+  rotate: false
+  xy: 2, 158
+  size: 86, 122
+  orig: 257, 775
+  offset: 93, 323
+  index: -1

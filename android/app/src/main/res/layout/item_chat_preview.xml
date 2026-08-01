@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chat list row: one presence line, VIP with badges, gray divider -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:foreground="?attr/selectableItemBackground"
+    android:minHeight="71dp">
+
+    <LinearLayout
+        android:id="@+id/chatRowBody"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:gravity="center_vertical"
+        android:layoutDirection="locale"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <FrameLayout
+            android:layout_width="66dp"
+            android:layout_height="66dp"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <ImageView
+                android:id="@+id/imgAvatar"
+                android:layout_width="55dp"
+                android:layout_height="55dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_seat_avatar_clip"
+                android:contentDescription="@string/chat"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_tab_me" />
+
+            <ImageView
+                android:id="@+id/imgFrame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgHostBadge"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <View
+                android:id="@+id/onlineDot"
+                android:layout_width="10dp"
+                android:layout_height="10dp"
+                android:layout_gravity="bottom|end"
+                android:layout_marginEnd="6dp"
+                android:layout_marginBottom="6dp"
+                android:background="@drawable/bg_online_dot"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:gravity="start"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textDirection="locale"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="AuraStar" />
+
+            <TextView
+                android:id="@+id/tvUsername"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <!-- VIP + level + wealth + charm — one row -->
+            <LinearLayout
+                android:id="@+id/rowBadges"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvVipChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_vip"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="1dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="VIP3"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/tvLevelChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_level"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="1dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    tools:text="Lv.12" />
+
+                <TextView
+                    android:id="@+id/tvWealthChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:background="@drawable/bg_chip_wealth"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="1dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    tools:text="❤9" />
+
+                <TextView
+                    android:id="@+id/tvCharmChip"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip_charm"
+                    android:paddingHorizontal="5dp"
+                    android:paddingVertical="1dp"
+                    android:textColor="#FFFFFFFF"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    tools:text="🌙15" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvLast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:gravity="start"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textDirection="locale"
+                android:textSize="13sp"
+                tools:text="مرحبا كيفك؟" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <!-- Message time only (no duplicate last-seen clock) -->
+            <TextView
+                android:id="@+id/tvTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                tools:text="10:42" />
+
+            <!-- Online / Offline only — never last-seen time -->
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp"
+                tools:text="متصل" />
+
+            <Space
+                android:layout_width="1dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/tvUnread"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_seat_host_chip"
+                android:gravity="center"
+                android:minWidth="18dp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="1dp"
+                android:textColor="@color/aurora_gold"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="88dp"
+        android:layout_marginEnd="14dp"
+        android:background="#FFE5E5EA" />
+</FrameLayout>

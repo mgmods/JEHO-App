@@ -1,0 +1,118 @@
+
+freespin_open_01.png
+size: 1847,621
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+ban
+  rotate: false
+  xy: 0, 155
+  size: 774, 466
+  orig: 774, 466
+  offset: 0, 0
+  index: -1
+cd/cd_001
+  rotate: true
+  xy: 776, 169
+  size: 46, 64
+  orig: 267, 318
+  offset: 85, 154
+  index: -1
+cd/cd_003
+  rotate: false
+  xy: 1732, 101
+  size: 69, 93
+  orig: 267, 318
+  offset: 76, 136
+  index: -1
+cd/cd_005
+  rotate: false
+  xy: 1720, 196
+  size: 88, 119
+  orig: 267, 318
+  offset: 69, 118
+  index: -1
+cd/cd_007
+  rotate: false
+  xy: 1720, 317
+  size: 108, 141
+  orig: 267, 318
+  offset: 60, 101
+  index: -1
+cd/cd_009
+  rotate: false
+  xy: 1718, 460
+  size: 129, 161
+  orig: 267, 318
+  offset: 50, 84
+  index: -1
+cd/cd_011
+  rotate: true
+  xy: 696, 0
+  size: 153, 182
+  orig: 267, 318
+  offset: 42, 68
+  index: -1
+cd/cd_013
+  rotate: true
+  xy: 1524, 5
+  size: 173, 206
+  orig: 267, 318
+  offset: 38, 52
+  index: -1
+cd/cd_015
+  rotate: false
+  xy: 1524, 180
+  size: 194, 200
+  orig: 267, 318
+  offset: 32, 64
+  index: -1
+cd/cd_017
+  rotate: false
+  xy: 880, 2
+  size: 219, 213
+  orig: 267, 318
+  offset: 21, 55
+  index: -1
+cd/cd_019
+  rotate: false
+  xy: 1101, 70
+  size: 225, 228
+  orig: 267, 318
+  offset: 25, 42
+  index: -1
+cd/cd_021
+  rotate: false
+  xy: 1478, 382
+  size: 238, 239
+  orig: 267, 318
+  offset: 19, 29
+  index: -1
+cd/cd_023
+  rotate: true
+  xy: 1328, 44
+  size: 254, 194
+  orig: 267, 318
+  offset: 13, 19
+  index: -1
+stanrt
+  rotate: false
+  xy: 776, 217
+  size: 302, 81
+  orig: 302, 81
+  offset: 0, 0
+  index: -1
+wen
+  rotate: false
+  xy: 776, 300
+  size: 700, 321
+  orig: 700, 321
+  offset: 0, 0
+  index: -1
+wen2
+  rotate: false
+  xy: 0, 7
+  size: 694, 146
+  orig: 694, 146
+  offset: 0, 0
+  index: -1

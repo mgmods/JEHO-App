@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شروط الاستخدام | JEHO CHAT</title>
+    <link rel="icon" type="image/png" href="/assets/brand/jeho_logo.png">
+    
+    <!-- Bootstrap RTL -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet" id="bootstrap-rtl">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+        :root {
+            --primary: #2563EB;
+            --primary-glow: rgba(37, 99, 235, 0.15);
+            --secondary: #06B6D4;
+            --secondary-glow: rgba(6, 182, 212, 0.15);
+            --bg-light: #ffffff;
+            --bg-card: #f8fafc;
+            --border-color: #e2e8f0;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            --transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+        }
+
+        body {
+            font-family: 'Tajawal', 'Outfit', sans-serif;
+            background-color: var(--bg-light);
+            color: var(--text-main);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        html[lang="en"] {
+            direction: ltr;
+        }
+        html[lang="en"] body {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Glowing Orbs */
+        .glowing-orb {
+            position: absolute;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            filter: blur(160px);
+            opacity: 0.08;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .orb-1 { top: 5%; right: -50px; background: var(--primary); }
+        .orb-2 { bottom: 10%; left: -100px; background: var(--secondary); }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            transition: var(--transition);
+        }
+
+        /* Navbar */
+        .navbar {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 18px 0;
+        }
+        .navbar-brand {
+            font-weight: 800;
+            font-size: 1.8rem;
+            color: var(--text-main) !important;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .brand-logo {
+            width: 42px;
+            height: 42px;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+        .nav-link {
+            font-weight: 500;
+            color: var(--text-muted) !important;
+            margin: 0 12px;
+            transition: var(--transition);
+        }
+        .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .lang-switch {
+            background: #f1f5f9;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 6px 14px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Header block */
+        .page-header {
+            padding: 160px 0 60px;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        .page-header h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 15px;
+        }
+        .page-header p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        /* Document Styling */
+        .doc-section {
+            margin-bottom: 40px;
+        }
+        .doc-section h2 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .doc-section h2 i {
+            color: var(--primary);
+        }
+        .doc-section p, .doc-section li {
+            color: #475569;
+            font-size: 1.05rem;
+            line-height: 1.8;
+        }
+        .doc-section ul {
+            margin-bottom: 20px;
+            padding-left: 20px;
+        }
+        html[lang="ar"] .doc-section ul {
+            padding-left: 0;
+            padding-right: 20px;
+        }
+        .doc-section li {
+            margin-bottom: 8px;
+        }
+
+        .alert-panel {
+            background: rgba(6, 182, 212, 0.05);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .alert-panel-danger {
+            background: rgba(239, 68, 68, 0.05);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        /* Language Toggle Display Classes */
+        .show-en, [lang="en"] .show-ar { display: none !important; }
+        [lang="en"] .show-en { display: block !important; }
+        span[lang="en"].show-en { display: inline !important; }
+        .show-ar, [lang="ar"] .show-ar { display: block !important; }
+        span[lang="ar"].show-ar { display: inline !important; }
+
+        /* Footer */
+        footer {
+            background: #0f172a;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding: 60px 0 30px;
+            color: #94a3b8;
+            margin-top: 100px;
+            font-size: 0.95rem;
+            position: relative;
+            z-index: 2;
+        }
+        footer a {
+            color: #94a3b8;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+        footer a:hover {
+            color: white;
+        }
+    
+        main, .hero, .features, .how-works, .cta-section, footer, .navbar, .container, .page-header, .legal-wrap {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Orbs -->
+    <div class="glowing-orb orb-1"></div>
+    <div class="glowing-orb orb-2"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <img src="/assets/brand/jeho_logo.png" alt="JEHO CHAT Logo" class="brand-logo">
+                <span>JEHO CHAT</span>
+            </a>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="lang-switch" onclick="toggleLanguage()">
+                    <i class="fas fa-globe"></i>
+                    <span class="show-ar">EN</span>
+                    <span class="show-en">عربي</span>
+                </button>
+                <a href="/" class="btn btn-premium btn-sm">
+                    <span class="show-ar">الرئيسية</span>
+                    <span class="show-en">Home</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <header class="page-header">
+        <div class="container">
+            <h1 class="show-ar">شروط وأحكام الخدمة</h1>
+            <h1 class="show-en">Terms of Service</h1>
+            <p class="show-ar">تطبيق JEHO CHAT (JEHO CHAT) &mdash; تاريخ التحديث: 22 يونيو 2026</p>
+            <p class="show-en">JEHO CHAT Application &mdash; Last Updated: June 22, 2026</p>
+        </div>
+    </header>
+
+    <!-- Content Panel -->
+    <main class="container">
+        <div class="glass-panel">
+            
+            <!-- Info Box -->
+            <div class="p-4 mb-5" style="background: #f1f5f9; border-radius:15px; border: 1px solid var(--border-color);">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Application Name / اسم التطبيق:</strong> JEHO CHAT (JEHO CHAT)</p>
+                        <p class="mb-2"><strong>Developer Name / المطور:</strong> JEHO CHAT</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2"><strong>Support Email / البريد الإلكتروني:</strong> <a href="mailto:sf213777@gmail.com" style="color: var(--primary); text-decoration: none;">sf213777@gmail.com</a></p>
+                        <p class="mb-0"><strong>Website / الموقع الإلكتروني:</strong> <a href="https://api.adnova.bbs.tr/" style="color: var(--primary); text-decoration: none;">api.adnova.bbs.tr</a></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. Agreement to Terms -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-file-contract"></i>
+                    <span class="show-ar">1. قبول شروط الخدمة</span>
+                    <span class="show-en">1. Acceptance of Terms</span>
+                </h2>
+                <p class="show-ar">مرحباً بك في تطبيق **JEHO CHAT (JEHO CHAT)**. تُشكل شروط وأحكام الخدمة هذه ("الشروط") اتفاقية قانونية ملزمة بينك كأحد مستخدمي التطبيق وبين **JEHO CHAT** بصفتها الشركة المالكة والمطورة للتطبيق. بتنزيلك أو تثبيتك للتطبيق أو استخدامه، فإنك تقر بأنك قد قرأت وفهمت ووافقت على الالتزام التام بجميع هذه الشروط إلى جانب <a href="/privacy.html" style="color: var(--primary);">سياسة الخصوصية</a> الخاصة بنا. إذا كنت لا توافق على هذه الشروط، يرجى التوقف عن استخدام التطبيق فوراً وإلغاء تثبيته.</p>
+                <p class="show-en">Welcome to **JEHO CHAT**. These Terms of Service ("Terms") constitute a legally binding agreement between you, as a user, and **JEHO CHAT**, as the developer and owner of the application. By downloading, installing, or accessing the application, you acknowledge that you have read, understood, and agree to be bound by these Terms and our <a href="/privacy.html" style="color: var(--primary);">Privacy Policy</a>. If you do not agree to these Terms, you must stop using JEHO CHAT and uninstall it.</p>
+            </div>
+
+            <!-- 2. Eligibility -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-user-check"></i>
+                    <span class="show-ar">2. الأهلية والسن المطلوب</span>
+                    <span class="show-en">2. Eligibility & Age Restriction</span>
+                </h2>
+                <p class="show-ar">لاستخدام JEHO CHAT، يجب عليك الإقرار والضمان بما يلي:</p>
+                <p class="show-en">To access JEHO CHAT services, you warrant that:</p>
+                <ul>
+                    <li class="show-ar">أن يكون عمرك **13 سنة فأكثر** (أو سن الرشد القانوني في بلدك). هذا التطبيق يحتوي على غرف صوتية وتواصل اجتماعي ولا يناسب الأطفال أو القاصرين.</li>
+                    <li class="show-en">You are at least **18 years of age** (or the age of legal majority in your country). The app features voice rooms and social chat and is strictly prohibited for minors.</li>
+                    
+                    <li class="show-ar">أنك تتمتع بالأهلية القانونية الكاملة لإبرام هذه الاتفاقية.</li>
+                    <li class="show-en">You hold full legal capacity to enter into a binding contractual agreement.</li>
+                    
+                    <li class="show-ar">لم يتم حظرك أو تعليق حسابك مسبقاً في التطبيق لانتهاك السياسات.</li>
+                    <li class="show-en">You have not been previously banned or suspended from JEHO CHAT for violating guidelines.</li>
+                </ul>
+            </div>
+
+            <!-- 3. User Accounts -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-user-lock"></i>
+                    <span class="show-ar">3. حسابات المستخدمين والتسجيل</span>
+                    <span class="show-en">3. User Accounts & Security</span>
+                </h2>
+                <p class="show-ar">عند التسجيل، يجب عليك توفير معلومات دقيقة وكاملة. أنت مسؤول مسؤولية كاملة عن كافة الأنشطة التي تحدث تحت حسابك الشخصي وعن المحافظة على سرية كلمة المرور وبيانات الدخول. يُحظر إنشاء حسابات بأوراق وهمية أو انتحال شخصية أشخاص آخرين. ونحتفظ بالحق في تعليق أو إغلاق أي حساب نكتشف أنه وهمي أو مخالف للواقع.</p>
+                <p class="show-en">You must provide accurate and complete credentials during signup. You are solely responsible for all activities that occur under your account, and for maintaining password confidentiality. Creating fake profiles or impersonating others is strictly prohibited. We reserve the right to suspend or close accounts containing fraudulent or misleading details.</p>
+            </div>
+
+            <!-- 4. User Conduct Guidelines -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-handshake-angle"></i>
+                    <span class="show-ar">4. قواعد السلوك والاستخدام المقبول</span>
+                    <span class="show-en">4. Rules of User Conduct</span>
+                </h2>
+                <p class="show-ar">للحفاظ على بيئة محترمة وآمنة لجميع المستخدمين، فإنك تلتزم التزاماً صارماً بالقواعد التالية.</p>
+                <p class="show-en">To maintain a respectful and safe community for all users, you agree to obey the following rules.</p>
+                
+                <div class="alert-panel-danger">
+                    <h5 style="color: #dc2626; font-weight: 700;" class="show-ar"><i class="fas fa-triangle-exclamation me-2"></i>الأفعال المحظورة تماماً (ستؤدي لحظر فوري ودائم لحسابك):</h5>
+                    <h5 style="color: #dc2626; font-weight: 700;" class="show-en"><i class="fas fa-triangle-exclamation me-2"></i>Strictly Prohibited Acts (Immediate and Permanent Ban):</h5>
+                    <ul>
+                        <li class="show-ar"><strong>المحتوى الجنسي أو الفاضح:</strong> يُحظر تماماً إرسال صور، فيديوهات، أو نصوص تحتوي على تعري أو تلميحات جنسية أو محتوى إباحي أثناء الغرف أو الدردشة.</li>
+                        <li class="show-en"><strong>Sexual Content:</strong> Sending nude photos, sexual content, or pornographic text in rooms or messages is strictly banned.</li>
+                        
+                        <li class="show-ar"><strong>المضايقة والاعتداء:</strong> يُمنع الإساءة والتهديد والمضايقة والبلطجة اللفظية أو التمييز العنصري أو الطائفي ضد أي مستخدم آخر.</li>
+                        <li class="show-en"><strong>Harassment & Abuse:</strong> Verbal abuse, threatening, bullying, racism, or religious discrimination targeting other users is prohibited.</li>
+                        
+                        <li class="show-ar"><strong>الاحتيال والنصب:</strong> يُحظر استدراج المستخدمين لغايات مالية أو إرسال روابط تصيد.</li>
+                        <li class="show-en"><strong>Scams & Fraud:</strong> Seeking money or driving users to external phishing links will result in immediate termination.</li>
+                        
+                        <li class="show-ar"><strong>التسجيل غير المصرح به:</strong> يُمنع منعاً باتاً تصوير شاشة المكالمات أو تسجيل الفيديو أو الصوت للطرف الآخر دون علمه وموافقته المسبقة الصريحة.</li>
+                        <li class="show-en"><strong>Screen Recording:</strong> Capturing, recording, or publishing screen images or call audio of other users without their explicit consent is strictly banned.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 5. Coins and Purchases -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-coins"></i>
+                    <span class="show-ar">5. العملات والمشتريات الافتراضية</span>
+                    <span class="show-en">5. Virtual Coins & Billing</span>
+                </h2>
+                <p class="show-ar">يوفر تطبيق JEHO CHAT نظام عملات افتراضية (Coins) تشتريها بنقود حقيقية لتفعيل ميزات VIP، مثل مكالمات الاتصال المباشر بمستخدم محدد، وإرسال الهدايا الافتراضية، أو تزيين صورتك بالإطارات. ونوضح هنا القواعد التالية:</p>
+                <p class="show-en">JEHO CHAT offers virtual currency (Coins) which are purchased with real money to enable premium features (like placing direct calls to specific friends, sending gifts, and buying profile frames):</p>
+                <ul>
+                    <li class="show-ar">تتم عمليات الدفع بشكل آمن عبر متجر Google Play ويخضع الدفع لسياسات المتجر.</li>
+                    <li class="show-en">All billing transactions are processed securely through Google Play Billing system.</li>
+                    
+                    <li class="show-ar">جميع المشتريات للعملات الافتراضية هي نهائية وغير قابلة للاسترداد (Non-refundable) إلا بموجب ما ينص عليه قانون حماية المستهلك المحلي أو سياسات جوجل.</li>
+                    <li class="show-en">Coin purchases are final and non-refundable, subject to local consumer laws or Google Play refund policies.</li>
+                    
+                    <li class="show-ar">العملات والهدايا ليس لها أي قيمة نقدية حقيقية خارج التطبيق ولا يحق لك بيعها أو تحويلها لأموال حقيقية خارج النظام المعتمد.</li>
+                    <li class="show-en">Coins and gifts have no monetary value outside the JEHO CHAT system and cannot be sold or traded for cash.</li>
+                </ul>
+            </div>
+
+            <!-- 6. Account Deletion -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-user-xmark"></i>
+                    <span class="show-ar">6. إنهاء الخدمة وحذف الحساب</span>
+                    <span class="show-en">6. Account Termination & Deletion</span>
+                </h2>
+                <p class="show-ar">يحق لك حذف حسابك والتوقف عن استخدام خدماتنا في أي وقت. يمكنك إجراء ذلك فوراً عبر التوجه إلى إعدادات الحساب في التطبيق والنقر على "حذف الحساب"، أو بتقديم طلب حذف الحساب الإلكتروني عبر زيارة صفحتنا:</p>
+                <p class="show-en">You have the right to close your account and delete your data at any time. You can do this instantly within the app's settings or by filling out the form on our web portal:</p>
+                <p class="text-center my-3">
+                    <a href="/delete-account.html" style="color: var(--primary); font-weight: 700; text-decoration: none;">
+                        <span class="show-ar"><i class="fas fa-trash-can me-1"></i> رابط صفحة حذف الحساب</span>
+                        <span class="show-en"><i class="fas fa-trash-can me-1"></i> Web Account Deletion Page</span>
+                    </a>
+                </p>
+                <p class="show-ar">ونحتفظ بالحق في حظر حسابك أو تعليقه فوراً دون إشعار مسبق في حال مخالفتك لأي بند من هذه الشروط.</p>
+                <p class="show-en">We also reserve the right to suspend or block your account immediately without prior notice if you violate these terms.</p>
+            </div>
+
+            <!-- 7. Disclaimers & Limitations -->
+            <div class="doc-section">
+                <h2>
+                    <i class="fas fa-shield-halved"></i>
+                    <span class="show-ar">7. إخلاء المسؤولية وحدودها</span>
+                    <span class="show-en">7. Disclaimers & Limitation of Liability</span>
+                </h2>
+                <p class="show-ar">نحن نقدم خدمة JEHO CHAT على أساس "كما هي" و"كما تتوفر"، دون أي ضمانات صريحة أو ضمنية باستمرار التشغيل الخالي من الأخطاء. نحن لا نتحمل المسؤولية عن سلوك أو أخلاقيات أي مستخدم آخر للتطبيق في الغرف الصوتية أو الدردشة. يجب عليك توخي الحذر والحيطة وعدم مشاركة بياناتك الشخصية أو البنكية الحساسة مع الغرباء.</p>
+                <p class="show-en">JEHO CHAT is provided on an "as is" and "as available" basis, without warranties of any kind. We do not monitor or take responsibility for the actions, behaviors, or shared content of other users in voice rooms or chats. You are advised to exercise extreme caution and never share sensitive bank details or private ID cards with strangers.</p>
+            </div>
+
+            <!-- 8. Contact -->
+            <div class="doc-section mb-0">
+                <h2>
+                    <i class="fas fa-paper-plane"></i>
+                    <span class="show-ar">8. معلومات التواصل للاستفسارات</span>
+                    <span class="show-en">8. Contact Information</span>
+                </h2>
+                <p class="show-ar">إذا كانت لديك أي أسئلة حول شروط الخدمة هذه، يرجى التواصل معنا عبر البريد الإلكتروني المباشر للدعم:</p>
+                <p class="show-en">If you have any questions or clarifications regarding these terms, please contact our support desk:</p>
+                <div class="p-3" style="background: #f1f5f9; border-radius:15px; display:inline-block; border: 1px solid var(--border-color);">
+                    <strong>Email:</strong> <a href="mailto:sf213777@gmail.com" style="color: var(--primary); text-decoration: none;">sf213777@gmail.com</a>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <p>&copy;  JEHO CHAT. All rights reserved by JEHO CHAT.</p>
+            <p style="margin: 10px 0 0;">
+                <a href="/privacy.html" class="mx-2"><span class="show-ar">سياسة الخصوصية</span><span class="show-en">Privacy Policy</span></a>
+                <a href="/terms.html" class="mx-2"><span class="show-ar">شروط الخدمة</span><span class="show-en">Terms of Service</span></a>
+                <a href="/delete-account.html" class="mx-2"><span class="show-ar">حذف الحساب</span><span class="show-en">Delete Account</span></a>
+                <a href="/support.html" class="mx-2"><span class="show-ar">اتصل بنا</span><span class="show-en">Contact</span></a>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap Bundle with Popper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function toggleLanguage() {
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (htmlTag.getAttribute('lang') === 'ar') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+                localStorage.setItem('hams_lang', 'en');
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+                localStorage.setItem('hams_lang', 'ar');
+            }
+}
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedLang = localStorage.getItem('hams_lang');
+            const htmlTag = document.documentElement;
+            const bootstrapRtl = document.getElementById('bootstrap-rtl');
+            
+            if (savedLang === 'en') {
+                htmlTag.setAttribute('lang', 'en');
+                htmlTag.removeAttribute('dir');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css');
+            } else {
+                htmlTag.setAttribute('lang', 'ar');
+                htmlTag.setAttribute('dir', 'rtl');
+                bootstrapRtl.setAttribute('href', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css');
+            }
+        });
+    </script>
+</body>
+</html>

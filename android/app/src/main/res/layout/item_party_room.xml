@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Literal Mikoo item_home_live_list.xml structure (widgets → JEHO views). -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/itemCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="5dp"
+    android:layout_marginBottom="8dp">
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/imgCover"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        app:layout_constraintDimensionRatio="175:195"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Mikoo.RoomList" />
+
+    <View
+        android:id="@+id/cardCover"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/imgCover"
+        app:layout_constraintEnd_toEndOf="@id/imgCover"
+        app:layout_constraintStart_toStartOf="@id/imgCover"
+        app:layout_constraintTop_toTopOf="@id/imgCover" />
+
+    <!-- Mikoo top fade (alpha 0.3 gradient) — simple dark scrim -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:alpha="0.3"
+        android:background="#66000000"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Mikoo home_gd_bg bottom fade -->
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="70dp"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/home_gd_bg"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <FrameLayout
+        android:id="@+id/flLock"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#66000000"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/imgCover"
+        app:layout_constraintEnd_toEndOf="@id/imgCover"
+        app:layout_constraintStart_toStartOf="@id/imgCover"
+        app:layout_constraintTop_toTopOf="@id/imgCover">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@android:drawable/ic_lock_lock"
+            app:tint="@color/white" />
+    </FrameLayout>
+
+    <!-- Mikoo OnlineUserAvatarView -->
+    <LinearLayout
+        android:id="@+id/rowAvatars"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="5dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toTopOf="@id/tvTitle"
+        app:layout_constraintStart_toStartOf="@id/tvTitle">
+
+        <FrameLayout
+            android:id="@+id/avatar1"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/imgAvatar1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hiyoo_list_avatar_ring"
+                android:contentDescription="@null"
+                android:padding="1dp"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgFrame1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+        <FrameLayout
+            android:id="@+id/avatar2"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="-5dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/imgAvatar2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hiyoo_list_avatar_ring"
+                android:contentDescription="@null"
+                android:padding="1dp"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgFrame2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+        <FrameLayout
+            android:id="@+id/avatar3"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="-5dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/imgAvatar3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hiyoo_list_avatar_ring"
+                android:contentDescription="@null"
+                android:padding="1dp"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgFrame3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+        <FrameLayout
+            android:id="@+id/avatar4"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="-5dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/imgAvatar4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hiyoo_list_avatar_ring"
+                android:contentDescription="@null"
+                android:padding="1dp"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgFrame4"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+        <FrameLayout
+            android:id="@+id/avatar5"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="-5dp"
+            android:visibility="gone">
+            <ImageView
+                android:id="@+id/imgAvatar5"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_hiyoo_list_avatar_ring"
+                android:contentDescription="@null"
+                android:padding="1dp"
+                android:scaleType="centerCrop" />
+            <ImageView
+                android:id="@+id/imgFrame5"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </FrameLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="10dp"
+        android:layout_marginBottom="10dp"
+        android:ellipsize="end"
+        android:gravity="start"
+        android:maxWidth="85dp"
+        android:singleLine="true"
+        android:textColor="#FFFFFFFF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toTopOf="@id/imgCountryFlag"
+        app:layout_constraintStart_toStartOf="@id/imgCountryFlag"
+        tools:text="Host" />
+
+    <ImageView
+        android:id="@+id/imgHotTop"
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvRoomTypeBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
+        android:id="@+id/imgOfficialRoom"
+        android:layout_width="58dp"
+        android:layout_height="18dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"
+        android:scaleType="fitStart"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Mikoo ivRoomLevel -->
+    <ImageView
+        android:id="@+id/imgRoomLevel"
+        android:layout_width="28dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="10dp"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"
+        android:src="@drawable/icon_room_level_1"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvRoomTypeBadge" />
+
+    <!-- Mikoo iv_country -->
+    <ImageView
+        android:id="@+id/imgCountryFlag"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="15dp"
+        android:layout_marginBottom="9dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/tvCountryFlag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/imgCountryFlag"
+        app:layout_constraintStart_toStartOf="@id/imgCountryFlag"
+        app:layout_constraintTop_toTopOf="@id/imgCountryFlag" />
+
+    <!-- Mikoo pretty room ID: curved level banner with baked-in "ID" + number -->
+    <FrameLayout
+        android:id="@+id/rowPrettyId"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:layout_marginStart="8dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/imgCountryFlag"
+        app:layout_constraintStart_toEndOf="@id/imgCountryFlag"
+        app:layout_constraintTop_toTopOf="@id/imgCountryFlag"
+        app:layout_goneMarginStart="15dp"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/imgPrettyIdBg"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:adjustViewBounds="true"
+            android:contentDescription="@null"
+            android:minWidth="78dp"
+            android:scaleType="fitXY"
+            android:src="@drawable/ic_pretty_id_level_1" />
+
+        <TextView
+            android:id="@+id/tvPrettyId"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical|start"
+            android:gravity="center_vertical|start"
+            android:includeFontPadding="false"
+            android:minWidth="88dp"
+            android:paddingStart="42dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:text="10086" />
+    </FrameLayout>
+
+    <!-- Mikoo tv_room_num -->
+    <TextView
+        android:id="@+id/tvExtraCount"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="13dp"
+        android:drawablePadding="4dp"
+        android:gravity="center_vertical"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:drawableStartCompat="@drawable/h_count_ic"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/imgCountryFlag"
+        tools:text="10" />
+
+    <!-- Compat stubs -->
+    <LinearLayout
+        android:id="@+id/rowViewerCount"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+        <ImageView
+            android:id="@+id/imgLiveEq"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/imgCardFrame"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tvHost"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <TextView
+        android:id="@+id/tvWelcome"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <TextView
+        android:id="@+id/tvLiveBadge"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <LinearLayout
+        android:id="@+id/rowRoomLevel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+        <TextView
+            android:id="@+id/tvRoomLevel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+        <ImageView
+            android:id="@+id/imgRoomTypeIcon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+    </LinearLayout>
+    <View
+        android:id="@+id/roomFrameStage"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <View
+        android:id="@+id/rowTitleFlag"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <View
+        android:id="@+id/rowFlagId"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+</androidx.constraintlayout.widget.ConstraintLayout>

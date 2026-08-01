@@ -1,0 +1,146 @@
+
+bg_01.png
+size: 2048,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+333
+  rotate: false
+  xy: 685, 873
+  size: 675, 480
+  orig: 675, 480
+  offset: 0, 0
+  index: -1
+c1
+  rotate: true
+  xy: 1074, 1355
+  size: 235, 362
+  orig: 235, 362
+  offset: 0, 0
+  index: -1
+c2
+  rotate: false
+  xy: 1706, 1565
+  size: 261, 140
+  orig: 261, 140
+  offset: 0, 0
+  index: -1
+c3
+  rotate: false
+  xy: 900, 1612
+  size: 240, 93
+  orig: 240, 93
+  offset: 0, 0
+  index: -1
+c4
+  rotate: true
+  xy: 641, 1457
+  size: 155, 210
+  orig: 155, 210
+  offset: 0, 0
+  index: -1
+ditu
+  rotate: true
+  xy: 0, 505
+  size: 366, 874
+  orig: 366, 874
+  offset: 0, 0
+  index: -1
+guang
+  rotate: false
+  xy: 0, 1498
+  size: 201, 151
+  orig: 201, 151
+  offset: 0, 0
+  index: -1
+hai1
+  rotate: false
+  xy: 1362, 612
+  size: 648, 524
+  orig: 648, 524
+  offset: 0, 0
+  index: -1
+lang1
+  rotate: false
+  xy: 294, 1629
+  size: 469, 76
+  orig: 469, 78
+  offset: 0, 2
+  index: -1
+lang2
+  rotate: false
+  xy: 1255, 1592
+  size: 449, 113
+  orig: 449, 116
+  offset: 0, 3
+  index: -1
+lang3
+  rotate: false
+  xy: 203, 1478
+  size: 436, 149
+  orig: 436, 152
+  offset: 0, 3
+  index: -1
+quan
+  rotate: false
+  xy: 0, 1651
+  size: 115, 54
+  orig: 115, 54
+  offset: 0, 0
+  index: -1
+shu
+  rotate: true
+  xy: 765, 1614
+  size: 91, 133
+  orig: 91, 133
+  offset: 0, 0
+  index: -1
+shu2
+  rotate: true
+  xy: 117, 1651
+  size: 54, 92
+  orig: 54, 92
+  offset: 0, 0
+  index: -1
+shu22
+  rotate: true
+  xy: 876, 0
+  size: 610, 1054
+  orig: 851, 1497
+  offset: 121, 344
+  index: -1
+shu4
+  rotate: true
+  xy: 1142, 1606
+  size: 99, 111
+  orig: 99, 111
+  offset: 0, 0
+  index: -1
+taiyang
+  rotate: true
+  xy: 853, 1402
+  size: 208, 219
+  orig: 230, 230
+  offset: 11, 5
+  index: -1
+tiankong
+  rotate: false
+  xy: 0, 1082
+  size: 683, 373
+  orig: 683, 373
+  offset: 0, 0
+  index: -1
+yazi
+  rotate: true
+  xy: 211, 1633
+  size: 72, 81
+  orig: 85, 81
+  offset: 4, 0
+  index: -1
+yizi
+  rotate: false
+  xy: 1438, 1138
+  size: 454, 425
+  orig: 482, 428
+  offset: 0, 0
+  index: -1

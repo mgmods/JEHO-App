@@ -1,0 +1,153 @@
+
+tb_01.png
+size: 283,270
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+10
+  rotate: false
+  xy: 88, 95
+  size: 113, 78
+  orig: 113, 78
+  offset: 0, 0
+  index: -1
+a
+  rotate: true
+  xy: 125, 175
+  size: 95, 90
+  orig: 95, 90
+  offset: 0, 0
+  index: -1
+j
+  rotate: false
+  xy: 203, 78
+  size: 80, 95
+  orig: 80, 95
+  offset: 0, 0
+  index: -1
+k
+  rotate: true
+  xy: 0, 111
+  size: 107, 86
+  orig: 107, 86
+  offset: 0, 0
+  index: -1
+q
+  rotate: false
+  xy: 0, 13
+  size: 86, 96
+  orig: 86, 96
+  offset: 0, 0
+  index: -1
+wild
+  rotate: false
+  xy: 0, 220
+  size: 123, 50
+  orig: 123, 50
+  offset: 0, 0
+  index: -1
+wsg/wsg_001
+  rotate: true
+  xy: 252, 2
+  size: 21, 23
+  orig: 78, 37
+  offset: 9, 7
+  index: -1
+wsg/wsg_002
+  rotate: false
+  xy: 145, 4
+  size: 33, 25
+  orig: 78, 37
+  offset: 8, 6
+  index: -1
+wsg/wsg_003
+  rotate: true
+  xy: 88, 175
+  size: 43, 26
+  orig: 78, 37
+  offset: 8, 6
+  index: -1
+wsg/wsg_004
+  rotate: false
+  xy: 182, 45
+  size: 58, 27
+  orig: 78, 37
+  offset: 8, 5
+  index: -1
+wsg/wsg_005
+  rotate: true
+  xy: 153, 31
+  size: 62, 27
+  orig: 78, 37
+  offset: 8, 5
+  index: -1
+wsg/wsg_006
+  rotate: true
+  xy: 247, 207
+  size: 63, 28
+  orig: 78, 37
+  offset: 8, 5
+  index: -1
+wsg/wsg_007
+  rotate: true
+  xy: 217, 206
+  size: 64, 28
+  orig: 78, 37
+  offset: 8, 5
+  index: -1
+wsg/wsg_008
+  rotate: false
+  xy: 217, 176
+  size: 64, 28
+  orig: 78, 37
+  offset: 8, 5
+  index: -1
+wsg/wsg_009
+  rotate: false
+  xy: 88, 66
+  size: 63, 27
+  orig: 78, 37
+  offset: 9, 5
+  index: -1
+wsg/wsg_010
+  rotate: true
+  xy: 88, 2
+  size: 62, 27
+  orig: 78, 37
+  offset: 10, 5
+  index: -1
+wsg/wsg_011
+  rotate: true
+  xy: 117, 3
+  size: 61, 26
+  orig: 78, 37
+  offset: 11, 6
+  index: -1
+wsg/wsg_012
+  rotate: true
+  xy: 242, 25
+  size: 51, 25
+  orig: 78, 37
+  offset: 21, 6
+  index: -1
+wsg/wsg_013
+  rotate: false
+  xy: 182, 18
+  size: 39, 25
+  orig: 78, 37
+  offset: 33, 6
+  index: -1
+wsg/wsg_014
+  rotate: false
+  xy: 223, 0
+  size: 27, 23
+  orig: 78, 37
+  offset: 44, 7
+  index: -1
+wsg/wsg_015
+  rotate: false
+  xy: 182, 74
+  size: 14, 19
+  orig: 78, 37
+  offset: 56, 9
+  index: -1

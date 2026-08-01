@@ -1,0 +1,1252 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import {
+  AgentLedgerType,
+  AgentRecharge,
+  RechargeAgent,
+  RechargeAgentApplication,
+  RechargeAgentContact,
+  RechargeAgentLedger,
+  RechargeAgentSource,
+  RechargeAgentStatus,
+} from '../../database/entities/recharge-agent.entity';
+import { User, UserStatus } from '../../database/entities/user.entity';
+import { Wallet } from '../../database/entities/wallet.entity';
+import {
+  CurrencyType,
+  TransactionType,
+  WalletTransaction,
+} from '../../database/entities/wallet-transaction.entity';
+import {
+  PaymentProvider,
+  RechargeOrder,
+  RechargeStatus,
+} from '../../database/entities/recharge-order.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
+import {
+  WithdrawRequest,
+  WithdrawStatus,
+} from '../../database/entities/withdraw-request.entity';
+import { GiftSend } from '../../database/entities/gift-send.entity';
+import { WalletService } from '../wallet/wallet.service';
+import { PaymentsService } from '../payments/payments.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
+
+export interface ApplyRechargeAgentDto {
+  contact?: string;
+  region?: string;
+  reason?: string;
+  requestedCoins?: number;
+  paymentNetwork?: string;
+  paymentReference?: string;
+  /** Completed Binance USDT deposit order id — auto-fills payment reference from tx. */
+  depositOrderId?: string;
+}
+
+export interface SellRechargeDto {
+  recipientUsernameOrId: string;
+  sku?: string;
+  coins?: number;
+  idempotencyKey: string;
+}
+
+export interface AdminAssignRechargeAgentDto {
+  userId: string;
+  floatCoins?: number;
+  commissionBps?: number;
+  dailyLimitCoins?: number;
+  notes?: string;
+}
+
+export interface AdminPatchRechargeAgentDto {
+  status?: RechargeAgentStatus;
+  commissionBps?: number;
+  dailyLimitCoins?: number;
+  notes?: string;
+  country?: string | null;
+  whatsapp?: string | null;
+  telegram?: string | null;
+  listedInDirectory?: boolean;
+}
+
+export interface AdminUpsertAgentContactDto {
+  id?: string;
+  displayName: string;
+  country: string;
+  whatsapp?: string | null;
+  telegram?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+export interface RechargeAgentPricingConfig {
+  membershipFeeUsdt: number;
+  wholesalePer100CoinsUsdt: number;
+  suggestedRetailPer100CoinsUsdt: number;
+  minInitialCoins: number;
+  maxInitialCoins: number;
+}
+
+export const RECHARGE_AGENT_CONFIG_KEY = 'recharge_agent_config';
+export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
+  membershipFeeUsdt: 25,
+  wholesalePer100CoinsUsdt: 0.01,
+  suggestedRetailPer100CoinsUsdt: 0.015,
+  minInitialCoins: 10_000,
+  maxInitialCoins: 10_000_000,
+};
+
+@Injectable()
+export class RechargeAgentsService implements OnModuleInit {
+  constructor(
+    @InjectRepository(RechargeAgent)
+    private readonly agentsRepo: Repository<RechargeAgent>,
+    @InjectRepository(RechargeAgentApplication)
+    private readonly applicationsRepo: Repository<RechargeAgentApplication>,
+    @InjectRepository(RechargeAgentContact)
+    private readonly contactsRepo: Repository<RechargeAgentContact>,
+    @InjectRepository(AgentRecharge)
+    private readonly rechargesRepo: Repository<AgentRecharge>,
+    @InjectRepository(AppSetting)
+    private readonly settingsRepo: Repository<AppSetting>,
+    @InjectRepository(WithdrawRequest)
+    private readonly withdrawRepo: Repository<WithdrawRequest>,
+    @InjectRepository(GiftSend)
+    private readonly giftSendsRepo: Repository<GiftSend>,
+    private readonly dataSource: DataSource,
+    private readonly walletService: WalletService,
+    private readonly paymentsService: PaymentsService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  async onModuleInit() {
+    try {
+      await this.dataSource.query(
+        `ALTER TABLE withdraw_requests ADD COLUMN IF NOT EXISTS "agentId" UUID`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE agency_members ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'`,
+      );
+      await this.dataSource.query(
+        `CREATE INDEX IF NOT EXISTS "idx_withdraw_requests_agent" ON withdraw_requests("agentId")`,
+      );
+    } catch {
+      /* column may already exist */
+    }
+  }
+
+  async apply(userId: string, dto: ApplyRechargeAgentDto) {
+    const existingAgent = await this.agentsRepo.findOne({ where: { userId } });
+    if (existingAgent?.status === RechargeAgentStatus.ACTIVE) {
+      throw new ConflictException('User is already an active recharge agent');
+    }
+    const pending = await this.applicationsRepo.findOne({
+      where: { userId, status: RechargeAgentStatus.PENDING },
+      order: { createdAt: 'DESC' },
+    });
+    if (pending) throw new ConflictException('An application is already pending');
+
+    const requestedCoins = Number(dto.requestedCoins || 0);
+    const config = await this.getPricingConfig();
+    if (
+      !Number.isSafeInteger(requestedCoins) ||
+      requestedCoins < config.minInitialCoins ||
+      requestedCoins > config.maxInitialCoins
+    ) {
+      throw new BadRequestException(
+        `requestedCoins must be between ${config.minInitialCoins} and ${config.maxInitialCoins}`,
+      );
+    }
+    const paymentReferenceRaw = dto.paymentReference?.trim();
+    let paymentReference = paymentReferenceRaw || '';
+    if (dto.depositOrderId) {
+      const depositStatus = await this.paymentsService.getBinanceWalletOrderStatus(
+        userId,
+        dto.depositOrderId,
+      );
+      const order = depositStatus.order as {
+        status?: string;
+        providerPaymentId?: string | null;
+        amountFiat?: number;
+        providerPayload?: Record<string, unknown>;
+      };
+      if (String(order?.status || '').toLowerCase() !== 'completed') {
+        throw new BadRequestException('Deposit order is not paid yet');
+      }
+      const purpose = String(order?.providerPayload?.purpose || '');
+      if (purpose && purpose !== 'recharge_agent') {
+        throw new BadRequestException('Deposit order is not an agent membership payment');
+      }
+      paymentReference = String(order.providerPaymentId || dto.depositOrderId);
+    }
+    if (!paymentReference || paymentReference.length < 8 || paymentReference.length > 160) {
+      throw new BadRequestException('A valid USDT transaction reference is required');
+    }
+    const duplicatePayment = await this.applicationsRepo.findOne({
+      where: { paymentReference },
+    });
+    if (duplicatePayment) {
+      throw new ConflictException('This payment reference has already been submitted');
+    }
+    const paymentNetwork = this.normalizeNetwork(dto.paymentNetwork);
+    const quote = this.quote(config, requestedCoins);
+
+    return this.applicationsRepo.save(
+      this.applicationsRepo.create({
+        userId,
+        contact: dto.contact?.trim() || null,
+        region: dto.region?.trim() || null,
+        reason: dto.reason?.trim() || null,
+        requestedCoins,
+        membershipFeeUsdt: quote.membershipFeeUsdt,
+        stockCostUsdt: quote.stockCostUsdt,
+        totalPaidUsdt: quote.totalUsdt,
+        paymentNetwork,
+        paymentReference,
+        status: RechargeAgentStatus.PENDING,
+      }),
+    );
+  }
+
+  async publicConfig() {
+    return this.getPricingConfig();
+  }
+
+  async quoteForCoins(coins: number) {
+    const config = await this.getPricingConfig();
+    if (!Number.isSafeInteger(coins) || coins <= 0) {
+      throw new BadRequestException('coins must be a positive integer');
+    }
+    return this.quote(config, coins);
+  }
+
+  async paymentDetails(userId: string, network?: string) {
+    const normalized = this.normalizeNetwork(network);
+    const [pricing, deposit] = await Promise.all([
+      this.getPricingConfig(),
+      this.paymentsService.getBinanceWalletDepositAddress(userId, {
+        network: normalized,
+      }),
+    ]);
+    return { ...pricing, ...deposit };
+  }
+
+  /** Create a trackable USDT deposit order for agent membership (auto-detect via reconcile). */
+  async createDepositOrder(userId: string, network: string, requestedCoins: number) {
+    const existingAgent = await this.agentsRepo.findOne({ where: { userId } });
+    if (existingAgent?.status === RechargeAgentStatus.ACTIVE) {
+      throw new ConflictException('User is already an active recharge agent');
+    }
+    const pending = await this.applicationsRepo.findOne({
+      where: { userId, status: RechargeAgentStatus.PENDING },
+      order: { createdAt: 'DESC' },
+    });
+    if (pending) throw new ConflictException('An application is already pending');
+
+    const config = await this.getPricingConfig();
+    if (
+      !Number.isSafeInteger(requestedCoins) ||
+      requestedCoins < config.minInitialCoins ||
+      requestedCoins > config.maxInitialCoins
+    ) {
+      throw new BadRequestException(
+        `requestedCoins must be between ${config.minInitialCoins} and ${config.maxInitialCoins}`,
+      );
+    }
+    const paymentNetwork = this.normalizeNetwork(network);
+    const quote = this.quote(config, requestedCoins);
+    const deposit = await this.paymentsService.createBinanceUsdtDepositOrder({
+      userId,
+      network: paymentNetwork,
+      expectedAmount: quote.totalUsdt,
+      sku: 'agent_apply',
+      coins: 0,
+      bonusCoins: 0,
+      purpose: 'recharge_agent',
+      uniqueAmount: true,
+      meta: {
+        requestedCoins,
+        membershipFeeUsdt: quote.membershipFeeUsdt,
+        stockCostUsdt: quote.stockCostUsdt,
+        totalUsdt: quote.totalUsdt,
+      },
+    });
+    return {
+      ...deposit,
+      requestedCoins,
+      membershipFeeUsdt: quote.membershipFeeUsdt,
+      stockCostUsdt: quote.stockCostUsdt,
+      quoteTotalUsdt: quote.totalUsdt,
+      paymentNetwork,
+    };
+  }
+
+  async getDepositOrderStatus(userId: string, orderId: string) {
+    const status = await this.paymentsService.getBinanceWalletOrderStatus(userId, orderId);
+    const order = status.order as {
+      status?: string;
+      providerPaymentId?: string | null;
+    };
+    const raw = String(order?.status || '').toLowerCase();
+    const paid = raw === 'completed' || raw === 'paid' || raw === 'success';
+    return {
+      ...status,
+      paid,
+      txId: order?.providerPaymentId || null,
+    };
+  }
+
+  async resolveRecipient(tokenRaw: string) {
+    const user = await this.findUserByToken(tokenRaw);
+    if (!user) throw new NotFoundException('Recipient not found');
+    return {
+      id: user.id,
+      username: user.username,
+      publicId: user.publicId,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      status: user.status,
+    };
+  }
+
+  /** Coin recharge agents only — never mix with voice-room agencies. */
+  async listAgentsForWithdraw() {
+    const agents = await this.agentsRepo.find({
+      where: {
+        status: RechargeAgentStatus.ACTIVE,
+        listedInDirectory: true,
+      },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+      take: 200,
+    });
+    return {
+      items: agents.map((a) => ({
+        id: a.id,
+        source: 'recharge_agent' as const,
+        displayName: a.user?.displayName || a.user?.username || 'وكيل شحن',
+        publicId: a.user?.publicId || null,
+        country: a.country || '',
+        whatsapp: a.whatsapp,
+        telegram: a.telegram,
+      })),
+      total: agents.length,
+    };
+  }
+
+  /**
+   * Agent looks up a user by public ID / username / UUID:
+   * wallet balances + received gifts (so agent can credit their account).
+   */
+  async userOverviewForAgent(agentUserId: string, queryRaw: string) {
+    await this.requireActiveAgent(agentUserId);
+    const user = await this.findUserByToken(queryRaw);
+    if (!user) throw new NotFoundException('المستخدم غير موجود');
+
+    const wallet = await this.dataSource.getRepository(Wallet).findOne({
+      where: { userId: user.id },
+    });
+    const received = await this.giftSendsRepo.find({
+      where: { receiverId: user.id },
+      relations: ['gift', 'sender'],
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+    let receivedDiamonds = 0;
+    let receivedCoins = 0;
+    for (const g of received) {
+      receivedDiamonds += Number(g.diamondsAwarded || 0);
+      receivedCoins += Number(g.totalCoins || 0);
+    }
+    // Full totals (not just last 50)
+    const sumRow = await this.giftSendsRepo
+      .createQueryBuilder('g')
+      .select('COALESCE(SUM(g.diamondsAwarded),0)', 'diamonds')
+      .addSelect('COALESCE(SUM(g.totalCoins),0)', 'coins')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('g.receiverId = :uid', { uid: user.id })
+      .getRawOne<{ diamonds: string; coins: string; cnt: string }>();
+
+    return {
+      user: {
+        id: user.id,
+        publicId: user.publicId,
+        username: user.username,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+      },
+      wallet: {
+        coins: Number(wallet?.coins || 0),
+        diamonds: Number(wallet?.diamonds || 0),
+      },
+      gifts: {
+        receivedCount: Number(sumRow?.cnt || 0),
+        receivedDiamondsTotal: Number(sumRow?.diamonds || 0),
+        receivedCoinsTotal: Number(sumRow?.coins || receivedCoins),
+        recent: received.map((g) => ({
+          id: g.id,
+          giftName: g.gift?.name || 'هدية',
+          quantity: g.quantity,
+          diamondsAwarded: Number(g.diamondsAwarded || 0),
+          totalCoins: Number(g.totalCoins || 0),
+          senderName: g.sender?.displayName || g.sender?.username || '—',
+          senderPublicId: g.sender?.publicId || null,
+          createdAt: g.createdAt,
+        })),
+      },
+    };
+  }
+
+  async listMyWithdraws(agentUserId: string) {
+    const agent = await this.requireActiveAgent(agentUserId);
+    const [items, total] = await this.withdrawRepo.findAndCount({
+      where: { agentId: agent.id, method: 'agent' },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    return {
+      items: items.map((w) => ({
+        id: w.id,
+        diamonds: Number(w.diamonds),
+        amountFiat: Number(w.amountFiat),
+        status: w.status,
+        method: w.method,
+        adminNote: w.adminNote,
+        createdAt: w.createdAt,
+        user: w.user
+          ? {
+              id: w.user.id,
+              publicId: w.user.publicId,
+              displayName: w.user.displayName,
+              username: w.user.username,
+              avatarUrl: w.user.avatarUrl,
+            }
+          : null,
+      })),
+      total,
+    };
+  }
+
+  async completeWithdraw(agentUserId: string, withdrawId: string, note?: string) {
+    const agent = await this.requireActiveAgent(agentUserId);
+    return this.dataSource.transaction(async (manager) => {
+      const req = await manager.findOne(WithdrawRequest, {
+        where: { id: withdrawId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!req) throw new NotFoundException('طلب السحب غير موجود');
+      if (req.agentId !== agent.id || req.method !== 'agent') {
+        throw new BadRequestException('هذا الطلب غير مخصص لك');
+      }
+      if (req.status !== WithdrawStatus.PENDING && req.status !== WithdrawStatus.APPROVED) {
+        throw new BadRequestException('تمت معالجة الطلب مسبقاً');
+      }
+      req.status = WithdrawStatus.PAID;
+      req.reviewedById = agentUserId;
+      req.adminNote = note?.trim() || 'تم الدفع عبر الوكيل';
+      await manager.save(req);
+      await manager.increment(
+        Wallet,
+        { userId: req.userId },
+        'totalWithdrawn',
+        Number(req.diamonds),
+      );
+      return { ok: true, status: req.status, id: req.id };
+    });
+  }
+
+  async rejectWithdraw(agentUserId: string, withdrawId: string, note?: string) {
+    const agent = await this.requireActiveAgent(agentUserId);
+    return this.dataSource.transaction(async (manager) => {
+      const req = await manager.findOne(WithdrawRequest, {
+        where: { id: withdrawId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!req) throw new NotFoundException('طلب السحب غير موجود');
+      if (req.agentId !== agent.id || req.method !== 'agent') {
+        throw new BadRequestException('هذا الطلب غير مخصص لك');
+      }
+      if (req.status !== WithdrawStatus.PENDING && req.status !== WithdrawStatus.APPROVED) {
+        throw new BadRequestException('تمت معالجة الطلب مسبقاً');
+      }
+      req.status = WithdrawStatus.REJECTED;
+      req.reviewedById = agentUserId;
+      req.adminNote = note?.trim() || 'رفض الوكيل';
+      await manager.save(req);
+
+      const refundRef = `withdraw_refund:${req.id}`;
+      const already = await manager.findOne(WalletTransaction, {
+        where: {
+          userId: req.userId,
+          referenceType: 'withdraw_refund',
+          referenceId: refundRef,
+        },
+      });
+      if (!already) {
+        const wallet = await manager.findOne(Wallet, {
+          where: { userId: req.userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (wallet) {
+          const amount = Number(req.diamonds);
+          wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+          await manager.save(wallet);
+          await manager.save(
+            manager.create(WalletTransaction, {
+              userId: req.userId,
+              type: TransactionType.ADMIN_ADJUST,
+              currency: CurrencyType.DIAMONDS,
+              amount,
+              balanceAfter: Number(wallet.diamonds),
+              referenceType: 'withdraw_refund',
+              referenceId: refundRef,
+              description: `Agent rejected withdraw ${req.id}`,
+            }),
+          );
+        }
+      }
+      return { ok: true, status: req.status, id: req.id };
+    });
+  }
+
+  private async requireActiveAgent(userId: string) {
+    const agent = await this.agentsRepo.findOne({ where: { userId } });
+    if (!agent || agent.status !== RechargeAgentStatus.ACTIVE) {
+      throw new BadRequestException('حساب الوكيل غير نشط');
+    }
+    return agent;
+  }
+
+  private async findUserByToken(tokenRaw: string) {
+    const token = tokenRaw?.trim();
+    if (!token || token.length > 128) {
+      throw new BadRequestException('معرّف المستخدم غير صالح');
+    }
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        token,
+      );
+    const repo = this.dataSource.getRepository(User);
+    if (isUuid) {
+      return repo.findOne({ where: { id: token } });
+    }
+    // Prefer numeric publicId, then username.
+    const byPublic = await repo.findOne({ where: { publicId: token } });
+    if (byPublic) return byPublic;
+    return repo.findOne({ where: { username: token.toLowerCase() } });
+  }
+
+  async myAgent(userId: string) {
+    const [agent, application, pricing] = await Promise.all([
+      this.agentsRepo.findOne({ where: { userId } }),
+      this.applicationsRepo.findOne({
+        where: { userId },
+        order: { createdAt: 'DESC' },
+      }),
+      this.getPricingConfig(),
+    ]);
+    return {
+      agent: agent ? this.normalizeAgent(agent) : null,
+      application: application ? this.normalizeApplication(application) : null,
+      pricing,
+    };
+  }
+
+  async listMyRecharges(userId: string) {
+    const agent = await this.agentsRepo.findOne({ where: { userId } });
+    if (!agent) return { items: [], total: 0 };
+    const [items, total] = await this.rechargesRepo.findAndCount({
+      where: { agentId: agent.id },
+      relations: { recipient: true },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    return {
+      items: items.map((item) => ({
+        ...item,
+        recipient: item.recipient
+          ? {
+              id: item.recipient.id,
+              username: item.recipient.username,
+              displayName: item.recipient.displayName,
+              avatarUrl: item.recipient.avatarUrl,
+            }
+          : null,
+      })),
+      total,
+    };
+  }
+
+  async sellToUser(agentUserId: string, dto: SellRechargeDto) {
+    const idempotencyKey = dto.idempotencyKey?.trim();
+    if (!idempotencyKey || idempotencyKey.length > 96) {
+      throw new BadRequestException('A valid idempotencyKey is required');
+    }
+    const coins = await this.resolveCoins(dto);
+    const recipientToken = dto.recipientUsernameOrId?.trim();
+    if (!recipientToken) throw new BadRequestException('Recipient is required');
+
+    return this.dataSource.transaction(async (manager) => {
+      const agent = await manager.findOne(RechargeAgent, {
+        where: { userId: agentUserId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!agent || agent.status !== RechargeAgentStatus.ACTIVE) {
+        throw new BadRequestException('Recharge agent is not active');
+      }
+
+      const duplicate = await manager.findOne(AgentRecharge, {
+        where: { idempotencyKey },
+      });
+      if (duplicate) {
+        if (duplicate.agentId !== agent.id) {
+          throw new ConflictException('Idempotency key is already in use');
+        }
+        return duplicate;
+      }
+
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          recipientToken,
+        );
+      const isPublicId = /^\d+$/.test(recipientToken);
+      let recipient: User | null = null;
+      if (isUuid) {
+        recipient = await manager.findOne(User, { where: { id: recipientToken } });
+      } else if (isPublicId) {
+        recipient = await manager.findOne(User, {
+          where: { publicId: recipientToken },
+        });
+      }
+      if (!recipient) {
+        recipient = await manager.findOne(User, {
+          where: { username: recipientToken.toLowerCase() },
+        });
+      }
+      if (!recipient) throw new NotFoundException('Recipient not found');
+      if (recipient.status !== UserStatus.ACTIVE) {
+        throw new BadRequestException('Recipient account is not active');
+      }
+      if (recipient.id === agentUserId) {
+        throw new BadRequestException('Agent cannot recharge their own account');
+      }
+
+      const today = new Date().toISOString().slice(0, 10);
+      if (agent.dailySoldKey !== today) {
+        agent.dailySoldKey = today;
+        agent.dailySoldCoins = 0;
+      }
+      if (Number(agent.dailySoldCoins) + coins > Number(agent.dailyLimitCoins)) {
+        throw new BadRequestException('Daily recharge limit exceeded');
+      }
+      if (Number(agent.floatCoins) < coins) {
+        throw new BadRequestException('Insufficient agent float');
+      }
+
+      agent.floatCoins = Number(agent.floatCoins) - coins;
+      agent.dailySoldCoins = Number(agent.dailySoldCoins) + coins;
+      await manager.save(agent);
+
+      let wallet = await manager.findOne(Wallet, {
+        where: { userId: recipient.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) wallet = manager.create(Wallet, { userId: recipient.id });
+      wallet.coins = Number(wallet.coins || 0) + coins;
+      wallet.totalRecharged = Number(wallet.totalRecharged || 0) + coins;
+      await manager.save(wallet);
+
+      const commissionCoins = Math.floor((coins * Number(agent.commissionBps)) / 10_000);
+      const recharge = await manager.save(
+        manager.create(AgentRecharge, {
+          agentId: agent.id,
+          recipientUserId: recipient.id,
+          sku: dto.sku?.trim() || null,
+          coins,
+          chargedFloat: coins,
+          commissionCoins,
+          status: 'completed',
+          idempotencyKey,
+        }),
+      );
+      const walletTx = await manager.save(
+        manager.create(WalletTransaction, {
+          userId: recipient.id,
+          type: TransactionType.RECHARGE,
+          currency: CurrencyType.COINS,
+          amount: coins,
+          balanceAfter: Number(wallet.coins),
+          referenceType: 'agent_recharge',
+          referenceId: recharge.id,
+          description: `Recharge agent sale of ${coins} coins`,
+          metadata: { agentId: agent.id, sku: dto.sku || null },
+        }),
+      );
+      recharge.walletTxId = walletTx.id;
+      await manager.save(recharge);
+
+      await manager.save(
+        manager.create(RechargeAgentLedger, {
+          agentId: agent.id,
+          type: AgentLedgerType.SALE,
+          amount: -coins,
+          balanceAfter: Number(agent.floatCoins),
+          referenceId: recharge.id,
+          referenceType: 'agent_recharge',
+          description: `Sold ${coins} coins to ${recipient.username}`,
+          actorUserId: agentUserId,
+        }),
+      );
+      await manager.save(
+        manager.create(RechargeOrder, {
+          userId: recipient.id,
+          sku: dto.sku?.trim() || null,
+          coins,
+          bonusCoins: 0,
+          amountFiat: 0,
+          currency: 'USD',
+          provider: PaymentProvider.RECHARGE_AGENT,
+          status: RechargeStatus.COMPLETED,
+          providerOrderId: recharge.id,
+          providerPaymentId: null,
+          providerPayload: { agentId: agent.id, agentRechargeId: recharge.id },
+          completedAt: new Date(),
+        }),
+      );
+
+      return recharge;
+    }).then(async (recharge) => {
+      let agentName = 'وكيل الشحن';
+      try {
+        const agentRow = await this.agentsRepo.findOne({
+          where: { id: recharge.agentId },
+          relations: ['user'],
+        });
+        agentName =
+          agentRow?.user?.displayName?.trim() ||
+          agentRow?.user?.username?.trim() ||
+          agentName;
+      } catch {
+        /* keep default */
+      }
+      await this.notifications.notifyUser(
+        recharge.recipientUserId,
+        NotificationType.WALLET,
+        'تم شحن رصيدك',
+        `تم إضافة ${recharge.coins} عملة إلى محفظتك عبر ${agentName}.`,
+        {
+          agentId: recharge.agentId,
+          coins: recharge.coins,
+          officialNews: true,
+          action: 'agent_recharge',
+          targetUserId: recharge.recipientUserId,
+          source: 'recharge_agent',
+        },
+      );
+      return recharge;
+    });
+  }
+
+  async adminAssign(adminId: string, dto: AdminAssignRechargeAgentDto) {
+    this.validateAgentNumbers(dto);
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.findOne(User, { where: { id: dto.userId } });
+      if (!user) throw new NotFoundException('User not found');
+      let agent = await manager.findOne(RechargeAgent, {
+        where: { userId: dto.userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const previousFloat = Number(agent?.floatCoins || 0);
+      if (!agent) {
+        agent = manager.create(RechargeAgent, {
+          userId: dto.userId,
+          source: RechargeAgentSource.ADMIN,
+        });
+      }
+      agent.status = RechargeAgentStatus.ACTIVE;
+      agent.floatCoins = dto.floatCoins ?? previousFloat;
+      agent.commissionBps = dto.commissionBps ?? Number(agent.commissionBps || 0);
+      agent.dailyLimitCoins =
+        dto.dailyLimitCoins ?? Number(agent.dailyLimitCoins || 500_000);
+      agent.notes = dto.notes?.trim() || agent.notes || null;
+      agent.reviewedBy = adminId;
+      agent.reviewedAt = new Date();
+      agent = await manager.save(agent);
+      if (Number(agent.floatCoins) !== previousFloat) {
+        await this.saveFloatLedger(
+          manager,
+          agent,
+          Number(agent.floatCoins) - previousFloat,
+          adminId,
+          dto.notes || 'Initial float assignment',
+        );
+      }
+      return this.normalizeAgent(agent);
+    });
+  }
+
+  async adminListAgents() {
+    const items = await this.agentsRepo.find({
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+    });
+    return { items: items.map((agent) => this.normalizeAgent(agent)), total: items.length };
+  }
+
+  async adminListApplications() {
+    const items = await this.applicationsRepo.find({
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+    });
+    return {
+      items: items.map((application) => this.normalizeApplication(application)),
+      total: items.length,
+    };
+  }
+
+  async adminReviewApplication(
+    id: string,
+    action: 'approve' | 'reject',
+    adminId: string,
+    note?: string,
+    options?: { floatCoins?: number; commissionBps?: number },
+  ) {
+    return this.dataSource.transaction(async (manager) => {
+      const application = await manager.findOne(RechargeAgentApplication, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!application) throw new NotFoundException('Application not found');
+      if (application.status !== RechargeAgentStatus.PENDING) {
+        throw new BadRequestException('Application has already been reviewed');
+      }
+      application.status =
+        action === 'approve' ? RechargeAgentStatus.ACTIVE : RechargeAgentStatus.REJECTED;
+      application.reviewNote = note?.trim() || null;
+      application.reviewedBy = adminId;
+      application.reviewedAt = new Date();
+      await manager.save(application);
+
+      if (action === 'approve') {
+        let agent = await manager.findOne(RechargeAgent, {
+          where: { userId: application.userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const previousFloat = Number(agent?.floatCoins || 0);
+        if (!agent) {
+          agent = manager.create(RechargeAgent, {
+            userId: application.userId,
+            source: RechargeAgentSource.APPLICATION,
+          });
+        }
+        agent.status = RechargeAgentStatus.ACTIVE;
+        agent.reviewedBy = adminId;
+        agent.reviewedAt = new Date();
+        if (note?.trim()) agent.notes = note.trim();
+        if (options?.commissionBps !== undefined) {
+          agent.commissionBps = options.commissionBps;
+        }
+        if (options?.floatCoins !== undefined) {
+          agent.floatCoins = options.floatCoins;
+        } else if (Number(application.requestedCoins) > 0) {
+          agent.floatCoins = Number(application.requestedCoins);
+        }
+        agent = await manager.save(agent);
+        const floatDelta = Number(agent.floatCoins) - previousFloat;
+        if (floatDelta !== 0) {
+          await this.saveFloatLedger(
+            manager,
+            agent,
+            floatDelta,
+            adminId,
+            note || 'Application approval float',
+          );
+        }
+      }
+      return application;
+    });
+  }
+
+  async adminAdjustFloat(agentId: string, amount: number, adminId: string, note?: string) {
+    if (!Number.isSafeInteger(amount) || amount === 0) {
+      throw new BadRequestException('Float amount must be a non-zero integer');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const agent = await manager.findOne(RechargeAgent, {
+        where: { id: agentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!agent) throw new NotFoundException('Recharge agent not found');
+      const nextFloat = Number(agent.floatCoins) + amount;
+      if (nextFloat < 0) throw new BadRequestException('Agent float cannot be negative');
+      agent.floatCoins = nextFloat;
+      await manager.save(agent);
+      await this.saveFloatLedger(manager, agent, amount, adminId, note || 'Admin float adjustment');
+      return this.normalizeAgent(agent);
+    });
+  }
+
+  async adminPatchAgent(id: string, dto: AdminPatchRechargeAgentDto, adminId: string) {
+    this.validateAgentNumbers(dto);
+    const agent = await this.agentsRepo.findOne({ where: { id } });
+    if (!agent) throw new NotFoundException('Recharge agent not found');
+    if (dto.status !== undefined) {
+      if (!Object.values(RechargeAgentStatus).includes(dto.status)) {
+        throw new BadRequestException('Invalid agent status');
+      }
+      agent.status = dto.status;
+    }
+    if (dto.commissionBps !== undefined) agent.commissionBps = dto.commissionBps;
+    if (dto.dailyLimitCoins !== undefined) agent.dailyLimitCoins = dto.dailyLimitCoins;
+    if (dto.notes !== undefined) agent.notes = dto.notes.trim() || null;
+    if (dto.country !== undefined) agent.country = dto.country?.trim() || null;
+    if (dto.whatsapp !== undefined) agent.whatsapp = dto.whatsapp?.trim() || null;
+    if (dto.telegram !== undefined) agent.telegram = dto.telegram?.trim() || null;
+    if (dto.listedInDirectory !== undefined) agent.listedInDirectory = !!dto.listedInDirectory;
+    agent.reviewedBy = adminId;
+    agent.reviewedAt = new Date();
+    return this.normalizeAgent(await this.agentsRepo.save(agent));
+  }
+
+  async publicDirectory(country?: string) {
+    const countryFilter = country?.trim() || null;
+    const contactsQb = this.contactsRepo
+      .createQueryBuilder('c')
+      .where('c.isActive = true')
+      .orderBy('c.sortOrder', 'ASC')
+      .addOrderBy('c.createdAt', 'DESC');
+    if (countryFilter) {
+      contactsQb.andWhere('LOWER(c.country) = LOWER(:country)', { country: countryFilter });
+    }
+    const contacts = await contactsQb.getMany();
+
+    const agentsQb = this.agentsRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.user', 'user')
+      .leftJoinAndSelect('user.profile', 'profile')
+      .where('a.status = :status', { status: RechargeAgentStatus.ACTIVE })
+      .andWhere('a.listedInDirectory = true')
+      .andWhere('(a.whatsapp IS NOT NULL OR a.telegram IS NOT NULL)')
+      .orderBy('a.createdAt', 'DESC');
+    if (countryFilter) {
+      agentsQb.andWhere('LOWER(a.country) = LOWER(:country)', { country: countryFilter });
+    }
+    const agents = await agentsQb.getMany();
+
+    const items = [
+      ...contacts.map((c) => ({
+        id: c.id,
+        source: 'contact' as const,
+        displayName: c.displayName,
+        country: c.country,
+        whatsapp: c.whatsapp,
+        telegram: c.telegram,
+        notes: c.notes,
+        avatarUrl: null as string | null,
+        coverUrl: null as string | null,
+      })),
+      ...agents.map((a) => ({
+        id: a.id,
+        source: 'agent' as const,
+        displayName: a.user?.displayName || a.user?.username || 'وكيل شحن',
+        country: a.country || '',
+        whatsapp: a.whatsapp,
+        telegram: a.telegram,
+        notes: a.notes,
+        avatarUrl: a.user?.avatarUrl || null,
+        coverUrl: a.user?.profile?.coverUrl || null,
+      })),
+    ];
+
+    const countriesSet = new Set<string>();
+    for (const row of await this.contactsRepo.find({
+      where: { isActive: true },
+      select: ['country'],
+    })) {
+      if (row.country) countriesSet.add(row.country);
+    }
+    for (const row of await this.agentsRepo.find({
+      where: { status: RechargeAgentStatus.ACTIVE, listedInDirectory: true },
+      select: ['country'],
+    })) {
+      if (row.country) countriesSet.add(row.country);
+    }
+
+    return {
+      items,
+      countries: Array.from(countriesSet).sort((a, b) => a.localeCompare(b, 'ar')),
+      total: items.length,
+    };
+  }
+
+  async adminListContacts() {
+    const items = await this.contactsRepo.find({ order: { sortOrder: 'ASC', createdAt: 'DESC' } });
+    return { items, total: items.length };
+  }
+
+  async adminUpsertContact(dto: AdminUpsertAgentContactDto) {
+    const displayName = dto.displayName?.trim();
+    const country = dto.country?.trim();
+    if (!displayName || !country) {
+      throw new BadRequestException('displayName and country are required');
+    }
+    const whatsapp = dto.whatsapp?.trim() || null;
+    const telegram = dto.telegram?.trim() || null;
+    if (!whatsapp && !telegram) {
+      throw new BadRequestException('At least one of whatsapp or telegram is required');
+    }
+    let contact: RechargeAgentContact | null = null;
+    if (dto.id) {
+      contact = await this.contactsRepo.findOne({ where: { id: dto.id } });
+      if (!contact) throw new NotFoundException('Contact not found');
+    } else {
+      contact = this.contactsRepo.create();
+    }
+    contact.displayName = displayName;
+    contact.country = country;
+    contact.whatsapp = whatsapp;
+    contact.telegram = telegram;
+    contact.notes = dto.notes?.trim() || null;
+    if (dto.isActive !== undefined) contact.isActive = !!dto.isActive;
+    if (dto.sortOrder !== undefined) contact.sortOrder = Number(dto.sortOrder) || 0;
+    return this.contactsRepo.save(contact);
+  }
+
+  async adminDeleteContact(id: string) {
+    const contact = await this.contactsRepo.findOne({ where: { id } });
+    if (!contact) throw new NotFoundException('Contact not found');
+    await this.contactsRepo.remove(contact);
+    return { deleted: true, id };
+  }
+
+  async adminDeleteAgent(id: string) {
+    const agent = await this.agentsRepo.findOne({ where: { id } });
+    if (!agent) throw new NotFoundException('Recharge agent not found');
+    await this.agentsRepo.remove(agent);
+    return { deleted: true, id, userId: agent.userId };
+  }
+
+  async adminGetPricing() {
+    return this.getPricingConfig();
+  }
+
+  async adminUpdatePricing(
+    patch: Partial<RechargeAgentPricingConfig>,
+  ): Promise<RechargeAgentPricingConfig> {
+    const current = await this.getPricingConfig();
+    const next: RechargeAgentPricingConfig = {
+      membershipFeeUsdt:
+        patch.membershipFeeUsdt !== undefined
+          ? Number(patch.membershipFeeUsdt)
+          : current.membershipFeeUsdt,
+      wholesalePer100CoinsUsdt:
+        patch.wholesalePer100CoinsUsdt !== undefined
+          ? Number(patch.wholesalePer100CoinsUsdt)
+          : current.wholesalePer100CoinsUsdt,
+      suggestedRetailPer100CoinsUsdt:
+        patch.suggestedRetailPer100CoinsUsdt !== undefined
+          ? Number(patch.suggestedRetailPer100CoinsUsdt)
+          : current.suggestedRetailPer100CoinsUsdt,
+      minInitialCoins:
+        patch.minInitialCoins !== undefined
+          ? Number(patch.minInitialCoins)
+          : current.minInitialCoins,
+      maxInitialCoins:
+        patch.maxInitialCoins !== undefined
+          ? Number(patch.maxInitialCoins)
+          : current.maxInitialCoins,
+    };
+    for (const [key, value] of Object.entries(next)) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new BadRequestException(`${key} must be a non-negative number`);
+      }
+    }
+    if (
+      !Number.isSafeInteger(next.minInitialCoins) ||
+      !Number.isSafeInteger(next.maxInitialCoins) ||
+      next.minInitialCoins <= 0 ||
+      next.maxInitialCoins < next.minInitialCoins
+    ) {
+      throw new BadRequestException('Invalid initial coin limits');
+    }
+    let row = await this.settingsRepo.findOne({
+      where: { key: RECHARGE_AGENT_CONFIG_KEY },
+    });
+    if (!row) {
+      row = this.settingsRepo.create({
+        key: RECHARGE_AGENT_CONFIG_KEY,
+        value: JSON.stringify(next),
+        description: 'Recharge agent membership and USDT pricing',
+      });
+    } else {
+      row.value = JSON.stringify(next);
+    }
+    await this.settingsRepo.save(row);
+    return next;
+  }
+
+  private async getPricingConfig(): Promise<RechargeAgentPricingConfig> {
+    const row = await this.settingsRepo.findOne({
+      where: { key: RECHARGE_AGENT_CONFIG_KEY },
+    });
+    let parsed: Partial<RechargeAgentPricingConfig> = {};
+    try {
+      parsed = row?.value ? JSON.parse(row.value) : {};
+    } catch {
+      parsed = {};
+    }
+    return {
+      membershipFeeUsdt: this.nonNegativeNumber(
+        parsed.membershipFeeUsdt,
+        DEFAULT_RECHARGE_AGENT_CONFIG.membershipFeeUsdt,
+      ),
+      wholesalePer100CoinsUsdt: this.nonNegativeNumber(
+        parsed.wholesalePer100CoinsUsdt,
+        DEFAULT_RECHARGE_AGENT_CONFIG.wholesalePer100CoinsUsdt,
+      ),
+      suggestedRetailPer100CoinsUsdt: this.nonNegativeNumber(
+        parsed.suggestedRetailPer100CoinsUsdt,
+        DEFAULT_RECHARGE_AGENT_CONFIG.suggestedRetailPer100CoinsUsdt,
+      ),
+      minInitialCoins: this.positiveInteger(
+        parsed.minInitialCoins,
+        DEFAULT_RECHARGE_AGENT_CONFIG.minInitialCoins,
+      ),
+      maxInitialCoins: this.positiveInteger(
+        parsed.maxInitialCoins,
+        DEFAULT_RECHARGE_AGENT_CONFIG.maxInitialCoins,
+      ),
+    };
+  }
+
+  private quote(config: RechargeAgentPricingConfig, coins: number) {
+    const stockCostUsdt = Number(
+      ((coins / 100) * config.wholesalePer100CoinsUsdt).toFixed(8),
+    );
+    const suggestedRetailUsdt = Number(
+      ((coins / 100) * config.suggestedRetailPer100CoinsUsdt).toFixed(8),
+    );
+    const membershipFeeUsdt = Number(config.membershipFeeUsdt.toFixed(8));
+    return {
+      coins,
+      membershipFeeUsdt,
+      stockCostUsdt,
+      totalUsdt: Number((membershipFeeUsdt + stockCostUsdt).toFixed(8)),
+      suggestedRetailUsdt,
+      wholesalePer100CoinsUsdt: config.wholesalePer100CoinsUsdt,
+      suggestedRetailPer100CoinsUsdt: config.suggestedRetailPer100CoinsUsdt,
+    };
+  }
+
+  private normalizeNetwork(network?: string): 'TRX' | 'BSC' {
+    const value = String(network || 'TRX').trim().toUpperCase();
+    if (value !== 'TRX' && value !== 'BSC') {
+      throw new BadRequestException('network must be TRX or BSC');
+    }
+    return value;
+  }
+
+  private nonNegativeNumber(value: unknown, fallback: number) {
+    const number = Number(value);
+    return Number.isFinite(number) && number >= 0 ? number : fallback;
+  }
+
+  private positiveInteger(value: unknown, fallback: number) {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number > 0 ? number : fallback;
+  }
+
+  private async resolveCoins(dto: SellRechargeDto): Promise<number> {
+    if (dto.sku?.trim()) {
+      const { items } = await this.walletService.listPackages();
+      const pkg = items.find((item) => String(item.sku) === dto.sku!.trim());
+      if (!pkg) throw new NotFoundException('Recharge package not found');
+      const coins = Number(pkg.coins) + Number(pkg.bonusCoins || 0);
+      if (!Number.isSafeInteger(coins) || coins <= 0) {
+        throw new BadRequestException('Recharge package has invalid coins');
+      }
+      return coins;
+    }
+    if (!Number.isSafeInteger(dto.coins) || Number(dto.coins) <= 0) {
+      throw new BadRequestException('A positive integer coins value is required');
+    }
+    return Number(dto.coins);
+  }
+
+  private validateAgentNumbers(dto: {
+    floatCoins?: number;
+    commissionBps?: number;
+    dailyLimitCoins?: number;
+  }) {
+    if (
+      dto.floatCoins !== undefined &&
+      (!Number.isSafeInteger(dto.floatCoins) || dto.floatCoins < 0)
+    ) {
+      throw new BadRequestException('floatCoins must be a non-negative integer');
+    }
+    if (
+      dto.commissionBps !== undefined &&
+      (!Number.isInteger(dto.commissionBps) ||
+        dto.commissionBps < 0 ||
+        dto.commissionBps > 10_000)
+    ) {
+      throw new BadRequestException('commissionBps must be between 0 and 10000');
+    }
+    if (
+      dto.dailyLimitCoins !== undefined &&
+      (!Number.isSafeInteger(dto.dailyLimitCoins) || dto.dailyLimitCoins < 0)
+    ) {
+      throw new BadRequestException('dailyLimitCoins must be a non-negative integer');
+    }
+  }
+
+  private async saveFloatLedger(
+    manager: import('typeorm').EntityManager,
+    agent: RechargeAgent,
+    amount: number,
+    adminId: string,
+    note: string,
+  ) {
+    await manager.save(
+      manager.create(RechargeAgentLedger, {
+        agentId: agent.id,
+        type: amount > 0 ? AgentLedgerType.FLOAT_CREDIT : AgentLedgerType.FLOAT_DEBIT,
+        amount,
+        balanceAfter: Number(agent.floatCoins),
+        referenceId: null,
+        referenceType: 'admin_adjustment',
+        description: note,
+        actorUserId: adminId,
+      }),
+    );
+  }
+
+  private normalizeAgent(agent: RechargeAgent) {
+    return {
+      ...agent,
+      floatCoins: Number(agent.floatCoins),
+      dailySoldCoins: Number(agent.dailySoldCoins),
+      dailyLimitCoins: Number(agent.dailyLimitCoins),
+    };
+  }
+
+  private normalizeApplication(application: RechargeAgentApplication) {
+    return {
+      ...application,
+      requestedCoins: Number(application.requestedCoins || 0),
+      membershipFeeUsdt: Number(application.membershipFeeUsdt || 0),
+      stockCostUsdt: Number(application.stockCostUsdt || 0),
+      totalPaidUsdt: Number(application.totalPaidUsdt || 0),
+    };
+  }
+}

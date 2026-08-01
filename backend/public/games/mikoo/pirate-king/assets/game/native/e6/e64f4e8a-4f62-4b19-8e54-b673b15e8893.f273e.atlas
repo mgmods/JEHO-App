@@ -1,0 +1,153 @@
+
+renwu.png
+size: 936,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+50f0e831-f2fa-4948-8b0d-a99cfbc8a1b4.4490c备份 8
+  rotate: false
+  xy: 214, 5
+  size: 138, 56
+  orig: 140, 58
+  offset: 1, 1
+  index: -1
+50f0e831-f2fa-4948-8b0d-a99cfbc8a1b4.4490c备份 9
+  rotate: true
+  xy: 827, 4
+  size: 120, 92
+  orig: 122, 94
+  offset: 1, 1
+  index: -1
+右手1
+  rotate: false
+  xy: 714, 338
+  size: 172, 172
+  orig: 175, 174
+  offset: 1, 1
+  index: -1
+右肩膀
+  rotate: false
+  xy: 2, 5
+  size: 210, 234
+  orig: 210, 234
+  offset: 0, 0
+  index: -1
+右胡子
+  rotate: true
+  xy: 525, 6
+  size: 60, 40
+  orig: 62, 42
+  offset: 1, 1
+  index: -1
+嘴巴
+  rotate: true
+  xy: 888, 327
+  size: 87, 40
+  orig: 89, 43
+  offset: 1, 1
+  index: -1
+左手
+  rotate: true
+  xy: 411, 68
+  size: 138, 170
+  orig: 138, 170
+  offset: 0, 0
+  index: -1
+左手钩子
+  rotate: false
+  xy: 583, 46
+  size: 134, 160
+  orig: 136, 162
+  offset: 1, 1
+  index: -1
+左肩膀
+  rotate: true
+  xy: 706, 214
+  size: 122, 178
+  orig: 122, 178
+  offset: 0, 0
+  index: -1
+左胡子
+  rotate: true
+  xy: 888, 416
+  size: 94, 46
+  orig: 96, 48
+  offset: 1, 1
+  index: -1
+帽子
+  rotate: false
+  xy: 417, 364
+  size: 295, 146
+  orig: 297, 148
+  offset: 1, 1
+  index: -1
+眉毛
+  rotate: true
+  xy: 886, 253
+  size: 72, 40
+  orig: 74, 42
+  offset: 1, 1
+  index: -1
+眼睛
+  rotate: false
+  xy: 886, 227
+  size: 40, 24
+  orig: 40, 24
+  offset: 0, 0
+  index: -1
+耳环
+  rotate: true
+  xy: 463, 2
+  size: 20, 24
+  orig: 22, 26
+  offset: 1, 1
+  index: -1
+胡子
+  rotate: false
+  xy: 417, 208
+  size: 287, 154
+  orig: 289, 156
+  offset: 1, 1
+  index: -1
+脸
+  rotate: false
+  xy: 214, 63
+  size: 195, 176
+  orig: 197, 178
+  offset: 1, 1
+  index: -1
+蓝色羽毛1
+  rotate: true
+  xy: 719, 2
+  size: 122, 106
+  orig: 124, 108
+  offset: 1, 1
+  index: -1
+蓝色羽毛2
+  rotate: false
+  xy: 719, 126
+  size: 164, 86
+  orig: 166, 88
+  offset: 1, 1
+  index: -1
+身体
+  rotate: false
+  xy: 2, 241
+  size: 413, 269
+  orig: 413, 269
+  offset: 0, 0
+  index: -1
+金色骷髅
+  rotate: false
+  xy: 411, 2
+  size: 50, 64
+  orig: 52, 66
+  offset: 1, 1
+  index: -1
+鼻子
+  rotate: false
+  xy: 463, 24
+  size: 60, 42
+  orig: 62, 44
+  offset: 1, 1
+  index: -1

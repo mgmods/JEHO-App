@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- From Mikoo dialog_room_more_operator — full 398dp bottom panel, no Material handle -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/transparent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="398dp"
+        android:layout_alignParentBottom="true"
+        android:background="@drawable/shape_121616_top_10dp"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/tv_room"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_32"
+            android:layout_marginTop="@dimen/dp_16"
+            android:text="@string/room"
+            android:textColor="#ffffffff"
+            android:textSize="18sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/iv_room"
+            android:layout_width="@dimen/dp_16"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/dp_6"
+            android:background="@drawable/shape_43d3a2_radius_12dp"
+            android:contentDescription="@null"
+            app:layout_constraintEnd_toEndOf="@id/tv_room"
+            app:layout_constraintStart_toStartOf="@id/tv_room"
+            app:layout_constraintTop_toBottomOf="@id/tv_room" />
+
+        <TextView
+            android:id="@+id/tv_tool"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_35"
+            android:layout_marginTop="@dimen/dp_16"
+            android:text="@string/tool"
+            android:textColor="#4dffffff"
+            android:textSize="18sp"
+            app:layout_constraintStart_toEndOf="@id/tv_room"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/iv_tool"
+            android:layout_width="@dimen/dp_16"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/dp_6"
+            android:background="@drawable/shape_43d3a2_radius_12dp"
+            android:contentDescription="@null"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@id/tv_tool"
+            app:layout_constraintStart_toStartOf="@id/tv_tool"
+            app:layout_constraintTop_toBottomOf="@id/tv_tool" />
+
+        <TextView
+            android:id="@+id/tv_effect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_35"
+            android:text="@string/effect"
+            android:textColor="#4dffffff"
+            android:textSize="18sp"
+            app:layout_constraintStart_toEndOf="@id/tv_tool"
+            app:layout_constraintTop_toTopOf="@id/tv_room" />
+
+        <ImageView
+            android:id="@+id/iv_effect"
+            android:layout_width="@dimen/dp_16"
+            android:layout_height="3dp"
+            android:layout_marginTop="@dimen/dp_6"
+            android:background="@drawable/shape_43d3a2_radius_12dp"
+            android:contentDescription="@null"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="@id/tv_effect"
+            app:layout_constraintStart_toStartOf="@id/tv_effect"
+            app:layout_constraintTop_toBottomOf="@id/tv_effect" />
+
+        <androidx.viewpager.widget.ViewPager
+            android:id="@+id/viewPager"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:clipToPadding="false"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tv_tool" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</RelativeLayout>

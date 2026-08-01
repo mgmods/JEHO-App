@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo line_send stroke (#43d3a2, 28dp radius). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="1dp"
+        android:color="#FF3AEBAB" />
+    <corners android:radius="28dp" />
+</shape>

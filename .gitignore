@@ -1,0 +1,77 @@
+# === caches / build (not source) ===
+**/.gradle/
+**/.gradle-home/
+**/build/
+**/node_modules/
+**/dist/
+**/.idea/
+**/*.iml
+**/.DS_Store
+**/Thumbs.db
+**/*.hprof
+**/*.log
+**/.cxx/
+**/captures/
+**/local.properties
+
+# === backend build artifacts ===
+backend/dist/
+backend/dashboard/node_modules/
+backend/dashboard/dist/
+backend/dashboard/dist-hams/
+# Vite/admin compiled bundle (source lives in backend/dashboard/)
+backend/admin/
+backend/public/admin/
+
+# Archives / packaged dumps — never commit (source already in tree)
+**/*.zip
+**/*.7z
+**/*.rar
+backend/public/games/*.zip
+backend/public/games/**/*.zip
+backend/public/.visual-system.zip
+backend/public/games/mikoo-games.zip
+backend/public/games/backend-dist.zip
+
+# Android build outputs / packages — rebuild with Gradle
+android/app/build/
+android/**/build/
+android/app/release/
+android/app/debug/
+**/outputs/
+*.apk
+*.aab
+**/*.apk
+**/*.aab
+app-debug.apk
+app-release.apk
+
+# === junk / upload leftovers ===
+**/.visual-system.zip.cursor-upload-*
+**/admin.bak.*/
+tmp_*.py
+tmp_*.jpg
+android/tmp_*.jpg
+android/arm64-v8a/
+android/armeabi-v7a/
+android/libZegoExpressEngine.so
+
+# Keep signing + secrets intentionally for private restore backup
+# (do NOT ignore: *.jks, keystore.properties, google-services.json, .env)
+
+# Production mirror / extracted dumps — local only
+server-snapshot/
+EXTRACTED_GAMES/
+_aab_extract/
+_agent_logs/
+_*.py
+_*.xml
+tmp_*.py
+tmp_*.jpg
+.tmp_*/
+.tmp_*
+*.vscdb
+logs/
+screen_*.png
+scripts/_mikoo_catalogs/
+scripts/__pycache__/

@@ -1,0 +1,90 @@
+JEHO CHAT — Google Play Store Listing (EN + AR)
+================================================
+Support email: sf213777@gmail.com
+Website: https://api.adnova.bbs.tr/
+Privacy: https://api.adnova.bbs.tr/privacy.html
+Terms: https://api.adnova.bbs.tr/terms.html
+Delete account: https://api.adnova.bbs.tr/delete-account.html
+Support page: https://api.adnova.bbs.tr/support.html
+
+Graphics
+--------
+icon-512.png                    → High-res icon (512×512)
+feature-graphic-1024x500.png    → Feature graphic (1024×500)
+screenshots/                    → Phone screenshots (1080×1920)
+  EN set: 01-voice-room … 06-profile
+  AR set: 01-voice-room-ar … 06-profile-ar
+
+ENGLISH LISTING
+---------------
+App name: JEHO CHAT: Voice & Drama
+
+Short description:
+Voice rooms, short drama, chat and games — together on JEHO CHAT.
+
+Full description:
+JEHO CHAT is a neon social universe for voice parties, short drama, chat and games.
+
+Open a voice room or take a seat. Talk with friends, meet new people, share reactions and send gifts in an audio-first social space. Watch bite-sized dramas made for mobile, chat privately and play party games.
+
+🎤 VOICE PARTY ROOMS
+Host seats, co-hosts, music vibes and late-night conversations that feel like a real party.
+
+🎬 SHORT DRAMA
+Enjoy quick mobile episodes across romance, suspense and more.
+
+💬 CHAT & SOCIAL
+Fast private chats for friends and new connections.
+
+🎮 GAMES & FUN
+Compete, laugh and keep the room energetic.
+
+👑 GIFTS · VIP · LEVELS
+Send gift effects, unlock VIP style and climb levels.
+
+Download JEHO CHAT and join the conversation.
+
+ARABIC LISTING
+--------------
+اسم التطبيق: JEHO CHAT: Voice & Drama
+
+الوصف القصير:
+غرف صوتية ودراما قصيرة وشات وألعاب — كل شيء داخل JEHO CHAT.
+
+الوصف الكامل:
+JEHO CHAT هو عالم اجتماعي للغرف الصوتية والدراما القصيرة والشات والألعاب.
+
+افتح غرفة صوتية أو خذ مقعداً وتحدث مع الأصدقاء وتعرّف على أشخاص جدد وشارك التفاعل والهدايا في تجربة اجتماعية صوتية. شاهد حلقات دراما قصيرة، دردش والعب ألعاب الحفلة.
+
+🎤 غرف صوتية وحفلات
+مقاعد للمضيفين وأجواء موسيقية ومحادثات ممتعة.
+
+🎬 دراما قصيرة
+حلقات سريعة للموبايل من الرومانسية والتشويق وغيرهما.
+
+💬 شات وتواصل
+دردشة خاصة سريعة للأصدقاء والمعارف الجديدة.
+
+🎮 ألعاب وترفيه
+نافس واضحك وحافظ على حماس الغرفة.
+
+👑 هدايا · VIP · مستويات
+أرسل مؤثرات الهدايا وافتح مزايا VIP وارتقِ بالمستويات.
+
+حمّل JEHO CHAT وانضم إلى المحادثة.
+
+ASO phrases:
+voice chat, voice room, audio room, party room, group voice chat,
+short drama, mini drama, drama series, social chat, party games, gifts, VIP
+
+غرف صوتية، حفلة صوتية، دردشة صوتية جماعية، دراما قصيرة، مسلسلات قصيرة،
+شات، دردشة، هدايا، سهرة، حلقات قصيرة، ألعاب حفلة
+
+Upload checklist:
+[ ] App name and descriptions added for EN + AR
+[ ] icon-512.png
+[ ] feature-graphic-1024x500.png
+[ ] Voice-room phone screenshots
+[ ] Privacy / Terms / Support URLs
+[ ] Category Social (+ Entertainment)
+[ ] In-app products / Data safety completed

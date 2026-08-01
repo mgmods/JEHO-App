@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<!-- Ported from Mikoo for gift/join toast layouts -->
+<color name="color_10fca6">#ff10fca6</color>
+<color name="color_FFDA81">#ffffda81</color>
+<color name="color_gift_dialog_bg">#ff121616</color>
+<color name="color_white">#ffffffff</color>
+<color name="red_font">#ffdb0913</color>
+<color name="white_alpha_30">#4dffffff</color>
+</resources>

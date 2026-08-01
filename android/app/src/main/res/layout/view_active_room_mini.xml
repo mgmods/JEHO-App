@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="84dp"
+    android:layout_height="84dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:contentDescription="العودة إلى الغرفة الصوتية"
+    android:elevation="20dp">
+
+    <FrameLayout
+        android:id="@+id/miniRoomRing"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|start"
+        android:background="@drawable/bg_active_room_mini"
+        android:clickable="false"
+        android:focusable="false">
+
+        <ImageView
+            android:id="@+id/imgMiniRoomCover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_margin="4dp"
+            android:background="@drawable/bg_voice_seat_circle"
+            android:clickable="false"
+            android:clipToOutline="true"
+            android:contentDescription="@null"
+            android:focusable="false"
+            android:scaleType="centerCrop"
+            android:src="@drawable/placeholder_cover" />
+    </FrameLayout>
+
+    <!-- Fixed center mic (does not spin with cover) — tap mute / unmute. -->
+    <ImageView
+        android:id="@+id/btnMiniRoomMic"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="21dp"
+        android:layout_marginBottom="21dp"
+        android:background="@drawable/bg_mini_room_mic"
+        android:clickable="true"
+        android:contentDescription="كتم / تشغيل المايك"
+        android:elevation="14dp"
+        android:focusable="true"
+        android:padding="6dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_asset_mic_open" />
+
+    <TextView
+        android:id="@+id/tvMiniRoomTitle"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/btnMiniRoomClose"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_gravity="top|end"
+        android:background="@drawable/bg_room_tool_circle"
+        android:clickable="true"
+        android:contentDescription="الخروج من الغرفة"
+        android:elevation="12dp"
+        android:focusable="true"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:text="×"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+</FrameLayout>

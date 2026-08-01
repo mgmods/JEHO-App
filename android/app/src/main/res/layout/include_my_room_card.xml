@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo-style "My Room / Create room" card -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/myRoomCard"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="6dp"
+    android:layout_marginTop="4dp"
+    android:layout_marginBottom="8dp"
+    android:foreground="?attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/imgMyRoomBg"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:src="@drawable/follow_create_bg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/imgMyRoomAvatar"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="25dp"
+        android:layout_marginBottom="12dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_default_avatar"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
+        app:layout_constraintStart_toStartOf="@id/imgMyRoomBg"
+        app:layout_constraintTop_toTopOf="@id/imgMyRoomBg"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded8" />
+
+    <ImageView
+        android:id="@+id/imgMyRoomCreateIcon"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="25dp"
+        android:layout_marginBottom="12dp"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter"
+        android:src="@drawable/create_ic"
+        app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
+        app:layout_constraintStart_toStartOf="@id/imgMyRoomBg"
+        app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
+
+    <TextView
+        android:id="@+id/tvMyRoomTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="110dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="marquee"
+        android:singleLine="true"
+        android:text="@string/my_room"
+        android:textColor="@color/text_primary"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/btnMyRoomGo"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
+
+    <TextView
+        android:id="@+id/tvMyRoomSubtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="marquee"
+        android:singleLine="true"
+        android:text="@string/agency_room_host_subtitle"
+        android:textColor="@color/text_hint"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toStartOf="@id/btnMyRoomGo"
+        app:layout_constraintStart_toStartOf="@id/tvMyRoomTitle"
+        app:layout_constraintTop_toBottomOf="@id/tvMyRoomTitle" />
+
+    <TextView
+        android:id="@+id/btnMyRoomGo"
+        android:layout_width="58dp"
+        android:layout_height="26dp"
+        android:layout_marginEnd="30dp"
+        android:background="@drawable/bg_mikoo_go_btn"
+        android:gravity="center"
+        android:text="@string/enter_room"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
+</androidx.constraintlayout.widget.ConstraintLayout>

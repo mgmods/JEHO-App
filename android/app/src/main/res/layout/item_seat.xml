@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo item_rv_multi_audio_micro: 80dp cell, 55dp avatar/empty seat -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="6dp"
+    android:paddingHorizontal="2dp">
+
+    <FrameLayout
+        android:layout_width="76dp"
+        android:layout_height="76dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <View
+            android:id="@+id/seatRing"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_avatar_ring"
+            android:visibility="gone" />
+
+        <View
+            android:id="@+id/seatRippleOuter"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_speaking_ripple"
+            android:visibility="invisible" />
+
+        <View
+            android:id="@+id/seatRippleMid"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_speaking_ripple"
+            android:visibility="invisible" />
+
+        <View
+            android:id="@+id/seatRippleInner"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_speaking_ripple"
+            android:visibility="invisible" />
+
+        <!-- Empty / locked classic Mikoo seat -->
+        <ImageView
+            android:id="@+id/imgSeatShell"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_classic_seat_normal" />
+
+        <ImageView
+            android:id="@+id/imgAvatar"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_seat_avatar_ring"
+            android:contentDescription="@string/seats"
+            android:padding="1.5dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_default_avatar"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgFrame"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/imgHostBadge"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <com.Dramizo.Series.util.HostSignalView
+            android:id="@+id/seatHostSignal"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Reaction ABOVE frame/badge so stickers are never hidden by wear. -->
+        <ImageView
+            android:id="@+id/imgSeatReaction"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:elevation="8dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <com.airbnb.lottie.LottieAnimationView
+            android:id="@+id/lottieSeatReaction"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="center"
+            android:elevation="8dp"
+            android:scaleType="centerInside"
+            android:visibility="gone"
+            app:lottie_autoPlay="false"
+            app:lottie_fileName="lottie/emoji_react.json"
+            app:lottie_loop="false" />
+
+        <ImageView
+            android:id="@+id/imgMuted"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="8dp"
+            android:contentDescription="@null"
+            android:elevation="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_mic_close"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Name row: optional mic badge + nickname (Mikoo white 50%) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingHorizontal="2dp">
+
+        <ImageView
+            android:id="@+id/imgSeatHostMark"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_marginEnd="2dp"
+            android:contentDescription="@null"
+            android:src="@drawable/mic_fz"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxWidth="72dp"
+            android:maxLines="1"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Charm / gift count — Mikoo grey pill -->
+    <TextView
+        android:id="@+id/tvGiftCount"
+        android:layout_width="wrap_content"
+        android:layout_height="13dp"
+        android:layout_marginTop="3dp"
+        android:background="@drawable/bg_mikoo_mic_charm"
+        android:drawablePadding="2dp"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="4dp"
+        android:textColor="#FFFFFF"
+        android:textSize="10sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</LinearLayout>

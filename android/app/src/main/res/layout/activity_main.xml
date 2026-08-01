@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <ImageView
+        android:id="@+id/imgThemeBg"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:src="@color/white"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/mainPager"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintBottom_toTopOf="@id/customBottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:visibility="gone"
+        app:labelVisibilityMode="unlabeled"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:menu="@menu/menu_bottom_nav" />
+
+    <include
+        android:id="@+id/activeRoomMini"
+        layout="@layout/view_active_room_mini"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginBottom="14dp"
+        android:visibility="gone"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        app:layout_constraintBottom_toTopOf="@id/customBottomBar"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/customBottomBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_chrome"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="10dp"
+        android:gravity="center"
+        android:minHeight="64dp"
+        android:orientation="horizontal"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/tabPartyWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <ImageView
+                android:id="@+id/tabParty"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/tab_party"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_party" />
+
+            <TextView
+                android:id="@+id/labelParty"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:text="@string/tab_party"
+                android:textColor="@color/bottom_chrome_label"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabDramaWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <ImageView
+                android:id="@+id/tabDrama"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/tab_drama"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_drama" />
+
+            <TextView
+                android:id="@+id/labelDrama"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:text="@string/tab_drama"
+                android:textColor="@color/bottom_chrome_label"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabGamesWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <ImageView
+                android:id="@+id/tabGames"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/nav_games"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_games" />
+
+            <TextView
+                android:id="@+id/labelGames"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:text="@string/nav_games"
+                android:textColor="@color/bottom_chrome_label"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/tabCreateRoomWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="2dp">
+
+                <ImageView
+                    android:id="@+id/tabCreateRoom"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/open_agency"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_tab_create_room" />
+
+                <TextView
+                    android:id="@+id/labelCreateRoom"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:includeFontPadding="false"
+                    android:text="@string/open_agency"
+                    android:textColor="@color/bottom_chrome_label"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/tabChatWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <ImageView
+                android:id="@+id/tabChat"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/nav_messages"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_social" />
+
+            <TextView
+                android:id="@+id/labelChat"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:text="@string/nav_messages"
+                android:textColor="@color/bottom_chrome_label"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/tabMeWrap"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingVertical="2dp">
+
+            <ImageView
+                android:id="@+id/tabMe"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/nav_profile"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_me" />
+
+            <TextView
+                android:id="@+id/labelMe"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:includeFontPadding="false"
+                android:text="@string/nav_profile"
+                android:textColor="@color/bottom_chrome_label"
+                android:textSize="12.5sp" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

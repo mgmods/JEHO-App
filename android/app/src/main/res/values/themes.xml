@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AuraLive" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_light_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_light_onPrimary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_light_primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_light_onPrimaryContainer</item>
+        <item name="colorSecondary">@color/md_theme_light_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_light_onSecondary</item>
+        <item name="colorSecondaryContainer">@color/md_theme_light_secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/md_theme_light_onSecondaryContainer</item>
+        <item name="colorTertiary">@color/md_theme_light_tertiary</item>
+        <item name="colorOnTertiary">@color/md_theme_light_onTertiary</item>
+        <item name="android:colorBackground">@color/white</item>
+        <item name="colorOnBackground">@color/text_primary</item>
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorSurfaceVariant">@color/md_theme_light_surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/md_theme_light_outline</item>
+        <item name="colorError">@color/md_theme_light_error</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceNavigationBarContrast">true</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.AuraLive.AlertDialog</item>
+        <item name="bottomSheetDialogTheme">@style/Theme.AuraLive.BottomSheet</item>
+        <item name="popupMenuStyle">@style/Widget.AuraLive.PopupMenu</item>
+        <item name="android:popupMenuStyle">@style/Widget.AuraLive.PopupMenu</item>
+    </style>
+
+    <style name="Widget.AuraLive.PopupMenu" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup_menu_light</item>
+    </style>
+
+    <style name="ThemeOverlay.AuraLive.PopupMenu" parent="ThemeOverlay.Material3">
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@android:color/black</item>
+        <item name="android:textColorPrimary">@android:color/black</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:colorBackground">@color/white</item>
+    </style>
+
+    <style name="Theme.AuraLive.Splash" parent="Theme.AuraLive">
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/ic_launcher_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+    </style>
+
+    <style name="Theme.AuraLive.Fullscreen" parent="Theme.AuraLive">
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="Widget.AuraLive.Button" parent="Widget.Material3.Button">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="backgroundTint">@color/gift_accent</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <style name="Widget.AuraLive.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="cornerRadius">16dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="strokeColor">@color/gift_accent</item>
+        <item name="android:textColor">@color/gift_accent</item>
+    </style>
+
+    <style name="Widget.AuraLive.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">14dp</item>
+        <item name="boxCornerRadiusTopEnd">14dp</item>
+        <item name="boxCornerRadiusBottomStart">14dp</item>
+        <item name="boxCornerRadiusBottomEnd">14dp</item>
+        <item name="boxStrokeColor">@color/gift_accent</item>
+    </style>
+
+    <style name="Widget.AuraLive.UserCardAction" parent="@android:style/Widget.TextView">
+        <item name="android:layout_height">46dp</item>
+        <item name="android:background">@drawable/bg_user_card_action</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">#111827</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:foreground">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="TextAppearance.AuraLive.Brand" parent="TextAppearance.Material3.HeadlineLarge">
+        <item name="android:textColor">@color/gift_accent</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <style name="TextAppearance.AuraLive.Title" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.01</item>
+    </style>
+
+    <style name="Widget.AuraLive.Button.Rose" parent="Widget.AuraLive.Button">
+        <item name="backgroundTint">@color/gift_accent</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="cornerRadius">18dp</item>
+    </style>
+
+    <style name="Widget.AuraLive.Button.Gold" parent="Widget.AuraLive.Button">
+        <item name="backgroundTint">@color/aurora_gold</item>
+        <item name="android:textColor">@color/aurora_night</item>
+        <item name="cornerRadius">18dp</item>
+    </style>
+
+    <style name="Theme.AuraLive.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.AuraLive.BottomSheet</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+    <!-- Mikoo gift category tabs — single-line, no wrap under the labels. -->
+    <style name="TextAppearance.Jeho.GiftTab" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:ellipsize">none</item>
+    </style>
+
+    <style name="Widget.AuraLive.BottomSheet" parent="Widget.Material3.BottomSheet">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.AuraLive.BottomSheet</item>
+    </style>
+
+    <style name="ShapeAppearance.AuraLive.BottomSheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">0dp</item>
+        <item name="cornerSizeTopRight">0dp</item>
+    </style>
+
+    <style name="ThemeOverlay.AuraLive.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="colorSurface">@color/white</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorPrimary">@color/gift_accent</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.AuraLive.Dialog</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.AuraLive.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.AuraLive.DialogButton</item>
+    </style>
+
+    <style name="ShapeAppearance.AuraLive.Dialog" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <style name="Widget.AuraLive.DialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/gift_accent</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="ShapeAppearance.Drama.Rounded8" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <!-- Mikoo roomListRoundCornerStyle ≈ 4% -->
+    <style name="ShapeAppearance.Mikoo.RoomList" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">4%</item>
+    </style>
+
+    <style name="ShapeAppearance.Flag.Rounded3" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">3dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Jeho.BannerImage" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="ShapeAppearance.AuraLive.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="TextAppearance.AuraLive.LargeTitle" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <style name="TextAppearance.AuraLive.Secondary" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="Widget.AuraLive.GroupedCard" parent="">
+        <item name="android:background">@drawable/bg_glass_grouped</item>
+        <item name="android:padding">0dp</item>
+    </style>
+
+    <style name="Widget.AuraLive.Button.Pill" parent="Widget.AuraLive.Button">
+        <item name="cornerRadius">22dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="backgroundTint">@color/gift_accent</item>
+    </style>
+</resources>

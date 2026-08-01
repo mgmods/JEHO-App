@@ -1,0 +1,97 @@
+
+beicheng_01.png
+size: 407,265
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+bcsg_00002
+  rotate: false
+  xy: 274, 6
+  size: 123, 25
+  orig: 184, 168
+  offset: 31, 2
+  index: -1
+bcsg_00003
+  rotate: true
+  xy: 337, 38
+  size: 126, 43
+  orig: 184, 168
+  offset: 30, 2
+  index: -1
+bcsg_00004
+  rotate: true
+  xy: 214, 9
+  size: 129, 58
+  orig: 184, 168
+  offset: 28, 4
+  index: -1
+bcsg_00005
+  rotate: true
+  xy: 116, 135
+  size: 130, 62
+  orig: 184, 168
+  offset: 28, 19
+  index: -1
+bcsg_00006
+  rotate: true
+  xy: 151, 4
+  size: 129, 61
+  orig: 184, 168
+  offset: 28, 37
+  index: -1
+bcsg_00007
+  rotate: true
+  xy: 180, 140
+  size: 125, 62
+  orig: 184, 168
+  offset: 30, 54
+  index: -1
+bcsg_00008
+  rotate: true
+  xy: 244, 146
+  size: 119, 62
+  orig: 184, 168
+  offset: 33, 72
+  index: -1
+bcsg_00009
+  rotate: true
+  xy: 274, 33
+  size: 111, 61
+  orig: 184, 168
+  offset: 37, 90
+  index: -1
+bcsg_00010
+  rotate: true
+  xy: 308, 166
+  size: 99, 57
+  orig: 184, 168
+  offset: 43, 107
+  index: -1
+bcsg_00011
+  rotate: true
+  xy: 367, 183
+  size: 82, 40
+  orig: 184, 168
+  offset: 52, 126
+  index: -1
+bcsg_00012
+  rotate: true
+  xy: 382, 129
+  size: 52, 20
+  orig: 184, 168
+  offset: 67, 144
+  index: -1
+fen
+  rotate: false
+  xy: 0, 116
+  size: 114, 149
+  orig: 114, 149
+  offset: 0, 0
+  index: -1
+lan
+  rotate: true
+  xy: 0, 0
+  size: 114, 149
+  orig: 114, 149
+  offset: 0, 0
+  index: -1
