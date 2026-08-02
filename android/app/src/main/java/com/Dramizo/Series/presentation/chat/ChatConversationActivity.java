@@ -299,6 +299,10 @@ public class ChatConversationActivity extends ThemedActivity {
                 openGiftGateSheet();
                 return;
             }
+            if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(msg)) {
+                com.Dramizo.Series.util.BalanceRedirect.handle(this, msg);
+                return;
+            }
             Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
         });
         viewModel.getConversationDeleted().observe(this, deleted -> {

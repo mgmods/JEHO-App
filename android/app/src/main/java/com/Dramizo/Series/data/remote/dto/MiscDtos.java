@@ -31,7 +31,13 @@ public final class MiscDtos {
 
     public static class PurchaseVipRequest {
         @SerializedName("level") public int level;
-        public PurchaseVipRequest(int level) { this.level = level; }
+        /** 7 = weekly, 30 = monthly, 40 = 40 days — VIP is never permanent. */
+        @SerializedName("durationDays") public int durationDays;
+        public PurchaseVipRequest(int level) { this(level, 30); }
+        public PurchaseVipRequest(int level, int durationDays) {
+            this.level = level;
+            this.durationDays = durationDays;
+        }
     }
 
     /** VIP plans API returns a raw array in `data`. */

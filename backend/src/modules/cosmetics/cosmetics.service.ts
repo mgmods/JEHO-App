@@ -67,6 +67,7 @@ export class CosmeticsService implements OnModuleInit {
       await this.ensureRoomCardCatalog();
       await this.ensureHostBadgeCatalog();
       await this.ensureMikooCosmeticsCatalog();
+      await this.ensurePromoCosmetics();
       await this.purgeBrokenEntryEffects();
       await this.ensureMallPricing();
       await this.ensurePublicBranding();
@@ -230,7 +231,12 @@ export class CosmeticsService implements OnModuleInit {
    * Extends from max(now, existing expiresAt) when already owned temporarily.
    * Permanent ownership (expiresAt null) is left permanent.
    */
-  async grantTemporary(userId: string, cosmeticCode: string, days: number) {
+  async grantTemporary(
+    userId: string,
+    cosmeticCode: string,
+    days: number,
+    opts?: { forceTimed?: boolean },
+  ) {
     const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
     let cosmetic =
       (await this.cosmeticsRepo.findOne({
@@ -270,11 +276,13 @@ export class CosmeticsService implements OnModuleInit {
         equipped: false,
         expiresAt: new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
       });
-    } else if (owned.expiresAt == null) {
+    } else if (owned.expiresAt == null && !opts?.forceTimed) {
       // Already permanent — keep permanent, still try equip.
     } else {
       const base =
-        owned.expiresAt.getTime() > now.getTime() ? owned.expiresAt.getTime() : now.getTime();
+        owned.expiresAt && owned.expiresAt.getTime() > now.getTime()
+          ? owned.expiresAt.getTime()
+          : now.getTime();
       owned.expiresAt = new Date(base + daysSafe * 24 * 60 * 60 * 1000);
     }
     owned = await this.userCosmeticsRepo.save(owned);
@@ -291,6 +299,89 @@ export class CosmeticsService implements OnModuleInit {
       expiresAt: owned.expiresAt,
       days: daysSafe,
     };
+  }
+
+  /**
+   * Upsert promo reward frames (monthly gifts + supporter packs).
+   * Uses existing pack art so grants never fall back to a random mall badge.
+   */
+  async ensurePromoCosmetics() {
+    const v = '20260802promo';
+    const items: Array<{
+      code: string;
+      name: string;
+      previewUrl: string;
+      sortOrder: number;
+      daysHint: number;
+    }> = [
+      {
+        code: 'promo_monthly_gift_45',
+        name: 'هدية الشحن الشهرية (45 يوم)',
+        previewUrl: `/assets/pack/ff_challenge_frame_top1.png?v=${v}`,
+        sortOrder: 9100,
+        daysHint: 45,
+      },
+      {
+        code: 'promo_monthly_gift_90',
+        name: 'هدية الشحن الشهرية (90 يوم)',
+        previewUrl: `/assets/pack/guardian_relation_cp_8_10.png?v=${v}`,
+        sortOrder: 9101,
+        daysHint: 90,
+      },
+      {
+        code: 'promo_supporter_frame_7',
+        name: 'إطار الداعم (7 أيام)',
+        previewUrl: `/assets/pack/bg_main_activity_center.png?v=${v}`,
+        sortOrder: 9110,
+        daysHint: 7,
+      },
+      {
+        code: 'promo_supporter_frame_15',
+        name: 'إطار الداعم (15 يوم)',
+        previewUrl: `/assets/pack/ff_challenge_frame_top1.png?v=${v}`,
+        sortOrder: 9111,
+        daysHint: 15,
+      },
+      {
+        code: 'promo_supporter_frame_30',
+        name: 'إطار الداعم (30 يوم)',
+        previewUrl: `/assets/pack/guardian_relation_cp_8_10.png?v=${v}`,
+        sortOrder: 9112,
+        daysHint: 30,
+      },
+    ];
+
+    for (const item of items) {
+      let row = await this.cosmeticsRepo.findOne({ where: { code: item.code } });
+      if (!row) {
+        await this.cosmeticsRepo.save(
+          this.cosmeticsRepo.create({
+            type: CosmeticType.HOST_BADGE,
+            code: item.code,
+            name: item.name,
+            description: `عرض ترويجي · ${item.daysHint} يوم`,
+            previewUrl: item.previewUrl,
+            animationUrl: null,
+            coinPrice: 0,
+            minVipLevel: 0,
+            minUserLevel: 0,
+            isActive: true,
+            sortOrder: item.sortOrder,
+            meta: { promo: true, rewardDays: item.daysHint, mallHidden: true },
+          }),
+        );
+        continue;
+      }
+      row.type = CosmeticType.HOST_BADGE;
+      row.name = item.name;
+      row.description = `عرض ترويجي · ${item.daysHint} يوم`;
+      row.previewUrl = item.previewUrl;
+      row.coinPrice = 0;
+      row.isActive = true;
+      row.sortOrder = item.sortOrder;
+      row.meta = { ...(row.meta || {}), promo: true, rewardDays: item.daysHint, mallHidden: true };
+      await this.cosmeticsRepo.save(row);
+    }
   }
 
   private async activeVipLevel(userId: string): Promise<number> {
@@ -461,13 +552,65 @@ export class CosmeticsService implements OnModuleInit {
     return { equipped: true, cosmetic: owned.cosmetic, profile };
   }
 
+  /** Clear wear for this cosmetic type (frame / entry / badge / room card). */
+  async unequip(userId: string, cosmeticId: string) {
+    const owned = await this.userCosmeticsRepo.findOne({
+      where: { userId, cosmeticId },
+      relations: ['cosmetic'],
+    });
+    if (!owned) throw new NotFoundException('You do not own this cosmetic');
+
+    const type = owned.cosmetic.type;
+    const sameType = await this.userCosmeticsRepo.find({
+      where: { userId },
+      relations: ['cosmetic'],
+    });
+    for (const row of sameType) {
+      if (row.cosmetic?.type === type && row.equipped) {
+        row.equipped = false;
+        await this.userCosmeticsRepo.save(row);
+      }
+    }
+
+    const profile = await this.profileRepo.findOne({ where: { userId } });
+    if (profile) {
+      if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
+        profile.entryEffectUrl = null;
+        profile.entryAnimationUrl = null;
+      }
+      if (type === CosmeticType.ROOM_CARD) {
+        profile.roomCardUrl = null;
+        await this.dataSource.query(
+          `UPDATE rooms
+              SET "roomCardUrl" = NULL, "roomCardEquippedById" = NULL
+            WHERE "hostId" = $1
+              AND "roomCardEquippedById" = $1`,
+          [userId],
+        ).catch(() => undefined);
+      }
+      if (type === CosmeticType.HOST_BADGE) {
+        profile.hostBadgeUrl = null;
+      }
+      if (type === CosmeticType.VIP_BADGE) {
+        profile.vipBadgeUrl = null;
+      }
+      if (type === CosmeticType.LEVEL_BADGE) {
+        profile.levelBadgeUrl = null;
+      }
+      await this.profileRepo.save(profile);
+    }
+
+    return { equipped: false, cosmetic: owned.cosmetic, profile };
+  }
+
   /**
    * VIP plans are 1..100; Mikoo visual frames/medals are VIP1–7 only.
    * Map plan level → visual tier 1..7 (same as vipMedalTier), then grant + equip.
    */
-  async grantVipAristocracyBundle(userId: string, vipLevel: number) {
+  async grantVipAristocracyBundle(userId: string, vipLevel: number, days = 30) {
     const vip = Math.min(100, Math.max(1, Math.floor(Number(vipLevel) || 1)));
     const level = this.vipVisualTier(vip);
+    const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 30)));
     await this.ensureAristocracyCatalog();
 
     const types: CosmeticType[] = [
@@ -476,18 +619,20 @@ export class CosmeticsService implements OnModuleInit {
       CosmeticType.HOST_BADGE,
     ];
 
-    const granted: Array<{ type: CosmeticType; code: string }> = [];
+    const granted: Array<{ type: CosmeticType; code: string; expiresAt?: Date | null }> = [];
     let hostId: string | null = null;
 
     for (const type of types) {
       const item = await this.pickAristocracyItem(type, level);
       if (!item) continue;
-      await this.ensureOwned(userId, item.id);
-      granted.push({ type, code: item.code });
+      // VIP rentals are time-limited — never grant permanent cosmetics with VIP.
+      const temp = await this.grantTemporary(userId, item.code, daysSafe, {
+        forceTimed: true,
+      });
+      granted.push({ type, code: item.code, expiresAt: temp?.expiresAt ?? null });
       if (type === CosmeticType.HOST_BADGE) hostId = item.id;
       else {
         try {
-          // VIP bundle is a paid grant — equip regardless of account level gates.
           await this.equip(userId, item.id, { skipRequirements: true });
         } catch {
           // ignore rare races
@@ -495,7 +640,6 @@ export class CosmeticsService implements OnModuleInit {
       }
     }
 
-    // The HTML host signal is the only avatar surround in the VIP bundle.
     if (hostId) {
       try {
         await this.equip(userId, hostId, { skipRequirements: true });
@@ -504,7 +648,7 @@ export class CosmeticsService implements OnModuleInit {
       }
     }
 
-    return { vipLevel: vip, visualTier: level, granted };
+    return { vipLevel: vip, visualTier: level, days: daysSafe, granted };
   }
 
   private vipVisualTier(vipLevel: number): number {

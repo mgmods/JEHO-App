@@ -218,14 +218,7 @@ public class AgencyActivity extends ThemedActivity {
         });
         vm.getError().observe(this, e -> {
             if (e == null) return;
-            Toast.makeText(this, e, Toast.LENGTH_LONG).show();
-            String lower = e.toLowerCase(Locale.US);
-            if (lower.contains("insufficient") || lower.contains("رصيد")
-                    || lower.contains("coins") || lower.contains("عملات")
-                    || lower.contains("balance")) {
-                startActivity(new android.content.Intent(this,
-                        com.Dramizo.Series.presentation.wallet.BagActivity.class));
-            }
+            com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
         binding.btnBecomeAgent.setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, AgencyCreateActivity.class)));
@@ -599,9 +592,7 @@ public class AgencyActivity extends ThemedActivity {
                                 Toast.makeText(this, "تم التوزيع بنجاح", Toast.LENGTH_SHORT).show();
                                 vm.load();
                             } else {
-                                Toast.makeText(this,
-                                        r.error != null ? r.error : "فشل التوزيع",
-                                        Toast.LENGTH_LONG).show();
+                                com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
                             }
                         });
                     });

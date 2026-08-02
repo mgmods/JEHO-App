@@ -52,8 +52,8 @@ import { AGENCY_CREATE } from '../../common/pricing-catalog';
 import { purgeRoomReferencesBeforeDelete } from '../../common/room-delete-sql';
 
 const DEFAULT_CREATE_PRICE = AGENCY_CREATE.defaultCoins;
-const DEFAULT_COMMISSION = 20;
-const DEFAULT_PLATFORM_CUT = 25;
+const DEFAULT_COMMISSION = 15;
+const DEFAULT_PLATFORM_CUT = 30;
 const DEFAULT_AGENCY_SEAT_COUNT = 11;
 
 @Injectable()
@@ -115,14 +115,26 @@ export class AgenciesService implements OnModuleInit {
         String(DEFAULT_PLATFORM_CUT),
         'حصة المنصة من هدايا الوكالة %',
       );
-      // Raise legacy 20% platform cut to the safer 25% house default.
+      // Raise legacy platform cut (20/25) to safer 30% house default.
       const cut = await this.settingsRepo.findOne({
         where: { key: 'agency_platform_cut_percent' },
       });
-      if (cut && String(cut.value).trim() === '20') {
-        cut.value = String(DEFAULT_PLATFORM_CUT);
-        cut.description = 'حصة المنصة من هدايا الوكالة %';
-        await this.settingsRepo.save(cut);
+      if (cut) {
+        const n = Number(String(cut.value).trim());
+        if (n === 20 || n === 25) {
+          cut.value = String(DEFAULT_PLATFORM_CUT);
+          cut.description = 'حصة المنصة من هدايا الوكالة %';
+          await this.settingsRepo.save(cut);
+        }
+      }
+      // Soft-migrate default agency commission 20 → 15 when still on legacy default.
+      const defComm = await this.settingsRepo.findOne({
+        where: { key: 'agency_default_commission_percent' },
+      });
+      if (defComm && String(defComm.value).trim() === '20') {
+        defComm.value = String(DEFAULT_COMMISSION);
+        defComm.description = 'حصة صاحب الوكالة من هدايا الأعضاء %';
+        await this.settingsRepo.save(defComm);
       }
     } catch (err) {
       this.logger.warn(`ensure agency commission settings: ${(err as Error).message}`);

@@ -74,8 +74,11 @@ public class PartyRoomAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
             showLoadingFooter = false;
             notifyItemRemoved(items.size());
         }
+        List<RoomDtos.RoomDto> old = new ArrayList<>(items);
         List<RoomDtos.RoomDto> next = data != null ? new ArrayList<>(data) : new ArrayList<>();
-        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new RoomDiff(items, next), true);
+        // Must snapshot old list — DiffResult reads oldList during dispatch; mutating
+        // `items` in place caused IndexOutOfBoundsException (e.g. index 14 of size 10).
+        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new RoomDiff(old, next), true);
         items.clear();
         items.addAll(next);
         diff.dispatchUpdatesTo(this);

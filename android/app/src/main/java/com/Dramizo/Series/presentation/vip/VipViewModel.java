@@ -43,14 +43,19 @@ public class VipViewModel extends ViewModel {
     }
 
     public void purchase(int level) {
+        purchase(level, 30);
+    }
+
+    public void purchase(int level, int durationDays) {
         if (!purchaseInFlight.compareAndSet(false, true)) return;
         purchasing.postValue(true);
+        final int days = durationDays == 7 || durationDays == 40 ? durationDays : 30;
         c.getIoExecutor().execute(() -> {
             try {
-                Result<Object> r = c.purchaseVipUseCase.execute(level);
+                Result<Object> r = c.purchaseVipUseCase.execute(level, days);
                 if (r.success) {
                     refreshMe();
-                    message.postValue("تمت الترقية بنجاح — أنت الآن VIP " + level);
+                    message.postValue("تم تفعيل VIP " + level + " لمدة " + days + " يوم");
                 } else {
                     error.postValue(r.error != null ? r.error : "تعذر شراء VIP");
                 }

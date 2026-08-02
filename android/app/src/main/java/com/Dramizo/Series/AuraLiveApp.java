@@ -85,6 +85,7 @@ public class AuraLiveApp extends Application {
     public void onCreate() {
         super.onCreate();
         container = new AppContainer(this);
+        com.Dramizo.Series.util.RoomChatMemory.init(this);
         // Fetch runtime Zego client settings early (non-blocking).
         try {
             container.getIoExecutor().execute(() -> {
@@ -233,14 +234,11 @@ public class AuraLiveApp extends Application {
                     return;
                 }
                 if ("celebration:toast".equals(event) && payload != null) {
-                    Activity activity = foregroundActivity;
-                    if (activity == null || activity.isFinishing()) return;
-                    // Inside voice room: use room chat bubbles + official-news-style
-                    // lucky strip — skip the global top toast over the room card.
-                    if (activity instanceof VoiceRoomActivity) return;
                     String title = jsonString(payload, "title", "مبروك!");
                     String body = jsonString(payload, "body", "");
                     String avatar = jsonString(payload, "avatarUrl", null);
+                    String displayName = jsonString(payload, "displayName", null);
+                    String kind = jsonString(payload, "kind", null);
                     String badgeCandidate = jsonString(payload, "giftIconUrl", null);
                     if (badgeCandidate == null || badgeCandidate.isEmpty()) {
                         badgeCandidate = jsonString(payload, "gameIconUrl", null);
@@ -250,9 +248,42 @@ public class AuraLiveApp extends Application {
                     }
                     final String badge = badgeCandidate;
                     String dedupe = jsonString(payload, "id", body);
-                    activity.runOnUiThread(() ->
-                            com.Dramizo.Series.util.GlobalCelebrationToast.show(
-                                    activity, title, body, avatar, badge, dedupe));
+                    long coinsWon = jsonLong(payload, "coinsWon", 0L);
+                    if (coinsWon <= 0L) coinsWon = jsonLong(payload, "winCoins", 0L);
+                    String gameTitle = jsonString(payload, "gameTitle", null);
+                    final long coinsFinal = coinsWon;
+                    final String gameFinal = gameTitle;
+                    final boolean appVisible = isAppInForeground();
+                    VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
+                    Activity activity = foregroundActivity;
+
+                    // Prefer live room (even when Home/minimized UI paused) so chat bubbles land.
+                    if (aliveRoom != null) {
+                        aliveRoom.runOnUiThread(() -> aliveRoom.onGlobalCelebration(
+                                kind, title, body, displayName, avatar, badge, dedupe,
+                                coinsFinal, gameFinal));
+                        if (!appVisible) {
+                            showCelebrationSystemNotification(title, body, avatar, dedupe);
+                        }
+                        return;
+                    }
+
+                    if (activity != null && !activity.isFinishing()) {
+                        activity.runOnUiThread(() -> {
+                            if (activity instanceof VoiceRoomActivity room) {
+                                room.onGlobalCelebration(
+                                        kind, title, body, displayName, avatar, badge, dedupe,
+                                        coinsFinal, gameFinal);
+                            } else {
+                                com.Dramizo.Series.util.GlobalCelebrationToast.show(
+                                        activity, title, body, avatar, badge, dedupe);
+                            }
+                        });
+                        return;
+                    }
+
+                    // Fully outside the app — system heads-up notification.
+                    showCelebrationSystemNotification(title, body, avatar, dedupe);
                     return;
                 }
                 if (!"notification:new".equals(event) || payload == null) return;
@@ -332,10 +363,48 @@ public class AuraLiveApp extends Application {
         return ("rt:" + System.currentTimeMillis()).hashCode();
     }
 
+    private void showCelebrationSystemNotification(
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String avatarUrl,
+            @Nullable String dedupe
+    ) {
+        try {
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            String safeTitle = title != null && !title.isEmpty() ? title : "مبروك!";
+            String safeBody = body != null ? body : "";
+            AuraNotificationHelper.show(
+                    this,
+                    "auralive_default",
+                    safeTitle,
+                    safeBody,
+                    "celebration",
+                    intent,
+                    notificationIdKey(dedupe != null ? dedupe : safeBody),
+                    avatarUrl);
+        } catch (Exception ignored) {
+        }
+    }
+
     private static String jsonString(JsonObject object, String key, String fallback) {
         try {
             JsonElement value = object.get(key);
             if (value != null && !value.isJsonNull()) return value.getAsString();
+        } catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private static long jsonLong(JsonObject object, String key, long fallback) {
+        try {
+            JsonElement value = object.get(key);
+            if (value != null && !value.isJsonNull() && value.isJsonPrimitive()) {
+                if (value.getAsJsonPrimitive().isNumber()) return value.getAsLong();
+                String s = value.getAsString();
+                if (s != null && !s.isEmpty()) return Long.parseLong(s.trim());
+            }
         } catch (Exception ignored) {
         }
         return fallback;

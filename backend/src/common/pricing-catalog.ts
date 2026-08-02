@@ -1,80 +1,83 @@
 /**
  * Canonical social-app pricing (USD Play product IDs = sku).
- * Profitable launch: modest bonuses, host diamond share ~55%, cashout rate below coin buy value.
+ * Tempting entry packs + profitable ladder; gift mint &lt; cashout liability.
  */
-export const PRICING_VERSION = '20260730mall-paid-v1';
+export const PRICING_VERSION = '20260802economy-v2';
 
 /** Google Play / store productId == sku. */
 export const STANDARD_RECHARGE_PACKAGES = [
   {
     id: '1',
     sku: 'coins_10000',
-    coins: 10000,
+    coins: 12000,
     bonusCoins: 0,
     priceUsd: 0.99,
-    label: '10,000',
+    label: '12,000',
     popular: false,
   },
   {
     id: '2',
     sku: 'coins_35000',
-    coins: 35000,
-    bonusCoins: 0,
+    coins: 40000,
+    bonusCoins: 2000,
     priceUsd: 2.99,
-    label: '35,000',
+    label: '42,000',
     popular: false,
   },
   {
     id: '3',
     sku: 'coins_70000',
-    coins: 70000,
-    bonusCoins: 3000,
+    coins: 85000,
+    bonusCoins: 8000,
     priceUsd: 4.99,
-    label: '70,000',
-    popular: false,
+    label: '93,000',
+    popular: true,
   },
   {
     id: '4',
     sku: 'coins_141700',
-    coins: 141700,
-    bonusCoins: 8000,
+    coins: 180000,
+    bonusCoins: 20000,
     priceUsd: 9.99,
-    label: '141,700',
-    popular: true,
+    label: '200,000',
+    popular: false,
   },
   {
     id: '5',
     sku: 'coins_300000',
-    coins: 300000,
-    bonusCoins: 25000,
+    coins: 380000,
+    bonusCoins: 45000,
     priceUsd: 19.99,
-    label: '300,000',
+    label: '425,000',
     popular: false,
   },
   {
     id: '6',
     sku: 'coins_750000',
-    coins: 750000,
-    bonusCoins: 75000,
+    coins: 950000,
+    bonusCoins: 120000,
     priceUsd: 49.99,
-    label: '750,000',
+    label: '1,070,000',
     popular: false,
   },
   {
     id: '7',
     sku: 'coins_2000000',
-    coins: 2000000,
-    bonusCoins: 250000,
+    coins: 2200000,
+    bonusCoins: 350000,
     priceUsd: 99.99,
-    label: '2,000,000',
+    label: '2,550,000',
     popular: false,
   },
 ] as const;
 
-/** Host diamond share of gift coins (rest is platform margin before cashout rate). */
-export const GIFT_DIAMOND_RATIO = 0.5;
+/**
+ * Coin → diamond mint on gifts (before platform/agency/host split).
+ * Slightly under 50% so platform stays profitable after Play fees + cashout.
+ */
+export const GIFT_DIAMOND_RATIO = 0.45;
 /** Lucky gifts pay less diamonds — rebate already returns coins to sender. */
-export const LUCKY_GIFT_DIAMOND_RATIO = 0.25;
+export const LUCKY_GIFT_DIAMOND_RATIO = 0.2;
 /**
  * Hard ceiling on lucky gift RNG multipliers (platform safety).
  * Soft returns (mul &lt; 1) are allowed for frequent «مردود» feel while EV stays &lt; 1.

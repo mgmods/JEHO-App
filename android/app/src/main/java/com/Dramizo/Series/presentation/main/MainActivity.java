@@ -61,7 +61,16 @@ public class MainActivity extends ThemedActivity {
     @Nullable private com.Dramizo.Series.util.PlayInAppUpdateHelper playInAppUpdateHelper;
 
     private final ActivityResultLauncher<String> notifPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> syncFcmToken());
+            registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+                syncFcmToken();
+                if (granted) {
+                    com.Dramizo.Series.util.LocalEngagementScheduler.rescheduleNow(this);
+                } else {
+                    Toast.makeText(this,
+                            "فعّل الإشعارات من الإعدادات لاستلام تنبيهات المهام والرومات",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -241,7 +250,15 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void requestNotificationsPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
+        com.Dramizo.Series.util.LocalEngagementScheduler.ensureScheduled(this);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            if (!androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+                Toast.makeText(this,
+                        "فعّل الإشعارات من الإعدادات لاستلام تنبيهات المهام والرومات",
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 == PackageManager.PERMISSION_GRANTED) return;
         notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);

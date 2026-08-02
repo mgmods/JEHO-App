@@ -9,10 +9,16 @@ import {
   TransactionType,
   CurrencyType,
 } from '../../database/entities/wallet-transaction.entity';
-import { IsInt, Min, Max } from 'class-validator';
+import { IsInt, Min, Max, IsOptional, IsIn } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { vipMedalUrl } from '../../common/vip-assets';
+import {
+  VIP_ALLOWED_DAYS,
+  VIP_DURATION_PACKS,
+  vipPackForDays,
+  vipPriceForDays,
+} from '../../common/promo-catalog';
 
 export class PurchaseVipDto {
   @ApiProperty({ minimum: 1, maximum: 100 })
@@ -20,6 +26,13 @@ export class PurchaseVipDto {
   @Min(1)
   @Max(100)
   level: number;
+
+  /** Rental days — VIP is never permanent. Allowed: 7 / 30 / 40. */
+  @ApiProperty({ required: false, enum: [7, 30, 40], default: 30 })
+  @IsOptional()
+  @IsInt()
+  @IsIn([7, 30, 40])
+  durationDays?: number;
 }
 
 @Injectable()
@@ -47,9 +60,21 @@ export class VipService {
   ) {}
 
   listPlans() {
-    return this.ensurePlans().then(() =>
-      this.plansRepo.find({ where: { isActive: true }, order: { level: 'ASC' } }),
-    );
+    return this.ensurePlans().then(async () => {
+      const plans = await this.plansRepo.find({
+        where: { isActive: true },
+        order: { level: 'ASC' },
+      });
+      return plans.map((p) => ({
+        ...p,
+        durationPacks: VIP_DURATION_PACKS.map((pack) => ({
+          ...pack,
+          coinPrice: vipPriceForDays(p.coinPriceMonthly, pack.days),
+        })),
+        // Default display = monthly (never permanent).
+        durationDays: 30,
+      }));
+    });
   }
 
   /** Ensure VIP1–100 plans exist and stay in sync. Medals are Mikoo VIP1–7 art. */
@@ -113,21 +138,27 @@ export class VipService {
     const plan = await this.plansRepo.findOne({ where: { level: dto.level, isActive: true } });
     if (!plan) throw new NotFoundException('VIP plan not found');
 
+    const durationDays = VIP_ALLOWED_DAYS.includes(Number(dto.durationDays) as 7 | 30 | 40)
+      ? Number(dto.durationDays)
+      : 30;
+    const pack = vipPackForDays(durationDays);
+    const price = vipPriceForDays(plan.coinPriceMonthly, durationDays);
+
     const result = await this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet || Number(wallet.coins) < plan.coinPriceMonthly) {
+      if (!wallet || Number(wallet.coins) < price) {
         throw new BadRequestException('Insufficient coins');
       }
-      wallet.coins = Number(wallet.coins) - plan.coinPriceMonthly;
+      wallet.coins = Number(wallet.coins) - price;
       await manager.save(wallet);
 
       await manager.update(UserVip, { userId, isActive: true }, { isActive: false });
 
       const startsAt = new Date();
-      const expiresAt = new Date(startsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const expiresAt = new Date(startsAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
       const userVip = await manager.save(
         manager.create(UserVip, {
           userId,
@@ -144,22 +175,33 @@ export class VipService {
           userId,
           type: TransactionType.ADMIN_ADJUST,
           currency: CurrencyType.COINS,
-          amount: -plan.coinPriceMonthly,
+          amount: -price,
           balanceAfter: Number(wallet.coins),
           referenceType: 'vip_purchase',
           referenceId: userVip.id,
-          description: `Purchased VIP${plan.level}`,
+          description: `Purchased VIP${plan.level} (${pack.labelEn} · ${durationDays}d)`,
         }),
       );
 
-      return { userVip, plan, balance: Number(wallet.coins) };
+      return {
+        userVip,
+        plan,
+        balance: Number(wallet.coins),
+        durationDays,
+        pack,
+        coinPrice: price,
+      };
     });
 
-    // After VIP is active: grant + equip matching aristocracy cosmetics.
+    // Cosmetics expire with VIP — never permanent.
     let cosmetics: unknown = null;
     if (this.cosmetics) {
       try {
-        cosmetics = await this.cosmetics.grantVipAristocracyBundle(userId, plan.level);
+        cosmetics = await this.cosmetics.grantVipAristocracyBundle(
+          userId,
+          plan.level,
+          durationDays,
+        );
       } catch {
         cosmetics = { error: 'cosmetics_grant_failed' };
       }

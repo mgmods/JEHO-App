@@ -75,3 +75,5 @@ logs/
 screen_*.png
 scripts/_mikoo_catalogs/
 scripts/__pycache__/
+# Local SSH deploy password — never commit
+scripts/deploy.local.env

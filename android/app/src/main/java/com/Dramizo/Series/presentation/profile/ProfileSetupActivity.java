@@ -66,6 +66,8 @@ public class ProfileSetupActivity extends ThemedActivity {
 
         binding.spinnerGender.setAdapter(new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_dropdown_item, GENDER_LABELS));
+        binding.spinnerCountry.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_spinner_dropdown_item, CountryCatalog.spinnerLabels()));
         setDetectedCountry(null);
         // Default birthday: 2000-01-01 (same picker UX as edit profile).
         binding.etBirthday.setText("2000-01-01");
@@ -73,6 +75,9 @@ public class ProfileSetupActivity extends ThemedActivity {
 
         binding.btnPickAvatar.setOnClickListener(v -> pickAvatar.launch("image/*"));
         binding.btnContinue.setOnClickListener(v -> saveProfile());
+        if (binding.tvCountryHint != null) {
+            binding.tvCountryHint.setText(R.string.month_change_country_limit);
+        }
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 Toast.makeText(ProfileSetupActivity.this,
@@ -127,10 +132,10 @@ public class ProfileSetupActivity extends ThemedActivity {
 
     public static boolean isProfileComplete(AuthDtos.UserDto user) {
         if (user == null || user.isGuest) return true;
-        return nonEmpty(user.avatarUrl)
-                && nonEmpty(user.bio)
-                && nonEmpty(user.birthday)
-                && nonEmpty(user.country)
+        // Returning users with a photo already onboarded — do not force setup after re-login.
+        if (nonEmpty(user.avatarUrl)) return true;
+        // Brand-new accounts without photo still need gender + country once.
+        return nonEmpty(user.country)
                 && nonEmpty(user.gender)
                 && !"unspecified".equalsIgnoreCase(user.gender);
     }
@@ -200,7 +205,16 @@ public class ProfileSetupActivity extends ThemedActivity {
         CountryCatalog.Entry entry = CountryCatalog.resolve(code);
         if (entry == null) entry = CountryCatalog.resolve("OTHER");
         countryCode = entry != null ? entry.code : "OTHER";
-        binding.tvCountry.setText(entry != null ? entry.label() : "🌍 أخرى");
+        if (binding.spinnerCountry != null) {
+            binding.spinnerCountry.setSelection(CountryCatalog.spinnerIndexFor(countryCode));
+        }
+    }
+
+    private String selectedCountryCode() {
+        if (binding.spinnerCountry == null) return countryCode;
+        int idx = binding.spinnerCountry.getSelectedItemPosition();
+        String code = CountryCatalog.codeAtSpinnerIndex(idx);
+        return nonEmpty(code) ? code : (countryCode != null ? countryCode : "OTHER");
     }
 
     private void saveProfile() {
@@ -245,7 +259,7 @@ public class ProfileSetupActivity extends ThemedActivity {
         request.bio = bio;
         request.gender = GENDER_VALUES[genderIndex];
         request.birthday = birthday;
-        request.country = countryCode;
+        request.country = selectedCountryCode();
 
         saving = true;
         binding.btnContinue.setEnabled(false);

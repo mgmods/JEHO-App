@@ -5,5 +5,5 @@ import com.Dramizo.Series.domain.model.Result;
 
 public interface VipRepository {
     Result<MiscDtos.VipPlanList> getPlans();
-    Result<Object> purchase(int level);
+    Result<Object> purchase(int level, int durationDays);
 }

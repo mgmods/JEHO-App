@@ -103,8 +103,11 @@ public final class HostSignalView extends FrameLayout {
             return Math.max(1, value.getByteCount() / 1024);
         }
     };
-    /** Warm SVGA decode so seat/header frames appear without waiting on network parse. */
-    private static final LruCache<String, SVGAVideoEntity> SVGA_CACHE = new LruCache<>(8);
+    /** Soft cap — mall grid must not keep dozens of decoded SVGA in RAM. */
+    private static final LruCache<String, SVGAVideoEntity> SVGA_CACHE = new LruCache<>(6);
+    /** Prevent parallel SVGA downloads from OOMing the mall. */
+    private static final java.util.concurrent.Semaphore SVGA_DOWNLOADS =
+            new java.util.concurrent.Semaphore(2);
 
     private final FrameLayout stage;
     private final View halo;
@@ -118,8 +121,11 @@ public final class HostSignalView extends FrameLayout {
     private int boundLevel = 1;
     @Nullable private Map<String, ?> boundMetadata;
     @Nullable private String boundFrameUrl;
+    /** Mall grid: never decode SVGA — static PNG only (avoids OOM). */
+    private boolean staticPreviewOnly;
     private float artworkAspect = 1f;
     private boolean svgaActive;
+    @Nullable private Runnable onFrameReadyListener;
 
     public HostSignalView(Context context) {
         this(context, null);
@@ -191,7 +197,8 @@ public final class HostSignalView extends FrameLayout {
     }
 
     /**
-     * Warm Glide / SVGA caches so seat & header frames bind without a cold decode delay.
+     * Warm Glide caches only. Never decode SVGA here — parallel SVGA downloads
+     * OOMed the process when opening the mall / profile.
      */
     public static void prefetchWear(@Nullable Context context, @Nullable String wearUrl) {
         if (context == null || wearUrl == null || wearUrl.isEmpty()) return;
@@ -199,33 +206,63 @@ public final class HostSignalView extends FrameLayout {
         if (abs == null || abs.isEmpty()) return;
         try {
             if (CosmeticMedia.kind(wearUrl) == CosmeticMedia.Kind.SVGA) {
-                if (SVGA_CACHE.get(abs) != null) return;
-                SVGAParser parser = new SVGAParser(context.getApplicationContext());
-                parser.decodeFromURL(new URL(abs), new SVGAParser.ParseCompletion() {
-                    @Override
-                    public void onComplete(@androidx.annotation.NonNull SVGAVideoEntity videoItem) {
-                        try {
-                            SVGA_CACHE.put(abs, videoItem);
-                        } catch (Exception ignored) {
-                        }
-                    }
-
-                    @Override
-                    public void onError() {
-                    }
-                }, null);
-            } else {
-                Glide.with(context.getApplicationContext())
-                        .load(abs)
-                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                        .preload(256, 256);
+                // Prefetch PNG sibling only — skip SVGA download entirely.
+                String png = abs.replaceAll("(?i)\\.svga(\\?.*)?$", ".png$1");
+                if (!png.equals(abs)) {
+                    Glide.with(context.getApplicationContext())
+                            .load(png)
+                            .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                            .preload(256, 256);
+                }
+                return;
             }
+            Glide.with(context.getApplicationContext())
+                    .load(abs)
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .preload(256, 256);
         } catch (Exception ignored) {
         }
     }
 
     public boolean bind(@Nullable String hostBadgeUrl, @Nullable String avatarUrl, int fallbackLevel) {
         return bind(hostBadgeUrl, avatarUrl, null, fallbackLevel);
+    }
+
+    /**
+     * Mall grid preview: avatar + static PNG frame only (no SVGA/GIF decode flood).
+     * Prevents OutOfMemoryError when many cells bind at once.
+     */
+    public boolean bindStaticPreview(@Nullable String hostBadgeUrl, @Nullable String avatarUrl,
+                                     @Nullable Map<String, ?> metadata, int fallbackLevel) {
+        staticPreviewOnly = true;
+        try {
+            String still = stillPreviewUrl(hostBadgeUrl);
+            return bind(still, avatarUrl, metadata, fallbackLevel);
+        } finally {
+            staticPreviewOnly = false;
+        }
+    }
+
+    @Nullable
+    private static String stillPreviewUrl(@Nullable String url) {
+        if (url == null || url.isEmpty()) return url;
+        String lower = url.toLowerCase(java.util.Locale.US);
+        if (lower.contains(".svga")) {
+            return url.replaceAll("(?i)\\.svga", ".png");
+        }
+        return url;
+    }
+
+    /** Fired once when frame artwork is actually painted (avoids half-frame flash). */
+    public void setOnFrameReadyListener(@Nullable Runnable listener) {
+        onFrameReadyListener = listener;
+    }
+
+    private void notifyFrameReady() {
+        Runnable r = onFrameReadyListener;
+        if (r == null) return;
+        onFrameReadyListener = null;
+        post(r);
     }
 
     public boolean bind(@Nullable String hostBadgeUrl, @Nullable String avatarUrl,
@@ -249,11 +286,14 @@ public final class HostSignalView extends FrameLayout {
             if (avatarUrl == null || avatarUrl.isEmpty()) {
                 avatar.setImageResource(ImagePlaceholder.avatar());
             } else {
+                int avatarPx = Math.max(dp(64), Math.min(
+                        avatar.getWidth() > 0 ? avatar.getWidth() : dp(96),
+                        512));
                 Glide.with(avatar)
                         .load(AssetCatalog.absoluteUrl(avatarUrl))
-                        .override(dp(72), dp(72))
+                        .thumbnail(0.2f)
+                        .override(avatarPx, avatarPx)
                         .centerCrop()
-                        .dontAnimate()
                         .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
                         .placeholder(ImagePlaceholder.avatar())
                         .error(ImagePlaceholder.avatar())
@@ -261,6 +301,7 @@ public final class HostSignalView extends FrameLayout {
             }
             if (!svgaActive) startMotion();
             else resumeMotion();
+            notifyFrameReady();
             return true;
         }
         final int boundLevel = level;
@@ -274,14 +315,18 @@ public final class HostSignalView extends FrameLayout {
         setVisibility(VISIBLE);
         configureAccent(level);
         // Avatar + frame start in the same bind (Mikoo ModelMicView) — no post delay on frame.
+        // Avatar size = view size (Mikoo HeadImageView override(thumbSize)), not fixed 72dp.
+        int avatarPx = Math.max(dp(64), Math.min(
+                avatar.getWidth() > 0 ? avatar.getWidth() : dp(96),
+                512));
         if (avatarUrl == null || avatarUrl.isEmpty()) {
             avatar.setImageResource(ImagePlaceholder.avatar());
         } else {
             Glide.with(avatar)
                     .load(AssetCatalog.absoluteUrl(avatarUrl))
-                    .override(dp(72), dp(72))
+                    .thumbnail(0.2f)
+                    .override(avatarPx, avatarPx)
                     .centerCrop()
-                    .dontAnimate()
                     .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
                     .placeholder(ImagePlaceholder.avatar())
                     .error(ImagePlaceholder.avatar())
@@ -291,6 +336,16 @@ public final class HostSignalView extends FrameLayout {
         if (!sameFrameUrl(previousFrameUrl, hostBadgeUrl)) {
             // Only clear SVGA when URL actually changes.
             clearSvgaFrame();
+            // Drop wing halves immediately — mall VIP must never flash clipped half-frames.
+            wingLeft.setImageDrawable(null);
+            wingRight.setImageDrawable(null);
+            wingLeft.setVisibility(GONE);
+            wingRight.setVisibility(GONE);
+            shine.setVisibility(GONE);
+            halo.setVisibility(GONE);
+            if (!shouldUseHostWingMotion()) {
+                frame.setImageDrawable(null);
+            }
         }
         int sizeHint = getWidth() > 0 && getHeight() > 0
                 ? Math.min(getWidth(), getHeight())
@@ -318,6 +373,7 @@ public final class HostSignalView extends FrameLayout {
 
     public void clearSignal() {
         generation++;
+        onFrameReadyListener = null;
         stopMotion();
         clearSvgaFrame();
         View video = stage.findViewWithTag("host_video_frame");
@@ -421,11 +477,14 @@ public final class HostSignalView extends FrameLayout {
         setCentered(stage, stageWidth, stageHeight, 0, 0);
 
         int levelIndex = Math.max(0, Math.min(AVATAR_OPENINGS.length - 1, boundLevel - 1));
-        // Mikoo SVGA frames own their opening; use a centered face hole.
+        // Host-signal agency frames keep authored CSS openings.
+        // Mikoo mall / VIP headwear: face must stay fully inside the frame hole
+        // (ornate SVGA/PNG art has a smaller opening than Me-page 77.8%).
         float[] opening;
-        if (svgaActive || (boundFrameUrl != null
-                && boundFrameUrl.toLowerCase(java.util.Locale.US).contains(".svga"))) {
-            opening = new float[]{.22f, .22f, .56f};
+        if (!shouldUseHostWingMotion()) {
+            float face = mikooMallFaceFraction();
+            float inset = (1f - face) / 2f;
+            opening = new float[]{inset, inset, face};
         } else {
             opening = AVATAR_OPENINGS[levelIndex];
         }
@@ -433,11 +492,13 @@ public final class HostSignalView extends FrameLayout {
         float left = opening[0];
         float top = opening[1];
         float sizeFrac = opening[2];
-        // CSS openings already size the face; only allow tiny authored tweaks.
-        float metaScale = metadataFloat(boundMetadata, "avatarScale", .72f);
         float scaleFactor = 1f;
-        if (metaScale > 0f && Math.abs(metaScale - .72f) > .02f && Math.abs(metaScale - .70f) > .02f) {
-            scaleFactor = clamp(metaScale / .72f, .97f, 1.05f);
+        // Only host-signal CSS openings accept authored avatarScale tweaks.
+        if (shouldUseHostWingMotion()) {
+            float metaScale = metadataFloat(boundMetadata, "avatarScale", .72f);
+            if (metaScale > 0f && Math.abs(metaScale - .72f) > .02f && Math.abs(metaScale - .70f) > .02f) {
+                scaleFactor = clamp(metaScale / .72f, .97f, 1.05f);
+            }
         }
         int avatarSize = Math.max(dp(14), Math.round(stageWidth * sizeFrac * scaleFactor));
         // Keep the circle square against the frame width basis (same as CSS width %).
@@ -499,6 +560,46 @@ public final class HostSignalView extends FrameLayout {
             halo.setVisibility(GONE);
         }
         if (CosmeticMedia.kind(remoteUrl) == CosmeticMedia.Kind.SVGA) {
+            if (staticPreviewOnly) {
+                clearSvgaFrame();
+                String png = remoteUrl.replaceAll("(?i)\\.svga(\\?.*)?$", ".png$1");
+                String absPng = AssetCatalog.absoluteUrl(png);
+                int size = Math.max(64, Math.min(target, 256));
+                Glide.with(this)
+                        .load(absPng)
+                        .override(size, size)
+                        .fitCenter()
+                        .dontAnimate()
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                        .listener(new RequestListener<Drawable>() {
+                            @Override
+                            public boolean onLoadFailed(@Nullable GlideException e, Object model,
+                                                        Target<Drawable> targetView,
+                                                        boolean isFirstResource) {
+                                // Mall: never swap Mikoo PNG for host-signal wing art.
+                                post(() -> {
+                                    if (token != generation) return;
+                                    frame.setImageDrawable(null);
+                                    frame.setVisibility(VISIBLE);
+                                    notifyFrameReady();
+                                });
+                                return true;
+                            }
+
+                            @Override
+                            public boolean onResourceReady(Drawable resource, Object model,
+                                                           Target<Drawable> targetView,
+                                                           DataSource dataSource,
+                                                           boolean isFirstResource) {
+                                if (token != generation) return true;
+                                applyFrameDrawable(resource);
+                                updateAspectFromDrawable(resource);
+                                return false;
+                            }
+                        })
+                        .into(frame);
+                return;
+            }
             // Skip re-decode when same SVGA already playing (Mikoo svgPreUrl).
             if (svgaActive && sameFrameUrl(boundFrameUrl, remoteUrl)) {
                 return;
@@ -506,6 +607,19 @@ public final class HostSignalView extends FrameLayout {
             clearSvgaFrame();
             bindSvgaFrame(AssetCatalog.absoluteUrl(remoteUrl), token, path, target);
             return;
+        }
+        if (staticPreviewOnly && (CosmeticMedia.kind(remoteUrl) == CosmeticMedia.Kind.GIF
+                || CosmeticMedia.kind(remoteUrl) == CosmeticMedia.Kind.VIDEO
+                || CosmeticMedia.isAnimatedWear(remoteUrl))) {
+            // Still prefer PNG sibling / local frame over heavy anim in mall.
+            clearSvgaFrame();
+            String png = remoteUrl.replaceAll("(?i)\\.(gif|webp|mp4|webm)(\\?.*)?$", ".png$1");
+            if (!png.equals(remoteUrl)) {
+                remoteUrl = png;
+            } else {
+                setLocalFrame(path, target, token);
+                return;
+            }
         }
         if (CosmeticMedia.kind(remoteUrl) == CosmeticMedia.Kind.VIDEO) {
             clearSvgaFrame();
@@ -586,8 +700,25 @@ public final class HostSignalView extends FrameLayout {
         }
         stopMotion();
         svgaActive = true;
-        frame.setImageDrawable(null);
-        frame.setVisibility(GONE);
+        // One frame only: hide wings/halo so PNG placeholder never stacks with SVGA.
+        wingLeft.setVisibility(GONE);
+        wingRight.setVisibility(GONE);
+        shine.setVisibility(GONE);
+        halo.setVisibility(GONE);
+        // Mikoo-fast: paint PNG sibling as placeholder, then replace (never stack) with SVGA.
+        String pngSibling = absUrl.replaceAll("(?i)\\.svga(\\?.*)?$", ".png$1");
+        if (!pngSibling.equals(absUrl)) {
+            Glide.with(this)
+                    .load(AssetCatalog.absoluteUrl(pngSibling))
+                    .fitCenter()
+                    .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                    .into(frame);
+            frame.setVisibility(VISIBLE);
+        } else if (frame.getDrawable() == null) {
+            setLocalFrame(fallbackPath, target, token);
+        } else {
+            frame.setVisibility(VISIBLE);
+        }
         View existing = stage.findViewWithTag("host_svga_frame");
         if (existing != null) stage.removeView(existing);
         try {
@@ -597,18 +728,30 @@ public final class HostSignalView extends FrameLayout {
             svga.setLoops(-1);
             svga.setScaleType(ImageView.ScaleType.FIT_CENTER);
             svga.setLayoutParams(frame.getLayoutParams());
-            stage.addView(svga, stage.indexOfChild(frame));
+            // Keep SVGA invisible until ready so PNG placeholder is the only visible frame.
+            svga.setAlpha(0f);
+            stage.addView(svga, stage.indexOfChild(frame) + 1);
             SVGAVideoEntity cached = SVGA_CACHE.get(absUrl);
             if (cached != null) {
                 svga.setVideoItem(cached);
+                svga.setAlpha(1f);
                 svga.startAnimation();
+                frame.setImageDrawable(null);
+                frame.setVisibility(GONE);
                 updateAspect(1, 1);
+                notifyFrameReady();
+                return;
+            }
+            if (!SVGA_DOWNLOADS.tryAcquire()) {
+                // Too many parallel SVGA downloads — keep PNG placeholder, skip decode.
+                notifyFrameReady();
                 return;
             }
             SVGAParser parser = new SVGAParser(getContext());
             parser.decodeFromURL(new URL(absUrl), new SVGAParser.ParseCompletion() {
                 @Override
                 public void onComplete(@androidx.annotation.NonNull SVGAVideoEntity videoItem) {
+                    SVGA_DOWNLOADS.release();
                     try {
                         SVGA_CACHE.put(absUrl, videoItem);
                     } catch (Exception ignored) {
@@ -616,13 +759,18 @@ public final class HostSignalView extends FrameLayout {
                     post(() -> {
                         if (token != generation) return;
                         svga.setVideoItem(videoItem);
+                        svga.setAlpha(1f);
                         svga.startAnimation();
+                        frame.setImageDrawable(null);
+                        frame.setVisibility(GONE);
                         updateAspect(1, 1);
+                        notifyFrameReady();
                     });
                 }
 
                 @Override
                 public void onError() {
+                    SVGA_DOWNLOADS.release();
                     post(() -> {
                         if (token != generation) return;
                         clearSvgaFrame();
@@ -709,13 +857,26 @@ public final class HostSignalView extends FrameLayout {
         if (bitmap != null) {
             Glide.with(getContext().getApplicationContext()).clear(frame);
             frame.setImageBitmap(bitmap);
-            wingLeft.setImageBitmap(bitmap);
-            wingRight.setImageBitmap(bitmap);
-            wingLeft.setVisibility(VISIBLE);
-            wingRight.setVisibility(VISIBLE);
-            shine.setVisibility(VISIBLE);
-            halo.setVisibility(VISIBLE);
+            frame.setVisibility(VISIBLE);
+            // Local host-signal assets only — wing halves are for CSS host frames.
+            if (shouldUseHostWingMotion()) {
+                wingLeft.setImageBitmap(bitmap);
+                wingRight.setImageBitmap(bitmap);
+                wingLeft.setVisibility(VISIBLE);
+                wingRight.setVisibility(VISIBLE);
+                shine.setVisibility(VISIBLE);
+                halo.setVisibility(VISIBLE);
+            } else {
+                wingLeft.setImageDrawable(null);
+                wingRight.setImageDrawable(null);
+                wingLeft.setVisibility(GONE);
+                wingRight.setVisibility(GONE);
+                shine.setVisibility(GONE);
+                halo.setVisibility(GONE);
+            }
             updateAspect(bitmap.getWidth(), bitmap.getHeight());
+            if (!svgaActive) startMotion();
+            notifyFrameReady();
         } else {
             frame.setImageDrawable(null);
             wingLeft.setImageDrawable(null);
@@ -725,7 +886,11 @@ public final class HostSignalView extends FrameLayout {
 
     private void applyFrameDrawable(@Nullable Drawable resource) {
         frame.setImageDrawable(resource);
-        if (resource != null) {
+        if (resource == null) return;
+        frame.setVisibility(VISIBLE);
+        // Mall / VIP: one full frame only. Wing clips look like "half a frame"
+        // stacked under the real artwork on profile during load.
+        if (shouldUseHostWingMotion()) {
             wingLeft.setImageDrawable(resource.getConstantState() != null
                     ? resource.getConstantState().newDrawable().mutate()
                     : resource);
@@ -736,7 +901,16 @@ public final class HostSignalView extends FrameLayout {
             wingRight.setVisibility(VISIBLE);
             shine.setVisibility(VISIBLE);
             halo.setVisibility(VISIBLE);
+        } else {
+            wingLeft.setImageDrawable(null);
+            wingRight.setImageDrawable(null);
+            wingLeft.setVisibility(GONE);
+            wingRight.setVisibility(GONE);
+            shine.setVisibility(GONE);
+            halo.setVisibility(GONE);
         }
+        if (!svgaActive) startMotion();
+        notifyFrameReady();
     }
 
     private void updateAspectFromDrawable(@Nullable Drawable drawable) {
@@ -813,12 +987,13 @@ public final class HostSignalView extends FrameLayout {
         stage.setScaleX(1f);
         stage.setScaleY(1f);
 
-        // Static mall PNG / unknown wears: no procedural motion.
+        // Static mall PNG / Mikoo headwear: soft pulse so every cell feels alive
+        // (SVGA is disabled in mall to avoid OOM — pulse replaces it).
         if (!shouldUseHostWingMotion()) {
-            wingLeft.setVisibility(GONE);
-            wingRight.setVisibility(GONE);
-            shine.setVisibility(GONE);
-            halo.setVisibility(GONE);
+            long phase = Math.floorMod(
+                    (boundFrameUrl != null ? boundFrameUrl.hashCode() : boundLevel) * 97L, 900L);
+            motion = motionPulse(phase);
+            motion.start();
             return;
         }
 
@@ -826,6 +1001,24 @@ public final class HostSignalView extends FrameLayout {
                 (boundFrameUrl != null ? boundFrameUrl.hashCode() : boundLevel) * 131L, 720L);
         motion = motionWingFlap(phase);
         motion.start();
+    }
+
+    /**
+     * Face diameter as fraction of frame for Mikoo mall / VIP PNG-SVGA wears.
+     * Keeps the profile photo fully inside the decorative opening.
+     */
+    private float mikooMallFaceFraction() {
+        float fromMeta = metadataFloat(boundMetadata, "avatarScale", 0f);
+        if (fromMeta > 0.35f && fromMeta < 0.92f) {
+            // Treat authored avatarScale as face÷frame (same units as HostSignal opening width).
+            return clamp(fromMeta, 0.48f, 0.78f);
+        }
+        float faceRatio = metadataFloat(boundMetadata, "faceRatio", 0f);
+        if (faceRatio > 0.35f && faceRatio < 0.92f) {
+            return clamp(faceRatio, 0.48f, 0.78f);
+        }
+        // Ornate Mikoo headwear holes are smaller than Me-page 77.8% VIP medals.
+        return 0.62f;
     }
 
     /** True only for Host-signals CSS frames (wing artwork), not Mikoo mall PNGs. */
@@ -881,17 +1074,18 @@ public final class HostSignalView extends FrameLayout {
         return set;
     }
 
-    /** Soft heartbeat scale — common on Mikoo VIP medals. */
+    /** Soft heartbeat scale — common on Mikoo VIP / mall headwear. */
     private AnimatorSet motionPulse(long phase) {
         hideWingsKeepFrame();
         shine.setVisibility(GONE);
         halo.setVisibility(VISIBLE);
-        long ms = 1800L;
-        ObjectAnimator sx = looping(stage, View.SCALE_X, ms, 1f, 1.06f, 1f);
-        ObjectAnimator sy = looping(stage, View.SCALE_Y, ms, 1f, 1.06f, 1f);
-        ObjectAnimator hx = looping(halo, View.SCALE_X, ms, .92f, 1.12f, .92f);
-        ObjectAnimator hy = looping(halo, View.SCALE_Y, ms, .92f, 1.12f, .92f);
-        ObjectAnimator ha = looping(halo, View.ALPHA, ms, .35f, .95f, .35f);
+        // Keep pulse subtle in mall grid cells so the face stays readable.
+        long ms = 2000L;
+        ObjectAnimator sx = looping(stage, View.SCALE_X, ms, 1f, 1.035f, 1f);
+        ObjectAnimator sy = looping(stage, View.SCALE_Y, ms, 1f, 1.035f, 1f);
+        ObjectAnimator hx = looping(halo, View.SCALE_X, ms, .94f, 1.08f, .94f);
+        ObjectAnimator hy = looping(halo, View.SCALE_Y, ms, .94f, 1.08f, .94f);
+        ObjectAnimator ha = looping(halo, View.ALPHA, ms, .30f, .85f, .30f);
         AnimatorSet set = new AnimatorSet();
         set.playTogether(sx, sy, hx, hy, ha);
         set.setInterpolator(new AccelerateDecelerateInterpolator());

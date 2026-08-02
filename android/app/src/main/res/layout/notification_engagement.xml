@@ -3,7 +3,6 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_notif_room_card"
     android:gravity="center_vertical"
     android:layoutDirection="ltr"
     android:orientation="horizontal"
@@ -42,7 +41,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#FFFFFFFF"
+            android:textColor="#000000"
             android:textDirection="locale"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -53,7 +52,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="2"
-            android:textColor="#B3FFFFFF"
+            android:textColor="#B3000000"
             android:textDirection="locale"
             android:textSize="12sp" />
     </LinearLayout>

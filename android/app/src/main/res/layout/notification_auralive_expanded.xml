@@ -58,7 +58,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="start"
         android:layout_marginTop="8dp"
-        android:textColor="@color/notification_action"
+        android:textColor="@color/white"
         android:textSize="12sp"
         android:textStyle="bold" />
 </LinearLayout>

@@ -174,6 +174,17 @@ export class BaishunWsHandler {
 
     authReady = (async () => {
       const connected = await ensurePlayer();
+      // Fishing uses numeric msgId protocol only — slot-style Connect/SelfInfo
+      // envelopes confuse its package router and can stall enter/splash.
+      if (gameSlug === 'fishing') {
+        if (connected) {
+          const bal = await this.sessions.refreshBalance(connected);
+          this.logger.log(
+            `baishun connect ${gameSlug} user=${connected.userId} bal=${bal} (fishing silent auth)`,
+          );
+        }
+        return;
+      }
       this.replyJson(ws, 'Connect', {
         Code: connected ? 0 : 1,
         Data: { ok: !!connected, game: gameSlug },
@@ -1403,57 +1414,72 @@ export class BaishunWsHandler {
 
     if (code === 1002) {
       if (!player) {
-        // Last-chance auth from query so splash can leave.
-        const uid = Number(query.user_id ?? query.userId ?? 0);
-        const auth = String(query.code ?? query.token ?? '');
-        if (uid || auth) {
-          player = await this.sessions.resolvePlayer(gameSlug, uid, auth);
+        // Auth by session ticket only — ignore mismatched user_id from client.
+        const auth = String(
+          data.code ?? data.token ?? query.code ?? query.token ?? '',
+        );
+        if (auth) {
+          player = await this.sessions.resolvePlayer(gameSlug, 0, auth);
           setPlayer(player);
         }
       }
       if (!player) {
-        this.replyFish(ws, 1002, { fishs: [] }, 5);
+        this.replyFish(ws, 1002, { fishs: [], players: [], paoBei: CHIP_LIST }, 5);
         return;
       }
       const bal = await this.sessions.refreshBalance(player);
       const uid = player.publicId || player.userId;
+      // ft 1..7 maps to Fish_1..Fish_7 pools; line is swim path id.
       const makeFish = (id: number, i: number) => ({
         id,
-        ft: 1 + (i % 8),
+        ft: 1 + (i % 7),
         line: 1 + (i % 12),
         buffer: 0,
         ageTime: 0,
         delayed: 0,
       });
-      const fishs = Array.from({ length: 8 }, (_, i) => makeFish(1000 + i, i));
+      const fishs = Array.from({ length: 10 }, (_, i) => makeFish(1000 + i, i));
       const self = {
         pos: 0,
         userId: uid,
         user_id: uid,
+        userID: uid,
         open_id: uid,
+        openId: uid,
         coin: bal,
+        newCoin: bal,
+        balance: bal,
         nickname: player.displayName || 'Player',
         nickName: player.displayName || 'Player',
+        name: player.displayName || 'Player',
         avatar: player.avatarUrl || '',
+        headImg: player.avatarUrl || '',
         angle: 90,
         weapon: 1,
         level: 1,
         betIndex: 0,
         fireCount: 0,
         exp: 0,
-        maxExp: 0,
+        maxExp: 100,
+        balanceList: [{ coin: bal, type: 0 }],
       };
       this.replyFish(ws, 1002, {
         user_id: uid,
+        userId: uid,
         players: [self],
-        paoBei: CHIP_LIST,
-        allProp: {},
-        itemsCfg: {},
+        paoBei: CHIP_LIST.slice(),
+        allProp: [],
+        itemsCfg: [],
         curBank: 0,
         piggyBank: 0,
         piggyBankStatus: 0,
-        fishType: [1, 2, 3, 4, 5, 6, 7, 8],
+        fishType: [1, 2, 3, 4, 5, 6, 7],
         coinType: 0,
+        showPiggyBank: false,
+        showRankList: true,
+        showShop: true,
+        showLevel: false,
+        nonRefund: false,
         fishs,
       });
       this.logger.log(`baishun connect ${gameSlug} user=${player.userId} bal=${bal} (fishing enter)`);
@@ -1465,9 +1491,9 @@ export class BaishunWsHandler {
         }
         const fid = 2000 + Math.floor(Math.random() * 9000);
         this.replyFish(ws, 1004, {
-          fishs: [makeFish(fid, fid % 8)],
+          fishs: [makeFish(fid, fid % 7)],
         });
-      }, 2800);
+      }, 2200);
       ws.once('close', () => clearInterval(spawnTimer));
       return;
     }

@@ -22,10 +22,15 @@ public final class BalanceRedirect {
         if (error == null || error.isEmpty()) return false;
         String e = error.toLowerCase(java.util.Locale.US);
         return e.contains("insufficient")
+                || e.contains("not enough")
+                || e.contains("needrecharge")
+                || e.contains("need_recharge")
+                || e.contains("balance")
+                || e.contains("coins")
                 || error.contains("رصيد")
                 || error.contains("عملات")
-                || e.contains("not enough")
-                || e.contains("balance");
+                || error.contains("غير كاف")
+                || error.contains("اشحن");
     }
 
     /** Toast + open packages sheet when possible; otherwise BagActivity. */
@@ -36,6 +41,15 @@ public final class BalanceRedirect {
                 : activity.getString(R.string.error_generic);
         Toast.makeText(activity, msg, Toast.LENGTH_LONG).show();
         if (!looksLikeInsufficient(error)) return;
+        openRecharge(activity);
+    }
+
+    /** Open recharge without requiring a matching error string. */
+    public static void handleForced(@Nullable Activity activity, @Nullable String message) {
+        if (activity == null || activity.isFinishing()) return;
+        if (message != null && !message.isEmpty()) {
+            Toast.makeText(activity, message, Toast.LENGTH_LONG).show();
+        }
         openRecharge(activity);
     }
 

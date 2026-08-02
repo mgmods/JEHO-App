@@ -502,7 +502,13 @@ public class VoiceRoomForegroundService extends Service {
         if (coverBitmap != null) {
             views.setImageViewBitmap(R.id.imgRoomCover, coverBitmap);
         } else {
-            views.setImageViewResource(R.id.imgRoomCover, R.mipmap.ic_launcher);
+            android.graphics.Bitmap logo =
+                    com.Dramizo.Series.util.AuraNotificationHelper.circularLauncherIcon(this);
+            if (logo != null) {
+                views.setImageViewBitmap(R.id.imgRoomCover, logo);
+            } else {
+                views.setImageViewResource(R.id.imgRoomCover, R.mipmap.ic_launcher);
+            }
         }
         views.setOnClickPendingIntent(R.id.btnNotifReturn, openIntent);
         views.setOnClickPendingIntent(R.id.btnNotifLeave, leaveIntent);

@@ -59,10 +59,13 @@ public class CosmeticsCategoryFragment extends Fragment {
         adapter = new CosmeticsAdapter(new CosmeticsAdapter.Listener() {
             @Override public void onPurchase(String cosmeticId) { vm.purchase(cosmeticId); }
             @Override public void onEquip(String cosmeticId) { vm.equip(cosmeticId); }
+            @Override public void onUnequip(String cosmeticId) { vm.unequip(cosmeticId); }
             @Override public boolean isOwned(String cosmeticId) { return vm.isOwned(cosmeticId); }
             @Override public boolean isEquipped(String cosmeticId) { return vm.isEquipped(cosmeticId); }
         });
         binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 2));
+        binding.recycler.setHasFixedSize(true);
+        binding.recycler.setItemViewCacheSize(6);
         binding.recycler.setAdapter(adapter);
 
         vm.getCatalogPage().observe(getViewLifecycleOwner(), page -> {

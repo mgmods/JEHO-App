@@ -133,11 +133,23 @@ public final class AuraNotificationHelper {
 
         int fallbackIcon = iconForType(type);
         int underlay = ContextCompat.getColor(context, R.color.notification_avatar_fill);
+        // Always circular — peer avatar when loaded, else circular brand/fallback.
         Bitmap contentBitmap = avatar != null
                 ? avatar
                 : bitmapFromDrawable(context, fallbackIcon, underlay);
+        if (contentBitmap == null && "chat".equalsIgnoreCase(type)) {
+            contentBitmap = circularLauncherIcon(context);
+        }
 
-        RemoteViews compact = new RemoteViews(context.getPackageName(), R.layout.notification_auralive_compact);
+        boolean isChat = "chat".equalsIgnoreCase(type);
+        int compactLayout = isChat
+                ? R.layout.notification_chat_compact
+                : R.layout.notification_auralive_compact;
+        int expandedLayout = isChat
+                ? R.layout.notification_chat_expanded
+                : R.layout.notification_auralive_expanded;
+
+        RemoteViews compact = new RemoteViews(context.getPackageName(), compactLayout);
         compact.setTextViewText(R.id.tvNotificationTitle, title);
         compact.setTextViewText(R.id.tvNotificationBody, body);
         if (contentBitmap != null) {
@@ -146,14 +158,26 @@ public final class AuraNotificationHelper {
             compact.setImageViewResource(R.id.imgNotificationContent, fallbackIcon);
         }
 
-        RemoteViews expanded = new RemoteViews(context.getPackageName(), R.layout.notification_auralive_expanded);
+        RemoteViews expanded = new RemoteViews(context.getPackageName(), expandedLayout);
         expanded.setTextViewText(R.id.tvNotificationTitle, title);
         expanded.setTextViewText(R.id.tvNotificationBody, body);
-        expanded.setTextViewText(R.id.tvNotificationAction, actionLabelForType(type));
         if (contentBitmap != null) {
             expanded.setImageViewBitmap(R.id.imgNotificationContent, contentBitmap);
         } else {
             expanded.setImageViewResource(R.id.imgNotificationContent, fallbackIcon);
+        }
+        if (isChat) {
+            expanded.setOnClickPendingIntent(R.id.btnNotifOpen, pi);
+            Intent dismiss = new Intent(context, NotificationDismissReceiver.class);
+            dismiss.putExtra(NotificationDismissReceiver.EXTRA_NOTIFICATION_ID, notificationId);
+            PendingIntent dismissPi = PendingIntent.getBroadcast(
+                    context,
+                    notificationId + 10_000,
+                    dismiss,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            expanded.setOnClickPendingIntent(R.id.btnNotifDismiss, dismissPi);
+        } else {
+            expanded.setTextViewText(R.id.tvNotificationAction, actionLabelForType(type));
         }
 
         // Custom RemoteViews only: one avatar inside the layout.
@@ -172,9 +196,10 @@ public final class AuraNotificationHelper {
                 .setContentIntent(pi)
                 .setCustomContentView(compact)
                 .setCustomBigContentView(expanded)
-                .setCustomHeadsUpContentView(compact);
+                .setCustomHeadsUpContentView(isChat ? expanded : compact);
 
         try {
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
             NotificationManagerCompat.from(context).notify(notificationId, builder.build());
         } catch (SecurityException ignored) {
             // POST_NOTIFICATIONS denied on Android 13+.
@@ -194,6 +219,13 @@ public final class AuraNotificationHelper {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    /** Circular app logo for RemoteViews (engagement / room fallback). */
+    @Nullable
+    public static Bitmap circularLauncherIcon(@NonNull Context context) {
+        int underlay = ContextCompat.getColor(context, R.color.notification_avatar_fill);
+        return bitmapFromDrawable(context, R.mipmap.ic_launcher, underlay);
     }
 
     @Nullable

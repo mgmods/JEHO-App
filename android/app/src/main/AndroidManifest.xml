@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" tools:ignore="ExactAlarm" />
     <uses-permission android:name="com.android.vending.BILLING" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -80,7 +82,8 @@
         <activity
             android:name=".presentation.voiceroom.VoiceRoomActivity"
             android:exported="false"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AuraLive.Fullscreen"
             android:windowSoftInputMode="adjustResize" />
@@ -180,6 +183,14 @@
             android:exported="false"
             android:foregroundServiceType="mediaPlayback|microphone"
             android:stopWithTask="false" />
+
+        <receiver
+            android:name=".util.EngagementAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".util.NotificationDismissReceiver"
+            android:exported="false" />
 
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"

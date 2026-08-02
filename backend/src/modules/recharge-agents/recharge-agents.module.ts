@@ -19,6 +19,7 @@ import { PaymentsModule } from '../payments/payments.module';
 import { RechargeAgentsController } from './recharge-agents.controller';
 import { RechargeAgentsService } from './recharge-agents.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     WalletModule,
     PaymentsModule,
     NotificationsModule,
+    PromotionsModule,
   ],
   controllers: [RechargeAgentsController],
   providers: [RechargeAgentsService],

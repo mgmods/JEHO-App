@@ -69,6 +69,12 @@ const routes = [
         meta: { titleKey: 'routes.offers' },
       },
       {
+        path: 'promos',
+        name: 'promos',
+        component: () => import('@/views/PromosView.vue'),
+        meta: { titleKey: 'routes.promos', title: 'العروض والترقيات' },
+      },
+      {
         path: 'wallet',
         name: 'wallet',
         component: () => import('@/views/WalletView.vue'),
@@ -93,6 +99,12 @@ const routes = [
         name: 'vip',
         component: () => import('@/views/VipView.vue'),
         meta: { titleKey: 'routes.vip' },
+      },
+      {
+        path: 'vanity-ids',
+        name: 'vanity-ids',
+        component: () => import('@/views/VanityIdsView.vue'),
+        meta: { titleKey: 'routes.vanityIds', title: 'الآي دي المميز' },
       },
       {
         path: 'cosmetics',

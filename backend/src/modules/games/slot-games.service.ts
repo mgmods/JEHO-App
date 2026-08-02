@@ -421,7 +421,7 @@ export class SlotGamesService {
 
       language,
 
-      gameMode: '2',
+      gameMode: game.id === 'fishing' ? '3' : '2',
 
       currencyIcon,
 

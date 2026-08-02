@@ -39,6 +39,18 @@ public final class GlobalCelebrationToast {
             @Nullable String badgeUrl,
             @Nullable String dedupeKey
     ) {
+        show(activity, title, body, avatarUrl, badgeUrl, dedupeKey, 28);
+    }
+
+    public static void show(
+            @Nullable Activity activity,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            int topMarginDp
+    ) {
         if (activity == null || activity.isFinishing()) return;
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
@@ -46,7 +58,8 @@ public final class GlobalCelebrationToast {
         }
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
-        MAIN.post(() -> showInternal(activity, title, body, avatarUrl, badgeUrl));
+        final int margin = Math.max(8, topMarginDp);
+        MAIN.post(() -> showInternal(activity, title, body, avatarUrl, badgeUrl, margin));
     }
 
     private static void showInternal(
@@ -54,7 +67,8 @@ public final class GlobalCelebrationToast {
             @Nullable String title,
             @Nullable String body,
             @Nullable String avatarUrl,
-            @Nullable String badgeUrl
+            @Nullable String badgeUrl,
+            int topMarginDp
     ) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         ViewGroup root = activity.findViewById(android.R.id.content);
@@ -119,7 +133,7 @@ public final class GlobalCelebrationToast {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.gravity = Gravity.TOP;
-        lp.topMargin = dp(activity, 28);
+        lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
         banner.setTranslationX(dp(activity, 80));

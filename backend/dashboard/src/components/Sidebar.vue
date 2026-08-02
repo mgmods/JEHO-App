@@ -63,6 +63,10 @@
         <i class="bi bi-box-seam"></i>
         <span>{{ t('nav.offers') }}</span>
       </RouterLink>
+      <RouterLink class="sidebar-link" :class="{ active: isActive('promos') }" :to="{ name: 'promos' }" @click="close">
+        <i class="bi bi-stars"></i>
+        <span>العروض والترقيات</span>
+      </RouterLink>
       <RouterLink class="sidebar-link" :class="{ active: isActive('wallet') }" :to="{ name: 'wallet' }" @click="close">
         <i class="bi bi-wallet2"></i>
         <span>{{ t('nav.wallet') }}</span>
@@ -83,6 +87,10 @@
       <RouterLink class="sidebar-link" :class="{ active: isActive('vip') }" :to="{ name: 'vip' }" @click="close">
         <i class="bi bi-diamond"></i>
         <span>{{ t('nav.vip') }}</span>
+      </RouterLink>
+      <RouterLink class="sidebar-link" :class="{ active: isActive('vanity-ids') }" :to="{ name: 'vanity-ids' }" @click="close">
+        <i class="bi bi-hash"></i>
+        <span>الآي دي المميز</span>
       </RouterLink>
 
       <div class="nav-section-label">{{ t('nav.engagement') }}</div>

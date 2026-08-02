@@ -38,6 +38,7 @@ import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Room, RoomStatus } from '../../database/entities/room.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { resolvePlayableGiftAnimation } from './gift-media.resolve';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import {
   GIFT_DIAMOND_RATIO,
@@ -577,11 +578,12 @@ export class GiftsService implements OnModuleInit {
 
   /**
    * House-positive lucky roll with frequent soft rebates (Mikoo-style feel).
-   * Approx EV ≈ 0.50–0.55 of stake — platform keeps the rest + diamond cut every send.
+   * Approx EV ≈ 0.52–0.55 of stake — platform keeps the rest + diamond cut every send.
+   * Soft returns are common so users rarely see an empty round (no harsh lose UX).
    * Tiers:
-   *  - 28% soft 0.30–0.80× (مردود جزئي — user rarely feels empty)
+   *  - 40% soft 0.30–0.80×
    *  - 10% medium 1.20–2.50×
-   *  - 2.5% big 3–max×
+   *  - 2.5% big 3–max× (hard-capped)
    */
   private rollLuckyPayout(
     totalCoins: number,
@@ -599,13 +601,13 @@ export class GiftsService implements OnModuleInit {
     );
     const roll = randomInt(0, 1_000_000) / 1_000_000;
     let luckyMultiplier: number | null = null;
-    if (roll < 0.28) {
+    if (roll < 0.4) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
       luckyMultiplier = Math.round((0.3 + frac * 0.5) * 100) / 100; // 0.30–0.80
-    } else if (roll < 0.38) {
+    } else if (roll < 0.5) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
       luckyMultiplier = Math.round((1.2 + frac * 1.3) * 100) / 100; // 1.20–2.50
-    } else if (roll < 0.405) {
+    } else if (roll < 0.525) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
       luckyMultiplier = Math.round((3 + frac * (maxMul - 3)) * 100) / 100;
     }
@@ -706,8 +708,8 @@ export class GiftsService implements OnModuleInit {
       );
 
       // Gift diamond split:
-      // - With active agency: platform / agency owner / recipient (defaults 25/20/55)
-      // - Without agency: platform / recipient (defaults 25/75)
+      // - With active agency: platform / agency owner / recipient (defaults 30/15/55)
+      // - Without agency: platform / recipient (defaults 30/70)
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       let platformCut = 0;
@@ -719,7 +721,7 @@ export class GiftsService implements OnModuleInit {
           status: AgencyMemberStatus.ACTIVE,
         },
       });
-      let platformPct = 25;
+      let platformPct = 30;
       const cutRow = await manager.findOne(AppSetting, {
         where: { key: 'agency_platform_cut_percent' },
       });
@@ -731,7 +733,7 @@ export class GiftsService implements OnModuleInit {
         const agency = await manager.findOne(Agency, { where: { id: membership.agencyId } });
         if (agency?.status === AgencyStatus.ACTIVE) {
           agencyId = agency.id;
-          const agencyPct = Math.min(50, Math.max(0, Number(agency.commissionPercent) || 20));
+          const agencyPct = Math.min(50, Math.max(0, Number(agency.commissionPercent) || 15));
           agentShare = Math.floor((diamondsAwarded * agencyPct) / 100);
           platformCut = Math.floor((diamondsAwarded * platformPct) / 100);
           const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
@@ -1014,7 +1016,12 @@ export class GiftsService implements OnModuleInit {
         giftType: gift.type,
         giftIconUrl: gift.iconUrl,
         iconUrl: gift.iconUrl,
-        animationUrl: gift.animationUrl,
+        animationUrl:
+          resolvePlayableGiftAnimation({
+            giftName: gift.name,
+            iconUrl: gift.iconUrl,
+            animationUrl: gift.animationUrl,
+          }) || gift.animationUrl,
         senderId,
         senderName: sender?.displayName || sender?.username || 'User',
         senderAvatarUrl: sender?.avatarUrl || null,
@@ -1480,7 +1487,12 @@ export class GiftsService implements OnModuleInit {
         giftType: gift.type,
         giftIconUrl: gift.iconUrl,
         iconUrl: gift.iconUrl,
-        animationUrl: gift.animationUrl,
+        animationUrl:
+          resolvePlayableGiftAnimation({
+            giftName: gift.name,
+            iconUrl: gift.iconUrl,
+            animationUrl: gift.animationUrl,
+          }) || gift.animationUrl,
         senderId,
         senderName: sender?.displayName || sender?.username || 'User',
         senderAvatarUrl: sender?.avatarUrl || null,
@@ -1576,15 +1588,15 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Notable: 500+ gift tier, ×5+, or won ≥ 500 — encourages others to play lucky.
-    const notable = won > 0 && (stake >= 500 || mul >= 5 || won >= 500);
+    // Broadcast wins that feel notable — 100+ stake with return, ×3+, or won ≥ 200.
+    const notable = won > 0 && (stake >= 100 || mul >= 3 || won >= 200);
     if (!notable || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
-    const title = soft ? 'مردود جزئي 💫' : 'حظ سعيد! 🎉';
+    const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
     const body = soft
-      ? `${name} حصل على مردود +${won}`
-      : `مبروك ${name} · محظوظ ×${Math.max(1, Math.round(mul))} · +${won}`;
+      ? `${name} ضرب حظه · مردود +${won}`
+      : `${name} ضرب حظه وربح ×${Math.max(1, Math.round(mul))} · +${won}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
       id: `lucky:${opts.senderId}:${Date.now()}`,

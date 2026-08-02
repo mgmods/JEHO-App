@@ -92,7 +92,7 @@ export class MikooEconomyNotifyService {
         balanceAfter: opts.balanceAfter,
       });
       // Global «مبروك» toast — encourages others (Mikoo-style, even outside rooms).
-      if (win >= 77) {
+      if (win >= 50) {
         this.realtime.emitToAll('celebration:toast', {
           kind: 'game_win',
           id: `game:${opts.userId}:${opts.gameId}:${Date.now()}`,
@@ -105,8 +105,8 @@ export class MikooEconomyNotifyService {
           gameCoverUrl,
           coinsWon: win,
           roomId,
-          title: 'مبروك! 🎊',
-          body: `مبروك ${displayName} حصل على ${win} · ${gameTitle}`,
+          title: 'مبروك!',
+          body: `${displayName} لعب ${gameTitle} وفاز بـ ${win}`,
           at: new Date().toISOString(),
         });
       }

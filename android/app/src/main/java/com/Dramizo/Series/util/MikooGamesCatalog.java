@@ -25,7 +25,7 @@ public final class MikooGamesCatalog {
         g.mode = "mikoo_slot";
         g.sortOrder = sortOrder;
         g.enabled = Boolean.TRUE;
-        g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html";
+        g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html?v=20260802g";
         g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260801a";
         return g;
     }

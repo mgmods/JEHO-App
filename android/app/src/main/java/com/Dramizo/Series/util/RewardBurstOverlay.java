@@ -170,88 +170,16 @@ public final class RewardBurstOverlay {
             long coinsWon,
             boolean softReturn
     ) {
-        Context host = resolveActivityContext(context);
-        if (host == null) return;
-
-        String gift = giftName != null && !giftName.isEmpty() ? giftName : "هدية الحظ";
-        int mul = Math.max(1, multiplier);
-        long spent = Math.max(0L, baseCoins);
-        long won = Math.max(0L, coinsWon);
-
-        Dialog dialog = new Dialog(host, android.R.style.Theme_Translucent_NoTitleBar);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        View root = LayoutInflater.from(host).inflate(R.layout.dialog_lucky_gift_win, null, false);
-        dialog.setContentView(root);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.55f);
-        }
-
-        TextView tvTitle = root.findViewById(R.id.tvLuckyTitle);
-        TextView tvBody = root.findViewById(R.id.tvLuckyBody);
-        TextView tvFormula = root.findViewById(R.id.tvLuckyFormula);
-        TextView btnOk = root.findViewById(R.id.btnLuckyOk);
-        View card = root.findViewById(R.id.luckyWinCard);
-
-        if (tvTitle != null) {
-            tvTitle.setText(softReturn ? "مردود جزئي" : "ربحت! 🎉");
-        }
-        if (tvBody != null) tvBody.setText(gift);
-        StringBuilder formula = new StringBuilder();
-        formula.append("دفعت ").append(spent).append(" عملة");
-        formula.append("\nرجعلك ").append(won).append(" عملة");
-        if (!softReturn && mul > 1) formula.append("\n×").append(mul).append(" مرات");
-        if (tvFormula != null) {
-            tvFormula.setText(formula.toString());
-            tvFormula.setTextColor(softReturn ? 0xFFD97706 : 0xFF0F766E);
-        }
-
-        animateLuckyCard(card);
-        wireLuckyDismiss(dialog, root, card, btnOk);
-        dialog.show();
+        // Disabled — room uses ComingMsgView-sized toast only.
     }
 
-    /** Lucky gift lose: دفعت X · لا مردود. */
+    /** Lucky gift lose: disabled (never show «ما جاك مردود»). */
     public static void showLuckyGiftLose(
             @NonNull Context context,
             @Nullable String giftName,
-            long spentCoins
+            long coinsSpent
     ) {
-        Context host = resolveActivityContext(context);
-        if (host == null) return;
-
-        String gift = giftName != null && !giftName.isEmpty() ? giftName : "هدية الحظ";
-        long spent = Math.max(0L, spentCoins);
-
-        Dialog dialog = new Dialog(host, android.R.style.Theme_Translucent_NoTitleBar);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        View root = LayoutInflater.from(host).inflate(R.layout.dialog_lucky_gift_win, null, false);
-        dialog.setContentView(root);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.55f);
-        }
-
-        TextView tvTitle = root.findViewById(R.id.tvLuckyTitle);
-        TextView tvBody = root.findViewById(R.id.tvLuckyBody);
-        TextView tvFormula = root.findViewById(R.id.tvLuckyFormula);
-        TextView btnOk = root.findViewById(R.id.btnLuckyOk);
-        View card = root.findViewById(R.id.luckyWinCard);
-
-        if (tvTitle != null) tvTitle.setText("ما جاك مردود");
-        if (tvBody != null) tvBody.setText(gift);
-        if (tvFormula != null) {
-            tvFormula.setText("دفعت " + spent + " عملة\nلا مردود هذه الجولة");
-            tvFormula.setTextColor(0xFFE53935);
-        }
-
-        animateLuckyCard(card);
-        wireLuckyDismiss(dialog, root, card, btnOk);
-        dialog.show();
+        // Disabled — empty rolls stay silent.
     }
 
     @Nullable

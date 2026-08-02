@@ -231,6 +231,7 @@ public class ProfileActivity extends ThemedActivity {
                     user.hostBadgeUrl,
                     user.hostBadgeMeta,
                     1);
+            com.Dramizo.Series.util.HostSignalView.prefetchWear(this, user.vipBadgeUrl);
             // Wear on avatar only — never chips under the name.
             if (binding.imgHostBadge != null) {
                 binding.imgHostBadge.setVisibility(View.GONE);
@@ -252,7 +253,10 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvLastSeen.setTextColor(getColor(R.color.text_secondary));
             }
             if (user.coverUrl != null && !user.coverUrl.isEmpty()) {
-                Glide.with(this).load(user.coverUrl).placeholder(ImagePlaceholder.cover()).into(binding.imgCover);
+                Glide.with(this)
+                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(user.coverUrl))
+                        .placeholder(ImagePlaceholder.cover())
+                        .into(binding.imgCover);
             } else {
                 binding.imgCover.setImageResource(ImagePlaceholder.cover());
             }

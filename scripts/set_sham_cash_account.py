@@ -7,9 +7,9 @@ import sys
 
 import paramiko
 
-HOST = os.environ.get("JEHO_DEPLOY_HOST", "79.143.180.50")
-USER = os.environ.get("JEHO_DEPLOY_USER", "root")
-PASSWORD = os.environ.get("JEHO_DEPLOY_PASSWORD", "")
+from deploy_secrets import deploy_settings
+
+HOST, USER, PASSWORD, _REMOTE_DIR = deploy_settings()
 ACCOUNT_ID = "2c5e893402a9cd76d27d28b4b92605aa"
 
 REMOTE_JS = r"""
@@ -61,8 +61,6 @@ const { Client } = require('pg');
 
 
 def main() -> None:
-    if not PASSWORD:
-        raise SystemExit("JEHO_DEPLOY_PASSWORD required")
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(HOST, username=USER, password=PASSWORD, timeout=45)

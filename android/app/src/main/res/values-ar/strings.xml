@@ -134,7 +134,8 @@
 <string name="withdrawal_pending_note">سيتم التحويل بعد موافقة الإدارة</string>
 <string name="cosmetics_mall">مول</string>
 <string name="equip">ارتداء</string>
-<string name="equipped">قيد الاستخدام</string>
+    <string name="unequip">خلع</string>
+    <string name="equipped">قيد الاستخدام</string>
 <string name="coins">عملات</string>
 <string name="drama_coins_label">كوينز</string>
 <string name="diamonds">ألماس</string>
@@ -645,7 +646,7 @@
 <string name="level_rank_star">نجمة</string>
 <string name="level_rank_legend">أسطورة</string>
 <string name="lazy_no_signature">كسلان لا توقيع الآن</string>
-<string name="diamond_tips">يمكنك الحصول على ماسة 1 لكل عملة 1 من الهدايا التي تتلقاها. يمكن تحويل الماس إلى عملات بسعر يعادل 60٪.</string>
+<string name="diamond_tips">الهدايا تحوّل حوالي 45٪ من العملات إلى ماس. مع وكالة: المنصة 30٪ · الوكالة 15٪ · المضيف 55٪. سحب الماس بسعر منخفض، وتحويل الماس لعملات حوالي 55٪.</string>
 <string name="auto_convert">تحويل تلقائي من الألماس إلى العملات</string>
 <string name="store_dice">نرد</string>
 <string name="store_tiles">قطع الطاية</string>
@@ -825,6 +826,8 @@
 <string name="notif_room_in_room">اضغط للرجوع إلى الغرفة</string>
 <string name="notif_room_in_room_hint">الصوت مستمر · ارجع بأي وقت</string>
 <string name="notif_room_return">رجوع</string>
+<string name="notif_chat_open">فتح</string>
+<string name="notif_chat_dismiss">إغلاق</string>
 <string name="notif_room_mic">مايك</string>
 <string name="notif_room_mic_off">مكتوم</string>
 <string name="notif_room_leave">خروج</string>

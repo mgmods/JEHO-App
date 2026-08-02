@@ -62,7 +62,7 @@ export class MikooSessionService {
 
   async resolvePlayer(
     gameSlug: string,
-    playerId: number,
+    _playerId: number,
     ticket: string,
   ): Promise<MikooPlayerContext | null> {
     const code = this.cleanTicket(ticket);
@@ -83,10 +83,8 @@ export class MikooSessionService {
     if (!user) return null;
 
     const publicId = Number(user.publicId || 0);
-    // Prefer matching playerId; if client sends 0 / missing, still allow ticket auth
-    if (playerId > 0 && publicId > 0 && playerId !== publicId) {
-      return null;
-    }
+    // Ticket alone is enough. BaiShun Fishing sometimes sends a mismatched user_id;
+    // rejecting left enter-room at errCode 5 and stuck splash.
 
     let wallet = await this.wallets.findOne({ where: { userId: user.id } });
     if (!wallet) {
@@ -108,7 +106,7 @@ export class MikooSessionService {
     return {
       sessionId: session.id,
       userId: user.id,
-      publicId: publicId || playerId || 0,
+      publicId: publicId || 0,
       gameId: game.id,
       gameType: game.gameType ?? 0,
       displayName,

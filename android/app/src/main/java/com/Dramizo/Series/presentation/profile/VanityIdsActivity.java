@@ -88,9 +88,7 @@ public class VanityIdsActivity extends ThemedActivity {
                             Toast.makeText(this, "تم شراء الآي دي بنجاح", Toast.LENGTH_SHORT).show();
                             load();
                         } else {
-                            Toast.makeText(this,
-                                    r.error != null ? r.error : getString(R.string.error_generic),
-                                    Toast.LENGTH_LONG).show();
+                            com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
                         }
                     });
                 }),

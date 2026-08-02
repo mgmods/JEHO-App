@@ -11,6 +11,7 @@ import { User } from '../../database/entities/user.entity';
 import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { TasksModule } from '../tasks/tasks.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ]),
     TasksModule,
     NotificationsModule,
+    PromotionsModule,
   ],
   controllers: [WalletController],
   providers: [WalletService],

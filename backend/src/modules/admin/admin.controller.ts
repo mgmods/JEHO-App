@@ -624,13 +624,14 @@ export class AdminController {
   adjustRechargeAgentFloat(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('sub') adminId: string,
-    @Body() body: { amount: number; note?: string },
+    @Body() body: { amount: number; note?: string; usdPaid?: number },
   ) {
     return this.rechargeAgentsService.adminAdjustFloat(
       id,
       Number(body?.amount),
       adminId,
       body?.note,
+      body?.usdPaid !== undefined ? Number(body.usdPaid) : undefined,
     );
   }
 

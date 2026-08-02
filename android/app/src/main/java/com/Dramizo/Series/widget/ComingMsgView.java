@@ -65,14 +65,31 @@ public class ComingMsgView extends LinearLayout {
                           @Nullable String avatarUrl,
                           int userLevel,
                           int vipLevel) {
+        setupView(displayName, avatarUrl, userLevel, vipLevel, null);
+    }
+
+    /** Same join-toast chrome with a custom trailing message (lucky / win). */
+    public void setupView(@Nullable String displayName,
+                          @Nullable String avatarUrl,
+                          int userLevel,
+                          int vipLevel,
+                          @Nullable String message) {
         if (tvUserName != null) {
             String name = displayName == null || displayName.trim().isEmpty()
                     ? "ضيف" : displayName.trim();
-            if (name.length() > 8) name = name.substring(0, 8);
+            if (name.length() > 14) name = name.substring(0, 14);
             tvUserName.setText(name);
+            tvUserName.setMaxWidth(dp(120));
         }
         if (tvJoin != null) {
-            tvJoin.setText(R.string.room_my_join);
+            if (message != null && !message.trim().isEmpty()) {
+                tvJoin.setText(message.trim());
+            } else {
+                tvJoin.setText(R.string.room_my_join);
+            }
+            tvJoin.setMaxWidth(dp(160));
+            tvJoin.setSingleLine(true);
+            tvJoin.setEllipsize(android.text.TextUtils.TruncateAt.END);
         }
         int vipTier = Math.min(7, Math.max(0, vipLevel));
         boolean vip = vipTier >= 1;
@@ -141,6 +158,10 @@ public class ComingMsgView extends LinearLayout {
         showing = false;
         animate().cancel();
         setVisibility(GONE);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     @DrawableRes

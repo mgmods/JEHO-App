@@ -30,20 +30,12 @@ from pathlib import Path, PurePosixPath
 
 import paramiko
 
+from deploy_secrets import deploy_settings
+
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 ROOT = Path(__file__).resolve().parents[1]
-HOST = os.environ.get("JEHO_DEPLOY_HOST", "79.143.180.50")
-USER = os.environ.get("JEHO_DEPLOY_USER", "root")
-PASSWORD = os.environ.get("JEHO_DEPLOY_PASSWORD", "")
-if not PASSWORD:
-    raise SystemExit(
-        "Set JEHO_DEPLOY_PASSWORD in the environment before running deploy_incremental.py"
-    )
-REMOTE_DIR = os.environ.get(
-    "JEHO_DEPLOY_DIR",
-    "/www/wwwroot/api.adnova.bbs.tr",
-)
+HOST, USER, PASSWORD, REMOTE_DIR = deploy_settings()
 BACKEND = ROOT / "backend"
 DASHBOARD = BACKEND / "dashboard"
 DASH_DIST = DASHBOARD / "dist"
@@ -470,7 +462,7 @@ def main() -> int:
             or (
                 path.is_relative_to(BACKEND / "public")
                 and path.suffix.lower() in {
-                    ".html", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
+                    ".html", ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico",
                     ".gif", ".mp4", ".json", ".svga",
                 }
                 and not path.is_relative_to(BACKEND / "public" / "admin")

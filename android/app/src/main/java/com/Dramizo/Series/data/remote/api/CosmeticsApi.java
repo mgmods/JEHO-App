@@ -20,4 +20,7 @@ public interface CosmeticsApi {
 
     @POST("cosmetics/equip")
     Call<ApiResponse<CosmeticDtos.EquipResult>> equip(@Body CosmeticDtos.EquipRequest body);
+
+    @POST("cosmetics/unequip")
+    Call<ApiResponse<CosmeticDtos.EquipResult>> unequip(@Body CosmeticDtos.EquipRequest body);
 }

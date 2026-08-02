@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>مول المظهر</title>
+  <link rel="stylesheet" href="mall.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-preview" id="heroPreview">
+      <div class="wear-stage" id="wearStage">
+        <img class="avatar-core" id="heroAvatar" alt="" />
+        <img class="frame-overlay" id="heroFrame" alt="" hidden />
+        <canvas class="frame-overlay svga-canvas" id="heroSvga" width="300" height="300" hidden></canvas>
+        <img class="badge-overlay" id="heroBadge" alt="" hidden />
+        <div class="room-card-stage" id="heroRoomCard" hidden>
+          <img class="room-cover" id="heroRoomCover" alt="" />
+          <img class="room-frame" id="heroRoomFrame" alt="" />
+        </div>
+        <img class="bg-preview" id="heroBg" alt="" hidden />
+        <video class="entry-preview" id="heroVideo" muted loop playsinline hidden></video>
+      </div>
+      <div class="hero-meta">
+        <div class="hero-name" id="heroName">—</div>
+        <div class="hero-hint" id="heroHint">اختر عنصراً لمعاينته على صورتك</div>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button type="button" class="btn btn-primary" id="btnPrimary" disabled>ارتدِ</button>
+      <button type="button" class="btn btn-ghost" id="btnSecondary" hidden>إزالة</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <p class="status" id="status" hidden></p>
+  <p class="empty" id="empty" hidden>لا توجد عناصر في هذا القسم</p>
+  <main class="grid" id="grid"></main>
+
+  <script src="vendor/svga.min.js"></script>
+  <script src="mall.js"></script>
+</body>
+</html>

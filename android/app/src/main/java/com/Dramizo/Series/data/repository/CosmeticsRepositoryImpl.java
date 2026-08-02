@@ -39,4 +39,9 @@ public class CosmeticsRepositoryImpl implements CosmeticsRepository {
     public Result<CosmeticDtos.EquipResult> equip(String cosmeticId) {
         return ApiCall.execute(api.equip(new CosmeticDtos.EquipRequest(cosmeticId)));
     }
+
+    @Override
+    public Result<CosmeticDtos.EquipResult> unequip(String cosmeticId) {
+        return ApiCall.execute(api.unequip(new CosmeticDtos.EquipRequest(cosmeticId)));
+    }
 }

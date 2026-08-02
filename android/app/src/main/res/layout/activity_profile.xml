@@ -72,25 +72,27 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="20dp">
 
+                <!-- Mikoo user info: face 80dp + frame 100dp centered. -->
                 <FrameLayout
-                    android:layout_width="168dp"
-                    android:layout_height="168dp"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
-                    <ImageView
+                    <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/imgAvatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/nav_profile"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/ic_default_avatar" />
+                        android:src="@drawable/ic_default_avatar"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
 
                     <ImageView
                         android:id="@+id/imgFrame"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
@@ -98,8 +100,8 @@
 
                     <com.Dramizo.Series.util.HostSignalView
                         android:id="@+id/webProfileHostSignal"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
                         android:layout_gravity="center"
                         android:visibility="gone" />
                 </FrameLayout>

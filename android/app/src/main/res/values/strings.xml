@@ -178,7 +178,8 @@
 <string name="withdrawal_pending_note">Transfer starts after admin approval</string>
 <string name="cosmetics_mall">Mall</string>
 <string name="equip">Wear</string>
-<string name="equipped">In use</string>
+    <string name="unequip">Remove</string>
+    <string name="equipped">In use</string>
 <string name="coins">Coins</string>
 <string name="drama_coins_label">Coins</string>
 <string name="diamonds">Diamonds</string>
@@ -648,7 +649,7 @@
 <string name="level_rank_star">Star</string>
 <string name="level_rank_legend">Legend</string>
 <string name="lazy_no_signature">No signature yet</string>
-<string name="diamond_tips">You get 1 diamond for every coin from gifts you receive. Diamonds can be converted to coins at about 60%%.</string>
+<string name="diamond_tips">Gifts convert about 45%% of coins into diamonds. With an agency: platform 30%% · agency 15%% · host 55%%. Diamonds cash out at a low rate; exchanging diamonds back to coins is about 55%%.</string>
 <string name="auto_convert">Auto-convert diamonds to coins</string>
 <string name="store_dice">Dice</string>
 <string name="store_tiles">Tiles</string>
@@ -837,6 +838,8 @@
 <string name="notif_room_in_room">You are in the room — tap to return</string>
 <string name="notif_room_in_room_hint">Audio continues · return anytime</string>
 <string name="notif_room_return">Return</string>
+<string name="notif_chat_open">Open</string>
+<string name="notif_chat_dismiss">Close</string>
 <string name="notif_room_mic">Mic</string>
 <string name="notif_room_mic_off">Muted</string>
 <string name="notif_room_leave">Leave</string>

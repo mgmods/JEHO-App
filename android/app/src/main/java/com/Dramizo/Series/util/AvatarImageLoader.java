@@ -62,15 +62,22 @@ public final class AvatarImageLoader {
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
-        Glide.with(view)
-                .load(AssetCatalog.absoluteUrl(avatarUrl))
-                .override(256, 256)
+        String abs = AssetCatalog.absoluteUrl(avatarUrl);
+        String lower = abs != null ? abs.toLowerCase(Locale.US) : "";
+        boolean animated = lower.contains(".gif") || lower.contains(".webp");
+        int size = Math.max(96, Math.min(
+                view.getWidth() > 0 ? view.getWidth() : 256, 512));
+        var req = Glide.with(view)
+                .load(abs)
+                .thumbnail(0.2f)
+                .override(size, size)
                 .centerCrop()
-                .dontAnimate()
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
                 .placeholder(ImagePlaceholder.avatar())
-                .error(ImagePlaceholder.avatar())
-                .into(view);
+                .error(ImagePlaceholder.avatar());
+        // Still photos: freeze. GIF/WebP: keep motion (Mikoo shows live head).
+        if (!animated) req = req.dontAnimate();
+        req.into(view);
     }
 
     /** Local preview (gallery Uri) — preserves GIF animation. */

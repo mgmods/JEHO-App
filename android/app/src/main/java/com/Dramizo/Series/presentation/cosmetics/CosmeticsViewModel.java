@@ -36,6 +36,8 @@ public class CosmeticsViewModel extends ViewModel {
     private final AtomicInteger loadSeq = new AtomicInteger();
     private volatile String filterType;
     private volatile boolean bagMode;
+    private volatile long inventoryLoadedAtMs;
+    private static final long INVENTORY_CACHE_MS = 8_000L;
 
     public CosmeticsViewModel(AppContainer container) {
         this.container = container;
@@ -74,16 +76,24 @@ public class CosmeticsViewModel extends ViewModel {
         final int seq = loadSeq.incrementAndGet();
         filterType = loadType;
         container.getIoExecutor().execute(() -> {
-            Result<List<CosmeticDtos.UserCosmeticDto>> inv =
-                    container.getCosmeticsRepository().inventory();
-            if (inv.success && inv.data != null) {
-                synchronized (ownedIds) {
-                    ownedIds.clear();
-                    equippedIds.clear();
-                    for (CosmeticDtos.UserCosmeticDto row : inv.data) {
-                        if (row.cosmeticId != null) ownedIds.add(row.cosmeticId);
-                        if (row.equipped && row.cosmeticId != null) equippedIds.add(row.cosmeticId);
+            boolean needInventory;
+            synchronized (ownedIds) {
+                needInventory = System.currentTimeMillis() - inventoryLoadedAtMs > INVENTORY_CACHE_MS
+                        || ownedIds.isEmpty();
+            }
+            if (needInventory) {
+                Result<List<CosmeticDtos.UserCosmeticDto>> inv =
+                        container.getCosmeticsRepository().inventory();
+                if (inv.success && inv.data != null) {
+                    synchronized (ownedIds) {
+                        ownedIds.clear();
+                        equippedIds.clear();
+                        for (CosmeticDtos.UserCosmeticDto row : inv.data) {
+                            if (row.cosmeticId != null) ownedIds.add(row.cosmeticId);
+                            if (row.equipped && row.cosmeticId != null) equippedIds.add(row.cosmeticId);
+                        }
                     }
+                    inventoryLoadedAtMs = System.currentTimeMillis();
                 }
             }
             Result<List<CosmeticDtos.CosmeticDto>> cat =
@@ -105,7 +115,7 @@ public class CosmeticsViewModel extends ViewModel {
                 }
                 catalogPage.postValue(new CatalogPage(loadType, items));
             } else {
-                error.postValue(cat.error != null ? cat.error : inv.error);
+                error.postValue(cat.error);
             }
         });
     }
@@ -131,6 +141,7 @@ public class CosmeticsViewModel extends ViewModel {
                     container.getSessionManager().updateCachedUser(me.data);
                 }
             }
+            inventoryLoadedAtMs = 0;
             message.postValue("تم الشراء والارتداء");
             loadForType(type);
         });
@@ -150,7 +161,32 @@ public class CosmeticsViewModel extends ViewModel {
                 if (me.success && me.data != null) {
                     container.getSessionManager().updateCachedUser(me.data);
                 }
+                inventoryLoadedAtMs = 0;
                 message.postValue("تم الارتداء");
+                loadForType(type);
+            } else {
+                error.postValue(r.error);
+            }
+        });
+    }
+
+    public void unequip(String cosmeticId) {
+        final String type = filterType;
+        container.getIoExecutor().execute(() -> {
+            Result<CosmeticDtos.EquipResult> r =
+                    container.getCosmeticsRepository().unequip(cosmeticId);
+            if (r.success) {
+                if (r.data != null && r.data.profile != null) {
+                    applyEquipProfile(r.data.profile);
+                } else {
+                    Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> me =
+                            container.getUserRepository().getMe();
+                    if (me.success && me.data != null) {
+                        container.getSessionManager().updateCachedUser(me.data);
+                    }
+                }
+                inventoryLoadedAtMs = 0;
+                message.postValue("تم الخلع");
                 loadForType(type);
             } else {
                 error.postValue(r.error);

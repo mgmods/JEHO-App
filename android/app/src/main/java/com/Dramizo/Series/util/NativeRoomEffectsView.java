@@ -111,18 +111,33 @@ public final class NativeRoomEffectsView extends FrameLayout {
     public boolean showGift(@Nullable String giftId, @Nullable String remoteIconUrl,
                             @Nullable String senderName, int quantity,
                             long durationMs, @Nullable Runnable onComplete) {
-        return showGift(giftId, remoteIconUrl, null, senderName, quantity, durationMs, onComplete);
+        return showGift(giftId, null, remoteIconUrl, null, senderName, quantity, durationMs, onComplete);
     }
 
     public boolean showGift(@Nullable String giftId, @Nullable String remoteIconUrl,
                             @Nullable String animationUrl, @Nullable String senderName, int quantity,
                             long durationMs, @Nullable Runnable onComplete) {
+        return showGift(giftId, null, remoteIconUrl, animationUrl, senderName, quantity, durationMs, onComplete);
+    }
+
+    public boolean showGift(@Nullable String giftId, @Nullable String displayName,
+                            @Nullable String remoteIconUrl, @Nullable String animationUrl,
+                            @Nullable String senderName, int quantity,
+                            long durationMs, @Nullable Runnable onComplete) {
         GiftSpec spec = giftId == null ? null : GIFTS.get(giftId.toLowerCase(Locale.US));
         if (spec == null && giftId != null && !giftId.isEmpty()) {
-            // Unknown catalog id — still play with a generic run/burst family.
-            spec = new GiftSpec(giftId.toLowerCase(Locale.US), giftId, "run", "premium");
+            String title = firstNonEmpty(displayName, humanizeGiftId(giftId));
+            spec = new GiftSpec(giftId.toLowerCase(Locale.US), title, "run", "premium");
         }
         if (spec == null) return false;
+        if (displayName != null && !displayName.trim().isEmpty()
+                && (GIFTS.get(spec.id) == null || !displayName.trim().equals(spec.name))) {
+            // Prefer the server/catalog gift title over a local fallback or raw id.
+            String title = displayName.trim();
+            if (!looksLikeRawMediaId(title)) {
+                spec = new GiftSpec(spec.id, title, spec.family, spec.tier);
+            }
+        }
         interruptActive(false);
         int token = ++generation;
         activeCompletion = onComplete;
@@ -136,13 +151,32 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 // Gift SFX disabled.
             } catch (Exception ignored) {
             }
+            String playable = CosmeticMedia.playableUrl(animationUrl);
             long hold = durationMs > 0 ? durationMs : (quantity > 1 ? 5200 : 4800);
-            if (isCrossingFamily(finalSpec.family)) {
+            if (playable != null && CosmeticMedia.kind(playable) == CosmeticMedia.Kind.VIDEO) {
+                hold = Math.max(hold, 8000L);
+            } else if (isCrossingFamily(finalSpec.family)) {
                 hold = Math.max(hold, 4500L);
             }
             scheduleFinish(token, hold);
         });
         return true;
+    }
+
+    private static boolean looksLikeRawMediaId(@Nullable String value) {
+        if (value == null || value.isEmpty()) return true;
+        String s = value.toLowerCase(Locale.US);
+        if (s.contains("cache") || s.contains("mikoo_gift")) return true;
+        if (s.matches(".*\\d{10,}.*")) return true;
+        return s.length() > 48 && !s.contains(" ");
+    }
+
+    private static String humanizeGiftId(@Nullable String giftId) {
+        if (giftId == null || giftId.isEmpty() || "custom".equalsIgnoreCase(giftId)) {
+            return "هدية";
+        }
+        if (looksLikeRawMediaId(giftId)) return "هدية";
+        return giftId.replace('-', ' ');
     }
 
     public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
@@ -313,6 +347,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
         col.addView(tvWin, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         card.addView(col);
+        card.setTag("slot_result_bubble");
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -323,6 +358,8 @@ public final class NativeRoomEffectsView extends FrameLayout {
         lp.setMarginStart(dp(36));
         lp.setMarginEnd(dp(16));
         addView(card, lp);
+        setVisibility(VISIBLE);
+        bringToFront();
 
         card.setAlpha(0f);
         card.setTranslationX(-dp(40));
@@ -331,9 +368,37 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 .setDuration(350)
                 .withEndAction(() ->
                         card.animate().setStartDelay(won ? 3200 : 2600).alpha(0f).setDuration(400)
-                                .withEndAction(() -> removeView(card))
+                                .withEndAction(() -> {
+                                    removeView(card);
+                                    if (!hasSlotBubbles() && getChildCount() == 0) {
+                                        setVisibility(GONE);
+                                    }
+                                })
                                 .start())
                 .start();
+    }
+
+    private boolean hasSlotBubbles() {
+        for (int i = 0; i < getChildCount(); i++) {
+            if ("slot_result_bubble".equals(getChildAt(i).getTag())) return true;
+        }
+        return false;
+    }
+
+    /** Remove FX layers but keep Mikoo win/lose identity bubbles. */
+    private void removeEffectViewsOnly() {
+        for (int i = getChildCount() - 1; i >= 0; i--) {
+            View child = getChildAt(i);
+            if (child != null && "slot_result_bubble".equals(child.getTag())) continue;
+            child.animate().cancel();
+            if (child instanceof ImageView) {
+                try {
+                    Glide.with(getContext().getApplicationContext()).clear(child);
+                } catch (Exception ignored) {
+                }
+            }
+            removeViewAt(i);
+        }
     }
 
     public void showSlotWinBubble(@Nullable String displayName, @Nullable String avatarUrl,
@@ -392,7 +457,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
 
     private void renderGift(GiftSpec spec, @Nullable String remoteIconUrl,
                             @Nullable String animationUrl, @Nullable String senderName, int quantity) {
-        removeAllViews();
+        removeEffectViewsOnly();
         releaseGiftPlayer();
         int width = Math.max(getWidth(), dp(120));
         int height = Math.max(getHeight(), dp(120));
@@ -402,12 +467,14 @@ public final class NativeRoomEffectsView extends FrameLayout {
             anim = "";
         }
         CosmeticMedia.Kind animKind = CosmeticMedia.kind(anim);
-        // Always fill the chat-panel overlay: GIF / video / SVGA / still — no fly motion.
+        // Always fill the overlay: GIF / video / SVGA / still — no fly motion.
         boolean mediaFx = animKind == CosmeticMedia.Kind.SVGA
                 || animKind == CosmeticMedia.Kind.VIDEO
                 || animKind == CosmeticMedia.Kind.GIF
                 || animKind == CosmeticMedia.Kind.IMAGE
                 || (anim != null && !anim.isEmpty());
+        boolean fullscreenMedia = animKind == CosmeticMedia.Kind.VIDEO
+                || animKind == CosmeticMedia.Kind.SVGA;
 
         View visual = createGiftVisual(spec, remoteIconUrl,
                 mediaFx ? anim : animationUrl, Math.min(width, height));
@@ -420,19 +487,25 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     Gravity.CENTER));
         }
-        TextView label = label(spec.name + (quantity > 1 ? " ×" + quantity : ""),
-                senderName == null || senderName.isEmpty() ? "" : "هدية من " + senderName);
-        LayoutParams labelParams = new LayoutParams(
-                Math.min(dp(430), Math.round(width * .92f)), LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        labelParams.bottomMargin = Math.max(dp(8), Math.round(height * .04f));
-        addView(label, labelParams);
-        ObjectAnimator labelIn = ObjectAnimator.ofPropertyValuesHolder(label,
-                PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
-        labelIn.setDuration(280);
-        activeAnimators = new AnimatorSet();
-        activeAnimators.play(labelIn);
-        activeAnimators.start();
+        // ComboGiftView already shows sender + gift name. Skip the old
+        // "هدية من <long id>" overlay — especially on video gifts.
+        if (!fullscreenMedia) {
+            String title = spec.name != null ? spec.name.trim() : "";
+            if (!title.isEmpty() && !looksLikeRawMediaId(title)) {
+                TextView label = label(title + (quantity > 1 ? " ×" + quantity : ""), "");
+                LayoutParams labelParams = new LayoutParams(
+                        Math.min(dp(430), Math.round(width * .92f)), LayoutParams.WRAP_CONTENT,
+                        Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+                labelParams.bottomMargin = Math.max(dp(8), Math.round(height * .04f));
+                addView(label, labelParams);
+                ObjectAnimator labelIn = ObjectAnimator.ofPropertyValuesHolder(label,
+                        PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
+                labelIn.setDuration(280);
+                activeAnimators = new AnimatorSet();
+                activeAnimators.play(labelIn);
+                activeAnimators.start();
+            }
+        }
     }
 
     /**
@@ -479,31 +552,144 @@ public final class NativeRoomEffectsView extends FrameLayout {
         anim.setLoop(1);
         anim.setMute(true);
         entryAnimView = anim;
+        bindAnimFinish(anim);
 
         final String mediaUrl = abs;
-        anim.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            @Override public void onViewAttachedToWindow(View v) {
-                anim.removeOnAttachStateChangeListener(this);
-                new Thread(() -> {
-                    File file = cacheEntryMp4(mediaUrl);
-                    if (file == null || !file.exists()) {
-                        android.util.Log.w("NativeRoomEffects", "entry cache miss: " + mediaUrl);
-                        post(() -> finishActive());
-                        return;
-                    }
-                    post(() -> {
-                        if (entryAnimView != anim || anim.getParent() == null) return;
-                        try {
-                            anim.startPlay(file);
-                        } catch (Exception e) {
-                            android.util.Log.w("NativeRoomEffects", "AnimView start failed", e);
-                        }
-                    });
-                }, "entry-vap").start();
+        // Start download immediately — don't wait for attach (realtime).
+        new Thread(() -> {
+            File file = cacheEntryMp4(mediaUrl);
+            if (file == null || !file.exists()) {
+                android.util.Log.w("NativeRoomEffects", "entry cache miss: " + mediaUrl);
+                post(() -> {
+                    if (entryAnimView == anim) finishActive();
+                });
+                return;
             }
-            @Override public void onViewDetachedFromWindow(View v) {}
-        });
+            post(() -> {
+                if (entryAnimView != anim) return;
+                Runnable start = () -> {
+                    if (entryAnimView != anim || anim.getParent() == null) return;
+                    try {
+                        anim.startPlay(file);
+                    } catch (Exception e) {
+                        android.util.Log.w("NativeRoomEffects", "AnimView start failed", e);
+                        finishActive();
+                    }
+                };
+                if (anim.isAttachedToWindow()) {
+                    start.run();
+                } else {
+                    anim.addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+                        @Override public void onViewAttachedToWindow(View v) {
+                            anim.removeOnAttachStateChangeListener(this);
+                            start.run();
+                        }
+                        @Override public void onViewDetachedFromWindow(View v) {}
+                    });
+                }
+            });
+        }, "entry-vap").start();
         return anim;
+    }
+
+    /** Stream gift MP4 immediately (no full-download gate) for realtime room playback. */
+    @Nullable
+    private View createGiftVideoStream(String absUrl) {
+        if (absUrl == null || absUrl.isEmpty()) return null;
+        releaseGiftPlayer();
+        PlayerView playerView = new PlayerView(getContext());
+        playerView.setUseController(false);
+        playerView.setBackgroundColor(Color.TRANSPARENT);
+        playerView.setShutterBackgroundColor(Color.TRANSPARENT);
+        try {
+            playerView.setResizeMode(
+                    androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        } catch (Exception ignored) {
+        }
+        playerView.setLayoutParams(new LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER));
+
+        ExoPlayer player = new ExoPlayer.Builder(getContext()).build();
+        giftPlayer = player;
+        playerView.setPlayer(player);
+        player.setRepeatMode(Player.REPEAT_MODE_OFF);
+        player.setMediaItem(MediaItem.fromUri(android.net.Uri.parse(absUrl)));
+        player.prepare();
+        player.play();
+        final int token = generation;
+        player.addListener(new Player.Listener() {
+            @Override
+            public void onPlaybackStateChanged(int playbackState) {
+                if (giftPlayer != player || token != generation) return;
+                if (playbackState == Player.STATE_ENDED) {
+                    post(() -> finishActive());
+                }
+            }
+
+            @Override
+            public void onPlayerError(androidx.media3.common.PlaybackException error) {
+                if (giftPlayer != player || token != generation) return;
+                android.util.Log.w("NativeRoomEffects", "gift stream failed: " + absUrl, error);
+                post(() -> {
+                    // Fall back to AnimView/VAP download path once.
+                    removeEffectViewsOnly();
+                    releaseGiftPlayer();
+                    View vap = createEntryRideVisual(absUrl,
+                            Math.max(getWidth(), dp(120)),
+                            Math.max(getHeight(), dp(120)));
+                    if (vap != null) {
+                        giftAnimView = entryAnimView;
+                        addView(vap, new LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                Gravity.CENTER));
+                    } else {
+                        finishActive();
+                    }
+                });
+            }
+        });
+        return playerView;
+    }
+
+    private void bindAnimFinish(AnimView anim) {
+        if (anim == null) return;
+        try {
+            anim.setAnimListener(new com.tencent.qgame.animplayer.inter.IAnimListener() {
+                @Override
+                public void onFailed(int errorType, @Nullable String errorMsg) {
+                    post(() -> {
+                        if (entryAnimView == anim || giftAnimView == anim) finishActive();
+                    });
+                }
+
+                @Override
+                public void onVideoComplete() {
+                    post(() -> {
+                        if (entryAnimView == anim || giftAnimView == anim) finishActive();
+                    });
+                }
+
+                @Override
+                public void onVideoDestroy() {}
+
+                @Override
+                public void onVideoStart() {}
+
+                @Override
+                public void onVideoRender(int frameIndex,
+                                          @Nullable com.tencent.qgame.animplayer.AnimConfig config) {}
+
+                @Override
+                public boolean onVideoConfigReady(
+                        @Nullable com.tencent.qgame.animplayer.AnimConfig config) {
+                    return true;
+                }
+            });
+        } catch (Exception ignored) {
+        }
     }
 
     /** Download entry MP4 once into app cache (AnimView needs a local file). */
@@ -534,6 +720,19 @@ public final class NativeRoomEffectsView extends FrameLayout {
             android.util.Log.w("NativeRoomEffects", "cacheGiftMp4 failed", e);
             return null;
         }
+    }
+
+    @Nullable
+    private static File peekGiftMp4Cache(Context context, String absUrl) {
+        if (context == null || absUrl == null || absUrl.isEmpty()) return null;
+        try {
+            File dir = new File(context.getCacheDir(), "entry_vap");
+            String name = Integer.toHexString(absUrl.split("\\?")[0].hashCode()) + ".mp4";
+            File out = new File(dir, name);
+            if (out.exists() && out.length() > 1024) return out;
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     /** Warm gift media so send/play is instant for everyone in the room. */
@@ -576,8 +775,23 @@ public final class NativeRoomEffectsView extends FrameLayout {
         String lower = abs.toLowerCase(Locale.US);
         CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
 
-        // Same as Mikoo GiftEffectView: VAP mp4 via AnimView (RGB|alpha + vapc).
+        // Gift videos: stream immediately (realtime). Cached VAP files still use AnimView.
         if (kind == CosmeticMedia.Kind.VIDEO) {
+            File cached = peekGiftMp4Cache(getContext(), abs);
+            if (cached != null) {
+                View vap = createEntryRideVisual(abs, visualSize, visualSize);
+                if (vap != null) {
+                    giftAnimView = entryAnimView;
+                    return vap;
+                }
+            }
+            View streamed = createGiftVideoStream(abs);
+            if (streamed != null) {
+                // Warm VAP/AnimView cache in background for next play.
+                new Thread(() -> cacheGiftMp4(getContext().getApplicationContext(), abs),
+                        "gift-vap-warm").start();
+                return streamed;
+            }
             View vap = createEntryRideVisual(abs, visualSize, visualSize);
             if (vap != null) {
                 giftAnimView = entryAnimView;
@@ -605,12 +819,26 @@ public final class NativeRoomEffectsView extends FrameLayout {
                             if (giftSvgaView != svga) return;
                             svga.setVideoItem(videoItem);
                             svga.startAnimation();
+                            try {
+                                svga.setCallback(new com.opensource.svgaplayer.SVGACallback() {
+                                    @Override public void onPause() {}
+                                    @Override public void onFinished() {
+                                        post(() -> {
+                                            if (giftSvgaView == svga) finishActive();
+                                        });
+                                    }
+                                    @Override public void onRepeat() {}
+                                    @Override public void onStep(int i, double v) {}
+                                });
+                            } catch (Exception ignored) {
+                            }
                         });
                     }
 
                     @Override
                     public void onError() {
                         android.util.Log.w("NativeRoomEffects", "SVGA gift parse failed: " + abs);
+                        post(() -> finishActive());
                     }
                 }, null);
                 return svga;
@@ -662,7 +890,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                              int vipLevel, int userLevel, long wealthScore,
                              @Nullable String vipBadgeUrl, @Nullable String levelBadgeUrl,
                              @Nullable String hostBadgeUrl, boolean isHost, boolean showHiBadge) {
-        removeAllViews();
+        removeEffectViewsOnly();
         releaseGiftPlayer();
         int width = Math.max(getWidth(), getResources().getDisplayMetrics().widthPixels);
         int height = Math.max(getHeight(), getResources().getDisplayMetrics().heightPixels);
@@ -1082,18 +1310,15 @@ public final class NativeRoomEffectsView extends FrameLayout {
             activeSprite = null;
         }
         releaseGiftPlayer();
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            child.animate().cancel();
-            if (child instanceof ImageView) {
-                Glide.with(getContext().getApplicationContext()).clear(child);
-            }
-        }
-        removeAllViews();
+        removeEffectViewsOnly();
         setAlpha(1f);
         setScaleX(1f);
         setScaleY(1f);
-        setVisibility(GONE);
+        if (!hasSlotBubbles()) {
+            setVisibility(GONE);
+        } else {
+            setVisibility(VISIBLE);
+        }
     }
 
     private void releaseGiftPlayer() {

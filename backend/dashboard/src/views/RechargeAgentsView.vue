@@ -511,18 +511,41 @@ async function adjustFloat(agent) {
     toast().danger(error.value)
     return
   }
+  let usdPaid
+  if (amount > 0) {
+    const usdRaw = await askPrompt({
+      title: 'بونص الوكيل',
+      label: 'كم دولار دُفع؟ (200→+12% · 500→+15% · 1000→+20%)',
+      defaultValue: '',
+    })
+    if (usdRaw === null) return
+    if (String(usdRaw).trim() !== '') {
+      usdPaid = Number(usdRaw)
+      if (!Number.isFinite(usdPaid) || usdPaid < 0) {
+        error.value = 'مبلغ الدولار غير صحيح'
+        toast().danger(error.value)
+        return
+      }
+    }
+  }
   const noteRaw = await askPrompt({
     title: 'تعديل الرصيد',
     label: 'سبب تعديل الرصيد',
     defaultValue: '',
   })
   if (noteRaw === null) return
-  const result = await rechargeAgentsApi.adjustFloat(agent.id, { amount, note: noteRaw })
+  const payload = { amount, note: noteRaw }
+  if (usdPaid !== undefined) payload.usdPaid = usdPaid
+  const result = await rechargeAgentsApi.adjustFloat(agent.id, payload)
   if (result.error) {
     error.value = result.error.message
     toast().danger(error.value)
   } else {
-    success.value = 'تم تعديل الرصيد'
+    const data = result.data?.data ?? result.data
+    const bonus = Number(data?.bonusCoins || 0)
+    success.value = bonus > 0
+      ? `تم التعديل · بونص +${data.bonusPercent}% (+${bonus.toLocaleString()} كوين)`
+      : 'تم تعديل الرصيد'
     toast().success(success.value)
     await load()
   }

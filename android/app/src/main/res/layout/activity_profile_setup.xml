@@ -52,16 +52,15 @@
                 android:layout_height="126dp"
                 android:layout_marginTop="24dp">
 
-                <ImageView
+                <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgAvatar"
                     android:layout_width="112dp"
                     android:layout_height="112dp"
                     android:layout_gravity="center"
-                    android:background="@drawable/bg_seat_ring"
                     android:contentDescription="@string/edit_profile"
-                    android:padding="4dp"
                     android:scaleType="centerCrop"
-                    android:src="@drawable/ic_tab_me" />
+                    android:src="@drawable/ic_default_avatar"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
             </FrameLayout>
 
             <com.google.android.material.button.MaterialButton
@@ -128,26 +127,23 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:layout_marginBottom="6dp"
-                android:text="الدولة (تُحدّد تلقائياً)"
+                android:text="الدولة"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/tvCountry"
+            <Spinner
+                android:id="@+id/spinnerCountry"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:background="@drawable/bg_list_card"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="14dp"
-                android:text="🌍 جاري تحديد الدولة…"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:paddingHorizontal="8dp" />
 
             <TextView
+                android:id="@+id/tvCountryHint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="لا يمكن تعديل الدولة يدوياً في هذه الخطوة"
+                android:text="@string/month_change_country_limit"
                 android:textColor="@color/text_hint"
                 android:textSize="11sp" />
 

@@ -28,8 +28,8 @@
     <meta name="360-fullscreen" content="true"/>
 
     <!-- force screen orientation on some browser -->
-    <meta name="screen-orientation" content="portrait"/>
-    <meta name="x5-orientation" content="portrait">
+    <meta name="screen-orientation" content="landscape"/>
+    <meta name="x5-orientation" content="landscape">
 
     <!--fix fireball/issues/3568 -->
     <!--<meta name="browsermode" content="application">-->
@@ -247,6 +247,30 @@
     }
 
     document.addEventListener('visibilitychange', updateVisibilityStatus);
+
+    // JEHO: never leave Fishing stuck on splash if Cocos stalls before closeLoadingBg.
+    (function jehoFishingSplashGuard() {
+        var done = false;
+        function finish() {
+            if (done) return;
+            done = true;
+            try { closeLoadingBg(); } catch (e) {}
+            try {
+                if (window.NativeBridge && NativeBridge.gameLoaded) NativeBridge.gameLoaded('{}');
+            } catch (e2) {}
+            try {
+                if (window.gameBridge && gameBridge.gameLoaded) gameBridge.gameLoaded('{}');
+            } catch (e3) {}
+        }
+        window.closeLoadingBg = (function (orig) {
+            return function () {
+                try { if (typeof orig === 'function') orig(); } catch (e) {}
+                finish();
+            };
+        })(window.closeLoadingBg || closeLoadingBg);
+        setTimeout(finish, 12000);
+        setTimeout(finish, 25000);
+    })();
 
 </script>
 </body>

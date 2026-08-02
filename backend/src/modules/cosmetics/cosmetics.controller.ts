@@ -18,6 +18,12 @@ class EquipCosmeticDto {
   cosmeticId: string;
 }
 
+class UnequipCosmeticDto {
+  @ApiProperty()
+  @IsUUID()
+  cosmeticId: string;
+}
+
 class CatalogQueryDto {
   @ApiPropertyOptional({ enum: CosmeticType })
   @IsOptional()
@@ -51,5 +57,11 @@ export class CosmeticsController {
   @Post('equip')
   equip(@CurrentUser('sub') userId: string, @Body() dto: EquipCosmeticDto) {
     return this.cosmeticsService.equip(userId, dto.cosmeticId);
+  }
+
+  @Post('unequip')
+  @ApiOperation({ summary: 'Remove equipped cosmetic of this type (clear wear)' })
+  unequip(@CurrentUser('sub') userId: string, @Body() dto: UnequipCosmeticDto) {
+    return this.cosmeticsService.unequip(userId, dto.cosmeticId);
   }
 }

@@ -1,8 +1,11 @@
 package com.Dramizo.Series.presentation.gifts;
 
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,7 +21,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Mikoo: ViewPager pages = category tabs (not 8-cell subpages).
+ * ViewPager pages = gift category tabs.
  * Selection updates only the gift cell highlight — never rebuilds pages.
  */
 public final class GiftCategoryPagerAdapter
@@ -141,9 +144,49 @@ public final class GiftCategoryPagerAdapter
             adapter = new GiftAdapter(null);
             recycler.setLayoutManager(new GridLayoutManager(itemView.getContext(), 4));
             recycler.setNestedScrollingEnabled(true);
-            recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
+            recycler.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
             recycler.setItemAnimator(null);
             recycler.setAdapter(adapter);
+            // Vertical scroll owns the gesture; horizontal still lets ViewPager2 change tabs.
+            final int touchSlop = ViewConfiguration.get(itemView.getContext()).getScaledTouchSlop();
+            recycler.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+                private float downX;
+                private float downY;
+                private boolean decided;
+
+                @Override
+                public boolean onInterceptTouchEvent(@NonNull RecyclerView rv,
+                                                     @NonNull MotionEvent e) {
+                    int action = e.getActionMasked();
+                    if (action == MotionEvent.ACTION_DOWN) {
+                        downX = e.getX();
+                        downY = e.getY();
+                        decided = false;
+                        setParentsDisallow(rv, true);
+                    } else if (action == MotionEvent.ACTION_MOVE && !decided) {
+                        float dx = Math.abs(e.getX() - downX);
+                        float dy = Math.abs(e.getY() - downY);
+                        if (dx > touchSlop || dy > touchSlop) {
+                            decided = true;
+                            // Vertical → keep gifts scrolling; horizontal → release to ViewPager.
+                            setParentsDisallow(rv, dy >= dx);
+                        }
+                    } else if (action == MotionEvent.ACTION_UP
+                            || action == MotionEvent.ACTION_CANCEL) {
+                        decided = false;
+                        setParentsDisallow(rv, false);
+                    }
+                    return false;
+                }
+            });
+        }
+
+        private static void setParentsDisallow(@NonNull View child, boolean disallow) {
+            ViewParent p = child.getParent();
+            while (p != null) {
+                p.requestDisallowInterceptTouchEvent(disallow);
+                p = p.getParent();
+            }
         }
 
         void bind(List<GiftDtos.GiftDto> gifts, @Nullable String selectedId, Listener listener) {

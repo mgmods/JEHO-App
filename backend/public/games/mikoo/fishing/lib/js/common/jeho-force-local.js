@@ -25,6 +25,10 @@
     if (dom && !BAD.test(dom)) {
       window.__JEHO_DOMAIN = dom;
       LOCAL = String(dom).replace(/\/$/, '');
+      try {
+        var u = new URL(LOCAL.indexOf('http') === 0 ? LOCAL : ('https://' + LOCAL));
+        LOCAL = u.origin;
+      } catch (e2) {}
       if (/^https?:/i.test(LOCAL)) {
         LOCAL_WS = LOCAL.replace(/^https:/i, 'wss:').replace(/^http:/i, 'ws:');
       }

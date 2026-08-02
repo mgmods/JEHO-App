@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -39,6 +40,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { PaymentsService } from '../payments/payments.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
+import { PromotionsService } from '../promotions/promotions.service';
 
 export interface ApplyRechargeAgentDto {
   contact?: string;
@@ -98,9 +100,11 @@ export interface RechargeAgentPricingConfig {
 
 export const RECHARGE_AGENT_CONFIG_KEY = 'recharge_agent_config';
 export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
-  membershipFeeUsdt: 25,
-  wholesalePer100CoinsUsdt: 0.01,
-  suggestedRetailPer100CoinsUsdt: 0.015,
+  membershipFeeUsdt: 20,
+  /** ~$0.90 / 10k — agents can undercut Play slightly and still profit. */
+  wholesalePer100CoinsUsdt: 0.009,
+  /** ~$1.20 / 10k suggested retail — tempting vs Play for local users. */
+  suggestedRetailPer100CoinsUsdt: 0.012,
   minInitialCoins: 10_000,
   maxInitialCoins: 10_000_000,
 };
@@ -126,6 +130,7 @@ export class RechargeAgentsService implements OnModuleInit {
     private readonly walletService: WalletService,
     private readonly paymentsService: PaymentsService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
   async onModuleInit() {
@@ -726,6 +731,20 @@ export class RechargeAgentsService implements OnModuleInit {
 
       return recharge;
     }).then(async (recharge) => {
+      // Count agent sales toward user monthly/supporter promos (retail USD).
+      try {
+        const config = await this.getPricingConfig();
+        const usd =
+          (Number(recharge.coins) / 100) *
+          Number(config.suggestedRetailPer100CoinsUsdt || 0.012);
+        if (usd > 0 && this.promotions) {
+          void this.promotions
+            .onUserRechargeCompleted(recharge.recipientUserId, usd)
+            .catch(() => undefined);
+        }
+      } catch {
+        /* non-fatal */
+      }
       let agentName = 'وكيل الشحن';
       try {
         const agentRow = await this.agentsRepo.findOne({
@@ -783,7 +802,7 @@ export class RechargeAgentsService implements OnModuleInit {
       agent.reviewedAt = new Date();
       agent = await manager.save(agent);
       if (Number(agent.floatCoins) !== previousFloat) {
-        await this.saveFloatLedger(
+        await this.applyFloatCreditBonus(
           manager,
           agent,
           Number(agent.floatCoins) - previousFloat,
@@ -864,7 +883,7 @@ export class RechargeAgentsService implements OnModuleInit {
         agent = await manager.save(agent);
         const floatDelta = Number(agent.floatCoins) - previousFloat;
         if (floatDelta !== 0) {
-          await this.saveFloatLedger(
+          await this.applyFloatCreditBonus(
             manager,
             agent,
             floatDelta,
@@ -877,23 +896,111 @@ export class RechargeAgentsService implements OnModuleInit {
     });
   }
 
-  async adminAdjustFloat(agentId: string, amount: number, adminId: string, note?: string) {
+  /**
+   * Adjust agent float. Positive credits apply agent-tier bonus when USDT paid
+   * hits $200/+12%, $500/+15%, $1000/+20%. Pass `usdPaid` for accurate tiers.
+   */
+  async adminAdjustFloat(
+    agentId: string,
+    amount: number,
+    adminId: string,
+    note?: string,
+    usdPaid?: number,
+  ) {
     if (!Number.isSafeInteger(amount) || amount === 0) {
       throw new BadRequestException('Float amount must be a non-zero integer');
     }
+    const config = await this.getPricingConfig();
+    let bonusCoins = 0;
+    let bonusPercent = 0;
+    let usdUsed = 0;
+    if (amount > 0 && this.promotions) {
+      const estimated =
+        (amount / 100) * Number(config.wholesalePer100CoinsUsdt || 0.009);
+      usdUsed =
+        Number.isFinite(Number(usdPaid)) && Number(usdPaid) > 0
+          ? Number(usdPaid)
+          : estimated;
+      const bonus = this.promotions.computeAgentFloatBonusCoins(amount, usdUsed);
+      bonusCoins = bonus.bonusCoins;
+      bonusPercent = bonus.bonusPercent;
+    }
+    const credit = amount + (amount > 0 ? bonusCoins : 0);
+
     return this.dataSource.transaction(async (manager) => {
       const agent = await manager.findOne(RechargeAgent, {
         where: { id: agentId },
         lock: { mode: 'pessimistic_write' },
       });
       if (!agent) throw new NotFoundException('Recharge agent not found');
-      const nextFloat = Number(agent.floatCoins) + amount;
+      const nextFloat = Number(agent.floatCoins) + credit;
       if (nextFloat < 0) throw new BadRequestException('Agent float cannot be negative');
       agent.floatCoins = nextFloat;
       await manager.save(agent);
-      await this.saveFloatLedger(manager, agent, amount, adminId, note || 'Admin float adjustment');
-      return this.normalizeAgent(agent);
+      const bonusNote =
+        bonusCoins > 0
+          ? ` · agent tier +${bonusPercent}% on $${usdUsed.toFixed(0)} (+${bonusCoins} coins)`
+          : '';
+      await this.saveFloatLedger(
+        manager,
+        agent,
+        credit,
+        adminId,
+        (note || 'Admin float adjustment') + bonusNote,
+      );
+      return {
+        ...this.normalizeAgent(agent),
+        floatCredited: credit,
+        bonusPercent,
+        bonusCoins,
+        usdPaid: usdUsed,
+      };
     });
+  }
+
+  /** Apply agent float-tier bonus when assigning / approving initial float. */
+  private async applyFloatCreditBonus(
+    manager: import('typeorm').EntityManager,
+    agent: RechargeAgent,
+    floatDelta: number,
+    adminId: string,
+    note: string,
+    usdPaid?: number,
+  ) {
+    if (floatDelta <= 0) {
+      await this.saveFloatLedger(manager, agent, floatDelta, adminId, note);
+      return { bonusCoins: 0, bonusPercent: 0 };
+    }
+    const config = await this.getPricingConfig();
+    const estimated =
+      (floatDelta / 100) * Number(config.wholesalePer100CoinsUsdt || 0.009);
+    const usd =
+      Number.isFinite(Number(usdPaid)) && Number(usdPaid) > 0
+        ? Number(usdPaid)
+        : estimated;
+    let bonusCoins = 0;
+    let bonusPercent = 0;
+    if (this.promotions) {
+      const bonus = this.promotions.computeAgentFloatBonusCoins(floatDelta, usd);
+      bonusCoins = bonus.bonusCoins;
+      bonusPercent = bonus.bonusPercent;
+    }
+    if (bonusCoins > 0) {
+      agent.floatCoins = Number(agent.floatCoins) + bonusCoins;
+      await manager.save(agent);
+    }
+    const bonusNote =
+      bonusCoins > 0
+        ? ` · agent tier +${bonusPercent}% on $${usd.toFixed(0)} (+${bonusCoins} coins)`
+        : '';
+    await this.saveFloatLedger(
+      manager,
+      agent,
+      floatDelta + bonusCoins,
+      adminId,
+      note + bonusNote,
+    );
+    return { bonusCoins, bonusPercent, usdPaid: usd };
   }
 
   async adminPatchAgent(id: string, dto: AdminPatchRechargeAgentDto, adminId: string) {

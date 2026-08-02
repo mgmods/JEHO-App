@@ -568,8 +568,8 @@ export class AdminService {
         gameCoverUrl: '',
         coinsWon: 777,
         roomId: null,
-        title: 'مبروك! 🎊',
-        body: `مبروك ${displayName} حصل على 777 · Solo 77`,
+        title: 'مبروك!',
+        body: `${displayName} لعب Solo 77 وفاز بـ 777`,
         at: new Date().toISOString(),
       });
       emitted.push('game');

@@ -32,6 +32,7 @@ import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.FlagImages;
+import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.MyRoomLauncher;
 
 import java.util.Calendar;
@@ -155,6 +156,7 @@ public class ProfileFragment extends Fragment {
             binding.tvFollowers.setText(String.valueOf(Math.max(0, user.friendsCount)));
             binding.tvFollowing.setText(String.valueOf(Math.max(0, user.followingCount)));
             binding.tvFans.setText(String.valueOf(Math.max(0, user.followersCount)));
+            HostSignalView.prefetchWear(requireContext(), user.vipBadgeUrl);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
@@ -296,12 +298,15 @@ public class ProfileFragment extends Fragment {
 
     private void refreshWalletBalances() {
         if (binding == null || binding.tvWalletCoins == null) return;
-        ContainerProvider.from(requireActivity()).getIoExecutor().execute(() -> {
+        if (!isAdded()) return;
+        final androidx.fragment.app.FragmentActivity act = getActivity();
+        if (act == null) return;
+        final com.Dramizo.Series.di.AppContainer container = ContainerProvider.from(act);
+        container.getIoExecutor().execute(() -> {
             Result<com.Dramizo.Series.data.remote.dto.WalletDtos.WalletDto> r =
-                    com.Dramizo.Series.util.ApiCall.execute(
-                            ContainerProvider.from(requireActivity()).getWalletApi().getWallet());
+                    com.Dramizo.Series.util.ApiCall.execute(container.getWalletApi().getWallet());
             if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
+            act.runOnUiThread(() -> {
                 if (!isAdded() || binding == null) return;
                 if (r.success && r.data != null) {
                     NumberFormat nf = NumberFormat.getInstance();

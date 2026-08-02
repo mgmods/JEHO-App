@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   OnModuleInit,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -45,6 +46,7 @@ import { CreateRechargeDto, ExchangeDto, WithdrawDto } from './dto/wallet.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
+import { PromotionsService } from '../promotions/promotions.service';
 
 const DIAMOND_TO_COIN_RATE = 0.55;
 /**
@@ -77,6 +79,7 @@ export class WalletService implements OnModuleInit {
     private readonly dataSource: DataSource,
     private readonly tasksService: TasksService,
     private readonly notifications: NotificationsService,
+    @Optional() private readonly promotions?: PromotionsService,
   ) {}
 
   async onModuleInit() {
@@ -457,6 +460,14 @@ export class WalletService implements OnModuleInit {
       return order;
     }).then(async (order) => {
       void this.tasksService.recordProgress(order.userId, 'recharge', 1).catch(() => undefined);
+      const usd = Number(order.amountFiat) || 0;
+      if (usd > 0 && this.promotions) {
+        void this.promotions
+          .onUserRechargeCompleted(order.userId, usd)
+          .catch((err) =>
+            this.logger.warn(`promo after recharge: ${(err as Error).message}`),
+          );
+      }
       return order;
     });
   }

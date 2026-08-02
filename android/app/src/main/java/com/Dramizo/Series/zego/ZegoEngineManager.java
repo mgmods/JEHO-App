@@ -64,11 +64,18 @@ public class ZegoEngineManager {
         void onStreamRemoved(String streamId);
         default void onSoundLevel(String userId, float level) {}
         default void onPlayerState(String streamId, int state, int errorCode) {}
+        /** In-room text chat over Zego broadcast (JSON payload). */
+        default void onRoomChatMessage(String roomId, String fromUserId, String fromUserName,
+                                       String jsonOrText) {}
     }
 
     /** Fired when host-mixed MediaPlayer reaches PLAY_ENDED (YouTube/local mix). */
     public interface LocalMusicEndListener {
         void onLocalMusicEnded();
+    }
+
+    public interface RoomChatSendCallback {
+        void onResult(boolean ok, int errorCode);
     }
 
     private final CopyOnWriteArrayList<RoomListener> roomListeners =
@@ -180,7 +187,10 @@ public class ZegoEngineManager {
                 int state = reason != null ? reason.value() : -1;
                 Log.i(TAG, "room state room=" + roomID + " reason=" + state + " err=" + errorCode);
                 for (RoomListener listener : roomListeners) {
-                    listener.onRoomStateChanged(roomID, state, errorCode);
+                    try {
+                        listener.onRoomStateChanged(roomID, state, errorCode);
+                    } catch (Throwable ignored) {
+                    }
                 }
             }
 
@@ -189,10 +199,13 @@ public class ZegoEngineManager {
                 if (roomListeners.isEmpty() || streamList == null) return;
                 for (ZegoStream stream : streamList) {
                     for (RoomListener listener : roomListeners) {
-                        if (updateType == ZegoUpdateType.ADD) {
-                            listener.onStreamAdded(stream.streamID);
-                        } else {
-                            listener.onStreamRemoved(stream.streamID);
+                        try {
+                            if (updateType == ZegoUpdateType.ADD) {
+                                listener.onStreamAdded(stream.streamID);
+                            } else {
+                                listener.onStreamRemoved(stream.streamID);
+                            }
+                        } catch (Throwable ignored) {
                         }
                     }
                 }
@@ -229,7 +242,10 @@ public class ZegoEngineManager {
             public void onCapturedSoundLevelUpdate(float soundLevel) {
                 if (currentUserId != null) {
                     for (RoomListener listener : roomListeners) {
-                        listener.onSoundLevel(currentUserId, soundLevel);
+                        try {
+                            listener.onSoundLevel(currentUserId, soundLevel);
+                        } catch (Throwable ignored) {
+                        }
                     }
                 }
             }
@@ -243,9 +259,50 @@ public class ZegoEngineManager {
                             ? streamId.substring(0, streamId.length() - 6)
                             : streamId;
                     for (RoomListener listener : roomListeners) {
-                        listener.onSoundLevel(
-                                userId,
-                                entry.getValue() != null ? entry.getValue() : 0f);
+                        try {
+                            listener.onSoundLevel(
+                                    userId,
+                                    entry.getValue() != null ? entry.getValue() : 0f);
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onIMRecvBroadcastMessage(
+                    String roomID,
+                    ArrayList<im.zego.zegoexpress.entity.ZegoBroadcastMessageInfo> messageList) {
+                if (messageList == null || messageList.isEmpty()) return;
+                for (im.zego.zegoexpress.entity.ZegoBroadcastMessageInfo info : messageList) {
+                    if (info == null) continue;
+                    String fromId = info.fromUser != null ? info.fromUser.userID : "";
+                    String fromName = info.fromUser != null ? info.fromUser.userName : "";
+                    String msg = info.message != null ? info.message : "";
+                    for (RoomListener listener : roomListeners) {
+                        try {
+                            listener.onRoomChatMessage(roomID, fromId, fromName, msg);
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onIMRecvBarrageMessage(
+                    String roomID,
+                    ArrayList<im.zego.zegoexpress.entity.ZegoBarrageMessageInfo> messageList) {
+                if (messageList == null || messageList.isEmpty()) return;
+                for (im.zego.zegoexpress.entity.ZegoBarrageMessageInfo info : messageList) {
+                    if (info == null) continue;
+                    String fromId = info.fromUser != null ? info.fromUser.userID : "";
+                    String fromName = info.fromUser != null ? info.fromUser.userName : "";
+                    String msg = info.message != null ? info.message : "";
+                    for (RoomListener listener : roomListeners) {
+                        try {
+                            listener.onRoomChatMessage(roomID, fromId, fromName, msg);
+                        } catch (Throwable ignored) {
+                        }
                     }
                 }
             }
@@ -300,7 +357,8 @@ public class ZegoEngineManager {
             Log.w(TAG, "loginRoom skipped — token required (no AppSign fallback)");
             return;
         }
-        if (roomId.equals(currentRoomId) && userId.equals(currentUserId)) {
+        if (roomId.equals(currentRoomId) && userId.equals(currentUserId)
+                && engine != null && initialized) {
             renewRoomToken(roomId, token);
             Log.i(TAG, "adopted existing room session room=" + roomId);
             return;
@@ -326,12 +384,53 @@ public class ZegoEngineManager {
         } catch (Exception e) {
             Log.w(TAG, "audio route setup failed", e);
         }
-        ZegoUser user = new ZegoUser(userId);
+        ZegoUser user = new ZegoUser(userId, userId);
         Log.i(TAG, "loginRoom room=" + roomId + " user=" + userId
                 + " tokenLen=" + token.length());
         im.zego.zegoexpress.entity.ZegoRoomConfig config = new im.zego.zegoexpress.entity.ZegoRoomConfig();
         config.token = token;
+        // Max member count for broadcast/barrage IM in room.
+        try {
+            config.maxMemberCount = 0; // 0 = no limit / SDK default
+        } catch (Throwable ignored) {
+        }
         engine.loginRoom(roomId, user, config);
+    }
+
+    /**
+     * Room text chat over Zego (reliable broadcast). Payload should be JSON ≤ 1024 bytes.
+     * Returns false if engine/room is not ready (caller may fall back).
+     */
+    public boolean sendRoomChatMessage(@Nullable String roomId, @Nullable String message,
+                                       @Nullable RoomChatSendCallback callback) {
+        ensureEngine();
+        if (engine == null || roomId == null || roomId.isEmpty()
+                || message == null || message.isEmpty()) {
+            if (callback != null) callback.onResult(false, -1);
+            return false;
+        }
+        if (currentRoomId == null || !roomId.equals(currentRoomId)) {
+            if (callback != null) callback.onResult(false, -2);
+            return false;
+        }
+        try {
+            engine.sendBroadcastMessage(roomId, message,
+                    (errorCode, messageID) -> {
+                        if (callback != null) callback.onResult(errorCode == 0, errorCode);
+                        if (errorCode != 0) {
+                            Log.w(TAG, "sendBroadcastMessage err=" + errorCode);
+                        }
+                    });
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "sendBroadcastMessage failed: " + t.getMessage());
+            if (callback != null) callback.onResult(false, -3);
+            return false;
+        }
+    }
+
+    public boolean isInRoom(@Nullable String roomId) {
+        return roomId != null && roomId.equals(currentRoomId) && engine != null;
     }
 
     public void renewRoomToken(String roomId, String token) {
@@ -508,9 +607,26 @@ public class ZegoEngineManager {
 
     private void destroyEngineOnly() {
         stopLocalMusic();
+        stopPublishing();
+        stopAllPlaying();
+        // Never leave stale room ids after destroy — adopt-login would skip real login.
+        currentRoomId = null;
+        currentUserId = null;
+        publishingStreamId = null;
+        playingStreamIds.clear();
+        playingStreamRooms.clear();
         if (initialized) {
-            if (engine != null) engine.stopSoundLevelMonitor();
-            ZegoExpressEngine.destroyEngine(null);
+            if (engine != null) {
+                try {
+                    engine.stopSoundLevelMonitor();
+                } catch (Throwable ignored) {
+                }
+            }
+            try {
+                ZegoExpressEngine.destroyEngine(null);
+            } catch (Throwable t) {
+                Log.w(TAG, "destroyEngine failed: " + t.getMessage());
+            }
             engine = null;
             initialized = false;
             activeAppId = 0L;

@@ -53,3 +53,5 @@ export * from './drama-episode.entity';
 export * from './drama-reaction.entity';
 export * from './female-identity-verification.entity';
 export * from './host-monthly-progress.entity';
+export * from './vanity-id.entity';
+export * from './user-promo-progress.entity';

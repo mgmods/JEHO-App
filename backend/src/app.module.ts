@@ -37,6 +37,8 @@ import { DramaModule } from './modules/drama/drama.module';
 import { HostTargetModule } from './modules/host-target/host-target.module';
 import { InvitesModule } from './modules/invites/invites.module';
 import { RoomCupModule } from './modules/room-cup/room-cup.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
+import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { User } from './database/entities/user.entity';
 
 const entityList = Object.values(entities).filter(
@@ -106,6 +108,8 @@ const entityList = Object.values(entities).filter(
     HostTargetModule,
     InvitesModule,
     RoomCupModule,
+    PromotionsModule,
+    VanityIdsModule,
   ],
   providers: [
     // JWT first so AppThrottlerGuard can key by user id (not shared carrier IP).

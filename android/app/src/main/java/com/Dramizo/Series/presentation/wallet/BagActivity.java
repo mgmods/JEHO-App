@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.PromoDtos;
 import com.Dramizo.Series.data.remote.dto.WalletDtos;
 import com.Dramizo.Series.databinding.ActivityBagBinding;
 import com.Dramizo.Series.databinding.ItemBagPackageBinding;
@@ -355,10 +356,48 @@ public class BagActivity extends ThemedActivity {
         if (c == null) return;
         c.getIoExecutor().execute(() -> {
             Result<WalletDtos.WalletDto> w = ApiCall.execute(c.getWalletApi().getWallet());
+            Result<PromoDtos.MyProgress> promo = ApiCall.execute(c.getPromotionsApi().me());
             runOnUiThread(() -> {
-                if (!isFinishing() && w.success) applyWallet(w.data);
+                if (isFinishing()) return;
+                if (w.success) applyWallet(w.data);
+                applyPromoProgress(promo.success ? promo.data : null);
             });
         });
+    }
+
+    private void applyPromoProgress(@Nullable PromoDtos.MyProgress progress) {
+        if (binding == null || binding.sectionPromoOffers == null) return;
+        if (progress == null) {
+            binding.sectionPromoOffers.setVisibility(View.GONE);
+            return;
+        }
+        binding.sectionPromoOffers.setVisibility(View.VISIBLE);
+        if (binding.tvPromoSpent != null) {
+            binding.tvPromoSpent.setText(String.format(Locale.US,
+                    "مصروف هذا الشهر: $%.0f", progress.usdSpent));
+        }
+        if (binding.tvPromoLines != null) {
+            StringBuilder sb = new StringBuilder();
+            for (PromoDtos.OfferProgress o : progress.safeMonthly()) {
+                appendPromoLine(sb, o, "هدية");
+            }
+            for (PromoDtos.OfferProgress o : progress.safeSupporter()) {
+                appendPromoLine(sb, o, "داعم");
+            }
+            if (sb.length() == 0) {
+                sb.append("اشحن $200 للحصول على إطار + ID مميز");
+            }
+            binding.tvPromoLines.setText(sb.toString().trim());
+        }
+    }
+
+    private static void appendPromoLine(StringBuilder sb, PromoDtos.OfferProgress o, String kind) {
+        if (o == null) return;
+        if (sb.length() > 0) sb.append('\n');
+        String title = o.titleAr != null && !o.titleAr.isEmpty() ? o.titleAr : kind;
+        String status = o.claimed ? "✓ مستلم" : (o.unlocked ? "جاهز" : String.format(Locale.US,
+                "$%.0f / $%.0f", o.progressUsd, o.thresholdUsd));
+        sb.append("• ").append(title).append(" — ").append(status);
     }
 
     /** Hub shows balance + menu; each action opens this activity focused on one form. */

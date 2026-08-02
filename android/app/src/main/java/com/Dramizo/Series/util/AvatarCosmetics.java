@@ -79,39 +79,76 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
-        // Prefetch face into imgAvatar first so fallback is never blank if HostSignalView fails.
-        if (avatarView != null) {
-            avatarView.setVisibility(View.VISIBLE);
-            bindAvatar(avatarView, avatarUrl);
-        }
-        if (frameView != null) {
-            stopWearMotion(frameView, avatarView);
-            frameView.setVisibility(View.GONE);
-            frameView.setImageDrawable(null);
-        }
+        // Always clear stacked imgFrame — HostSignalView owns the only frame (no double ring).
+        clearStackedFrame(frameView);
         if (hostSignal == null) {
+            if (avatarView != null) {
+                avatarView.setVisibility(View.VISIBLE);
+                bindAvatar(avatarView, avatarUrl);
+            }
             return false;
         }
         if (hostBadgeUrl == null || hostBadgeUrl.isEmpty()) {
+            hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
+            if (avatarView != null) {
+                avatarView.setVisibility(View.VISIBLE);
+                bindAvatar(avatarView, avatarUrl);
+            }
             return false;
         }
-        // Mikoo: hide bare avatar only after HostSignalView owns the face.
+        // Keep full circular avatar visible until the real frame paints — no half-frame flash.
+        // Mikoo: face stays the same dp with/without wear (no match_parent blow-up).
+        if (avatarView != null) {
+            resetWearTransform(avatarView);
+            avatarView.setVisibility(View.VISIBLE);
+            bindAvatar(avatarView, avatarUrl);
+            avatarView.bringToFront();
+        }
+        hostSignal.setAlpha(0f);
         hostSignal.setVisibility(View.VISIBLE);
+        hostSignal.setOnFrameReadyListener(() -> {
+            if (avatarView != null) {
+                try {
+                    Glide.with(avatarView).clear(avatarView);
+                } catch (Exception ignored) {
+                }
+                resetWearTransform(avatarView);
+                avatarView.setVisibility(View.GONE);
+                avatarView.setImageDrawable(null);
+            }
+            clearStackedFrame(frameView);
+            hostSignal.setAlpha(1f);
+            hostSignal.bringToFront();
+            hostSignal.resumeMotion();
+        });
         boolean ok = hostSignal.bind(
                 hostBadgeUrl, avatarUrl, hostBadgeMeta, Math.max(1, fallbackLevel));
-        if (ok) {
-            if (avatarView != null) avatarView.setVisibility(View.GONE);
-            hostSignal.resumeMotion();
-        } else {
+        if (!ok) {
+            hostSignal.setOnFrameReadyListener(null);
+            hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
             if (avatarView != null) {
+                resetWearTransform(avatarView);
                 avatarView.setVisibility(View.VISIBLE);
                 bindAvatar(avatarView, avatarUrl);
             }
         }
         return ok;
+    }
+
+    private static void clearStackedFrame(@Nullable ImageView frameView) {
+        if (frameView == null) return;
+        stopWearMotion(frameView, null);
+        try {
+            Glide.with(frameView).clear(frameView);
+        } catch (Exception ignored) {
+        }
+        frameView.setVisibility(View.GONE);
+        frameView.setImageDrawable(null);
     }
 
     /**
@@ -430,11 +467,22 @@ public final class AvatarCosmetics {
             if (live) return;
         }
         if (hostSignal != null) {
+            hostSignal.setOnFrameReadyListener(null);
             hostSignal.clearSignal();
             hostSignal.setVisibility(View.GONE);
+            hostSignal.setAlpha(1f);
         }
-        if (avatarView != null) avatarView.setVisibility(View.VISIBLE);
-        bindWear(avatarView, frameView, avatarUrl, vipFrameUrl, null, null, null);
+        if (avatarView != null) {
+            resetWearTransform(avatarView);
+            avatarView.setVisibility(View.VISIBLE);
+            bindAvatar(avatarView, avatarUrl);
+        }
+        // Mikoo Me/Profile: fixed XML face+frame sizes — never scale/match_parent the face.
+        clearStackedFrame(frameView);
+        if (vipFrameUrl != null && !vipFrameUrl.isEmpty() && frameView != null) {
+            applyFrame(frameView, vipFrameUrl, null);
+            frameView.bringToFront();
+        }
     }
 
     /**

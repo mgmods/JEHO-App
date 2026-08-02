@@ -11,9 +11,16 @@ import {
   decodeFields,
   decodeLoginReq,
   encode7UpBetRsp,
+  encode7UpGetRankDataRes,
+  encode7UpGetUserRecordRes,
+  encode7UpUpdateBetPoolBroadcast,
+  encode7UpUpdatePlayerNumBroadcast,
   encodeBetRsp,
   encodeCashoutRsp,
+  encodeCashoutConfRsp,
   encodeCleopatraBetRes,
+  encodeCrashUpdateBetPoolBroadcast,
+  encodeSomeoneCashoutBroadcast,
   encodeDoSlotsRsp,
   encodeEmpty,
   encodeFortuneGameCfgRes,
@@ -22,11 +29,16 @@ import {
   encodeGameOverRsp,
   encodeGetUserDataFor,
   encodeGreedyBetRes,
+  encodeGreedyGetRankDataRes,
+  encodeGreedyGetUserRecordRes,
+  encodeGreedyOtherPlayerBetBroadcast,
   encodeGreedyResultBroadcast,
   encodeGreedyStartBetBroadcast,
   encodeGreedyTableInfoRes,
   encodeHeartBeatRsp,
   encodeLineSlotsGameCfgRsp,
+  encodeLineSlotsGetRankDataRes,
+  encodeLineSlotsGetUserRecordRes,
   encodeLoginRes,
   encodeLuckCarBetRsp,
   encodeLuckCarGameOverRsp,
@@ -35,6 +47,8 @@ import {
   encodeCrashGetUserRecordRes,
   encodeLuckCarStartBetBroadcast,
   encodeLuckCarTableInfo,
+  encodeLuckCarUpdateBetPoolBroadcast,
+  encodeLuckCarUpdatePlayerNumBroadcast,
   encodeLucky77BetRsp,
   encodeLucky77GetRankDataRes,
   encodeLucky77OtherPlayerBetBroadcast,
@@ -98,8 +112,12 @@ type RoomState = {
   ratio: number;
   flyStart: number;
   betEnds: number;
+  /** When over phase ends (crash settle hold). */
+  overEnds: number;
   bets: Map<string, RoomBet>; // key = playerId:areaId
   clients: Set<WebSocket>;
+  /** Last known wallet balance per WS (keeps spectator GameOver selfMoney honest). */
+  balances: Map<WebSocket, number>;
   timers: NodeJS.Timeout[];
   /** Recent winning areas for 7updown history strip (1=down,2=seven,3=up). */
   history: number[];
@@ -152,8 +170,11 @@ export class MikooGatewayService implements OnModuleDestroy {
     if (ws.readyState === WebSocket.OPEN) ws.send(packFrame(name, body));
   }
 
-  private broadcast(room: RoomState, name: string, body: Buffer) {
-    for (const ws of room.clients) this.send(ws, name, body);
+  private broadcast(room: RoomState, name: string, body: Buffer, except?: WebSocket) {
+    for (const ws of room.clients) {
+      if (except && ws === except) continue;
+      this.send(ws, name, body);
+    }
   }
 
   /** Aggregate Lucky77 area totals (icon 0/1/2). Optional filter by playerId. */
@@ -167,6 +188,43 @@ export class MikooGatewayService implements OnModuleDestroy {
       map.set(b.areaId, (map.get(b.areaId) || 0) + b.amount);
     }
     return [...map.entries()].map(([icon, money]) => ({ icon, money }));
+  }
+
+  /** 7updown areas 1=down, 2=seven, 3=up. */
+  private sevenUpAreaBets(
+    room: RoomState,
+    onlyPlayerId?: number,
+  ): Array<{ id: number; totalBet: number; myBet: number; ratio: number }> {
+    const ratios: Record<number, number> = { 1: 2, 2: 5, 3: 2 };
+    const totals = new Map<number, number>();
+    const mine = new Map<number, number>();
+    for (const b of room.bets.values()) {
+      totals.set(b.areaId, (totals.get(b.areaId) || 0) + b.amount);
+      if (onlyPlayerId != null && b.playerId === onlyPlayerId) {
+        mine.set(b.areaId, (mine.get(b.areaId) || 0) + b.amount);
+      }
+    }
+    return [1, 2, 3].map((id) => ({
+      id,
+      totalBet: totals.get(id) || 0,
+      myBet: mine.get(id) || 0,
+      ratio: ratios[id] || 2,
+    }));
+  }
+
+  /** Pool + chip-fly for everyone except the better (they already animated from BetRsp). */
+  private sevenUpPoolBroadcast(room: RoomState, exceptWs?: WebSocket) {
+    const areas = this.sevenUpAreaBets(room);
+    const totalBet = areas.reduce((s, a) => s + a.totalBet, 0);
+    this.broadcast(
+      room,
+      '.game.UpdateBetPoolBroadcast',
+      encode7UpUpdateBetPoolBroadcast({
+        totalBet,
+        betInfo: areas.map((a) => ({ id: a.id, totalBet: a.totalBet })),
+      }),
+      exceptWs,
+    );
   }
 
   /** Safe BetRsp for Lucky77 — curBet required by client chip-fly path. */
@@ -201,9 +259,19 @@ export class MikooGatewayService implements OnModuleDestroy {
         crashAt: this.randomCrash(),
         ratio: 1,
         flyStart: 0,
-        betEnds: Date.now() + 10000,
+        betEnds:
+          Date.now() +
+          (gameId === 'lucky77' ||
+          gameId === '7updown' ||
+          gameId === 'crash' ||
+          gameId === 'greedy-box' ||
+          gameId === 'luck-car'
+            ? 18000
+            : 10000),
+        overEnds: 0,
         bets: new Map(),
         clients: new Set(),
+        balances: new Map(),
         timers: [],
         history: [],
       };
@@ -260,19 +328,33 @@ export class MikooGatewayService implements OnModuleDestroy {
     room.phase = 'flying';
     room.ratio = 1;
     room.flyStart = Date.now();
-    this.broadcast(room, '.game.StartFlyBroadcast', encodeStartFlyBroadcast(1, 3));
+    room.overEnds = 0;
+    this.broadcast(room, '.game.StartFlyBroadcast', encodeStartFlyBroadcast());
     this.tickFly(gameId);
   }
 
   private tickFly(gameId: string) {
     const room = this.rooms.get(gameId);
     if (!room || room.phase !== 'flying') return;
-    const elapsed = Date.now() - room.flyStart;
-    room.ratio = Math.round((1 + elapsed / 3200) * 100) / 100;
-    this.broadcast(room, '.game.UpdateRatioBroadcast', encodeUpdateRatioBroadcast(room.ratio, elapsed));
+    const elapsed = Math.max(0, Date.now() - room.flyStart);
+    // Match Crash client curve: 1 + (tSec / 10)^1.4 (BASENUM=10, INDEXNUM=1.4).
+    const tSec = elapsed / 1000;
+    room.ratio = Math.max(1, Math.round((1 + Math.pow(tSec / 10, 1.4)) * 100) / 100);
+    // Client UpdateRatioBroadcast expects centi (150 = 1.50x).
+    this.broadcast(
+      room,
+      '.game.UpdateRatioBroadcast',
+      encodeUpdateRatioBroadcast(room.ratio * 100, elapsed),
+    );
     if (room.ratio >= room.crashAt) {
       room.phase = 'over';
-      this.broadcast(room, '.game.GameOverBroadcast', encodeGameOverBroadcast(room.crashAt, 3));
+      room.overEnds = Date.now() + 6000;
+      room.history = [...room.history, room.crashAt].slice(-12);
+      this.broadcast(
+        room,
+        '.game.GameOverBroadcast',
+        encodeGameOverBroadcast(room.crashAt * 100, 6),
+      );
       // Notify room for players who did not cash out (lost their bet).
       for (const bet of room.bets.values()) {
         if (bet.cashedOut || !bet.sessionId || bet.amount <= 0) continue;
@@ -283,10 +365,10 @@ export class MikooGatewayService implements OnModuleDestroy {
           betCoins: 0,
           winCoins: 0,
           lostCoins: bet.amount,
-          balanceAfter: 0,
+          balanceAfter: room.balances.get(bet.ws!) ?? 0,
         });
       }
-      room.timers.push(setTimeout(() => this.resetRound(gameId), 3000));
+      room.timers.push(setTimeout(() => this.resetRound(gameId), 6000));
       return;
     }
     room.timers.push(setTimeout(() => this.tickFly(gameId), 180));
@@ -444,6 +526,16 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
 
     if (gameId === '7updown') {
+      const areasForRoom = this.sevenUpAreaBets(room);
+      const rank = [...sevenByUser.values()]
+        .filter((r) => r.win > 0)
+        .sort((a, b) => b.win - a.win)
+        .slice(0, 3)
+        .map((r) => ({
+          name: r.displayName || 'Player',
+          head: r.avatarUrl || '',
+          winMoney: r.win,
+        }));
       const notifiedWs = new Set<WebSocket>();
       for (const row of sevenByUser.values()) {
         let bal = 0;
@@ -459,12 +551,21 @@ export class MikooGatewayService implements OnModuleDestroy {
           bal = 0;
         }
         if (row.ws && row.ws.readyState === WebSocket.OPEN) {
+          const myAreas = this.sevenUpAreaBets(room, row.playerId);
           this.send(
             row.ws,
             '.game.GameOverRsp',
-            encodeGameOverRsp({ nums: [d1, d2], winMoney: row.win, selfMoney: bal }),
+            encodeGameOverRsp({
+              time: 6,
+              nums: [d1, d2],
+              winMoney: row.win,
+              selfMoney: bal,
+              betInfo: myAreas,
+              rank,
+            }),
           );
           notifiedWs.add(row.ws);
+          room.balances.set(row.ws, bal);
         }
         if (row.win > 0 && row.sessionId) {
           void this.economy.onBetWin({
@@ -492,9 +593,21 @@ export class MikooGatewayService implements OnModuleDestroy {
         this.send(
           ws,
           '.game.GameOverRsp',
-          encodeGameOverRsp({ nums: [d1, d2], winMoney: 0, selfMoney: 0 }),
+          encodeGameOverRsp({
+            time: 6,
+            nums: [d1, d2],
+            winMoney: 0,
+            selfMoney: room.balances.get(ws) ?? 0,
+            betInfo: areasForRoom,
+            rank,
+          }),
         );
       }
+      this.broadcast(
+        room,
+        '.game.UpdatePlayerNumBroadcast',
+        encode7UpUpdatePlayerNumBroadcast(room.clients.size),
+      );
     } else if (gameId === 'lucky77') {
       const notifiedWs = new Set<WebSocket>();
       const goodLuck = [...sevenByUser.values()]
@@ -619,7 +732,7 @@ export class MikooGatewayService implements OnModuleDestroy {
           encodeLuckCarGameOverRsp({
             winCar: winArea,
             winMoney: 0,
-            selfMoney: 0,
+            selfMoney: room.balances.get(ws) ?? 0,
             myBets: new Array(8).fill(0),
           }),
         );
@@ -627,7 +740,14 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
 
     room.timers.push(
-      setTimeout(() => this.resetRound(gameId), gameId === 'lucky77' ? 8500 : 4000),
+      setTimeout(
+        () => this.resetRound(gameId),
+        gameId === 'lucky77' || gameId === '7updown'
+          ? 8500
+          : gameId === 'luck-car'
+            ? 9000
+            : 4000,
+      ),
     );
   }
 
@@ -638,8 +758,17 @@ export class MikooGatewayService implements OnModuleDestroy {
     room.round += 1;
     room.crashAt = this.randomCrash();
     room.ratio = 1;
-    // Lucky77: longer bet window so chip-fly + area taps are usable.
-    room.betEnds = Date.now() + (gameId === 'lucky77' ? 18000 : 10000);
+    room.overEnds = 0;
+    // Lucky77 / 7updown / crash: longer bet window so chip select is usable.
+    room.betEnds =
+      Date.now() +
+      (gameId === 'lucky77' ||
+      gameId === '7updown' ||
+      gameId === 'crash' ||
+      gameId === 'greedy-box' ||
+      gameId === 'luck-car'
+        ? 18000
+        : 10000);
     room.bets.clear();
     this.scheduleRound(gameId);
   }
@@ -662,7 +791,15 @@ export class MikooGatewayService implements OnModuleDestroy {
     room.clients.add(ws);
     // Resume multi rounds when first player joins an idle table.
     if (wasEmpty && (kind === 'crash' || kind === 'multi') && room.phase === 'betting' && room.timers.length === 0) {
-      room.betEnds = Date.now() + (gameSlug === 'lucky77' ? 18000 : 10000);
+      room.betEnds =
+        Date.now() +
+        (gameSlug === 'lucky77' ||
+        gameSlug === '7updown' ||
+        gameSlug === 'crash' ||
+        gameSlug === 'greedy-box' ||
+        gameSlug === 'luck-car'
+          ? 18000
+          : 10000);
       this.scheduleRound(gameSlug);
     }
     let player: MikooPlayerContext | null = null;
@@ -682,8 +819,19 @@ export class MikooGatewayService implements OnModuleDestroy {
         });
     });
 
-    ws.on('close', () => room.clients.delete(ws));
-    ws.on('error', () => room.clients.delete(ws));
+    const onGone = () => {
+      room.clients.delete(ws);
+      room.balances.delete(ws);
+      if (gameSlug === '7updown' && room.clients.size > 0) {
+        this.broadcast(
+          room,
+          '.game.UpdatePlayerNumBroadcast',
+          encode7UpUpdatePlayerNumBroadcast(room.clients.size),
+        );
+      }
+    };
+    ws.on('close', onGone);
+    ws.on('error', onGone);
   }
 
   /** Push TableInfo / StartBet for crash, multi, and spin slots that need chip lists. */
@@ -700,8 +848,21 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     if (kind !== 'crash' && kind !== 'multi') return;
     const timeLeft =
-      room.phase === 'betting' ? Math.max(1, Math.ceil((room.betEnds - Date.now()) / 1000)) : 0;
-    const state = room.phase === 'betting' ? 1 : room.phase === 'flying' ? 2 : 3;
+      room.phase === 'betting'
+        ? Math.max(1, Math.ceil((room.betEnds - Date.now()) / 1000))
+        : room.phase === 'over' && gameSlug === 'crash'
+          ? Math.max(1, Math.ceil((room.overEnds - Date.now()) / 1000))
+          : 0;
+    const state =
+      gameSlug === 'luck-car'
+        ? room.phase === 'betting'
+          ? 1
+          : 2 // luck-car GameState: betting=1, over=2 only
+        : room.phase === 'betting'
+          ? 1
+          : room.phase === 'flying'
+            ? 2
+            : 3;
     if (gameSlug === 'greedy-box') {
       const body = encodeGreedyTableInfoRes({
         state,
@@ -734,30 +895,81 @@ export class MikooGatewayService implements OnModuleDestroy {
       return;
     }
     if (gameSlug === '7updown') {
+      // Client only: betting=1, over=2
+      const sevenState = room.phase === 'betting' ? 1 : 2;
+      const areas = this.sevenUpAreaBets(room, player?.publicId);
+      const totalBet = areas.reduce((s, a) => s + a.totalBet, 0);
+      const body = encodeTableInfo7UpDown({
+        state: sevenState,
+        betTime: 18,
+        playerNum: room.clients.size,
+        timeLeft,
+        totalBet,
+        history: room.history.length ? room.history : [1, 3, 2, 1, 3, 1, 2, 3],
+        betInfo: areas,
+      });
+      this.send(ws, '.game.TableInfo', body);
+      this.send(ws, '.game.TableInfoRes', body);
       this.send(
         ws,
-        '.game.TableInfo',
-        encodeTableInfo7UpDown({
-          state,
-          betTime: 10,
-          playerNum: room.clients.size,
-          timeLeft,
-          history: room.history.length
-            ? room.history
-            : [1, 3, 2, 1, 3, 1, 2, 3],
-        }),
+        '.game.UpdatePlayerNumBroadcast',
+        encode7UpUpdatePlayerNumBroadcast(room.clients.size),
       );
     } else if (gameSlug === 'luck-car') {
+      let totalBet = 0;
+      const myBets = new Array(8).fill(0);
+      for (const b of room.bets.values()) {
+        totalBet += b.amount;
+        const idx = Math.max(0, Math.min(7, (b.areaId || 1) - 1));
+        if (player && b.playerId === player.publicId) myBets[idx] += b.amount;
+      }
+      const body = encodeLuckCarTableInfo({
+        state,
+        playerNum: room.clients.size,
+        timeLeft,
+        curTurn: room.round,
+        totalBet,
+        myBets,
+      });
+      this.send(ws, '.game.TableInfo', body);
+      this.send(ws, '.game.TableInfoRes', body);
       this.send(
         ws,
-        '.game.TableInfo',
-        encodeLuckCarTableInfo({
-          state,
-          playerNum: room.clients.size,
-          timeLeft,
-          curTurn: room.round,
-        }),
+        '.game.UpdatePlayerNumBroadcast',
+        encodeLuckCarUpdatePlayerNumBroadcast(room.clients.size),
       );
+    } else if (gameSlug === 'crash') {
+      let totalBet = 0;
+      let selfBet = 0;
+      for (const b of room.bets.values()) {
+        totalBet += b.amount;
+        if (player && b.playerId === player.publicId) selfBet += b.amount;
+      }
+      const flyTime =
+        room.phase === 'flying' ? Math.max(0, Date.now() - room.flyStart) : 0;
+      // Crash states: 0 wait, 1 bet, 2 fly, 3 over
+      const crashState =
+        room.phase === 'betting' ? 1 : room.phase === 'flying' ? 2 : 3;
+      const body = encodeTableInfoCrash({
+        state: crashState,
+        playerNum: room.clients.size,
+        timeLeft,
+        ratio: room.ratio,
+        history: room.history.length ? room.history : [1.2, 2.1, 1.5, 3.4, 1.8],
+        totalBet,
+        selfBet,
+        flyTime,
+      });
+      this.send(ws, '.game.TableInfo', body);
+      this.send(ws, '.game.TableInfoRes', body);
+      // Mid-join during flight: seed rocket line immediately (avoids null _animNode freeze).
+      if (room.phase === 'flying') {
+        this.send(
+          ws,
+          '.game.UpdateRatioBroadcast',
+          encodeUpdateRatioBroadcast(room.ratio * 100, flyTime),
+        );
+      }
     } else {
       this.send(
         ws,
@@ -842,6 +1054,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         this.logger.log(
           `login OK ${gameSlug} user=${ctx.userId} publicId=${ctx.publicId} bal=${ctx.balance} room=${ctx.roomId || '-'}`,
         );
+        room.balances.set(ws, ctx.balance);
         this.send(ws, '.login.LoginRes', encodeLoginRes({
           code: 0,
           desc: 'OK',
@@ -852,8 +1065,15 @@ export class MikooGatewayService implements OnModuleDestroy {
           userMoney: ctx.balance,
           tipType: ctx.balance <= 0 ? 2 : 0,
         }));
-        // Lucky77 HUD (name/avatar/coins) reads SelfData from GetUserData + Login.
-        if (gameSlug === 'lucky77') {
+        // Lucky77 / 7updown / crash / greedy / line-slots / luck-car HUD from GetUserData + Login.
+        if (
+          gameSlug === 'lucky77' ||
+          gameSlug === '7updown' ||
+          gameSlug === 'crash' ||
+          gameSlug === 'greedy-box' ||
+          gameSlug === 'line-slots' ||
+          gameSlug === 'luck-car'
+        ) {
           const ud = encodeGetUserDataFor(gameSlug, {
             code: 0,
             desc: 'OK',
@@ -938,6 +1158,12 @@ export class MikooGatewayService implements OnModuleDestroy {
           }));
           if (gameSlug === 'lucky77') {
             this.send(ws, '.game.GetRankDataRes', encodeLucky77GetRankDataRes(mapped));
+          } else if (gameSlug === '7updown') {
+            this.send(ws, '.game.GetRankDataRes', encode7UpGetRankDataRes(mapped));
+          } else if (gameSlug === 'greedy-box') {
+            this.send(ws, '.game.GetRankDataRes', encodeGreedyGetRankDataRes(mapped));
+          } else if (gameSlug === 'line-slots') {
+            this.send(ws, '.game.GetRankDataRes', encodeLineSlotsGetRankDataRes(mapped));
           } else {
             this.send(ws, '.game.GetRankDataRes', encodeLuckCarGetRankDataRes(mapped));
           }
@@ -948,7 +1174,13 @@ export class MikooGatewayService implements OnModuleDestroy {
             '.game.GetRankDataRes',
             gameSlug === 'lucky77'
               ? encodeLucky77GetRankDataRes([])
-              : encodeLuckCarGetRankDataRes([]),
+              : gameSlug === '7updown'
+                ? encode7UpGetRankDataRes([])
+                : gameSlug === 'greedy-box'
+                  ? encodeGreedyGetRankDataRes([])
+                  : gameSlug === 'line-slots'
+                    ? encodeLineSlotsGetRankDataRes([])
+                    : encodeLuckCarGetRankDataRes([]),
           );
         }
         return player;
@@ -960,8 +1192,13 @@ export class MikooGatewayService implements OnModuleDestroy {
             this.send(ws, '.game.GetUserRecordRes', encodeCrashGetUserRecordRes([]));
           } else if (gameSlug === 'luck-car') {
             this.send(ws, '.game.GetUserRecordRes', encodeLuckCarGetUserRecordRes([]));
+          } else if (gameSlug === '7updown') {
+            this.send(ws, '.game.GetUserRecordRes', encode7UpGetUserRecordRes([]));
+          } else if (gameSlug === 'greedy-box') {
+            this.send(ws, '.game.GetUserRecordRes', encodeGreedyGetUserRecordRes());
+          } else if (gameSlug === 'line-slots') {
+            this.send(ws, '.game.GetUserRecordRes', encodeLineSlotsGetUserRecordRes());
           } else {
-            // 7updown / others — empty crash-shaped is safest no-op for unknown
             this.send(ws, '.game.GetUserRecordRes', encodeCrashGetUserRecordRes([]));
           }
         } catch (err) {
@@ -1021,6 +1258,16 @@ export class MikooGatewayService implements OnModuleDestroy {
 
       if (name === '.game.CashoutReq' && kind === 'crash') {
         return this.handleCashout(ws, gameSlug, room, player);
+      }
+
+      if (name === '.game.CashoutConfReq' && gameSlug === 'crash') {
+        const f = decodeFields(body);
+        const type = Number(f[1] ?? 0);
+        const ratio = Number(f[2] ?? 101);
+        const rsp = encodeCashoutConfRsp({ code: 0, desc: 'OK', type, ratio });
+        this.send(ws, '.game.CashoutConfRsp', rsp);
+        this.send(ws, '.game.CashoutConfRes', rsp);
+        return player;
       }
 
       if (name.endsWith('Req')) {
@@ -1193,7 +1440,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     body: Buffer,
     player: MikooPlayerContext,
   ) {
-    const req = decodeBetReq(body, kind === 'multi' || kind === 'crash' ? 'multi' : 'default');
+    const req = decodeBetReq(body, kind === 'multi' ? 'multi' : 'default');
     const amount = Math.max(1, Math.floor(Number(req.money) || 0));
     this.logger.log(
       `GAME_PROBE BET_DECODE game=${gameSlug} phase=${room.phase} amount=${amount} area=${req.areaId} user=${player.userId} bal=${player.balance}`,
@@ -1283,6 +1530,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     try {
       const bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
       player.balance = bal;
+      room.balances.set(ws, bal);
       const key = `${player.publicId}:${req.areaId || 0}`;
       const existing = room.bets.get(key);
       if (existing) {
@@ -1306,9 +1554,25 @@ export class MikooGatewayService implements OnModuleDestroy {
         });
       }
       if (gameSlug === 'greedy-box') {
+        const myAreaAmt = room.bets.get(`${player.publicId}:${req.areaId || 0}`)?.amount ?? amount;
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
-          code: 0, desc: 'OK', userMoney: bal, tipType: 0, iconId: req.areaId,
+          code: 0,
+          desc: 'OK',
+          userMoney: bal,
+          tipType: 0,
+          iconId: req.areaId,
+          betMoney: myAreaAmt,
         }));
+        this.broadcast(
+          room,
+          '.game.OtherPlayerBetBroadcast',
+          encodeGreedyOtherPlayerBetBroadcast({
+            icon: req.areaId || 0,
+            money: amount,
+            uid: player.publicId,
+          }),
+          ws,
+        );
       } else if (gameSlug === 'lucky77') {
         const betTotal = this.lucky77AreaBets(room, player.publicId);
         const roomBetTotal = this.lucky77AreaBets(room);
@@ -1332,15 +1596,28 @@ export class MikooGatewayService implements OnModuleDestroy {
           }),
         );
       } else if (gameSlug === '7updown') {
-        this.send(ws, '.game.BetRsp', encode7UpBetRsp({
-          code: 0, desc: 'OK', selfMoney: bal, betMoney: amount, areaId: req.areaId, tipType: 0,
-        }));
-        this.send(ws, '.game.BetRes', encode7UpBetRsp({
-          code: 0, desc: 'OK', selfMoney: bal, betMoney: amount, areaId: req.areaId, tipType: 0,
-        }));
+        const areas = this.sevenUpAreaBets(room, player.publicId);
+        const rsp = encode7UpBetRsp({
+          code: 0,
+          desc: 'OK',
+          selfMoney: bal,
+          betMoney: amount,
+          areaId: req.areaId,
+          tipType: 0,
+          betInfo: areas,
+        });
+        this.send(ws, '.game.BetRsp', rsp);
+        this.send(ws, '.game.BetRes', rsp);
+        // Others see chip-fly via UpdateBetPool; better already flew from BetRsp.
+        this.sevenUpPoolBroadcast(room, ws);
       } else if (gameSlug === 'luck-car') {
         let myBetAll = 0;
+        let totalBet = 0;
+        const areaTotals = new Array(8).fill(0);
         for (const b of room.bets.values()) {
+          totalBet += b.amount;
+          const idx = Math.max(0, Math.min(7, (b.areaId || 1) - 1));
+          areaTotals[idx] += b.amount;
           if (b.playerId === player.publicId) myBetAll += b.amount;
         }
         const rsp = encodeLuckCarBetRsp({
@@ -1354,9 +1631,37 @@ export class MikooGatewayService implements OnModuleDestroy {
         });
         this.send(ws, '.game.BetRsp', rsp);
         this.send(ws, '.game.BetRes', rsp);
+        this.broadcast(
+          room,
+          '.game.UpdateBetPoolBroadcast',
+          encodeLuckCarUpdateBetPoolBroadcast({
+            totalBet,
+            playerId: player.publicId,
+            bet: amount,
+            betInfo: areaTotals.map((t, i) => ({
+              id: i + 1,
+              totalBet: t,
+            })),
+          }),
+        );
+      } else if (gameSlug === 'crash') {
+        this.send(ws, '.game.BetRsp', encodeBetRsp({
+          code: 0, desc: 'OK', selfMoney: bal, tipType: 0, betMoney: amount,
+        }));
+        let totalBet = 0;
+        for (const b of room.bets.values()) totalBet += b.amount;
+        this.broadcast(
+          room,
+          '.game.UpdateBetPoolBroadcast',
+          encodeCrashUpdateBetPoolBroadcast({
+            totalBet,
+            playerId: player.publicId,
+            bet: amount,
+          }),
+        );
       } else {
         this.send(ws, '.game.BetRsp', encodeBetRsp({
-          code: 0, desc: 'OK', selfMoney: bal, tipType: 0,
+          code: 0, desc: 'OK', selfMoney: bal, tipType: 0, betMoney: amount,
         }));
       }
       this.logger.log(
@@ -1406,7 +1711,11 @@ export class MikooGatewayService implements OnModuleDestroy {
     const bet = [...room.bets.values()].find((b) => b.playerId === player.publicId && !b.cashedOut);
     if (!bet || room.phase !== 'flying') {
       this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({
-        code: 1, desc: 'Cannot cashout', ratio: room.ratio, winMoney: 0, selfMoney: player.balance,
+        code: 1,
+        desc: 'Cannot cashout',
+        ratio: room.ratio * 100,
+        winMoney: 0,
+        selfMoney: player.balance,
       }));
       return player;
     }
@@ -1415,9 +1724,20 @@ export class MikooGatewayService implements OnModuleDestroy {
     bet.payout = win;
     const bal = await this.credit(player.userId, win, gameSlug, room.ratio, bet.amount);
     player.balance = bal;
+    room.balances.set(ws, bal);
+    // CashoutRsp.ratio is centi (client shows ratio/100).
     this.send(ws, '.game.CashoutRsp', encodeCashoutRsp({
-      code: 0, desc: 'OK', ratio: room.ratio, winMoney: win, selfMoney: bal,
+      code: 0,
+      desc: 'OK',
+      ratio: room.ratio * 100,
+      winMoney: win,
+      selfMoney: bal,
     }));
+    this.broadcast(
+      room,
+      '.game.SomeoneCashoutBroadcast',
+      encodeSomeoneCashoutBroadcast(room.ratio * 100, player.publicId),
+    );
     void this.economy.onBetWin({
       sessionId: player.sessionId,
       userId: player.userId,

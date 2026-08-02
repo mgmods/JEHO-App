@@ -12,9 +12,17 @@ public class ProfileViewModel extends ViewModel {
     public LiveData<String> getError() { return error; }
     public LiveData<Boolean> getSaved() { return saved; }
     public void loadMe() {
+        // Mikoo-style: paint cached profile instantly, then refresh from network.
+        AuthDtos.UserDto cached = c.getSessionManager().getUser();
+        if (cached != null) user.setValue(cached);
         c.getIoExecutor().execute(() -> {
             Result<AuthDtos.UserDto> r = c.getProfileUseCase.me();
-            if (r.success) user.postValue(r.data); else error.postValue(r.error);
+            if (r.success) {
+                c.getSessionManager().updateCachedUser(r.data);
+                user.postValue(r.data);
+            } else if (cached == null) {
+                error.postValue(r.error);
+            }
         });
     }
     public void loadUser(String id) {

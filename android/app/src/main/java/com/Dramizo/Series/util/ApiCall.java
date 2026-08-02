@@ -129,7 +129,13 @@ public final class ApiCall {
             return "خطأ في السيرفر، حاول لاحقاً";
         }
         if (message != null && message.toLowerCase().contains("insufficient coins")) {
-            return "رصيد العملات غير كافٍ";
+            if (message.toLowerCase().contains("room entry")) {
+                return "رصيدك غير كافٍ لدخول الغرفة — اشحن كوينز";
+            }
+            return "رصيد العملات غير كافٍ — اشحن للمتابعة";
+        }
+        if (message != null && message.toLowerCase().contains("insufficient")) {
+            return "رصيد غير كافٍ — اشحن للمتابعة";
         }
         if (message != null && !message.isEmpty() && !message.trim().startsWith("{")) {
             return message;

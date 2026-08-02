@@ -60,6 +60,9 @@ public class GamePlayActivity extends ThemedActivity {
     /** Typical Mikoo portrait canvas (crash/luck-car/megaways). */
     private static final float DESIGN_W = 750f;
     private static final float DESIGN_H = 1334f;
+    /** Fishing Cocos build is landscape (see fishing/src/settings.js). */
+    private static final float FISHING_W = 1334f;
+    private static final float FISHING_H = 750f;
 
     private WebView web;
     private View loadingOverlay;
@@ -188,7 +191,8 @@ public class GamePlayActivity extends ThemedActivity {
         }
 
         // Size after first layout pass so design aspect matches real viewport.
-        gameStage.post(() -> layoutGameStage(mikoo || isDiceOrWheel(pendingUrl)));
+        boolean fishing = "fishing".equalsIgnoreCase(gameId);
+        gameStage.post(() -> layoutGameStage(mikoo || isDiceOrWheel(pendingUrl), fishing));
         configureWebView(mikoo);
         showLoading(true);
         handler.postDelayed(loadingWatchdog, 45_000);
@@ -298,8 +302,12 @@ public class GamePlayActivity extends ThemedActivity {
         }
     }
 
-    /** Letterbox Mikoo design canvas (750×1334) so UI is not cropped on tall phones. */
+    /** Letterbox Mikoo design canvas so UI is not cropped on tall phones. */
     private void layoutGameStage(boolean aspectFit) {
+        layoutGameStage(aspectFit, false);
+    }
+
+    private void layoutGameStage(boolean aspectFit, boolean fishingLandscape) {
         if (gameStage == null) return;
         View root = findViewById(android.R.id.content);
         int screenW = getResources().getDisplayMetrics().widthPixels;
@@ -310,9 +318,11 @@ public class GamePlayActivity extends ThemedActivity {
         }
         FrameLayout.LayoutParams lp;
         if (aspectFit) {
-            float scale = Math.min(screenW / DESIGN_W, screenH / DESIGN_H);
-            int w = Math.max(1, Math.round(DESIGN_W * scale));
-            int h = Math.max(1, Math.round(DESIGN_H * scale));
+            float designW = fishingLandscape ? FISHING_W : DESIGN_W;
+            float designH = fishingLandscape ? FISHING_H : DESIGN_H;
+            float scale = Math.min(screenW / designW, screenH / designH);
+            int w = Math.max(1, Math.round(designW * scale));
+            int h = Math.max(1, Math.round(designH * scale));
             lp = new FrameLayout.LayoutParams(w, h, android.view.Gravity.CENTER);
         } else {
             lp = new FrameLayout.LayoutParams(

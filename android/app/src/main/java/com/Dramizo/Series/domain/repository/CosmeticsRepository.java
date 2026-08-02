@@ -9,4 +9,5 @@ public interface CosmeticsRepository {
     Result<List<CosmeticDtos.UserCosmeticDto>> inventory();
     Result<CosmeticDtos.UserCosmeticDto> purchase(String cosmeticId);
     Result<CosmeticDtos.EquipResult> equip(String cosmeticId);
+    Result<CosmeticDtos.EquipResult> unequip(String cosmeticId);
 }

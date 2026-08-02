@@ -1,6 +1,5 @@
 package com.Dramizo.Series.presentation.agency;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.widget.FrameLayout;
@@ -19,7 +18,6 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.presentation.wallet.BagActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.CountryCatalog;
 
@@ -77,13 +75,7 @@ public class AgencyCreateActivity extends ThemedActivity {
         });
         vm.getError().observe(this, e -> {
             if (e == null) return;
-            Toast.makeText(this, e, Toast.LENGTH_LONG).show();
-            String lower = e.toLowerCase(Locale.US);
-            if (lower.contains("insufficient") || lower.contains("رصيد")
-                    || lower.contains("coins") || lower.contains("عملات")
-                    || lower.contains("balance")) {
-                startActivity(new Intent(this, BagActivity.class));
-            }
+            com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
 
         vm.loadPricing();
@@ -134,10 +126,8 @@ public class AgencyCreateActivity extends ThemedActivity {
             return;
         }
         if (walletCoins >= 0 && walletCoins < priceCoins) {
-            Toast.makeText(this,
-                    getString(R.string.agency_insufficient_coins_format, priceCoins),
-                    Toast.LENGTH_LONG).show();
-            startActivity(new Intent(this, BagActivity.class));
+            com.Dramizo.Series.util.BalanceRedirect.handleForced(this,
+                    getString(R.string.agency_insufficient_coins_format, priceCoins));
             return;
         }
         MiscDtos.AgencyApplicationRequest request = applicationFrom();

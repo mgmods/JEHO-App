@@ -18,9 +18,16 @@ import java.util.List;
 
 /** VIP 1–7 cards with privilege rows + wealth gates (Mikoo-style). */
 public class VipAdapter extends RecyclerView.Adapter<VipAdapter.VH> {
-    public interface Listener { void onBuy(int level); }
+    public interface Listener {
+        void onBuy(int level);
+        default void onBuy(int level, int durationDays) { onBuy(level); }
+    }
 
     private static final int MAX_DISPLAY_VIP = 7;
+    /** Colorful VIP rental packs — never permanent. */
+    private static final int[] DURATION_DAYS = { 7, 30, 40 };
+    private static final String[] DURATION_LABELS = { "أسبوعي · 7 أيام", "شهري · 30 يوم", "40 يوم" };
+    private static final double[] DURATION_MULT = { 0.28, 1.0, 1.25 };
 
     private final List<MiscDtos.VipPlanDto> items = new ArrayList<>();
     private final Listener listener;
@@ -62,7 +69,7 @@ public class VipAdapter extends RecyclerView.Adapter<VipAdapter.VH> {
         MiscDtos.VipPlanDto plan = items.get(position);
         int level = Math.max(1, Math.min(MAX_DISPLAY_VIP, plan.level));
         holder.b.tvName.setText("VIP " + level);
-        holder.b.tvPrice.setText(plan.coinPriceMonthly + " عملة / شهر");
+        holder.b.tvPrice.setText(plan.coinPriceMonthly + " عملة / شهر · إيجار فقط");
 
         // Same Mikoo medal art as dashboard (VIP1→medal1 … VIP7→medal7).
         String badge = plan.badgeUrl;
@@ -84,10 +91,28 @@ public class VipAdapter extends RecyclerView.Adapter<VipAdapter.VH> {
             holder.b.btnBuy.setEnabled(false);
             holder.b.btnBuy.setOnClickListener(null);
         } else {
-            holder.b.btnBuy.setText(currentVipLevel > 0 ? "ترقية" : "شراء");
+            holder.b.btnBuy.setText(currentVipLevel > 0 ? "ترقية" : "شراء مدة");
             holder.b.btnBuy.setEnabled(true);
-            holder.b.btnBuy.setOnClickListener(v -> listener.onBuy(plan.level));
+            holder.b.btnBuy.setOnClickListener(v -> showDurationPicker(holder.b.getRoot().getContext(), plan));
         }
+    }
+
+    private void showDurationPicker(android.content.Context ctx, MiscDtos.VipPlanDto plan) {
+        if (listener == null || ctx == null || plan == null) return;
+        CharSequence[] rows = new CharSequence[DURATION_DAYS.length];
+        for (int i = 0; i < DURATION_DAYS.length; i++) {
+            int price = Math.max(1, (int) Math.ceil(plan.coinPriceMonthly * DURATION_MULT[i]));
+            rows[i] = DURATION_LABELS[i] + " — " + price + " عملة";
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(ctx)
+                .setTitle("مدة VIP " + plan.level + " (ليست دائمة)")
+                .setItems(rows, (d, which) -> {
+                    if (which >= 0 && which < DURATION_DAYS.length) {
+                        listener.onBuy(plan.level, DURATION_DAYS[which]);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void bindPrivileges(LinearLayout container, int vipLevel, MiscDtos.VipBenefits benefits) {

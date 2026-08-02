@@ -18,6 +18,7 @@
         android:orientation="vertical"
         android:padding="10dp">
 
+        <!-- Lightweight preview: NO HostSignalView / SVGA in mall grid (OOM crash). -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="110dp"
@@ -26,19 +27,21 @@
             android:clipToPadding="true">
 
             <ImageView
+                android:id="@+id/imgFace"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <ImageView
                 android:id="@+id/imgPreview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:contentDescription="@null"
-                android:padding="8dp"
+                android:padding="6dp"
                 android:scaleType="fitCenter" />
-
-            <com.Dramizo.Series.util.HostSignalView
-                android:id="@+id/webHostPreview"
-                android:layout_width="96dp"
-                android:layout_height="96dp"
-                android:layout_gravity="center"
-                android:visibility="gone" />
         </FrameLayout>
 
         <TextView
@@ -71,7 +74,6 @@
             android:textStyle="bold"
             tools:text="500 عملة" />
 
-        <!-- Single action button: شراء / تجهيز / مجهّز — avoids black invisible secondary btn -->
         <TextView
             android:id="@+id/btnPurchase"
             android:layout_width="match_parent"

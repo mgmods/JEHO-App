@@ -43,7 +43,12 @@ public class VipActivity extends ThemedActivity {
         }
 
         VipViewModel vm = new ViewModelProvider(this, new ViewModelFactory(c)).get(VipViewModel.class);
-        adapter = new VipAdapter(vm::purchase);
+        adapter = new VipAdapter(new VipAdapter.Listener() {
+            @Override public void onBuy(int level) { vm.purchase(level, 30); }
+            @Override public void onBuy(int level, int durationDays) {
+                vm.purchase(level, durationDays);
+            }
+        });
         binding.recycler.setLayoutManager(new LinearLayoutManager(this));
         binding.recycler.setAdapter(adapter);
 

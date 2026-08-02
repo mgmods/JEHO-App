@@ -29,10 +29,8 @@ import com.Dramizo.Series.databinding.DialogRoomGiftBinding;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
-import com.Dramizo.Series.presentation.wallet.RechargePackagesBottomSheet;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.GiftAudioFx;
-import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.Dramizo.Series.widget.GiftUserAvatarView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -78,7 +76,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
     private static final String[] TAB_LABELS = {
-            "حقيبة", "عام", "حظ", "CP", "كبير", "دولة", "فئات", "VIP", "صداقة"
+            "عادي", "حظ", "كومبو", "مميز"
     };
 
     // From included layouts (not exposed on DialogRoomGiftBinding without include ids).
@@ -148,10 +146,22 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             BottomSheetBehavior<FrameLayout> behavior = BottomSheetBehavior.from(sheet);
             behavior.setFitToContents(true);
             behavior.setSkipCollapsed(true);
-            behavior.setDraggable(true);
+            // Keep sheet fixed so vertical swipes scroll the gift grid, not the sheet.
+            behavior.setDraggable(false);
             int screenH = sheet.getResources().getDisplayMetrics().heightPixels;
             behavior.setMaxHeight(Math.round(screenH * 0.88f));
             behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+
+            // Gift grid: ~3.5 rows visible, then scroll for the rest.
+            if (binding != null && binding.vpGiftListContainer != null) {
+                ViewGroup.LayoutParams vplp = binding.vpGiftListContainer.getLayoutParams();
+                if (vplp != null) {
+                    vplp.height = Math.max(
+                            Math.round(220 * sheet.getResources().getDisplayMetrics().density),
+                            Math.round(screenH * 0.36f));
+                    binding.vpGiftListContainer.setLayoutParams(vplp);
+                }
+            }
 
             if (dialog.getWindow() != null) {
                 int bg = ContextCompat.getColor(requireContext(), R.color.color_gift_dialog_bg);
@@ -338,10 +348,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 });
         tabMediator.attach();
 
-        // Default tab: عام (index 1) — like Mikoo.
-        binding.vpGiftListContainer.setCurrentItem(1, false);
-        giftTypeFilter = typeForTab(1);
-        styleGiftTab(tabs.getTabAt(1), true);
+        // Default tab: عادي
+        binding.vpGiftListContainer.setCurrentItem(0, false);
+        giftTypeFilter = typeForTab(0);
+        styleGiftTab(tabs.getTabAt(0), true);
 
         // Do NOT clearOnTabSelectedListeners — that kills TabLayoutMediator sync.
         tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -386,16 +396,11 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable
     private static String typeForTab(int pos) {
         switch (pos) {
-            case 0: return "bag";
-            case 1: return null; // عام
-            case 2: return "lucky";
-            case 3: return "cp";
-            case 4: return "premium";
-            case 5: return "country";
-            case 6: return "debris";
-            case 7: return "vip";
-            case 8: return "friend";
-            default: return null;
+            case 0: return "normal";
+            case 1: return "lucky";
+            case 2: return "combo";
+            case 3: return "premium";
+            default: return "normal";
         }
     }
 
@@ -412,7 +417,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.vpGiftListContainer.setVisibility(View.VISIBLE);
 
         int cur = binding.vpGiftListContainer.getCurrentItem();
-        if (cur < 0 || cur >= byTab.size()) cur = 1;
+        if (cur < 0 || cur >= byTab.size()) cur = 0;
         List<GiftDtos.GiftDto> current = byTab.get(cur);
         if (current.isEmpty() && !allGifts.isEmpty()) {
             // Soft empty — no toast spam on every swipe.
@@ -422,21 +427,27 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
     @NonNull
     private List<GiftDtos.GiftDto> filterForTab(@Nullable String filter) {
+        String want = filter != null && !filter.isEmpty() ? filter : "normal";
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
-            if (filter == null || filter.isEmpty()) {
-                out.add(g);
-                continue;
-            }
-            String cat = g.category != null && !g.category.trim().isEmpty()
-                    ? g.category.trim().toLowerCase(Locale.US)
-                    : (g.type != null ? g.type.trim().toLowerCase(Locale.US) : "normal");
-            String t = g.type != null
-                    ? g.type.trim().toLowerCase(Locale.US) : "normal";
-            if (filter.equals(cat) || filter.equals(t)) out.add(g);
+            if (want.equals(giftBucket(g))) out.add(g);
         }
         return out;
+    }
+
+    /** Map gift type/category into the 4 app tabs: normal / lucky / combo / premium. */
+    @NonNull
+    private static String giftBucket(@NonNull GiftDtos.GiftDto g) {
+        String t = g.type != null ? g.type.trim().toLowerCase(Locale.US) : "";
+        String c = g.category != null ? g.category.trim().toLowerCase(Locale.US) : "";
+        if ("lucky".equals(t) || "lucky".equals(c)) return "lucky";
+        if ("combo".equals(t) || "combo".equals(c)) return "combo";
+        if ("premium".equals(t) || "premium".equals(c)
+                || "vip".equals(c) || "celebrity".equals(c)) {
+            return "premium";
+        }
+        return "normal";
     }
 
     /** صندوق الحظ العائم في الغرفة — ليس من تبويب المحظوظ. */
@@ -788,20 +799,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : java.util.Collections.emptyList());
             boolean allMic = sendToAllMic && tgts.size() > 1;
             if (luckyGift) {
-                // Lucky / مردود mega: always sprinkle onto EVERY occupied mic.
-                List<String> rainTargets = room.collectOccupiedMicUserIdsPublic();
-                if (rainTargets.isEmpty() && !tgts.isEmpty()) {
-                    rainTargets = new ArrayList<>(tgts);
-                }
-                GiftAudioFx.playLuckyCoins(requireContext(), 5);
-                room.playLuckyGiftStage(
-                        icon,
-                        rainTargets,
-                        Math.max(1L, spentTotal),
-                        qty,
-                        Math.max(1, rainTargets.size()),
-                        null);
-                // Credit seats + chat line (no gift GIF — mega coins only).
+                GiftAudioFx.playLuckyCoins(requireContext(), 2);
+                // No big stage / no all-mic rain on send — seats + chat only.
                 for (String tid : tgts) {
                     if (tid != null && !tid.isEmpty() && coinValue > 0) {
                         room.creditGiftCoinsOnSeat(tid, coinValue);
@@ -869,8 +868,6 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 wonCoinsResolved = Math.max(1L, (long) Math.floor(spent * mulRaw));
             }
             final long wonCoins = wonCoinsResolved;
-            final long spentFinal = spent;
-            final String giftName = name;
             final int mulFinal = mul;
             final boolean softFinal = softReturn;
             final boolean didWin = wonCoins > 0;
@@ -881,60 +878,58 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             dismissAllowingStateLoss();
             if (hostAct instanceof VoiceRoomActivity room) {
                 SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
-                List<String> rainTargets = room.collectOccupiedMicUserIdsPublic();
-                if (rainTargets.isEmpty() && !lastTargets.isEmpty()) {
-                    rainTargets = new ArrayList<>(lastTargets);
-                }
-                Runnable showResultDialog = () -> {
-                    if (hostAct == null || hostAct.isFinishing()) return;
-                    if (didWin) {
-                        RewardBurstOverlay.showLuckyGiftWin(
-                                hostAct, giftName,
-                                softFinal ? 1 : Math.max(1, mulFinal),
-                                spentFinal, wonCoins, softFinal);
-                    } else {
-                        RewardBurstOverlay.showLuckyGiftLose(hostAct, giftName, spentFinal);
-                    }
-                };
-                if (didWin) {
-                    room.showLuckyHitBanner(
+                Runnable showSmallToast = () -> {
+                    if (hostAct == null || hostAct.isFinishing() || !didWin) return;
+                    String msg = softFinal
+                            ? ("مردود +" + wonCoins)
+                            : ("ضرب حظه ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                    room.showLuckyResultToast(
                             session.getDisplayName(),
                             session.getAvatarUrl(),
-                            wonCoins,
-                            softFinal ? 0 : Math.max(1, mulFinal));
-                    room.showLuckyReturnOnMics(rainTargets, wonCoins);
+                            Math.max(1, session.getUserLevel()),
+                            Math.max(0, session.getVipLevel()),
+                            msg);
+                };
+                if (didWin) {
+                    String who = session.getDisplayName();
+                    if (who == null || who.isEmpty()) who = "مستخدم";
+                    String chat = softFinal
+                            ? ("ضرب حظه · مردود +" + wonCoins)
+                            : ("ضرب حظه وربح ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                    room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
+                    String meId = session.getUserId();
+                    if (meId != null && !meId.isEmpty()) {
+                        room.showLuckyReturnOnMics(
+                                java.util.Collections.singletonList(meId), wonCoins);
+                        room.playCoinRainToUsers(
+                                java.util.Collections.singletonList(meId), 16);
+                    }
                     if (sfxCtx != null) {
                         GiftAudioFx.playLuckyCoins(sfxCtx,
-                                softFinal ? 3 : Math.min(7, Math.max(4, mulFinal)));
+                                softFinal ? 2 : Math.min(4, Math.max(2, mulFinal)));
                     }
-                    if (!softFinal && mulFinal >= 1) {
-                        // Win burst already rains onto mics — then dialog.
-                        room.playLuckyWinBurst(mulFinal, wonCoins, rainTargets, () ->
-                                hostAct.getWindow().getDecorView().post(showResultDialog));
-                    } else {
-                        room.playLuckyCoinBurst(3);
-                        room.playCoinRainToUsers(rainTargets,
-                                Math.min(100, 36 + Math.max(1, rainTargets.size()) * 8));
-                        hostAct.getWindow().getDecorView().postDelayed(showResultDialog, 900L);
-                    }
-                } else {
-                    hostAct.getWindow().getDecorView().postDelayed(showResultDialog, 450L);
+                    hostAct.getWindow().getDecorView().postDelayed(showSmallToast, 200L);
                 }
+                // Empty roll: silent.
             } else if (didWin) {
                 if (sfxCtx != null) {
                     GiftAudioFx.playLuckyCoins(sfxCtx, softFinal ? 3 : 4);
                 }
                 if (hostAct != null && !hostAct.isFinishing()) {
-                    final boolean softDlg = softFinal;
+                    String body = softFinal
+                            ? ("مردود +" + wonCoins)
+                            : ("ضرب حظه ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
                     hostAct.getWindow().getDecorView().post(() ->
-                            RewardBurstOverlay.showLuckyGiftWin(
-                                    hostAct, giftName, Math.max(1, mulFinal),
-                                    spentFinal, wonCoins, softDlg));
+                            com.Dramizo.Series.util.GlobalCelebrationToast.show(
+                                    hostAct,
+                                    softFinal ? "مردود جزئي" : "حظ سعيد!",
+                                    body,
+                                    null,
+                                    icon,
+                                    "lucky-local:" + System.currentTimeMillis()));
                 }
-            } else if (hostAct != null && !hostAct.isFinishing()) {
-                hostAct.getWindow().getDecorView().post(() ->
-                        RewardBurstOverlay.showLuckyGiftLose(hostAct, giftName, spentFinal));
             }
+            // Empty roll outside room: silent — never show lose dialog.
             return;
         }
 
@@ -1026,7 +1021,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         FragmentManager fm = getParentFragmentManager();
         dismissAllowingStateLoss();
         fm.executePendingTransactions();
-        RechargePackagesBottomSheet.show(fm);
+        com.Dramizo.Series.util.BalanceRedirect.openRecharge(requireActivity());
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────

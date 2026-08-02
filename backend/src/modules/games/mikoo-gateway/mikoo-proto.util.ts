@@ -333,7 +333,10 @@ export function pbPackedUInt32(field: number, values: number[]): Buffer {
   return Buffer.concat([tag(field, 2), writeVarint(payload.length), payload]);
 }
 
-/** greedy-box TableInfoRes — unlocks table UI after login. */
+/** greedy-box TableInfoRes — unlocks table UI after login.
+ * Client fields: state@1 timeLeft@2 curTurn@3 chips@4 boxList@5 bingoIcon@6
+ * betTotal@7 totalGain@9 todayWin@10 betRank@11 userMoney@12 lastChips@13
+ * totalBet@17 curBingoIcon@18. Field 11 is RankInfo[], never a scalar. */
 export function encodeGreedyTableInfoRes(data: {
   state: number;
   timeLeft: number;
@@ -352,17 +355,45 @@ export function encodeGreedyTableInfoRes(data: {
     ]);
     boxes.push(Buffer.concat([tag(5, 2), writeVarint(box.length), box]));
   }
+  const money = Math.max(0, Math.floor(data.userMoney));
   return encodeMessage([
     pbUInt32(1, data.state),
     pbUInt32(2, Math.max(0, data.timeLeft | 0)),
     pbUInt32(3, data.curTurn),
     pbPackedUInt64(4, chips),
     ...boxes,
-    pbPackedUInt32(6, [1, 2, 3]),
-    pbUInt64(11, Math.max(0, Math.floor(data.userMoney))),
-    pbUInt64(12, chips[0] || 100),
-    pbUInt32(17, 1),
+    pbPackedUInt32(6, [1, 2, 3, 4, 5, 6, 7, 8]),
+    pbUInt64(9, 0), // totalGain
+    pbUInt64(10, 0), // todayWin
+    // betRank@11 omitted (empty)
+    pbUInt64(12, money),
+    pbUInt64(13, chips[0] || 100), // lastChips = last selected chip
+    pbUInt64(17, 0), // totalBet
+    pbUInt32(18, 0), // curBingoIcon
   ]);
+}
+
+/** greedy-box GetRankDataRes: code@1 desc@2 rankList@3 RankInfo{uid,name,head,score,rank}. */
+export function encodeGreedyGetRankDataRes(
+  ranks: Array<{ playerId?: number; name: string; head: string; winMoney: number }>,
+): Buffer {
+  const parts: Buffer[] = [pbUInt32(1, 0), pbString(2, 'OK')];
+  ranks.forEach((r, i) => {
+    const row = encodeMessage([
+      pbUInt64(1, Math.max(0, Math.floor(r.playerId ?? 0))),
+      pbString(2, r.name || 'Player'),
+      pbString(3, r.head || ''),
+      pbUInt64(4, Math.max(0, Math.floor(r.winMoney))),
+      pbUInt32(5, i + 1),
+    ]);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  });
+  return encodeMessage(parts);
+}
+
+/** greedy-box GetUserRecordRes: code@1 desc@2 recordData@3[]. Empty list clears loading. */
+export function encodeGreedyGetUserRecordRes(): Buffer {
+  return encodeMessage([pbUInt32(1, 0), pbString(2, 'OK')]);
 }
 
 /** greedy-box StartBetBroadcast: state, betTime, curTurn. */
@@ -381,13 +412,38 @@ export function encodeGreedyBetRes(data: {
   userMoney: number;
   tipType?: number;
   iconId?: number;
+  betMoney?: number;
 }): Buffer {
-  return encodeMessage([
+  const parts: Buffer[] = [
     pbUInt32(1, data.code),
     pbString(2, data.desc),
     pbInt32(3, data.tipType ?? 0),
     pbUInt64(4, Math.max(0, Math.floor(data.userMoney))),
-    pbUInt32(6, data.iconId ?? 0),
+  ];
+  if (data.iconId != null && data.iconId > 0) {
+    const area = encodeMessage([
+      pbUInt32(1, data.iconId | 0),
+      pbUInt64(2, Math.max(0, Math.floor(data.betMoney ?? 0))),
+    ]);
+    parts.push(Buffer.concat([tag(5, 2), writeVarint(area.length), area]));
+  }
+  parts.push(pbUInt32(6, data.iconId ?? 0));
+  return encodeMessage(parts);
+}
+
+/** greedy-box OtherPlayerBetBroadcast: curBet@1 BetArea, uid@2. */
+export function encodeGreedyOtherPlayerBetBroadcast(data: {
+  icon: number;
+  money: number;
+  uid: number;
+}): Buffer {
+  const area = encodeMessage([
+    pbUInt32(1, data.icon | 0),
+    pbUInt64(2, Math.max(0, Math.floor(data.money))),
+  ]);
+  return encodeMessage([
+    Buffer.concat([tag(1, 2), writeVarint(area.length), area]),
+    pbInt32(2, data.uid | 0),
   ]);
 }
 
@@ -413,6 +469,93 @@ export function encodeGreedyResultBroadcast(data: {
 }
 
 /** 7updown TableInfo — different from crash. */
+const SEVEN_UP_AREA_RATIOS: Record<number, number> = { 1: 2, 2: 5, 3: 2 };
+const SEVEN_UP_CHIPS = [10, 50, 100, 500, 1000];
+
+function encode7UpBetArea(data: {
+  id: number;
+  totalBet?: number;
+  myBet?: number;
+  ratio?: number;
+}): Buffer {
+  const id = data.id | 0;
+  return encodeMessage([
+    pbUInt32(1, id),
+    pbUInt32(2, Math.max(0, Math.floor(data.totalBet ?? 0))),
+    pbUInt32(3, Math.max(0, Math.floor(data.myBet ?? 0))),
+    pbUInt32(4, Math.max(0, Math.floor(data.ratio ?? SEVEN_UP_AREA_RATIOS[id] ?? 2))),
+  ]);
+}
+
+function encode7UpBetAreaAll(id: number, totalBet: number): Buffer {
+  return encodeMessage([
+    pbUInt32(1, id | 0),
+    pbUInt32(2, Math.max(0, Math.floor(totalBet))),
+  ]);
+}
+
+/** 7updown UpdateBetPoolBroadcast — realtime pooled totals on each area. */
+export function encode7UpUpdateBetPoolBroadcast(data: {
+  totalBet: number;
+  betInfo: Array<{ id: number; totalBet: number }>;
+}): Buffer {
+  const parts: Buffer[] = [pbUInt64(1, Math.max(0, Math.floor(data.totalBet)))];
+  for (const a of data.betInfo ?? []) {
+    const row = encode7UpBetAreaAll(a.id, a.totalBet);
+    parts.push(Buffer.concat([tag(2, 2), writeVarint(row.length), row]));
+  }
+  return encodeMessage(parts);
+}
+
+export function encode7UpUpdatePlayerNumBroadcast(num: number): Buffer {
+  return encodeMessage([pbUInt64(1, Math.max(0, Math.floor(num)))]);
+}
+
+/**
+ * 7updown GetRankDataRes: code@1, desc@2, rankData@3[], tipType@4
+ * (luck-car uses tipType@3 / rankData@4 — do NOT reuse that encoder here.)
+ */
+export function encode7UpGetRankDataRes(
+  ranks: Array<{ name: string; head: string; winMoney: number }>,
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const r of ranks) {
+    const row = encodeMessage([
+      pbString(1, r.name || 'Player'),
+      pbString(2, r.head || ''),
+      pbDouble(3, Math.max(0, Number(r.winMoney) || 0)),
+    ]);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(4, 0)); // tipType required
+  return encodeMessage(parts);
+}
+
+/** 7updown GetUserRecordRes: code, desc, recordData[], tipType. */
+export function encode7UpGetUserRecordRes(
+  records: Array<{
+    time?: number;
+    betInfo?: string;
+    returnMoney?: number;
+    result?: number;
+    round?: number;
+  }> = [],
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const rec of records) {
+    const row = encodeMessage([
+      pbInt32(1, Math.max(0, Math.floor(rec.time ?? Date.now() / 1000))),
+      pbString(2, rec.betInfo ?? ''),
+      pbDouble(3, Math.max(0, Number(rec.returnMoney) || 0)),
+      pbInt32(4, Math.max(0, Math.floor(rec.result ?? 0))),
+      pbInt32(5, Math.max(0, Math.floor(rec.round ?? 0))),
+    ]);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(4, 0));
+  return encodeMessage(parts);
+}
+
 export function encodeTableInfo7UpDown(data: {
   state: number;
   betTime: number;
@@ -421,18 +564,36 @@ export function encodeTableInfo7UpDown(data: {
   timeLeft: number;
   totalBet?: number;
   history?: number[];
+  /** Area pools — down=1, seven=2, up=3. */
+  betInfo?: Array<{ id: number; totalBet?: number; myBet?: number; ratio?: number }>;
 }): Buffer {
   const history = data.history ?? [1, 2, 3, 1, 3, 2, 1, 3];
+  // Client enum: betting=1, over=2 only — never send 3.
+  const state = data.state === 1 ? 1 : 2;
   const parts: Buffer[] = [
-    pbInt32(1, data.state),
+    pbInt32(1, state),
     pbUInt32(2, data.betTime),
     pbUInt32(3, data.waitTime ?? 3),
     pbUInt32(4, data.playerNum),
   ];
   for (const h of history) parts.push(pbUInt32(5, h));
   parts.push(pbUInt32(6, Math.max(0, data.timeLeft | 0)));
-  parts.push(pbUInt32(7, data.totalBet ?? 0));
-  // betConf chips: id, betMin, conf csv
+  parts.push(pbUInt32(7, Math.max(0, Math.floor(data.totalBet ?? 0))));
+  // betInfo@8 — area cards + ratios (required for cup/area taps)
+  const areas =
+    data.betInfo?.length
+      ? data.betInfo
+      : ([1, 2, 3] as const).map((id) => ({
+          id,
+          totalBet: 0,
+          myBet: 0,
+          ratio: SEVEN_UP_AREA_RATIOS[id],
+        }));
+  for (const a of areas) {
+    const area = encode7UpBetArea(a);
+    parts.push(Buffer.concat([tag(8, 2), writeVarint(area.length), area]));
+  }
+  // betConf@9 chips: id, betMin, conf csv
   const chips = [
     { id: 1, min: 10, conf: '10,50,100,500,1000' },
     { id: 2, min: 100, conf: '100,500,1000,5000' },
@@ -445,24 +606,14 @@ export function encodeTableInfo7UpDown(data: {
     ]);
     parts.push(Buffer.concat([tag(9, 2), writeVarint(row.length), row]));
   }
-  // area ratios for down/seven/up
-  for (const [id, ratio] of [[1, 2], [2, 5], [3, 2]] as const) {
-    const area = encodeMessage([
-      pbUInt32(1, id),
-      pbUInt32(2, 0),
-      pbUInt32(3, 0),
-      pbUInt32(4, ratio),
-    ]);
-    parts.push(Buffer.concat([tag(8, 2), writeVarint(area.length), area]));
-  }
-  // AvailableChips@14 — unlocks chip tray on some clients
-  for (const chip of [10, 50, 100, 500, 1000, 5000, 10000]) {
-    parts.push(pbUInt32(14, chip));
+  // AvailableChips@14 int32 — unlocks 10/50/100/500 tray
+  for (const chip of SEVEN_UP_CHIPS) {
+    parts.push(pbInt32(14, chip));
   }
   return encodeMessage(parts);
 }
 
-/** 7updown BetRsp field order. */
+/** 7updown BetRsp — includes betInfo so chips land on areas. */
 export function encode7UpBetRsp(data: {
   code: number;
   desc: string;
@@ -470,15 +621,21 @@ export function encode7UpBetRsp(data: {
   areaId?: number;
   betMoney?: number;
   tipType?: number;
+  betInfo?: Array<{ id: number; totalBet?: number; myBet?: number; ratio?: number }>;
 }): Buffer {
-  return encodeMessage([
+  const parts: Buffer[] = [
     pbInt32(1, data.code),
     pbString(2, data.desc),
     pbDouble(3, data.selfMoney),
     pbInt32(4, data.areaId ?? 0),
     pbInt32(5, Math.max(0, Math.floor(data.betMoney ?? 0))),
-    pbInt32(7, data.tipType ?? 0),
-  ]);
+  ];
+  for (const a of data.betInfo ?? []) {
+    const row = encode7UpBetArea(a);
+    parts.push(Buffer.concat([tag(6, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(7, data.tipType ?? 0));
+  return encodeMessage(parts);
 }
 
 export function encodeBetRsp(data: {
@@ -509,10 +666,12 @@ export function encodeStartBetBroadcast(betTime: number): Buffer {
 }
 
 export function encodeUpdateRatioBroadcast(ratio: number, flyTime: number): Buffer {
+  // Crash client: curMult = ratio/100 — send centi (150 = 1.50x).
   return encodeMessage([pbFloat(1, ratio), pbUInt64(2, flyTime)]);
 }
 
 export function encodeGameOverBroadcast(ratio: number, settleTime: number): Buffer {
+  // Crash client: saveResult(ratio/100) — send centi.
   return encodeMessage([pbFloat(1, ratio), pbUInt32(2, settleTime)]);
 }
 
@@ -522,14 +681,52 @@ export function encodeCashoutRsp(data: {
   ratio: number;
   winMoney: number;
   selfMoney: number;
+  tipType?: number;
 }): Buffer {
   return encodeMessage([
     pbInt32(1, data.code),
     pbString(2, data.desc),
-    pbInt32(3, 0),
+    pbInt32(3, data.tipType ?? 0),
     pbFloat(4, data.ratio),
     pbUInt64(5, data.winMoney),
     pbDouble(6, data.selfMoney),
+  ]);
+}
+
+/** Crash auto-cashout toggle ack — type is required by client. */
+export function encodeCashoutConfRsp(data: {
+  code?: number;
+  desc?: string;
+  type: number;
+  ratio?: number;
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, data.code ?? 0),
+    pbString(2, data.desc ?? 'OK'),
+    pbInt32(3, data.type | 0),
+  ];
+  if (data.ratio != null) parts.push(pbInt32(4, Math.max(0, Math.floor(data.ratio))));
+  return encodeMessage(parts);
+}
+
+/** Crash UpdateBetPoolBroadcast — totalBet, playerId, bet amount. */
+export function encodeCrashUpdateBetPoolBroadcast(data: {
+  totalBet: number;
+  playerId: number;
+  bet: number;
+}): Buffer {
+  return encodeMessage([
+    pbUInt64(1, Math.max(0, Math.floor(data.totalBet))),
+    pbUInt64(2, Math.max(0, Math.floor(data.playerId))),
+    pbUInt64(3, Math.max(0, Math.floor(data.bet))),
+  ]);
+}
+
+/** Crash SomeoneCashoutBroadcast — ratio in centi, playerId. */
+export function encodeSomeoneCashoutBroadcast(ratioCenti: number, playerId: number): Buffer {
+  return encodeMessage([
+    pbFloat(1, ratioCenti),
+    pbInt32(2, playerId | 0),
   ]);
 }
 
@@ -538,26 +735,51 @@ export function encodeTableInfoCrash(data: {
   playerNum: number;
   timeLeft: number;
   ratio?: number;
+  history?: number[];
+  totalBet?: number;
+  selfBet?: number;
+  flyTime?: number;
+  cashOutMoney?: number;
+  cashRatio?: number;
+  cashOutConfType?: number;
+  cashOutConfRatio?: number;
+  availableChips?: number[];
 }): Buffer {
-  // Crash client: 1 state, 2 playerNum, 3 history, 4 timeLeft, 5 argAlpha, 6 argBeta,
-  // 7 cashOutMoney, 8 cashRatio, 9 totalBet, 10 selfBet, 11 ratio, 12 flyTime, 15 availableChips
-  const parts = [
-    pbInt32(1, data.state),
-    pbInt32(2, data.playerNum),
-    pbInt32(4, Math.max(0, data.timeLeft | 0)),
-    pbFloat(5, 0.08),
-    pbFloat(6, 0.5),
-    pbDouble(7, 0),
-    pbFloat(8, 1),
-    pbUInt64(9, 0),
-    pbUInt64(10, 0),
-    pbFloat(11, data.ratio ?? 1),
-    pbUInt64(12, 0),
+  // Crash TableInfo (strict):
+  // 1 state, 2 playerNum, 3 history[] float, 4 timeLeft,
+  // 5 argAlpha, 6 argBeta, 7 cashOutMoney uint64, 8 cashRatio int32,
+  // 9 totalBet, 10 selfBet, 11 ratio (raw x), 12 flyTime,
+  // 13 cashOutConfType, 14 cashOutConfRatio (centi), 15 availableChips[]
+  const parts: Buffer[] = [
+    pbInt32(1, data.state | 0),
+    pbUInt32(2, Math.max(0, data.playerNum | 0)),
   ];
-  for (const chip of [100, 500, 1000, 5000, 10000, 50000]) {
-    parts.push(pbInt32(15, chip));
+  for (const h of data.history ?? []) {
+    parts.push(pbFloat(3, Number(h) || 0));
+  }
+  parts.push(pbUInt32(4, Math.max(0, data.timeLeft | 0)));
+  // Match client defaults BASENUM=10, INDEXNUM=1.4
+  parts.push(pbFloat(5, 10));
+  parts.push(pbFloat(6, 1.4));
+  parts.push(pbUInt64(7, Math.max(0, Math.floor(data.cashOutMoney ?? 0))));
+  parts.push(pbInt32(8, Math.max(0, Math.floor(data.cashRatio ?? 0))));
+  parts.push(pbUInt64(9, Math.max(0, Math.floor(data.totalBet ?? 0))));
+  parts.push(pbUInt64(10, Math.max(0, Math.floor(data.selfBet ?? 0))));
+  parts.push(pbFloat(11, data.ratio ?? 1));
+  parts.push(pbUInt64(12, Math.max(0, Math.floor(data.flyTime ?? 0))));
+  parts.push(pbInt32(13, data.cashOutConfType ?? 0));
+  parts.push(pbInt32(14, data.cashOutConfRatio ?? 101)); // 1.01x default
+  // Crash UI only has chip0..chip3 (AMOUNDNUM=4). Extra chips → null.getChildByName freeze.
+  const chips = (data.availableChips ?? [100, 500, 1000, 5000]).slice(0, 4);
+  for (const chip of chips) {
+    parts.push(pbInt32(15, Math.max(1, Math.floor(Number(chip) || 0))));
   }
   return encodeMessage(parts);
+}
+
+/** Crash StartFlyBroadcast is an empty message — presence alone starts the rocket. */
+export function encodeStartFlyBroadcast(_ratio = 1, _settleTime = 3): Buffer {
+  return Buffer.alloc(0);
 }
 
 /** cleopatra-slots BetRes — client changeIcon needs 33 cells: cols heights [6,7,7,7,6]. */
@@ -602,7 +824,7 @@ export function encodeCleopatraBetRes(data: {
   ]);
 }
 
-/** luck-car BetRsp: code,desc,tipType,selfMoney,id,betMoney,myBetAll */
+/** luck-car BetRsp: code,desc,tipType,selfMoney,id(int32),betMoney(int32),myBetAll(uint32). */
 export function encodeLuckCarBetRsp(data: {
   code: number;
   desc: string;
@@ -617,9 +839,9 @@ export function encodeLuckCarBetRsp(data: {
     pbString(2, data.desc),
     pbInt32(3, data.tipType ?? 0),
     pbDouble(4, data.selfMoney),
-    pbUInt64(5, data.areaId ?? 0),
-    pbUInt64(6, data.betMoney ?? 0),
-    pbUInt64(7, data.myBetAll ?? data.betMoney ?? 0),
+    pbInt32(5, data.areaId ?? 0),
+    pbInt32(6, Math.max(0, Math.floor(data.betMoney ?? 0))),
+    pbUInt32(7, Math.max(0, Math.floor(data.myBetAll ?? data.betMoney ?? 0))),
   ]);
 }
 
@@ -805,7 +1027,7 @@ export function encodePirateBetRes(data: {
   return encodeMessage(parts);
 }
 
-/** line-slots DoSlotsRsp */
+/** line-slots DoSlotsRsp — iconGroup@7, bingoLine@6, userMoney@8 double, tipType@9 required. */
 export function encodeDoSlotsRsp(data: {
   code: number;
   desc: string;
@@ -814,20 +1036,38 @@ export function encodeDoSlotsRsp(data: {
   winMoney: number;
   tipType?: number;
 }): Buffer {
-  const icons: Buffer[] = [];
+  const icons: number[] = [];
   for (let i = 0; i < 15; i++) {
-    icons.push(pbInt32(7, 1 + Math.floor(Math.random() * 9)));
+    icons.push(1 + Math.floor(Math.random() * 9));
   }
-  const isBingo = data.winMoney > 0 ? 1 : 0;
-  return encodeMessage([
+  const win = Math.max(0, Math.floor(data.winMoney));
+  const isBingo = win > 0 ? 1 : 0;
+  // Paint middle row (indices 5..9) as a 5-of-a-kind when winning.
+  const winIcon = 1 + Math.floor(Math.random() * 8);
+  if (isBingo) {
+    for (let col = 0; col < 5; col++) icons[5 + col] = winIcon;
+  }
+  const parts: Buffer[] = [
     pbInt32(1, data.code),
     pbString(2, data.desc),
-    pbInt32(3, data.cost),
+    pbInt32(3, Math.max(0, Math.floor(data.cost))),
     pbInt32(4, isBingo),
-    ...icons,
-    pbDouble(8, data.userMoney),
-    pbInt32(9, data.tipType ?? 0),
-  ]);
+  ];
+  if (isBingo) {
+    // BingoLine required fields: lineID, icon, num, award, ratio
+    const bingo = encodeMessage([
+      pbInt32(1, 1),
+      pbInt32(2, winIcon),
+      pbInt32(3, 5),
+      pbInt32(4, win),
+      pbInt32(5, Math.max(1, Math.floor(win / Math.max(1, data.cost)))),
+    ]);
+    parts.push(Buffer.concat([tag(6, 2), writeVarint(bingo.length), bingo]));
+  }
+  for (const ic of icons) parts.push(pbInt32(7, ic));
+  parts.push(pbDouble(8, Math.max(0, Number(data.userMoney) || 0)));
+  parts.push(pbInt32(9, data.tipType ?? 0));
+  return encodeMessage(parts);
 }
 
 /** fortune-slot / Fortune Gems DoFortuneGemsRes */
@@ -876,33 +1116,61 @@ export function encodeFortuneGameCfgRes(): Buffer {
   ]);
 }
 
-/** line-slots GameCfgRsp — client waits on splash until this arrives. */
+/**
+ * line-slots GameCfgRsp — client does JSON.parse on BetMult / AutoSpinCount
+ * (after stripping quotes), so they MUST be JSON array strings like "[1,2,5]".
+ * Paylines are cell indices on a 3×5 board (row-major 0..14).
+ */
 export function encodeLineSlotsGameCfgRsp(): Buffer {
   const defaultCfg = encodeMessage([
     pbInt32(1, 10), // BasicBetLimit
     pbInt32(2, 1), // MinBet
-    pbInt32(3, 3), // ScrollGrid
+    pbInt32(3, 3), // ScrollGrid (rows)
     pbInt32(4, 0), // BonusTrunCount
-    pbString(5, '1,2,5,10,20,50,100'), // BetMult
-    pbString(6, '10,20,50,100'), // AutoSpinCount
+    pbString(5, '[1,2,5,10,20,50,100]'), // BetMult — JSON array
+    pbString(6, '[10,20,50,100]'), // AutoSpinCount — JSON array
   ]);
   const symbols: Buffer[] = [];
+  const mults = [
+    [5, 10, 20],
+    [5, 15, 30],
+    [8, 20, 40],
+    [10, 25, 50],
+    [15, 40, 80],
+    [20, 50, 100],
+    [25, 75, 150],
+    [40, 100, 250],
+    [50, 150, 500],
+  ];
   for (let i = 1; i <= 9; i++) {
+    const m = mults[i - 1] || [5, 10, 20];
     const row = encodeMessage([
       pbInt32(1, i), // SymbolID
       pbString(2, `s${i}`), // SymbolName
       pbInt32(3, 1), // SymbolType
-      pbInt32(4, 5),
-      pbInt32(5, 10),
-      pbInt32(6, 20),
+      pbInt32(4, m[0]), // ScoreMultLine3
+      pbInt32(5, m[1]), // ScoreMultLine4
+      pbInt32(6, m[2]), // ScoreMultLine5
     ]);
     symbols.push(Buffer.concat([tag(2, 2), writeVarint(row.length), row]));
   }
+  // Classic 9 paylines on 3×5 (cols left→right).
+  const paylines = [
+    '5,6,7,8,9', // mid row
+    '0,1,2,3,4', // top row
+    '10,11,12,13,14', // bottom row
+    '0,6,12,8,4',
+    '10,6,2,8,14',
+    '0,1,7,3,4',
+    '10,11,7,13,14',
+    '5,1,2,3,9',
+    '5,11,12,13,9',
+  ];
   const lines: Buffer[] = [];
-  for (let i = 1; i <= 9; i++) {
+  for (let i = 0; i < paylines.length; i++) {
     const row = encodeMessage([
-      pbInt32(1, i), // lineID
-      pbString(2, '0,1,2,3,4'), // lineInclude
+      pbInt32(1, i + 1), // lineID
+      pbString(2, paylines[i]), // lineInclude
     ]);
     lines.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
   }
@@ -911,6 +1179,28 @@ export function encodeLineSlotsGameCfgRsp(): Buffer {
     ...symbols,
     ...lines,
   ]);
+}
+
+/** line-slots GetRankDataRes: code@1 desc@2 rankData@3{name,head,winMoney int64} tipType@4. */
+export function encodeLineSlotsGetRankDataRes(
+  ranks: Array<{ name: string; head: string; winMoney: number }>,
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const r of ranks) {
+    const row = encodeMessage([
+      pbString(1, r.name || 'Player'),
+      pbString(2, r.head || ''),
+      pbInt32(3, Math.max(0, Math.floor(Number(r.winMoney) || 0))), // int64 as varint
+    ]);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(4, 0)); // tipType required
+  return encodeMessage(parts);
+}
+
+/** line-slots GetUserRecordRes: empty list + tipType clears history loading. */
+export function encodeLineSlotsGetUserRecordRes(): Buffer {
+  return encodeMessage([pbInt32(1, 0), pbString(2, 'OK'), pbInt32(4, 0)]);
 }
 
 /** megaways / sugar chip list — unlocks bet UI after splash. */
@@ -965,10 +1255,6 @@ export function encodeCleopatraTableInfo(
   ]);
 }
 
-export function encodeStartFlyBroadcast(ratio = 1, settleTime = 3): Buffer {
-  return encodeMessage([pbFloat(1, ratio), pbUInt32(2, settleTime)]);
-}
-
 /** UI ratios are milli (ratio/1000 → x2). Settlement still uses real 2..25. */
 const LUCK_CAR_RATIOS_MILLI = [2000, 3000, 4000, 5000, 8000, 10000, 15000, 25000];
 const LUCK_CAR_CHIPS = [100, 500, 1000, 5000, 10000, 50000];
@@ -1002,36 +1288,78 @@ function encodeLuckCarSpeed(trackID: number, carID: number, speed: number): Buff
   ]);
 }
 
-/** luck-car TableInfo — NOT crash TableInfo. */
+/** luck-car TableInfo — GameState is ONLY betting=1, over=2 (never 3). */
 export function encodeLuckCarTableInfo(data: {
   state: number;
   playerNum: number;
   timeLeft: number;
   curTurn?: number;
   totalBet?: number;
+  myBets?: number[];
 }): Buffer {
+  // Client enum: betting=1, over=2 only.
+  const state = data.state === 1 ? 1 : 2;
+  const betTime = Math.max(1, data.timeLeft | 0) || 10;
   const cars = LUCK_CAR_RATIOS_MILLI.map((_, i) => i + 1);
+  const myBets = data.myBets ?? new Array(8).fill(0);
   const parts: Buffer[] = [
-    pbInt32(1, data.state),
-    pbUInt32(2, data.playerNum),
+    pbInt32(1, state),
+    pbUInt32(2, Math.max(0, data.playerNum | 0)),
     pbUInt32(3, Math.max(0, data.timeLeft | 0)),
-    pbUInt32(4, data.totalBet ?? 0),
+    pbUInt32(4, Math.max(0, data.totalBet ?? 0)),
   ];
   for (let i = 0; i < LUCK_CAR_RATIOS_MILLI.length; i++) {
-    const area = encodeLuckCarBetArea(i + 1, LUCK_CAR_RATIOS_MILLI[i]);
+    const area = encodeLuckCarBetArea(
+      i + 1,
+      LUCK_CAR_RATIOS_MILLI[i],
+      0,
+      myBets[i] || 0,
+    );
     parts.push(Buffer.concat([tag(5, 2), writeVarint(area.length), area]));
   }
   for (let i = 0; i < LUCK_CAR_RATIOS_MILLI.length; i++) {
     const conf = encodeLuckCarConf(i + 1);
     parts.push(Buffer.concat([tag(6, 2), writeVarint(conf.length), conf]));
   }
-  parts.push(pbInt32(14, 10)); // betTime
-  for (const c of cars) parts.push(pbInt32(15, c)); // betCars
-  for (const r of LUCK_CAR_RATIOS_MILLI) parts.push(pbInt32(16, r)); // betRatio milli
+  for (const b of myBets) parts.push(pbUInt32(8, Math.max(0, b | 0)));
+  parts.push(pbInt32(14, betTime));
+  for (const c of cars) parts.push(pbInt32(15, c));
+  for (const r of LUCK_CAR_RATIOS_MILLI) parts.push(pbInt32(16, r));
   parts.push(pbInt32(17, 1)); // trackType
   parts.push(pbInt32(18, 0)); // trackPos
-  parts.push(pbString(23, JSON.stringify(LUCK_CAR_CHIPS))); // chipsConf
+  // Client does JSON.parse(chipsConf) then pushes into Instance.chipsConf[].
+  parts.push(pbString(23, JSON.stringify(LUCK_CAR_CHIPS)));
   return encodeMessage(parts);
+}
+
+/** luck-car UpdateBetPoolBroadcast: totalBet@1 id@2 bet@3 betInfo@4[]. */
+export function encodeLuckCarUpdateBetPoolBroadcast(data: {
+  totalBet: number;
+  playerId: number;
+  bet: number;
+  betInfo?: Array<{ id: number; totalBet: number; myBet?: number; ratio?: number }>;
+}): Buffer {
+  const parts: Buffer[] = [
+    pbUInt64(1, Math.max(0, Math.floor(data.totalBet))),
+    pbUInt64(2, Math.max(0, Math.floor(data.playerId))),
+    pbUInt64(3, Math.max(0, Math.floor(data.bet))),
+  ];
+  for (const a of data.betInfo ?? []) {
+    const id = Math.max(1, Math.min(8, a.id | 0));
+    const area = encodeLuckCarBetArea(
+      id,
+      a.ratio ?? LUCK_CAR_RATIOS_MILLI[id - 1] ?? 2000,
+      a.totalBet ?? 0,
+      a.myBet ?? 0,
+    );
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(area.length), area]));
+  }
+  return encodeMessage(parts);
+}
+
+/** luck-car UpdatePlayerNumBroadcast. */
+export function encodeLuckCarUpdatePlayerNumBroadcast(num: number): Buffer {
+  return encodeMessage([pbUInt64(1, Math.max(0, Math.floor(num)))]);
 }
 
 /** luck-car StartBetBroadcast — required: betTime, trackType, trackPos, curTurn. */
@@ -1098,7 +1426,7 @@ export function encodeLuckCarGetRankDataRes(
   return encodeMessage(parts);
 }
 
-/** luck-car GetUserRecordRes: code,desc,recordData[]. Empty list clears loading. */
+/** luck-car GetUserRecordRes: code,desc,recordData[]. returnMoney is int32 not double. */
 export function encodeLuckCarGetUserRecordRes(
   records: Array<{
     time?: number;
@@ -1112,12 +1440,12 @@ export function encodeLuckCarGetUserRecordRes(
   const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
   for (const rec of records) {
     const row = encodeMessage([
-      pbUInt32(1, Math.max(0, Math.floor(rec.time ?? Date.now() / 1000))),
+      pbInt32(1, Math.max(0, Math.floor(rec.time ?? Date.now() / 1000))),
       pbString(2, rec.betInfo ?? ''),
-      pbDouble(3, Math.max(0, Number(rec.returnMoney) || 0)),
-      pbUInt32(4, Math.max(0, rec.winCar ?? 0)),
-      pbUInt32(5, Math.max(0, rec.winRatio ?? 0)),
-      pbUInt32(6, Math.max(0, rec.winCarBet ?? 0)),
+      pbInt32(3, Math.max(0, Math.floor(Number(rec.returnMoney) || 0))),
+      pbInt32(4, Math.max(0, rec.winCar ?? 0)),
+      pbInt32(5, Math.max(0, rec.winRatio ?? 0)),
+      pbInt32(6, Math.max(0, rec.winCarBet ?? 0)),
     ]);
     parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
   }
@@ -1151,15 +1479,34 @@ export function encodeCrashGetUserRecordRes(
   return encodeMessage(parts);
 }
 
-/** 7UpDown / multi-area settle. */
+/** 7UpDown / multi-area settle — nums are dice faces; rank fills top cup winners. */
 export function encodeGameOverRsp(data: {
   time?: number;
   nums: number[];
   winMoney: number;
   selfMoney: number;
+  betInfo?: Array<{ id: number; totalBet?: number; myBet?: number; ratio?: number }>;
+  rank?: Array<{ name: string; head: string; winMoney: number }>;
 }): Buffer {
-  const parts: Buffer[] = [pbInt32(1, data.time ?? 3)];
-  for (const n of data.nums) parts.push(pbInt32(2, n));
+  const parts: Buffer[] = [pbUInt32(1, data.time ?? 3)];
+  for (const n of data.nums) parts.push(pbUInt32(2, Math.max(0, Math.floor(n))));
+  for (const a of data.betInfo ?? []) {
+    const row = encode7UpBetArea(a);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  if (data.rank?.length) {
+    const players = data.rank.map((r) =>
+      encodeMessage([
+        pbString(1, r.name || 'Player'),
+        pbString(2, r.head || ''),
+        pbDouble(3, Math.max(0, Number(r.winMoney) || 0)),
+      ]),
+    );
+    const rankMsg = encodeMessage(
+      players.map((p) => Buffer.concat([tag(1, 2), writeVarint(p.length), p])),
+    );
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(rankMsg.length), rankMsg]));
+  }
   parts.push(pbDouble(5, data.winMoney));
   parts.push(pbDouble(6, data.selfMoney));
   return encodeMessage(parts);

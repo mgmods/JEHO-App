@@ -20,25 +20,67 @@ public final class RoomVisualEffects {
 
     public boolean showGift(@Nullable String giftName, @Nullable String iconUrl,
                             @Nullable String animationUrl, @Nullable String senderName, int quantity) {
-        String giftId = match(GIFT_ID, iconUrl);
-        if (giftId == null) giftId = match(GIFT_ID, animationUrl);
-        if (giftId == null) giftId = match(GIFT_ID, giftName);
-        if (giftId == null) giftId = slugGiftName(giftName);
+        return showGift(giftName, iconUrl, animationUrl, senderName, quantity, null);
+    }
+
+    public boolean showGift(@Nullable String giftName, @Nullable String iconUrl,
+                            @Nullable String animationUrl, @Nullable String senderName, int quantity,
+                            @Nullable Runnable onComplete) {
+        String giftId = resolveGiftId(giftName, iconUrl, animationUrl);
         if (giftId == null) return false;
+        boolean media = CosmeticMedia.playableUrl(animationUrl) != null;
+        long hold = media
+                ? (quantity > 1 ? 8200 : 7500)
+                : (quantity > 1 ? 5200 : 4800);
         return effectsView.showGift(
                 giftId.toLowerCase(Locale.US),
+                giftName,
                 iconUrl,
                 animationUrl,
                 senderName,
                 Math.max(1, quantity),
-                quantity > 1 ? 5200 : 4800,
-                null);
+                hold,
+                onComplete);
     }
 
     /** Backward-compatible overload. */
     public boolean showGift(@Nullable String giftName, @Nullable String iconUrl,
                             @Nullable String senderName, int quantity) {
-        return showGift(giftName, iconUrl, null, senderName, quantity);
+        return showGift(giftName, iconUrl, null, senderName, quantity, null);
+    }
+
+    /** Prefer human gift name / catalog slug — never use cache filenames as title ids. */
+    @Nullable
+    private static String resolveGiftId(@Nullable String giftName, @Nullable String iconUrl,
+                                        @Nullable String animationUrl) {
+        String fromName = slugGiftName(giftName);
+        if (isCleanAssetId(fromName)) return fromName;
+
+        String fromIcon = match(GIFT_ID, iconUrl);
+        if (isCleanAssetId(fromIcon)) return fromIcon;
+
+        String fromAnim = match(GIFT_ID, animationUrl);
+        if (isCleanAssetId(fromAnim)) return fromAnim;
+
+        if (fromName != null && !fromName.isEmpty() && !looksLikeGarbageId(fromName)) {
+            return fromName;
+        }
+        // Keep playback even for custom uploads — never surface cache ids as the gift title.
+        return "custom";
+    }
+
+    private static boolean looksLikeGarbageId(@Nullable String id) {
+        if (id == null || id.isEmpty()) return true;
+        String s = id.toLowerCase(Locale.US);
+        if (s.length() > 32) return true;
+        if (s.contains("cache") || s.contains("mikoo_gift") || s.contains("gift_cache")) return true;
+        return s.matches(".*\\d{10,}.*");
+    }
+
+    private static boolean isCleanAssetId(@Nullable String id) {
+        if (id == null || id.isEmpty()) return false;
+        if (looksLikeGarbageId(id)) return false;
+        return id.matches("[a-z0-9-]{2,40}");
     }
 
     public boolean showEntry(@Nullable String displayName, @Nullable String avatarUrl,
@@ -152,9 +194,12 @@ public final class RoomVisualEffects {
         String n = name.trim().toLowerCase(Locale.US)
                 .replace(' ', '-')
                 .replace('_', '-');
-        if (n.contains("lion") || n.contains("أسد")) return "lion";
+        if (n.contains("lion") || n.contains("أسد") || n.contains("اسد")) return "lion";
         if (n.contains("tiger") || n.contains("نمر")) return "royal-tiger";
         if (n.contains("wolf") || n.contains("ذئب")) return "dire-wolf";
+        if (n.contains("donkey") || n.contains("حمار") || n.contains("جحش")) return "donkey";
+        if (n.contains("cow") || n.contains("بقرة") || n.contains("بقره")) return "cow";
+        if (n.contains("ass") || n.contains("حمير")) return "donkey";
         if (n.contains("car") || n.contains("سيارة")) return "car";
         if (n.contains("dragon") || n.contains("تنين")) return "dragon";
         if (n.contains("rocket") || n.contains("صاروخ")) return "rocket";

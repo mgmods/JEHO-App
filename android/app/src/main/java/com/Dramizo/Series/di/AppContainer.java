@@ -20,6 +20,7 @@ import com.Dramizo.Series.data.remote.api.GiftApi;
 import com.Dramizo.Series.data.remote.api.GameApi;
 import com.Dramizo.Series.data.remote.api.SlotGameApi;
 import com.Dramizo.Series.data.remote.api.CasualGameApi;
+import com.Dramizo.Series.data.remote.api.PromotionsApi;
 import com.Dramizo.Series.data.remote.api.VanityApi;
 import com.Dramizo.Series.data.remote.api.GameStoreApi;
 import com.Dramizo.Series.data.remote.api.NotificationApi;
@@ -122,6 +123,7 @@ public class AppContainer {
     private final SlotGameApi slotGameApi;
     private final CasualGameApi casualGameApi;
     private final VanityApi vanityApi;
+    private final PromotionsApi promotionsApi;
     private final GameStoreApi gameStoreApi;
     private final ContestsApi contestsApi;
     private final EventsApi eventsApi;
@@ -229,6 +231,7 @@ public class AppContainer {
         slotGameApi = retrofit.create(SlotGameApi.class);
         casualGameApi = retrofit.create(CasualGameApi.class);
         vanityApi = retrofit.create(VanityApi.class);
+        promotionsApi = retrofit.create(PromotionsApi.class);
         gameStoreApi = retrofit.create(GameStoreApi.class);
         contestsApi = retrofit.create(ContestsApi.class);
         eventsApi = retrofit.create(EventsApi.class);
@@ -315,6 +318,7 @@ public class AppContainer {
     public SlotGameApi getSlotGameApi() { return slotGameApi; }
     public CasualGameApi getCasualGameApi() { return casualGameApi; }
     public VanityApi getVanityApi() { return vanityApi; }
+    public PromotionsApi getPromotionsApi() { return promotionsApi; }
     public GameStoreApi getGameStoreApi() { return gameStoreApi; }
     public ContestsApi getContestsApi() { return contestsApi; }
     public EventsApi getEventsApi() { return eventsApi; }

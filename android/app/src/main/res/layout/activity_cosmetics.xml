@@ -73,33 +73,35 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <com.google.android.material.tabs.TabLayout
-            android:id="@+id/tabCosmetics"
+        <!-- Native SVGA preview (same engine as live room) — قطاع الراس -->
+        <FrameLayout
+            android:id="@+id/nativeHeroWrap"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:background="@android:color/transparent"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp"
+            android:layout_height="148dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_mall_native_hero"
+            android:padding="10dp"
+            android:visibility="gone"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/toolbar"
-            app:tabGravity="start"
-            app:tabIndicatorColor="#FF0E7490"
-            app:tabIndicatorFullWidth="false"
-            app:tabIndicatorHeight="3dp"
-            app:tabMode="scrollable"
-            app:tabRippleColor="#1A0E7490"
-            app:tabSelectedTextColor="#FF0E7490"
-            app:tabTextColor="#FF6B7280" />
+            app:layout_constraintTop_toBottomOf="@id/toolbar">
 
-        <androidx.viewpager2.widget.ViewPager2
-            android:id="@+id/pagerCosmetics"
+            <com.Dramizo.Series.util.HostSignalView
+                android:id="@+id/nativeHeroFrame"
+                android:layout_width="128dp"
+                android:layout_height="128dp"
+                android:layout_gravity="center" />
+        </FrameLayout>
+
+        <WebView
+            android:id="@+id/webMall"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_marginTop="4dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tabCosmetics" />
+            app:layout_constraintTop_toBottomOf="@id/nativeHeroWrap" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 </FrameLayout>

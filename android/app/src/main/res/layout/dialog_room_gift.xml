@@ -58,7 +58,15 @@
         app:tabSelectedTextColor="@color/white"
         app:tabTextAppearance="@style/TextAppearance.Jeho.GiftTab"
         app:tabTextColor="#99FFFFFF" />
-    <androidx.viewpager2.widget.ViewPager2 android:id="@+id/vp_gift_list_container" android:background="@color/color_gift_dialog_bg" android:layout_width="fill_parent" android:layout_height="220.0dip" app:layout_constraintBottom_toTopOf="@id/cl_bottom" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent" />
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/vp_gift_list_container"
+        android:background="@color/color_gift_dialog_bg"
+        android:layout_width="fill_parent"
+        android:layout_height="300dp"
+        android:nestedScrollingEnabled="true"
+        app:layout_constraintBottom_toTopOf="@id/cl_bottom"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
     <androidx.constraintlayout.widget.ConstraintLayout android:gravity="start|center" android:orientation="horizontal" android:id="@+id/cl_bottom" android:background="@color/color_gift_dialog_bg" android:paddingTop="@dimen/dp_3" android:paddingBottom="@dimen/dp_10" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="43.0dip" android:layoutDirection="locale" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
         <LinearLayout android:gravity="center_vertical" android:id="@+id/rl_wealth" android:layout_width="wrap_content" android:layout_height="@dimen/dp_30" android:layout_marginStart="@dimen/dp_15" app:layout_constraintBottom_toBottomOf="@id/line_send" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="@id/line_send">
             <TextView android:textSize="@dimen/sp_10" android:textColor="@color/white" android:ellipsize="end" android:gravity="center_vertical" android:id="@+id/tv_gift_user_gold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:maxLines="1" android:drawablePadding="@dimen/dp_4" app:drawableStartCompat="@drawable/me_bi_ic" />
