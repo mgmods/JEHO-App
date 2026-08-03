@@ -160,4 +160,22 @@ export class UpdateAgencySettingsDto {
   @IsString()
   @MaxLength(32)
   notificationStyle?: string;
+
+  @ApiPropertyOptional({ description: 'Agency display name (owner only)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Agency welcome / about text' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Agency logo / cover URL' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(512)
+  logoUrl?: string;
 }

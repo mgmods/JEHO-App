@@ -94,6 +94,9 @@ public class ProfileFragment extends Fragment {
                 startActivity(new Intent(requireContext(), RankingActivity.class)));
         bindRow(binding.btnAgency, v ->
                 startActivity(new Intent(requireContext(), AgencyActivity.class)));
+        if (binding.btnQuickAgency != null) {
+            bindRow(binding.btnQuickAgency, v -> openAgencyHub());
+        }
         bindRow(binding.btnNotifications, v ->
                 startActivity(new Intent(requireContext(), NotificationsActivity.class)));
 
@@ -256,9 +259,18 @@ public class ProfileFragment extends Fragment {
             requireActivity().runOnUiThread(() -> {
                 if (binding == null) return;
                 agencyMine = result.success ? result.data : null;
-                // Keep quick-action label as short "غرفة" — agency has its own row.
+                // Keep quick-action label as short "غرفة" — agency has its own icon.
                 binding.tvMyRoomQuickLabel.setText(R.string.room_short);
                 binding.btnMyRoom.setVisibility(View.VISIBLE);
+                boolean hasAgency = agencyMine != null
+                        && agencyMine.agency != null
+                        && agencyMine.agency.id != null
+                        && !agencyMine.agency.id.isEmpty()
+                        && (agencyMine.agency.status == null
+                        || !"rejected".equalsIgnoreCase(agencyMine.agency.status));
+                if (binding.btnQuickAgency != null) {
+                    binding.btnQuickAgency.setVisibility(hasAgency ? View.VISIBLE : View.GONE);
+                }
             });
         });
     }
@@ -276,6 +288,22 @@ public class ProfileFragment extends Fragment {
         Intent i = new Intent(requireContext(), CosmeticsActivity.class);
         if (type != null) i.putExtra(CosmeticsViewModel.EXTRA_TYPE, type);
         startActivity(i);
+    }
+
+    private void openAgencyHub() {
+        if (agencyMine != null && agencyMine.agency != null
+                && agencyMine.agency.id != null && !agencyMine.agency.id.isEmpty()) {
+            String role = agencyMine.role != null ? agencyMine.role.toLowerCase(java.util.Locale.US) : "";
+            if ("owner".equals(role) || "manager".equals(role) || "host".equals(role)) {
+                Intent i = new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.class);
+                i.putExtra(com.Dramizo.Series.presentation.agency.AgencyManageActivity.EXTRA_AGENCY_ID,
+                        agencyMine.agency.id);
+                startActivity(i);
+                return;
+            }
+        }
+        startActivity(new Intent(requireContext(), AgencyActivity.class));
     }
 
     private void openRanking(String category) {

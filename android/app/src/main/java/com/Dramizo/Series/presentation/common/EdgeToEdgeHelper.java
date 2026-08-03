@@ -112,6 +112,56 @@ public final class EdgeToEdgeHelper {
         ViewCompat.requestApplyInsets(view);
     }
 
+    /**
+     * System bars + soft keyboard. Use on form screens so EditTexts stay above IME
+     * when edge-to-edge makes adjustResize unreliable.
+     */
+    public static void padSystemBarsWithIme(@NonNull View view) {
+        final int left = view.getPaddingLeft();
+        final int top = view.getPaddingTop();
+        final int right = view.getPaddingRight();
+        final int bottom = view.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            int bottomPad = Math.max(bars.bottom, ime.bottom);
+            v.setPadding(left, top + bars.top, right, bottom + bottomPad);
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(view);
+    }
+
+    /** Bottom padding only: max(nav, IME). */
+    public static void padImeBottom(@NonNull View view) {
+        final int left = view.getPaddingLeft();
+        final int top = view.getPaddingTop();
+        final int right = view.getPaddingRight();
+        final int bottom = view.getPaddingBottom();
+        ViewCompat.setOnApplyWindowInsetsListener(view, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            v.setPadding(left, top, right, bottom + Math.max(bars.bottom, ime.bottom));
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(view);
+    }
+
+    /** Scroll focused field into view above the keyboard (NestedScrollView forms). */
+    public static void keepAboveImeOnFocus(@NonNull View field) {
+        field.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) return;
+            v.postDelayed(() -> {
+                try {
+                    int extra = Math.round(200 * v.getResources().getDisplayMetrics().density);
+                    v.requestRectangleOnScreen(
+                            new android.graphics.Rect(0, 0, v.getWidth(), v.getHeight() + extra),
+                            true);
+                } catch (Exception ignored) {
+                }
+            }, 280);
+        });
+    }
+
     /** Adds status-bar inset to an existing top margin (for chrome over full-bleed BG). */
     public static void addStatusBarTopMargin(@NonNull View view) {
         android.view.ViewGroup.LayoutParams lp = view.getLayoutParams();

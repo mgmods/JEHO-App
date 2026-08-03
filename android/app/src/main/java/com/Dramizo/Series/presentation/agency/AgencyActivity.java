@@ -21,6 +21,7 @@ import com.Dramizo.Series.databinding.DialogCreateAgencyBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.AuraDialogHelper;
@@ -611,6 +612,8 @@ public class AgencyActivity extends ThemedActivity {
                     android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
         dialog.show();
+        EdgeToEdgeHelper.keepAboveImeOnFocus(etUser);
+        EdgeToEdgeHelper.keepAboveImeOnFocus(etAmount);
         etUser.requestFocus();
     }
 

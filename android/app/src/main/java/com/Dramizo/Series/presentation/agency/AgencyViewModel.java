@@ -82,12 +82,23 @@ public class AgencyViewModel extends ViewModel {
     }
 
     public void updateNotificationStyle(String agencyId, String style) {
+        java.util.Map<String, String> body = new java.util.HashMap<>();
+        body.put("notificationStyle", style);
+        updateSettings(agencyId, body, "تم حفظ إشعار الوكالة");
+    }
+
+    public void updateAgencyBranding(String agencyId, String name, String description) {
+        java.util.Map<String, String> body = new java.util.HashMap<>();
+        if (name != null) body.put("name", name);
+        if (description != null) body.put("description", description);
+        updateSettings(agencyId, body, "تم حفظ اسم الوكالة والترحيب");
+    }
+
+    private void updateSettings(String agencyId, java.util.Map<String, String> body, String okMsg) {
         c.getIoExecutor().execute(() -> {
-            java.util.Map<String, String> body = new java.util.HashMap<>();
-            body.put("notificationStyle", style);
             Result<Object> r = ApiCall.execute(c.getAgencyApi().updateSettings(agencyId, body));
             if (r.success) {
-                message.postValue("تم حفظ إشعار الوكالة");
+                message.postValue(okMsg);
                 load();
             } else {
                 error.postValue(r.error);

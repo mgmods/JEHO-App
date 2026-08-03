@@ -709,11 +709,18 @@ export class AgenciesService implements OnModuleInit {
   async updateSettings(
     agencyId: string,
     actorId: string,
-    dto: { notificationStyle?: string },
+    dto: {
+      notificationStyle?: string;
+      name?: string;
+      description?: string;
+      logoUrl?: string;
+    },
   ) {
     await this.assertManager(agencyId, actorId);
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
+
+    let renamed = false;
     if (dto.notificationStyle != null) {
       const style = String(dto.notificationStyle).trim().toLowerCase();
       if (!isAgencyNotificationStyle(style)) {
@@ -721,9 +728,62 @@ export class AgenciesService implements OnModuleInit {
       }
       agency.notificationStyle = style;
     }
+    if (dto.name != null) {
+      // Renaming the agency brand is owner-only; managers keep notification style.
+      await this.assertOwner(agencyId, actorId);
+      const next = String(dto.name).trim().replace(/\s+/g, ' ');
+      if (next.length < 2) {
+        throw new BadRequestException('اسم الوكالة قصير جداً');
+      }
+      if (next.length > 64) {
+        throw new BadRequestException('اسم الوكالة طويل جداً');
+      }
+      const clash = await this.agenciesRepo
+        .createQueryBuilder('agency')
+        .where('LOWER(agency.name) = LOWER(:name)', { name: next })
+        .andWhere('agency.id != :id', { id: agencyId })
+        .getOne();
+      if (clash) {
+        throw new ConflictException('اسم الوكالة مستخدم مسبقاً');
+      }
+      agency.name = next;
+      renamed = true;
+    }
+    if (dto.description !== undefined) {
+      await this.assertOwner(agencyId, actorId);
+      const desc = dto.description == null ? null : String(dto.description).trim();
+      agency.description = desc && desc.length > 0 ? desc.slice(0, 500) : null;
+    }
+    if (dto.logoUrl !== undefined) {
+      await this.assertOwner(agencyId, actorId);
+      const logo = dto.logoUrl == null ? null : String(dto.logoUrl).trim();
+      agency.logoUrl = logo && logo.length > 0 ? logo.slice(0, 512) : null;
+    }
+
     await this.agenciesRepo.save(agency);
+
+    if (renamed || dto.description !== undefined) {
+      const rooms = await this.roomsRepo.find({ where: { agencyId } });
+      for (const room of rooms) {
+        if (!room) continue;
+        room.title = agency.name;
+        const welcome =
+          agency.description && agency.description.trim().length > 0
+            ? agency.description.trim()
+            : `مرحباً بكم في الغرفة الصوتية · ${agency.name}`;
+        room.description = welcome.slice(0, 500);
+        if (agency.logoUrl) {
+          room.coverUrl = agency.logoUrl;
+        }
+        await this.roomsRepo.save(room);
+      }
+    }
+
     return {
       id: agency.id,
+      name: agency.name,
+      description: agency.description,
+      logoUrl: agency.logoUrl,
       activationCode: agency.activationCode,
       notificationStyle: agency.notificationStyle,
     };
@@ -1650,6 +1710,14 @@ export class AgenciesService implements OnModuleInit {
       .catch(() => undefined);
 
     return { deleted: true, id: agencyId, deletedRoomIds: roomIds };
+  }
+
+  private async assertOwner(agencyId: string, actorId: string) {
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    if (agency.ownerId !== actorId) {
+      throw new ForbiddenException('فقط صاحب الوكالة يمكنه تعديل الاسم والوصف');
+    }
   }
 
   private async assertManager(agencyId: string, actorId: string) {

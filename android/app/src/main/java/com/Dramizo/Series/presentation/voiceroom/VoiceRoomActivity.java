@@ -157,6 +157,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean isOwner;
     private boolean isPersistentRoom;
     private boolean isAgencyRoom;
+    private boolean roomWelcomePosted;
+    @Nullable private String welcomePostedForRoomId;
     private String myUserId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -862,6 +864,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             setTextIfChanged(binding.tvRoomBannerSubtitle,
                     room.description != null && !room.description.trim().isEmpty()
                             ? room.description : "مرحبًا بكم في الغرفة الصوتية");
+            if (!roomWelcomePosted || !Objects.equals(welcomePostedForRoomId, room.id)) {
+                roomWelcomePosted = true;
+                welcomePostedForRoomId = room.id;
+                String welcomeName = displayTitle != null ? displayTitle : getString(R.string.voice_room);
+                String welcomeBody = room.description != null && !room.description.trim().isEmpty()
+                        ? room.description.trim()
+                        : ("مرحباً بكم في الغرفة الصوتية · " + welcomeName);
+                appendChatLine("النظام", welcomeBody, 0, 1, null, null, null, null);
+            }
             if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
                 lastBoundCoverUrl = room.coverUrl;
                 // Room cover = permanent room photo (list + header face). Banner mirrors it.
@@ -6776,10 +6787,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView btnChangeName = sheet.findViewById(R.id.btnChangeRoomName);
         if (btnChangeName != null) {
             btnChangeName.setVisibility(canManageRoom ? View.VISIBLE : View.GONE);
+            if (isAgencyRoom) {
+                btnChangeName.setText("تغيير اسم الوكالة");
+            }
             btnChangeName.setOnClickListener(v -> {
                 dialog.dismiss();
                 promptRenameRoomTitle(viewModel != null ? viewModel.getRoom().getValue() : null);
             });
+        }
+        TextView btnManageAgency = sheet.findViewById(R.id.btnManageAgencyFromRoom);
+        if (btnManageAgency != null) {
+            RoomDtos.RoomDto live = viewModel != null ? viewModel.getRoom().getValue() : null;
+            boolean showAgencyManage = isAgencyRoom && canManageRoom
+                    && live != null && live.agencyId != null && !live.agencyId.isEmpty();
+            btnManageAgency.setVisibility(showAgencyManage ? View.VISIBLE : View.GONE);
+            if (showAgencyManage) {
+                final String agencyId = live.agencyId;
+                btnManageAgency.setOnClickListener(v -> {
+                    dialog.dismiss();
+                    android.content.Intent i = new android.content.Intent(this,
+                            com.Dramizo.Series.presentation.agency.AgencyManageActivity.class);
+                    i.putExtra(com.Dramizo.Series.presentation.agency.AgencyManageActivity.EXTRA_AGENCY_ID,
+                            agencyId);
+                    startActivity(i);
+                });
+            }
         }
         TextView btnChangePhoto = sheet.findViewById(R.id.btnChangeRoomPhoto);
         if (btnChangePhoto != null) {
@@ -10474,14 +10506,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (room == null || roomId == null || viewModel == null) return;
         if (!(isHost || isOwner || canManageRoom)) return;
         String current = room.title != null ? room.title : "";
+        if (current.startsWith("وكالة · ")) current = current.substring("وكالة · ".length()).trim();
+        if (current.startsWith("وكالة ")) current = current.substring("وكالة ".length()).trim();
         final android.widget.EditText input = new android.widget.EditText(this);
         input.setText(current);
-        input.setHint(RoomUiHelper.isAgencyRoom(room) ? "اسم الوكالة / الغرفة" : "اسم الروم (دائم)");
+        final boolean agency = RoomUiHelper.isAgencyRoom(room);
+        input.setHint(agency ? "اسم الوكالة" : "اسم الروم (دائم)");
         input.setSelection(input.getText() != null ? input.getText().length() : 0);
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(RoomUiHelper.isAgencyRoom(room) ? "اسم الوكالة / الغرفة" : "اسم الروم")
-                .setMessage(RoomUiHelper.isAgencyRoom(room)
-                        ? "سيظهر للجمهور. لغرف الوكالة يُعرض كـ «وكالة · الاسم»."
+                .setTitle(agency ? "اسم الوكالة" : "اسم الروم")
+                .setMessage(agency
+                        ? "يُحدَّث اسم الوكالة للجميع ويظهر في الروم كـ «وكالة · الاسم»."
                         : "اسم الروم دائم ومستقل عن اسمك الشخصي — يظهر للجميع.")
                 .setView(input)
                 .setPositiveButton(R.string.save, (d, w) -> {
@@ -10490,10 +10525,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         Toast.makeText(this, "الاسم مطلوب", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    // Store plain title; UI prefixes «وكالة ·» for agency rooms.
                     if (next.startsWith("وكالة · ")) next = next.substring("وكالة · ".length()).trim();
                     if (next.startsWith("وكالة ")) next = next.substring("وكالة ".length()).trim();
-                    viewModel.updateTitle(roomId, next);
+                    if (agency && room.agencyId != null && !room.agencyId.isEmpty()) {
+                        final String agencyId = room.agencyId;
+                        final String name = next;
+                        AppContainer c = ContainerProvider.from(this);
+                        c.getIoExecutor().execute(() -> {
+                            java.util.Map<String, String> body = new java.util.HashMap<>();
+                            body.put("name", name);
+                            Result<Object> r = ApiCall.execute(
+                                    c.getAgencyApi().updateSettings(agencyId, body));
+                            runOnUiThread(() -> {
+                                if (r.success) {
+                                    Toast.makeText(this, "تم تحديث اسم الوكالة", Toast.LENGTH_SHORT).show();
+                                    viewModel.refresh(roomId);
+                                } else {
+                                    Toast.makeText(this,
+                                            r.error != null ? r.error : getString(R.string.error_generic),
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        });
+                    } else {
+                        viewModel.updateTitle(roomId, next);
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();

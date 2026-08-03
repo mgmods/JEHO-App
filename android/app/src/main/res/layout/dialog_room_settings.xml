@@ -52,6 +52,23 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/btnManageAgencyFromRoom"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_room_dialog_item"
+        android:drawablePadding="10dp"
+        android:drawableStart="@drawable/icon_agency"
+        android:gravity="center_vertical"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:text="إدارة الوكالة"
+        android:textColor="@color/aurora_gold"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/btnChangeRoomPhoto"
         android:layout_width="match_parent"
         android:layout_height="46dp"

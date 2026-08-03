@@ -17,11 +17,16 @@ import com.Dramizo.Series.databinding.DialogAgencyConfirmBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.presentation.cosmetics.CosmeticsActivity;
+import com.Dramizo.Series.presentation.cosmetics.CosmeticsViewModel;
 import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
+import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.Locale;
@@ -121,20 +126,35 @@ public class AgencyManageActivity extends ThemedActivity {
         });
 
         // Keep focused EditTexts above the soft keyboard inside NestedScrollView.
-        View.OnFocusChangeListener scrollOnFocus = (v, hasFocus) -> {
-            if (!hasFocus) return;
-            v.postDelayed(() -> {
-                try {
-                    v.requestRectangleOnScreen(
-                            new android.graphics.Rect(0, 0, v.getWidth(), v.getHeight() + 160),
-                            true);
-                } catch (Exception ignored) {
-                }
-            }, 280);
-        };
-        binding.etUserId.setOnFocusChangeListener(scrollOnFocus);
+        EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etUserId);
         if (binding.etMemberSearch != null) {
-            binding.etMemberSearch.setOnFocusChangeListener(scrollOnFocus);
+            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etMemberSearch);
+        }
+        if (binding.etAgencyName != null) {
+            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etAgencyName);
+        }
+        if (binding.etAgencyWelcome != null) {
+            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etAgencyWelcome);
+        }
+
+        if (binding.btnSaveAgencyBranding != null) {
+            binding.btnSaveAgencyBranding.setOnClickListener(v -> {
+                String name = binding.etAgencyName.getText() != null
+                        ? binding.etAgencyName.getText().toString().trim() : "";
+                String welcome = binding.etAgencyWelcome.getText() != null
+                        ? binding.etAgencyWelcome.getText().toString().trim() : "";
+                if (name.length() < 2) {
+                    Toast.makeText(this, "أدخل اسم وكالة صالحاً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                vm.updateAgencyBranding(agencyId, name, welcome);
+            });
+        }
+        if (binding.btnAgencyMallFrames != null) {
+            binding.btnAgencyMallFrames.setOnClickListener(v -> openMall("host_badge"));
+        }
+        if (binding.btnAgencyMallBadges != null) {
+            binding.btnAgencyMallBadges.setOnClickListener(v -> openMall("level_badge"));
         }
 
         vm.getMessage().observe(this, m -> {
@@ -197,6 +217,39 @@ public class AgencyManageActivity extends ThemedActivity {
                             && mineResult.data.agency != null
                             && agencyId.equals(mineResult.data.agency.id);
                     if (mineResult.data.agency != null) {
+                        MiscDtos.AgencyDto ag = mineResult.data.agency;
+                        if (binding.tvAgencyHeroName != null) {
+                            binding.tvAgencyHeroName.setText(
+                                    ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                        }
+                        if (binding.tvAgencyHeroMeta != null) {
+                            binding.tvAgencyHeroMeta.setText(
+                                    "أعضاء " + Math.max(0, ag.memberCount)
+                                            + " · " + roleAr(role));
+                        }
+                        if (binding.imgAgencyLogo != null) {
+                            if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
+                                Glide.with(this)
+                                        .load(AssetCatalog.absoluteUrl(ag.logoUrl))
+                                        .circleCrop()
+                                        .placeholder(R.drawable.icon_agency)
+                                        .into(binding.imgAgencyLogo);
+                            } else {
+                                binding.imgAgencyLogo.setImageResource(R.drawable.icon_agency);
+                            }
+                        }
+                        if (binding.boxAgencyBranding != null) {
+                            binding.boxAgencyBranding.setVisibility(isOwner ? View.VISIBLE : View.GONE);
+                            if (isOwner) {
+                                if (binding.etAgencyName != null) {
+                                    binding.etAgencyName.setText(ag.name != null ? ag.name : "");
+                                }
+                                if (binding.etAgencyWelcome != null) {
+                                    String welcome = ag.description != null ? ag.description : "";
+                                    binding.etAgencyWelcome.setText(welcome);
+                                }
+                            }
+                        }
                         String code = mineResult.data.agency.activationCode;
                         if (code != null && !code.isEmpty()) {
                             binding.tvActivationCode.setText(code);
@@ -490,5 +543,11 @@ public class AgencyManageActivity extends ThemedActivity {
             case "host": return "مضيف";
             default: return "عضو";
         }
+    }
+
+    private void openMall(String type) {
+        android.content.Intent i = new android.content.Intent(this, CosmeticsActivity.class);
+        if (type != null) i.putExtra(CosmeticsViewModel.EXTRA_TYPE, type);
+        startActivity(i);
     }
 }

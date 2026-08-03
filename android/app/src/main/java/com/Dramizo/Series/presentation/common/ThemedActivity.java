@@ -53,7 +53,7 @@ public abstract class ThemedActivity extends AppCompatActivity {
             View padTarget = findContentColumnForInsets();
             if (padTarget != null) {
                 // Status + nav — prevents content under Android 15/16 gesture/nav bar.
-                EdgeToEdgeHelper.padSystemBars(padTarget);
+                EdgeToEdgeHelper.padSystemBarsWithIme(padTarget);
             }
         }
 

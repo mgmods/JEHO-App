@@ -154,7 +154,7 @@ export class AgenciesController {
   }
 
   @Patch(':id/settings')
-  @ApiOperation({ summary: 'Update agency notification style (owner/manager)' })
+  @ApiOperation({ summary: 'Update agency settings (style; owner: name/description/logo)' })
   updateSettings(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('sub') userId: string,
