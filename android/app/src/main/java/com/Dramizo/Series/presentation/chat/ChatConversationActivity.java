@@ -349,6 +349,21 @@ public class ChatConversationActivity extends ThemedActivity {
     private void sendNow() {
         String text = binding.etMessage.getText() != null ? binding.etMessage.getText().toString().trim() : "";
         if (text.isEmpty() || conversationId == null) return;
+        com.Dramizo.Series.data.local.prefs.SessionManager sm =
+                ContainerProvider.from(this).getSessionManager();
+        if (sm.isChatPromoFilterFromServer()) {
+            java.util.List<String> extra =
+                    com.Dramizo.Series.util.ChatContentFilter.parseExtraKeywords(
+                            sm.getChatExtraKeywordsFromServer());
+            if (com.Dramizo.Series.util.ChatContentFilter.isBlocked(text, extra)) {
+                Toast.makeText(
+                                this,
+                                com.Dramizo.Series.util.ChatContentFilter.BLOCK_REASON,
+                                Toast.LENGTH_LONG)
+                        .show();
+                return;
+            }
+        }
         if (editingMessageId != null) {
             viewModel.editMessage(editingMessageId, text);
             clearEditing();

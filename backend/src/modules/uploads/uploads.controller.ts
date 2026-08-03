@@ -3,6 +3,7 @@ import {
   Delete,
   Param,
   Post,
+  Req,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -36,6 +37,10 @@ export class UploadsController {
     });
   }
 
+  private userIdFrom(req: { user?: { sub?: string; id?: string } }) {
+    return req?.user?.sub || req?.user?.id || undefined;
+  }
+
   @Post()
   @ApiOperation({ summary: 'Upload a single file' })
   @ApiConsumes('multipart/form-data')
@@ -63,8 +68,8 @@ export class UploadsController {
       },
     }),
   )
-  upload(@UploadedFile() file: Express.Multer.File) {
-    return this.uploadsService.processUploaded(file);
+  upload(@UploadedFile() file: Express.Multer.File, @Req() req: any) {
+    return this.uploadsService.processUploaded(file, this.userIdFrom(req));
   }
 
   @Post('multiple')
@@ -82,8 +87,8 @@ export class UploadsController {
       limits: { fileSize: 20 * 1024 * 1024 },
     }),
   )
-  uploadMany(@UploadedFiles() files: Express.Multer.File[]) {
-    return this.uploadsService.processMany(files);
+  uploadMany(@UploadedFiles() files: Express.Multer.File[], @Req() req: any) {
+    return this.uploadsService.processMany(files, this.userIdFrom(req));
   }
 
   @Delete(':filename')

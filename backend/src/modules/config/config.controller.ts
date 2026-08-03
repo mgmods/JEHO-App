@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Public } from '../../common/decorators';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
+import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @ApiTags('Config')
 @Controller('config')
@@ -14,6 +15,7 @@ export class ConfigController {
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly zegoSettingsService: ZegoSettingsService,
+    private readonly moderation: ContentModerationService,
   ) {}
 
   @Public()
@@ -121,6 +123,7 @@ export class ConfigController {
       ),
       // Default ON: gift WAV / SFX play unless admin mutes globally.
       giftSoundsEnabled: bool('gifts.sound_enabled', true),
+      ...(await this.moderation.clientPolicy()),
     };
   }
 

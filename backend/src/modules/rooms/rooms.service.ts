@@ -7,6 +7,8 @@ import {
   Optional,
   OnModuleInit,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -108,6 +110,7 @@ export class RoomsService implements OnModuleInit {
     private readonly musicTracksRepo: Repository<RoomMusicTrack>,
     private readonly dataSource: DataSource,
     private readonly zegoTokenService: ZegoTokenService,
+    @Inject(forwardRef(() => RealtimeGateway))
     private readonly realtimeGateway: RealtimeGateway,
     private readonly tasksService: TasksService,
     private readonly mediaCleanup: MediaCleanupService,
@@ -2418,6 +2421,91 @@ export class RoomsService implements OnModuleInit {
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Kicked from voice room');
     return { kicked: true, userId: dto.userId };
+  }
+
+  /** Auto-moderation: mute mic without requiring a human moderator. */
+  async systemMuteMic(roomId: string, userId: string, reason?: string) {
+    const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
+    if (seat) {
+      seat.isMuted = true;
+      seat.isModeratorMuted = true;
+      await this.seatsRepo.save(seat);
+    }
+    this.notifyRoomUpdated(roomId);
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:mic_changed',
+      payload: {
+        roomId,
+        userId,
+        muted: true,
+        moderatorMuted: true,
+        reason: reason || 'auto_moderation',
+      },
+      at: new Date().toISOString(),
+    });
+    return { muted: true, userId };
+  }
+
+  /** Auto-moderation: kick (and optionally short ban) without mod permission. */
+  async systemKick(
+    roomId: string,
+    userId: string,
+    reason?: string,
+    options?: { banMinutes?: number },
+  ) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) return { kicked: false, userId };
+    // Never auto-kick room owner / active host / cohost.
+    if (
+      room.hostId === userId ||
+      room.activeHostId === userId ||
+      room.cohostId === userId
+    ) {
+      return { kicked: false, userId, skipped: 'host' };
+    }
+    const banMinutes = Math.max(0, Number(options?.banMinutes || 0));
+    if (banMinutes > 0) {
+      const expiresAt = new Date(Date.now() + banMinutes * 60 * 1000);
+      const existing = await this.bansRepo.findOne({ where: { roomId, userId } });
+      if (existing) {
+        existing.reason = reason || existing.reason;
+        existing.expiresAt = expiresAt;
+        existing.bannedById = room.hostId;
+        await this.bansRepo.save(existing);
+      } else {
+        await this.bansRepo.save(
+          this.bansRepo.create({
+            roomId,
+            userId,
+            bannedById: room.hostId,
+            reason: reason || 'auto_moderation',
+            expiresAt,
+          }),
+        );
+      }
+    }
+    await this.leave(roomId, userId);
+    const member = await this.memberIdentity(userId);
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: banMinutes > 0 ? 'room:banned' : 'room:kicked',
+      payload: {
+        roomId,
+        ...member,
+        reason: reason || 'auto_moderation',
+        auto: true,
+      },
+      at: new Date().toISOString(),
+    });
+    this.realtimeGateway.emitToUser(userId, 'moderation:action', {
+      roomId,
+      action: banMinutes > 0 ? 'ban' : 'kick',
+      reason: reason || 'محتوى مخالف في الدردشة',
+    });
+    await this.realtimeGateway.ejectUserFromRoom(roomId, userId);
+    void this.ejectRtcUser(roomId, userId, reason || 'Auto-moderation kick');
+    return { kicked: true, userId, banMinutes };
   }
 
   async ban(roomId: string, actorId: string, dto: KickBanDto) {

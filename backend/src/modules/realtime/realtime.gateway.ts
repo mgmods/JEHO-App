@@ -7,7 +7,12 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import {
+  Logger,
+  Inject,
+  forwardRef,
+  Optional,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,6 +36,8 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { ContentModerationService } from '../moderation/content-moderation.service';
+import { RoomsService } from '../rooms/rooms.service';
 
 interface AuthSocket extends Socket {
   userId?: string;
@@ -85,6 +92,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly giftSendsRepo: Repository<GiftSend>,
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
+    private readonly moderation: ContentModerationService,
+    @Optional()
+    @Inject(forwardRef(() => RoomsService))
+    private readonly roomsService?: RoomsService,
   ) {}
 
   async handleConnection(client: AuthSocket) {
@@ -570,6 +581,17 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (data.event === 'chat:message') {
       const text = String(incoming.text || '').trim().slice(0, 1000);
       if (!text) return { error: 'Message is empty' };
+      const mod = await this.moderation.inspectText(text);
+      if (!mod.ok) {
+        client.emit('moderation:blocked', {
+          roomId: data.roomId,
+          code: mod.code,
+          reason: mod.reason,
+          action: mod.action,
+        });
+        void this.enforceChatViolation(data.roomId, client.userId!, mod.reason, mod.action);
+        return { error: mod.reason, code: mod.code, action: mod.action };
+      }
       const wealthScore = Math.max(
         0,
         Number(profile.wealthLevel || profile.wealthScore || profile.totalSentCoins || incoming.wealthScore || 0),
@@ -791,6 +813,27 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   emitToUser(userId: string, event: string, payload: unknown) {
     this.server.to(`user:${userId}`).emit(event, payload);
+  }
+
+  private async enforceChatViolation(
+    roomId: string,
+    userId: string,
+    reason: string,
+    action: 'block' | 'mute' | 'kick' | 'ban',
+  ) {
+    if (!this.roomsService || !userId || !roomId) return;
+    try {
+      await this.roomsService.systemMuteMic(roomId, userId, reason);
+      if (action === 'kick' || action === 'ban') {
+        await this.roomsService.systemKick(roomId, userId, reason, {
+          banMinutes: action === 'ban' ? 30 : 10,
+        });
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Auto-moderation enforce failed: ${(err as Error).message}`,
+      );
+    }
   }
 
   async ejectUserEverywhere(userId: string, reason: string) {

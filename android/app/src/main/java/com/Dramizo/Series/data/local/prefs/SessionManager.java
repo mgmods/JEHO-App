@@ -237,6 +237,22 @@ public class SessionManager {
         return prefs.getBoolean("server_gift_sounds_enabled", true);
     }
 
+    public void setChatPromoFilterFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_chat_promo_filter", enabled).apply();
+    }
+
+    public boolean isChatPromoFilterFromServer() {
+        return prefs.getBoolean("server_chat_promo_filter", true);
+    }
+
+    public void setChatExtraKeywordsFromServer(String keywordsCsv) {
+        prefs.edit().putString("server_chat_extra_keywords", keywordsCsv != null ? keywordsCsv : "").apply();
+    }
+
+    public String getChatExtraKeywordsFromServer() {
+        return prefs.getString("server_chat_extra_keywords", "");
+    }
+
     public void setLanguage(String lang) {
         prefs.edit().putString("language", lang).commit();
         try {

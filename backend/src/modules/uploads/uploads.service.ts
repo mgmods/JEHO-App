@@ -6,13 +6,17 @@ import { ConfigService } from '@nestjs/config';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
 export class UploadsService {
   private readonly uploadDir: string;
   private readonly maxSizeMb: number;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly moderation: ContentModerationService,
+  ) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
     if (!existsSync(this.uploadDir)) {
@@ -42,7 +46,7 @@ export class UploadsService {
     return `/uploads/${filename}`;
   }
 
-  processUploaded(file: Express.Multer.File) {
+  async processUploaded(file: Express.Multer.File, userId?: string) {
     if (!file) throw new BadRequestException('No file uploaded');
     const ext = extname(file.originalname).toLowerCase();
     const storedName = file.filename || `${uuidv4()}${ext}`;
@@ -53,6 +57,18 @@ export class UploadsService {
     ) {
       if (existsSync(storedPath)) unlinkSync(storedPath);
       throw new BadRequestException('Invalid or unsupported audio file');
+    }
+    try {
+      await this.moderation.assertCleanImageFile(storedPath, file.mimetype);
+    } catch (err) {
+      if (userId) {
+        try {
+          await this.moderation.recordNsfwStrike(userId);
+        } catch {
+          /* ignore strike errors */
+        }
+      }
+      throw err;
     }
     return {
       originalName: file.originalname,
@@ -88,8 +104,19 @@ export class UploadsService {
     }
   }
 
-  processMany(files: Express.Multer.File[]) {
-    return (files || []).map((f) => this.processUploaded(f));
+  async processMany(files: Express.Multer.File[], userId?: string) {
+    const out: Array<{
+      originalName: string;
+      filename: string;
+      mimeType: string;
+      size: number;
+      url: string;
+      path: string;
+    }> = [];
+    for (const f of files || []) {
+      out.push(await this.processUploaded(f, userId));
+    }
+    return out;
   }
 
   deleteFilename(filename: string) {

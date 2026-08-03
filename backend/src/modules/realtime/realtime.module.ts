@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -15,6 +15,8 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RoomBan } from '../../database/entities/room-ban.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Agency } from '../../database/entities/agency.entity';
+import { ModerationModule } from '../moderation/moderation.module';
+import { RoomsModule } from '../rooms/rooms.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { Agency } from '../../database/entities/agency.entity';
       GiftSend,
       AppSetting,
     ]),
+    ModerationModule,
+    forwardRef(() => RoomsModule),
   ],
   providers: [RealtimeGateway],
   exports: [RealtimeGateway],

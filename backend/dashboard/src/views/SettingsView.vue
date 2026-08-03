@@ -235,11 +235,34 @@
               </label>
               <label class="settings-switch">
                 <div>
+                  <div class="settings-switch-title">{{ t('settings.chatPromoFilter') }}</div>
+                  <div class="settings-switch-hint">{{ t('settings.chatPromoFilterHint') }}</div>
+                </div>
+                <input v-model="form.chatPromoFilterEnabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <label class="settings-switch">
+                <div>
+                  <div class="settings-switch-title">{{ t('settings.chatPromoKick') }}</div>
+                  <div class="settings-switch-hint">{{ t('settings.chatPromoKickHint') }}</div>
+                </div>
+                <input v-model="form.chatPromoKickEnabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <label class="settings-switch">
+                <div>
                   <div class="settings-switch-title">{{ t('settings.requireStreamReview') }}</div>
                   <div class="settings-switch-hint">{{ t('settings.requireStreamReviewHint') }}</div>
                 </div>
                 <input v-model="form.requireStreamReview" class="form-check-input" type="checkbox" role="switch" />
               </label>
+              <div class="mt-3">
+                <label class="form-label">{{ t('settings.chatBlockedKeywords') }}</label>
+                <textarea
+                  v-model="form.chatBlockedExtraKeywords"
+                  class="form-control"
+                  rows="3"
+                  :placeholder="t('settings.chatBlockedKeywordsHint')"
+                />
+              </div>
             </section>
 
             <section class="settings-card">
@@ -386,6 +409,9 @@ const form = reactive({
   roomRulesText: 'احترموا القوانين واستمتعوا بالجلسة',
   autoModeration: true,
   liveNsfwEnabled: true,
+  chatPromoFilterEnabled: true,
+  chatPromoKickEnabled: true,
+  chatBlockedExtraKeywords: '',
   requireStreamReview: false,
   reportSlaHours: 24,
   liveNsfwConfidence: 0.78,
@@ -503,6 +529,17 @@ async function load() {
     roomRulesText: String(map['rooms.rules_text'] ?? map.roomRulesText ?? form.roomRulesText),
     autoModeration: bool(map.autoModeration ?? map.auto_moderation, form.autoModeration),
     liveNsfwEnabled: bool(map.live_nsfw_enabled ?? map.liveNsfwEnabled, form.liveNsfwEnabled),
+    chatPromoFilterEnabled: bool(
+      map.chat_promo_filter_enabled ?? map.chatPromoFilterEnabled,
+      form.chatPromoFilterEnabled,
+    ),
+    chatPromoKickEnabled: bool(
+      map.chat_promo_kick_enabled ?? map.chatPromoKickEnabled,
+      form.chatPromoKickEnabled,
+    ),
+    chatBlockedExtraKeywords: String(
+      map.chat_blocked_extra_keywords ?? map.chatBlockedExtraKeywords ?? form.chatBlockedExtraKeywords,
+    ),
     requireStreamReview: bool(map.requireStreamReview ?? map.require_stream_review, form.requireStreamReview),
     reportSlaHours: num(map.reportSlaHours ?? map.report_sla_hours, form.reportSlaHours),
     liveNsfwConfidence: num(map.live_nsfw_confidence ?? map.liveNsfwConfidence, form.liveNsfwConfidence),
@@ -549,7 +586,11 @@ async function save() {
     'chat.requireGiftToDm': String(!!form.requireGiftToDm),
     'rooms.rules_text': String(form.roomRulesText ?? ''),
     autoModeration: String(!!form.autoModeration),
+    auto_moderation: String(!!form.autoModeration),
     live_nsfw_enabled: String(!!form.liveNsfwEnabled),
+    chat_promo_filter_enabled: String(!!form.chatPromoFilterEnabled),
+    chat_promo_kick_enabled: String(!!form.chatPromoKickEnabled),
+    chat_blocked_extra_keywords: String(form.chatBlockedExtraKeywords ?? ''),
     requireStreamReview: String(!!form.requireStreamReview),
     reportSlaHours: String(form.reportSlaHours ?? ''),
     live_nsfw_confidence: String(form.liveNsfwConfidence ?? 0.78),

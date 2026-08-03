@@ -14,6 +14,7 @@ import { TasksModule } from '../tasks/tasks.module';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
     NotificationsModule,
     UploadsModule,
     TasksModule,
+    ModerationModule,
   ],
   controllers: [ChatController],
   providers: [ChatService],

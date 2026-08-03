@@ -272,6 +272,11 @@ public final class MiscDtos {
         @SerializedName("roomRulesText") public String roomRulesText;
         /** When false, gift effect audio is fully muted across the app. */
         @SerializedName("giftSoundsEnabled") public boolean giftSoundsEnabled = true;
+        @SerializedName("autoModeration") public boolean autoModeration = true;
+        @SerializedName("chatPromoFilterEnabled") public boolean chatPromoFilterEnabled = true;
+        @SerializedName("chatPromoKickEnabled") public boolean chatPromoKickEnabled = true;
+        @SerializedName("liveNsfwEnabled") public boolean liveNsfwEnabled = true;
+        @SerializedName("extraKeywords") public java.util.List<String> extraKeywords;
     }
 
     /** Store update prompt from GET /config/app-update. */

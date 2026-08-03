@@ -1162,12 +1162,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void appendChatFromInput() {
         String text = binding.etChat.getText() != null ? binding.etChat.getText().toString().trim() : "";
         if (text.isEmpty() || roomId == null) return;
-        String me = ContainerProvider.from(this).getSessionManager().getDisplayName();
+        com.Dramizo.Series.data.local.prefs.SessionManager sm =
+                ContainerProvider.from(this).getSessionManager();
+        if (sm.isChatPromoFilterFromServer()) {
+            java.util.List<String> extra =
+                    com.Dramizo.Series.util.ChatContentFilter.parseExtraKeywords(
+                            sm.getChatExtraKeywordsFromServer());
+            if (com.Dramizo.Series.util.ChatContentFilter.isBlocked(text, extra)) {
+                Toast.makeText(
+                                this,
+                                com.Dramizo.Series.util.ChatContentFilter.BLOCK_REASON,
+                                Toast.LENGTH_LONG)
+                        .show();
+                return;
+            }
+        }
+        String me = sm.getDisplayName();
         if (me == null || me.isEmpty()) me = "أنا";
-        int vip = ContainerProvider.from(this).getSessionManager().getVipLevel();
-        int level = Math.max(1, ContainerProvider.from(this).getSessionManager().getUserLevel());
-        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto u =
-                ContainerProvider.from(this).getSessionManager().getUser();
+        int vip = sm.getVipLevel();
+        int level = Math.max(1, sm.getUserLevel());
+        com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto u = sm.getUser();
         String avatar = u != null ? u.avatarUrl : null;
         long wealth = u != null ? Math.max(u.wealthScore, u.totalSentCoins) : 0L;
         long charm = u != null ? Math.max(0L, u.charmScore) : 0L;

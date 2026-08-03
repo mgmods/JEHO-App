@@ -30,6 +30,7 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
 export class ChatService {
@@ -51,6 +52,7 @@ export class ChatService {
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly mediaCleanup: MediaCleanupService,
+    private readonly moderation: ContentModerationService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly tasks?: TasksService,
@@ -359,6 +361,10 @@ export class ChatService {
       forwardedFromId = original.id;
     }
 
+    if (type === MessageType.TEXT || type === MessageType.IMAGE) {
+      await this.moderation.assertCleanText(content);
+    }
+
     // Gift messages themselves satisfy the gate — only block first text/media.
     if (type !== MessageType.GIFT && type !== MessageType.SYSTEM) {
       await this.assertDmGiftGate(conversationId, senderId, type);
@@ -543,6 +549,7 @@ export class ChatService {
     if (!msg) throw new NotFoundException('Message not found');
     if (msg.senderId !== userId) throw new ForbiddenException('Cannot edit others messages');
     if (msg.isUnsent) throw new BadRequestException('Message was unsent');
+    await this.moderation.assertCleanText(dto.content);
     msg.content = dto.content;
     msg.isEdited = true;
     msg.editedAt = new Date();
