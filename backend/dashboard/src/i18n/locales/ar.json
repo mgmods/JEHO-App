@@ -422,7 +422,17 @@
     "showKeys": "إظهار المفاتيح",
     "hideKeys": "إخفاء المفاتيح",
     "appSignHint": "يُستخدم في تطبيق أندرويد لتهيئة Express SDK",
-    "serverSecretHint": "سر الخادم بطول 32 حرفاً لتوليد التوكن — لا يُعرض للتطبيق"
+    "serverSecretHint": "سر الخادم بطول 32 حرفاً لتوليد التوكن — لا يُعرض للتطبيق",
+    "importTitle": "جلب الإعدادات من رابط API",
+    "importHint": "ضع دومين أو رابط API يعيد إعدادات Zego (مثل /api/v1/config/zego). جرّب أولاً ثم استورد. ملاحظة: ميجو يستخدم Agora وليس Zego.",
+    "importUrl": "رابط / دومين الـ API",
+    "importToken": "توكن اختياري (Bearer)",
+    "importTokenHint": "إذا كان الـ API محمياً",
+    "testUrl": "اختبار الرابط",
+    "importApply": "استيراد وحفظ",
+    "probedUrl": "الرابط الذي نجح",
+    "testSuccess": "تم اختبار الرابط — راجع النتيجة أدناه",
+    "importSuccess": "تم استيراد إعدادات Zego وحفظها"
   },
   "commonStatus": {
     "open": "مفتوحة",

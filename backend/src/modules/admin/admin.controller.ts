@@ -49,6 +49,7 @@ import { PaymentsService } from '../payments/payments.service';
 import { PatchBinancePaySettingsDto } from '../payments/dto/patch-binance-pay-settings.dto';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { PatchZegoSettingsDto } from '../zego/dto/patch-zego-settings.dto';
+import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
 import { DramaService } from '../drama/drama.service';
 import { GameAdsService } from '../games/game-ads.service';
 import { IdentityVerificationService } from '../users/identity-verification.service';
@@ -1130,6 +1131,16 @@ export class AdminController {
   @ApiOperation({ summary: 'Update ZEGOCLOUD settings (secrets encrypted at rest)' })
   patchZegoSettings(@Body() body: PatchZegoSettingsDto) {
     return this.zegoSettingsService.updateSettings(body);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('zego-settings/import-from-url')
+  @ApiOperation({
+    summary: 'Probe or import ZEGOCLOUD settings from a remote API URL/domain',
+  })
+  importZegoFromUrl(@Body() body: ImportZegoFromUrlDto) {
+    return this.zegoSettingsService.importFromRemoteUrl(body);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

@@ -221,6 +221,8 @@ export const zegoSettingsApi = {
   get: () => safeRequest(() => api.get('/admin/zego-settings')),
   reveal: () => safeRequest(() => api.post('/admin/zego-settings/reveal')),
   update: (data) => safeRequest(() => api.patch('/admin/zego-settings', data)),
+  importFromUrl: (data) =>
+    safeRequest(() => api.post('/admin/zego-settings/import-from-url', data)),
 }
 
 export const contestsApi = {

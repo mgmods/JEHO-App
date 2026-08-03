@@ -161,6 +161,257 @@ export class ZegoSettingsService {
     return this.getMaskedSettings();
   }
 
+  /**
+   * Probe (and optionally import) ZEGO credentials from a remote API URL/domain.
+   * Supports JEHO-style `/config/zego` and flexible JSON shapes with appId/appSign/serverSecret.
+   */
+  async importFromRemoteUrl(input: {
+    url: string;
+    bearerToken?: string;
+    apply?: boolean;
+  }): Promise<{
+    probedUrl: string;
+    applied: boolean;
+    found: {
+      appId: string | null;
+      appSign: boolean;
+      serverSecret: boolean;
+      wsUrl: string | null;
+      wsUrlBak: string | null;
+    };
+    warnings: string[];
+    settings?: MaskedZegoSettings;
+  }> {
+    const raw = String(input.url || '').trim();
+    if (!raw) throw new BadRequestException('URL is required');
+
+    let base: URL;
+    try {
+      base = new URL(raw.includes('://') ? raw : `https://${raw}`);
+    } catch {
+      throw new BadRequestException('Invalid URL');
+    }
+    if (!['http:', 'https:'].includes(base.protocol)) {
+      throw new BadRequestException('Only http/https URLs are allowed');
+    }
+
+    const candidates = this.buildRemoteCandidateUrls(base);
+    const warnings: string[] = [];
+    let probedUrl = '';
+    let parsed: {
+      appId?: string;
+      appSign?: string;
+      serverSecret?: string;
+      wsUrl?: string;
+      wsUrlBak?: string;
+      note?: string;
+    } | null = null;
+
+    for (const candidate of candidates) {
+      try {
+        const json = await this.fetchRemoteJson(candidate, input.bearerToken);
+        const mapped = this.mapRemoteZegoPayload(json);
+        if (mapped?.note && !mapped.appId && !mapped.serverSecret && !mapped.appSign) {
+          warnings.push(mapped.note);
+          continue;
+        }
+        if (mapped?.appId || mapped?.serverSecret || mapped?.appSign || mapped?.wsUrl) {
+          probedUrl = candidate;
+          parsed = mapped;
+          break;
+        }
+      } catch (err) {
+        warnings.push(`${candidate}: ${(err as Error).message}`);
+      }
+    }
+
+    if (!parsed?.appId && !parsed?.serverSecret && !parsed?.appSign) {
+      throw new BadRequestException({
+        message:
+          'لم يُعثر على إعدادات Zego في الرابط. تأكد أنه API يعيد appId (ومن الأفضل ServerSecret). تطبيقات مثل ميجو تستخدم Agora وليس Zego.',
+        warnings: warnings.slice(0, 8),
+      });
+    }
+
+    if (parsed.note) warnings.push(parsed.note);
+    if (!parsed.serverSecret) {
+      warnings.push(
+        'الرابط لم يُرجع ServerSecret — التوكنات لن تُولَّد حتى تضيف ServerSecret يدوياً أو من API إداري.',
+      );
+    }
+
+    const found = {
+      appId: parsed.appId || null,
+      appSign: Boolean(parsed.appSign),
+      serverSecret: Boolean(parsed.serverSecret),
+      wsUrl: parsed.wsUrl || null,
+      wsUrlBak: parsed.wsUrlBak || null,
+    };
+
+    if (!input.apply) {
+      return { probedUrl, applied: false, found, warnings };
+    }
+
+    const patch: PatchZegoSettingsDto = {};
+    if (parsed.appId) patch.appId = parsed.appId;
+    if (parsed.appSign) patch.appSign = parsed.appSign;
+    if (parsed.serverSecret) patch.serverSecret = parsed.serverSecret;
+    if (parsed.wsUrl) patch.wsUrl = parsed.wsUrl;
+    if (parsed.wsUrlBak) patch.wsUrlBak = parsed.wsUrlBak;
+    const settings = await this.updateSettings(patch);
+
+    const metaKey = 'zego_import_last_url';
+    let meta = await this.settingsRepo.findOne({ where: { key: metaKey } });
+    if (!meta) {
+      meta = this.settingsRepo.create({
+        key: metaKey,
+        value: probedUrl || base.origin,
+        description: 'Last remote URL used to import ZEGO settings',
+      });
+    } else {
+      meta.value = probedUrl || base.origin;
+    }
+    await this.settingsRepo.save(meta);
+
+    return { probedUrl, applied: true, found, warnings, settings };
+  }
+
+  private buildRemoteCandidateUrls(base: URL): string[] {
+    const path = (base.pathname || '/').replace(/\/+$/, '') || '';
+    const looksLikeEndpoint =
+      /config\/zego|zego-settings|zego|agora\/getKey|client\/app\/config/i.test(path);
+    const origin = base.origin;
+    const list: string[] = [];
+    if (looksLikeEndpoint || path.length > 1) {
+      list.push(base.toString());
+    }
+    const suffixes = [
+      '/api/v1/config/zego',
+      '/api/config/zego',
+      '/config/zego',
+      '/api/v1/admin/zego-settings',
+      '/admin/zego-settings',
+      '/client/app/config',
+    ];
+    for (const s of suffixes) {
+      list.push(`${origin}${s}`);
+    }
+    return [...new Set(list)];
+  }
+
+  private async fetchRemoteJson(
+    url: string,
+    bearerToken?: string,
+  ): Promise<unknown> {
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'User-Agent': 'JEHO-CHAT-Admin/1.0',
+    };
+    const token = String(bearerToken || '').trim();
+    if (token) {
+      headers.Authorization = token.toLowerCase().startsWith('bearer ')
+        ? token
+        : `Bearer ${token}`;
+    }
+    const res = await fetch(url, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(12_000),
+      redirect: 'follow',
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('Response is not JSON');
+    }
+  }
+
+  private mapRemoteZegoPayload(raw: unknown): {
+    appId?: string;
+    appSign?: string;
+    serverSecret?: string;
+    wsUrl?: string;
+    wsUrlBak?: string;
+    note?: string;
+  } | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const root = raw as Record<string, unknown>;
+    const data =
+      (root.data && typeof root.data === 'object'
+        ? (root.data as Record<string, unknown>)
+        : null) ||
+      (root.result && typeof root.result === 'object'
+        ? (root.result as Record<string, unknown>)
+        : null) ||
+      root;
+
+    const pick = (...keys: string[]) => {
+      for (const k of keys) {
+        const v = data[k];
+        if (v == null || v === '') continue;
+        return String(v).trim();
+      }
+      return '';
+    };
+
+    const agoraHint =
+      pick('agoraAppId', 'agora_app_id', 'agoraKey', 'agora_key') ||
+      (typeof data.agora === 'object' ? 'agora' : '');
+    if (agoraHint && !pick('appId', 'app_id', 'zegoAppId', 'zego_app_id')) {
+      return {
+        note: 'الرابط يبدو لإعدادات Agora (ميجو وما شابه) وليس Zego — لا يمكن استيرادها كتطبيق Zego.',
+      };
+    }
+
+    const appId = pick(
+      'appId',
+      'app_id',
+      'zegoAppId',
+      'zego_app_id',
+      'zegoAppID',
+    );
+    const appSign = pick('appSign', 'app_sign', 'zegoAppSign', 'zego_app_sign');
+    const serverSecret = pick(
+      'serverSecret',
+      'server_secret',
+      'zegoServerSecret',
+      'zego_server_secret',
+    );
+    let wsUrl = pick('wsUrl', 'ws_url', 'zegoWsUrl');
+    let wsUrlBak = pick('wsUrlBak', 'ws_url_bak', 'zegoWsUrlBak');
+
+    const cleanSign = appSign && appSign !== 'null' ? appSign : '';
+    const cleanSecret = serverSecret || '';
+
+    if (!appId && !cleanSign && !cleanSecret && !wsUrl) return null;
+
+    if (appId && /^\d+$/.test(appId)) {
+      if (!wsUrl) {
+        wsUrl = `wss://webliveroom${appId}-api.coolzcloud.com/ws`;
+      }
+      if (!wsUrlBak) {
+        wsUrlBak = `wss://webliveroom${appId}-api-bak.coolzcloud.com/ws`;
+      }
+    }
+
+    return {
+      appId: appId && /^\d+$/.test(appId) ? appId : undefined,
+      appSign: cleanSign || undefined,
+      serverSecret:
+        cleanSecret && cleanSecret.length === 32 ? cleanSecret : undefined,
+      wsUrl: wsUrl || undefined,
+      wsUrlBak: wsUrlBak || undefined,
+      note:
+        cleanSecret && cleanSecret.length !== 32 && cleanSecret.length > 0
+          ? 'ServerSecret الموجود في الرد ليس بطول 32 حرفاً وتم تجاهله.'
+          : undefined,
+    };
+  }
+
   async resolveConfig(): Promise<ResolvedZegoConfig> {
     if (this.cache) return this.cache;
     const stored = await this.loadStoredConfig();

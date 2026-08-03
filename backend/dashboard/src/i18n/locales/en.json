@@ -422,7 +422,17 @@
     "showKeys": "Show keys",
     "hideKeys": "Hide keys",
     "appSignHint": "Used by the Android app to initialize Express SDK",
-    "serverSecretHint": "32-character server secret for token generation — never exposed to the app"
+    "serverSecretHint": "32-character server secret for token generation — never exposed to the app",
+    "importTitle": "Import settings from API URL",
+    "importHint": "Paste a domain or API URL that returns Zego settings (e.g. /api/v1/config/zego). Test first, then import. Note: Mikoo uses Agora, not Zego.",
+    "importUrl": "API URL / domain",
+    "importToken": "Optional Bearer token",
+    "importTokenHint": "If the remote API requires auth",
+    "testUrl": "Test URL",
+    "importApply": "Import & save",
+    "probedUrl": "Successful URL",
+    "testSuccess": "URL tested — review the result below",
+    "importSuccess": "Zego settings imported and saved"
   },
   "commonStatus": {
     "open": "Open",
