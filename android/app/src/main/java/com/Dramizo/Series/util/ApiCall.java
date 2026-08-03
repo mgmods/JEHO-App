@@ -78,6 +78,14 @@ public final class ApiCall {
     }
 
     private static String friendly(String message, int code) {
+        if (message != null && (
+                message.contains("NSFW")
+                        || message.contains("عري")
+                        || message.contains("غير لائق")
+                        || message.contains("CHAT_PROMO")
+                        || message.contains("ممنوع الترويج"))) {
+            return message;
+        }
         if (message != null && (message.contains("DM_GIFT_REQUIRED") || message.contains("أرسل هدية"))) {
             return message;
         }

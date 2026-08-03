@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
@@ -111,6 +112,28 @@ public class VoiceRoomForegroundService extends Service {
                         }
                         final String text = msg;
                         main.post(() -> postSummonAlert(text));
+                        return;
+                    }
+                    if ("room:kicked".equals(event) || "room:banned".equals(event)) {
+                        String target = string(payload, "userId");
+                        String me = com.Dramizo.Series.presentation.common.ContainerProvider
+                                .from(VoiceRoomForegroundService.this)
+                                .getSessionManager()
+                                .getUserId();
+                        if (me != null && me.equals(target)) {
+                            final String toast =
+                                    "room:banned".equals(event)
+                                            ? "تم حظرك من الغرفة"
+                                            : "تم طردك من الغرفة";
+                            main.post(() -> {
+                                Toast.makeText(
+                                                VoiceRoomForegroundService.this,
+                                                toast,
+                                                Toast.LENGTH_LONG)
+                                        .show();
+                                leaveRoom(roomId);
+                            });
+                        }
                         return;
                     }
                     if ("room:seat_invited".equals(event)) {

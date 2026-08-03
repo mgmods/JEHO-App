@@ -376,6 +376,12 @@ public class RealtimeClient {
      * @return {@code false} when the socket is disconnected or the payload could not be emitted.
      */
     public boolean emitRoomEvent(String roomId, String event, JsonObject payload) {
+        return emitRoomEvent(roomId, event, payload, null);
+    }
+
+    /** Emits a room event and optionally waits for the Nest ack ({@code ok}/{@code error}). */
+    public boolean emitRoomEvent(
+            String roomId, String event, JsonObject payload, @Nullable AckCallback callback) {
         if (roomId == null || event == null || socket == null || !socket.connected()) return false;
         try {
             JSONObject body = new JSONObject();
@@ -384,12 +390,39 @@ public class RealtimeClient {
             if (payload != null) {
                 body.put("payload", new JSONObject(payload.toString()));
             }
-            socket.emit("room:event", body);
+            if (callback == null) {
+                socket.emit("room:event", body);
+            } else {
+                socket.emit("room:event", body, (Ack) args -> {
+                    boolean ok = true;
+                    String error = null;
+                    String code = null;
+                    try {
+                        if (args != null && args.length > 0 && args[0] instanceof JSONObject) {
+                            JSONObject res = (JSONObject) args[0];
+                            if (res.has("error") && !res.isNull("error")) {
+                                ok = false;
+                                error = res.optString("error", "تعذر إرسال الرسالة");
+                                code = res.optString("code", null);
+                            } else if (res.has("ok") && !res.optBoolean("ok", true)) {
+                                ok = false;
+                                error = res.optString("message", "تعذر إرسال الرسالة");
+                            }
+                        }
+                    } catch (Exception ignored) {
+                    }
+                    callback.onAck(ok, error, code);
+                });
+            }
             return true;
         } catch (JSONException e) {
             Log.w(TAG, "emitRoomEvent failed", e);
             return false;
         }
+    }
+
+    public interface AckCallback {
+        void onAck(boolean ok, @Nullable String error, @Nullable String code);
     }
 
     public synchronized void disconnect() {

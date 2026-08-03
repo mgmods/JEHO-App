@@ -173,7 +173,18 @@ export class ContentModerationService implements OnModuleInit {
 
     const threshold = await this.numSetting('live_nsfw_confidence', 0.72);
     const score = await this.estimateNsfwScore(storedPath, ext);
-    if (score == null) return;
+    // Fail closed for images we cannot scan when NSFW moderation is on.
+    if (score == null) {
+      try {
+        unlinkSync(storedPath);
+      } catch {
+        /* ignore */
+      }
+      throw new BadRequestException({
+        code: 'NSFW_SCAN_UNAVAILABLE',
+        message: 'تعذر فحص الصورة — ارفع JPG أو PNG',
+      });
+    }
     if (score < threshold) return;
 
     try {
@@ -206,6 +217,7 @@ export class ContentModerationService implements OnModuleInit {
       user.status = UserStatus.BANNED;
       action = 'ban_perm';
     } else if (strikes >= banTempAt) {
+      user.status = UserStatus.SUSPENDED;
       action = 'ban_temp';
     } else if (strikes >= muteAt) {
       action = 'mute';

@@ -361,7 +361,7 @@ export class ChatService {
       forwardedFromId = original.id;
     }
 
-    if (type === MessageType.TEXT || type === MessageType.IMAGE) {
+    if (content && String(content).trim()) {
       await this.moderation.assertCleanText(content);
     }
 

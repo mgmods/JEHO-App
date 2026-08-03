@@ -16,6 +16,7 @@ import { RoomBan } from '../../database/entities/room-ban.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Agency } from '../../database/entities/agency.entity';
 import { ModerationModule } from '../moderation/moderation.module';
+import { ZegoModule } from '../zego/zego.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ModerationModule } from '../moderation/moderation.module';
       AppSetting,
     ]),
     ModerationModule,
+    ZegoModule,
   ],
   providers: [RealtimeGateway],
   exports: [RealtimeGateway],

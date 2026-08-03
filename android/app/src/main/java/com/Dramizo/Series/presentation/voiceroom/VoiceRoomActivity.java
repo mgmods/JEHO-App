@@ -1204,6 +1204,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (hostFrame != null && !hostFrame.isEmpty()) payload.addProperty("hostBadgeUrl", hostFrame);
         if (frame != null && !frame.isEmpty()) payload.addProperty("frameUrl", frame);
 
+        final String displayMe = me;
+        final String displayFrame = frame;
+        final String displayAvatar = avatar;
+        final long displayWealth = wealth;
+        final long displayCharm = charm;
+        final int displayVip = vip;
+        final int displayLevel = level;
+        final boolean serverModeration = sm.isChatPromoFilterFromServer();
+
+        // When server promo moderation is on: socket-first so mute/kick can run.
+        // Otherwise keep Zego as the primary broadcast path.
+        if (serverModeration) {
+            if (!realtimeJoined) {
+                Toast.makeText(this, "جارٍ الاتصال بالغرفة… حاول مجدداً", Toast.LENGTH_SHORT).show();
+                connectRealtimeRoom();
+                return;
+            }
+            boolean emitted = RealtimeClient.getInstance().emitRoomEvent(
+                    roomId, "chat:message", payload, (ok, error, code) -> runOnUiThread(() -> {
+                        if (!ok) {
+                            Toast.makeText(
+                                            this,
+                                            error != null && !error.isEmpty()
+                                                    ? error
+                                                    : com.Dramizo.Series.util.ChatContentFilter.BLOCK_REASON,
+                                            Toast.LENGTH_LONG)
+                                    .show();
+                            return;
+                        }
+                        // Socket already broadcast to peers; skip Zego to avoid duplicate lines.
+                        appendChatLine(
+                                displayMe, text, displayVip, displayLevel, displayFrame,
+                                myUserId, displayAvatar, null, displayWealth, displayCharm);
+                        binding.etChat.setText("");
+                        closeRoomChatComposer(true);
+                    }));
+            if (!emitted) {
+                Toast.makeText(this, "غير متصل — تعذر إرسال الرسالة", Toast.LENGTH_SHORT).show();
+                connectRealtimeRoom();
+            }
+            return;
+        }
+
         // Primary path: Zego in-room broadcast (same platform as voice).
         boolean zegoOk = ZegoEngineManager.getInstance().isInRoom(roomId)
                 && ZegoEngineManager.getInstance().sendRoomChatMessage(

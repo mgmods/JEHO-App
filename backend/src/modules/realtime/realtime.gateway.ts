@@ -34,6 +34,7 @@ import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import { ContentModerationService } from '../moderation/content-moderation.service';
+import { ZegoTokenService } from '../zego/zego-token.service';
 
 interface AuthSocket extends Socket {
   userId?: string;
@@ -89,6 +90,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly moderation: ContentModerationService,
+    private readonly zegoTokenService: ZegoTokenService,
   ) {}
 
   async handleConnection(client: AuthSocket) {
@@ -816,37 +818,37 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {
     if (!userId || !roomId) return;
     try {
-      const seat = await this.roomSeats.findOne({ where: { roomId, userId } });
-      if (seat) {
-        seat.isMuted = true;
-        seat.isModeratorMuted = true;
-        await this.roomSeats.save(seat);
-        this.emitToRoom(roomId, 'room:event', {
-          roomId,
-          event: 'room:mic_changed',
-          payload: {
+      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+      if (!room) return;
+      const isRoomLead =
+        room.hostId === userId ||
+        room.activeHostId === userId ||
+        room.cohostId === userId;
+
+      if (!isRoomLead) {
+        const seat = await this.roomSeats.findOne({ where: { roomId, userId } });
+        if (seat) {
+          seat.isMuted = true;
+          seat.isModeratorMuted = true;
+          await this.roomSeats.save(seat);
+          this.emitToRoom(roomId, 'room:event', {
             roomId,
-            userId,
-            muted: true,
-            moderatorMuted: true,
-            reason: reason || 'auto_moderation',
-          },
-          at: new Date().toISOString(),
-        });
+            event: 'room:mic_changed',
+            payload: {
+              roomId,
+              userId,
+              muted: true,
+              moderatorMuted: true,
+              reason: reason || 'auto_moderation',
+            },
+            at: new Date().toISOString(),
+          });
+        }
       }
 
       if (action !== 'kick' && action !== 'ban') return;
-
-      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
-      if (!room) return;
       // Never auto-kick room owner / active host / cohost.
-      if (
-        room.hostId === userId ||
-        room.activeHostId === userId ||
-        room.cohostId === userId
-      ) {
-        return;
-      }
+      if (isRoomLead) return;
 
       const banMinutes = action === 'ban' ? 30 : 10;
       const expiresAt = new Date(Date.now() + banMinutes * 60 * 1000);
@@ -900,6 +902,11 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         reason: reason || 'محتوى مخالف في الدردشة',
       });
       await this.ejectUserFromRoom(roomId, userId);
+      void this.zegoTokenService.kickUser(
+        room.zegoRoomId || room.id,
+        userId,
+        reason || 'Auto-moderation kick',
+      );
     } catch (err) {
       this.logger.warn(
         `Auto-moderation enforce failed: ${(err as Error).message}`,
