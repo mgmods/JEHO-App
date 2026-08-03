@@ -11,13 +11,11 @@ import android.widget.ImageView;
 
 
 import androidx.annotation.Nullable;
-
+import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
-
 import androidx.media3.common.Player;
-
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
-
 import androidx.media3.ui.PlayerView;
 
 
@@ -44,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
  */
 
+@OptIn(markerClass = UnstableApi.class)
 public final class GiftPlayer {
 
     public static final long OVERLAY_DURATION_MS = 4000L;

@@ -22,7 +22,9 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.appcompat.widget.AppCompatImageView;
+import androidx.media3.common.util.UnstableApi;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
@@ -45,6 +47,7 @@ import java.util.regex.Pattern;
  * wing flap (clipped frame duplicates), aura pulse, shine sweep.
  * No vertical bounce — the stage stays planted while wings move.
  */
+@OptIn(markerClass = UnstableApi.class)
 public final class HostSignalView extends FrameLayout {
     private static final Pattern LEVEL =
             Pattern.compile("frame-(\\d{1,2})-", Pattern.CASE_INSENSITIVE);

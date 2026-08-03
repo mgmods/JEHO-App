@@ -31,8 +31,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.ui.PlayerView;
 
@@ -60,6 +62,7 @@ import java.util.Map;
  * Transparent, touch-pass-through native renderer for room entries and gifts.
  * It intentionally owns only one effect tree at a time to keep room memory bounded.
  */
+@OptIn(markerClass = UnstableApi.class)
 public final class NativeRoomEffectsView extends FrameLayout {
     private static final String[] ENTRY_VARIANTS = {
             "normal", "vip", "gold", "diamond", "legend", "supporter"
@@ -1243,6 +1246,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
 
         // Same as Mikoo: SVGA full-screen gift effect.
         if (kind == CosmeticMedia.Kind.SVGA) {
+            final String absSvga = abs;
             try {
                 com.opensource.svgaplayer.SVGAImageView svga =
                         new com.opensource.svgaplayer.SVGAImageView(getContext());
@@ -1252,7 +1256,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 giftSvgaView = svga;
                 com.opensource.svgaplayer.SVGAParser parser =
                         new com.opensource.svgaplayer.SVGAParser(getContext());
-                parser.decodeFromURL(new URL(abs), new com.opensource.svgaplayer.SVGAParser.ParseCompletion() {
+                parser.decodeFromURL(new URL(absSvga), new com.opensource.svgaplayer.SVGAParser.ParseCompletion() {
                     @Override
                     public void onComplete(
                             @androidx.annotation.NonNull
@@ -1279,7 +1283,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
 
                     @Override
                     public void onError() {
-                        android.util.Log.w("NativeRoomEffects", "SVGA gift parse failed: " + abs);
+                        android.util.Log.w("NativeRoomEffects", "SVGA gift parse failed: " + absSvga);
                         post(() -> finishActive());
                     }
                 }, null);
@@ -1288,6 +1292,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
             }
         }
 
+        String lower = abs != null ? abs.toLowerCase(Locale.US) : "";
         if (lower.contains(".json")) {
             LottieAnimationView lottie = new LottieAnimationView(getContext());
             lottie.setRepeatCount(0);

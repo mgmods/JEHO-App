@@ -13,9 +13,11 @@ import android.view.Surface;
 import android.view.TextureView;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
 
 import java.nio.ByteBuffer;
@@ -27,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Mikoo/YY VAP entry videos: left RGB + right grayscale alpha, composited to a
  * transparent TextureView. Keep this view at alpha=1 — animate a parent instead.
  */
+@OptIn(markerClass = UnstableApi.class)
 public final class AlphaMaskVideoView extends TextureView
         implements TextureView.SurfaceTextureListener, SurfaceTexture.OnFrameAvailableListener {
 

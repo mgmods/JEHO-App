@@ -22,7 +22,9 @@ import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.IconCompat;
 import androidx.media3.common.MediaItem;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.annotation.OptIn;
 
 import com.Dramizo.Series.AuraLiveApp;
 import com.Dramizo.Series.R;
@@ -36,6 +38,7 @@ import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.google.gson.JsonObject;
 
+@OptIn(markerClass = UnstableApi.class)
 public class VoiceRoomForegroundService extends Service {
     public static final String CHANNEL_ID = "auralive_active_room_pro";
     public static final String BUBBLE_CHANNEL_ID = "auralive_room_bubble";

@@ -376,8 +376,7 @@
                     android:visibility="gone"
                     android:text="@string/agency_empty_active"
                     android:textColor="@color/text_hint"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
+                    android:textSize="14sp" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>

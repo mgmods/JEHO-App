@@ -46,7 +46,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.annotation.OptIn;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
@@ -129,6 +131,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+@OptIn(markerClass = UnstableApi.class)
 public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSource {
     public static final String EXTRA_ROOM_ID = "room_id";
     /** True while any VoiceRoomActivity is started (for global invite routing). */
