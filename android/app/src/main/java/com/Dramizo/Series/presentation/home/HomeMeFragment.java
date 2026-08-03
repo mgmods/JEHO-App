@@ -19,9 +19,9 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.MyRoomCardBinder;
-import com.Dramizo.Series.util.MyRoomLauncher;
 import com.Dramizo.Series.util.RecentRoomsStore;
 import com.Dramizo.Series.util.RoomBrowseFilter;
+import com.Dramizo.Series.util.RoomOpenChooser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -118,7 +118,7 @@ public class HomeMeFragment extends Fragment {
         String myId = c.getSessionManager().getUserId();
         AuthDtos.UserDto me = c.getSessionManager().getUser();
         List<RoomDtos.RoomDto> rooms = viewModel.getRooms().getValue();
-        View.OnClickListener open = v -> MyRoomLauncher.open(requireActivity());
+        View.OnClickListener open = v -> RoomOpenChooser.open(requireActivity());
         MyRoomCardBinder.bind(binding.myRoomCardMe, me, myId, rooms, open, open);
     }
 

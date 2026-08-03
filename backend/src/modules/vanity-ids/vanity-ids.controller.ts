@@ -24,6 +24,8 @@ import { CurrentUser, Public } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
+const VANITY_LEASE_DAYS = 30;
+
 @ApiTags('Vanity IDs')
 @Controller('vanity-ids')
 export class VanityIdsController {
@@ -47,7 +49,36 @@ export class VanityIdsController {
       order: { priceCoins: 'ASC', publicId: 'ASC' },
       take: 200,
     });
-    return { items };
+    return {
+      items: items.map((i) => ({
+        ...i,
+        leaseDays: VANITY_LEASE_DAYS,
+        renewPriceCoins: Math.max(0, Math.ceil(Number(i.priceCoins || 0) / 2)),
+      })),
+      leaseDays: VANITY_LEASE_DAYS,
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('mine')
+  @ApiOperation({ summary: 'Current vanity lease for the signed-in user' })
+  async mine(@CurrentUser('sub') userId: string) {
+    const row = await this.vanityRepo.findOne({
+      where: { ownerUserId: userId, status: VanityIdStatus.OWNED },
+      order: { purchasedAt: 'DESC' },
+    });
+    if (!row) return { item: null, leaseDays: VANITY_LEASE_DAYS };
+    const active = !row.expiresAt || row.expiresAt > new Date();
+    return {
+      item: {
+        ...row,
+        active,
+        leaseDays: VANITY_LEASE_DAYS,
+        renewPriceCoins: Math.max(0, Math.ceil(Number(row.priceCoins || 0) / 2)),
+      },
+      leaseDays: VANITY_LEASE_DAYS,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -60,7 +91,7 @@ export class VanityIdsController {
   ) {
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
-    if (row.status === VanityIdStatus.OWNED) {
+    if (row.status === VanityIdStatus.OWNED && row.ownerUserId !== userId) {
       throw new BadRequestException('ID already owned');
     }
     if (
@@ -70,6 +101,9 @@ export class VanityIdsController {
       row.ownerUserId !== userId
     ) {
       throw new BadRequestException('ID is reserved by another user');
+    }
+    if (row.status === VanityIdStatus.OWNED && row.ownerUserId === userId) {
+      return row; // renew path — already owned
     }
     row.status = VanityIdStatus.RESERVED;
     row.ownerUserId = userId;
@@ -81,7 +115,7 @@ export class VanityIdsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('id/:publicId/purchase')
-  @ApiOperation({ summary: 'Purchase a vanity ID and apply it to your account' })
+  @ApiOperation({ summary: 'Purchase or renew a vanity ID (30-day lease)' })
   async purchase(
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
@@ -104,37 +138,84 @@ export class VanityIdsController {
     if (taken && taken.id !== userId) {
       throw new BadRequestException('This public ID is already in use');
     }
-    const price = Math.max(0, Number(row.priceCoins) || 0);
-    const wallet = await this.walletsRepo.findOne({ where: { userId } });
-    if (!wallet || Number(wallet.coins) < price) {
-      throw new BadRequestException('Insufficient coins');
-    }
-    if (price > 0) {
-      wallet.coins = Number(wallet.coins) - price;
-      await this.walletsRepo.save(wallet);
-      await this.txRepo.save(
-        this.txRepo.create({
-          userId,
-          type: TransactionType.GIFT_SEND,
-          currency: CurrencyType.COINS,
-          amount: -price,
-          balanceAfter: Number(wallet.coins),
-          referenceType: 'vanity_id',
-          referenceId: row.id,
-          description: `شراء آي دي مميز ${publicId}`,
-        }),
-      );
-    }
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
-    user.publicId = publicId;
-    await this.usersRepo.save(user);
-    row.status = VanityIdStatus.OWNED;
-    row.ownerUserId = userId;
-    row.purchasedAt = new Date();
-    row.reservedUntil = null;
-    await this.vanityRepo.save(row);
-    return { publicId, priceCoins: price, userId };
+
+    const now = new Date();
+    const fullPrice = Math.max(0, Math.floor(Number(row.priceCoins) || 0));
+    const isOwner = row.status === VanityIdStatus.OWNED && row.ownerUserId === userId;
+    const activeLease =
+      isOwner && row.expiresAt != null && row.expiresAt.getTime() > now.getTime();
+    const renew = activeLease;
+    const price = renew ? Math.ceil(fullPrice / 2) : fullPrice;
+
+    const result = await this.vanityRepo.manager.transaction(async (manager) => {
+      if (price > 0) {
+        const wallet = await manager.findOne(Wallet, {
+          where: { userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!wallet || Number(wallet.coins) < price) {
+          throw new BadRequestException('Insufficient coins');
+        }
+        wallet.coins = Number(wallet.coins) - price;
+        await manager.save(Wallet, wallet);
+        await manager.save(
+          WalletTransaction,
+          manager.create(WalletTransaction, {
+            userId,
+            type: TransactionType.GIFT_SEND,
+            currency: CurrencyType.COINS,
+            amount: -price,
+            balanceAfter: Number(wallet.coins),
+            referenceType: 'vanity_id',
+            // Unique per charge — renews must not reuse vanity row id.
+            referenceId: `${row.id}:${Date.now()}`,
+            description: renew
+              ? `تجديد آي دي مميز ${publicId} (30 يوم)`
+              : `شراء آي دي مميز ${publicId} (30 يوم)`,
+          }),
+        );
+      }
+
+      const user = await manager.findOne(User, { where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+
+      const vanity = await manager.findOne(VanityId, { where: { id: row.id } });
+      if (!vanity) throw new NotFoundException('ID not found');
+
+      if (!renew) {
+        if (!vanity.previousPublicId || user.publicId !== publicId) {
+          vanity.previousPublicId =
+            user.publicId && user.publicId !== publicId
+              ? user.publicId
+              : vanity.previousPublicId;
+        }
+        user.publicId = publicId;
+        await manager.save(User, user);
+      }
+
+      const baseMs =
+        renew && vanity.expiresAt && vanity.expiresAt.getTime() > now.getTime()
+          ? vanity.expiresAt.getTime()
+          : now.getTime();
+      vanity.expiresAt = new Date(baseMs + VANITY_LEASE_DAYS * 24 * 60 * 60 * 1000);
+      vanity.status = VanityIdStatus.OWNED;
+      vanity.ownerUserId = userId;
+      vanity.purchasedAt = now;
+      vanity.reservedUntil = null;
+      await manager.save(VanityId, vanity);
+
+      return {
+        publicId,
+        priceCoins: price,
+        fullPriceCoins: fullPrice,
+        renew,
+        leaseDays: VANITY_LEASE_DAYS,
+        expiresAt: vanity.expiresAt,
+        userId,
+      };
+    });
+
+    return result;
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -146,8 +227,11 @@ export class VanityIdsController {
     body: { publicId: string; priceCoins?: number; status?: string },
   ) {
     const publicId = String(body.publicId || '').trim();
-    if (!/^\d{4,12}$/.test(publicId)) {
-      throw new BadRequestException('publicId must be 4-12 digits');
+    // 3–12 digits (short vanity like 888 is allowed; max 12).
+    if (!/^\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException(
+        'الآي دي يجب أن يكون أرقاماً فقط من 3 إلى 12 خانة',
+      );
     }
     let row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) {
@@ -157,7 +241,9 @@ export class VanityIdsController {
         priceCoins: Math.max(0, Math.floor(Number(body.priceCoins) || 0)),
       });
     } else {
-      if (body.priceCoins != null) row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
+      if (body.priceCoins != null) {
+        row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
+      }
       if (body.status) row.status = body.status as VanityIdStatus;
     }
     return this.vanityRepo.save(row);

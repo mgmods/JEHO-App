@@ -576,16 +576,61 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (data.event === 'chat:message') {
       const text = String(incoming.text || '').trim().slice(0, 1000);
       if (!text) return { error: 'Message is empty' };
+      const chatMute = await this.moderation.getActiveChatMute(
+        data.roomId,
+        client.userId!,
+      );
+      if (chatMute.muted) {
+        const untilIso = chatMute.until ? chatMute.until.toISOString() : null;
+        client.emit('moderation:blocked', {
+          roomId: data.roomId,
+          code: 'CHAT_MUTED',
+          reason: 'أنت مكتوم من الدردشة مؤقتاً',
+          action: 'mute',
+          until: untilIso,
+          strikes: chatMute.strikes,
+        });
+        return {
+          error: 'أنت مكتوم من الدردشة مؤقتاً',
+          code: 'CHAT_MUTED',
+          action: 'mute',
+          until: untilIso,
+        };
+      }
       const mod = await this.moderation.inspectText(text);
       if (!mod.ok) {
+        const resolution = await this.moderation.resolveRoomChatStrike(
+          data.roomId,
+          client.userId!,
+          mod.reason,
+        );
         client.emit('moderation:blocked', {
           roomId: data.roomId,
           code: mod.code,
-          reason: mod.reason,
-          action: mod.action,
+          reason: resolution.reason,
+          action: resolution.action,
+          strikes: resolution.strikes,
+          until: resolution.muteUntil
+            ? resolution.muteUntil.toISOString()
+            : null,
+          muteMinutes: resolution.muteMinutes,
         });
-        void this.enforceChatViolation(data.roomId, client.userId!, mod.reason, mod.action);
-        return { error: mod.reason, code: mod.code, action: mod.action };
+        void this.enforceChatViolation(
+          data.roomId,
+          client.userId!,
+          resolution.reason,
+          resolution.action,
+          {
+            muteUntil: resolution.muteUntil,
+            muteMinutes: resolution.muteMinutes,
+            strikes: resolution.strikes,
+          },
+        );
+        return {
+          error: resolution.reason,
+          code: mod.code,
+          action: resolution.action,
+        };
       }
       const wealthScore = Math.max(
         0,
@@ -815,6 +860,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     userId: string,
     reason: string,
     action: 'block' | 'mute' | 'kick' | 'ban',
+    meta?: { muteUntil?: Date | null; muteMinutes?: number; strikes?: number },
   ) {
     if (!userId || !roomId) return;
     try {
@@ -825,12 +871,33 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         room.activeHostId === userId ||
         room.cohostId === userId;
 
+      // Always force off seat + mic mute for non-leads (even on chat mute).
       if (!isRoomLead) {
         const seat = await this.roomSeats.findOne({ where: { roomId, userId } });
         if (seat) {
-          seat.isMuted = true;
-          seat.isModeratorMuted = true;
-          await this.roomSeats.save(seat);
+          await this.roomSeats.update(
+            { roomId, userId },
+            {
+              userId: null,
+              status: SeatStatus.EMPTY,
+              isMuted: false,
+              isModeratorMuted: false,
+            },
+          );
+          const user = await this.usersRepo.findOne({ where: { id: userId } });
+          this.emitToRoom(roomId, 'room:event', {
+            roomId,
+            event: 'room:seat_left',
+            payload: {
+              roomId,
+              userId,
+              username: user?.username || null,
+              displayName: user?.displayName || user?.username || null,
+              forced: true,
+              reason: reason || 'auto_moderation',
+            },
+            at: new Date().toISOString(),
+          });
           this.emitToRoom(roomId, 'room:event', {
             roomId,
             event: 'room:mic_changed',
@@ -846,28 +913,54 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
       }
 
-      if (action !== 'kick' && action !== 'ban') return;
+      if (action === 'mute' || action === 'block') {
+        this.emitToUser(userId, 'moderation:action', {
+          roomId,
+          action: 'mute',
+          reason: reason || 'محتوى مخالف في الدردشة',
+          until: meta?.muteUntil ? meta.muteUntil.toISOString() : null,
+          muteMinutes: meta?.muteMinutes || 0,
+          strikes: meta?.strikes || 0,
+        });
+        this.emitToRoom(roomId, 'room:event', {
+          roomId,
+          event: 'room:chat_muted',
+          payload: {
+            roomId,
+            userId,
+            until: meta?.muteUntil ? meta.muteUntil.toISOString() : null,
+            muteMinutes: meta?.muteMinutes || 0,
+            strikes: meta?.strikes || 0,
+            reason: reason || 'auto_moderation',
+          },
+          at: new Date().toISOString(),
+        });
+        return;
+      }
+
       // Never auto-kick room owner / active host / cohost.
       if (isRoomLead) return;
 
-      const banMinutes = action === 'ban' ? 30 : 10;
-      const expiresAt = new Date(Date.now() + banMinutes * 60 * 1000);
-      const existing = await this.roomBans.findOne({ where: { roomId, userId } });
-      if (existing) {
-        existing.reason = reason || existing.reason;
-        existing.expiresAt = expiresAt;
-        existing.bannedById = room.hostId;
-        await this.roomBans.save(existing);
-      } else {
-        await this.roomBans.save(
-          this.roomBans.create({
-            roomId,
-            userId,
-            bannedById: room.hostId,
-            reason: reason || 'auto_moderation',
-            expiresAt,
-          }),
-        );
+      if (action === 'ban') {
+        const banMinutes = Math.max(10, Number(meta?.muteMinutes || 30));
+        const expiresAt = new Date(Date.now() + banMinutes * 60 * 1000);
+        const existing = await this.roomBans.findOne({ where: { roomId, userId } });
+        if (existing) {
+          existing.reason = reason || existing.reason;
+          existing.expiresAt = expiresAt;
+          existing.bannedById = room.hostId;
+          await this.roomBans.save(existing);
+        } else {
+          await this.roomBans.save(
+            this.roomBans.create({
+              roomId,
+              userId,
+              bannedById: room.hostId,
+              reason: reason || 'auto_moderation',
+              expiresAt,
+            }),
+          );
+        }
       }
 
       await this.roomSeats.update(
@@ -882,9 +975,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       await this.roomAccess.delete({ roomId, userId });
 
       const user = await this.usersRepo.findOne({ where: { id: userId } });
+      const eventName = action === 'ban' ? 'room:banned' : 'room:kicked';
       this.emitToRoom(roomId, 'room:event', {
         roomId,
-        event: 'room:banned',
+        event: eventName,
         payload: {
           roomId,
           userId,
@@ -892,20 +986,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
           displayName: user?.displayName || user?.username || null,
           reason: reason || 'auto_moderation',
           auto: true,
-          expiresAt,
+          strikes: meta?.strikes || 0,
         },
         at: new Date().toISOString(),
       });
       this.emitToUser(userId, 'moderation:action', {
         roomId,
-        action: 'kick',
+        action,
         reason: reason || 'محتوى مخالف في الدردشة',
+        strikes: meta?.strikes || 0,
       });
       await this.ejectUserFromRoom(roomId, userId);
       void this.zegoTokenService.kickUser(
         room.zegoRoomId || room.id,
         userId,
-        reason || 'Auto-moderation kick',
+        reason || 'Auto-moderation',
       );
     } catch (err) {
       this.logger.warn(

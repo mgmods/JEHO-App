@@ -11,7 +11,7 @@ import androidx.fragment.app.Fragment;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.FragmentCreateRoomBinding;
-import com.Dramizo.Series.util.MyRoomLauncher;
+import com.Dramizo.Series.util.RoomOpenChooser;
 
 /**
  * Legacy create-room tab — redirected to one-tap {@link MyRoomLauncher}.
@@ -37,7 +37,7 @@ public class CreateRoomFragment extends Fragment {
         view.setVisibility(View.GONE);
         view.post(() -> {
             if (!isAdded()) return;
-            MyRoomLauncher.open(requireActivity());
+            RoomOpenChooser.open(requireActivity());
             if (requireActivity() instanceof com.Dramizo.Series.presentation.main.MainActivity) {
                 ((com.Dramizo.Series.presentation.main.MainActivity) requireActivity()).go(R.id.nav_home);
             }

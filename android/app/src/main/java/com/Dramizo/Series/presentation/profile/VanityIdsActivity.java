@@ -33,6 +33,7 @@ public class VanityIdsActivity extends ThemedActivity {
     private AppContainer c;
     private final List<VanityDtos.VanityItem> items = new ArrayList<>();
     private Adapter adapter;
+    private VanityDtos.VanityItem myLease;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,17 +53,38 @@ public class VanityIdsActivity extends ThemedActivity {
             Result<WalletDtos.WalletDto> w = c.getWalletUseCase.execute();
             Result<AuthDtos.UserDto> me = ApiCall.execute(c.getUserApi().me());
             Result<VanityDtos.Catalog> cat = ApiCall.execute(c.getVanityApi().list(null));
+            Result<VanityDtos.MineResult> mine = ApiCall.execute(c.getVanityApi().mine());
+            if (me.success && me.data != null) {
+                c.getSessionManager().updateCachedUser(me.data);
+            }
             runOnUiThread(() -> {
                 if (w.success && w.data != null) {
                     binding.tvBalance.setText(String.format(Locale.US, "%,d", w.data.coins));
                 }
+                myLease = mine.success && mine.data != null ? mine.data.item : null;
                 if (me.success && me.data != null) {
                     String pid = me.data.displayPublicId();
-                    binding.tvCurrentId.setText("آيدي الحالي: " + (pid.isEmpty() ? "—" : pid));
+                    String leaseNote = "";
+                    if (myLease != null && myLease.expiresAt != null && myLease.active) {
+                        leaseNote = " · ينتهي: " + myLease.expiresAt.replace('T', ' ').replace("Z", "");
+                    }
+                    binding.tvCurrentId.setText(
+                            "آيدي الحالي: " + (pid.isEmpty() ? "—" : pid) + leaseNote);
                 }
                 items.clear();
                 if (cat.success && cat.data != null && cat.data.items != null) {
                     items.addAll(cat.data.items);
+                }
+                // Show own active lease at top for renew.
+                if (myLease != null && myLease.active && myLease.publicId != null) {
+                    boolean listed = false;
+                    for (VanityDtos.VanityItem it : items) {
+                        if (myLease.publicId.equals(it.publicId)) {
+                            listed = true;
+                            break;
+                        }
+                    }
+                    if (!listed) items.add(0, myLease);
                 }
                 adapter.notifyDataSetChanged();
                 binding.tvEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
@@ -75,17 +97,32 @@ public class VanityIdsActivity extends ThemedActivity {
 
     private void purchase(VanityDtos.VanityItem item) {
         if (item == null || item.publicId == null) return;
-        AuraDialogHelper.confirm(this,
-                "شراء آي دي " + item.publicId,
-                "سيتم خصم " + item.priceCoins + " كوينز واستبدال آيديك الحالي.",
-                "شراء",
+        boolean renew = myLease != null
+                && item.publicId.equals(myLease.publicId)
+                && myLease.active;
+        long full = Math.max(0, item.priceCoins);
+        long price = renew
+                ? (item.renewPriceCoins > 0 ? item.renewPriceCoins : (full + 1) / 2)
+                : full;
+        int days = item.leaseDays > 0 ? item.leaseDays : 30;
+        String title = renew
+                ? ("تجديد آي دي " + item.publicId)
+                : ("شراء آي دي " + item.publicId);
+        String msg = renew
+                ? ("تجديد 30 يوماً بنصف السعر: " + price + " كوينز (بدلاً من " + full + ").")
+                : ("مدة الاشتراك 30 يوماً. سيتم خصم " + price + " كوينز واستبدال آيديك الحالي.");
+        AuraDialogHelper.confirm(this, title, msg, renew ? "تجديد" : "شراء",
                 () -> c.getIoExecutor().execute(() -> {
                     ApiCall.execute(c.getVanityApi().reserve(item.publicId));
                     Result<VanityDtos.PurchaseResult> r =
                             ApiCall.execute(c.getVanityApi().purchase(item.publicId));
                     runOnUiThread(() -> {
                         if (r.success) {
-                            Toast.makeText(this, "تم شراء الآي دي بنجاح", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this,
+                                    r.data != null && r.data.renew
+                                            ? "تم تجديد الآي دي (+" + days + " يوم)"
+                                            : "تم شراء الآي دي لمدة " + days + " يوم",
+                                    Toast.LENGTH_SHORT).show();
                             load();
                         } else {
                             com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
@@ -100,14 +137,29 @@ public class VanityIdsActivity extends ThemedActivity {
         @NonNull
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new VH(ItemVanityIdBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+            return new VH(ItemVanityIdBinding.inflate(
+                    LayoutInflater.from(parent.getContext()), parent, false));
         }
 
         @Override
         public void onBindViewHolder(@NonNull VH h, int position) {
             VanityDtos.VanityItem item = items.get(position);
             h.b.tvPublicId.setText(item.publicId != null ? item.publicId : "—");
-            h.b.tvPrice.setText(String.format(Locale.US, "%,d كوينز", Math.max(0, item.priceCoins)));
+            boolean renew = myLease != null
+                    && item.publicId != null
+                    && item.publicId.equals(myLease.publicId)
+                    && myLease.active;
+            long full = Math.max(0, item.priceCoins);
+            long half = item.renewPriceCoins > 0 ? item.renewPriceCoins : (full + 1) / 2;
+            if (renew) {
+                h.b.tvPrice.setText(String.format(Locale.US,
+                        "تجديد %,d كوينز (½) · +30 يوم", half));
+                h.b.btnBuy.setText("تجديد");
+            } else {
+                h.b.tvPrice.setText(String.format(Locale.US,
+                        "%,d كوينز · 30 يوم", full));
+                h.b.btnBuy.setText("شراء");
+            }
             h.b.btnBuy.setOnClickListener(v -> purchase(item));
         }
 

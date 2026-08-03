@@ -26,6 +26,7 @@ import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
+import com.Dramizo.Series.util.RoomOpenChooser;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -102,11 +103,15 @@ public class AgencyManageActivity extends ThemedActivity {
                 });
 
         binding.btnOpenAgencyStream.setOnClickListener(v -> {
-            String name = null;
-            if (myAgency != null && myAgency.agency != null && myAgency.agency.name != null) {
-                name = myAgency.agency.name;
+            if (myAgency != null && myAgency.isEligibleHost()) {
+                RoomOpenChooser.showChooser(this, myAgency);
+            } else {
+                String name = null;
+                if (myAgency != null && myAgency.agency != null && myAgency.agency.name != null) {
+                    name = myAgency.agency.name;
+                }
+                AgencyRoomLauncher.open(this, agencyId, name);
             }
-            AgencyRoomLauncher.open(this, agencyId, name);
         });
 
         binding.btnDeleteAgencyManage.setOnClickListener(v -> confirmDeleteAgency());

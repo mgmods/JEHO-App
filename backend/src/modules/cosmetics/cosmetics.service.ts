@@ -22,6 +22,11 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import {
+  WalletTransaction,
+  TransactionType,
+  CurrencyType,
+} from '../../database/entities/wallet-transaction.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
@@ -215,21 +220,27 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   async inventory(userId: string) {
-    const now = new Date();
+    // Include expired rows so the mall can offer full-price repurchase.
     return this.userCosmeticsRepo.find({
-      where: [
-        { userId, expiresAt: IsNull() },
-        { userId, expiresAt: MoreThan(now) },
-      ],
+      where: { userId },
       relations: ['cosmetic'],
       order: { createdAt: 'DESC' },
     });
   }
 
+  private mallLeaseDays() {
+    return 30;
+  }
+
+  private chargePrice(fullPrice: number, renew: boolean) {
+    const full = Math.max(0, Math.floor(Number(fullPrice) || 0));
+    return renew ? Math.ceil(full / 2) : full;
+  }
+
   /**
    * Grant a cosmetic for a limited number of days (contest prizes, promos).
    * Extends from max(now, existing expiresAt) when already owned temporarily.
-   * Permanent ownership (expiresAt null) is left permanent.
+   * Permanent ownership (expiresAt null) is left permanent unless forceTimed.
    */
   async grantTemporary(
     userId: string,
@@ -415,33 +426,67 @@ export class CosmeticsService implements OnModuleInit {
 
     await this.assertCosmeticRequirements(userId, cosmetic);
 
-    const price = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
-    // coinPrice 0 = free claim (mall "مجاني").
+    const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));
+    const leaseDays = this.mallLeaseDays();
+    const now = new Date();
 
-    const ownedRow = await this.cosmeticsRepo.manager.transaction(async (manager) => {
+    const result = await this.cosmeticsRepo.manager.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId },
         lock: { mode: 'pessimistic_write' },
       });
-      const owned = await manager.findOne(UserCosmetic, {
+      let owned = await manager.findOne(UserCosmetic, {
         where: { userId, cosmeticId },
       });
-      if (owned) throw new BadRequestException('Already owned');
+
+      const active =
+        !!owned &&
+        (owned.expiresAt == null || owned.expiresAt.getTime() > now.getTime());
+      // Renew at half price only while the lease is still active.
+      const renew = active;
+      const price = this.chargePrice(fullPrice, renew);
+
       if (price > 0) {
         if (!wallet || wallet.coins < price) {
           throw new BadRequestException('Insufficient coins');
         }
         wallet.coins -= price;
         await manager.save(Wallet, wallet);
+        await manager.save(
+          WalletTransaction,
+          manager.create(WalletTransaction, {
+            userId,
+            type: TransactionType.GIFT_SEND,
+            currency: CurrencyType.COINS,
+            amount: -price,
+            balanceAfter: wallet.coins,
+            referenceType: 'cosmetic_purchase',
+            // Unique per charge — renews must not reuse cosmeticId (uq_wallet_tx_user_reference).
+            referenceId: `${cosmeticId}:${Date.now()}`,
+            description: renew
+              ? `تجديد ${cosmetic.name || cosmetic.code} (${leaseDays} يوم · نصف السعر)`
+              : `شراء ${cosmetic.name || cosmetic.code} (${leaseDays} يوم)`,
+          }),
+        );
       }
-      return manager.save(
-        UserCosmetic,
-        manager.create(UserCosmetic, {
+
+      if (!owned) {
+        owned = manager.create(UserCosmetic, {
           userId,
           cosmeticId,
           equipped: false,
-        }),
-      );
+          expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
+        });
+      } else {
+        const base =
+          renew && owned.expiresAt && owned.expiresAt.getTime() > now.getTime()
+            ? owned.expiresAt.getTime()
+            : now.getTime();
+        // Always timed mall lease (max 30 days per purchase/renew).
+        owned.expiresAt = new Date(base + leaseDays * 24 * 60 * 60 * 1000);
+      }
+      owned = await manager.save(UserCosmetic, owned);
+      return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
     // Auto-equip after purchase/claim so the user wears it immediately.
@@ -450,7 +495,7 @@ export class CosmeticsService implements OnModuleInit {
     } catch {
       /* ownership is enough; equip may fail on rare races */
     }
-    return ownedRow;
+    return result;
   }
 
   async equip(userId: string, cosmeticId: string, opts?: { skipRequirements?: boolean }) {

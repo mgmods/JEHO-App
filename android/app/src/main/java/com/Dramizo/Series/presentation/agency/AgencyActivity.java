@@ -23,9 +23,9 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.CountryCatalog;
+import com.Dramizo.Series.util.RoomOpenChooser;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.Collections;
@@ -66,13 +66,13 @@ public class AgencyActivity extends ThemedActivity {
                 showConfirmSheet(
                         pending
                                 ? getString(R.string.agency_cancel_join_title)
-                                : "مغادرة الوكالة",
+                                : getString(R.string.agency_leave_title),
                         pending
                                 ? getString(R.string.agency_cancel_join_message)
-                                : "هل تريد مغادرة هذه الوكالة؟",
+                                : getString(R.string.agency_leave_message),
                         pending
                                 ? getString(R.string.agency_cancel_join)
-                                : "مغادرة",
+                                : getString(R.string.agency_leave),
                         () -> vm.leave(agencyId));
             }
             @Override public void onManage(String agencyId) { openManage(agencyId); }
@@ -83,7 +83,7 @@ public class AgencyActivity extends ThemedActivity {
             String code = binding.etActivationCode.getText() != null
                     ? binding.etActivationCode.getText().toString().trim() : "";
             if (code.length() < 4) {
-                Toast.makeText(this, "أدخل كود التفعيل الصحيح", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, R.string.agency_join_code_invalid, Toast.LENGTH_SHORT).show();
                 return;
             }
             vm.joinByCode(code);
@@ -102,17 +102,21 @@ public class AgencyActivity extends ThemedActivity {
             if (myAgencyId != null) openManage(myAgencyId);
         });
         if (binding.btnWithdrawAgencyEarnings != null) {
-            binding.btnWithdrawAgencyEarnings.setOnClickListener(v -> {
-                Intent i = new Intent(this,
-                        com.Dramizo.Series.presentation.wallet.BagActivity.class);
-                i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_TAB, 1);
-                i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_DIAMOND_ACTION,
-                        "withdraw");
-                startActivity(i);
-            });
+            binding.btnWithdrawAgencyEarnings.setOnClickListener(v -> openDiamondWithdraw());
         }
         if (binding.btnDistributeAgencyEarnings != null) {
             binding.btnDistributeAgencyEarnings.setOnClickListener(v -> showDistributeDialog());
+        }
+        if (binding.btnHostWithdraw != null) {
+            binding.btnHostWithdraw.setOnClickListener(v -> openDiamondWithdraw());
+        }
+        if (binding.btnHostViewEarnings != null) {
+            binding.btnHostViewEarnings.setOnClickListener(v -> {
+                Intent i = new Intent(this,
+                        com.Dramizo.Series.presentation.wallet.BagActivity.class);
+                i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_TAB, 1);
+                startActivity(i);
+            });
         }
         vm.getAgencies().observe(this, list -> {
             // Browse-all list retired — my agency card is the only surface.
@@ -134,12 +138,17 @@ public class AgencyActivity extends ThemedActivity {
                 canLeave = pendingJoin || !"owner".equals(role);
                 canManage = !pendingJoin && ("owner".equals(role) || "manager".equals(role));
                 canDeleteAgency = !pendingJoin && "owner".equals(role);
+                binding.tvPricing.setVisibility(View.GONE);
                 binding.cardJoinByCode.setVisibility(View.GONE);
                 binding.cardMyAgency.setVisibility(View.VISIBLE);
+                if (binding.sectionEarnings != null) {
+                    binding.sectionEarnings.setVisibility(View.VISIBLE);
+                }
                 if (binding.rowOwnerEarningsActions != null) {
                     binding.rowOwnerEarningsActions.setVisibility(
                             !pendingJoin && "owner".equals(role) ? View.VISIBLE : View.GONE);
                 }
+                syncHostEarningsHelp(!pendingJoin && "host".equals(role));
                 binding.tvMyAgencyName.setText(
                         m.agency.name != null ? m.agency.name : getString(R.string.agency));
                 binding.tvMyAgencyMeta.setText(formatAgencyMeta(m));
@@ -152,25 +161,31 @@ public class AgencyActivity extends ThemedActivity {
                 }
                 adapter.submit(Collections.emptyList(), myAgencyId, canLeave, canManage);
                 if (pendingJoin) {
-                    binding.tvEarnings.setVisibility(View.VISIBLE);
-                    binding.tvEarnings.setText(R.string.agency_join_pending_hint);
+                    showEarningsMessage(getString(R.string.agency_join_pending_hint));
+                } else if (m.earnings == null && "host".equals(role)) {
+                    // Hosts: keep section visible with help (no owner commission cards).
+                    showHostEarningsOnly();
                 } else if (m.earnings == null) {
-                    binding.tvEarnings.setVisibility(View.VISIBLE);
-                    binding.tvEarnings.setText(
-                            "أرباح العمولة تظهر لصاحب الوكالة / المدير فقط");
+                    syncHostEarningsHelp(false);
+                    showEarningsMessage(getString(R.string.agency_earn_owner_only));
                 }
             } else {
                 myAgencyId = null;
                 canLeave = false;
                 canManage = false;
                 canDeleteAgency = false;
+                binding.tvPricing.setVisibility(View.VISIBLE);
                 binding.cardJoinByCode.setVisibility(View.VISIBLE);
                 binding.cardMyAgency.setVisibility(View.GONE);
-                binding.tvEarnings.setVisibility(View.GONE);
+                if (binding.sectionEarnings != null) {
+                    binding.sectionEarnings.setVisibility(View.GONE);
+                }
+                clearEarningsCards();
                 binding.rowActivationCode.setVisibility(View.GONE);
                 if (binding.rowOwnerEarningsActions != null) {
                     binding.rowOwnerEarningsActions.setVisibility(View.GONE);
                 }
+                syncHostEarningsHelp(false);
                 adapter.submit(Collections.emptyList(), null, false, false);
             }
             bindApplicationStatus(m);
@@ -181,26 +196,19 @@ public class AgencyActivity extends ThemedActivity {
                 return;
             }
             binding.cardMyAgency.setVisibility(View.VISIBLE);
-            binding.tvEarnings.setVisibility(View.VISIBLE);
-            binding.tvEarnings.setText(String.format(Locale.US,
-                    "عمولتك المستلمة: %,d ألماس\n" +
-                    "إجمالي هدايا الأعضاء: %,d\n" +
-                    "تقدير: مضيفين %,d · تطبيق %,d · وكيل %,d\n" +
-                    "النسب: وكيل %.0f%% · تطبيق %.0f%% · مضيف ≈ %.0f%%\n" +
-                    "السحب الذاتي من المحفظة · التوزيع لصاحب الوكالة فقط",
-                    e.totals.ownerCommissionEarned,
-                    e.totals.grossGiftsDiamonds,
-                    e.totals.estimatedHostShare,
-                    e.totals.estimatedPlatformCut,
-                    e.totals.estimatedAgentShare,
-                    e.commissionPercent,
-                    e.platformCutPercent,
-                    e.hostSharePercent));
+            if (binding.sectionEarnings != null) {
+                binding.sectionEarnings.setVisibility(View.VISIBLE);
+            }
+            bindEarningsCards(e);
             if (binding.rowOwnerEarningsActions != null) {
                 boolean isOwner = myAgency != null && myAgency.role != null
                         && "owner".equalsIgnoreCase(myAgency.role);
                 binding.rowOwnerEarningsActions.setVisibility(isOwner ? View.VISIBLE : View.GONE);
             }
+            boolean isHost = myAgency != null && myAgency.role != null
+                    && "host".equalsIgnoreCase(myAgency.role)
+                    && !isPendingMembership(myAgency);
+            syncHostEarningsHelp(isHost);
         });
         vm.getMessage().observe(this, m -> {
             if ("application_submitted".equals(m)) {
@@ -226,12 +234,65 @@ public class AgencyActivity extends ThemedActivity {
         });
         binding.btnBecomeAgent.setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, AgencyCreateActivity.class)));
-        binding.btnAgencyRoom.setOnClickListener(v -> {
-            String name = myAgency != null && myAgency.agency != null ? myAgency.agency.name : null;
-            AgencyRoomLauncher.open(this, myAgencyId, name);
-        });
+        binding.btnAgencyRoom.setOnClickListener(v ->
+                RoomOpenChooser.openWithMine(this, myAgency));
         binding.btnDeleteAgency.setOnClickListener(v -> confirmDeleteAgency());
         vm.load();
+    }
+
+    private void openDiamondWithdraw() {
+        Intent i = new Intent(this,
+                com.Dramizo.Series.presentation.wallet.BagActivity.class);
+        i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_TAB, 1);
+        i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_DIAMOND_ACTION,
+                "withdraw");
+        startActivity(i);
+    }
+
+    private void syncHostEarningsHelp(boolean show) {
+        if (binding.rowHostEarningsHelp == null) return;
+        binding.rowHostEarningsHelp.setVisibility(show ? View.VISIBLE : View.GONE);
+    }
+
+    private void showHostEarningsOnly() {
+        clearEarningsCards();
+        binding.tvEarnings.setVisibility(View.GONE);
+        syncHostEarningsHelp(true);
+    }
+
+    private void showEarningsMessage(String message) {
+        clearEarningsCards();
+        binding.tvEarnings.setVisibility(View.VISIBLE);
+        binding.tvEarnings.setText(message);
+    }
+
+    private void clearEarningsCards() {
+        binding.tvEarnings.setVisibility(View.GONE);
+        if (binding.rowEarnCards != null) binding.rowEarnCards.setVisibility(View.GONE);
+        if (binding.rowEarnEstimates != null) binding.rowEarnEstimates.setVisibility(View.GONE);
+        if (binding.tvEarnPercents != null) binding.tvEarnPercents.setVisibility(View.GONE);
+    }
+
+    private void bindEarningsCards(MiscDtos.AgencyEarningsDto e) {
+        binding.tvEarnings.setVisibility(View.GONE);
+        if (binding.rowEarnCards != null) binding.rowEarnCards.setVisibility(View.VISIBLE);
+        if (binding.rowEarnEstimates != null) binding.rowEarnEstimates.setVisibility(View.VISIBLE);
+        if (binding.tvEarnPercents != null) binding.tvEarnPercents.setVisibility(View.VISIBLE);
+        binding.tvEarnCommission.setText(
+                getString(R.string.agency_earn_diamonds_format, e.totals.ownerCommissionEarned));
+        binding.tvEarnGross.setText(
+                getString(R.string.agency_earn_diamonds_format, e.totals.grossGiftsDiamonds));
+        binding.tvEarnHost.setText(
+                getString(R.string.agency_earn_diamonds_format, e.totals.estimatedHostShare));
+        // Platform cut is intentionally not shown to agency owners.
+        if (binding.tvEarnPlatform != null) {
+            binding.tvEarnPlatform.setText(
+                    getString(R.string.agency_earn_diamonds_format, e.totals.estimatedPlatformCut));
+        }
+        binding.tvEarnAgent.setText(
+                getString(R.string.agency_earn_diamonds_format, e.totals.estimatedAgentShare));
+        binding.tvEarnPercents.setText(getString(R.string.agency_earn_percents_format,
+                e.commissionPercent, e.hostSharePercent));
     }
 
     private void confirmDeleteAgency() {
@@ -251,6 +312,10 @@ public class AgencyActivity extends ThemedActivity {
         binding.btnAgencyRoom.setVisibility(eligible ? View.VISIBLE : View.GONE);
         binding.btnDeleteAgency.setVisibility(canDeleteAgency ? View.VISIBLE : View.GONE);
         binding.btnManageAgency.setVisibility(canManage ? View.VISIBLE : View.GONE);
+        if (binding.sectionAdminGrid != null) {
+            binding.sectionAdminGrid.setVisibility(
+                    canManage || canDeleteAgency ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void bindApplicationStatus(MiscDtos.AgencyMineDto mine) {
@@ -322,12 +387,11 @@ public class AgencyActivity extends ThemedActivity {
                 : (m.agency.status != null ? m.agency.status : "");
         String statusLabel = "";
         if ("suspended".equalsIgnoreCase(status)) {
-            statusLabel = " · موقوفة";
+            statusLabel = getString(R.string.agency_status_suspended);
         } else if ("pending".equalsIgnoreCase(status)) {
-            statusLabel = " · قيد المراجعة";
+            statusLabel = getString(R.string.agency_status_pending_review);
         }
-        return String.format(Locale.US,
-                "%s · %d أعضاء · عمولة %.0f%%%s",
+        return getString(R.string.agency_meta_format,
                 roleAr(m.role),
                 m.agency.memberCount,
                 m.agency.commissionPercent,
@@ -558,10 +622,10 @@ public class AgencyActivity extends ThemedActivity {
     private void showDistributeDialog() {
         if (myAgencyId == null) return;
         final android.widget.EditText etUser = new android.widget.EditText(this);
-        etUser.setHint("معرّف العضو (UUID أو رقم عام)");
+        etUser.setHint(R.string.agency_distribute_user_hint);
         etUser.setSingleLine(true);
         final android.widget.EditText etAmount = new android.widget.EditText(this);
-        etAmount.setHint("كمية الألماس");
+        etAmount.setHint(R.string.agency_distribute_amount_hint);
         etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout box = new LinearLayout(this);
@@ -572,10 +636,10 @@ public class AgencyActivity extends ThemedActivity {
         box.addView(etAmount);
         scroll.addView(box);
         androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("توزيع أرباح الوكالة")
-                .setMessage("صاحب الوكالة فقط — يُخصم من رصيدك ويُضاف لعضو الوكالة.")
+                .setTitle(R.string.agency_distribute_title)
+                .setMessage(R.string.agency_distribute_message)
                 .setView(scroll)
-                .setPositiveButton("توزيع", (d, w) -> {
+                .setPositiveButton(R.string.agency_distribute_action, (d, w) -> {
                     String uid = etUser.getText() != null ? etUser.getText().toString().trim() : "";
                     long diamonds = 0;
                     try {
@@ -583,7 +647,7 @@ public class AgencyActivity extends ThemedActivity {
                                 ? etAmount.getText().toString().trim() : "0");
                     } catch (NumberFormatException ignored) {}
                     if (uid.isEmpty() || diamonds < 1) {
-                        Toast.makeText(this, "أدخل عضواً وكمية صحيحة", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, R.string.agency_distribute_invalid, Toast.LENGTH_SHORT).show();
                         return;
                     }
                     long finalDiamonds = diamonds;
@@ -597,7 +661,7 @@ public class AgencyActivity extends ThemedActivity {
                                                 .distribute(myAgencyId, body));
                         runOnUiThread(() -> {
                             if (r.success) {
-                                Toast.makeText(this, "تم التوزيع بنجاح", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, R.string.agency_distribute_ok, Toast.LENGTH_SHORT).show();
                                 vm.load();
                             } else {
                                 com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);

@@ -143,6 +143,8 @@ public final class RoomDtos {
 
     public static class RoomBanDto {
         @SerializedName("id") public String id;
+        /** "ban" or "chat_mute" */
+        @SerializedName("kind") public String kind;
         @SerializedName("userId") public String userId;
         @SerializedName("reason") public String reason;
         @SerializedName("expiresAt") public String expiresAt;

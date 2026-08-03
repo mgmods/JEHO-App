@@ -486,7 +486,8 @@ public final class AvatarCosmetics {
     }
 
     /**
-     * In-room wear: agency rooms → host signal; personal rooms → VIP frame.
+     * In-room wear: agency rooms prefer host signal when equipped;
+     * otherwise fall back to the purchased VIP/head frame (same as personal rooms).
      */
     public static void bindRoomWear(
             @Nullable HostSignalView hostSignal,
@@ -499,28 +500,15 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             boolean agencyRoom,
             int fallbackLevel) {
-        if (agencyRoom) {
+        final boolean hasHost =
+                hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty();
+        final String wearUrl = (agencyRoom && hasHost) ? hostBadgeUrl : vipFrameUrl;
+        final Map<String, ?> wearMeta = (agencyRoom && hasHost) ? hostBadgeMeta : null;
+
+        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()) {
             boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, hostBadgeUrl, hostBadgeMeta,
+                    hostSignal, avatarView, frameView, avatarUrl, wearUrl, wearMeta,
                     fallbackLevel);
-            if (live) {
-                if (hostBadgeView != null) {
-                    hostBadgeView.setVisibility(View.GONE);
-                    hostBadgeView.setImageDrawable(null);
-                }
-                return;
-            }
-            if (avatarView != null) {
-                avatarView.setVisibility(View.VISIBLE);
-                bindAvatar(avatarView, avatarUrl);
-            }
-            applyHostWear(frameView, hostBadgeView, avatarView, null, hostBadgeUrl, null, hostBadgeMeta);
-            return;
-        }
-        // Personal room: VIP frame with wing motion when HostSignalView is available.
-        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()) {
-            boolean live = bindHostLikeLive(
-                    hostSignal, avatarView, frameView, avatarUrl, vipFrameUrl, null, fallbackLevel);
             if (live) {
                 if (hostBadgeView != null) {
                     hostBadgeView.setVisibility(View.GONE);
@@ -537,7 +525,11 @@ public final class AvatarCosmetics {
             avatarView.setVisibility(View.VISIBLE);
             bindAvatar(avatarView, avatarUrl);
         }
-        applyHostWear(frameView, hostBadgeView, avatarView, vipFrameUrl, null, null, null);
+        if (agencyRoom && hasHost) {
+            applyHostWear(frameView, hostBadgeView, avatarView, null, hostBadgeUrl, null, hostBadgeMeta);
+        } else {
+            applyHostWear(frameView, hostBadgeView, avatarView, vipFrameUrl, null, null, null);
+        }
     }
 
     /** Frame without reloading avatar — VIP frame only outside agency rooms. */

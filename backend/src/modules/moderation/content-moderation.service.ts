@@ -5,11 +5,12 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { extname } from 'path';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User, UserStatus } from '../../database/entities/user.entity';
+import { RoomChatPenalty } from '../../database/entities/room-chat-penalty.entity';
 
 export type ModerationHit = {
   ok: false;
@@ -22,6 +23,14 @@ export type ModerationHit = {
 export type ModerationPass = { ok: true };
 
 export type ModerationResult = ModerationHit | ModerationPass;
+
+export type ChatStrikeResolution = {
+  strikes: number;
+  action: 'mute' | 'kick' | 'ban';
+  muteMinutes: number;
+  muteUntil: Date | null;
+  reason: string;
+};
 
 @Injectable()
 export class ContentModerationService implements OnModuleInit {
@@ -50,6 +59,9 @@ export class ContentModerationService implements OnModuleInit {
     private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
+    @InjectRepository(RoomChatPenalty)
+    private readonly penaltiesRepo: Repository<RoomChatPenalty>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
@@ -57,8 +69,13 @@ export class ContentModerationService implements OnModuleInit {
       ['auto_moderation', 'true', 'Enable automated chat/image moderation'],
       ['autoModeration', 'true', 'Enable automated chat/image moderation (dashboard key)'],
       ['chat_promo_filter_enabled', 'true', 'Block promo links in room/DM chat'],
-      ['chat_promo_kick_enabled', 'true', 'Kick from room on promo/link violation'],
-      ['chat_promo_mute_first', 'true', 'Mute mic then kick on promo violation'],
+      ['chat_promo_kick_enabled', 'true', 'Escalate room chat violations (mute→kick→ban)'],
+      ['chat_promo_mute_first', 'true', 'Mute chat before kick/ban on promo violation'],
+      ['chat_promo_mute_minutes_1', '5', 'Chat mute minutes on 1st room strike'],
+      ['chat_promo_mute_minutes_2', '10', 'Chat mute minutes on 2nd room strike'],
+      ['chat_promo_kick_at_strike', '3', 'Kick from room at this strike count'],
+      ['chat_promo_ban_at_strike', '4', 'Ban from room at this strike count'],
+      ['chat_promo_ban_minutes', '30', 'Room ban minutes on 4th+ chat strike'],
       [
         'chat_blocked_extra_keywords',
         '',
@@ -78,6 +95,33 @@ export class ContentModerationService implements OnModuleInit {
           this.settingsRepo.create({ key, value, description }),
         );
       }
+    }
+    await this.ensurePenaltyTable();
+  }
+
+  private async ensurePenaltyTable() {
+    try {
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS room_chat_penalties (
+          id uuid PRIMARY KEY,
+          "roomId" uuid NOT NULL,
+          "userId" uuid NOT NULL,
+          "strikeCount" integer NOT NULL DEFAULT 0,
+          "chatMutedUntil" TIMESTAMPTZ NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await this.dataSource.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_room_chat_penalties_room_user"
+        ON room_chat_penalties ("roomId", "userId")
+      `);
+    } catch (err) {
+      this.log.warn(
+        `room_chat_penalties ensure skipped: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 
@@ -132,13 +176,14 @@ export class ContentModerationService implements OnModuleInit {
 
     for (const re of patterns) {
       if (re.test(raw)) {
-        const kick = await this.boolSetting('chat_promo_kick_enabled', true);
+        // Action is resolved per-room via strike ladder in resolveRoomChatStrike.
+        const escalate = await this.boolSetting('chat_promo_kick_enabled', true);
         return {
           ok: false,
           code: 'CHAT_PROMO_BLOCKED',
           reason:
             'ممنوع الترويج أو الروابط أو المحتوى المخالف في الدردشة',
-          action: kick ? 'kick' : 'block',
+          action: escalate ? 'mute' : 'block',
         };
       }
     }
@@ -157,6 +202,97 @@ export class ContentModerationService implements OnModuleInit {
     }
   }
 
+  async getActiveChatMute(
+    roomId: string,
+    userId: string,
+  ): Promise<{ muted: boolean; until: Date | null; strikes: number }> {
+    const row = await this.penaltiesRepo.findOne({ where: { roomId, userId } });
+    if (!row) return { muted: false, until: null, strikes: 0 };
+    const until = row.chatMutedUntil;
+    const active = !!until && until.getTime() > Date.now();
+    return {
+      muted: active,
+      until: active ? until : null,
+      strikes: row.strikeCount || 0,
+    };
+  }
+
+  /**
+   * Escalation: 1st mute, 2nd mute, 3rd kick, 4th+ ban.
+   * Always increments strikeCount for the room+user pair.
+   */
+  async resolveRoomChatStrike(
+    roomId: string,
+    userId: string,
+    baseReason: string,
+  ): Promise<ChatStrikeResolution> {
+    const escalate = await this.boolSetting('chat_promo_kick_enabled', true);
+    let row = await this.penaltiesRepo.findOne({ where: { roomId, userId } });
+    if (!row) {
+      row = this.penaltiesRepo.create({
+        roomId,
+        userId,
+        strikeCount: 0,
+        chatMutedUntil: null,
+      });
+    }
+    row.strikeCount = Math.max(0, Number(row.strikeCount || 0)) + 1;
+    const strikes = row.strikeCount;
+    const kickAt = await this.numSetting('chat_promo_kick_at_strike', 3);
+    const banAt = await this.numSetting('chat_promo_ban_at_strike', 4);
+    const mute1 = await this.numSetting('chat_promo_mute_minutes_1', 5);
+    const mute2 = await this.numSetting('chat_promo_mute_minutes_2', 10);
+    const banMinutes = await this.numSetting('chat_promo_ban_minutes', 30);
+
+    let action: 'mute' | 'kick' | 'ban' = 'mute';
+    let muteMinutes = strikes <= 1 ? mute1 : mute2;
+    if (escalate && strikes >= banAt) {
+      action = 'ban';
+      muteMinutes = banMinutes;
+      row.chatMutedUntil = null;
+    } else if (escalate && strikes >= kickAt) {
+      action = 'kick';
+      muteMinutes = 0;
+      row.chatMutedUntil = null;
+    } else {
+      action = 'mute';
+      const until = new Date(Date.now() + Math.max(1, muteMinutes) * 60 * 1000);
+      row.chatMutedUntil = until;
+    }
+    await this.penaltiesRepo.save(row);
+
+    const reason =
+      action === 'ban'
+        ? `${baseReason} · حظر الغرفة (مخالفة ${strikes})`
+        : action === 'kick'
+          ? `${baseReason} · طرد من الغرفة (مخالفة ${strikes})`
+          : `${baseReason} · كتم الدردشة ${muteMinutes} د (مخالفة ${strikes})`;
+
+    return {
+      strikes,
+      action,
+      muteMinutes: action === 'ban' ? banMinutes : muteMinutes,
+      muteUntil: row.chatMutedUntil,
+      reason,
+    };
+  }
+
+  async clearRoomChatPenalty(roomId: string, userId: string) {
+    await this.penaltiesRepo.delete({ roomId, userId });
+  }
+
+  async listActiveChatMutes(roomId: string) {
+    const now = new Date();
+    return this.penaltiesRepo
+      .createQueryBuilder('p')
+      .where('p.roomId = :roomId', { roomId })
+      .andWhere('p.chatMutedUntil IS NOT NULL')
+      .andWhere('p.chatMutedUntil > :now', { now })
+      .orderBy('p.updatedAt', 'DESC')
+      .take(100)
+      .getMany();
+  }
+
   /**
    * Scan an uploaded image file for likely nudity (skin-ratio heuristic).
    * Deletes the file and throws when blocked.
@@ -173,7 +309,6 @@ export class ContentModerationService implements OnModuleInit {
 
     const threshold = await this.numSetting('live_nsfw_confidence', 0.72);
     const score = await this.estimateNsfwScore(storedPath, ext);
-    // Fail closed for images we cannot scan when NSFW moderation is on.
     if (score == null) {
       try {
         unlinkSync(storedPath);
@@ -240,7 +375,6 @@ export class ContentModerationService implements OnModuleInit {
       } else if (ext === '.jpg' || ext === '.jpeg') {
         rgba = await this.decodeJpeg(buf);
       } else {
-        // webp/gif: optional external API only
         return await this.externalNsfwScore(path);
       }
       if (!rgba || rgba.width < 8 || rgba.height < 8) return null;
@@ -269,7 +403,6 @@ export class ContentModerationService implements OnModuleInit {
     return total > 0 ? skin / total : 0;
   }
 
-  /** YCbCr / RGB skin heuristic (conservative for moderation). */
   private isSkinPixel(r: number, g: number, b: number): boolean {
     const y = 0.299 * r + 0.587 * g + 0.114 * b;
     const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;

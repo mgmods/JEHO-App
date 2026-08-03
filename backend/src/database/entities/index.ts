@@ -10,6 +10,7 @@ export * from './room-seat.entity';
 export * from './room-seat-signal.entity';
 export * from './room-music-track.entity';
 export * from './room-ban.entity';
+export * from './room-chat-penalty.entity';
 export * from './room-moderator.entity';
 export * from './room-access.entity';
 export * from './room-host-follow.entity';

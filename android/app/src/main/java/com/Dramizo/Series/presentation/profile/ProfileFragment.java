@@ -33,7 +33,7 @@ import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.HostSignalView;
-import com.Dramizo.Series.util.MyRoomLauncher;
+import com.Dramizo.Series.util.RoomOpenChooser;
 
 import java.util.Calendar;
 import java.text.NumberFormat;
@@ -70,7 +70,7 @@ public class ProfileFragment extends Fragment {
                 startActivity(new Intent(requireContext(), TaskCenterActivity.class)));
         bindRow(binding.btnContests, v ->
                 startActivity(new Intent(requireContext(), MedalActivity.class)));
-        bindRow(binding.btnMyRoom, v -> MyRoomLauncher.open(requireActivity()));
+        bindRow(binding.btnMyRoom, v -> RoomOpenChooser.open(requireActivity()));
         loadAgencyAction();
         bindRow(binding.btnVisitors, v ->
                 startActivity(new Intent(requireContext(), VisitorsActivity.class)));
@@ -94,6 +94,10 @@ public class ProfileFragment extends Fragment {
                 startActivity(new Intent(requireContext(), RankingActivity.class)));
         bindRow(binding.btnAgency, v ->
                 startActivity(new Intent(requireContext(), AgencyActivity.class)));
+        if (binding.btnVanityId != null) {
+            bindRow(binding.btnVanityId, v ->
+                    startActivity(new Intent(requireContext(), VanityIdsActivity.class)));
+        }
         if (binding.btnQuickAgency != null) {
             bindRow(binding.btnQuickAgency, v -> openAgencyHub());
         }
@@ -291,18 +295,6 @@ public class ProfileFragment extends Fragment {
     }
 
     private void openAgencyHub() {
-        if (agencyMine != null && agencyMine.agency != null
-                && agencyMine.agency.id != null && !agencyMine.agency.id.isEmpty()) {
-            String role = agencyMine.role != null ? agencyMine.role.toLowerCase(java.util.Locale.US) : "";
-            if ("owner".equals(role) || "manager".equals(role) || "host".equals(role)) {
-                Intent i = new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.class);
-                i.putExtra(com.Dramizo.Series.presentation.agency.AgencyManageActivity.EXTRA_AGENCY_ID,
-                        agencyMine.agency.id);
-                startActivity(i);
-                return;
-            }
-        }
         startActivity(new Intent(requireContext(), AgencyActivity.class));
     }
 

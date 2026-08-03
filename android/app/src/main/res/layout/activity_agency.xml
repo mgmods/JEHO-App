@@ -18,7 +18,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Top bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="52dp"
@@ -63,7 +62,7 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingBottom="20dp">
+            android:paddingBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -71,7 +70,6 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="16dp">
 
-                <!-- Intro -->
                 <TextView
                     android:id="@+id/tvPricing"
                     android:layout_width="match_parent"
@@ -82,7 +80,6 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
-                <!-- Application status -->
                 <LinearLayout
                     android:id="@+id/cardApplicationStatus"
                     android:layout_width="match_parent"
@@ -137,164 +134,433 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
-                <!-- My agency dashboard -->
+                <!-- My agency hub -->
                 <LinearLayout
                     android:id="@+id/cardMyAgency"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_glass_grouped"
                     android:orientation="vertical"
-                    android:padding="14dp"
                     android:visibility="gone">
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_my_section"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvMyAgencyName"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:gravity="end"
-                        android:textColor="@color/text_primary"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvMyAgencyMeta"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:gravity="end"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
+                    <!-- Header -->
                     <LinearLayout
-                        android:id="@+id/rowActivationCode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:background="#22000000"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:padding="10dp"
-                        android:visibility="gone">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnCopyCode"
-                            style="@style/Widget.MaterialComponents.Button.TextButton"
-                            android:layout_width="wrap_content"
-                            android:layout_height="36dp"
-                            android:minWidth="0dp"
-                            android:text="@string/copy"
-                            android:textAllCaps="false"
-                            android:textColor="@color/text_secondary" />
+                        android:background="@drawable/bg_glass_grouped"
+                        android:orientation="vertical"
+                        android:padding="14dp">
 
                         <TextView
-                            android:id="@+id/tvActivationCode"
-                            android:layout_width="0dp"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:gravity="end"
+                            android:text="@string/agency_my_section"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvMyAgencyName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
                             android:gravity="end"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="22sp"
                             android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvMyAgencyMeta"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:gravity="end"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp" />
+
+                        <LinearLayout
+                            android:id="@+id/rowActivationCode"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:background="#22000000"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:padding="10dp"
+                            android:visibility="gone">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnCopyCode"
+                                style="@style/Widget.MaterialComponents.Button.TextButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="36dp"
+                                android:minWidth="0dp"
+                                android:text="@string/copy"
+                                android:textAllCaps="false"
+                                android:textColor="@color/text_secondary" />
+
+                            <TextView
+                                android:id="@+id/tvActivationCode"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:gravity="end"
+                                android:textColor="@color/text_primary"
+                                android:textSize="15sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/tvEarnings"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:background="#18000000"
-                        android:gravity="end"
-                        android:lineSpacingExtra="2dp"
-                        android:padding="10dp"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp"
-                        android:visibility="gone" />
-
+                    <!-- Earnings -->
                     <LinearLayout
-                        android:id="@+id/rowOwnerEarningsActions"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:orientation="horizontal"
-                        android:visibility="gone">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnWithdrawAgencyEarnings"
-                            style="@style/Widget.AuraLive.Button.Outlined"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            android:text="سحب الأرباح"
-                            android:textAllCaps="false"
-                            android:textSize="12sp" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnDistributeAgencyEarnings"
-                            style="@style/Widget.AuraLive.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            android:text="توزيع على عضو"
-                            android:textAllCaps="false"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <LinearLayout
+                        android:id="@+id/sectionEarnings"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:orientation="horizontal">
+                        android:background="@drawable/bg_glass_grouped"
+                        android:orientation="vertical"
+                        android:padding="14dp"
+                        android:visibility="gone">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnDeleteAgency"
-                            style="@style/Widget.AuraLive.Button.Outlined"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_marginEnd="6dp"
-                            android:layout_weight="1"
-                            android:text="@string/agency_delete"
-                            android:textAllCaps="false"
-                            android:textColor="#FFFF8A80"
-                            android:visibility="gone"
-                            app:strokeColor="#FFFF8A80" />
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="@string/agency_earnings_section"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnManageAgency"
-                            style="@style/Widget.AuraLive.Button"
-                            android:layout_width="0dp"
-                            android:layout_height="46dp"
-                            android:layout_marginStart="6dp"
-                            android:layout_weight="1"
-                            android:text="@string/agency_manage"
-                            android:textAllCaps="false"
+                        <TextView
+                            android:id="@+id/tvEarnings"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="end"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="13sp"
                             android:visibility="gone" />
+
+                        <LinearLayout
+                            android:id="@+id/rowEarnCards"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:background="#18000000"
+                                android:orientation="vertical"
+                                android:padding="12dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="end"
+                                    android:text="@string/agency_earn_commission"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="11sp" />
+
+                                <TextView
+                                    android:id="@+id/tvEarnCommission"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:gravity="end"
+                                    android:text="0"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:background="#18000000"
+                                android:orientation="vertical"
+                                android:padding="12dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="end"
+                                    android:text="@string/agency_earn_gross"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="11sp" />
+
+                                <TextView
+                                    android:id="@+id/tvEarnGross"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="4dp"
+                                    android:gravity="end"
+                                    android:text="0"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/rowEarnEstimates"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="4dp"
+                                android:layout_weight="1"
+                                android:background="#14000000"
+                                android:orientation="vertical"
+                                android:padding="10dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:text="@string/agency_earn_hosts"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvEarnHost"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:text="0"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:id="@+id/boxEarnPlatform"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginHorizontal="4dp"
+                                android:layout_weight="1"
+                                android:background="#14000000"
+                                android:orientation="vertical"
+                                android:padding="10dp"
+                                android:visibility="gone">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:text="@string/agency_earn_platform"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvEarnPlatform"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:text="0"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="4dp"
+                                android:layout_weight="1"
+                                android:background="#14000000"
+                                android:orientation="vertical"
+                                android:padding="10dp">
+
+                                <TextView
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:gravity="center"
+                                    android:text="@string/agency_earn_agent"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="10sp" />
+
+                                <TextView
+                                    android:id="@+id/tvEarnAgent"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:gravity="center"
+                                    android:text="0"
+                                    android:textColor="@color/text_primary"
+                                    android:textSize="14sp"
+                                    android:textStyle="bold" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/tvEarnPercents"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="end"
+                            android:textColor="@color/text_hint"
+                            android:textSize="11sp"
+                            android:visibility="gone" />
+
+                        <LinearLayout
+                            android:id="@+id/rowOwnerEarningsActions"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="horizontal"
+                            android:visibility="gone">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnWithdrawAgencyEarnings"
+                                style="@style/Widget.AuraLive.Button.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:text="@string/agency_withdraw_earnings"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnDistributeAgencyEarnings"
+                                style="@style/Widget.AuraLive.Button"
+                                android:layout_width="0dp"
+                                android:layout_height="44dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:text="@string/agency_distribute_earnings"
+                                android:textAllCaps="false"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/rowHostEarningsHelp"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical"
+                            android:visibility="gone">
+
+                            <TextView
+                                android:id="@+id/tvHostEarningsHelp"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="end"
+                                android:lineSpacingExtra="2dp"
+                                android:text="@string/agency_host_earnings_help"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="12sp" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="10dp"
+                                android:orientation="horizontal">
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnHostViewEarnings"
+                                    style="@style/Widget.AuraLive.Button.Outlined"
+                                    android:layout_width="0dp"
+                                    android:layout_height="44dp"
+                                    android:layout_marginEnd="6dp"
+                                    android:layout_weight="1"
+                                    android:text="@string/agency_host_view_earnings"
+                                    android:textAllCaps="false"
+                                    android:textSize="12sp" />
+
+                                <com.google.android.material.button.MaterialButton
+                                    android:id="@+id/btnHostWithdraw"
+                                    style="@style/Widget.AuraLive.Button"
+                                    android:layout_width="0dp"
+                                    android:layout_height="44dp"
+                                    android:layout_marginStart="6dp"
+                                    android:layout_weight="1"
+                                    android:text="@string/agency_withdraw_earnings"
+                                    android:textAllCaps="false"
+                                    android:textSize="12sp" />
+                            </LinearLayout>
+                        </LinearLayout>
                     </LinearLayout>
 
+                    <!-- Go live -->
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnAgencyRoom"
                         style="@style/Widget.AuraLive.Button.Gold"
                         android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="8dp"
-                        android:text="@string/my_room"
+                        android:layout_height="52dp"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/agency_go_live"
                         android:textAllCaps="false"
                         android:visibility="gone" />
+
+                    <!-- Admin grid -->
+                    <LinearLayout
+                        android:id="@+id/sectionAdminGrid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_glass_grouped"
+                        android:orientation="vertical"
+                        android:padding="14dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="end"
+                            android:text="@string/agency_admin_section"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnManageAgency"
+                                style="@style/Widget.AuraLive.Button"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="6dp"
+                                android:layout_weight="1"
+                                android:text="@string/agency_manage"
+                                android:textAllCaps="false"
+                                android:visibility="gone" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnDeleteAgency"
+                                style="@style/Widget.AuraLive.Button.Outlined"
+                                android:layout_width="0dp"
+                                android:layout_height="48dp"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:text="@string/agency_delete"
+                                android:textAllCaps="false"
+                                android:textColor="#FFFF8A80"
+                                android:visibility="gone"
+                                app:strokeColor="#FFFF8A80" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
 
-                <!-- Open agency CTA -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnBecomeAgent"
                     style="@style/Widget.AuraLive.Button.Gold"
@@ -304,7 +570,6 @@
                     android:text="@string/open_agency"
                     android:textAllCaps="false" />
 
-                <!-- Join by code -->
                 <LinearLayout
                     android:id="@+id/cardJoinByCode"
                     android:layout_width="match_parent"
@@ -359,13 +624,12 @@
                         android:textAllCaps="false" />
                 </LinearLayout>
 
-                <!-- Directory of all agencies removed — only cardMyAgency above. -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
-                    android:visibility="gone"
-                    android:nestedScrollingEnabled="false" />
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvEmpty"
@@ -373,10 +637,10 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:padding="28dp"
-                    android:visibility="gone"
                     android:text="@string/agency_empty_active"
                     android:textColor="@color/text_hint"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    android:visibility="gone" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>

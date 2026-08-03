@@ -80,7 +80,9 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
         Joiner j = items.get(position);
         AvatarCosmetics.bindAvatar(h.b.imgJoinerAvatar, j.avatarUrl);
         AvatarCosmetics.applyFrame(h.b.imgJoinerFrame,
-                agencyRoom ? j.hostBadgeUrl : j.vipBadgeUrl);
+                agencyRoom
+                        ? firstNonEmpty(j.hostBadgeUrl, j.vipBadgeUrl)
+                        : j.vipBadgeUrl);
         h.itemView.setContentDescription(j.displayName);
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(j);
@@ -90,6 +92,12 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
     @Override
     public int getItemCount() {
         return items.size();
+    }
+
+    private static String firstNonEmpty(String a, String b) {
+        if (a != null && !a.trim().isEmpty()) return a;
+        if (b != null && !b.trim().isEmpty()) return b;
+        return null;
     }
 
     static class VH extends RecyclerView.ViewHolder {

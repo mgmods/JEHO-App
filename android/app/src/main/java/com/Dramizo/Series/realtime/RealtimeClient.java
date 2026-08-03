@@ -174,6 +174,8 @@ public class RealtimeClient {
             socket.on("notification:new", onNotificationNew);
             socket.on("celebration:toast", onCelebrationToast);
             socket.on("account:restricted", onAccountRestricted);
+            socket.on("moderation:blocked", onModerationBlocked);
+            socket.on("moderation:action", onModerationAction);
             socket.connect();
             Log.i(TAG, "Connecting to " + url);
         } catch (URISyntaxException e) {
@@ -842,6 +844,12 @@ public class RealtimeClient {
 
     private final Emitter.Listener onAccountRestricted = args ->
             dispatchUserEvent("account:restricted", args);
+
+    private final Emitter.Listener onModerationBlocked = args ->
+            dispatchUserEvent("moderation:blocked", args);
+
+    private final Emitter.Listener onModerationAction = args ->
+            dispatchUserEvent("moderation:action", args);
 
     private void dispatchUserEvent(String event, Object[] args) {
         if (args.length == 0 || userListeners.isEmpty()) return;

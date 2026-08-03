@@ -128,6 +128,8 @@
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".presentation.vip.VipActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".presentation.profile.VanityIdsActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
         <activity android:name=".presentation.settings.SettingsActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" />
         <activity android:name=".presentation.settings.LanguageActivity" android:exported="false"

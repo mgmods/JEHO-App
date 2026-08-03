@@ -310,6 +310,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean rtcTokenRequestInFlight;
     private boolean rtcReconnectInFlight;
     private RealtimeClient.RoomListener realtimeRoomListener;
+    private RealtimeClient.UserListener moderationUserListener;
+    /** Local mirror of server chat mute (text), until epoch ms. */
+    private long chatMutedUntilMs;
     private ZegoEngineManager.RoomListener zegoRoomListener;
     private final ActivityResultLauncher<String[]> musicPicker = registerForActivityResult(
             new ActivityResultContracts.OpenDocument(),
@@ -481,7 +484,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String vipBadge = seat.user != null ? seat.user.vipBadgeUrl : null;
                     String hostBadge = seat.user != null ? seat.user.hostBadgeUrl : null;
                     showUserCard(occupantId, name, avatar,
-                            isAgencyRoom ? null : vipBadge,
+                            vipBadge,
                             isAgencyRoom ? hostBadge : null,
                             vip, lv);
                     return;
@@ -523,7 +526,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             seat.userId,
                             name,
                             seat.user != null ? seat.user.avatarUrl : null,
-                            isAgencyRoom ? null : (seat.user != null ? seat.user.vipBadgeUrl : null),
+                            seat.user != null ? seat.user.vipBadgeUrl : null,
                             isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
                             seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
                             seat.user != null ? Math.max(1, seat.user.level) : 1);
@@ -564,7 +567,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setAdapter(seatAdapter);
         audienceAdapter = new RecentJoinersAdapter(member ->
                 showUserCard(member.userId, member.displayName, member.avatarUrl,
-                        isAgencyRoom ? null : member.vipBadgeUrl,
+                        member.vipBadgeUrl,
                         isAgencyRoom ? member.hostBadgeUrl : null,
                         member.vipLevel, member.userLevel));
         binding.recyclerRecentJoiners.setLayoutManager(
@@ -1162,6 +1165,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void appendChatFromInput() {
         String text = binding.etChat.getText() != null ? binding.etChat.getText().toString().trim() : "";
         if (text.isEmpty() || roomId == null) return;
+        if (isChatTextMuted()) {
+            Toast.makeText(this, chatMuteToastMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
         com.Dramizo.Series.data.local.prefs.SessionManager sm =
                 ContainerProvider.from(this).getSessionManager();
         if (sm.isChatPromoFilterFromServer()) {
@@ -1224,6 +1231,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean emitted = RealtimeClient.getInstance().emitRoomEvent(
                     roomId, "chat:message", payload, (ok, error, code) -> runOnUiThread(() -> {
                         if (!ok) {
+                            if ("CHAT_MUTED".equals(code) || (error != null && error.contains("مكتوم"))) {
+                                applyChatMuteFromServer(null, error);
+                            }
                             Toast.makeText(
                                             this,
                                             error != null && !error.isEmpty()
@@ -1383,9 +1393,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (avatarUrl == null) avatarUrl = session.getAvatarUrl();
                 AuthDtos.UserDto selfUser = session.getUser();
                 if (frameUrl == null && selfUser != null) {
-                    frameUrl = isAgencyRoom ? selfUser.hostBadgeUrl : selfUser.vipBadgeUrl;
+                    if (isAgencyRoom) {
+                        frameUrl = selfUser.hostBadgeUrl;
+                        if (frameUrl == null || frameUrl.isEmpty()) frameUrl = selfUser.vipBadgeUrl;
+                    } else {
+                        frameUrl = selfUser.vipBadgeUrl;
+                    }
                 }
-                if (frameUrl == null && isAgencyRoom) frameUrl = session.getHostBadgeUrl();
+                if ((frameUrl == null || frameUrl.isEmpty()) && isAgencyRoom) {
+                    frameUrl = session.getHostBadgeUrl();
+                }
+                if ((frameUrl == null || frameUrl.isEmpty()) && selfUser != null) {
+                    frameUrl = selfUser.vipBadgeUrl;
+                }
                 if (selfUser != null) {
                     if (wealthScore <= 0) wealthScore = Math.max(selfUser.wealthScore, selfUser.totalSentCoins);
                     if (charmScore <= 0) charmScore = Math.max(0L, selfUser.charmScore);
@@ -1773,7 +1793,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         myUserId,
                         name,
                         seat.user != null ? seat.user.avatarUrl : null,
-                        isAgencyRoom ? null : (seat.user != null ? seat.user.vipBadgeUrl : null),
+                        seat.user != null ? seat.user.vipBadgeUrl : null,
                         isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
                         seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
                         seat.user != null ? Math.max(1, seat.user.level) : 1);
@@ -2358,7 +2378,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 if (tvCount != null) {
                     tvCount.setVisibility(View.VISIBLE);
-                    tvCount.setText("المحظورون: " + items.size());
+                    tvCount.setText("العقوبات: " + items.size());
                 }
                 if (recycler == null) return;
                 recycler.setVisibility(View.VISIBLE);
@@ -2385,6 +2405,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         if (name == null || name.isEmpty()) name = "مستخدم";
                         String pid = ban.user != null ? ban.user.displayPublicId() : "";
                         String meta = pid != null && !pid.isEmpty() ? ("ID " + pid) : "";
+                        boolean isChatMute = ban.kind != null
+                                && "chat_mute".equalsIgnoreCase(ban.kind);
+                        if (isChatMute) {
+                            meta = meta.isEmpty() ? "كتم دردشة" : (meta + " · كتم دردشة");
+                        }
                         if (ban.reason != null && !ban.reason.isEmpty()
                                 && !"moderator_timed_ban".equals(ban.reason)
                                 && !"moderator_kick".equals(ban.reason)) {
@@ -2410,11 +2435,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         }
                         final String targetId = ban.userId;
                         final String displayName = name;
+                        final boolean muteOnly = isChatMute;
                         if (unbanBtn != null) {
+                            unbanBtn.setText(muteOnly ? "فك الكتم" : "إزالة");
                             unbanBtn.setOnClickListener(v -> AuraDialogHelper.confirm(VoiceRoomActivity.this,
-                                    "إزالة الحظر",
-                                    "إلغاء حظر " + displayName + "؟",
-                                    "إزالة",
+                                    muteOnly ? "فك كتم الدردشة" : "إزالة الحظر",
+                                    (muteOnly ? "فك كتم " : "إلغاء حظر ") + displayName + "؟",
+                                    muteOnly ? "فك الكتم" : "إزالة",
                                     () -> {
                                         viewModel.unbanUser(roomId, targetId);
                                         dialog.dismiss();
@@ -4524,7 +4551,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         ? seat.user.displayName : seat.user.username);
                 row.addProperty("avatarUrl", seat.user.avatarUrl);
                 row.addProperty("frameUrl",
-                        isAgencyRoom ? seat.user.hostBadgeUrl : seat.user.vipBadgeUrl);
+                        isAgencyRoom
+                                ? firstNonEmpty(seat.user.hostBadgeUrl, seat.user.vipBadgeUrl)
+                                : seat.user.vipBadgeUrl);
                 row.addProperty("vipLevel", seat.user.vipLevel);
                 row.addProperty("userLevel", seat.user.level);
                 allRows.add(row);
@@ -4539,7 +4568,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? liveRoom.host.displayName : liveRoom.host.username);
             row.addProperty("avatarUrl", liveRoom.host.avatarUrl);
             row.addProperty("frameUrl",
-                    isAgencyRoom ? liveRoom.host.hostBadgeUrl : liveRoom.host.vipBadgeUrl);
+                    isAgencyRoom
+                            ? firstNonEmpty(liveRoom.host.hostBadgeUrl, liveRoom.host.vipBadgeUrl)
+                            : liveRoom.host.vipBadgeUrl);
             row.addProperty("vipLevel", liveRoom.host.vipLevel);
             row.addProperty("userLevel", liveRoom.host.level);
             allRows.add(row);
@@ -4593,7 +4624,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     dialog.dismiss();
                     if (uid != null && !uid.isEmpty()) {
                         showUserCard(uid, name, avatar,
-                                isAgencyRoom ? null : frame,
+                                frame,
                                 isAgencyRoom ? frame : null,
                                 vip, Math.max(1, level));
                     }
@@ -5259,11 +5290,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         // Personal chat / profile always use VIP frame — never agency host signal.
-        final String[] chatVipFrame = { isAgencyRoom ? null : frameUrl };
+        final String[] chatVipFrame = { frameUrl };
         AvatarCosmetics.bindStacked(img, frame, avatarUrl, frameUrl);
-        // Agency room → host signal; personal room → VIP frame (applied after profile fetch too).
+        // Agency: host signal if set, otherwise purchased VIP/head frame.
         if (isAgencyRoom) {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, null, hostBadgeUrl, null, null);
+            AvatarCosmetics.applyHostWear(frame, hostBadge, img, frameUrl, hostBadgeUrl, null, null);
         } else {
             AvatarCosmetics.applyHostWear(frame, hostBadge, img, frameUrl, null, null, null);
         }
@@ -5281,7 +5312,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             frame,
                             hostBadge,
                             img,
-                            isAgencyRoom ? null : r.data.vipBadgeUrl,
+                            r.data.vipBadgeUrl,
                             isAgencyRoom ? r.data.hostBadgeUrl : null,
                             null,
                             isAgencyRoom ? r.data.hostBadgeMeta : null);
@@ -5940,7 +5971,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     tap.userId,
                     tap.displayName,
                     tap.avatarUrl,
-                    isAgencyRoom ? null : tap.vipBadgeUrl,
+                    tap.vipBadgeUrl,
                     isAgencyRoom ? tap.hostBadgeUrl : null,
                     0,
                     1));
@@ -5998,7 +6029,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     supporter.userId,
                     supporter.displayName,
                     supporter.avatarUrl,
-                    isAgencyRoom ? null : supporter.vipBadgeUrl,
+                    supporter.vipBadgeUrl,
                     isAgencyRoom ? supporter.hostBadgeUrl : null,
                     0,
                     1));
@@ -6070,7 +6101,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         AuraDialogHelper.list(this, title, rows, which -> {
             RoomDtos.SupporterDto item = supporters.get(which);
             showUserCard(item.userId, item.displayName, item.avatarUrl,
-                    isAgencyRoom ? null : item.vipBadgeUrl,
+                    item.vipBadgeUrl,
                     isAgencyRoom ? item.hostBadgeUrl : null, 0, 1);
         });
     }
@@ -8689,6 +8720,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             RealtimeClient.getInstance().removeRoomListener(realtimeRoomListener);
             realtimeRoomListener = null;
         }
+        if (moderationUserListener != null) {
+            RealtimeClient.getInstance().removeUserListener(moderationUserListener);
+            moderationUserListener = null;
+        }
         if (zegoRoomListener != null) {
             ZegoEngineManager.getInstance().removeRoomListener(zegoRoomListener);
             zegoRoomListener = null;
@@ -8890,7 +8925,102 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         };
         rt.addRoomListener(realtimeRoomListener);
+        if (moderationUserListener == null) {
+            moderationUserListener = new RealtimeClient.UserListener() {
+                @Override
+                public void onUserEvent(String event, JsonObject payload) {
+                    if (payload == null || event == null) return;
+                    String rid = payload.has("roomId") && !payload.get("roomId").isJsonNull()
+                            ? payload.get("roomId").getAsString() : null;
+                    if (roomId == null || rid == null || !roomId.equals(rid)) return;
+                    handler.post(() -> {
+                        if ("moderation:blocked".equals(event) || "moderation:action".equals(event)) {
+                            String action = payload.has("action") && !payload.get("action").isJsonNull()
+                                    ? payload.get("action").getAsString() : "";
+                            String reason = payload.has("reason") && !payload.get("reason").isJsonNull()
+                                    ? payload.get("reason").getAsString() : null;
+                            String until = payload.has("until") && !payload.get("until").isJsonNull()
+                                    ? payload.get("until").getAsString() : null;
+                            if ("unmute".equalsIgnoreCase(action)) {
+                                chatMutedUntilMs = 0L;
+                                Toast.makeText(VoiceRoomActivity.this,
+                                        reason != null ? reason : "تم فك الكتم",
+                                        Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                            if ("mute".equalsIgnoreCase(action)
+                                    || "CHAT_MUTED".equals(
+                                    payload.has("code") && !payload.get("code").isJsonNull()
+                                            ? payload.get("code").getAsString() : "")) {
+                                int mins = 0;
+                                try {
+                                    if (payload.has("muteMinutes") && !payload.get("muteMinutes").isJsonNull()) {
+                                        mins = payload.get("muteMinutes").getAsInt();
+                                    }
+                                } catch (Exception ignored) {}
+                                applyChatMuteFromServer(until, reason, mins);
+                                requestRoomRefresh(false);
+                            }
+                        }
+                    });
+                }
+            };
+            rt.addUserListener(moderationUserListener);
+        }
         rt.connect(token);
+    }
+
+    private boolean isChatTextMuted() {
+        return chatMutedUntilMs > System.currentTimeMillis();
+    }
+
+    private String chatMuteToastMessage() {
+        long leftMs = Math.max(0L, chatMutedUntilMs - System.currentTimeMillis());
+        int mins = (int) Math.max(1, Math.ceil(leftMs / 60_000.0));
+        return "أنت مكتوم من الدردشة · تبقّى تقريباً " + mins + " د";
+    }
+
+    private void applyChatMuteFromServer(@Nullable String untilIso, @Nullable String reason) {
+        long until = 0L;
+        if (untilIso != null && !untilIso.isEmpty()) {
+            try {
+                until = java.time.Instant.parse(untilIso).toEpochMilli();
+            } catch (Exception ignored) {
+                until = 0L;
+            }
+        }
+        if (until <= 0L) {
+            until = System.currentTimeMillis() + 5 * 60_000L;
+        }
+        chatMutedUntilMs = Math.max(chatMutedUntilMs, until);
+        Toast.makeText(this,
+                reason != null && !reason.isEmpty() ? reason : chatMuteToastMessage(),
+                Toast.LENGTH_LONG).show();
+    }
+
+    private void applyChatMuteFromServer(
+            @Nullable String untilIso,
+            @Nullable String reason,
+            int muteMinutes
+    ) {
+        long until = 0L;
+        if (untilIso != null && !untilIso.isEmpty()) {
+            try {
+                until = java.time.Instant.parse(untilIso).toEpochMilli();
+            } catch (Exception ignored) {
+                until = 0L;
+            }
+        }
+        if (until <= 0L && muteMinutes > 0) {
+            until = System.currentTimeMillis() + muteMinutes * 60_000L;
+        }
+        if (until <= 0L) {
+            until = System.currentTimeMillis() + 5 * 60_000L;
+        }
+        chatMutedUntilMs = Math.max(chatMutedUntilMs, until);
+        Toast.makeText(this,
+                reason != null && !reason.isEmpty() ? reason : chatMuteToastMessage(),
+                Toast.LENGTH_LONG).show();
     }
 
     private void connectRealtimeRoom() {
@@ -9510,6 +9640,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 requestRoomRefresh(false);
             }
+        } else if ("room:chat_muted".equals(event)) {
+            String mutedId = memberStr(payload, "userId");
+            if (myUserId != null && myUserId.equals(mutedId)) {
+                applyChatMuteFromServer(
+                        memberStr(payload, "until"),
+                        memberStr(payload, "reason"));
+            }
+            requestRoomRefresh(false);
+        } else if ("room:unbanned".equals(event)) {
+            String uid = memberStr(payload, "userId");
+            if (myUserId != null && myUserId.equals(uid)) {
+                chatMutedUntilMs = 0L;
+                Toast.makeText(this, "تم رفع العقوبة عنك", Toast.LENGTH_SHORT).show();
+            }
         } else if ("room:suspended".equals(event)) {
             forceExitRoom("تم تعليق الوكالة وإيقاف الغرفة");
         } else if ("room:seat_requests_cleared".equals(event)) {
@@ -9564,15 +9708,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
         } else if ("room:seat_left".equals(event)) {
             String leftId = payload.has("userId") ? payload.get("userId").getAsString() : null;
+            boolean forced = payload.has("forced")
+                    && !payload.get("forced").isJsonNull()
+                    && payload.get("forced").getAsBoolean();
             if (myUserId != null && myUserId.equals(leftId)) {
                 micOn = false;
                 userChoseMute = false;
                 ZegoEngineManager.getInstance().setMicEnabled(false);
                 ZegoEngineManager.getInstance().stopPublishing();
+                if (forced) {
+                    Toast.makeText(this, "تم إنزالك من المقعد بسبب مخالفة", Toast.LENGTH_LONG).show();
+                }
             } else if (leftId != null) {
                 ZegoEngineManager.getInstance().stopPlaying(ZegoEngineManager.audioStreamId(leftId));
             }
-            appendChatLine("النظام", "مستخدم نزل من المايك", 0, 1);
+            appendChatLine("النظام",
+                    forced ? "تم إنزال مستخدم من المقعد (رقابة)" : "مستخدم نزل من المايك",
+                    0, 1);
             requestRoomRefresh(true);
         } else if ("room:user_left".equals(event)) {
             requestRoomRefresh(false);
@@ -10664,7 +10816,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 hostId,
                 name,
                 host != null ? host.avatarUrl : null,
-                isAgencyRoom ? null : (host != null ? host.vipBadgeUrl : null),
+                host != null ? host.vipBadgeUrl : null,
                 isAgencyRoom ? (host != null ? host.hostBadgeUrl : null) : null,
                 host != null ? Math.max(0, host.vipLevel) : 0,
                 host != null ? Math.max(1, host.level) : 1);

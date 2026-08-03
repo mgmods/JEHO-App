@@ -22,6 +22,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { ModerationModule } from '../moderation/moderation.module';
 import { Agency } from '../../database/entities/agency.entity';
 import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { Report } from '../../database/entities/report.entity';
@@ -54,6 +55,7 @@ import { RoomMusicTrack } from '../../database/entities/room-music-track.entity'
     TasksModule,
     NotificationsModule,
     UploadsModule,
+    ModerationModule,
   ],
   controllers: [RoomsController],
   providers: [RoomsService, InternetMusicService],

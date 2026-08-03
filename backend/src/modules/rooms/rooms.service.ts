@@ -9,7 +9,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -66,6 +66,7 @@ import {
 } from '../../database/entities/report.entity';
 import { RoomMusicTrack } from '../../database/entities/room-music-track.entity';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { ContentModerationService } from '../moderation/content-moderation.service';
 
 const DEFAULT_ROOM_SEAT_COUNT = 11; // host stage + numbered seats 1..10
 
@@ -112,6 +113,7 @@ export class RoomsService implements OnModuleInit {
     private readonly tasksService: TasksService,
     private readonly mediaCleanup: MediaCleanupService,
     private readonly configService: ConfigService,
+    private readonly moderation: ContentModerationService,
     @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
@@ -2338,6 +2340,40 @@ export class RoomsService implements OnModuleInit {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
     // Owner may leave a seat when switching; closing the room is a separate path.
+    await this.clearUserSeat(roomId, userId);
+    this.notifyRoomUpdated(roomId);
+    const member = await this.memberIdentity(userId);
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:seat_left',
+      payload: { roomId, ...member },
+      at: new Date().toISOString(),
+    });
+    return this.getRoom(roomId);
+  }
+
+  /** Force a seated user into audience (keeps room access). Used by auto-mod. */
+  async forceLeaveSeat(roomId: string, userId: string, reason?: string) {
+    const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
+    if (!seat) return { left: false, userId };
+    await this.clearUserSeat(roomId, userId);
+    this.notifyRoomUpdated(roomId);
+    const member = await this.memberIdentity(userId);
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:seat_left',
+      payload: {
+        roomId,
+        ...member,
+        forced: true,
+        reason: reason || 'auto_moderation',
+      },
+      at: new Date().toISOString(),
+    });
+    return { left: true, userId };
+  }
+
+  private async clearUserSeat(roomId: string, userId: string) {
     await this.seatsRepo.update(
       { roomId, userId },
       {
@@ -2348,15 +2384,6 @@ export class RoomsService implements OnModuleInit {
       },
     );
     await this.seatSignalsRepo.delete({ roomId, userId });
-    this.notifyRoomUpdated(roomId);
-    const member = await this.memberIdentity(userId);
-    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-      roomId,
-      event: 'room:seat_left',
-      payload: { roomId, ...member },
-      at: new Date().toISOString(),
-    });
-    return this.getRoom(roomId);
   }
 
   async setCohost(roomId: string, hostId: string, dto: SetCohostDto) {
@@ -2582,26 +2609,58 @@ export class RoomsService implements OnModuleInit {
       take: 100,
     });
     const now = new Date();
-    return {
-      items: rows
-        .filter((b) => !b.expiresAt || b.expiresAt > now)
-        .map((b) => ({
-          id: b.id,
-          userId: b.userId,
-          reason: b.reason,
-          expiresAt: b.expiresAt,
-          createdAt: b.createdAt,
-          user: b.user
+    const banItems = rows
+      .filter((b) => !b.expiresAt || b.expiresAt > now)
+      .map((b) => ({
+        id: b.id,
+        kind: 'ban' as const,
+        userId: b.userId,
+        reason: b.reason,
+        expiresAt: b.expiresAt,
+        createdAt: b.createdAt,
+        user: b.user
+          ? {
+              id: b.user.id,
+              publicId: b.user.publicId,
+              username: b.user.username,
+              displayName: b.user.displayName,
+              avatarUrl: b.user.avatarUrl,
+            }
+          : null,
+      }));
+
+    const muteRows = await this.moderation.listActiveChatMutes(roomId);
+    const muteUserIds = muteRows.map((m) => m.userId);
+    const muteUsers =
+      muteUserIds.length > 0
+        ? await this.usersRepo.find({ where: { id: In(muteUserIds) } })
+        : [];
+    const muteById = new Map(muteUsers.map((u) => [u.id, u]));
+    const bannedIds = new Set(banItems.map((b) => b.userId));
+    const muteItems = muteRows
+      .filter((m) => !bannedIds.has(m.userId))
+      .map((m) => {
+        const u = muteById.get(m.userId);
+        return {
+          id: m.id,
+          kind: 'chat_mute' as const,
+          userId: m.userId,
+          reason: `كتم الدردشة · مخالفة ${m.strikeCount || 0}`,
+          expiresAt: m.chatMutedUntil,
+          createdAt: m.updatedAt || m.createdAt,
+          user: u
             ? {
-                id: b.user.id,
-                publicId: b.user.publicId,
-                username: b.user.username,
-                displayName: b.user.displayName,
-                avatarUrl: b.user.avatarUrl,
+                id: u.id,
+                publicId: u.publicId,
+                username: u.username,
+                displayName: u.displayName,
+                avatarUrl: u.avatarUrl,
               }
             : null,
-        })),
-    };
+        };
+      });
+
+    return { items: [...banItems, ...muteItems] };
   }
 
   async unban(roomId: string, actorId: string, targetUserId: string) {
@@ -2612,13 +2671,19 @@ export class RoomsService implements OnModuleInit {
       'لا تملك صلاحية الطرد من الغرفة',
     );
     await this.bansRepo.delete({ roomId, userId: targetUserId });
+    await this.moderation.clearRoomChatPenalty(roomId, targetUserId);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
       event: 'room:unbanned',
-      payload: { roomId, userId: targetUserId },
+      payload: { roomId, userId: targetUserId, clearedChatMute: true },
       at: new Date().toISOString(),
     });
-    return { banned: false, userId: targetUserId };
+    this.realtimeGateway.emitToUser(targetUserId, 'moderation:action', {
+      roomId,
+      action: 'unmute',
+      reason: 'تم رفع العقوبة من القائمة السوداء',
+    });
+    return { banned: false, userId: targetUserId, chatMuted: false };
   }
 
   async addModerator(roomId: string, hostId: string, userId: string) {

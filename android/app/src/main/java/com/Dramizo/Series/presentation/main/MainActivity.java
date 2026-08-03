@@ -126,7 +126,7 @@ public class MainActivity extends ThemedActivity {
 
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_OPEN_CREATE_ROOM, false)) {
             getIntent().removeExtra(EXTRA_OPEN_CREATE_ROOM);
-            com.Dramizo.Series.util.MyRoomLauncher.open(this);
+            com.Dramizo.Series.util.RoomOpenChooser.open(this);
         }
         if (getIntent() != null && getIntent().getBooleanExtra(EXTRA_OPEN_HOME, false)) {
             getIntent().removeExtra(EXTRA_OPEN_HOME);
@@ -183,7 +183,7 @@ public class MainActivity extends ThemedActivity {
         setIntent(intent);
         if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_CREATE_ROOM, false)) {
             intent.removeExtra(EXTRA_OPEN_CREATE_ROOM);
-            com.Dramizo.Series.util.MyRoomLauncher.open(this);
+            com.Dramizo.Series.util.RoomOpenChooser.open(this);
         }
         if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_HOME, false)) {
             intent.removeExtra(EXTRA_OPEN_HOME);
@@ -356,7 +356,7 @@ public class MainActivity extends ThemedActivity {
 
     private void handleAgencyAction() {
         // One-tap personal/agency room — no create form.
-        com.Dramizo.Series.util.MyRoomLauncher.open(this);
+        com.Dramizo.Series.util.RoomOpenChooser.open(this);
     }
 
     private void loadAgencyAction(AppContainer container) {

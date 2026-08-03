@@ -20,6 +20,8 @@
     items: [],
     owned: {},
     equipped: {},
+    expiresAt: {},
+    leaseDays: 30,
     selectedId: null,
     busy: false,
     nativeFramePreview: false,
@@ -567,6 +569,26 @@
     syncActionButtons(item);
   }
 
+  function renewPrice(full) {
+    var n = Math.max(0, Math.floor(Number(full) || 0));
+    return Math.ceil(n / 2);
+  }
+
+  function isActiveOwned(id) {
+    if (!state.owned[id]) return false;
+    var exp = state.expiresAt[id];
+    if (!exp) return true; // legacy permanent
+    return new Date(exp).getTime() > Date.now();
+  }
+
+  function daysLeft(id) {
+    var exp = state.expiresAt[id];
+    if (!exp) return null;
+    var ms = new Date(exp).getTime() - Date.now();
+    if (ms <= 0) return 0;
+    return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
+  }
+
   function syncActionButtons(item) {
     el.btnSecondary.hidden = true;
     if (!item) {
@@ -574,37 +596,54 @@
       el.btnPrimary.textContent = 'ارتدِ';
       return;
     }
-    var owned = !!state.owned[item.id];
+    var owned = isActiveOwned(item.id);
     var equipped = !!state.equipped[item.id];
+    var left = daysLeft(item.id);
     el.btnPrimary.disabled = state.busy;
 
     if (state.type === 'room_background') {
       if (!owned) {
-        el.btnPrimary.textContent = item.coinPrice > 0 ? ('شراء ' + item.coinPrice) : 'احصل مجاناً';
+        el.btnPrimary.textContent = item.coinPrice > 0
+          ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+          : 'احصل مجاناً · 30 يوم';
         el.btnPrimary.className = 'btn btn-buy';
       } else if (state.roomId) {
         el.btnPrimary.textContent = 'طبّق على الروم';
         el.btnPrimary.className = 'btn btn-primary';
+        el.btnSecondary.hidden = false;
+        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+        el.btnSecondary.disabled = state.busy;
       } else {
-        el.btnPrimary.textContent = 'مشتراة — من إعدادات الروم';
+        el.btnPrimary.textContent = left != null
+          ? ('مشتراة · متبقي ' + left + ' يوم')
+          : 'مشتراة — من إعدادات الروم';
         el.btnPrimary.className = 'btn btn-owned';
         el.btnPrimary.disabled = true;
+        el.btnSecondary.hidden = false;
+        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+        el.btnSecondary.disabled = state.busy;
       }
       return;
     }
 
     if (!owned) {
-      el.btnPrimary.textContent = item.coinPrice > 0 ? ('شراء ' + item.coinPrice) : 'احصل مجاناً';
+      el.btnPrimary.textContent = item.coinPrice > 0
+        ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+        : 'احصل مجاناً · 30 يوم';
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
-      el.btnPrimary.textContent = 'مُرتدى';
-      el.btnPrimary.className = 'btn btn-owned';
-      el.btnPrimary.disabled = true;
+      el.btnPrimary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+      el.btnPrimary.className = 'btn btn-buy';
+      el.btnPrimary.disabled = state.busy;
       el.btnSecondary.hidden = false;
+      el.btnSecondary.textContent = 'إزالة';
       el.btnSecondary.disabled = state.busy;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
       el.btnPrimary.className = 'btn btn-primary';
+      el.btnSecondary.hidden = false;
+      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+      el.btnSecondary.disabled = state.busy;
     }
   }
 
@@ -713,16 +752,21 @@
 
       var price = document.createElement('div');
       price.className = 'card-price';
-      if (state.owned[item.id]) {
-        price.textContent = state.equipped[item.id] ? 'مُرتدى' : 'مشتراة';
+      if (isActiveOwned(item.id)) {
+        var left = daysLeft(item.id);
+        price.textContent = state.equipped[item.id]
+          ? (left != null ? ('مُرتدى · ' + left + 'ي') : 'مُرتدى')
+          : (left != null ? ('مشتراة · ' + left + 'ي') : 'مشتراة');
       } else {
-        price.textContent = item.coinPrice > 0 ? (item.coinPrice + ' عملة') : 'مجاني';
+        price.textContent = item.coinPrice > 0
+          ? (item.coinPrice + ' · 30 يوم')
+          : 'مجاني · 30 يوم';
       }
       card.appendChild(price);
 
       var action = document.createElement('button');
       action.type = 'button';
-      var owned = !!state.owned[item.id];
+      var owned = isActiveOwned(item.id);
       var equipped = !!state.equipped[item.id];
       if (!owned) {
         action.className = 'btn btn-buy';
@@ -732,9 +776,8 @@
         action.textContent = state.roomId ? 'طبّق' : 'مشتراة';
         if (!state.roomId) action.disabled = true;
       } else if (equipped) {
-        action.className = 'btn btn-owned';
-        action.textContent = 'مُرتدى';
-        action.disabled = true;
+        action.className = 'btn btn-buy';
+        action.textContent = 'تجديد ' + renewPrice(item.coinPrice);
       } else {
         action.className = 'btn btn-primary';
         action.textContent = 'ارتدِ';
@@ -772,19 +815,28 @@
     if (!state.token) {
       state.owned = {};
       state.equipped = {};
+      state.expiresAt = {};
       return;
     }
     var rows = await api('cosmetics/inventory');
     var owned = {};
     var equipped = {};
+    var expiresAt = {};
+    var now = Date.now();
     (rows || []).forEach(function (row) {
       var id = row.cosmeticId || (row.cosmetic && row.cosmetic.id);
       if (!id) return;
-      owned[id] = true;
-      if (row.equipped) equipped[id] = true;
+      var exp = row.expiresAt || null;
+      expiresAt[id] = exp;
+      var active = !exp || new Date(exp).getTime() > now;
+      if (active) {
+        owned[id] = true;
+        if (row.equipped) equipped[id] = true;
+      }
     });
     state.owned = owned;
     state.equipped = equipped;
+    state.expiresAt = expiresAt;
   }
 
   async function loadCatalog() {
@@ -821,16 +873,16 @@
     state.busy = true;
     syncActionButtons(item);
     try {
-      var owned = !!state.owned[item.id];
+      var owned = isActiveOwned(item.id);
       if (!owned) {
-        await api('cosmetics/purchase', {
+        var bought = await api('cosmetics/purchase', {
           method: 'POST',
           body: JSON.stringify({ cosmeticId: item.id }),
         });
         state.owned[item.id] = true;
-        setStatus('تم الشراء', 'ok');
-        toastNative('تم الشراء');
-        // purchase auto-equips on server for most types
+        if (bought && bought.expiresAt) state.expiresAt[item.id] = bought.expiresAt;
+        setStatus('تم الشراء لمدة 30 يوماً', 'ok');
+        toastNative('تم الشراء · 30 يوم');
         await loadInventory();
       } else if (state.type === 'room_background') {
         if (!state.roomId) {
@@ -845,7 +897,9 @@
           setStatus('تم تطبيق خلفية الروم', 'ok');
           toastNative('تم تطبيق الخلفية');
         }
-      } else if (!state.equipped[item.id]) {
+      } else if (state.equipped[item.id]) {
+        await renewItem(item);
+      } else {
         await api('cosmetics/equip', {
           method: 'POST',
           body: JSON.stringify({ cosmeticId: item.id }),
@@ -868,6 +922,44 @@
       } else {
         toastNative(em);
       }
+    } finally {
+      state.busy = false;
+      syncActionButtons(selectedItem());
+    }
+  }
+
+  async function renewItem(item) {
+    var res = await api('cosmetics/purchase', {
+      method: 'POST',
+      body: JSON.stringify({ cosmeticId: item.id }),
+    });
+    if (res && res.expiresAt) state.expiresAt[item.id] = res.expiresAt;
+    state.owned[item.id] = true;
+    await loadInventory();
+    setStatus('تم التجديد بنصف السعر (+30 يوم)', 'ok');
+    toastNative('تم التجديد · +30 يوم');
+  }
+
+  async function onSecondary() {
+    var item = selectedItem();
+    if (!item || state.busy) return;
+    if (!isActiveOwned(item.id)) return;
+    // Equipped wearables: secondary removes. Room backgrounds / unequipped: renew.
+    if (state.type !== 'room_background' && state.equipped[item.id]) {
+      await onUnequip();
+      return;
+    }
+    state.busy = true;
+    syncActionButtons(item);
+    try {
+      await renewItem(item);
+      updateHero();
+      renderGrid();
+    } catch (err) {
+      var em = (err && err.message) ? err.message : 'فشل التجديد';
+      setStatus(em, 'err');
+      if (looksInsufficient(em)) openRechargeNative(em);
+      else toastNative(em);
     } finally {
       state.busy = false;
       syncActionButtons(selectedItem());
@@ -918,7 +1010,7 @@
   };
 
   el.btnPrimary.addEventListener('click', onPrimary);
-  el.btnSecondary.addEventListener('click', onUnequip);
+  el.btnSecondary.addEventListener('click', onSecondary);
 
   // Bootstrap from query + bridge
   state.type = qs('type') || 'vip_badge';
