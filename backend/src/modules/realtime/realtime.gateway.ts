@@ -9,9 +9,6 @@ import {
 } from '@nestjs/websockets';
 import {
   Logger,
-  Inject,
-  forwardRef,
-  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -37,7 +34,6 @@ import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import { ContentModerationService } from '../moderation/content-moderation.service';
-import { RoomsService } from '../rooms/rooms.service';
 
 interface AuthSocket extends Socket {
   userId?: string;
@@ -93,9 +89,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly moderation: ContentModerationService,
-    @Optional()
-    @Inject(forwardRef(() => RoomsService))
-    private readonly roomsService?: RoomsService,
   ) {}
 
   async handleConnection(client: AuthSocket) {
@@ -821,14 +814,92 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     reason: string,
     action: 'block' | 'mute' | 'kick' | 'ban',
   ) {
-    if (!this.roomsService || !userId || !roomId) return;
+    if (!userId || !roomId) return;
     try {
-      await this.roomsService.systemMuteMic(roomId, userId, reason);
-      if (action === 'kick' || action === 'ban') {
-        await this.roomsService.systemKick(roomId, userId, reason, {
-          banMinutes: action === 'ban' ? 30 : 10,
+      const seat = await this.roomSeats.findOne({ where: { roomId, userId } });
+      if (seat) {
+        seat.isMuted = true;
+        seat.isModeratorMuted = true;
+        await this.roomSeats.save(seat);
+        this.emitToRoom(roomId, 'room:event', {
+          roomId,
+          event: 'room:mic_changed',
+          payload: {
+            roomId,
+            userId,
+            muted: true,
+            moderatorMuted: true,
+            reason: reason || 'auto_moderation',
+          },
+          at: new Date().toISOString(),
         });
       }
+
+      if (action !== 'kick' && action !== 'ban') return;
+
+      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+      if (!room) return;
+      // Never auto-kick room owner / active host / cohost.
+      if (
+        room.hostId === userId ||
+        room.activeHostId === userId ||
+        room.cohostId === userId
+      ) {
+        return;
+      }
+
+      const banMinutes = action === 'ban' ? 30 : 10;
+      const expiresAt = new Date(Date.now() + banMinutes * 60 * 1000);
+      const existing = await this.roomBans.findOne({ where: { roomId, userId } });
+      if (existing) {
+        existing.reason = reason || existing.reason;
+        existing.expiresAt = expiresAt;
+        existing.bannedById = room.hostId;
+        await this.roomBans.save(existing);
+      } else {
+        await this.roomBans.save(
+          this.roomBans.create({
+            roomId,
+            userId,
+            bannedById: room.hostId,
+            reason: reason || 'auto_moderation',
+            expiresAt,
+          }),
+        );
+      }
+
+      await this.roomSeats.update(
+        { roomId, userId },
+        {
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isMuted: false,
+          isModeratorMuted: false,
+        },
+      );
+      await this.roomAccess.delete({ roomId, userId });
+
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      this.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'room:banned',
+        payload: {
+          roomId,
+          userId,
+          username: user?.username || null,
+          displayName: user?.displayName || user?.username || null,
+          reason: reason || 'auto_moderation',
+          auto: true,
+          expiresAt,
+        },
+        at: new Date().toISOString(),
+      });
+      this.emitToUser(userId, 'moderation:action', {
+        roomId,
+        action: 'kick',
+        reason: reason || 'محتوى مخالف في الدردشة',
+      });
+      await this.ejectUserFromRoom(roomId, userId);
     } catch (err) {
       this.logger.warn(
         `Auto-moderation enforce failed: ${(err as Error).message}`,

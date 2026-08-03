@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RoomsController } from './rooms.controller';
 import { RoomsService } from './rooms.service';
@@ -50,7 +50,7 @@ import { RoomMusicTrack } from '../../database/entities/room-music-track.entity'
       RoomMusicTrack,
     ]),
     ZegoModule,
-    forwardRef(() => RealtimeModule),
+    RealtimeModule,
     TasksModule,
     NotificationsModule,
     UploadsModule,

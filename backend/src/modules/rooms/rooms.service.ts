@@ -7,8 +7,6 @@ import {
   Optional,
   OnModuleInit,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, IsNull, Repository } from 'typeorm';
@@ -110,7 +108,6 @@ export class RoomsService implements OnModuleInit {
     private readonly musicTracksRepo: Repository<RoomMusicTrack>,
     private readonly dataSource: DataSource,
     private readonly zegoTokenService: ZegoTokenService,
-    @Inject(forwardRef(() => RealtimeGateway))
     private readonly realtimeGateway: RealtimeGateway,
     private readonly tasksService: TasksService,
     private readonly mediaCleanup: MediaCleanupService,
