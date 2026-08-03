@@ -1,15 +1,19 @@
 <template>
   <header class="topbar">
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 min-w-0">
       <button class="theme-toggle d-lg-none" type="button" @click="$emit('toggle-sidebar')" :aria-label="t('app.menu')">
         <i class="bi bi-list fs-5"></i>
       </button>
-      <div>
-        <div class="fw-semibold">{{ pageTitle }}</div>
+      <div class="min-w-0">
+        <div class="topbar-title text-truncate">{{ pageTitle }}</div>
       </div>
+      <span class="topbar-chip">
+        <i class="bi bi-broadcast"></i>
+        Live Ops
+      </span>
     </div>
 
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-shrink-0">
       <select class="form-select form-select-sm lang-switch" :value="locale" @change="onLocale">
         <option value="ar">{{ t('app.arabic') }}</option>
         <option value="en">{{ t('app.english') }}</option>
@@ -34,7 +38,7 @@
 
       <button class="btn btn-sm btn-ghost" type="button" @click="onLogout">
         <i class="bi bi-box-arrow-right me-1"></i>
-        {{ t('app.logout') }}
+        <span class="d-none d-md-inline">{{ t('app.logout') }}</span>
       </button>
     </div>
   </header>
@@ -84,8 +88,8 @@ function onLogout() {
 <style scoped>
 .lang-switch {
   width: auto;
-  min-width: 7.5rem;
-  background: transparent;
+  min-width: 6.5rem;
+  background: var(--card-bg);
   color: inherit;
   border-color: var(--border-color);
 }

@@ -6,6 +6,7 @@ import android.content.Context;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -77,9 +78,12 @@ public class ComingMsgView extends LinearLayout {
         if (tvUserName != null) {
             String name = displayName == null || displayName.trim().isEmpty()
                     ? "ضيف" : displayName.trim();
-            if (name.length() > 14) name = name.substring(0, 14);
+            if (name.length() > 16) name = name.substring(0, 16);
             tvUserName.setText(name);
-            tvUserName.setMaxWidth(dp(120));
+            boolean celebration = message != null && !message.trim().isEmpty()
+                    && (message.contains("مبروك") || message.contains("فاز")
+                    || message.contains("حظ") || message.contains("حصل"));
+            tvUserName.setMaxWidth(dp(celebration ? 96 : 120));
         }
         if (tvJoin != null) {
             if (message != null && !message.trim().isEmpty()) {
@@ -87,9 +91,21 @@ public class ComingMsgView extends LinearLayout {
             } else {
                 tvJoin.setText(R.string.room_my_join);
             }
-            tvJoin.setMaxWidth(dp(160));
-            tvJoin.setSingleLine(true);
+            boolean celebration = message != null && !message.trim().isEmpty()
+                    && (message.contains("مبروك") || message.contains("فاز")
+                    || message.contains("حظ") || message.contains("حصل"));
+            tvJoin.setMaxWidth(dp(celebration ? 200 : 160));
+            tvJoin.setSingleLine(!celebration);
+            tvJoin.setMaxLines(celebration ? 2 : 1);
             tvJoin.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        }
+        if (ivBg != null && message != null && !message.trim().isEmpty()) {
+            // Widen strip for win lines so profile + text fit like Mikoo.
+            ViewGroup.LayoutParams lp = ivBg.getLayoutParams();
+            if (lp != null) {
+                lp.width = dp(340);
+                ivBg.setLayoutParams(lp);
+            }
         }
         int vipTier = Math.min(7, Math.max(0, vipLevel));
         boolean vip = vipTier >= 1;

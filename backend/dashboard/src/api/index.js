@@ -11,6 +11,10 @@ export const dashboardApi = {
   liveStats: () => safeRequest(() => api.get('/admin/dashboard/live')),
 }
 
+export const policyBrochureApi = {
+  snapshot: () => safeRequest(() => api.get('/admin/policy-brochure/snapshot')),
+}
+
 export const usersApi = {
   list: (params) => safeRequest(() => api.get('/admin/users', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/users/${id}`)),
@@ -27,7 +31,15 @@ export const roomsApi = {
   list: (params) => safeRequest(() => api.get('/admin/rooms', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/rooms/${id}`)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/rooms/${id}`, data)),
+  setCustomerService: (id, enabled) =>
+    safeRequest(() =>
+      enabled
+        ? api.post(`/admin/rooms/${id}/customer-service`, { enabled: true })
+        : api.delete(`/admin/rooms/${id}/customer-service`),
+    ),
   close: (id) => safeRequest(() => api.post(`/admin/rooms/${id}/close`)),
+  forceEnd: (id, data = {}) =>
+    safeRequest(() => api.post(`/admin/streams/${id}/force-end`, data)),
   delete: (id, opts = {}) =>
     safeRequest(() =>
       api.delete(`/admin/rooms/${id}`, {

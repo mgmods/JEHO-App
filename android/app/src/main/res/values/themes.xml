@@ -137,8 +137,9 @@
 
     <style name="Theme.AuraLive.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
         <item name="bottomSheetStyle">@style/Widget.AuraLive.BottomSheet</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowIsFloating">true</item>
+        <!-- Match Mikoo panel #121616 so Android nav buttons never show a light strip. -->
+        <item name="android:navigationBarColor">@color/color_gift_dialog_bg</item>
+        <item name="android:windowIsFloating">false</item>
         <item name="android:backgroundDimEnabled">true</item>
     </style>
 

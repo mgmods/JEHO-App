@@ -65,15 +65,15 @@ const toneClass = computed(() => `tone-${kind.value}`)
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.28), rgba(6, 182, 212, 0.22));
-  color: #2ef3e1;
-  box-shadow: inset 0 0 0 1px rgba(46, 243, 225, 0.18);
+  background: linear-gradient(135deg, rgba(61, 220, 151, 0.22), rgba(232, 196, 124, 0.16));
+  color: #3ddc97;
+  box-shadow: inset 0 0 0 1px rgba(61, 220, 151, 0.22);
 }
 .stat-icon svg {
   width: 24px;
   height: 24px;
 }
-.tone-users .stat-icon { color: #7dd3fc; background: linear-gradient(135deg, rgba(56,189,248,.25), rgba(14,116,144,.2)); }
-.tone-rooms .stat-icon { color: #86efac; background: linear-gradient(135deg, rgba(74,222,128,.22), rgba(21,128,61,.18)); }
-.tone-revenue .stat-icon { color: #fde68a; background: linear-gradient(135deg, rgba(251,191,36,.25), rgba(180,83,9,.18)); }
+.tone-users .stat-icon { color: #5eb8ff; background: linear-gradient(135deg, rgba(94,184,255,.22), rgba(31,168,106,.12)); }
+.tone-rooms .stat-icon { color: #6ef0b5; background: linear-gradient(135deg, rgba(61,220,151,.22), rgba(31,168,106,.16)); }
+.tone-revenue .stat-icon { color: #e8c47c; background: linear-gradient(135deg, rgba(232,196,124,.28), rgba(31,168,106,.12)); }
 </style>

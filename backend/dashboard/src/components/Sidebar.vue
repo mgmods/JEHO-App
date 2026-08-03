@@ -4,172 +4,51 @@
       <img :src="logoUrl" :alt="t('app.brand')" />
       <div>
         <div class="brand-text">{{ t('app.brand') }}</div>
-        <div class="brand-sub">{{ t('app.adminConsole') }}</div>
+        <div class="brand-sub">Command Center</div>
       </div>
     </div>
 
     <nav class="sidebar-nav">
-      <div class="nav-section-label">{{ t('nav.overview') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('dashboard') }" :to="{ name: 'dashboard' }" @click="close">
-        <i class="bi bi-speedometer2"></i>
-        <span>{{ t('nav.dashboard') }}</span>
-      </RouterLink>
-
-      <div class="nav-section-label">{{ t('nav.community') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('users') }" :to="{ name: 'users' }" @click="close">
-        <i class="bi bi-people"></i>
-        <span>{{ t('nav.users') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('agencies') }" :to="{ name: 'agencies' }" @click="close">
-        <i class="bi bi-building"></i>
-        <span>{{ t('nav.agencies') }}</span>
-      </RouterLink>
-      <RouterLink
-        v-if="femaleVerifyEnabled"
-        class="sidebar-link"
-        :class="{ active: isActive('gender-verifications') }"
-        :to="{ name: 'gender-verifications' }"
-        @click="close"
+      <div
+        v-for="section in visibleSections"
+        :key="section.id"
+        class="nav-section"
+        :class="{ 'is-collapsed': collapsed[section.id] }"
       >
-        <i class="bi bi-person-check"></i>
-        <span>{{ t('nav.genderVerifications') }}</span>
-      </RouterLink>
-
-      <div class="nav-section-label">{{ t('nav.liveRooms') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('rooms') }" :to="{ name: 'rooms' }" @click="close">
-        <i class="bi bi-door-open"></i>
-        <span>{{ t('nav.rooms') }}</span>
-      </RouterLink>
-      <RouterLink
-        class="sidebar-link"
-        :class="{ active: isSettingsTab('zego') }"
-        :to="{ name: 'settings', query: { tab: 'zego' } }"
-        @click="close"
-      >
-        <i class="bi bi-broadcast-pin"></i>
-        <span>{{ t('nav.zegoSettings') }}</span>
-      </RouterLink>
-
-      <div class="nav-section-label">{{ t('nav.monetization') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('gifts') }" :to="{ name: 'gifts' }" @click="close">
-        <i class="bi bi-gift"></i>
-        <span>{{ t('nav.gifts') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('coins') }" :to="{ name: 'coins' }" @click="close">
-        <i class="bi bi-coin"></i>
-        <span>{{ t('nav.coins') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('offers') }" :to="{ name: 'offers' }" @click="close">
-        <i class="bi bi-box-seam"></i>
-        <span>{{ t('nav.offers') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('promos') }" :to="{ name: 'promos' }" @click="close">
-        <i class="bi bi-stars"></i>
-        <span>العروض والترقيات</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('wallet') }" :to="{ name: 'wallet' }" @click="close">
-        <i class="bi bi-wallet2"></i>
-        <span>{{ t('nav.wallet') }}</span>
-      </RouterLink>
-      <RouterLink
-        class="sidebar-link"
-        :class="{ active: isSettingsTab('payment') }"
-        :to="{ name: 'settings', query: { tab: 'payment' } }"
-        @click="close"
-      >
-        <i class="bi bi-credit-card"></i>
-        <span>{{ t('nav.paymentSettings') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('recharge-agents') }" :to="{ name: 'recharge-agents' }" @click="close">
-        <i class="bi bi-person-badge"></i>
-        <span>{{ t('nav.rechargeAgents') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('vip') }" :to="{ name: 'vip' }" @click="close">
-        <i class="bi bi-diamond"></i>
-        <span>{{ t('nav.vip') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('vanity-ids') }" :to="{ name: 'vanity-ids' }" @click="close">
-        <i class="bi bi-hash"></i>
-        <span>الآي دي المميز</span>
-      </RouterLink>
-
-      <div class="nav-section-label">{{ t('nav.engagement') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('cosmetics') }" :to="{ name: 'cosmetics' }" @click="close">
-        <i class="bi bi-stars"></i>
-        <span>{{ t('nav.cosmetics') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('banners') }" :to="{ name: 'banners' }" @click="close">
-        <i class="bi bi-images"></i>
-        <span>{{ t('nav.banners') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('lucky-boxes') }" :to="{ name: 'lucky-boxes' }" @click="close">
-        <i class="bi bi-box2-heart"></i>
-        <span>{{ t('nav.luckyBoxes') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('tasks') }" :to="{ name: 'tasks' }" @click="close">
-        <i class="bi bi-list-check"></i>
-        <span>{{ t('nav.tasks') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('host-target') }" :to="{ name: 'host-target' }" @click="close">
-        <i class="bi bi-bullseye"></i>
-        <span>{{ t('nav.hostTarget') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('contests') }" :to="{ name: 'contests' }" @click="close">
-        <i class="bi bi-trophy"></i>
-        <span>{{ t('nav.contests') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('ranking') }" :to="{ name: 'ranking' }" @click="close">
-        <i class="bi bi-bar-chart"></i>
-        <span>{{ t('nav.ranking') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('room-cup') }" :to="{ name: 'room-cup' }" @click="close">
-        <i class="bi bi-trophy-fill"></i>
-        <span>{{ t('nav.roomCup') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('games') }" :to="{ name: 'games' }" @click="close">
-        <i class="bi bi-controller"></i>
-        <span>{{ t('nav.games') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('game-ads') }" :to="{ name: 'game-ads' }" @click="close">
-        <i class="bi bi-badge-ad"></i>
-        <span>{{ t('nav.gameAds') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('drama') }" :to="{ name: 'drama' }" @click="close">
-        <i class="bi bi-film"></i>
-        <span>{{ t('nav.drama') }}</span>
-      </RouterLink>
-
-      <div class="nav-section-label">{{ t('nav.ops') }}</div>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('reports') }" :to="{ name: 'reports' }" @click="close">
-        <i class="bi bi-flag"></i>
-        <span>{{ t('nav.reports') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('notifications') }" :to="{ name: 'notifications' }" @click="close">
-        <i class="bi bi-bell"></i>
-        <span>{{ t('nav.notifications') }}</span>
-      </RouterLink>
-      <RouterLink
-        class="sidebar-link"
-        :class="{ active: isActive('settings') && !isSettingsTab('payment') && !isSettingsTab('zego') }"
-        :to="{ name: 'settings' }"
-        @click="close"
-      >
-        <i class="bi bi-gear"></i>
-        <span>{{ t('nav.settings') }}</span>
-      </RouterLink>
-      <RouterLink class="sidebar-link" :class="{ active: isActive('logs') }" :to="{ name: 'logs' }" @click="close">
-        <i class="bi bi-journal-text"></i>
-        <span>{{ t('nav.logs') }}</span>
-      </RouterLink>
+        <button
+          type="button"
+          class="nav-section-toggle"
+          @click="toggleSection(section.id)"
+        >
+          <span>{{ section.label }}</span>
+          <i class="bi bi-chevron-down"></i>
+        </button>
+        <div class="nav-section-body">
+          <div class="nav-section-inner">
+            <RouterLink
+              v-for="item in section.items"
+              :key="item.name + String(item.query?.tab || '')"
+              class="sidebar-link"
+              :class="{ active: isItemActive(item) }"
+              :to="itemTo(item)"
+              @click="close"
+            >
+              <i :class="['bi', item.icon]"></i>
+              <span>{{ item.label }}</span>
+            </RouterLink>
+          </div>
+        </div>
+      </div>
     </nav>
   </aside>
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { settingsApi } from '@/api'
+import brandLogo from '@/assets/brand/logo.png'
 
 defineProps({
   open: { type: Boolean, default: false },
@@ -178,16 +57,125 @@ defineProps({
 const emit = defineEmits(['close'])
 const route = useRoute()
 const { t } = useI18n()
-const logoUrl = '/logo.png'
+const logoUrl = brandLogo
 const femaleVerifyEnabled = ref(false)
+const COLLAPSE_KEY = 'jeho_admin_nav_collapse'
 
-function isActive(name) {
-  if (name === 'users') return route.name === 'users' || route.name === 'user-detail'
-  return route.name === name
+const collapsed = reactive({})
+
+function loadCollapse() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '{}')
+    Object.assign(collapsed, raw)
+  } catch {
+    /* ignore */
+  }
 }
 
-function isSettingsTab(tab) {
-  return route.name === 'settings' && String(route.query.tab || '') === tab
+function persistCollapse() {
+  try {
+    localStorage.setItem(COLLAPSE_KEY, JSON.stringify({ ...collapsed }))
+  } catch {
+    /* ignore */
+  }
+}
+
+function toggleSection(id) {
+  collapsed[id] = !collapsed[id]
+  persistCollapse()
+}
+
+const sections = computed(() => [
+  {
+    id: 'overview',
+    label: t('nav.overview'),
+    items: [
+      { name: 'dashboard', icon: 'bi-speedometer2', label: t('nav.dashboard') },
+      { name: 'policy-brochure', icon: 'bi-file-earmark-pdf', label: t('nav.policyBrochure') },
+    ],
+  },
+  {
+    id: 'community',
+    label: t('nav.community'),
+    items: [
+      { name: 'users', icon: 'bi-people', label: t('nav.users'), also: ['user-detail'] },
+      { name: 'agencies', icon: 'bi-building', label: t('nav.agencies') },
+      ...(femaleVerifyEnabled.value
+        ? [{ name: 'gender-verifications', icon: 'bi-person-check', label: t('nav.genderVerifications') }]
+        : []),
+    ],
+  },
+  {
+    id: 'live',
+    label: t('nav.liveRooms'),
+    items: [
+      { name: 'rooms', icon: 'bi-door-open', label: t('nav.rooms') },
+      { name: 'settings', query: { tab: 'zego' }, icon: 'bi-broadcast-pin', label: t('nav.zegoSettings') },
+    ],
+  },
+  {
+    id: 'money',
+    label: t('nav.monetization'),
+    items: [
+      { name: 'gifts', icon: 'bi-gift', label: t('nav.gifts') },
+      { name: 'coins', icon: 'bi-coin', label: t('nav.coins') },
+      { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
+      { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
+      { name: 'wallet', icon: 'bi-wallet2', label: t('nav.wallet') },
+      { name: 'settings', query: { tab: 'payment' }, icon: 'bi-credit-card', label: t('nav.paymentSettings') },
+      { name: 'recharge-agents', icon: 'bi-person-badge', label: t('nav.rechargeAgents') },
+      { name: 'vip', icon: 'bi-diamond', label: t('nav.vip') },
+      { name: 'vanity-ids', icon: 'bi-hash', label: t('nav.vanityIds') },
+    ],
+  },
+  {
+    id: 'engage',
+    label: t('nav.engagement'),
+    items: [
+      { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
+      { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
+      { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
+      { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
+      { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
+      { name: 'contests', icon: 'bi-trophy', label: t('nav.contests') },
+      { name: 'ranking', icon: 'bi-bar-chart', label: t('nav.ranking') },
+      { name: 'room-cup', icon: 'bi-trophy-fill', label: t('nav.roomCup') },
+      { name: 'games', icon: 'bi-controller', label: t('nav.games') },
+      { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
+      { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
+    ],
+  },
+  {
+    id: 'ops',
+    label: t('nav.ops'),
+    items: [
+      { name: 'reports', icon: 'bi-flag', label: t('nav.reports') },
+      { name: 'notifications', icon: 'bi-bell', label: t('nav.notifications') },
+      { name: 'settings', icon: 'bi-gear', label: t('nav.settings'), settingsRoot: true },
+      { name: 'logs', icon: 'bi-journal-text', label: t('nav.logs') },
+    ],
+  },
+])
+
+const visibleSections = computed(() =>
+  sections.value.filter((s) => s.items && s.items.length > 0),
+)
+
+function itemTo(item) {
+  if (item.query) return { name: item.name, query: item.query }
+  return { name: item.name }
+}
+
+function isItemActive(item) {
+  if (item.settingsRoot) {
+    return route.name === 'settings'
+      && !route.query.tab
+  }
+  if (item.query?.tab) {
+    return route.name === 'settings' && String(route.query.tab || '') === item.query.tab
+  }
+  if (item.also?.includes(route.name)) return true
+  return route.name === item.name
 }
 
 function close() {
@@ -215,7 +203,10 @@ async function loadFeatureFlags() {
   femaleVerifyEnabled.value = readFeatureFlag(data?.data ?? data)
 }
 
-onMounted(loadFeatureFlags)
+onMounted(() => {
+  loadCollapse()
+  loadFeatureFlags()
+})
 
 watch(
   () => route.name,

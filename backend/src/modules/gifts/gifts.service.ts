@@ -628,24 +628,11 @@ export class GiftsService implements OnModuleInit {
 
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = senderId === dto.receiverId;
+    // Room owner / host / anyone: never gift yourself (no self-support).
     if (selfGift) {
-      // Mikoo parity: only the live/room host may gift themselves (room support effect).
-      if (!dto.roomId) {
-        throw new BadRequestException(
-          'الدعم الذاتي غير مسموح — لا يمكن إرسال هدية لنفسك',
-        );
-      }
-      const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
-      if (!room) throw new NotFoundException('Room not found');
-      const isRoomHost =
-        room.hostId === senderId ||
-        room.activeHostId === senderId ||
-        (room as any).cohostId === senderId;
-      if (!isRoomHost) {
-        throw new BadRequestException(
-          'فقط مضيف الغرفة يمكنه إرسال هدية لنفسه',
-        );
-      }
+      throw new BadRequestException(
+        'الدعم الذاتي غير مسموح — لا يمكن إرسال هدية لنفسك',
+      );
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
     if (!gift) throw new NotFoundException('Gift not found');
@@ -1138,11 +1125,15 @@ export class GiftsService implements OnModuleInit {
     const rawIds = Array.isArray(dto.receiverIds) ? dto.receiverIds : [];
     const receiverIds = [
       ...new Set(
-        rawIds.map((id) => String(id || '').trim()).filter((id) => id.length > 0),
+        rawIds
+          .map((id) => String(id || '').trim())
+          .filter((id) => id.length > 0 && id !== senderId),
       ),
     ].slice(0, 20);
     if (receiverIds.length === 0) {
-      throw new BadRequestException('No mic recipients');
+      throw new BadRequestException(
+        'الدعم الذاتي غير مسموح — اختر مستلمين آخرين على المايك',
+      );
     }
     if (receiverIds.length === 1) {
       return this.send(senderId, {
@@ -1569,8 +1560,7 @@ export class GiftsService implements OnModuleInit {
   }
 
   /**
-   * Mikoo-style global toast: big lucky hits (500+ gift tier / big × / big win)
-   * broadcast to every connected client (home, chats, any room).
+   * Global toast for OUR lucky gifts only (catalog lucky_* rolls) — not invented Mikoo packs.
    */
   private broadcastLuckyCelebration(opts: {
     roomId?: string;
@@ -1593,17 +1583,19 @@ export class GiftsService implements OnModuleInit {
     if (!notable || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
+    const times = Math.max(1, Math.round(mul));
+    const giftLabel = (opts.giftName || '').trim();
     const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
     const body = soft
-      ? `${name} ضرب حظه · مردود +${won}`
-      : `${name} ضرب حظه وربح ×${Math.max(1, Math.round(mul))} · +${won}`;
+      ? `${name} أرسل ${giftLabel || 'هدية حظ'} · مردود +${won}`
+      : `${name} أرسل ${giftLabel || 'هدية حظ'} للفوز بـ ${won} عملة. (${times} مرة)`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
       id: `lucky:${opts.senderId}:${Date.now()}`,
       userId: opts.senderId,
       displayName: name,
       avatarUrl: opts.avatarUrl || '',
-      giftName: opts.giftName || '',
+      giftName: giftLabel,
       giftIconUrl: opts.giftIconUrl || '',
       multiplier: mul,
       coinsWon: won,

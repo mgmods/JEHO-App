@@ -109,11 +109,23 @@ public final class RoomCardBinder {
     }
 
     /**
-     * HotTop 1/2/3 assets are for Mikoo dynamic/topics — not room cards.
-     * Never invent ranks on list positions.
+     * Mikoo HotTop 1/2/3 — only for top explore ranks from server list order.
      */
     private static void bindHotTop(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
         if (b.imgHotTop != null) b.imgHotTop.setVisibility(View.GONE);
+        if (b.tvHotTop == null) return;
+        int rank = room.exploreRank;
+        if (rank < 1 || rank > 3) {
+            b.tvHotTop.setVisibility(View.GONE);
+            return;
+        }
+        b.tvHotTop.setText(String.valueOf(rank));
+        int bg = rank == 1 ? R.drawable.bg_hot_rank_1
+                : rank == 2 ? R.drawable.bg_hot_rank_2
+                : R.drawable.bg_hot_rank_3;
+        b.tvHotTop.setBackgroundResource(bg);
+        b.tvHotTop.setVisibility(View.VISIBLE);
+        b.tvHotTop.setContentDescription("Top " + rank);
     }
 
     private static void bindCountryFlag(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
@@ -123,37 +135,9 @@ public final class RoomCardBinder {
 
     /** Mikoo VipIdView — room display ID on curved level banner (ID badge + number). */
     private static void bindPrettyId(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
-        if (b.rowPrettyId == null || b.tvPrettyId == null) return;
-        String id = room.displayRoomId;
-        if (id == null || id.trim().isEmpty()) {
-            if (room.host != null) id = room.host.displayPublicId();
-        }
-        if (id == null || id.trim().isEmpty()) {
-            b.rowPrettyId.setVisibility(View.GONE);
-            return;
-        }
-        id = id.trim();
-        // Banner already paints "ID"; show the large number next to it.
-        b.tvPrettyId.setText(id);
-        if (b.imgPrettyIdBg != null) {
-            int level = Math.max(1, room.roomLevel);
-            int idx = Math.min(PRETTY_ID_BG.length - 1, level - 1);
-            b.imgPrettyIdBg.setImageResource(PRETTY_ID_BG[idx]);
-            b.tvPrettyId.post(() -> {
-                if (b.imgPrettyIdBg == null || b.tvPrettyId == null) return;
-                int w = Math.max(b.tvPrettyId.getMeasuredWidth(), b.tvPrettyId.getMinWidth());
-                if (w <= 0) w = b.tvPrettyId.getWidth();
-                if (w > 0) {
-                    ViewGroup.LayoutParams lp = b.imgPrettyIdBg.getLayoutParams();
-                    if (lp != null && lp.width != w) {
-                        lp.width = w;
-                        b.imgPrettyIdBg.setLayoutParams(lp);
-                    }
-                }
-            });
-        }
-        b.rowPrettyId.setVisibility(View.VISIBLE);
-        b.rowPrettyId.setContentDescription("ID " + id);
+        if (b.rowPrettyId == null) return;
+        // Home room cards: no pretty ID row (requested).
+        b.rowPrettyId.setVisibility(View.GONE);
     }
 
     private static void bindCover(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {

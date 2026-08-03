@@ -377,7 +377,8 @@
 <string name="room_photo_upload_failed">Failed to upload room photo</string>
 <string name="room_open">OPEN</string>
 <string name="room_badge_personal">Personal room</string>
-<string name="room_badge_agency">Agency</string>
+    <string name="room_badge_agency">Agency</string>
+    <string name="room_badge_support">Customer service</string>
 <string name="withdraw_pick_recharge_agent">Choose a recharge agent</string>
 <string name="connection_slow_retrying">Connection is slow — retrying…</string>
 <string name="microphone_on">Microphone on</string>
@@ -842,6 +843,8 @@
 <string name="notif_chat_dismiss">Close</string>
 <string name="notif_room_mic">Mic</string>
 <string name="notif_room_mic_off">Muted</string>
+<string name="notif_room_speaker_on">Sound</string>
+<string name="notif_room_speaker_off">Silent</string>
 <string name="notif_room_leave">Leave</string>
 <string name="notif_room_channel">Active voice room</string>
 <string name="notif_room_channel_desc">Professional room controls while minimized</string>
@@ -852,6 +855,8 @@
 <string name="notif_engage_badge_tasks">DAILY TASKS</string>
 <string name="notif_engage_tasks_title">Your rewards are waiting</string>
 <string name="notif_engage_tasks_body">Complete today’s tasks and claim free coins &amp; gifts.</string>
+<string name="notif_engage_tasks_pending_title">You have %d tasks today</string>
+<string name="notif_engage_tasks_claimable_title">%d tasks ready to claim</string>
 <string name="notif_engage_badge_rooms">LIVE ROOMS</string>
 <string name="notif_engage_rooms_title">Rooms are heating up</string>
 <string name="notif_engage_rooms_body">Join a live room now — friends and hosts are online.</string>

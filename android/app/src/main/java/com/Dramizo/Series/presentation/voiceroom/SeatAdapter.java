@@ -62,6 +62,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     private final Map<String, String> activeReactionKeys = new HashMap<>();
     private final Map<String, Runnable> hideReactionRunnables = new HashMap<>();
     private final Map<String, Long> giftCoinsByUser = new HashMap<>();
+    /** Users highlighted as gift targets while GiftBottomSheet is open. */
+    private final Set<String> giftSelectedUsers = new HashSet<>();
+    private boolean giftSelectionActive;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int scaleMode = SCALE_NORMAL;
     private boolean selfMicMuted;
@@ -311,6 +314,33 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         notifyGift(key);
     }
 
+    /**
+     * While gift sheet is open: teal ring + underline under selected seats (Mikoo).
+     * Pass null/empty to clear.
+     */
+    public void setGiftSelectedUsers(@Nullable Set<String> userIds) {
+        giftSelectedUsers.clear();
+        if (userIds != null) {
+            for (String id : userIds) {
+                String key = normalizeUserId(id);
+                if (!key.isEmpty()) giftSelectedUsers.add(key);
+            }
+        }
+        giftSelectionActive = !giftSelectedUsers.isEmpty();
+        for (int i = 0; i < items.size(); i++) {
+            notifyItemChanged(i, "gift_select");
+        }
+    }
+
+    public void clearGiftSelection() {
+        if (!giftSelectionActive && giftSelectedUsers.isEmpty()) return;
+        giftSelectedUsers.clear();
+        giftSelectionActive = false;
+        for (int i = 0; i < items.size(); i++) {
+            notifyItemChanged(i, "gift_select");
+        }
+    }
+
     private void notifyGift(String userId) {
         for (int i = 0; i < items.size(); i++) {
             if (userId.equals(seatUserId(items.get(i)))) {
@@ -470,6 +500,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     bindReaction(holder, userId);
                 } else if ("gift".equals(p)) {
                     bindGiftCount(holder, userId);
+                } else if ("gift_select".equals(p)) {
+                    bindGiftSelection(holder, userId);
                 } else if ("mute".equals(p)) {
                     if (holder.b.imgMuted != null) {
                         boolean show = seat != null && (seat.isMuted || seat.isModeratorMuted);
@@ -563,6 +595,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (holder.b.tvGiftCount != null) {
                 holder.b.tvGiftCount.setVisibility(View.GONE);
             }
+            bindGiftSelection(holder, null);
             return;
         }
 
@@ -621,6 +654,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
 
             bindGiftCount(holder, userId);
+            bindGiftSelection(holder, userId);
 
             if (holder.b.imgSeatHostMark != null) {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
@@ -661,6 +695,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         clearHostWear(holder);
         clearReactionView(holder);
         bindSpeaking(holder, false);
+        bindGiftSelection(holder, null);
     }
 
     /** Host is index 0 (center stage). Guest seats are 1..N shown as-is. */
@@ -802,7 +837,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             coin = coin.mutate();
             coin.setBounds(0, 0, coinPx, coinPx);
             holder.b.tvGiftCount.setCompoundDrawablesRelative(coin, null, null, null);
-            holder.b.tvGiftCount.setCompoundDrawablePadding(Math.round(3 * holder.itemView.getResources().getDisplayMetrics().density));
+            holder.b.tvGiftCount.setCompoundDrawablePadding(
+                    Math.round(3 * holder.itemView.getResources().getDisplayMetrics().density));
         }
         if (holder.lastGiftCoins != coins) {
             holder.lastGiftCoins = coins;
@@ -814,6 +850,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     .scaleY(1f)
                     .setDuration(220)
                     .start();
+        }
+    }
+
+    private void bindGiftSelection(VH holder, @Nullable String userId) {
+        boolean on = giftSelectionActive
+                && userId != null
+                && !userId.isEmpty()
+                && giftSelectedUsers.contains(userId);
+        if (holder.b.giftSelectRing != null) {
+            holder.b.giftSelectRing.setVisibility(on ? View.VISIBLE : View.GONE);
+        }
+        if (holder.b.giftSelectUnderline != null) {
+            holder.b.giftSelectUnderline.setVisibility(on ? View.VISIBLE : View.GONE);
         }
     }
 

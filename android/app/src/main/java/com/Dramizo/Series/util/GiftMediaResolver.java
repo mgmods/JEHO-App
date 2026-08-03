@@ -69,7 +69,11 @@ public final class GiftMediaResolver {
         if (u.contains("rocket") || u.contains("صاروخ") || u.contains("meteor") || u.contains("نيزك")) {
             return entry("entry_mikoo_177_glory_kick.mp4");
         }
-        if (u.contains("fireworks") || u.contains("ألعاب") || u.contains("galaxy") || u.contains("مجرة")) {
+        if (u.contains("fireworks") || u.contains("ألعاب") || u.contains("galaxy")
+                || u.contains("مجرة") || u.contains("champagne") || u.contains("gift-champagne")) {
+            return entry("entry_mikoo_267_winning_the_championship.mp4");
+        }
+        if (u.contains("planet") || u.contains("saturn") || u.contains("earth") || u.contains("كوكب")) {
             return entry("entry_mikoo_267_winning_the_championship.mp4");
         }
         if (u.contains("mikoo_gift_cache") || u.contains("/anims/")) {
@@ -113,13 +117,20 @@ public final class GiftMediaResolver {
         if (containsAny(n, "rocket", "صاروخ", "meteor", "نيزك", "plane")) {
             return entry("entry_mikoo_177_glory_kick.mp4");
         }
-        if (containsAny(n, "fireworks", "ألعاب نارية", "galaxy", "مجرة", "champagne", "شامبانيا")) {
+        if (containsAny(n, "fireworks", "ألعاب نارية", "galaxy", "مجرة", "champagne", "شامبانيا",
+                "احتفال", "فاخر")) {
+            return entry("entry_mikoo_267_winning_the_championship.mp4");
+        }
+        if (containsAny(n, "planet", "كوكب", "saturn", "earth")) {
             return entry("entry_mikoo_267_winning_the_championship.mp4");
         }
         if (containsAny(n, "castle", "قلعة", "diamond", "ألماس", "ring", "خاتم")) {
             return entry("entry_mikoo_268_royal_family.mp4");
         }
         if (containsAny(n, "heart", "قلب", "rose", "وردة", "teddy", "دب")) {
+            return entry("entry_mikoo_260_happy_football.mp4");
+        }
+        if (containsAny(n, "egg", "بيضة", "بيضه", "icecream", "آيس", "ايس")) {
             return entry("entry_mikoo_260_happy_football.mp4");
         }
         if (containsAny(n, "guitar", "غيتار", "microphone", "ميكروفون", "piano", "بيانو", "drums", "طبول")) {

@@ -141,10 +141,9 @@ public final class AuraNotificationHelper {
             contentBitmap = circularLauncherIcon(context);
         }
 
-        boolean isChat = "chat".equalsIgnoreCase(type);
-        int compactLayout = isChat
-                ? R.layout.notification_chat_compact
-                : R.layout.notification_auralive_compact;
+        boolean isChat = "chat".equalsIgnoreCase(type) || "message".equalsIgnoreCase(type);
+        // One style for all alerts: compact horizontal, circular avatar on the LEFT.
+        int compactLayout = R.layout.notification_auralive_compact;
         int expandedLayout = isChat
                 ? R.layout.notification_chat_expanded
                 : R.layout.notification_auralive_expanded;
@@ -167,6 +166,8 @@ public final class AuraNotificationHelper {
             expanded.setImageViewResource(R.id.imgNotificationContent, fallbackIcon);
         }
         if (isChat) {
+            expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.VISIBLE);
+            expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.GONE);
             expanded.setOnClickPendingIntent(R.id.btnNotifOpen, pi);
             Intent dismiss = new Intent(context, NotificationDismissReceiver.class);
             dismiss.putExtra(NotificationDismissReceiver.EXTRA_NOTIFICATION_ID, notificationId);
@@ -177,18 +178,23 @@ public final class AuraNotificationHelper {
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
             expanded.setOnClickPendingIntent(R.id.btnNotifDismiss, dismissPi);
         } else {
+            expanded.setViewVisibility(R.id.rowNotifChatActions, android.view.View.GONE);
+            expanded.setViewVisibility(R.id.tvNotificationAction, android.view.View.VISIBLE);
             expanded.setTextViewText(R.id.tvNotificationAction, actionLabelForType(type));
         }
 
         // Custom RemoteViews only: one avatar inside the layout.
         // No setLargeIcon / no DecoratedCustomViewStyle — those duplicate the photo / app icon.
+        // Heads-up always uses COMPACT (never the tall expanded card).
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_jeho)
                 .setColor(ContextCompat.getColor(context, R.color.aurora_teal))
                 .setContentTitle(title)
                 .setContentText(body)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setCategory(isChat
+                        ? NotificationCompat.CATEGORY_MESSAGE
+                        : NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setAutoCancel(true)
@@ -196,7 +202,7 @@ public final class AuraNotificationHelper {
                 .setContentIntent(pi)
                 .setCustomContentView(compact)
                 .setCustomBigContentView(expanded)
-                .setCustomHeadsUpContentView(isChat ? expanded : compact);
+                .setCustomHeadsUpContentView(compact);
 
         try {
             if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;

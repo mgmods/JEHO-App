@@ -239,6 +239,7 @@ public class AuraLiveApp extends Application {
                     String avatar = jsonString(payload, "avatarUrl", null);
                     String displayName = jsonString(payload, "displayName", null);
                     String kind = jsonString(payload, "kind", null);
+                    String roomId = jsonString(payload, "roomId", null);
                     String badgeCandidate = jsonString(payload, "giftIconUrl", null);
                     if (badgeCandidate == null || badgeCandidate.isEmpty()) {
                         badgeCandidate = jsonString(payload, "gameIconUrl", null);
@@ -251,8 +252,11 @@ public class AuraLiveApp extends Application {
                     long coinsWon = jsonLong(payload, "coinsWon", 0L);
                     if (coinsWon <= 0L) coinsWon = jsonLong(payload, "winCoins", 0L);
                     String gameTitle = jsonString(payload, "gameTitle", null);
+                    int multiplier = (int) Math.max(0L, jsonLong(payload, "multiplier", 0L));
                     final long coinsFinal = coinsWon;
                     final String gameFinal = gameTitle;
+                    final int mulFinal = multiplier;
+                    final String roomFinal = roomId;
                     final boolean appVisible = isAppInForeground();
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
                     Activity activity = foregroundActivity;
@@ -261,7 +265,7 @@ public class AuraLiveApp extends Application {
                     if (aliveRoom != null) {
                         aliveRoom.runOnUiThread(() -> aliveRoom.onGlobalCelebration(
                                 kind, title, body, displayName, avatar, badge, dedupe,
-                                coinsFinal, gameFinal));
+                                coinsFinal, gameFinal, roomFinal));
                         if (!appVisible) {
                             showCelebrationSystemNotification(title, body, avatar, dedupe);
                         }
@@ -273,10 +277,11 @@ public class AuraLiveApp extends Application {
                             if (activity instanceof VoiceRoomActivity room) {
                                 room.onGlobalCelebration(
                                         kind, title, body, displayName, avatar, badge, dedupe,
-                                        coinsFinal, gameFinal);
+                                        coinsFinal, gameFinal, roomFinal);
                             } else {
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
-                                        activity, title, body, avatar, badge, dedupe);
+                                        activity, title, body, avatar, badge, dedupe,
+                                        28, mulFinal, coinsFinal, displayName, kind, roomFinal);
                             }
                         });
                         return;

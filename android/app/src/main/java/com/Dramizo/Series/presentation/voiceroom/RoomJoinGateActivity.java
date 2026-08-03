@@ -48,6 +48,11 @@ public class RoomJoinGateActivity extends AppCompatActivity {
             return;
         }
         final String id = roomId.trim();
+        // Already live in-process (minimized) — skip gate loading / GET, reopen UI instantly.
+        if (com.Dramizo.Series.util.ActiveRoomSession.get().canResumeUi(id)) {
+            openLiveRoom(id, password);
+            return;
+        }
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(id);
@@ -83,16 +88,11 @@ public class RoomJoinGateActivity extends AppCompatActivity {
     }
 
     private void probeJoin(AppContainer c, String id, String password) {
-        c.getIoExecutor().execute(() -> {
-            Result<RoomDtos.JoinRoomResult> join = c.joinRoomUseCase.execute(id, password);
-            runOnUiThread(() -> {
-                if (isFinishing()) return;
-                if (join.success && join.data != null) {
-                    openLiveRoom(id, password);
-                    return;
-                }
-                finishQuiet(getString(R.string.room_not_live));
-            });
+        // Never HTTP-join here — that doubles join when VoiceRoomActivity joins again.
+        // Unknown GET failures still open Activity; join/password errors handled there.
+        runOnUiThread(() -> {
+            if (isFinishing()) return;
+            openLiveRoom(id, password);
         });
     }
 

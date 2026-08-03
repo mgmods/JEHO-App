@@ -283,8 +283,9 @@ public class RealtimeClient {
     }
 
     public void leaveRoom(String roomId) {
-        if (roomId == null || roomId.isEmpty() || socket == null) return;
-        if (!joinedRooms.remove(roomId)) return;
+        if (roomId == null || roomId.isEmpty()) return;
+        joinedRooms.remove(roomId);
+        if (socket == null) return;
         try {
             JSONObject body = new JSONObject();
             body.put("roomId", roomId);
@@ -292,6 +293,11 @@ public class RealtimeClient {
         } catch (JSONException e) {
             Log.w(TAG, "leaveRoom failed", e);
         }
+    }
+
+    /** True when this process already completed a successful room:join for the id. */
+    public boolean isJoinedRoom(@Nullable String roomId) {
+        return roomId != null && !roomId.isEmpty() && joinedRooms.contains(roomId);
     }
 
     public void joinConversation(String conversationId) {
@@ -407,14 +413,8 @@ public class RealtimeClient {
         for (RoomListener l : roomListeners) l.onConnected();
         for (ChatListener l : chatListeners) l.onConnected();
         for (UserListener l : userListeners) l.onConnected();
-        for (String roomId : new HashSet<>(joinedRooms)) {
-            try {
-                JSONObject body = new JSONObject();
-                body.put("roomId", roomId);
-                if (socket != null) socket.emit("room:join", body);
-            } catch (JSONException ignored) {
-            }
-        }
+        // Room re-join is owned by VoiceRoomActivity.connectRealtimeRoom (full profile).
+        // Skipping bare room:join here avoids double presence traffic on every reconnect.
         for (String cid : new HashSet<>(joinedConversations)) {
             try {
                 JSONObject body = new JSONObject();

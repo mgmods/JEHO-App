@@ -724,6 +724,8 @@ public class HomeFragment extends Fragment {
         if (pwd != null && !pwd.isEmpty()) {
             i.putExtra(VoiceRoomActivity.EXTRA_PASSWORD, pwd);
         }
+        // Bring existing singleTask room to front when reopening same live session.
+        i.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         startActivity(i);
     }
 

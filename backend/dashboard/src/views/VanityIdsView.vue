@@ -1,6 +1,9 @@
 <template>
   <div>
-    <PageHeader title="الآي دي المميز" subtitle="إنشاء وحجز وبيع أرقام عامة مميزة للمستخدمين" />
+    <PageHeader
+      title="الآي دي المميز"
+      subtitle="أنشئ أرقاماً للبيع هنا — المستخدم يشتريها من التطبيق (ملف الشخصي → الآي دي المميز) بالكوينز ويستبدل آيديه الحالي"
+    />
     <AlertMessage v-if="error" :message="error" type="danger" class="mb-3" />
     <AlertMessage v-if="ok" :message="ok" type="success" class="mb-3" />
 

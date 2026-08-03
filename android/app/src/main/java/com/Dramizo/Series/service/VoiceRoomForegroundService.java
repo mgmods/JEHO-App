@@ -46,6 +46,7 @@ public class VoiceRoomForegroundService extends Service {
     private static final String ACTION_START = "room.service.START";
     private static final String ACTION_LEAVE = "room.service.LEAVE";
     private static final String ACTION_TOGGLE_MIC = "room.service.TOGGLE_MIC";
+    private static final String ACTION_TOGGLE_SPEAKER = "room.service.TOGGLE_SPEAKER";
     private static final String ACTION_UI_ATTACHED = "room.service.UI_ATTACHED";
     private static final String ACTION_UI_EXIT = "room.service.UI_EXIT";
     private static final String EXTRA_ROOM_ID = "roomId";
@@ -70,8 +71,9 @@ public class VoiceRoomForegroundService extends Service {
                 @Override public void onStreamAdded(String streamId) {
                     String mine = ZegoEngineManager.audioStreamId(
                             ZegoEngineManager.getInstance().getCurrentUserId());
-                    if (streamId != null && !streamId.equals(mine)
-                            && !streamId.endsWith("_host")) {
+                    // Play every remote stream including host (_host) — needed while minimized.
+                    if (streamId != null && !streamId.equals(mine)) {
+                        ZegoEngineManager.getInstance().setSpeakerMuted(false);
                         ZegoEngineManager.getInstance().startPlayingAudio(streamId);
                     }
                 }
@@ -335,6 +337,10 @@ public class VoiceRoomForegroundService extends Service {
             toggleMicFromNotification();
             return START_STICKY;
         }
+        if (ACTION_TOGGLE_SPEAKER.equals(action)) {
+            toggleSpeakerFromNotification();
+            return START_STICKY;
+        }
         if (ACTION_UI_EXIT.equals(action)) {
             stopBackgroundOwner(true);
             return START_NOT_STICKY;
@@ -359,6 +365,11 @@ public class VoiceRoomForegroundService extends Service {
                 .putString(EXTRA_TITLE, roomTitle)
                 .putString(EXTRA_COVER, roomCoverUrl)
                 .apply();
+        // Keep hearing the room while minimized (never leave speaker muted from Activity onStop).
+        try {
+            ZegoEngineManager.getInstance().setSpeakerMuted(false);
+        } catch (Exception ignored) {
+        }
         int foregroundTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED
@@ -385,8 +396,29 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleMicFromNotification() {
-        boolean currentlyOn = ZegoEngineManager.getInstance().isPublishing();
-        ZegoEngineManager.getInstance().setMicEnabled(!currentlyOn);
+        // Must use isMicEnabled — isPublishing stays true while mic is soft-muted.
+        boolean nextOn = !ZegoEngineManager.getInstance().isMicEnabled();
+        ZegoEngineManager.getInstance().setMicEnabled(nextOn);
+        final String rid = roomId;
+        if (rid != null && !rid.isEmpty()) {
+            try {
+                AppContainer container = ((AuraLiveApp) getApplication()).getContainer();
+                final boolean muted = !nextOn;
+                container.getIoExecutor().execute(() ->
+                        container.getRoomRepository().setMic(rid, muted));
+            } catch (Exception ignored) {
+            }
+        }
+        refreshNotificationUi();
+    }
+
+    private void toggleSpeakerFromNotification() {
+        boolean nextMuted = !ZegoEngineManager.getInstance().isSpeakerMuted();
+        ZegoEngineManager.getInstance().setSpeakerMuted(nextMuted);
+        refreshNotificationUi();
+    }
+
+    private void refreshNotificationUi() {
         try {
             NotificationManagerCompat.from(this)
                     .notify(NOTIFICATION_ID, buildForegroundNotification());
@@ -458,8 +490,10 @@ public class VoiceRoomForegroundService extends Service {
         PendingIntent openIntent = openRoomIntent();
         PendingIntent leaveIntent = serviceAction(ACTION_LEAVE, 7302);
         PendingIntent micIntent = serviceAction(ACTION_TOGGLE_MIC, 7305);
+        PendingIntent speakerIntent = serviceAction(ACTION_TOGGLE_SPEAKER, 7306);
 
-        boolean micOn = ZegoEngineManager.getInstance().isPublishing();
+        boolean micOn = ZegoEngineManager.getInstance().isMicEnabled();
+        boolean speakerOn = !ZegoEngineManager.getInstance().isSpeakerMuted();
         String title = roomTitle != null && !roomTitle.isEmpty()
                 ? roomTitle : getString(R.string.voice_room);
 
@@ -468,8 +502,10 @@ public class VoiceRoomForegroundService extends Service {
         android.widget.RemoteViews expanded = new android.widget.RemoteViews(
                 getPackageName(), R.layout.notification_voice_room_expanded);
 
-        bindRoomRemoteViews(compact, title, micOn, openIntent, micIntent, leaveIntent);
-        bindRoomRemoteViews(expanded, title, micOn, openIntent, micIntent, leaveIntent);
+        bindRoomRemoteViews(compact, title, micOn, speakerOn,
+                openIntent, micIntent, speakerIntent, leaveIntent);
+        bindRoomRemoteViews(expanded, title, micOn, speakerOn,
+                openIntent, micIntent, speakerIntent, leaveIntent);
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_jeho)
@@ -486,6 +522,11 @@ public class VoiceRoomForegroundService extends Service {
                 .setOnlyAlertOnce(true)
                 .setShowWhen(false)
                 .setColor(0xFF6C5CE7)
+                .addAction(0, getString(R.string.notif_room_mic), micIntent)
+                .addAction(0, speakerOn
+                        ? getString(R.string.notif_room_speaker_on)
+                        : getString(R.string.notif_room_speaker_off), speakerIntent)
+                .addAction(0, getString(R.string.notif_room_leave), leaveIntent)
                 .build();
     }
 
@@ -493,8 +534,10 @@ public class VoiceRoomForegroundService extends Service {
             android.widget.RemoteViews views,
             String title,
             boolean micOn,
+            boolean speakerOn,
             PendingIntent openIntent,
             PendingIntent micIntent,
+            PendingIntent speakerIntent,
             PendingIntent leaveIntent
     ) {
         views.setTextViewText(R.id.tvRoomTitle, title);
@@ -514,12 +557,24 @@ public class VoiceRoomForegroundService extends Service {
         views.setOnClickPendingIntent(R.id.btnNotifLeave, leaveIntent);
         views.setOnClickPendingIntent(R.id.btnNotifMic, micIntent);
         try {
+            views.setOnClickPendingIntent(R.id.btnNotifSpeaker, speakerIntent);
+        } catch (Exception ignored) {
+        }
+        try {
             views.setImageViewResource(R.id.imgNotifMic,
                     micOn ? R.drawable.ic_pro_mic : R.drawable.ic_room_mic_muted);
             views.setTextViewText(R.id.tvNotifMic,
                     micOn ? getString(R.string.notif_room_mic) : getString(R.string.notif_room_mic_off));
         } catch (Exception ignored) {
-            // Compact layout has no mic image/text ids.
+        }
+        try {
+            views.setImageViewResource(R.id.imgNotifSpeaker,
+                    speakerOn ? R.drawable.ic_room_speaker : R.drawable.ic_room_speaker_mute);
+            views.setTextViewText(R.id.tvNotifSpeaker,
+                    speakerOn
+                            ? getString(R.string.notif_room_speaker_on)
+                            : getString(R.string.notif_room_speaker_off));
+        } catch (Exception ignored) {
         }
     }
 

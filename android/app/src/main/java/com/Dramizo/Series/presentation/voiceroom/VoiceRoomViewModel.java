@@ -46,6 +46,14 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
+    /** Restore UI from an in-process minimized session — no network join. */
+    public void restoreLocalSession(RoomDtos.JoinRoomResult join, RoomDtos.RoomDto latest) {
+        if (join == null) return;
+        session.setValue(join);
+        if (latest != null) room.setValue(latest);
+        else if (join.room != null) room.setValue(join.room);
+    }
+
     public void refresh(String roomId) {
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(roomId);

@@ -64,11 +64,13 @@
     "banners": "البنرات",
     "coins": "باقات العملات",
     "offers": "العروض",
+    "promos": "العروض والترقيات",
     "wallet": "المحفظة",
     "paymentSettings": "إعدادات الدفع",
     "zegoSettings": "مفاتيح الصوت (Zego)",
     "rechargeAgents": "وكلاء الشحن",
     "vip": "العضوية المميزة (VIP)",
+    "vanityIds": "الآي دي المميز",
     "cosmetics": "متجر المظهر (إطارات ودخولية)",
     "contests": "المسابقات",
     "games": "الألعاب",
@@ -83,7 +85,8 @@
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
     "settings": "الإعدادات",
-    "logs": "السجلات"
+    "logs": "السجلات",
+    "policyBrochure": "سياسة المنصة PDF"
   },
   "routes": {
     "login": "تسجيل الدخول",
@@ -96,10 +99,12 @@
     "banners": "البنرات",
     "coins": "باقات العملات",
     "offers": "عروض المتجر",
+    "promos": "العروض والترقيات",
     "wallet": "المحفظة",
     "paymentSettings": "إعدادات الدفع",
     "zegoSettings": "إعدادات ZegoCloud",
     "vip": "العضوية المميزة",
+    "vanityIds": "الآي دي المميز",
     "cosmetics": "متجر المظهر",
     "contests": "المسابقات",
     "games": "الألعاب",
@@ -116,7 +121,8 @@
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
     "settings": "الإعدادات",
-    "logs": "السجلات"
+    "logs": "السجلات",
+    "policyBrochure": "سياسة المنصة PDF"
   },
   "login": {
     "title": "JEHO CHAT Admin",

@@ -1152,6 +1152,7 @@ public class BagActivity extends ThemedActivity {
                     TextView tvIndex = item.findViewById(R.id.tvStageIndex);
                     TextView tvTitle = item.findViewById(R.id.tvStageTitle);
                     TextView tvTh = item.findViewById(R.id.tvStageThreshold);
+                    TextView tvSalary = item.findViewById(R.id.tvStageSalary);
                     TextView tvReward = item.findViewById(R.id.tvStageReward);
                     TextView tvState = item.findViewById(R.id.tvStageState);
                     ImageView imgStatus = item.findViewById(R.id.imgStageStatus);
@@ -1173,6 +1174,13 @@ public class BagActivity extends ThemedActivity {
                             ? ((Number) s.get("rewardCoins")).longValue() : 0;
                     long rewardDiamonds = s.get("rewardDiamonds") instanceof Number
                             ? ((Number) s.get("rewardDiamonds")).longValue() : 0;
+                    double hostSalary = s.get("hostSalaryUsd") instanceof Number
+                            ? ((Number) s.get("hostSalaryUsd")).doubleValue() : 0;
+                    double agentSalary = s.get("agentSalaryUsd") instanceof Number
+                            ? ((Number) s.get("agentSalaryUsd")).doubleValue() : 0;
+                    double totalSalary = s.get("totalUsd") instanceof Number
+                            ? ((Number) s.get("totalUsd")).doubleValue()
+                            : hostSalary + agentSalary;
 
                     if (tvIndex != null) {
                         Object idxObj = s.get("index");
@@ -1182,10 +1190,21 @@ public class BagActivity extends ThemedActivity {
                     }
                     if (tvTitle != null) tvTitle.setText(title);
                     if (tvTh != null) {
-                        tvTh.setText(String.format(Locale.US, "الهدف: %,d ماسة", th));
+                        tvTh.setText(String.format(Locale.US,
+                                "التارجت: %,d كوين = %,d ألماسة", th, th));
+                    }
+                    if (tvSalary != null) {
+                        if (hostSalary > 0 || agentSalary > 0 || totalSalary > 0) {
+                            tvSalary.setVisibility(View.VISIBLE);
+                            tvSalary.setText(String.format(Locale.US,
+                                    "مضيف $%.0f · وكيل $%.0f · إجمالي $%.0f",
+                                    hostSalary, agentSalary, totalSalary));
+                        } else {
+                            tvSalary.setVisibility(View.GONE);
+                        }
                     }
                     if (tvReward != null) {
-                        StringBuilder reward = new StringBuilder("مكافأة: ");
+                        StringBuilder reward = new StringBuilder("مكافأة إضافية: ");
                         boolean any = false;
                         if (rewardCoins > 0) {
                             reward.append("+").append(String.format(Locale.US, "%,d", rewardCoins))
@@ -1216,8 +1235,12 @@ public class BagActivity extends ThemedActivity {
                             reward.append("VIP").append(vl).append(" · ").append(vd).append("ي");
                             any = true;
                         }
-                        if (!any) reward.append("—");
-                        tvReward.setText(reward.toString());
+                        if (!any) {
+                            tvReward.setVisibility(View.GONE);
+                        } else {
+                            tvReward.setVisibility(View.VISIBLE);
+                            tvReward.setText(reward.toString());
+                        }
                     }
 
                     if ("done".equals(status)) {

@@ -55,13 +55,20 @@ function mapByName(name: string): string | null {
   if (/(dragon|تنين|phoenix|عنقاء)/i.test(name)) return entry('entry_mikoo_264_majestic_lion_king.mp4');
   if (/(yacht|يخت|train|قطار|bike|دراجة)/i.test(name)) return entry('entry_mikoo_265_luxury_car_team.mp4');
   if (/(rocket|صاروخ|meteor|نيزك)/i.test(name)) return entry('entry_mikoo_177_glory_kick.mp4');
-  if (/(fireworks|galaxy|مجرة|champagne|شامبانيا)/i.test(name)) {
+  if (/(fireworks|galaxy|مجرة|champagne|شامبانيا|احتفال|فاخر)/i.test(name)) {
+    return entry('entry_mikoo_267_winning_the_championship.mp4');
+  }
+  if (/(planet|كوكب|saturn|earth)/i.test(name)) {
     return entry('entry_mikoo_267_winning_the_championship.mp4');
   }
   if (/(castle|قلعة|diamond|ألماس|ring|خاتم)/i.test(name)) {
     return entry('entry_mikoo_268_royal_family.mp4');
   }
   if (/(heart|قلب|rose|وردة|teddy|دب)/i.test(name)) return entry('entry_mikoo_260_happy_football.mp4');
+  if (/(egg|بيضة|بيضه|lucky.?egg)/i.test(name)) return entry('entry_mikoo_260_happy_football.mp4');
+  if (/(icecream|آيس|ايس.?كريم|ice.?cream)/i.test(name)) {
+    return entry('entry_mikoo_260_happy_football.mp4');
+  }
   if (/(guitar|غيتار|microphone|ميكروفون|piano|بيانو|drums|طبول)/i.test(name)) {
     return entry('entry_mikoo_208_shoter_wealth_top3.mp4');
   }
@@ -81,7 +88,11 @@ function mapByIcon(iconUrl: string): string | null {
   if (u.includes('crown') || u.includes('royal')) return entry('entry_mikoo_268_royal_family.mp4');
   if (u.includes('dragon')) return entry('entry_mikoo_264_majestic_lion_king.mp4');
   if (u.includes('rocket') || u.includes('meteor')) return entry('entry_mikoo_177_glory_kick.mp4');
-  if (u.includes('fireworks') || u.includes('galaxy')) {
+  if (u.includes('fireworks') || u.includes('galaxy') || u.includes('champagne')
+      || u.includes('gift-champagne')) {
+    return entry('entry_mikoo_267_winning_the_championship.mp4');
+  }
+  if (u.includes('planet') || u.includes('saturn') || u.includes('earth')) {
     return entry('entry_mikoo_267_winning_the_championship.mp4');
   }
   return null;

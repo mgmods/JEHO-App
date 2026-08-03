@@ -167,6 +167,11 @@ final class RoomMoreOperatorSheet {
                         : R.drawable.icon_room_opera_public_screen_close,
                 withState(host, R.string.room_more_chat_zone, host.chatZoneOn()),
                 "chat_zone"));
+        // Admin: wipe public chat for everyone in the room (socket room:chat_cleared).
+        list.add(item(
+                R.drawable.icon_room_opera_public_screen_close,
+                R.string.clear_room_chat,
+                "clear_chat"));
         list.add(item(
                 host.charmOn() ? R.drawable.icon_room_charm_open : R.drawable.icon_room_charm_close,
                 withState(host, R.string.room_more_charm, host.charmOn()),

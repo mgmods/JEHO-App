@@ -17,6 +17,10 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { VipService } from '../vip/vip.service';
+import {
+  salaryLadderToHostTargetStages,
+  stagesMissingSalaryFields,
+} from '../../common/host-salary-ladder';
 
 export type HostTargetStage = {
   id: string;
@@ -24,6 +28,14 @@ export type HostTargetStage = {
   rewardCoins: number;
   rewardDiamonds: number;
   title?: string;
+  /** Policy salary (USD) paid to host when stage is completed — display / settlement. */
+  hostSalaryUsd?: number;
+  /** Policy salary (USD) paid to agency/agent when stage is completed. */
+  agentSalaryUsd?: number;
+  /** hostSalaryUsd + agentSalaryUsd (cached for UI). */
+  totalUsd?: number;
+  /** Table rule: 1 target coin unit = 1 diamond for display. */
+  coinEqualsDiamond?: boolean;
   /** Optional mall cosmetic code (frame / entry / room card…). */
   rewardCosmeticCode?: string;
   /** Days for temporary cosmetic grant (default 7). */
@@ -43,13 +55,7 @@ export type HostMonthlyTargetConfig = {
 const DEFAULT_CONFIG: HostMonthlyTargetConfig = {
   enabled: true,
   currency: 'diamonds',
-  stages: [
-    { id: 'stage_1', threshold: 1000, rewardCoins: 50, rewardDiamonds: 0, title: 'مرحلة 1' },
-    { id: 'stage_2', threshold: 5000, rewardCoins: 200, rewardDiamonds: 20, title: 'مرحلة 2' },
-    { id: 'stage_3', threshold: 15000, rewardCoins: 500, rewardDiamonds: 80, title: 'مرحلة 3' },
-    { id: 'stage_4', threshold: 35000, rewardCoins: 1000, rewardDiamonds: 200, title: 'مرحلة 4' },
-    { id: 'stage_5', threshold: 75000, rewardCoins: 2500, rewardDiamonds: 500, title: 'مرحلة 5' },
-  ],
+  stages: salaryLadderToHostTargetStages(),
 };
 
 @Injectable()
@@ -81,13 +87,20 @@ export class HostTargetService implements OnModuleInit {
         return;
       }
       const parsed = JSON.parse(row.value) as Partial<HostMonthlyTargetConfig>;
-      if (!Array.isArray(parsed.stages) || parsed.stages.length === 0) {
+      const stages = Array.isArray(parsed.stages) ? parsed.stages : [];
+      if (
+        stages.length === 0 ||
+        stagesMissingSalaryFields(stages) ||
+        stages.length < 20
+      ) {
         await this.saveConfig({
           ...DEFAULT_CONFIG,
           enabled: parsed.enabled !== false,
           currency: parsed.currency === 'gift_coins' ? 'gift_coins' : 'diamonds',
         });
-        this.log.log('Backfilled empty host_monthly_target stages');
+        this.log.log(
+          'Upgraded host_monthly_target to official 34-stage salary ladder',
+        );
       }
     } catch (err) {
       this.log.warn(
@@ -123,12 +136,22 @@ export class HostTargetService implements OnModuleInit {
   private normalizeStage(s: Partial<HostTargetStage> | null | undefined, i: number): HostTargetStage {
     const cosmeticCode = String(s?.rewardCosmeticCode || '').trim();
     const vipLevel = Math.max(0, Math.floor(Number(s?.rewardVipLevel) || 0));
+    const hostSalaryUsd = Math.max(0, Number(s?.hostSalaryUsd) || 0);
+    const agentSalaryUsd = Math.max(0, Number(s?.agentSalaryUsd) || 0);
+    const totalUsd = Math.max(
+      0,
+      Number(s?.totalUsd) || hostSalaryUsd + agentSalaryUsd,
+    );
     return {
       id: String(s?.id || `stage_${i + 1}`),
       threshold: Math.max(0, Number(s?.threshold) || 0),
       rewardCoins: Math.max(0, Math.floor(Number(s?.rewardCoins) || 0)),
       rewardDiamonds: Math.max(0, Math.floor(Number(s?.rewardDiamonds) || 0)),
       title: s?.title ? String(s.title) : `مرحلة ${i + 1}`,
+      hostSalaryUsd,
+      agentSalaryUsd,
+      totalUsd,
+      coinEqualsDiamond: s?.coinEqualsDiamond !== false,
       ...(cosmeticCode
         ? {
             rewardCosmeticCode: cosmeticCode,

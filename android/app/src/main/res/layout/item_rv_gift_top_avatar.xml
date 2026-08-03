@@ -15,15 +15,7 @@
         android:layout_gravity="center"
         android:src="@drawable/ic_default_avatar" />
 
-    <View
-        android:id="@+id/select_line"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_gravity="center"
-        android:background="@drawable/bg_gift_top_avatar_select"
-        android:visibility="invisible" />
-
-    <!-- Frame drawn ABOVE select ring so wear cosmetics stay visible. -->
+    <!-- Frame drawn ABOVE avatar so wear cosmetics stay visible. -->
     <ImageView
         android:id="@+id/iv_avatar_frame"
         android:layout_width="48dp"
@@ -37,12 +29,22 @@
         android:id="@+id/iv_check_status"
         android:layout_width="10dp"
         android:layout_height="10dp"
-        android:layout_gravity="end|bottom"
+        android:layout_gravity="end|center_vertical"
         android:layout_marginEnd="2dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginTop="-6dp"
         android:background="@drawable/bg_gift_top_avatar_check"
         android:gravity="center"
         android:textColor="@color/white"
         android:textSize="8sp"
         android:visibility="gone" />
+
+    <!-- Colored bar UNDER the avatar (not over the face). -->
+    <View
+        android:id="@+id/select_line"
+        android:layout_width="28dp"
+        android:layout_height="3dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="1dp"
+        android:background="@drawable/bg_gift_seat_select_underline"
+        android:visibility="invisible" />
 </FrameLayout>

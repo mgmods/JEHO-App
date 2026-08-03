@@ -51,8 +51,14 @@ public class ZegoEngineManager {
     private boolean micEnabled = true;
     private boolean speakerMuted = false;
     private String publishingStreamId;
+    /** Publish requested before room login finished — flush on LOGINED. */
+    @Nullable private String pendingPublishStreamId;
+    private boolean publisherStreaming;
     private final Set<String> playingStreamIds = new HashSet<>();
     private final Map<String, String> playingStreamRooms = new HashMap<>();
+    /** Streams paused by speaker-mute — restored on unmute so minimize keeps working. */
+    private final Set<String> pausedPlayStreamIds = new HashSet<>();
+    private final Map<String, String> pausedPlayStreamRooms = new HashMap<>();
 
     public interface RoomListener {
         void onRoomStateChanged(String roomId, int state);
@@ -186,6 +192,20 @@ public class ZegoEngineManager {
             public void onRoomStateChanged(String roomID, im.zego.zegoexpress.constants.ZegoRoomStateChangedReason reason, int errorCode, org.json.JSONObject extendedData) {
                 int state = reason != null ? reason.value() : -1;
                 Log.i(TAG, "room state room=" + roomID + " reason=" + state + " err=" + errorCode);
+                // LOGINED / RECONNECTED — flush any publish that ran too early (host open race).
+                if (errorCode == 0 && (state == 1 || state == 4 || state == 5)) {
+                    String pending = pendingPublishStreamId;
+                    if (pending != null && !pending.isEmpty()) {
+                        pendingPublishStreamId = null;
+                        Log.i(TAG, "flush deferred publish stream=" + pending);
+                        startPublishingAudio(pending);
+                    } else if (publishingStreamId != null && !publisherStreaming) {
+                        String again = publishingStreamId;
+                        publishingStreamId = null;
+                        Log.i(TAG, "retry publish after login stream=" + again);
+                        startPublishingAudio(again);
+                    }
+                }
                 for (RoomListener listener : roomListeners) {
                     try {
                         listener.onRoomStateChanged(roomID, state, errorCode);
@@ -215,9 +235,18 @@ public class ZegoEngineManager {
             public void onPublisherStateUpdate(String streamID,
                     im.zego.zegoexpress.constants.ZegoPublisherState state,
                     int errorCode, org.json.JSONObject extendedData) {
+                int st = state != null ? state.value() : -1;
                 Log.i(TAG, "publisher state stream=" + streamID
-                        + " state=" + (state != null ? state.value() : -1)
+                        + " state=" + st
                         + " err=" + errorCode);
+                // PUBLISHING=1 — only then remote peers can hear us.
+                publisherStreaming = errorCode == 0 && st == 1
+                        && streamID != null && streamID.equals(publishingStreamId);
+                if (errorCode != 0 && streamID != null && streamID.equals(publishingStreamId)) {
+                    Log.w(TAG, "publish failed — clear so next activate can retry err=" + errorCode);
+                    publishingStreamId = null;
+                    publisherStreaming = false;
+                }
             }
 
             @Override
@@ -366,6 +395,9 @@ public class ZegoEngineManager {
         // SINGLE_ROOM: leave the previous voice room before joining another.
         if (currentRoomId != null && !currentRoomId.equals(roomId)) {
             Log.i(TAG, "logout previous room before login old=" + currentRoomId + " new=" + roomId);
+            clearPausedPlayStreams();
+            stopPublishing();
+            stopAllPlaying();
             try {
                 engine.logoutRoom(currentRoomId);
             } catch (Exception e) {
@@ -445,8 +477,16 @@ public class ZegoEngineManager {
 
     public void startPublishingAudio(String streamId) {
         ensureEngine();
-        if (engine == null) return;
-        if (streamId != null && streamId.equals(publishingStreamId)) {
+        if (engine == null || streamId == null || streamId.isEmpty()) return;
+        // Host open race: Activity may publish before loginRoom completes. Defer instead of
+        // marking publishingStreamId (that blocked retries and guests never heard the host).
+        if (currentRoomId == null || currentRoomId.isEmpty()) {
+            pendingPublishStreamId = streamId;
+            Log.w(TAG, "defer publish until room login stream=" + streamId);
+            return;
+        }
+        pendingPublishStreamId = null;
+        if (streamId.equals(publishingStreamId) && publisherStreaming) {
             engine.muteMicrophone(!micEnabled);
             return;
         }
@@ -459,6 +499,7 @@ public class ZegoEngineManager {
         }
         engine.startPublishingStream(streamId);
         publishingStreamId = streamId;
+        publisherStreaming = false;
         Log.i(TAG, "publishing audio stream=" + streamId + " room=" + currentRoomId
                 + " micEnabled=" + micEnabled);
     }
@@ -466,6 +507,8 @@ public class ZegoEngineManager {
     public void stopPublishing() {
         if (engine != null) engine.stopPublishingStream();
         publishingStreamId = null;
+        publisherStreaming = false;
+        pendingPublishStreamId = null;
     }
 
 
@@ -513,12 +556,53 @@ public class ZegoEngineManager {
     }
 
     public void stopAllPlaying() {
-        if (engine == null) return;
+        if (engine == null) {
+            playingStreamIds.clear();
+            playingStreamRooms.clear();
+            return;
+        }
         for (String id : new HashSet<>(playingStreamIds)) {
             engine.stopPlayingStream(id);
         }
         playingStreamIds.clear();
         playingStreamRooms.clear();
+    }
+
+    /** Drop mute-restore stash so a later unmute cannot revive the previous room. */
+    public void clearPausedPlayStreams() {
+        pausedPlayStreamIds.clear();
+        pausedPlayStreamRooms.clear();
+    }
+
+    /**
+     * Full leave for room hop / exit: stop publish+play, drop mute stash, logout.
+     * Unlike {@link #setSpeakerMuted(true)}, this never keeps streams for restore.
+     */
+    public void hardLeaveRoom() {
+        clearPausedPlayStreams();
+        stopLocalMusic();
+        stopPublishing();
+        stopAllPlaying();
+        pendingPublishStreamId = null;
+        publisherStreaming = false;
+        micEnabled = false;
+        speakerMuted = true;
+        if (engine != null) {
+            try {
+                engine.muteMicrophone(true);
+                engine.muteSpeaker(true);
+            } catch (Exception ignored) {
+            }
+            if (currentRoomId != null) {
+                try {
+                    engine.logoutRoom(currentRoomId);
+                } catch (Exception e) {
+                    Log.w(TAG, "hardLeaveRoom logout failed", e);
+                }
+            }
+        }
+        currentRoomId = null;
+        Log.i(TAG, "hardLeaveRoom done");
     }
 
     public void setMicEnabled(boolean enabled) {
@@ -527,8 +611,8 @@ public class ZegoEngineManager {
     }
 
     /**
-     * Mute room playback. When muted we fully stop pulling remote streams
-     * so Zego does not bill play minutes — unmute resumes via the activity.
+     * Mute room playback. When muted we stop pulling remote streams
+     * so Zego does not bill play minutes — unmute restores the same streams.
      */
     public void setSpeakerMuted(boolean muted) {
         speakerMuted = muted;
@@ -538,6 +622,10 @@ public class ZegoEngineManager {
                 engine.muteSpeaker(true);
             } catch (Exception ignored) {
             }
+            pausedPlayStreamIds.clear();
+            pausedPlayStreamRooms.clear();
+            pausedPlayStreamIds.addAll(playingStreamIds);
+            pausedPlayStreamRooms.putAll(playingStreamRooms);
             // Stop pull = no listener minutes while user has sound off.
             stopAllPlaying();
             try {
@@ -546,7 +634,7 @@ public class ZegoEngineManager {
                 }
             } catch (Throwable ignored) {
             }
-            Log.i(TAG, "speaker muted — stopped all play streams (save minutes)");
+            Log.i(TAG, "speaker muted — paused " + pausedPlayStreamIds.size() + " play streams");
             return;
         }
         try {
@@ -561,7 +649,16 @@ public class ZegoEngineManager {
             }
         } catch (Throwable ignored) {
         }
-        Log.i(TAG, "speaker unmuted — activity should re-subscribe seat audio");
+        // Restore streams stopped by a previous mute (critical for minimize → keep listening).
+        if (!pausedPlayStreamIds.isEmpty()) {
+            for (String id : new HashSet<>(pausedPlayStreamIds)) {
+                String room = pausedPlayStreamRooms.get(id);
+                startPlayingAudio(id, room != null ? room : currentRoomId);
+            }
+            pausedPlayStreamIds.clear();
+            pausedPlayStreamRooms.clear();
+        }
+        Log.i(TAG, "speaker unmuted — restored play streams");
     }
 
     public boolean isSpeakerMuted() {
@@ -574,30 +671,19 @@ public class ZegoEngineManager {
         return streamId != null && playingStreamIds.contains(streamId);
     }
 
+    /** Snapshot of currently pulled play streams (for seat prune on room hop). */
+    public Set<String> getPlayingStreamIds() {
+        return new HashSet<>(playingStreamIds);
+    }
+
     public static String audioStreamId(String userId) {
         return userId != null ? userId + "_audio" : null;
     }
 
 
     public void logoutRoom() {
-        stopLocalMusic();
-        stopPublishing();
-        stopAllPlaying();
-        if (engine != null && currentRoomId != null) {
-            engine.logoutRoom(currentRoomId);
-        }
-        currentRoomId = null;
-        // Stay muted until the next explicit setMicEnabled — never force-open on logout
-        // (reconnect / WhatsApp return used to unmute a muted user here).
-        micEnabled = false;
-        speakerMuted = false;
-        if (engine != null) {
-            try {
-                engine.muteMicrophone(true);
-                engine.muteSpeaker(false);
-            } catch (Exception ignored) {
-            }
-        }
+        hardLeaveRoom();
+        currentUserId = null;
     }
 
     public void destroy() {

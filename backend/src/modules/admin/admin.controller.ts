@@ -141,6 +141,16 @@ export class AdminController {
     return this.adminService.dashboardLive();
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('policy-brochure/snapshot')
+  @ApiOperation({
+    summary: 'Snapshot for hosts/agencies/supporters policy PDF brochure',
+  })
+  policyBrochureSnapshot() {
+    return this.adminService.policyBrochureSnapshot();
+  }
+
   // ─── Users ─────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
@@ -337,9 +347,35 @@ export class AdminController {
   @Patch('rooms/:id')
   updateRoom(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { accessMode?: string; entryFeeCoins?: number; title?: string },
+    @Body()
+    body: {
+      accessMode?: string;
+      entryFeeCoins?: number;
+      title?: string;
+      roomKind?: string;
+      isSupport?: boolean;
+    },
   ) {
     return this.adminService.updateRoom(id, body);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/:id/customer-service')
+  @ApiOperation({ summary: 'Elevate or revoke a room as official customer-service' })
+  setRoomCustomerService(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { enabled?: boolean },
+  ) {
+    return this.adminService.setRoomCustomerService(id, body?.enabled !== false);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('rooms/:id/customer-service')
+  @ApiOperation({ summary: 'Revoke customer-service elevation' })
+  clearRoomCustomerService(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.setRoomCustomerService(id, false);
   }
 
   // ─── Gifts ─────────────────────────────────────────────────

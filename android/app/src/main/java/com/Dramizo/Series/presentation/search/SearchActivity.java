@@ -180,7 +180,9 @@ public class SearchActivity extends ThemedActivity {
                     row.kind = KIND_ROOM;
                     row.room = r;
                     row.title = r.title != null && !r.title.isEmpty() ? r.title : "غرفة";
-                    String typeLabel = RoomUiHelper.isAgencyRoom(r)
+                    String typeLabel = RoomUiHelper.isSupportRoom(r)
+                            ? getString(R.string.room_badge_support)
+                            : RoomUiHelper.isAgencyRoom(r)
                             ? getString(R.string.room_badge_agency)
                             : getString(R.string.room_badge_personal);
                     String roomId = RoomUiHelper.displayRoomId(r);

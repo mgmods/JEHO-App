@@ -686,216 +686,180 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
 
-    <!-- Top-3 supporters below seats (above official news) — never over room card. -->
-    <LinearLayout
+    <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles. -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowTopHosts"
-        android:layout_width="0dp"
-        android:layout_height="44dp"
-        android:layout_marginTop="2dp"
-        android:background="@android:color/transparent"
+        android:layout_width="wrap_content"
+        android:layout_height="26dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="6dp"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
+        android:layoutDirection="ltr"
         android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintStart_toStartOf="@id/recyclerSeats"
         app:layout_constraintTop_toBottomOf="@id/recyclerSeats">
 
-            <FrameLayout
-                android:id="@+id/topSlot1"
-                android:layout_width="32dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="-10dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:elevation="8dp"
-                android:visibility="gone">
+        <!-- Count badge (left of stack, like Mikoo "5") -->
+        <TextView
+            android:id="@+id/tvSupportersCount"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/bg_supporters_count_circle"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-                <ImageView
-                    android:id="@+id/imgTop1"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop" />
+        <!-- Slot 1 — front / leftmost -->
+        <FrameLayout
+            android:id="@+id/topSlot1"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="6dp"
+            android:clipChildren="false"
+            android:elevation="8dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/tvSupportersCount"
+            app:layout_constraintTop_toTopOf="parent">
 
-                <View
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_top_supporter_ring"
-                    android:clickable="false"
-                    android:focusable="false" />
+            <ImageView
+                android:id="@+id/imgTop1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
 
-                <ImageView
-                    android:id="@+id/imgTopFrame1"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:visibility="gone" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_supporter_avatar_ring"
+                android:clickable="false"
+                android:focusable="false" />
 
-                <TextView
-                    android:id="@+id/tvTopRank1"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_gravity="bottom|end"
-                    android:layout_marginEnd="0dp"
-                    android:layout_marginBottom="10dp"
-                    android:background="@drawable/bg_offers_badge"
-                    android:elevation="9dp"
-                    android:gravity="center"
-                    android:text="1"
-                    android:textColor="@color/text_primary"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/imgTopFrame1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/tvTopScore1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:textColor="#FFFFD54F"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
+            <TextView
+                android:id="@+id/tvTopRank1"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
 
-            <FrameLayout
-                android:id="@+id/topSlot2"
-                android:layout_width="32dp"
-                android:layout_height="40dp"
-                android:layout_marginEnd="-10dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:elevation="6dp"
-                android:visibility="gone">
+            <TextView
+                android:id="@+id/tvTopScore1"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </FrameLayout>
 
-                <ImageView
-                    android:id="@+id/imgTop2"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop" />
+        <!-- Slot 2 — overlaps slot 1 by ~7dp (22 − 15) -->
+        <FrameLayout
+            android:id="@+id/topSlot2"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="15dp"
+            android:clipChildren="false"
+            android:elevation="6dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="@id/topSlot1"
+            app:layout_constraintTop_toTopOf="parent">
 
-                <View
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_top_supporter_ring_silver"
-                    android:clickable="false"
-                    android:focusable="false" />
+            <ImageView
+                android:id="@+id/imgTop2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
 
-                <ImageView
-                    android:id="@+id/imgTopFrame2"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:visibility="gone" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_supporter_avatar_ring"
+                android:clickable="false"
+                android:focusable="false" />
 
-                <TextView
-                    android:id="@+id/tvTopRank2"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_gravity="bottom|end"
-                    android:layout_marginBottom="10dp"
-                    android:background="@drawable/bg_offers_badge"
-                    android:elevation="7dp"
-                    android:gravity="center"
-                    android:text="2"
-                    android:textColor="@color/text_primary"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/imgTopFrame2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/tvTopScore2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:textColor="#FFCFD8DC"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
+            <TextView
+                android:id="@+id/tvTopRank2"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
 
-            <FrameLayout
-                android:id="@+id/topSlot3"
-                android:layout_width="32dp"
-                android:layout_height="40dp"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:elevation="4dp"
-                android:visibility="gone">
+            <TextView
+                android:id="@+id/tvTopScore2"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </FrameLayout>
 
-                <ImageView
-                    android:id="@+id/imgTop3"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop" />
+        <!-- Slot 3 -->
+        <FrameLayout
+            android:id="@+id/topSlot3"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="15dp"
+            android:clipChildren="false"
+            android:elevation="4dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="@id/topSlot2"
+            app:layout_constraintTop_toTopOf="parent">
 
-                <View
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:layout_marginTop="2dp"
-                    android:background="@drawable/bg_top_supporter_ring_bronze"
-                    android:clickable="false"
-                    android:focusable="false" />
+            <ImageView
+                android:id="@+id/imgTop3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop" />
 
-                <ImageView
-                    android:id="@+id/imgTopFrame3"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:layout_gravity="center_horizontal|top"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:visibility="gone" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_supporter_avatar_ring"
+                android:clickable="false"
+                android:focusable="false" />
 
-                <TextView
-                    android:id="@+id/tvTopRank3"
-                    android:layout_width="12dp"
-                    android:layout_height="12dp"
-                    android:layout_gravity="bottom|end"
-                    android:layout_marginBottom="10dp"
-                    android:background="@drawable/bg_offers_badge"
-                    android:elevation="5dp"
-                    android:gravity="center"
-                    android:text="3"
-                    android:textColor="@color/text_primary"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
+            <ImageView
+                android:id="@+id/imgTopFrame3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/tvTopScore3"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_gravity="bottom"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:textColor="#FFFFAB91"
-                    android:textSize="7sp"
-                    android:textStyle="bold" />
-            </FrameLayout>
-    </LinearLayout>
+            <TextView
+                android:id="@+id/tvTopRank3"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvTopScore3"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
+        </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 
 
@@ -1552,6 +1516,21 @@
         app:layout_constraintStart_toStartOf="parent" />
 
     <!-- Mikoo ComboGiftView — center gift toast -->
+    <com.Dramizo.Series.util.NativeRoomEffectsView
+        android:id="@+id/webVisualEffects"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:elevation="55dp"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <com.Dramizo.Series.widget.ComboGiftView
         android:id="@+id/comboGiftView"
         android:layout_width="wrap_content"
@@ -1570,7 +1549,7 @@
         android:layout_height="0dp"
         android:background="@android:color/transparent"
         android:clickable="false"
-        android:elevation="31dp"
+        android:elevation="42dp"
         android:focusable="false"
         android:importantForAccessibility="no"
         android:visibility="gone"
@@ -1578,21 +1557,6 @@
         app:layout_constraintEnd_toEndOf="@id/chatPanel"
         app:layout_constraintStart_toStartOf="@id/chatPanel"
         app:layout_constraintTop_toTopOf="@id/chatPanel" />
-
-    <com.Dramizo.Series.util.NativeRoomEffectsView
-        android:id="@+id/webVisualEffects"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:background="@android:color/transparent"
-        android:clickable="false"
-        android:elevation="30dp"
-        android:focusable="false"
-        android:importantForAccessibility="no"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
 
     <FrameLayout
         android:id="@+id/gameOverlay"

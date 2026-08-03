@@ -64,11 +64,13 @@
     "banners": "Banners",
     "coins": "Coin Bags",
     "offers": "Offers",
+    "promos": "Offers & promos",
     "wallet": "Wallet",
     "paymentSettings": "Payment Settings",
     "zegoSettings": "Voice RTC keys (Zego)",
     "rechargeAgents": "Recharge Agents",
     "vip": "VIP membership",
+    "vanityIds": "Vanity IDs",
     "cosmetics": "Appearance Store",
     "contests": "Contests",
     "games": "Games",
@@ -83,7 +85,8 @@
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
     "settings": "Settings",
-    "logs": "Logs"
+    "logs": "Logs",
+    "policyBrochure": "Platform policy PDF"
   },
   "routes": {
     "login": "Login",
@@ -96,10 +99,12 @@
     "banners": "Banners",
     "coins": "Coin Bags",
     "offers": "Store Offers",
+    "promos": "Offers & promos",
     "wallet": "Wallet",
     "paymentSettings": "Payment Settings",
     "zegoSettings": "ZegoCloud Settings",
     "vip": "VIP",
+    "vanityIds": "Vanity IDs",
     "cosmetics": "Appearance Store",
     "contests": "Contests",
     "games": "Games",
@@ -116,7 +121,8 @@
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
     "settings": "Settings",
-    "logs": "Logs"
+    "logs": "Logs",
+    "policyBrochure": "Platform policy PDF"
   },
   "login": {
     "title": "JEHO CHAT Admin",

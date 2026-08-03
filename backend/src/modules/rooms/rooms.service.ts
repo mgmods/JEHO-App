@@ -962,9 +962,11 @@ export class RoomsService implements OnModuleInit {
       seen.add(id);
       urls.push(url);
     };
+    // Host first so home cards always show a face (Mikoo supporter row).
+    if (room.host) push(room.host);
     for (const seat of room.seats || []) {
-      if (seat?.user) push(seat.user);
       if (urls.length >= 6) break;
+      if (seat?.user) push(seat.user);
     }
     return urls;
   }
@@ -1047,6 +1049,7 @@ export class RoomsService implements OnModuleInit {
       : this.defaultRoomCover(decorated);
     const isAgency =
       decorated.roomKind === RoomKind.AGENCY || !!decorated.agencyId;
+    const isSupport = decorated.roomKind === RoomKind.SUPPORT;
     // Room identity is permanent (title + coverUrl), separate from host profile.
     const listTitle =
       String(decorated.title || '').trim() ||
@@ -1057,7 +1060,8 @@ export class RoomsService implements OnModuleInit {
       title: listTitle,
       coverUrl,
       backgroundUrl: equippedBackground,
-      roomLabel: isAgency ? 'agency' : 'personal',
+      roomLabel: isSupport ? 'support' : isAgency ? 'agency' : 'personal',
+      isSupport,
       displayRoomId: decorated.host?.publicId || null,
       viewerAvatars: this.collectViewerAvatars(decorated),
       moderatorIds: (room.moderators || []).map((m: any) => m.userId).filter(Boolean),
@@ -1145,7 +1149,21 @@ export class RoomsService implements OnModuleInit {
       .leftJoinAndSelect('seats.user', 'seatUser')
       .leftJoinAndSelect('seatUser.profile', 'seatProfile');
     this.applyPublicRoomListFilters(qb, query);
-    qb.orderBy('room.viewerCount', 'DESC')
+    // Mikoo Hot heat: viewers + lifetime gift coins (not viewers alone).
+    // Customer-service rooms always float to the top of explore.
+    qb.addSelect(
+      `CASE WHEN room.roomKind = 'support' THEN 1 ELSE 0 END`,
+      'support_pin',
+    )
+    qb.addSelect(
+      `(COALESCE(room.viewerCount, 0) * 100 + COALESCE((
+          SELECT SUM(gs."totalCoins") FROM gift_sends gs WHERE gs."roomId" = room.id
+        ), 0) / 50)`,
+      'explore_heat',
+    )
+      .orderBy('support_pin', 'DESC')
+      .addOrderBy('explore_heat', 'DESC')
+      .addOrderBy('room.updatedAt', 'DESC')
       .addOrderBy('room.createdAt', 'DESC')
       .skip(query.skip)
       .take(query.limit || 20);
@@ -1160,7 +1178,7 @@ export class RoomsService implements OnModuleInit {
           giftCoins.get(room.id) || 0,
           room.viewerCount || 0,
         ),
-        exploreRank: index + 1,
+        exploreRank: (query.skip || 0) + index + 1,
         challengeBadge: room.viewerCount >= 10 ? 'Hot 🔥' : null,
       })),
     );

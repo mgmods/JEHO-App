@@ -2,9 +2,12 @@
   <div>
     <PageHeader
       title="تارجيت المضيف الشهري"
-      subtitle="مراحل منفصلة عن باقات الشحن. عند عبور العتبة تُمنح العملات/الألماس ويمكن إضافة إطار مؤقت أو VIP لعدد أيام."
+      subtitle="جدول التارجت (كوينز = ألماس ١:١) + راتب المضيف وراتب الوكيل بالدولار — يظهر في التطبيق وملف السياسة PDF"
     >
       <template #actions>
+        <button class="btn btn-ghost btn-sm" type="button" :disabled="saving" @click="loadOfficialLadder">
+          تحميل الجدول الرسمي (٣٤ مرحلة)
+        </button>
         <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
           حفظ التارجيت
         </button>
@@ -26,56 +29,79 @@
         <div class="col-md-4">
           <label class="form-label">عملة التقدّم</label>
           <select v-model="hostTarget.currency" class="form-select">
-            <option value="diamonds">ألماس الهدايا</option>
+            <option value="diamonds">ألماس الهدايا (جدول الرواتب: ١ كوين = ١ ألماسة)</option>
             <option value="gift_coins">عملات الهدايا</option>
           </select>
         </div>
       </div>
 
-      <div class="small text-muted mb-3">
-        كود الإطار من صفحة المستحضرات (مثلاً frame_mikoo_…) · أيام الإطار/VIP افتراضياً 7.
-      </div>
-
-      <div v-for="(stage, idx) in hostTarget.stages" :key="stage.id || idx" class="border rounded p-2 mb-2">
-        <div class="row g-2 align-items-end">
-          <div class="col-md-2">
-            <label class="form-label">العنوان</label>
-            <input v-model="stage.title" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">العتبة</label>
-            <input v-model.number="stage.threshold" type="number" min="1" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">عملات</label>
-            <input v-model.number="stage.rewardCoins" type="number" min="0" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">ألماس</label>
-            <input v-model.number="stage.rewardDiamonds" type="number" min="0" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-2">
-            <label class="form-label">كود إطار/هدية</label>
-            <input v-model="stage.rewardCosmeticCode" class="form-control form-control-sm" placeholder="frame_mikoo_…" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">أيام إطار</label>
-            <input v-model.number="stage.rewardCosmeticDays" type="number" min="0" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">VIP</label>
-            <input v-model.number="stage.rewardVipLevel" type="number" min="0" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-1">
-            <label class="form-label">أيام VIP</label>
-            <input v-model.number="stage.rewardVipDays" type="number" min="0" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-sm btn-outline-danger" type="button" @click="hostTarget.stages.splice(idx, 1)">
-              حذف
-            </button>
-          </div>
-        </div>
+      <div class="table-responsive mb-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>العنوان</th>
+              <th>التارجت (كوينز)</th>
+              <th>١ كوين = ١ ألماسة</th>
+              <th>راتب المضيف $</th>
+              <th>راتب الوكيل $</th>
+              <th>الإجمالي $</th>
+              <th>عملات مكافأة</th>
+              <th>ألماس مكافأة</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(stage, idx) in hostTarget.stages" :key="stage.id || idx">
+              <td>{{ idx + 1 }}</td>
+              <td><input v-model="stage.title" class="form-control form-control-sm" style="min-width:6rem" /></td>
+              <td>
+                <input
+                  v-model.number="stage.threshold"
+                  type="number"
+                  min="1"
+                  class="form-control form-control-sm"
+                  style="min-width:7rem"
+                />
+              </td>
+              <td class="small text-muted">{{ formatNumber(stage.threshold) }}</td>
+              <td>
+                <input
+                  v-model.number="stage.hostSalaryUsd"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="form-control form-control-sm"
+                  style="min-width:5rem"
+                  @change="recalcTotal(stage)"
+                />
+              </td>
+              <td>
+                <input
+                  v-model.number="stage.agentSalaryUsd"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="form-control form-control-sm"
+                  style="min-width:5rem"
+                  @change="recalcTotal(stage)"
+                />
+              </td>
+              <td class="fw-semibold">${{ Number(stage.totalUsd || 0) }}</td>
+              <td>
+                <input v-model.number="stage.rewardCoins" type="number" min="0" class="form-control form-control-sm" style="min-width:4.5rem" />
+              </td>
+              <td>
+                <input v-model.number="stage.rewardDiamonds" type="number" min="0" class="form-control form-control-sm" style="min-width:4.5rem" />
+              </td>
+              <td>
+                <button class="btn btn-sm btn-outline-danger" type="button" @click="hostTarget.stages.splice(idx, 1)">
+                  حذف
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <button class="btn btn-ghost btn-sm" type="button" @click="addStage">+ مرحلة</button>
@@ -86,34 +112,86 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { settingsApi } from '@/api'
+import { formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import { OFFICIAL_SALARY_LADDER } from '@/data/hostSalaryLadder'
 
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const hostTarget = reactive({
-  enabled: false,
+  enabled: true,
   currency: 'diamonds',
   stages: [],
 })
 
+function recalcTotal(stage) {
+  stage.totalUsd =
+    Math.max(0, Number(stage.hostSalaryUsd) || 0) + Math.max(0, Number(stage.agentSalaryUsd) || 0)
+}
+
+function mapStage(s, i) {
+  const host = Math.max(0, Number(s?.hostSalaryUsd) || 0)
+  const agent = Math.max(0, Number(s?.agentSalaryUsd) || 0)
+  return {
+    id: String(s?.id || `stage_${i + 1}`),
+    title: s?.title ? String(s.title) : `مرحلة ${i + 1}`,
+    threshold: Math.max(0, Number(s?.threshold) || 0),
+    rewardCoins: Math.max(0, Math.floor(Number(s?.rewardCoins) || 0)),
+    rewardDiamonds: Math.max(0, Math.floor(Number(s?.rewardDiamonds) || 0)),
+    hostSalaryUsd: host,
+    agentSalaryUsd: agent,
+    totalUsd: Math.max(0, Number(s?.totalUsd) || host + agent),
+    coinEqualsDiamond: s?.coinEqualsDiamond !== false,
+    rewardCosmeticCode: s?.rewardCosmeticCode ? String(s.rewardCosmeticCode) : '',
+    rewardCosmeticDays: Math.max(0, Math.floor(Number(s?.rewardCosmeticDays) || 7)),
+    rewardVipLevel: Math.max(0, Math.floor(Number(s?.rewardVipLevel) || 0)),
+    rewardVipDays: Math.max(0, Math.floor(Number(s?.rewardVipDays) || 7)),
+  }
+}
+
 function addStage() {
   const n = hostTarget.stages.length + 1
-  hostTarget.stages.push({
-    id: `stage_${n}`,
-    title: `مرحلة ${n}`,
-    threshold: n * 1000,
-    rewardCoins: 0,
-    rewardDiamonds: 0,
-    rewardCosmeticCode: '',
-    rewardCosmeticDays: 7,
-    rewardVipLevel: 0,
-    rewardVipDays: 7,
-  })
+  hostTarget.stages.push(
+    mapStage(
+      {
+        id: `stage_${n}`,
+        title: `مرحلة ${n}`,
+        threshold: n * 15000,
+        hostSalaryUsd: 0,
+        agentSalaryUsd: 0,
+        totalUsd: 0,
+      },
+      n - 1,
+    ),
+  )
+}
+
+function loadOfficialLadder() {
+  hostTarget.enabled = true
+  hostTarget.currency = 'diamonds'
+  hostTarget.stages = OFFICIAL_SALARY_LADDER.map((row, i) =>
+    mapStage(
+      {
+        id: `salary_${row.stage}`,
+        title: `مرحلة ${row.stage}`,
+        threshold: row.targetCoins,
+        hostSalaryUsd: row.hostSalaryUsd,
+        agentSalaryUsd: row.agentSalaryUsd,
+        totalUsd: row.totalUsd,
+        coinEqualsDiamond: true,
+        rewardCoins: 0,
+        rewardDiamonds: 0,
+      },
+      i,
+    ),
+  )
+  success.value = 'تم تحميل الجدول الرسمي — اضغط حفظ لتطبيقه'
+  toast().success(success.value)
 }
 
 async function load() {
@@ -130,23 +208,20 @@ async function load() {
   const map = Object.fromEntries(rows.map((row) => [row.key, row.value]))
   try {
     const raw = map.host_monthly_target
-    if (!raw) return
+    if (!raw) {
+      loadOfficialLadder()
+      return
+    }
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-    hostTarget.enabled = !!parsed.enabled
+    hostTarget.enabled = parsed.enabled !== false
     hostTarget.currency = parsed.currency === 'gift_coins' ? 'gift_coins' : 'diamonds'
-    hostTarget.stages = Array.isArray(parsed.stages)
-      ? parsed.stages.map((s, i) => ({
-          id: String(s?.id || `stage_${i + 1}`),
-          title: s?.title ? String(s.title) : `مرحلة ${i + 1}`,
-          threshold: Math.max(0, Number(s?.threshold) || 0),
-          rewardCoins: Math.max(0, Math.floor(Number(s?.rewardCoins) || 0)),
-          rewardDiamonds: Math.max(0, Math.floor(Number(s?.rewardDiamonds) || 0)),
-          rewardCosmeticCode: s?.rewardCosmeticCode ? String(s.rewardCosmeticCode) : '',
-          rewardCosmeticDays: Math.max(0, Math.floor(Number(s?.rewardCosmeticDays) || 7)),
-          rewardVipLevel: Math.max(0, Math.floor(Number(s?.rewardVipLevel) || 0)),
-          rewardVipDays: Math.max(0, Math.floor(Number(s?.rewardVipDays) || 7)),
-        }))
-      : []
+    hostTarget.stages = Array.isArray(parsed.stages) ? parsed.stages.map(mapStage) : []
+    const hasSalary = hostTarget.stages.some(
+      (s) => Number(s.hostSalaryUsd) > 0 || Number(s.agentSalaryUsd) > 0,
+    )
+    if (!hostTarget.stages.length || !hasSalary || hostTarget.stages.length < 20) {
+      loadOfficialLadder()
+    }
   } catch {
     error.value = 'تعذر قراءة إعدادات التارجيت'
   }
@@ -156,6 +231,7 @@ async function save() {
   saving.value = true
   error.value = ''
   success.value = ''
+  hostTarget.stages.forEach(recalcTotal)
   const payload = {
     enabled: !!hostTarget.enabled,
     currency: hostTarget.currency,
@@ -169,7 +245,7 @@ async function save() {
     error.value = result.error.message
     toast().danger(result.error.message)
   } else {
-    success.value = 'تم حفظ تارجيت المضيف الشهري'
+    success.value = 'تم حفظ تارجيت المضيف وجدول الرواتب'
     toast().success(success.value)
   }
 }

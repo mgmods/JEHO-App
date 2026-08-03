@@ -18,7 +18,10 @@
             {{ accessLabel }}
           </span>
           <span v-if="room.isLive" class="badge bg-danger ms-1">مباشر</span>
-          <span v-if="room.isPersistent || room.roomKind === 'agency'" class="badge bg-info ms-1">
+          <span v-if="room.roomKind === 'support' || room.isSupport" class="badge bg-success ms-1">
+            خدمة عملاء
+          </span>
+          <span v-else-if="room.isPersistent || room.roomKind === 'agency'" class="badge bg-info ms-1">
             {{ t('rooms.agency') }}
           </span>
           <span v-if="entryFee > 0" class="text-warning ms-1">{{ formatNumber(entryFee) }} {{ t('common.coins') }}</span>
@@ -42,6 +45,15 @@
     <div class="room-card__actions">
       <span class="small text-muted">{{ formatDate(room.createdAt) }}</span>
       <div class="action-btns">
+        <button
+          v-if="!isAgency"
+          class="btn btn-sm"
+          :class="isSupport ? 'btn-outline-secondary' : 'btn-outline-success'"
+          type="button"
+          @click="$emit('toggleSupport', room)"
+        >
+          {{ isSupport ? 'إلغاء خدمة عملاء' : 'ترقية لخدمة عملاء' }}
+        </button>
         <button
           v-if="room.isLive"
           class="btn btn-sm btn-outline-danger"
@@ -88,9 +100,17 @@ const props = defineProps({
 })
 const { t } = useI18n()
 
-defineEmits(['close', 'delete', 'edit', 'forceEnd'])
+defineEmits(['close', 'delete', 'edit', 'forceEnd', 'toggleSupport'])
 
 const avatarError = ref(false)
+const isSupport = computed(
+  () => props.room.roomKind === 'support' || props.room.isSupport === true,
+)
+const isAgency = computed(
+  () =>
+    !isSupport.value &&
+    (props.room.isPersistent || props.room.roomKind === 'agency' || !!props.room.agencyId),
+)
 
 const hostName = computed(() =>
   props.room.ownerName

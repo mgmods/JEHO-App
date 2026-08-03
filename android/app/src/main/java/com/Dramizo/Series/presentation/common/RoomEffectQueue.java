@@ -269,12 +269,20 @@ public final class RoomEffectQueue {
         }
         playing = true;
         if (listener != null) listener.onPlay(next);
-        long duration = next.isGift()
-                ? (next.comboCount > 1 ? COMBO_GIFT_DURATION_MS : GIFT_DURATION_MS)
-                : (next.durationMs > 0 ? Math.max(4500L, Math.min(9000L, next.durationMs))
-                : ENTRY_DURATION_MS);
-        // Safety net if the effect never reports completion (entry VAP download can take seconds).
+        long duration;
+        if (next.durationMs > 0) {
+            duration = next.durationMs;
+        } else if (next.isGift()) {
+            duration = next.comboCount > 1 ? COMBO_GIFT_DURATION_MS : GIFT_DURATION_MS;
+        } else {
+            duration = ENTRY_DURATION_MS;
+        }
+        // Safety net if the effect never reports completion (entry VAP / gift MP4 download).
         handler.removeCallbacks(safetyAdvance);
-        handler.postDelayed(safetyAdvance, duration + (next.isEntry() ? 4000L : 1200L));
+        long pad = next.isEntry() ? 4000L : 2500L;
+        if (next.isGift() && next.durationMs >= 30_000L) {
+            pad = 5_000L; // video gifts already carry a long hold
+        }
+        handler.postDelayed(safetyAdvance, duration + pad);
     }
 }

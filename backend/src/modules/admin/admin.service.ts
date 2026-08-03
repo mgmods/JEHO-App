@@ -63,6 +63,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GiftType } from '../../database/entities/gift.entity';
 import { v4 as uuidv4 } from 'uuid';
+import { salaryLadderToHostTargetStages } from '../../common/host-salary-ladder';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -643,6 +644,7 @@ export class AdminService {
       hostName: r.host?.displayName || r.host?.username || '—',
       hostAvatarUrl: r.host?.avatarUrl || null,
       membersCount: r.viewerCount ?? 0,
+      isSupport: r.roomKind === RoomKind.SUPPORT,
     }));
     return paginate(mapped, total, query.page || 1, query.limit || 20);
   }
@@ -746,7 +748,7 @@ export class AdminService {
   async closeRoom(roomId: string) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
-    if (room.agencyId || room.roomKind === RoomKind.AGENCY || room.isPersistent) {
+    if (room.agencyId || room.roomKind === RoomKind.AGENCY) {
       throw new ForbiddenException('Suspend the agency instead of closing its persistent room');
     }
 
@@ -778,7 +780,7 @@ export class AdminService {
   async deleteRoom(roomId: string, opts: { allowAgency?: boolean } = {}) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
-    const isAgencyRoom = room.isPersistent || room.roomKind === 'agency' || !!room.agencyId;
+    const isAgencyRoom = room.roomKind === RoomKind.AGENCY || !!room.agencyId;
     if (isAgencyRoom) {
       throw new ForbiddenException(
         'Persistent agency rooms cannot be deleted; suspend the agency instead.',
@@ -852,12 +854,50 @@ export class AdminService {
 
   async updateRoom(
     roomId: string,
-    dto: { accessMode?: string; entryFeeCoins?: number; title?: string },
+    dto: {
+      accessMode?: string;
+      entryFeeCoins?: number;
+      title?: string;
+      roomKind?: string;
+      isSupport?: boolean;
+    },
   ) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
     if (dto.title !== undefined) room.title = dto.title;
-    if (room.agencyId || room.roomKind === RoomKind.AGENCY || room.isPersistent) {
+
+    const kindHint = String(dto.roomKind || '').toLowerCase();
+    const enableSupport = dto.isSupport === true || kindHint === RoomKind.SUPPORT;
+    const disableSupport =
+      dto.isSupport === false ||
+      (kindHint === RoomKind.STANDARD && room.roomKind === RoomKind.SUPPORT);
+
+    if (enableSupport) {
+      if (room.agencyId || room.roomKind === RoomKind.AGENCY) {
+        throw new BadRequestException(
+          'لا يمكن ترقية روم وكالة إلى خدمة عملاء — اختر روماً شخصياً',
+        );
+      }
+      room.roomKind = RoomKind.SUPPORT;
+      room.isPersistent = true;
+      room.status = RoomStatus.OPEN;
+      room.isPublic = true;
+      room.hasPassword = false;
+      room.passwordHash = null;
+      room.accessMode = RoomAccessMode.FREE;
+      room.entryFeeCoins = 0;
+    } else if (disableSupport) {
+      room.roomKind = RoomKind.STANDARD;
+      room.isPersistent = false;
+    }
+
+    const lockedFree =
+      !!room.agencyId ||
+      room.roomKind === RoomKind.AGENCY ||
+      room.roomKind === RoomKind.SUPPORT ||
+      room.isPersistent;
+
+    if (lockedFree) {
       room.status = RoomStatus.OPEN;
       room.isPublic = true;
       room.hasPassword = false;
@@ -870,8 +910,13 @@ export class AdminService {
         room.entryFeeCoins = Math.max(0, Number(dto.entryFeeCoins || 0));
       }
     }
+
     await this.roomsRepo.save(room);
     return room;
+  }
+
+  async setRoomCustomerService(roomId: string, enabled: boolean) {
+    return this.updateRoom(roomId, { isSupport: enabled });
   }
 
   reconcileFriendsCounts() {
@@ -1142,6 +1187,293 @@ export class AdminService {
 
   async getSettings() {
     return this.settingsRepo.find({ order: { key: 'ASC' } });
+  }
+
+  /**
+   * Public-facing policy brochure snapshot for hosts / agencies / supporters.
+   * No secrets (payment keys, Zego, admin internals).
+   */
+  async policyBrochureSnapshot() {
+    const settingsRows = await this.settingsRepo.find();
+    const settings: Record<string, string> = {};
+    for (const row of settingsRows) {
+      if (row?.key != null) settings[row.key] = String(row.value ?? '');
+    }
+
+    const parseJson = <T>(key: string, fallback: T): T => {
+      try {
+        const raw = settings[key];
+        if (!raw) return fallback;
+        return JSON.parse(raw) as T;
+      } catch {
+        return fallback;
+      }
+    };
+
+    const {
+      GIFT_DIAMOND_RATIO,
+      LUCKY_GIFT_DIAMOND_RATIO,
+      AGENCY_CREATE,
+      HOST_ROOM_INVITE_REWARD,
+      STANDARD_RECHARGE_PACKAGES,
+      MALL_COSMETIC_PRICES,
+    } = await import('../../common/pricing-catalog');
+
+    const gifts = await this.giftsRepo.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC', coinPrice: 'ASC' },
+      take: 120,
+    });
+
+    const packages = await this.walletService.listPackages().catch(() => ({
+      items: [...STANDARD_RECHARGE_PACKAGES],
+    }));
+
+    const vipPlans = await this.vipRepo.find({
+      where: { isActive: true },
+      order: { level: 'ASC' },
+      take: 40,
+    });
+
+    let vanityItems: Array<{ publicId: string; priceCoins: number; status?: string }> = [];
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT "publicId", "priceCoins", status FROM vanity_ids
+         WHERE status = 'available'
+         ORDER BY "priceCoins" ASC
+         LIMIT 80`,
+      );
+      if (Array.isArray(rows)) {
+        vanityItems = rows.map((r: any) => ({
+          publicId: String(r.publicId ?? ''),
+          priceCoins: Number(r.priceCoins ?? 0) || 0,
+          status: String(r.status ?? ''),
+        }));
+      }
+    } catch {
+      vanityItems = [];
+    }
+
+    let cosmetics: Array<{ name: string; type: string; priceCoins: number }> = [];
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT name, type, "coinPrice" FROM cosmetics
+         WHERE "isActive" = true
+         ORDER BY type ASC, "coinPrice" ASC
+         LIMIT 100`,
+      );
+      if (Array.isArray(rows)) {
+        cosmetics = rows.map((r: any) => ({
+          name: String(r.name ?? ''),
+          type: String(r.type ?? ''),
+          priceCoins: Number(r.coinPrice ?? 0) || 0,
+        }));
+      }
+    } catch {
+      cosmetics = [];
+    }
+
+    let luckyBoxes: Array<{ name: string; priceCoins: number; note?: string }> = [];
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT title, kind, "costCoins" FROM lucky_boxes
+         WHERE "isActive" = true
+         ORDER BY "costCoins" ASC
+         LIMIT 40`,
+      );
+      if (Array.isArray(rows)) {
+        luckyBoxes = rows.map((r: any) => ({
+          name: String(r.title ?? 'صندوق حظ'),
+          priceCoins: Number(r.costCoins ?? 0) || 0,
+          note: String(r.kind || '') === 'free_daily' ? 'يومي مجاني' : undefined,
+        }));
+      }
+    } catch {
+      luckyBoxes = [];
+    }
+
+    const hostTargetRaw =
+      parseJson<any>('host_monthly_target', null) ||
+      parseJson<any>('hostMonthlyTarget', null);
+    let hostTarget: any[] = [];
+    if (Array.isArray(hostTargetRaw)) {
+      hostTarget = hostTargetRaw;
+    } else if (hostTargetRaw && Array.isArray(hostTargetRaw.stages)) {
+      hostTarget = hostTargetRaw.stages;
+    }
+    const hasSalary = hostTarget.some(
+      (s) => Number(s?.hostSalaryUsd) > 0 || Number(s?.agentSalaryUsd) > 0,
+    );
+    if (!hostTarget.length || !hasSalary) {
+      hostTarget = salaryLadderToHostTargetStages();
+    }
+
+    const agencyCreateCoins = Number(
+      settings[AGENCY_CREATE.settingKey] || AGENCY_CREATE.defaultCoins,
+    );
+
+    const economy = {
+      giftDiamondRatio: GIFT_DIAMOND_RATIO,
+      luckyGiftDiamondRatio: LUCKY_GIFT_DIAMOND_RATIO,
+      diamondUsdRate: Number(settings['economy.diamondUsdRate'] || 0.00005),
+      diamondCoinRate: Number(settings['economy.diamondCoinRate'] || 0.55),
+      withdrawTargetDiamonds: Number(
+        settings['economy.withdrawTargetDiamonds'] ||
+          settings['withdraw_target_diamonds'] ||
+          10000,
+      ),
+      agencyCreateCoins: Number.isFinite(agencyCreateCoins)
+        ? agencyCreateCoins
+        : AGENCY_CREATE.defaultCoins,
+      hostInviteDiamonds: HOST_ROOM_INVITE_REWARD.diamonds,
+      hostInviteDwellSeconds: HOST_ROOM_INVITE_REWARD.dwellSeconds,
+      hostInviteMaxPerDay: HOST_ROOM_INVITE_REWARD.maxRewardsPerHostPerDay,
+      platformShare: Number(settings['economy.platform_share'] || settings['gift_platform_share'] || 0.3),
+      agencyShare: Number(settings['economy.agency_share'] || settings['gift_agency_share'] || 0.15),
+      hostShareWithAgency: Number(settings['economy.host_share_agency'] || 0.55),
+      hostShareSolo: Number(settings['economy.host_share_solo'] || 0.7),
+    };
+
+    const paymentFlags = {
+      shamCash: /true|1|yes/i.test(String(settings['payments.sham_cash.enabled'] || settings['sham_cash_enabled'] || '')),
+      binancePay: /true|1|yes/i.test(String(settings['payments.binance_pay.enabled'] || settings['binance_pay_enabled'] || '')),
+      fourthwall: /true|1|yes/i.test(String(settings['payments.fourthwall.enabled'] || settings['fourthwall_enabled'] || '')),
+      googlePlay: true,
+      rechargeAgents: true,
+    };
+
+    const storeOffers = (() => {
+      const raw = parseJson<any>('store_offers', []);
+      const list = Array.isArray(raw) ? raw : raw?.items || [];
+      return (list as any[])
+        .filter((o) => o && (o.active !== false))
+        .slice(0, 40)
+        .map((o) => ({
+          title: String(o.title || o.name || o.sku || 'عرض'),
+          subtitle: String(o.subtitle || o.description || ''),
+          coins: Number(o.coins || 0) || 0,
+          bonusCoins: Number(o.bonusCoins || o.bonus || 0) || 0,
+          priceUsd: Number(o.priceUsd || o.price || 0) || 0,
+        }));
+    })();
+
+    const homeBanners = (() => {
+      const raw = parseJson<any>('home_banners', []);
+      const list = Array.isArray(raw) ? raw : raw?.items || [];
+      return (list as any[]).slice(0, 20).map((b) => ({
+        title: String(b.title || b.name || 'بنر'),
+        imageUrl: String(b.imageUrl || b.url || ''),
+        link: String(b.link || b.href || ''),
+      }));
+    })();
+
+    let promoCatalog: any = null;
+    try {
+      const {
+        PROMO_CATALOG_VERSION,
+        MONTHLY_RECHARGE_OFFERS,
+        AGENT_FLOAT_BONUS_TIERS,
+        SUPPORTER_PACKS,
+        VIP_DURATION_PACKS,
+      } = await import('../../common/promo-catalog');
+      const override = parseJson<any>('promo_catalog', null);
+      promoCatalog = override || {
+        version: PROMO_CATALOG_VERSION,
+        monthlyOffers: MONTHLY_RECHARGE_OFFERS,
+        agentTiers: AGENT_FLOAT_BONUS_TIERS,
+        supporterPacks: SUPPORTER_PACKS,
+        vipDurationPacks: VIP_DURATION_PACKS,
+      };
+    } catch {
+      promoCatalog = null;
+    }
+
+    let withdrawPackages: any[] = [];
+    try {
+      const wp = await this.walletService.listWithdrawPackages?.();
+      const items = (wp as any)?.items || wp || [];
+      withdrawPackages = Array.isArray(items)
+        ? items.slice(0, 20).map((p: any) => ({
+            usd: Number(p.usd || p.priceUsd || 0) || 0,
+            diamonds: Number(p.diamonds || 0) || 0,
+          }))
+        : [];
+    } catch {
+      withdrawPackages = [];
+    }
+
+    const games = (() => {
+      const raw = parseJson<any>('app_games', []);
+      const list = Array.isArray(raw) ? raw : raw?.games || raw?.items || [];
+      return (list as any[])
+        .filter((g) => g && g.enabled !== false)
+        .slice(0, 40)
+        .map((g) => ({
+          name: String(g.name || g.title || g.id || 'لعبة'),
+          id: String(g.id || g.code || ''),
+        }));
+    })();
+
+    let agentPricing: any = null;
+    try {
+      agentPricing = parseJson<any>('recharge_agent_pricing', null);
+    } catch {
+      agentPricing = null;
+    }
+
+    const mediaBase = 'https://api.adnova.bbs.tr';
+    const absUrl = (u?: string | null) => {
+      if (!u) return null;
+      const s = String(u).trim();
+      if (!s) return null;
+      if (s.startsWith('http')) return s;
+      return `${mediaBase}${s.startsWith('/') ? '' : '/'}${s}`;
+    };
+
+    return {
+      brand: 'JEHO CHAT',
+      logoUrl: `${mediaBase}/logo.png`,
+      audience: 'hosts_agencies_supporters',
+      generatedAt: new Date().toISOString(),
+      economy,
+      hostTarget: Array.isArray(hostTarget) ? hostTarget : [],
+      gifts: gifts.map((g) => ({
+        id: g.id,
+        name: g.name,
+        coinPrice: g.coinPrice,
+        diamondValue: g.diamondValue,
+        type: g.type,
+        iconUrl: absUrl(g.iconUrl),
+      })),
+      packages: (packages as any)?.items || packages || [],
+      storeOffers,
+      promoCatalog,
+      homeBanners,
+      withdrawPackages,
+      games,
+      agentPricing,
+      vipPlans: vipPlans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        level: p.level,
+        priceCoins: p.coinPriceMonthly ?? vipPriceForLevel(p.level),
+        durationDays: 30,
+      })),
+      vanityIds: vanityItems,
+      cosmetics,
+      mallPriceHints: MALL_COSMETIC_PRICES,
+      luckyBoxes,
+      paymentFlags,
+      luckyGiftTiers: [
+        { name: 'حظ برونزي', coinPrice: 100 },
+        { name: 'حظ فضي', coinPrice: 500 },
+        { name: 'حظ ذهبي', coinPrice: 1000 },
+      ],
+      notes: {
+        intro:
+          'دليل سياسة JEHO CHAT للمضيفات ومن يريد فتح وكالة والداعمين — لفهم الاقتصاد والغرف والهدايا والسحب بدون تفاصيل إدارية داخلية.',
+      },
+    };
   }
 
   async setSetting(key: string, value: string, description?: string) {

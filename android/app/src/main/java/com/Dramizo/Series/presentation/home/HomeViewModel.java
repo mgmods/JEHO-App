@@ -175,10 +175,11 @@ public class HomeViewModel extends ViewModel {
         c.status = neu.status;
         c.hostId = old.hostId;
         c.cohostId = old.cohostId;
-        c.agencyId = old.agencyId;
-        c.roomKind = old.roomKind;
-        c.isPersistent = old.isPersistent;
-        c.activeHostId = old.activeHostId;
+        // Identity must track server (personal vs agency), not stick to first poll.
+        c.agencyId = neu.agencyId != null ? neu.agencyId : old.agencyId;
+        c.roomKind = neu.roomKind != null ? neu.roomKind : old.roomKind;
+        c.isPersistent = neu.isPersistent;
+        c.activeHostId = neu.activeHostId != null ? neu.activeHostId : old.activeHostId;
         c.moderatorIds = old.moderatorIds;
         c.moderatorPermissions = old.moderatorPermissions;
         c.musicUrl = old.musicUrl;
@@ -190,14 +191,15 @@ public class HomeViewModel extends ViewModel {
         c.seatCount = old.seatCount;
         c.viewerCount = neu.viewerCount;
         c.zegoRoomId = old.zegoRoomId;
-        c.hasPassword = old.hasPassword;
-        c.isPublic = old.isPublic;
+        c.hasPassword = neu.hasPassword;
+        c.isPublic = neu.isPublic;
         c.seats = neu.seats != null ? neu.seats : old.seats;
         c.host = neu.host != null ? neu.host : old.host;
         c.challengeBadge = old.challengeBadge;
         c.viewerAvatars = neu.viewerAvatars != null ? neu.viewerAvatars : old.viewerAvatars;
         c.roomLevel = neu.roomLevel;
-        c.exploreRank = old.exploreRank;
+        // Keep live Hot rank from server (1/2/3 badges); fall back only if missing.
+        c.exploreRank = neu.exploreRank > 0 ? neu.exploreRank : old.exploreRank;
         c.giftSoundsEnabled = old.giftSoundsEnabled;
         c.chatZoneEnabled = old.chatZoneEnabled;
         c.charmEnabled = old.charmEnabled;

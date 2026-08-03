@@ -35,6 +35,8 @@ export enum RoomAccessMode {
 export enum RoomKind {
   STANDARD = 'standard',
   AGENCY = 'agency',
+  /** Official customer-service / support room (admin-elevated). */
+  SUPPORT = 'support',
 }
 
 @Entity('rooms')

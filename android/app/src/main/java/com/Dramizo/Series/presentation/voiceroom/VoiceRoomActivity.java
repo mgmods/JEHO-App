@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.voiceroom;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
 import android.content.Intent;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
@@ -19,6 +20,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -69,12 +71,14 @@ import com.Dramizo.Series.presentation.gifts.GiftRecipient;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.service.VoiceRoomForegroundService;
 import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.util.ActiveRoomSession;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.AvatarImageLoader;
 import com.Dramizo.Series.util.GiftAudioFx;
+import com.Dramizo.Series.util.GlobalCelebrationToast;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RoomCardAnimator;
@@ -219,12 +223,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private Boolean lastMicUiState;
     private boolean roomSpeakerMuted;
     private int realtimeJoinAttempts;
+    /** True when this Activity instance restored UI from {@link ActiveRoomSession}. */
+    private boolean resumedFromActiveSession;
     private final Runnable retryRealtimeJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
         connectRealtimeRoom();
     };
     private final Runnable retryHttpJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
+        // Never force a full rejoin while the live session is still in-process.
+        if (ActiveRoomSession.get().canResumeUi(roomId) || resumedFromActiveSession) return;
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
         String pass = getIntent() != null ? getIntent().getStringExtra(EXTRA_PASSWORD) : null;
@@ -244,7 +252,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 viewModel.refresh(roomId);
                 if (canInviteMic) viewModel.loadSeatRequests(roomId);
             }
-            handler.postDelayed(this, 30_000L);
+            handler.postDelayed(this, 60_000L);
         }
     };
 
@@ -389,12 +397,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     binding.comingMsgView.play(Math.max(2800L, Math.min(5000L, effect.durationMs)));
                 }
             } else if (effect.isGift()) {
-                if (!roomLowGiftEffectsEnabled()
+                // Never suppress VIDEO/SVGA gifts (e.g. user-uploaded أسد mp4 at 10 coins).
+                String animCheck = effect.giftAnimationUrl;
+                String mappedCheck = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                        effect.giftName, effect.giftIconUrl, animCheck);
+                if (mappedCheck != null) animCheck = mappedCheck;
+                com.Dramizo.Series.util.CosmeticMedia.Kind animKind =
+                        com.Dramizo.Series.util.CosmeticMedia.kind(
+                                com.Dramizo.Series.util.CosmeticMedia.playableUrl(animCheck));
+                boolean hasFullscreenMedia =
+                        animKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO
+                                || animKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA;
+                if (!hasFullscreenMedia
+                        && !roomLowGiftEffectsEnabled()
                         && effect.totalCoins > 0 && effect.totalCoins < 100) {
                     effectQueue.notifyFinished();
                     return;
                 }
-                playGiftToRecipient(effect.giftName, effect.giftIconUrl, effect.giftAnimationUrl,
+                playGiftToRecipient(effect.giftName, effect.giftIconUrl,
+                        mappedCheck != null ? mappedCheck : effect.giftAnimationUrl,
                         effect.displayName, Math.max(1, effect.comboCount),
                         effect.senderUserId, effect.senderVipLevel, effect.avatarUrl,
                         effect.hostBadgeUrl, effect.userLevel,
@@ -713,14 +734,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(e)
                     || msg.contains("room entry")) {
                 dismissRoomJoinLoading();
+                hoppingRoom = false;
+                switchingRoom = false;
                 com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
-                if (!exiting) {
+                // Gift / lucky / in-room spend must NEVER kick the user out.
+                // Only unpaid room-entry (never joined) may leave this screen.
+                boolean alreadyInRoom = pendingSession != null
+                        || resumedFromActiveSession
+                        || ActiveRoomSession.get().canResumeUi(roomId)
+                        || zegoLoggedIn;
+                if (!alreadyInRoom && !exiting) {
                     exiting = true;
                     finish();
                 }
             } else if (isJoinBlockedError(msg)) {
                 // Ban / room missing only — never eject for network / socket noise.
                 dismissRoomJoinLoading();
+                hoppingRoom = false;
+                switchingRoom = false;
                 Toast.makeText(this, e, Toast.LENGTH_LONG).show();
                 if (!exiting) {
                     exiting = true;
@@ -729,6 +760,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else {
                 // Stay in the room screen and soft-retry HTTP join.
                 dismissRoomJoinLoading();
+                hoppingRoom = false;
+                switchingRoom = false;
+                // Already live (minimize resume) — never spam "اتصال ضعيف" / rejoin.
+                if (resumedFromActiveSession || pendingSession != null
+                        || ActiveRoomSession.get().canResumeUi(roomId)) {
+                    return;
+                }
                 Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
                 if (!exiting && roomId != null && !roomId.isEmpty()) {
                     handler.removeCallbacks(retryHttpJoinRunnable);
@@ -924,17 +962,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     } catch (Exception ignored) {
                     }
                 }
+            } else if (nowOnSeat && isHost && !userChoseMute && !micOn
+                    && (mySeat == null || !mySeat.isModeratorMuted)) {
+                // Host already seated on first open (no wasOnSeat edge) — still open mic.
+                micOn = true;
+                try {
+                    ZegoEngineManager.getInstance().setMicEnabled(true);
+                } catch (Exception ignored) {
+                }
             }
             syncMicUi();
-            activateSeatAudio(seats);
+            activateSeatAudio(seats, nowOnSeat && (!wasOnSeat || isHost));
             applyRoomBackground(room.backgroundUrl);
             locked = room.hasPassword || "locked".equalsIgnoreCase(room.status);
+            ActiveRoomSession.get().updateRoom(room);
+            ActiveRoomSession.get().syncFlags(isHost, isAgencyRoom, micOn, roomSpeakerMuted);
             // The realtime join event is authoritative, including this viewer's own spend/cosmetics.
         });
         viewModel.getSession().observe(this, session -> {
             if (session == null) return;
             pendingSession = session;
+            hoppingRoom = false;
+            switchingRoom = false;
+            ActiveRoomSession.get().capture(
+                    roomId, session, viewModel.getRoom().getValue(),
+                    isHost, isAgencyRoom, micOn, roomSpeakerMuted);
             rtcCanPublish = session.canPublish;
+            // expireAt from API is unix seconds — needed so first publish does not wait forever.
+            rtcPublishTokenExpiresAtMs = session.expireAt > 0
+                    ? session.expireAt * 1000L
+                    : System.currentTimeMillis() + 55_000L;
             connectRealtimeRoom();
             // Refresh VIP/level so chat bubbles use real VIP from /users/me
             ContainerProvider.from(this).getIoExecutor().execute(() -> {
@@ -954,22 +1011,108 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ZegoEngineManager.getInstance().loginRoom(zegoRoom, userId != null ? userId : "guest", session.token);
             if (session.room != null && myUserId != null && myUserId.equals(session.room.hostId)) {
                 isHost = true;
-                // Do NOT force mic open — respect current mute preference.
+            }
+            // Host/agency open: already seated on seat 0 — open mic unless user muted themselves.
+            if (session.room != null && session.room.seats != null
+                    && (currentSeats == null || currentSeats.isEmpty())) {
+                currentSeats = session.room.seats;
+            }
+            if (isOnSeat(currentSeats)) {
+                if (!userChoseMute) {
+                    RoomDtos.SeatDto mySeat = findMySeat(currentSeats);
+                    if (mySeat == null || !mySeat.isModeratorMuted) {
+                        micOn = true;
+                    }
+                }
             }
             ZegoEngineManager.getInstance().setMicEnabled(micOn);
-            handler.postDelayed(() -> activateSeatAudio(currentSeats), 600);
+            // Unmute speakers for this session (leave path leaves them muted).
+            // Clear any stash first so unmute cannot revive streams from the previous room hop.
+            roomSpeakerMuted = false;
+            try {
+                ZegoEngineManager.getInstance().clearPausedPlayStreams();
+                ZegoEngineManager.getInstance().setSpeakerMuted(false);
+                RoomSoundFx.setMuted(false);
+            } catch (Exception ignored) {
+            }
+            // Force publish after login (debounce used to skip and guests never heard host).
+            final int audioEpoch = roomAudioEpoch;
+            activateSeatAudio(currentSeats, true);
+            handler.postDelayed(() -> {
+                if (audioEpoch != roomAudioEpoch || exiting) return;
+                activateSeatAudio(currentSeats, true);
+            }, 180);
+            handler.postDelayed(() -> {
+                if (audioEpoch != roomAudioEpoch || exiting) return;
+                activateSeatAudio(currentSeats, true);
+            }, 700);
         });
 
-        handler.postDelayed(refreshRunnable, 30_000L);
+        handler.postDelayed(refreshRunnable, 60_000L);
 
         if (roomId == null || roomId.isEmpty() || "demo-room-1".equals(roomId)) {
             Toast.makeText(this, R.string.open_or_create_room, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
+        if (tryRestoreActiveRoomSession()) {
+            return;
+        }
         String pass = getIntent().getStringExtra(EXTRA_PASSWORD);
         showRoomJoinLoading();
         viewModel.join(roomId, pass);
+    }
+
+    /**
+     * Mikoo reopen: same process still in Zego room → paint UI from cache, skip loading/join.
+     */
+    private boolean tryRestoreActiveRoomSession() {
+        ActiveRoomSession ars = ActiveRoomSession.get();
+        if (!ars.canResumeUi(roomId)) return false;
+        RoomDtos.JoinRoomResult join = ars.session();
+        if (join == null) return false;
+        resumedFromActiveSession = true;
+        roomJoinLoadingDismissed = true;
+        dismissRoomJoinLoading();
+        ars.setMinimized(false);
+        isHost = ars.isHost() || getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
+        isAgencyRoom = ars.isAgencyRoom();
+        try {
+            micOn = ZegoEngineManager.getInstance().isMicEnabled();
+        } catch (Exception ignored) {
+            micOn = ars.isMicOn();
+        }
+        roomSpeakerMuted = ars.isSpeakerMuted();
+        // Zego already logged in — do not call loginRoom again.
+        zegoLoggedIn = true;
+        realtimeJoined = RealtimeClient.getInstance().isJoinedRoom(roomId);
+        realtimeJoinAttempts = 0;
+        viewModel.restoreLocalSession(join, ars.latestRoom());
+        // Soft sync only (no join loading).
+        handler.post(() -> {
+            if (exiting || roomId == null) return;
+            viewModel.refresh(roomId);
+            viewModel.loadSupporters(roomId);
+            if (!realtimeJoined) connectRealtimeRoom();
+            try {
+                activateSeatAudio(currentSeats, true);
+            } catch (Exception ignored) {
+            }
+            syncMicUi();
+        });
+        return true;
+    }
+
+    private void captureActiveRoomSession() {
+        if (roomId == null || roomId.isEmpty() || pendingSession == null) return;
+        ActiveRoomSession.get().capture(
+                roomId,
+                pendingSession,
+                viewModel != null ? viewModel.getRoom().getValue() : null,
+                isHost,
+                isAgencyRoom,
+                micOn,
+                roomSpeakerMuted);
     }
 
     private void showRoomJoinLoading() {
@@ -1374,12 +1517,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    /** Wipe chat only when broadcast ends. */
+    /** Wipe chat only when broadcast ends OR staff clears for everyone. */
     private void clearRoomChatSession() {
         if (roomId != null) RoomChatMemory.clear(roomId);
         if (binding != null && binding.chatLog != null) {
             binding.chatLog.removeAllViews();
         }
+        roomChatMemorySyncedCount = 0;
         roomChatRestored = true;
     }
 
@@ -1684,10 +1828,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      */
     private void keepRoomInBackground() {
         if (roomId == null || roomId.isEmpty() || minimizing || exiting || isFinishing()) return;
+        captureActiveRoomSession();
+        ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
+        ensureMinimizedListeningState();
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
         navigateHomeAndFinish();
+    }
+
+    /**
+     * While UI is gone but room session stays: hear the room, own mic off.
+     * Never call setSpeakerMuted(true) here — that stops remote play streams.
+     */
+    private void ensureMinimizedListeningState() {
+        try {
+            mutedForBackground = false;
+            roomSpeakerMuted = false;
+            speakerMutedBeforeBackground = false;
+            RoomSoundFx.setMuted(false);
+            ZegoEngineManager.getInstance().setSpeakerMuted(false);
+            // Mute own mic while minimized (notification / mini player can unmute).
+            micOn = false;
+            ZegoEngineManager.getInstance().setMicEnabled(false);
+            if (roomId != null && !roomId.isEmpty()) {
+                final String rid = roomId;
+                ContainerProvider.from(this).getIoExecutor().execute(() ->
+                        ContainerProvider.from(this).getRoomRepository().setMic(rid, true));
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     /**
@@ -1696,7 +1866,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      */
     private void ensuringRoomKeepAlive(boolean markMinimizing) {
         if (roomId == null || roomId.isEmpty() || exiting) return;
-        if (markMinimizing) minimizing = true;
+        if (markMinimizing) {
+            minimizing = true;
+            captureActiveRoomSession();
+            ActiveRoomSession.get().setMinimized(true);
+        }
         long musicPosition = 0L;
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
@@ -1833,6 +2007,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Toast.makeText(this, withOnOff(R.string.room_more_chat_zone, next), Toast.LENGTH_SHORT).show();
                 break;
             }
+            case "clear_chat":
+                confirmClearRoomChat();
+                break;
             case "charm": {
                 if (!canManageRoom) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
@@ -1959,16 +2136,60 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void applyChatZone(boolean enabled) {
-        if (binding != null && binding.chatLog != null) {
-            binding.chatLog.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        if (binding == null) return;
+        // منطقة الدردشة: يخفي لوحة الشات العامة + حبة الكتابة (لا مساحة فاضية).
+        int vis = enabled ? View.VISIBLE : View.GONE;
+        if (binding.chatPanel != null) binding.chatPanel.setVisibility(vis);
+        if (binding.scrollChat != null) binding.scrollChat.setVisibility(vis);
+        if (binding.chatLog != null) binding.chatLog.setVisibility(vis);
+        if (binding.tvChatInputTips != null) {
+            binding.tvChatInputTips.setVisibility(vis);
+        }
+        if (!enabled) {
+            try {
+                closeRoomChatComposer(false);
+            } catch (Exception ignored) {
+            }
         }
     }
 
     private void applyRoomBanner(boolean enabled) {
-        // Banner strip is shown only when there is content; master switch gates future shows.
-        if (!enabled && binding != null && binding.roomBanner != null) {
+        if (binding == null || binding.roomBanner == null) return;
+        if (!enabled) {
             binding.roomBanner.setVisibility(View.GONE);
+            return;
         }
+        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        String title = room != null && room.title != null && !room.title.isEmpty()
+                ? room.title
+                : (binding.tvRoomTitle != null && binding.tvRoomTitle.getText() != null
+                ? binding.tvRoomTitle.getText().toString()
+                : getString(R.string.voice_room));
+        if (binding.tvRoomBannerTitle != null) {
+            binding.tvRoomBannerTitle.setText(title);
+        }
+        String cover = currentRoomCoverUrl;
+        if ((cover == null || cover.isEmpty()) && room != null) cover = room.coverUrl;
+        if (binding.imgRoomBannerCover != null) {
+            AvatarImageLoader.load(binding.imgRoomBannerCover, cover);
+        }
+        binding.roomBanner.setVisibility(View.VISIBLE);
+    }
+
+    /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
+    public void setGiftSeatSelection(@Nullable java.util.Collection<String> userIds) {
+        if (seatAdapter == null) return;
+        java.util.HashSet<String> set = new java.util.HashSet<>();
+        if (userIds != null) {
+            for (String id : userIds) {
+                if (id != null && !id.isEmpty()) set.add(id);
+            }
+        }
+        seatAdapter.setGiftSelectedUsers(set);
+    }
+
+    public void clearGiftSeatSelection() {
+        if (seatAdapter != null) seatAdapter.clearGiftSelection();
     }
 
     private boolean roomCharmEnabled() {
@@ -2002,8 +2223,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
             return;
         }
-        BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
+        Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View root = getLayoutInflater().inflate(R.layout.dialog_room_blacklist, null, false);
+        dialog.setContentView(root);
+        dialog.setCanceledOnTouchOutside(true);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setGravity(android.view.Gravity.BOTTOM);
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            WindowManager.LayoutParams lp = window.getAttributes();
+            lp.width = WindowManager.LayoutParams.MATCH_PARENT;
+            lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.gravity = android.view.Gravity.BOTTOM;
+            lp.dimAmount = 0.45f;
+            window.setAttributes(lp);
+            window.setNavigationBarColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.color_gift_dialog_bg));
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                window.setNavigationBarContrastEnforced(false);
+            }
+        }
         TextView tvCount = root.findViewById(R.id.tvBlacklistCount);
         ProgressBar progress = root.findViewById(R.id.progressBlacklist);
         TextView tvEmpty = root.findViewById(R.id.tvBlacklistEmpty);
@@ -2011,8 +2252,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (recycler != null) {
             recycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
         }
-        AuraDialogHelper.applyContent(root);
-        dialog.setContentView(root);
         dialog.show();
 
         AppContainer c = ContainerProvider.from(this);
@@ -2115,19 +2354,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void confirmClearRoomChat() {
-        // Chat stays for the whole live — cleared only when ending the broadcast.
-        Toast.makeText(this,
-                "رسائل الروم تُحفظ أثناء البث وتُمسح فقط عند إنهاء اللايف",
-                Toast.LENGTH_LONG).show();
+        if (!(canManageRoom || canModerateRoom() || isHost || isOwner)) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AuraDialogHelper.confirm(this,
+                getString(R.string.clear_room_chat),
+                getString(R.string.clear_room_chat_confirm),
+                getString(R.string.clear_room_chat_short),
+                this::clearRoomChatForEveryone,
+                getString(android.R.string.cancel),
+                null);
     }
 
+    /** Staff action: clear public room chat for every client in the room. */
     private void clearRoomChatForEveryone() {
-        // Intentionally disabled mid-broadcast (see confirmClearRoomChat).
-        confirmClearRoomChat();
+        if (roomId == null || roomId.isEmpty()) return;
+        if (!(canManageRoom || canModerateRoom() || isHost || isOwner)) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        boolean sent = RealtimeClient.getInstance().emitRoomEvent(
+                roomId, "room:chat_cleared", new JsonObject());
+        if (!sent) {
+            Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Optimistic local wipe; room:chat_cleared also arrives for every client (incl. self).
+        clearLocalRoomChat();
+        Toast.makeText(this, R.string.clear_room_chat_done, Toast.LENGTH_SHORT).show();
     }
 
     private void clearLocalRoomChat() {
-        // Do not wipe mid-live. Session wipe happens via clearRoomChatSession().
+        clearRoomChatSession();
     }
 
     private void setupMusicUi() {
@@ -2451,17 +2710,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             clearMusicVideoUi();
             if (roomMusicPlayer != null) roomMusicPlayer.stop();
             if (canManageMusic) ZegoEngineManager.getInstance().stopLocalMusic();
-            // Host/staff always keep the Mikoo-style music chip to pick local tracks.
-            showMusicReopenChip(canManageMusic || isHost || isOwner);
+            // No music → never float a player chip in the user's face (fresh install / idle).
+            showMusicReopenChip(false);
             return;
         }
 
         boolean dismissed = incomingMusicUrl.equals(dismissedMusicUrl);
         if (canManageMusic) {
-            // Manager/Host: sees full control card.
+            // Manager/Host: sees full control card only while track is active & not dismissed.
             boolean showCard = !dismissed && (playing || paused);
             musicPanelExpanded = showCard;
             binding.musicCard.setVisibility(showCard ? View.VISIBLE : View.GONE);
+            // After close (X): compact disc near mic — only while music still plays/pauses.
             showMusicReopenChip(!showCard && (playing || paused));
             if (showCard) {
                 binding.musicCard.setElevation(dp(28));
@@ -2469,7 +2729,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.musicCard.bringToFront();
             }
         } else {
-            // Listeners: NEVER see the control card. Only see the spinning disc indicator while music plays.
+            // Listeners: NEVER see the control card. Only spinning disc while music plays.
             musicPanelExpanded = false;
             binding.musicCard.setVisibility(View.GONE);
             showMusicReopenChip(!dismissed && playing);
@@ -2979,7 +3239,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .putString("dismissed_music_" + roomId, dismissedMusicUrl)
                     .apply();
         }
-        showMusicReopenChip(canManageMusic || isHost || isOwner);
+        boolean stillActive = currentMusicUrl != null && !currentMusicUrl.isEmpty()
+                && ("playing".equalsIgnoreCase(currentMusicStatus)
+                || "paused".equalsIgnoreCase(currentMusicStatus));
+        // Close → compact disc near mic (only while music is still active).
+        showMusicReopenChip(stillActive && (canManageMusic || isHost || isOwner));
         bindMusicVideoSurfaces();
     }
 
@@ -4700,18 +4964,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void showEmojiPicker() {
-        BottomSheetDialog dialog = new BottomSheetDialog(this);
-        dialog.setOnShowListener(d -> {
-            AuraDialogHelper.configureShown(dialog);
-            android.widget.FrameLayout bottom = dialog.findViewById(
-                    com.google.android.material.R.id.design_bottom_sheet);
-            if (bottom != null) {
-                com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottom)
-                        .setDraggable(false);
-            }
-        });
+        Dialog dialog = new Dialog(this, R.style.MikooBottomPanelDialog);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_emoji_picker, null);
         dialog.setContentView(sheet);
+        dialog.setCanceledOnTouchOutside(true);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setGravity(android.view.Gravity.BOTTOM);
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            WindowManager.LayoutParams lp = window.getAttributes();
+            lp.width = WindowManager.LayoutParams.MATCH_PARENT;
+            lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            lp.gravity = android.view.Gravity.BOTTOM;
+            lp.dimAmount = 0.45f;
+            window.setAttributes(lp);
+            window.setNavigationBarColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.color_gift_dialog_bg));
+            if (android.os.Build.VERSION.SDK_INT >= 29) {
+                window.setNavigationBarContrastEnforced(false);
+            }
+        }
 
         String[] stickerKeys = SeatReactionEmojis.KEYS;
         int[] stickerRes = SeatReactionEmojis.DRAWABLES;
@@ -5510,19 +5784,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         for (View slot : slots) {
             if (slot != null) slot.setVisibility(View.GONE);
         }
+        for (TextView score : scores) {
+            if (score != null) score.setVisibility(View.GONE);
+        }
         // Only the current top-3 by score (rank shifts when someone overtakes).
-        List<RoomDtos.SupporterDto> top = new ArrayList<>();
+        List<RoomDtos.SupporterDto> all = new ArrayList<>();
         if (supporters != null) {
             for (RoomDtos.SupporterDto item : supporters) {
                 if (item == null) continue;
-                top.add(item);
+                all.add(item);
             }
-            top.sort((a, b) -> Long.compare(Math.max(0L, b.score), Math.max(0L, a.score)));
-            if (top.size() > 3) top = new ArrayList<>(top.subList(0, 3));
+            all.sort((a, b) -> Long.compare(Math.max(0L, b.score), Math.max(0L, a.score)));
         }
+        List<RoomDtos.SupporterDto> top = all.size() > 3
+                ? new ArrayList<>(all.subList(0, 3))
+                : all;
         boolean hasAny = !top.isEmpty();
         if (binding.rowTopHosts != null) {
             binding.rowTopHosts.setVisibility(hasAny ? View.VISIBLE : View.GONE);
+        }
+        if (binding.tvSupportersCount != null) {
+            if (hasAny) {
+                int total = Math.max(top.size(), all.size());
+                binding.tvSupportersCount.setText(total > 99 ? "99+" : String.valueOf(total));
+                binding.tvSupportersCount.setVisibility(View.VISIBLE);
+            } else {
+                binding.tvSupportersCount.setVisibility(View.GONE);
+            }
         }
         // Keep room card readable beside the compact stack.
         if (binding.hostCardWrap != null) {
@@ -5536,14 +5824,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         for (int i = 0; i < top.size(); i++) {
             RoomDtos.SupporterDto supporter = top.get(i);
             bindTop(slots[i], imgs[i], frames[i], supporter.avatarUrl, null);
-            if (slots[i] != null) slots[i].setElevation(dp(6 - i));
-            if (scores[i] != null) {
-                scores[i].setText(formatAudienceScore(supporter.score));
-                scores[i].setVisibility(View.VISIBLE);
-            }
-            String medal = i == 0 ? "🥇" : i == 1 ? "🥈" : "🥉";
+            // Front avatar (left) highest elevation — Mikoo cascade.
+            if (slots[i] != null) slots[i].setElevation(dp(8 - i * 2));
             slots[i].setContentDescription(
-                    medal + " " + supporter.displayName + " " + supporter.score);
+                    "داعم " + (i + 1) + " " + supporter.displayName);
             final RoomDtos.SupporterDto tap = supporter;
             slots[i].setOnClickListener(v -> showUserCard(
                     tap.userId,
@@ -5629,6 +5913,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         img.setPadding(0, 0, 0, 0);
         img.setBackground(null);
+        AvatarImageLoader.applyCircularClip(img);
         AvatarImageLoader.load(img, url);
     }
 
@@ -5638,6 +5923,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View[] slots = {binding.topSlot1, binding.topSlot2, binding.topSlot3};
         for (View slot : slots) {
             if (slot != null) slot.setVisibility(View.GONE);
+        }
+        if (binding.tvSupportersCount != null) {
+            binding.tvSupportersCount.setVisibility(View.GONE);
         }
         if (binding.rowTopHosts != null) binding.rowTopHosts.setVisibility(View.GONE);
         if (binding.rowAgencyTop != null) binding.rowAgencyTop.setVisibility(View.GONE);
@@ -5708,11 +5996,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /**
      * Single leave/logout path (Mikoo BaseRoomServiceScheduler.exitRoom analogue).
-     * Safe to call from exitRoom, forceExitRoom, or onDestroy fallback — runs once.
+     * Safe to call from exitRoom, forceExitRoom, room-hop, or onDestroy fallback.
+     * Order: hard-cut audio (no mute-restore stash) → stop music → socket/HTTP leave → Zego logout.
+     *
+     * @param force when true, run even if a previous teardown already marked done
+     *              (required for swipe room-hop so old audio always dies).
      */
     private void teardownRoomSession(boolean stopForeground) {
-        if (roomTeardownDone) return;
+        teardownRoomSession(stopForeground, false);
+    }
+
+    private void teardownRoomSession(boolean stopForeground, boolean force) {
+        if (roomTeardownDone && !force) return;
         roomTeardownDone = true;
+        // 1) Cut all room sound IMMEDIATELY — never stash streams for unmute restore.
+        try {
+            roomSpeakerMuted = true;
+            RoomSoundFx.setMuted(true);
+            GiftAudioFx.resetRoomGiftSounds();
+        } catch (Exception ignored) {
+        }
+        try {
+            if (roomMusicPlayer != null) {
+                roomMusicPlayer.setPlayWhenReady(false);
+                roomMusicPlayer.stop();
+                roomMusicPlayer.setVolume(0f);
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            ZegoEngineManager.getInstance().stopLocalMusic();
+        } catch (Exception ignored) {
+        }
         if (stopForeground) {
             try {
                 VoiceRoomForegroundService.stopForUiExit(this);
@@ -5723,7 +6038,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         try {
             micOn = false;
             ZegoEngineManager.getInstance().setMicEnabled(false);
-            ZegoEngineManager.getInstance().stopPublishing();
+            // Hard leave: stop play/publish + logout. Do NOT setSpeakerMuted(true) first —
+            // that would stash streams and unmute after hop could revive the previous room.
+            ZegoEngineManager.getInstance().hardLeaveRoom();
         } catch (Exception ignored) {
         }
         if (leavingRoomId != null) {
@@ -5737,7 +6054,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         try {
-            ZegoEngineManager.getInstance().logoutRoom();
+            ActiveRoomSession.get().clear();
         } catch (Exception ignored) {
         }
     }
@@ -6811,15 +7128,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @NonNull
     public List<GiftRecipient> getGiftRecipients() {
         // Seated guests + live host on stage. Host is always first (TikTok-style).
+        // Never include yourself — room owner/host cannot self-support.
         List<GiftRecipient> out = new ArrayList<>();
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         String liveHostId = resolveLiveHostId(room);
         java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
 
-        // 1) Always pin the live host first when giftable (incl. self when I am the host — Mikoo).
-        boolean iAmLiveHost = myUserId != null && liveHostId != null
-                && myUserId.equals(liveHostId);
-        if (liveHostId != null && !liveHostId.isEmpty()) {
+        // 1) Pin the live host first when giftable (skip if that host is me).
+        if (liveHostId != null && !liveHostId.isEmpty()
+                && (myUserId == null || !myUserId.equals(liveHostId))) {
             String name = null;
             String avatar = null;
             String hostBadge = null;
@@ -6843,12 +7160,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (stageName != null && stageName.length() > 0) name = stageName.toString();
             }
             if (name == null || name.isEmpty()) name = "المضيف";
-            if (iAmLiveHost) name = "أنت · " + name;
             out.add(new GiftRecipient(liveHostId, name, avatar, hostBadge, vipBadge, -1, true));
             seen.add(liveHostId);
         }
 
-        // 2) Everyone else currently on a mic seat (skip self — already listed if host).
+        // 2) Everyone else currently on a mic seat (never include self).
         if (currentSeats != null) {
             List<RoomDtos.SeatDto> ordered = new ArrayList<>(currentSeats);
             ordered.sort((a, b) -> Integer.compare(
@@ -6901,8 +7217,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     public String getDefaultGiftReceiverId() {
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         String liveHostId = resolveLiveHostId(room);
-        // Host defaults to self (support own stage) — Mikoo parity.
-        if (liveHostId != null && !liveHostId.isEmpty()) {
+        // Never default to yourself — room owner cannot self-support.
+        if (liveHostId != null && !liveHostId.isEmpty()
+                && (myUserId == null || !myUserId.equals(liveHostId))) {
             return liveHostId;
         }
         if (currentSeats != null) {
@@ -6914,7 +7231,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         List<GiftRecipient> recipients = getGiftRecipients();
-        return recipients.isEmpty() ? null : recipients.get(0).userId;
+        for (GiftRecipient r : recipients) {
+            if (r == null || r.userId == null || r.userId.isEmpty()) continue;
+            if (myUserId != null && myUserId.equals(r.userId)) continue;
+            return r.userId;
+        }
+        return null;
     }
 
     @Override
@@ -7086,7 +7408,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String dedupeKey
     ) {
         onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
-                0L, null);
+                0L, null, null);
     }
 
     public void onGlobalCelebration(
@@ -7100,51 +7422,102 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long coinsWon,
             @Nullable String gameTitle
     ) {
+        onGlobalCelebration(kind, title, body, displayName, avatarUrl, badgeUrl, dedupeKey,
+                coinsWon, gameTitle, null);
+    }
+
+    public void onGlobalCelebration(
+            @Nullable String kind,
+            @Nullable String title,
+            @Nullable String body,
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String badgeUrl,
+            @Nullable String dedupeKey,
+            long coinsWon,
+            @Nullable String gameTitle,
+            @Nullable String targetRoomId
+    ) {
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String line = body != null && !body.isEmpty()
                 ? body
                 : (title != null ? title : "مبروك!");
         boolean isGame = kind != null && "game_win".equalsIgnoreCase(kind);
         boolean isLucky = kind != null && "lucky_hit".equalsIgnoreCase(kind);
+        boolean isPlanet = kind != null && "planet_summon".equalsIgnoreCase(kind);
+        // Prefer chat-lane stage so bubbles match message recycle area (Mikoo).
+        RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
+
+        if (isPlanet) {
+            boolean otherRoom = targetRoomId != null && !targetRoomId.isEmpty()
+                    && (roomId == null || !targetRoomId.equals(roomId));
+            if (otherRoom) {
+                // Mikoo detonate strip with Go — jump to the summoning room.
+                GlobalCelebrationToast.show(
+                        this, title, line, avatarUrl, badgeUrl, dedupeKey,
+                        56, 0, 0L, who, kind, targetRoomId);
+            } else {
+                String shortMsg = "استدعى كوكبًا رائعًا · " + (title != null ? title : "كوكب");
+                if (shortMsg.length() > 48) shortMsg = shortMsg.substring(0, 46) + "…";
+                showLuckyResultToast(who, avatarUrl, 1, 0, shortMsg);
+            }
+            if (roomBannerEnabled()) {
+                appendChatLine(who, line, 0, 1, null, null, avatarUrl, badgeUrl);
+            }
+            return;
+        }
 
         if (isGame) {
             long coins = coinsWon > 0 ? coinsWon : extractCoinsFromBody(line);
             String game = gameTitle != null && !gameTitle.isEmpty()
                     ? gameTitle
                     : extractGameTitleFromBody(line);
-            if (visualEffects != null) {
-                visualEffects.showSlotWinBubble(who, avatarUrl, Math.max(1L, coins), game, badgeUrl);
+            if (bubbleFx != null) {
+                bubbleFx.showSlotWinBubble(who, avatarUrl, Math.max(1L, coins), game, badgeUrl);
             }
-            // Short join-lane toast: name+avatar stay visible; trailing text is the win line.
-            String shortMsg = coins > 0
-                    ? ("فاز بـ " + coins + (game != null && !game.isEmpty() ? " · " + game : ""))
-                    : "لعب وفاز";
+            if (binding != null && binding.giftChatEffects != null) {
+                binding.giftChatEffects.setVisibility(View.VISIBLE);
+                binding.giftChatEffects.bringToFront();
+                binding.giftChatEffects.setElevation(42f);
+            }
+            // Mikoo join-lane strip: avatar + مبروك حصل على …
+            String shortMsg = "مبروك حصل على " + Math.max(1L, coins)
+                    + (game != null && !game.isEmpty() ? (" مبروك " + game) : "");
             showLuckyResultToast(who, avatarUrl, 1, 0, shortMsg);
-            String chat = who + " لعب "
-                    + (game != null && !game.isEmpty() ? game : "لعبة")
-                    + " وفاز بـ " + Math.max(1L, coins);
+            String chat = "مبروك " + who + " حصل على " + Math.max(1L, coins)
+                    + (game != null && !game.isEmpty() ? (" مبروك " + game) : "");
             if (roomBannerEnabled()) {
                 appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
             }
             return;
         }
 
-        String toastMsg = line;
+        String toastMsg;
+        String chat;
         if (isLucky) {
-            if (!toastMsg.contains("ضرب حظه") && !toastMsg.contains("مردود")) {
-                toastMsg = coinsWon > 0 ? ("ضرب حظه وربح +" + coinsWon) : "ضرب حظه وربح";
+            long coins = coinsWon > 0 ? coinsWon : extractCoinsFromBody(line);
+            toastMsg = coins > 0
+                    ? ("أرسل هدايا حظ وفاز بـ " + coins)
+                    : "أرسل هدايا حظ وفاز";
+            chat = coins > 0
+                    ? (who + " أرسل هدايا حظ للفوز بـ " + coins + " عملة")
+                    : (who + " أرسل هدايا حظ وفاز");
+            if (bubbleFx != null && coins > 0) {
+                bubbleFx.showSlotWinBubble(who, avatarUrl, coins, "حظ", badgeUrl);
+                if (binding != null && binding.giftChatEffects != null) {
+                    binding.giftChatEffects.setVisibility(View.VISIBLE);
+                    binding.giftChatEffects.bringToFront();
+                }
             }
+        } else {
+            toastMsg = line;
+            chat = line;
         }
-        if (toastMsg.length() > 48) {
-            toastMsg = toastMsg.substring(0, 46) + "…";
+        if (toastMsg.length() > 52) {
+            toastMsg = toastMsg.substring(0, 50) + "…";
         }
         showLuckyResultToast(who, avatarUrl, 1, 0, toastMsg);
         if (roomBannerEnabled()) {
-            String chat = line;
-            if (isLucky && !chat.contains("ضرب حظه") && !chat.contains("مردود")) {
-                chat = who + " ضرب حظه وربح"
-                        + (coinsWon > 0 ? (" +" + coinsWon) : "");
-            }
             appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
         }
     }
@@ -7487,6 +7860,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             RoomEffectQueue.EffectType type = coinValue >= 5000
                     ? RoomEffectQueue.EffectType.LEGENDARY_GIFT
                     : RoomEffectQueue.EffectType.GIFT;
+            String playAnim = animationUrl;
+            String mapped = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                    giftName, iconUrl, animationUrl);
+            if (mapped != null) playAnim = mapped;
+            boolean video = com.Dramizo.Series.util.CosmeticMedia.kind(
+                    com.Dramizo.Series.util.CosmeticMedia.playableUrl(playAnim))
+                    == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO;
+            // Kick disk cache before the queue plays — first frame from file, not HTTP.
+            if (video && playAnim != null) {
+                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                        this, java.util.Collections.singletonList(playAnim));
+            }
             effectQueue.enqueue(new RoomEffectQueue.Builder()
                     .type(type)
                     .displayName(senderName)
@@ -7497,11 +7882,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .hostBadgeUrl(senderFrameUrl)
                     .giftName(giftName)
                     .giftIconUrl(iconUrl)
-                    .giftAnimationUrl(animationUrl)
+                    .giftAnimationUrl(playAnim)
                     .comboCount(comboCount)
                     .totalCoins(coinValue)
                     .receiverId(receiverId)
                     .receiverGiftCoins(coinValue)
+                    .durationMs(video ? 90_000L : 0L)
                     .build(effectQueue));
             return;
         }
@@ -7606,7 +7992,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                         int comboCount, String senderUserId, int senderVipLevel,
                                         String senderAvatarUrl, int senderUserLevel, String senderFrameUrl) {
         if (binding == null) return;
-        // Video / SVGA / sprite gifts play FULL-SCREEN (TikTok-style). Never the chat panel.
         String animUrl = animationUrl;
         String playable = com.Dramizo.Series.util.CosmeticMedia.playableUrl(animUrl);
         if (playable == null
@@ -7620,11 +8005,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 animUrl = mapped;
             }
         }
-        RoomVisualEffects giftFx = visualEffects != null ? visualEffects : giftVisualEffects;
         final String playAnimUrl = animUrl;
+        final boolean isVideoGift = com.Dramizo.Series.util.CosmeticMedia.kind(
+                com.Dramizo.Series.util.CosmeticMedia.playableUrl(playAnimUrl))
+                == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO;
+        // Video gifts play inside chatPanel bounds (same as message recycle area), not mid-screen.
+        RoomVisualEffects giftFx = isVideoGift && giftVisualEffects != null
+                ? giftVisualEffects
+                : (visualEffects != null ? visualEffects : giftVisualEffects);
         Runnable onDone = () -> {
             if (effectQueue != null) effectQueue.notifyFinished();
             if (binding == null) return;
+            if (isVideoGift) {
+                showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+            }
             if (binding.webVisualEffects != null
                     && binding.webVisualEffects.getChildCount() == 0) {
                 binding.webVisualEffects.setVisibility(View.GONE);
@@ -7636,7 +8030,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         };
         boolean htmlPlayed = giftFx != null
                 && giftFx.showGift(giftName, iconUrl, playAnimUrl, senderName, comboCount, onDone);
-        if (htmlPlayed && binding.webVisualEffects != null) {
+        if (htmlPlayed && isVideoGift && binding.giftChatEffects != null) {
+            binding.giftChatEffects.setVisibility(View.VISIBLE);
+            binding.giftChatEffects.bringToFront();
+            binding.giftChatEffects.setElevation(42f);
+            if (binding.comboGiftView != null) {
+                binding.comboGiftView.setElevation(36f);
+            }
+        } else if (htmlPlayed && binding.webVisualEffects != null) {
             binding.webVisualEffects.setVisibility(View.VISIBLE);
             binding.webVisualEffects.bringToFront();
             binding.webVisualEffects.setElevation(31f);
@@ -7651,8 +8052,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && binding.giftOverlay.getChildCount() == 0) {
             binding.giftOverlay.setVisibility(View.GONE);
         }
-        // Mikoo gift toast: center pop → hold → fly away (gift icon in its lane).
-        showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+        // Non-video: Mikoo toast immediately. Video: after stage ends (see onDone).
+        if (!isVideoGift) {
+            showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+        }
 
         String me = senderName;
         if (me == null || me.isEmpty()) {
@@ -7694,9 +8097,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 java.util.ArrayList<String> urls = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : r.data) {
                     if (g == null) continue;
-                    if (g.animationUrl != null && !g.animationUrl.isEmpty()) urls.add(g.animationUrl);
+                    String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                            g.name, g.iconUrl, g.animationUrl);
+                    if (resolved != null && !resolved.isEmpty()) {
+                        urls.add(resolved);
+                    } else if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
+                        urls.add(g.animationUrl);
+                    }
                     if (g.iconUrl != null && !g.iconUrl.isEmpty()) urls.add(g.iconUrl);
-                    if (urls.size() > 80) break;
+                    if (urls.size() > 100) break;
                 }
                 com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(this, urls);
             } catch (Exception ignored) {
@@ -7788,11 +8197,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.webHostSignal.pauseMotion();
         }
         stopMusicDiscAnimation();
-        muteAudioForBackground();
-        // Only keep-alive AFTER a successful join — never during loading/failed entry.
-        if (!exiting && !isChangingConfigurations() && roomId != null && !roomId.isEmpty()
-                && pendingSession != null) {
+        boolean keepAlive = !exiting && !isChangingConfigurations()
+                && roomId != null && !roomId.isEmpty()
+                && pendingSession != null;
+        if (keepAlive) {
+            // Mikoo minimize / leave-UI: keep hearing others; mute only own mic.
             ensuringRoomKeepAlive(true);
+            ensureMinimizedListeningState();
+        } else if (!exiting) {
+            muteAudioForBackground();
         }
         super.onStop();
     }
@@ -7809,8 +8222,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         unmuteAudioAfterBackground();
         try {
+            // Prefer live Zego mic state (may have been toggled from notification / mini).
+            micOn = ZegoEngineManager.getInstance().isMicEnabled();
             ZegoEngineManager.getInstance().setMicEnabled(micOn);
             syncMicUi();
+        } catch (Exception ignored) {
+        }
+        try {
+            // Re-pull seat audio in case anything was paused while away.
+            activateSeatAudio(currentSeats, true);
         } catch (Exception ignored) {
         }
         // Pull any chat lines buffered by FGS while we were away.
@@ -7901,6 +8321,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         minimizing = false;
+        ActiveRoomSession.get().setMinimized(false);
+        // Same room brought back (notification / singleTask) — never rejoin.
+        if (incomingRoomId != null && incomingRoomId.equals(roomId) && pendingSession != null) {
+            resumedFromActiveSession = true;
+            if (!realtimeJoined) connectRealtimeRoom();
+            try {
+                activateSeatAudio(currentSeats, true);
+            } catch (Exception ignored) {
+            }
+        }
         if (intent.getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false)) {
             pendingSeatInviteDialog = true;
             handler.postDelayed(this::showPendingSeatInviteDialog, 300);
@@ -7908,37 +8338,77 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /**
-     * Mikoo singleTask room hop: leave old session once, then join the new room
-     * without finishing the Activity (avoids destroy-during-start races).
+     * Mikoo singleTask room hop: fully leave old room (audio + socket + HTTP), then join the new one.
+     * Swipe feed must never keep hearing the previous room.
      */
     private void switchRoomInPlace(String targetRoomId, String password) {
         if (targetRoomId == null || targetRoomId.isEmpty()) return;
         if (targetRoomId.equals(roomId)) return;
         hoppingRoom = true;
+        switchingRoom = true;
         roomSwitchTeardownComplete = true;
-        teardownRoomSession(true);
+
+        // Cancel delayed audio / join retries from the previous room.
+        handler.removeCallbacks(retryRealtimeJoinRunnable);
+        handler.removeCallbacks(retryHttpJoinRunnable);
+        handler.removeCallbacks(coalescedRoomRefresh);
+        handler.removeCallbacks(supporterRefresh);
+        handler.removeCallbacks(refreshRunnable);
+        handler.removeCallbacks(rtcTokenRefreshRunnable);
+
+        // Drop local seat/audio state so delayed activateSeatAudio cannot revive old streams.
+        roomAudioEpoch++;
+        currentSeats = new ArrayList<>();
+        pendingSession = null;
+        lastActivateSeatAudioKey = null;
+        lastActivateSeatAudioAt = 0L;
+        rtcCanPublish = false;
+        rtcPublishTokenExpiresAtMs = 0L;
+        micOn = false;
+        userChoseMute = false;
+        zegoLoggedIn = false;
+        realtimeJoined = false;
+        realtimeJoinInFlight = false;
+        resumedFromActiveSession = false;
+        currentMusicUrl = null;
+        currentMusicStatus = "stopped";
+        preparedMusicUrl = null;
+
+        try {
+            clearLocalRoomChat();
+        } catch (Exception ignored) {
+        }
+        clearSeatRequestsUi();
+        clearTopSupportersUi();
+
+        // Force leave even if a prior teardown flag was stuck.
+        teardownRoomSession(true, true);
+        ActiveRoomSession.get().clear();
+
         exiting = false;
         minimizing = false;
         roomTeardownDone = false;
         roomSwitchTeardownComplete = false;
-        hoppingRoom = false;
-        pendingSession = null;
-        realtimeJoined = false;
-        zegoLoggedIn = false;
+
         roomId = targetRoomId;
         Intent updated = getIntent() != null ? getIntent() : new Intent(this, VoiceRoomActivity.class);
         updated.putExtra(EXTRA_ROOM_ID, targetRoomId);
         if (password != null) updated.putExtra(EXTRA_PASSWORD, password);
         else updated.removeExtra(EXTRA_PASSWORD);
         setIntent(updated);
-        clearSeatRequestsUi();
-        clearTopSupportersUi();
         if (binding != null && binding.tvRoomTitle != null) {
             binding.tvRoomTitle.setText(R.string.voice_room);
         }
+        if (binding != null && binding.musicCard != null) {
+            binding.musicCard.setVisibility(View.GONE);
+        }
+        showMusicReopenChip(false);
+        musicPanelExpanded = false;
+
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
         viewModel.join(targetRoomId, password);
+        // hoppingRoom stays true until the new session arrives (see session observer).
     }
 
     private void showPendingSeatInviteDialog() {
@@ -7962,6 +8432,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         stopTaskFloatPulse();
         // Mikoo-style: while minimizing, UI dies — session/engine stay in process + FGS.
         if (!minimizing) {
+            // Leaving for real — keep speakers muted (already cut in teardown).
+            mutedForBackground = false;
+            roomSpeakerMuted = true;
+            RoomSoundFx.setMuted(true);
+            GiftAudioFx.resetRoomGiftSounds();
+            try {
+                ZegoEngineManager.getInstance().setSpeakerMuted(true);
+            } catch (Exception ignored) {
+            }
+        } else {
             mutedForBackground = false;
             roomSpeakerMuted = false;
             RoomSoundFx.setMuted(false);
@@ -8243,6 +8723,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void connectRealtimeRoom() {
         if (roomId == null || realtimeJoined || realtimeJoinInFlight) return;
         RealtimeClient rt = RealtimeClient.getInstance();
+        // Already in the socket room from minimize — skip rejoin / "اتصال ضعيف".
+        if (rt.isJoinedRoom(roomId)) {
+            realtimeJoined = true;
+            realtimeJoinAttempts = 0;
+            return;
+        }
         if (!rt.isConnected()) {
             // Socket still connecting — retry softly; never eject the user.
             scheduleRealtimeJoinRetry(1_800L);
@@ -8268,7 +8754,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     // Socket/join blip must NEVER eject — looks like "تم إغلاق التطبيق".
                     // Keep the HTTP/Zego room open and retry quietly.
                     realtimeJoinAttempts++;
-                    if (realtimeJoinAttempts <= 1 || realtimeJoinAttempts % 3 == 0) {
+                    boolean quiet = resumedFromActiveSession
+                            || ActiveRoomSession.get().canResumeUi(roomId)
+                            || pendingSession != null;
+                    if (!quiet && (realtimeJoinAttempts <= 1 || realtimeJoinAttempts % 3 == 0)) {
                         Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
                     }
                     long delay = Math.min(12_000L, 1_500L * Math.max(1, realtimeJoinAttempts));
@@ -8402,9 +8891,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else if ("room:summon".equals(event)) {
             if (fromUserId != null && myUserId != null && fromUserId.equals(myUserId)) return;
             String msg = memberStr(payload, "message");
-            if (msg == null || msg.isEmpty()) msg = "صاحب الغرفة يستدعيك — ارجع للغرفة";
-            Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
-            appendChatLine("النظام", msg, 0, 1);
+            if (msg == null || msg.isEmpty()) msg = "يستدعيك للغرفة — ارجع الآن";
+            String who = firstNonEmpty(
+                    memberStr(payload, "displayName"),
+                    fromUsername,
+                    "صاحب الغرفة");
+            String avatar = memberStr(payload, "avatarUrl");
+            // Mikoo-style strip (avatar + message) instead of plain system Toast.
+            showLuckyResultToast(who, avatar, 1, Math.max(0,
+                    memberInt(payload, "vipLevel", 0)), msg);
+            appendChatLine(who, msg, 0, 1, null, fromUserId, avatar, null);
             if (!isFinishing() && !hasWindowFocus()) {
                 Intent open = new Intent(this, VoiceRoomActivity.class);
                 open.putExtra(EXTRA_ROOM_ID, roomId);
@@ -8412,7 +8908,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 startActivity(open);
             }
         } else if ("room:chat_cleared".equals(event)) {
-            // Ignore mid-live clears — chat persists until broadcast ends.
+            // Staff wiped public chat — clear for every client, then show a short system note.
+            clearLocalRoomChat();
+            String who = firstNonEmpty(
+                    memberStr(payload, "displayName"),
+                    fromUsername,
+                    "مشرف");
+            appendChatLine("النظام",
+                    getString(R.string.clear_room_chat_done) + " · " + who,
+                    0, 1);
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
             if (serverTime != null) {
@@ -8593,6 +9097,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String playTo = allReceivers.isEmpty() ? receiverId : allReceivers.get(0);
                 // Lucky stage already plays the visual — queue only chat/banner, no second Lottie.
                 if (!isLuckyGift) {
+                String playAnimRemote = anim;
+                String mappedRemote = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                        name, icon, anim);
+                if (mappedRemote != null) playAnimRemote = mappedRemote;
+                boolean videoRemote = com.Dramizo.Series.util.CosmeticMedia.kind(
+                        com.Dramizo.Series.util.CosmeticMedia.playableUrl(playAnimRemote))
+                        == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO;
+                if (videoRemote && playAnimRemote != null) {
+                    com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                            this, java.util.Collections.singletonList(playAnimRemote));
+                }
                 effectQueue.enqueue(new RoomEffectQueue.Builder()
                         .type(giftType)
                         .displayName(sender)
@@ -8604,11 +9119,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         .supporterTier(tier)
                         .giftName(name)
                         .giftIconUrl(icon)
-                        .giftAnimationUrl(anim)
+                        .giftAnimationUrl(playAnimRemote)
                         .comboCount(combo)
                         .totalCoins(perSeatCoins)
                         .receiverId(playTo)
                         .receiverGiftCoins(perSeatCoins)
+                        .durationMs(videoRemote ? 90_000L : 0L)
                         .build(effectQueue));
                 }
                 for (String rid : allReceivers) {
@@ -8755,10 +9271,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
             String uid = memberStr(payload, "userId");
-            appendChatLine(who, "لعب " + gameTitle + " وفاز بـ " + win, 0, 1, null, uid, avatar, gameIcon);
-            if (visualEffects != null) {
-                visualEffects.showSlotWinBubble(who, avatar, win, gameTitle, gameIcon);
+            String chat = "مبروك " + who + " حصل على " + win
+                    + (gameTitle != null ? (" مبروك " + gameTitle) : "");
+            appendChatLine(who, chat, 0, 1, null, uid, avatar, gameIcon);
+            RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
+            if (bubbleFx != null) {
+                bubbleFx.showSlotWinBubble(who, avatar, win, gameTitle, gameIcon);
             }
+            if (binding != null && binding.giftChatEffects != null) {
+                binding.giftChatEffects.setVisibility(View.VISIBLE);
+                binding.giftChatEffects.bringToFront();
+            }
+            showLuckyResultToast(who, avatar, 1, 0,
+                    "مبروك حصل على " + win
+                            + (gameTitle != null ? (" مبروك " + gameTitle) : ""));
         } else if ("room:slot_lose".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));
@@ -8770,9 +9296,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
             String uid = memberStr(payload, "userId");
-            appendChatLine(who, "💔 خسر " + bet + " · " + gameTitle, 0, 1, null, uid, avatar, gameIcon);
-            if (visualEffects != null) {
-                visualEffects.showSlotLoseBubble(who, avatar, bet, gameTitle, gameIcon);
+            appendChatLine(who, "خسر " + bet + " · " + gameTitle, 0, 1, null, uid, avatar, gameIcon);
+            RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
+            if (bubbleFx != null) {
+                bubbleFx.showSlotLoseBubble(who, avatar, bet, gameTitle, gameIcon);
+            }
+            if (binding != null && binding.giftChatEffects != null) {
+                binding.giftChatEffects.setVisibility(View.VISIBLE);
+                binding.giftChatEffects.bringToFront();
             }
         } else if ("room:slot_ended".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
@@ -8931,9 +9462,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         zegoRoomListener = new ZegoEngineManager.RoomListener() {
             @Override
             public void onRoomStateChanged(String roomID, int state) {
-                // LOGINED=1, RECONNECTED=4 — re-attach seat audio after flaps.
-                if (state == 1 || state == 4) {
-                    handler.post(() -> activateSeatAudio(currentSeats));
+                // LOGINED=1, RECONNECTING/RECONNECTED≈4/5 — force re-publish after flaps.
+                if (state == 1 || state == 4 || state == 5) {
+                    handler.post(() -> activateSeatAudio(currentSeats, true));
                 }
             }
 
@@ -9359,14 +9890,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private long lastActivateSeatAudioAt;
     private String lastActivateSeatAudioKey;
+    /** Bumped on room hop so delayed audio posts from the previous room are ignored. */
+    private int roomAudioEpoch;
 
     private void activateSeatAudio(List<RoomDtos.SeatDto> seats) {
+        activateSeatAudio(seats, false);
+    }
+
+    private void activateSeatAudio(List<RoomDtos.SeatDto> seats, boolean force) {
         boolean onSeat = isOnSeat(seats);
         String key = (onSeat ? "1" : "0") + "|" + micOn + "|"
                 + (myUserId != null ? myUserId : "");
         long now = android.os.SystemClock.elapsedRealtime();
-        // Avoid thrashing publish start/stop on every room poll.
-        if (key.equals(lastActivateSeatAudioKey) && now - lastActivateSeatAudioAt < 800L) {
+        // Avoid thrashing publish start/stop on every room poll — but never skip after
+        // Zego login (force), or host publish stays dead until leave/rejoin.
+        if (!force && key.equals(lastActivateSeatAudioKey) && now - lastActivateSeatAudioAt < 800L) {
             ensurePlayingSeatedAudio(seats);
             return;
         }
@@ -9946,16 +10484,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         updateHostMuteBadge();
     }
 
-    /** Ensure we play audio for every seated remote user. */
+    /** Ensure we play audio for every seated remote user — and stop streams from the previous room. */
     private void ensurePlayingSeatedAudio(List<RoomDtos.SeatDto> seats) {
-        if (seats == null || !ZegoEngineManager.getInstance().isReady()) return;
+        if (!ZegoEngineManager.getInstance().isReady()) return;
         try {
-            for (RoomDtos.SeatDto seat : seats) {
-                String uid = seatUserId(seat);
-                if (uid == null || uid.isEmpty()) continue;
-                if (myUserId != null && sameUser(myUserId, uid)) continue;
-                String streamId = ZegoEngineManager.audioStreamId(uid);
-                if (streamId != null) playRemoteAudio(streamId);
+            java.util.HashSet<String> want = new java.util.HashSet<>();
+            if (seats != null) {
+                for (RoomDtos.SeatDto seat : seats) {
+                    String uid = seatUserId(seat);
+                    if (uid == null || uid.isEmpty()) continue;
+                    if (myUserId != null && sameUser(myUserId, uid)) continue;
+                    String streamId = ZegoEngineManager.audioStreamId(uid);
+                    if (streamId != null) want.add(streamId);
+                }
+            }
+            // Prune leftovers from the previous room / seats that left.
+            for (String playing : new java.util.HashSet<>(
+                    ZegoEngineManager.getInstance().getPlayingStreamIds())) {
+                if (!want.contains(playing)) {
+                    ZegoEngineManager.getInstance().stopPlaying(playing);
+                }
+            }
+            for (String streamId : want) {
+                playRemoteAudio(streamId);
             }
         } catch (Exception e) {
             android.util.Log.e("VoiceRoom", "ensurePlayingSeatedAudio failed", e);

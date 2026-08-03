@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <PageHeader :title="t('rooms.title')" :subtitle="t('rooms.subtitle')">
       <template #actions>
@@ -36,7 +36,16 @@
     <LoadingSpinner v-if="loading" />
     <div v-else-if="!rooms.length" class="glass empty-state p-5 text-center">{{ t('rooms.empty') }}</div>
     <div v-else class="widget-grid rooms-grid">
-      <RoomCard v-for="r in rooms" :key="r.id" :room="r" @close="closeRoom" @delete="removeRoom" @edit="editRoom" @forceEnd="forceEndRoom" />
+      <RoomCard
+        v-for="r in rooms"
+        :key="r.id"
+        :room="r"
+        @close="closeRoom"
+        @delete="removeRoom"
+        @edit="editRoom"
+        @forceEnd="forceEndRoom"
+        @toggleSupport="toggleSupport"
+      />
     </div>
 
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 mt-2">
@@ -123,6 +132,16 @@ function forceEndRoom(r) {
   confirmOpen.value = true
 }
 
+function toggleSupport(r) {
+  const enable = !(r.roomKind === 'support' || r.isSupport)
+  pendingAction.value = { type: 'support', payload: r, enable }
+  confirmTitle.value = enable ? 'ترقية لخدمة عملاء' : 'إلغاء خدمة عملاء'
+  confirmMsg.value = enable
+    ? `ترقية الروم «${r.name || r.title || r.id}» إلى روم خدمة عملاء رسمي؟ سيظهر أعلى القائمة في التطبيق.`
+    : `إلغاء ترقية «${r.name || r.title || r.id}» وإعادته روماً عادياً؟`
+  confirmOpen.value = true
+}
+
 function removeRoom(r) {
   const isAgency = r.isPersistent || r.roomKind === 'agency' || r.agencyId
   const msg = isAgency
@@ -144,6 +163,8 @@ async function runConfirm() {
     ;({ error: err } = await roomsApi.close(r.id))
   } else if (action.type === 'forceEnd') {
     ;({ error: err } = await roomsApi.forceEnd(r.id, { reason: 'Admin force end' }))
+  } else if (action.type === 'support') {
+    ;({ error: err } = await roomsApi.setCustomerService(r.id, !!action.enable))
   } else if (action.type === 'delete') {
     ;({ error: err } = await roomsApi.delete(r.id, { force: !!action.force }))
   }

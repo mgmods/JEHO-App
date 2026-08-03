@@ -13,8 +13,14 @@ import com.Dramizo.Series.data.remote.dto.RoomDtos;
 public final class RoomUiHelper {
     private RoomUiHelper() {}
 
+    public static boolean isSupportRoom(@Nullable RoomDtos.RoomDto room) {
+        if (room == null || room.roomKind == null) return false;
+        return "support".equalsIgnoreCase(room.roomKind.trim());
+    }
+
     public static boolean isAgencyRoom(@Nullable RoomDtos.RoomDto room) {
         if (room == null) return false;
+        if (isSupportRoom(room)) return false;
         // Prefer explicit roomKind — personal/standard rooms must never show as agency
         // even if agencyId is stale or the host belongs to an agency.
         if (room.roomKind != null && !room.roomKind.trim().isEmpty()) {
@@ -29,7 +35,11 @@ public final class RoomUiHelper {
             badge.setVisibility(View.GONE);
             return;
         }
-        if (isAgencyRoom(room)) {
+        if (isSupportRoom(room)) {
+            badge.setVisibility(View.VISIBLE);
+            badge.setText(R.string.room_badge_support);
+            badge.setBackgroundResource(R.drawable.bg_viewer_pill_rose);
+        } else if (isAgencyRoom(room)) {
             badge.setVisibility(View.VISIBLE);
             badge.setText(R.string.room_badge_agency);
             badge.setBackgroundResource(R.drawable.bg_viewer_pill_rose);

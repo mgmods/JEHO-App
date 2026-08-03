@@ -10,10 +10,14 @@
     "lint": "vite build"
   },
   "dependencies": {
+    "arabic-persian-reshaper": "^1.0.1",
     "axios": "^1.7.9",
+    "bidi-js": "^1.0.3",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "chart.js": "^4.4.7",
+    "html2pdf.js": "^0.14.0",
+    "pdfmake": "^0.2.20",
     "pinia": "^2.3.0",
     "svga": "^2.1.1",
     "vue": "^3.5.13",

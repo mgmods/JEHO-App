@@ -333,7 +333,8 @@
 <string name="room_photo_upload_failed">فشل رفع صورة الروم</string>
 <string name="room_open">مفتوحة</string>
 <string name="room_badge_personal">روم شخصي</string>
-<string name="room_badge_agency">وكالة</string>
+    <string name="room_badge_agency">وكالة</string>
+    <string name="room_badge_support">خدمة عملاء</string>
 <string name="withdraw_pick_recharge_agent">اختر وكيل شحن</string>
 <string name="connection_slow_retrying">الاتصال بطيء — جارٍ المحاولة…</string>
 <string name="microphone_on">الميكروفون مفتوح</string>
@@ -830,6 +831,8 @@
 <string name="notif_chat_dismiss">إغلاق</string>
 <string name="notif_room_mic">مايك</string>
 <string name="notif_room_mic_off">مكتوم</string>
+<string name="notif_room_speaker_on">الصوت</string>
+<string name="notif_room_speaker_off">صامت</string>
 <string name="notif_room_leave">خروج</string>
 <string name="notif_room_channel">الغرفة الصوتية النشطة</string>
 <string name="notif_room_channel_desc">تحكم احترافي بالروم أثناء التصغير</string>
@@ -840,6 +843,8 @@
 <string name="notif_engage_badge_tasks">مهام يومية</string>
 <string name="notif_engage_tasks_title">مكافآتك بانتظارك</string>
 <string name="notif_engage_tasks_body">أكمل مهام اليوم واحصل على عملات وهدايا مجانية.</string>
+<string name="notif_engage_tasks_pending_title">عندك %d مهام اليوم</string>
+<string name="notif_engage_tasks_claimable_title">%d مهام جاهزة للاستلام</string>
 <string name="notif_engage_badge_rooms">رومات مباشرة</string>
 <string name="notif_engage_rooms_title">الرومات مشتعلة الآن</string>
 <string name="notif_engage_rooms_body">ادخل روم مباشر — أصحابك والمضيفين أونلاين.</string>

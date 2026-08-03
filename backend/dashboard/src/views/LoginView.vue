@@ -75,13 +75,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/composables/useToast'
 import AlertMessage from '@/components/AlertMessage.vue'
+import brandLogo from '@/assets/brand/logo.png'
 
 const { t } = useI18n()
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-const logoUrl = '/logo.png'
+const logoUrl = brandLogo
 
 const form = reactive({
   email: 'admin@jeho.chat',
@@ -116,7 +117,7 @@ async function onSubmit() {
 
 .login-hero {
   padding: 2.25rem;
-  color: #e8f7f6;
+  color: #eef1f6;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -131,8 +132,8 @@ async function onSubmit() {
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   font-weight: 700;
-  color: #07111c;
-  background: linear-gradient(135deg, #ffc84a, #2ef3e1);
+  color: #04140c;
+  background: linear-gradient(135deg, #e8c47c, #3ddc97);
   margin-bottom: 1.1rem;
 }
 
@@ -143,7 +144,7 @@ async function onSubmit() {
 }
 
 .login-hero p {
-  color: rgba(232, 247, 246, 0.72);
+  color: rgba(238, 241, 246, 0.72);
   margin-bottom: 1.5rem;
   max-width: 36ch;
 }
@@ -163,37 +164,37 @@ async function onSubmit() {
   padding: 0.85rem 1rem;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(46, 243, 225, 0.12);
+  border: 1px solid rgba(61, 220, 151, 0.14);
 }
 
 .login-stats strong {
-  color: #2ef3e1;
-  font-family: var(--al-display);
+  color: #3ddc97;
+  font-family: var(--font-display), var(--al-display);
 }
 
 .login-stats span {
-  color: rgba(232, 247, 246, 0.55);
+  color: rgba(238, 241, 246, 0.55);
   font-size: 0.85rem;
 }
 
 .login-logo {
-  border-radius: 50%;
+  border-radius: 18px;
   object-fit: cover;
-  filter: drop-shadow(0 8px 24px rgba(46, 243, 225, 0.45));
+  filter: drop-shadow(0 8px 24px rgba(61, 220, 151, 0.35));
 }
 
 .login-sub {
-  color: rgba(232, 247, 246, 0.65);
+  color: rgba(238, 241, 246, 0.65);
 }
 
 .login-hint {
   text-align: center;
   font-size: 0.78rem;
-  color: rgba(232, 247, 246, 0.45);
+  color: rgba(238, 241, 246, 0.45);
 }
 
 .login-hint code {
-  color: #ffc84a;
+  color: #e8c47c;
   font-size: 0.78rem;
 }
 
@@ -201,9 +202,9 @@ async function onSubmit() {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 50% 45% at 18% 28%, rgba(0, 201, 177, 0.42), transparent 60%),
-    radial-gradient(ellipse 45% 40% at 82% 68%, rgba(255, 96, 120, 0.18), transparent 55%),
-    radial-gradient(ellipse 40% 35% at 55% 100%, rgba(255, 200, 74, 0.16), transparent 50%);
+    radial-gradient(ellipse 50% 45% at 18% 28%, rgba(61, 220, 151, 0.28), transparent 60%),
+    radial-gradient(ellipse 45% 40% at 82% 68%, rgba(232, 196, 124, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 55% 100%, rgba(31, 168, 106, 0.12), transparent 50%);
   animation: aurora-drift 12s ease-in-out infinite alternate;
   z-index: 0;
 }
@@ -212,8 +213,8 @@ async function onSubmit() {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(46, 243, 225, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(46, 243, 225, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(61, 220, 151, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(61, 220, 151, 0.05) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(circle at center, black, transparent 75%);
   z-index: 1;

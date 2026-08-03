@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Mikoo-style bottom panel — matches RoomMoreOperator tools dialog -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_room_sheet_professional"
+    android:background="@drawable/shape_121616_top_10dp"
     android:orientation="vertical"
     android:paddingBottom="12dp">
 
-    <View
-        android:layout_width="36dp"
-        android:layout_height="4dp"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="10dp"
-        android:background="#66FFFFFF" />
-
     <TextView
         android:id="@+id/tvBlacklistTitle"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:gravity="center"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="16dp"
         android:text="القائمة السوداء"
-        android:textColor="@color/text_primary"
-        android:textSize="17sp"
-        android:textStyle="bold" />
+        android:textColor="#FFFFFFFF"
+        android:textSize="18sp" />
+
+    <View
+        android:layout_width="16dp"
+        android:layout_height="3dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/shape_43d3a2_radius_12dp" />
 
     <TextView
         android:id="@+id/tvBlacklistCount"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="8dp"
         android:gravity="center"
-        android:textColor="@color/text_secondary"
+        android:textColor="#99FFFFFF"
         android:textSize="12sp"
         android:visibility="gone" />
 
@@ -40,7 +40,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
         android:layout_marginTop="24dp"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="24dp"
+        android:indeterminateTint="#FF43D3A2" />
 
     <TextView
         android:id="@+id/tvBlacklistEmpty"
@@ -49,14 +50,14 @@
         android:gravity="center"
         android:padding="28dp"
         android:text="لا يوجد محظورون حالياً"
-        android:textColor="@color/text_secondary"
+        android:textColor="#99FFFFFF"
         android:textSize="14sp"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerBlacklist"
         android:layout_width="match_parent"
-        android:layout_height="420dp"
+        android:layout_height="360dp"
         android:layout_marginTop="8dp"
         android:clipToPadding="false"
         android:overScrollMode="never"

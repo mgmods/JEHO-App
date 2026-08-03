@@ -1,5 +1,6 @@
 package com.Dramizo.Series.presentation.gifts;
 
+import android.app.Activity;
 import android.app.Dialog;
 import android.content.Context;
 import android.graphics.drawable.ColorDrawable;
@@ -82,6 +83,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     // From included layouts (not exposed on DialogRoomGiftBinding without include ids).
     @Nullable private com.Dramizo.Series.widget.XProgressBar wealthProgress;
     @Nullable private android.widget.TextView wealthLevelDesc;
+    @Nullable private android.widget.TextView wealthLevelBadge;
     @Nullable private android.widget.ImageView wealthLevelAvatar;
     @Nullable private android.widget.ImageView wealthLevelFrame;
     @Nullable private View noCpLayout;
@@ -166,13 +168,22 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (dialog.getWindow() != null) {
                 int bg = ContextCompat.getColor(requireContext(), R.color.color_gift_dialog_bg);
                 dialog.getWindow().setDimAmount(0.45f);
-                // Extend under Android nav buttons with same gift-panel color.
+                // Same solid Mikoo panel under Android nav buttons (no light strip).
+                dialog.getWindow().addFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                dialog.getWindow().clearFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
                 dialog.getWindow().setNavigationBarColor(bg);
                 dialog.getWindow().setStatusBarColor(0x00000000);
+                if (android.os.Build.VERSION.SDK_INT >= 29) {
+                    dialog.getWindow().setNavigationBarContrastEnforced(false);
+                }
             }
 
             // Pad bottom dock for nav inset so send/balance stay above buttons.
             if (binding != null && binding.clBottom != null) {
+                binding.clBottom.setBackgroundColor(
+                        ContextCompat.getColor(requireContext(), R.color.color_gift_dialog_bg));
                 androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(
                         binding.clBottom, (v, insets) -> {
                             int nav = insets.getInsets(
@@ -183,6 +194,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         });
                 androidx.core.view.ViewCompat.requestApplyInsets(binding.clBottom);
             }
+            publishSeatGiftSelection();
         });
         return dialog;
     }
@@ -240,6 +252,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (gifts != null) allGifts.addAll(gifts);
             applyFilter();
             setLoading(false);
+            // Warm MP4s while the sheet is open so send is instant.
+            if (gifts != null && !gifts.isEmpty() && getContext() != null) {
+                java.util.ArrayList<String> warm = new java.util.ArrayList<>();
+                for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : gifts) {
+                    if (g == null) continue;
+                    String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                            g.name, g.iconUrl, g.animationUrl);
+                    if (resolved != null) warm.add(resolved);
+                    else if (g.animationUrl != null) warm.add(g.animationUrl);
+                    if (warm.size() > 40) break;
+                }
+                com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                        requireContext().getApplicationContext(), warm);
+            }
         });
 
         vm.getCoinsBalance().observe(getViewLifecycleOwner(), this::bindCoins);
@@ -254,7 +280,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             refreshSendBtn();
             updateDockText();
             if (e == null || e.isEmpty()) return;
-            if (e.contains("رصيد") || e.toLowerCase().contains("insufficient")) {
+            if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(e)) {
                 Toast.makeText(requireContext(),
                         "رصيدك غير كافٍ — اشحن عملاتك", Toast.LENGTH_SHORT).show();
                 openRechargeOnly();
@@ -276,6 +302,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         View root = binding.getRoot();
         wealthProgress = root.findViewById(R.id.progress_bar);
         wealthLevelDesc = root.findViewById(R.id.tv_level_desc);
+        wealthLevelBadge = root.findViewById(R.id.tv_level_badge);
         wealthLevelAvatar = root.findViewById(R.id.iv_level);
         wealthLevelFrame = root.findViewById(R.id.iv_level_frame);
         noCpLayout = root.findViewById(R.id.no_cp_layout);
@@ -497,6 +524,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 }
                 refreshSendBtn();
                 updateDockText();
+                publishSeatGiftSelection();
             }
         });
 
@@ -516,6 +544,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             binding.guavGiftUserAvatar.submit(micRecipients, receiverId, true);
             refreshSendBtn();
             updateDockText();
+            publishSeatGiftSelection();
             return;
         }
 
@@ -530,6 +559,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
         refreshSendBtn();
         updateDockText();
+        publishSeatGiftSelection();
     }
 
     private void selectRecipient(@NonNull GiftRecipient r) {
@@ -542,6 +572,27 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         }
         refreshSendBtn();
         updateDockText();
+        publishSeatGiftSelection();
+    }
+
+    /** Paint teal underline on room seats matching current gift targets. */
+    private void publishSeatGiftSelection() {
+        if (!(getActivity() instanceof VoiceRoomActivity room)) return;
+        LinkedHashSet<String> ids = new LinkedHashSet<>();
+        if (sendToAllMic) {
+            for (GiftRecipient r : micRecipients) {
+                if (r != null && r.userId != null && !r.userId.isEmpty()) ids.add(r.userId);
+            }
+        } else if (receiverId != null && !receiverId.isEmpty()) {
+            ids.add(receiverId);
+        }
+        room.setGiftSeatSelection(ids);
+    }
+
+    private void clearSeatGiftSelection() {
+        if (getActivity() instanceof VoiceRoomActivity room) {
+            room.clearGiftSeatSelection();
+        }
     }
 
     @Nullable
@@ -707,6 +758,23 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
+        // Never allow self-support (room owner/host gifting themselves).
+        String myId = null;
+        try {
+            myId = ContainerProvider.from(requireActivity()).getSessionManager().getUserId();
+        } catch (Exception ignored) {
+        }
+        if (myId != null && !myId.isEmpty()) {
+            final String me = myId;
+            boolean removedSelf = targets.removeIf(id -> me.equals(id));
+            if (removedSelf && targets.isEmpty()) {
+                Toast.makeText(requireContext(),
+                        "لا يمكنك دعم نفسك — اختر مستلم آخر",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
+
         if (targets.isEmpty()) {
             Toast.makeText(requireContext(),
                     R.string.choose_recipient_first, Toast.LENGTH_LONG).show();
@@ -750,9 +818,28 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (result == null) return;
 
         GiftDtos.GiftDto gift = selected;
-        String name = gift != null ? gift.name : "هدية";
-        String icon = gift != null ? gift.iconUrl : null;
-        String anim = gift != null ? gift.animationUrl : null;
+        if (result.gift != null) {
+            // Prefer server row (real uploaded MP4) over stale local catalog HTML placeholders.
+            gift = result.gift;
+        }
+        final String name = gift != null && gift.name != null && !gift.name.isEmpty()
+                ? gift.name
+                : (selected != null ? selected.name : "هدية");
+        String iconTmp = gift != null ? gift.iconUrl : null;
+        if ((iconTmp == null || iconTmp.isEmpty()) && selected != null) iconTmp = selected.iconUrl;
+        String animTmp = gift != null ? gift.animationUrl : null;
+        if ((animTmp == null || animTmp.isEmpty()
+                || animTmp.toLowerCase(java.util.Locale.US).contains("runtime.html"))
+                && selected != null
+                && selected.animationUrl != null
+                && !selected.animationUrl.toLowerCase(java.util.Locale.US).contains("runtime.html")) {
+            animTmp = selected.animationUrl;
+        }
+        // Last resort: map known names (أسد…) to CDN entry MP4s.
+        String mapped = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(name, iconTmp, animTmp);
+        if (mapped != null) animTmp = mapped;
+        final String icon = iconTmp;
+        final String anim = animTmp;
         int combo = result.comboCount > 0 ? result.comboCount : vm.getCombo();
         int qty = effectiveQty();
         int ppl = Math.max(1, lastTargets.size());
@@ -972,9 +1059,12 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 wealthProgress.setMax(100);
                 wealthProgress.setProgress((int) Math.min(100, done * 100 / span));
             }
+            if (wealthLevelBadge != null) {
+                wealthLevelBadge.setText(String.format(Locale.US, "LV.%d", level));
+            }
             if (wealthLevelDesc != null) {
                 wealthLevelDesc.setText(String.format(Locale.US,
-                        "LV.%d التقدم: %d/%d", level, done, span));
+                        "التقدم: %s / %s", fmt(done), fmt(span)));
             }
             if (wealthLevelAvatar != null) {
                 String frame = null;
@@ -1018,10 +1108,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void openRechargeOnly() {
-        FragmentManager fm = getParentFragmentManager();
-        dismissAllowingStateLoss();
-        fm.executePendingTransactions();
-        com.Dramizo.Series.util.BalanceRedirect.openRecharge(requireActivity());
+        // Open recharge over the room — never navigate away / finish VoiceRoom.
+        Activity host = getActivity();
+        if (host == null || host.isFinishing()) return;
+        try {
+            com.Dramizo.Series.util.BalanceRedirect.openRecharge(host);
+        } catch (Exception ignored) {
+        }
+        // Dismiss gift sheet after recharge is queued so the room stays underneath.
+        try {
+            dismissAllowingStateLoss();
+        } catch (Exception ignored) {
+        }
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -1053,8 +1151,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     @Override
+    public void onDismiss(@NonNull android.content.DialogInterface dialog) {
+        clearSeatGiftSelection();
+        super.onDismiss(dialog);
+    }
+
+    @Override
     public void onDestroyView() {
         dismissQtyPopup();
+        clearSeatGiftSelection();
         if (tabMediator != null) {
             try { tabMediator.detach(); } catch (Exception ignored) {}
             tabMediator = null;
@@ -1064,6 +1169,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         loadingBar = null;
         wealthProgress = null;
         wealthLevelDesc = null;
+        wealthLevelBadge = null;
         wealthLevelAvatar = null;
         wealthLevelFrame = null;
         noCpLayout = null;

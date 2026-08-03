@@ -202,6 +202,12 @@ const routes = [
         component: () => import('@/views/LogsView.vue'),
         meta: { titleKey: 'routes.logs' },
       },
+      {
+        path: 'policy-brochure',
+        name: 'policy-brochure',
+        component: () => import('@/views/PolicyBrochureView.vue'),
+        meta: { titleKey: 'routes.policyBrochure', title: 'سياسة المنصة PDF' },
+      },
     ],
   },
   {
