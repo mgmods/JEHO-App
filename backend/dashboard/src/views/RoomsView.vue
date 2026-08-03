@@ -33,6 +33,18 @@
       </div>
     </div>
 
+    <BulkActionBar
+      :count="rooms.length"
+      :selected-count="selectedCount"
+      :all-selected="allSelected"
+      :some-selected="someSelected"
+      :busy="bulkBusy"
+      :actions="bulkActions"
+      @toggle-all="toggleAll"
+      @clear="clear"
+      @action="onBulkAction"
+    />
+
     <LoadingSpinner v-if="loading" />
     <div v-else-if="!rooms.length" class="glass empty-state p-5 text-center">{{ t('rooms.empty') }}</div>
     <div v-else class="widget-grid rooms-grid">
@@ -40,6 +52,8 @@
         v-for="r in rooms"
         :key="r.id"
         :room="r"
+        :selected="isSelected(r.id)"
+        @toggle-select="(row) => toggle(row.id)"
         @close="closeRoom"
         @delete="removeRoom"
         @edit="editRoom"
@@ -75,10 +89,13 @@ import { roomsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import RoomCard from '@/components/RoomCard.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -91,8 +108,54 @@ const status = ref('')
 const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(rooms)
+
+const bulkActions = computed(() => [
+  { key: 'close', label: t('bulk.closeSelected'), icon: 'bi-door-closed', variant: 'btn-outline-warning' },
+  { key: 'force-end', label: t('bulk.forceEndSelected'), icon: 'bi-broadcast', variant: 'btn-outline-danger' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value) || 1))
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  const messages = {
+    close: t('bulk.confirmClose', { count: ids.length }),
+    'force-end': t('bulk.confirmForceEnd', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'rooms',
+      action: key,
+      ids,
+      force: key === 'delete',
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 async function load() {
   loading.value = true

@@ -115,6 +115,16 @@ export class AgenciesService implements OnModuleInit {
         String(DEFAULT_PLATFORM_CUT),
         'حصة المنصة من هدايا الوكالة %',
       );
+      await this.ensureSetting(
+        'agency_host_share_percent',
+        String(100 - DEFAULT_COMMISSION - DEFAULT_PLATFORM_CUT),
+        'حصة المضيفة من هدايا الوكالة % (المتبقي بعد المنصة وصاحب الوكالة)',
+      );
+      await this.ensureSetting(
+        'agency_auto_approve_after_payment',
+        'false',
+        'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
+      );
       // Raise legacy platform cut (20/25) to safer 30% house default.
       const cut = await this.settingsRepo.findOne({
         where: { key: 'agency_platform_cut_percent' },
@@ -184,24 +194,35 @@ export class AgenciesService implements OnModuleInit {
       AGENCY_CREATE.minCoins,
       Math.min(AGENCY_CREATE.maxCoins, Math.floor(raw)),
     );
-    const defaultCommissionPercent = await this.getSettingNumber(
-      'agency_default_commission_percent',
-      DEFAULT_COMMISSION,
+    const defaultCommissionPercent = Math.min(
+      50,
+      Math.max(0, await this.getSettingNumber('agency_default_commission_percent', DEFAULT_COMMISSION)),
     );
-    const platformCutPercent = await this.getSettingNumber(
-      'agency_platform_cut_percent',
-      DEFAULT_PLATFORM_CUT,
+    const platformCutPercent = Math.min(
+      50,
+      Math.max(0, await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT)),
     );
+    const hostSharePercent = Math.max(0, 100 - defaultCommissionPercent - platformCutPercent);
     const platformRevenueDiamonds = await this.getSettingNumber(
       'platform_gift_revenue_diamonds',
       0,
     );
+    const autoRaw = String(
+      (await this.settingsRepo.findOne({ where: { key: 'agency_auto_approve_after_payment' } }))
+        ?.value || 'false',
+    )
+      .trim()
+      .toLowerCase();
+    const autoApproveAfterPayment =
+      autoRaw === 'true' || autoRaw === '1' || autoRaw === 'yes';
     return {
       createPriceCoins,
       currency: 'coins',
       isPaid: createPriceCoins > 0,
       defaultCommissionPercent,
       platformCutPercent,
+      hostSharePercent,
+      autoApproveAfterPayment,
       platformRevenueDiamonds,
     };
   }
@@ -398,10 +419,165 @@ export class AgenciesService implements OnModuleInit {
 
       if (pending?.status === AgencyApplicationStatus.CHANGES_REQUESTED) {
         Object.assign(pending, values);
-        return manager.save(pending);
+        const saved = await manager.save(pending);
+        return saved;
       }
       return manager.save(manager.create(AgencyApplication, values));
+    }).then(async (saved) => {
+      try {
+        const pricingAfter = await this.pricing();
+        if (pricingAfter.autoApproveAfterPayment && saved?.id) {
+          await this.autoApprovePaidApplication(saved.id, applicantId);
+          const refreshed = await this.applicationsRepo.findOne({ where: { id: saved.id } });
+          return refreshed || saved;
+        }
+      } catch (err) {
+        this.logger.warn(
+          `agency auto-approve failed for ${saved?.id}: ${(err as Error).message}`,
+        );
+      }
+      return saved;
     });
+  }
+
+  /**
+   * System/admin-style approve after payment when auto-approve is enabled.
+   * Leaves the application pending if anything conflicts.
+   */
+  async autoApprovePaidApplication(applicationId: string, reviewerId: string) {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const application = await manager.findOne(AgencyApplication, {
+        where: { id: applicationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!application) throw new NotFoundException('Agency application not found');
+      if (application.status === AgencyApplicationStatus.APPROVED) {
+        return { application, agency: null as Agency | null };
+      }
+      if (application.status !== AgencyApplicationStatus.PENDING) {
+        throw new ConflictException('Only pending applications can be auto-approved');
+      }
+
+      const existingAgency = await manager
+        .createQueryBuilder(Agency, 'agency')
+        .where(
+          'agency."ownerId" = :applicantId OR LOWER(agency.name) = LOWER(:name)',
+          {
+            applicantId: application.applicantId,
+            name: application.proposedName,
+          },
+        )
+        .getOne();
+      const existingMembership = await manager.findOne(AgencyMember, {
+        where: {
+          userId: application.applicantId,
+          isActive: true,
+          status: AgencyMemberStatus.ACTIVE,
+        },
+      });
+      if (existingAgency || existingMembership) {
+        throw new ConflictException(
+          'Applicant already owns or belongs to an agency, or name is taken',
+        );
+      }
+
+      const commissionRow = await manager.findOne(AppSetting, {
+        where: { key: 'agency_default_commission_percent' },
+      });
+      let activationCode = generateActivationCode();
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const clash = await manager.findOne(Agency, {
+          where: { activationCode },
+          select: ['id'],
+        });
+        if (!clash) break;
+        activationCode = generateActivationCode();
+      }
+      const agency = await manager.save(
+        manager.create(Agency, {
+          name: application.proposedName,
+          description: application.description,
+          ownerId: application.applicantId,
+          status: AgencyStatus.ACTIVE,
+          memberCount: 1,
+          totalDiamonds: 0,
+          commissionPercent: Number(commissionRow?.value || DEFAULT_COMMISSION),
+          activationCode,
+          notificationStyle: 'welcome',
+        }),
+      );
+      await manager.save(
+        manager.create(AgencyMember, {
+          agencyId: agency.id,
+          userId: application.applicantId,
+          role: AgencyRole.OWNER,
+          status: AgencyMemberStatus.ACTIVE,
+          isActive: true,
+        }),
+      );
+      const room = await manager.save(
+        manager.create(Room, {
+          title: agency.name,
+          description: `${agency.name} — persistent agency voice room`,
+          type: RoomType.VOICE,
+          status: RoomStatus.CLOSED,
+          hostId: agency.ownerId,
+          activeHostId: null,
+          seatCount: DEFAULT_AGENCY_SEAT_COUNT,
+          viewerCount: 0,
+          isPublic: true,
+          roomKind: RoomKind.AGENCY,
+          isPersistent: true,
+          agencyId: agency.id,
+          accessMode: 'free' as any,
+          entryFeeCoins: 0,
+          hasPassword: false,
+          passwordHash: null,
+          zegoRoomId: `agency_${uuidv4().replace(/-/g, '').slice(0, 16)}`,
+        }),
+      );
+      const seats: RoomSeat[] = [];
+      for (let index = 0; index < DEFAULT_AGENCY_SEAT_COUNT; index++) {
+        seats.push(
+          manager.create(RoomSeat, {
+            roomId: room.id,
+            seatIndex: index,
+            isHostSeat: index === 0,
+            status: SeatStatus.EMPTY,
+            userId: null,
+          }),
+        );
+      }
+      await manager.save(seats);
+      application.status = AgencyApplicationStatus.APPROVED;
+      application.agencyId = agency.id;
+      application.reviewNote = 'موافقة تلقائية بعد الدفع';
+      application.reviewedById = reviewerId;
+      application.reviewedAt = new Date();
+      await manager.save(application);
+      return { application, agency };
+    });
+
+    if (result.agency?.activationCode) {
+      try {
+        await this.notificationsService.create({
+          userId: result.agency.ownerId,
+          type: NotificationType.AGENCY,
+          title: 'تم تفعيل وكالتك',
+          body: `وكالتك «${result.agency.name}» نشطة تلقائياً بعد الدفع. كود التفعيل: ${result.agency.activationCode}`,
+          data: {
+            agencyId: result.agency.id,
+            activationCode: result.agency.activationCode,
+            officialNews: true,
+            autoApproved: true,
+          },
+          sendPush: true,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+    return result;
   }
 
   /** Refund application fee on admin reject (idempotent). */
@@ -1097,7 +1273,7 @@ export class AgenciesService implements OnModuleInit {
       ownerId: agency.ownerId,
       commissionPercent: commissionPct,
       platformCutPercent: platformPct,
-      hostSharePercent: Math.max(0, 100 - Math.min(50, commissionPct) - Math.min(40, platformPct)),
+      hostSharePercent: Math.max(0, 100 - Math.min(50, commissionPct) - Math.min(50, platformPct)),
       totals: {
         grossGiftsDiamonds: gross,
         agencyTotalDiamonds: Number(agency.totalDiamonds || 0),
@@ -1114,7 +1290,7 @@ export class AgenciesService implements OnModuleInit {
         createdAt: t.createdAt,
       })),
       explanation: {
-        ar: `عند إرسال هدية لعضو في الوكالة: المنصة ${platformPct}%، صاحب الوكالة ${commissionPct}%، المدعوم ≈ ${Math.max(0, 100 - platformPct - commissionPct)}%. أرباح صاحب الوكالة تظهر هنا مفصّلة. وكيل الشحن منفصل ولا علاقة له بهذه النسب.`,
+        ar: `عند إرسال هدية لعضو في الوكالة: المنصة ${platformPct}%، صاحب الوكالة ${commissionPct}%، المضيفة ≈ ${Math.max(0, 100 - platformPct - commissionPct)}%. أرباح صاحب الوكالة تظهر هنا مفصّلة. وكيل الشحن منفصل ولا علاقة له بهذه النسب.`,
       },
     };
   }
@@ -1253,16 +1429,15 @@ export class AgenciesService implements OnModuleInit {
       existing.passwordHash = null;
       existing.accessMode = 'free' as any;
       existing.entryFeeCoins = 0;
+      // Keep lobby title = agency name (never host personal name).
+      existing.title = agency.name;
       await this.roomsRepo.save(existing);
       await this.grantAgencyModerators(agency.id, existing.id);
       return existing;
     }
 
     const room = this.roomsRepo.create({
-      title:
-        effectiveHostId === agency.ownerId
-          ? agency.name
-          : `${agency.name} · Voice`,
+      title: agency.name,
       description: `${agency.name} — persistent agency voice room`,
       type: RoomType.VOICE,
       status: RoomStatus.CLOSED,
@@ -1412,7 +1587,12 @@ export class AgenciesService implements OnModuleInit {
     ) {
       throw new ForbiddenException('Active owner, manager, or host membership required');
     }
-    return this.roomsService.create(userId, dto);
+    const agencyName = String(membership.agency.name || '').trim() || 'وكالة';
+    return this.roomsService.create(userId, {
+      ...dto,
+      title: agencyName,
+      preferPersonal: false,
+    });
   }
 
   /**

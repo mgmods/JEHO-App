@@ -35,12 +35,25 @@
       </div>
     </div>
 
+    <BulkActionBar
+      :count="reports.length"
+      :selected-count="selectedCount"
+      :all-selected="allSelected"
+      :some-selected="someSelected"
+      :busy="bulkBusy"
+      :actions="bulkActions"
+      @toggle-all="toggleAll"
+      @clear="clear"
+      @action="onBulkAction"
+    />
+
     <div class="glass p-0 overflow-hidden">
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle">
           <thead>
             <tr>
+              <th style="width:2.2rem"></th>
               <th>{{ t('reports.report') }}</th>
               <th>{{ t('reports.target') }}</th>
               <th>{{ t('reports.reporter') }}</th>
@@ -52,9 +65,17 @@
           </thead>
           <tbody>
             <tr v-if="!reports.length">
-              <td colspan="7" class="empty-state">{{ t('reports.empty') }}</td>
+              <td colspan="8" class="empty-state">{{ t('reports.empty') }}</td>
             </tr>
             <tr v-for="r in reports" :key="r.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="isSelected(r.id)"
+                  @change="toggle(r.id)"
+                />
+              </td>
               <td class="small text-muted">{{ shortId(r.id) }}</td>
               <td>
                 <div>{{ r.targetType || r.type || '—' }}</div>
@@ -81,20 +102,31 @@
         </table>
       </div>
     </div>
+
+    <ConfirmDialog
+      v-model="confirmOpen"
+      :title="confirmTitle"
+      :message="confirmMsg"
+      @confirm="runConfirm"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { reportsApi } from '@/api'
 import { extractList, formatDate } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
@@ -104,6 +136,58 @@ const error = ref('')
 const success = ref('')
 const status = ref('')
 const type = ref('')
+const bulkBusy = ref(false)
+const confirmOpen = ref(false)
+const confirmTitle = ref('')
+const confirmMsg = ref('')
+const pendingAction = ref(null)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(reports)
+
+const bulkActions = computed(() => [
+  { key: 'resolve', label: t('bulk.resolveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'dismiss', label: t('bulk.dismissSelected'), icon: 'bi-x-lg', variant: 'btn-outline-secondary' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'resolve'
+    ? `${t('bulk.resolveSelected')} (${ids.length})?`
+    : `${t('bulk.dismissSelected')} (${ids.length})?`
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'reports',
+      action: key,
+      ids,
+      note: key === 'resolve' ? t('reports.defaultResolution') : t('reports.defaultDismissReason'),
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') await action()
+}
 
 function shortId(id) {
   if (!id) return '—'

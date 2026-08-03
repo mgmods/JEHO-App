@@ -22,10 +22,22 @@
     </div>
 
     <LoadingSpinner v-if="loading" />
-    <div v-else class="widget-grid">
-      <div v-if="!rows.length" class="glass p-4 empty-state">{{ t('banners.empty') }}</div>
-      <article v-for="(row, idx) in rows" :key="idx" class="widget-card">
-        <div class="widget-card-media banner-media">
+    <template v-else>
+      <BulkActionBar
+        :count="rows.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <div v-if="!rows.length" class="glass p-4 empty-state">{{ t('banners.empty') }}</div>
+        <article v-for="(row, idx) in rows" :key="idx" class="widget-card position-relative" :class="{ 'is-selected': isSelected(String(idx)) }">
+          <BulkCheck :checked="isSelected(String(idx))" @toggle="toggle(String(idx))" />
+          <div class="widget-card-media banner-media">
           <img v-if="row.imageUrl" :src="absUrl(row.imageUrl)" alt="" />
           <i v-else class="bi bi-image text-muted" style="font-size: 2rem" />
         </div>
@@ -64,7 +76,8 @@
           </div>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <ConfirmDialog
       v-model="confirmOpen"
@@ -80,9 +93,12 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -110,6 +126,30 @@ const success = ref('')
 const confirmOpen = ref(false)
 const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(rows, (row) => String(rows.value.indexOf(row)))
+
+const bulkActions = computed(() => [
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+function onBulkAction(key) {
+  if (key !== 'delete') return
+  const ids = selectedIds.value
+  if (!ids.length) return
+  pendingRemoveIdx.value = -2
+  confirmMsg.value = t('bulk.confirmDelete', { count: ids.length })
+  confirmOpen.value = true
+}
 
 function absUrl(u) {
   if (!u) return ''
@@ -146,6 +186,12 @@ function askRemove(idx) {
 function doRemove() {
   const idx = pendingRemoveIdx.value
   pendingRemoveIdx.value = -1
+  if (idx === -2) {
+    const indices = selectedIds.value.map(Number).sort((a, b) => b - a)
+    indices.forEach((i) => rows.value.splice(i, 1))
+    clear()
+    return
+  }
   if (idx < 0) return
   rows.value.splice(idx, 1)
 }
@@ -226,5 +272,9 @@ onMounted(load)
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
 }
 </style>

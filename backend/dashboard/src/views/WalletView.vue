@@ -195,18 +195,45 @@
     </div>
 
     <div v-else class="glass p-0 overflow-hidden">
+      <div v-if="tab === 'withdraws'" class="px-3 pt-2">
+        <BulkActionBar
+          :count="rows.length"
+          :selected-count="withdrawSelectedCount"
+          :all-selected="withdrawAllSelected"
+          :some-selected="withdrawSomeSelected"
+          :busy="bulkBusy"
+          :actions="withdrawBulkActions"
+          @toggle-all="withdrawToggleAll"
+          @clear="withdrawClear"
+          @action="onWithdrawBulkAction"
+        />
+      </div>
+      <div v-if="tab === 'recharges'" class="px-3 pt-2">
+        <BulkActionBar
+          :count="rows.length"
+          :selected-count="rechargeSelectedCount"
+          :all-selected="rechargeAllSelected"
+          :some-selected="rechargeSomeSelected"
+          :busy="bulkBusy"
+          :actions="rechargeBulkActions"
+          @toggle-all="rechargeToggleAll"
+          @clear="rechargeClear"
+          @action="onRechargeBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle">
           <thead>
             <tr>
+              <th v-if="tab === 'withdraws' || tab === 'recharges'" style="width:2.2rem"></th>
               <th v-for="h in headers" :key="h">{{ h }}</th>
               <th v-if="tab === 'withdraws' || tab === 'recharges'"></th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!rows.length">
-              <td :colspan="headers.length + (tab === 'withdraws' || tab === 'recharges' ? 1 : 0)" class="empty-state">{{ t('common.noRecords') }}</td>
+              <td :colspan="(tab === 'withdraws' || tab === 'recharges' ? 1 : 0) + headers.length + (tab === 'withdraws' || tab === 'recharges' ? 1 : 0)" class="empty-state">{{ t('common.noRecords') }}</td>
             </tr>
 
             <template v-if="tab === 'transactions'">
@@ -225,6 +252,14 @@
 
             <template v-else-if="tab === 'withdraws'">
               <tr v-for="r in rows" :key="r.id">
+                <td>
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="withdrawIsSelected(r.id)"
+                    @change="withdrawToggle(r.id)"
+                  />
+                </td>
                 <td class="small text-muted">{{ shortId(r.id) }}</td>
                 <td>
                   <div class="fw-medium">{{ displayUser(r) }}</div>
@@ -249,6 +284,14 @@
 
             <template v-else>
               <tr v-for="r in rows" :key="r.id">
+                <td v-if="tab === 'recharges'">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="rechargeIsSelected(r.id)"
+                    @change="rechargeToggle(r.id)"
+                  />
+                </td>
                 <td class="small text-muted">{{ shortId(r.id) }}</td>
                 <td>
                   <div class="fw-medium">{{ displayUser(r) }}</div>
@@ -320,7 +363,7 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      :title="t('common.delete')"
+      :title="confirmTitle"
       :message="confirmMsg"
       @confirm="runConfirm"
     />
@@ -335,10 +378,13 @@ import { extractList, formatNumber, formatMoney, formatDate } from '@/composable
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -370,6 +416,88 @@ const economy = reactive({
   coinToSilverRate: 20,
 })
 const adjustForm = reactive({ userId: '', amount: 0, reason: '' })
+const bulkBusy = ref(false)
+
+const {
+  selectedIds: withdrawSelectedIds,
+  selectedCount: withdrawSelectedCount,
+  allSelected: withdrawAllSelected,
+  someSelected: withdrawSomeSelected,
+  isSelected: withdrawIsSelected,
+  toggle: withdrawToggle,
+  clear: withdrawClear,
+  toggleAll: withdrawToggleAll,
+} = useBulkSelection(rows)
+
+const {
+  selectedIds: rechargeSelectedIds,
+  selectedCount: rechargeSelectedCount,
+  allSelected: rechargeAllSelected,
+  someSelected: rechargeSomeSelected,
+  isSelected: rechargeIsSelected,
+  toggle: rechargeToggle,
+  clear: rechargeClear,
+  toggleAll: rechargeToggleAll,
+} = useBulkSelection(rows)
+
+const withdrawBulkActions = computed(() => [
+  { key: 'approve', label: t('bulk.approveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'reject', label: t('bulk.rejectSelected'), icon: 'bi-x-lg', variant: 'btn-outline-danger' },
+])
+
+const rechargeBulkActions = computed(() => [
+  { key: 'complete', label: t('bulk.completeSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'cancel', label: t('bulk.cancelSelected'), icon: 'bi-x-lg', variant: 'btn-outline-danger' },
+])
+
+async function onWithdrawBulkAction(key) {
+  const ids = withdrawSelectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'approve'
+    ? t('bulk.confirmApprove', { count: ids.length })
+    : t('bulk.confirmReject', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'withdraws',
+      action: key,
+      ids,
+      reason: key === 'reject' ? t('wallet.defaultRejectReason') : undefined,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      withdrawClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
+
+async function onRechargeBulkAction(key) {
+  const ids = rechargeSelectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'complete'
+    ? t('bulk.confirmApprove', { count: ids.length })
+    : t('bulk.confirmReject', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'recharges',
+      action: key,
+      ids,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      rechargeClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 const economyPreviewLine = computed(() => {
   const target = Math.max(1, Math.floor(Number(economy.minWithdrawDiamonds) || 0))
@@ -414,6 +542,8 @@ function payoutAccount(r) {
 
 function switchTab(id) {
   tab.value = id
+  withdrawClear()
+  rechargeClear()
   load()
 }
 
@@ -545,22 +675,29 @@ async function saveEconomy() {
 }
 
 const confirmOpen = ref(false)
+const confirmTitle = ref('')
 const confirmMsg = ref('')
 const pendingAction = ref(null)
 
 function askRemovePackage(idx) {
   pendingAction.value = { type: 'pkg', idx }
+  confirmTitle.value = t('common.delete')
   confirmMsg.value = t('common.delete') + '؟'
   confirmOpen.value = true
 }
 function askRemoveWithdraw(idx) {
   pendingAction.value = { type: 'withdraw', idx }
+  confirmTitle.value = t('common.delete')
   confirmMsg.value = t('common.delete') + '؟'
   confirmOpen.value = true
 }
-function runConfirm() {
+async function runConfirm() {
   const a = pendingAction.value
   pendingAction.value = null
+  if (typeof a === 'function') {
+    await a()
+    return
+  }
   if (!a) return
   if (a.type === 'pkg') packages.value.splice(a.idx, 1)
   else if (a.type === 'withdraw') withdrawPackages.value.splice(a.idx, 1)

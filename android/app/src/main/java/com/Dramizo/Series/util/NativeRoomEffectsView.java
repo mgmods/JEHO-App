@@ -266,30 +266,39 @@ public final class NativeRoomEffectsView extends FrameLayout {
                                   @Nullable String gameIconUrl, boolean won) {
         setVisibility(VISIBLE);
         bringToFront();
+
+        // One crawl at a time (Mikoo mid-screen banner) — clear older win bubbles.
+        for (int i = getChildCount() - 1; i >= 0; i--) {
+            View old = getChildAt(i);
+            if (old != null && "slot_result_bubble".equals(old.getTag())) {
+                old.animate().cancel();
+                removeViewAt(i);
+            }
+        }
+
         LinearLayout card = new LinearLayout(getContext());
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
-        int padH = dp(12), padV = dp(10);
+        int padH = dp(10), padV = dp(6);
         card.setPadding(padH, padV, padH, padV);
-        card.setMinimumWidth(dp(200));
-        // Mikoo dark chat-lane bubble (not mid-screen purple plate).
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.RECTANGLE);
-        bg.setCornerRadius(dp(16));
+        bg.setCornerRadius(dp(14));
         bg.setColor(won ? 0xD9121820 : 0xD9181418);
         bg.setStroke(dp(1), won ? 0x66FFD76A : 0x44FFFFFF);
         card.setBackground(bg);
+        card.setElevation(dp(6));
 
         ImageView img = new ImageView(getContext());
-        int avatarSize = dp(44);
+        int avatarSize = dp(30);
         LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
-        imgLp.setMarginEnd(dp(10));
+        imgLp.setMarginEnd(dp(8));
         img.setLayoutParams(imgLp);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         GradientDrawable circle = new GradientDrawable();
         circle.setShape(GradientDrawable.OVAL);
         circle.setColor(0xFF243038);
-        circle.setStroke(dp(2), won ? 0xFFFFD76A : 0x88FFFFFF);
+        circle.setStroke(dp(1), won ? 0xFFFFD76A : 0x88FFFFFF);
         img.setBackground(circle);
         img.setClipToOutline(true);
         img.setOutlineProvider(new android.view.ViewOutlineProvider() {
@@ -316,13 +325,13 @@ public final class NativeRoomEffectsView extends FrameLayout {
         if (gameIconUrl != null && !gameIconUrl.isEmpty()
                 && avatarUrl != null && !avatarUrl.isEmpty()) {
             ImageView gameImg = new ImageView(getContext());
-            int gSize = dp(34);
+            int gSize = dp(24);
             LinearLayout.LayoutParams gLp = new LinearLayout.LayoutParams(gSize, gSize);
-            gLp.setMarginEnd(dp(8));
+            gLp.setMarginEnd(dp(6));
             gameImg.setLayoutParams(gLp);
             gameImg.setScaleType(ImageView.ScaleType.CENTER_CROP);
             GradientDrawable gBg = new GradientDrawable();
-            gBg.setCornerRadius(dp(8));
+            gBg.setCornerRadius(dp(6));
             gBg.setColor(0xFF2a1a44);
             gameImg.setBackground(gBg);
             gameImg.setClipToOutline(true);
@@ -337,17 +346,15 @@ public final class NativeRoomEffectsView extends FrameLayout {
         LinearLayout col = new LinearLayout(getContext());
         col.setOrientation(LinearLayout.VERTICAL);
         col.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        int maxText = Math.max(dp(180), Math.round(getResources().getDisplayMetrics().widthPixels * 0.52f));
-        col.setMinimumWidth(dp(120));
+        int maxText = Math.max(dp(140), Math.round(getResources().getDisplayMetrics().widthPixels * 0.42f));
 
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         TextView tvLine = new TextView(getContext());
-        tvLine.setTextColor(0xFFFFFFFF);
-        tvLine.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13f);
-        tvLine.setMaxLines(3);
+        tvLine.setTextColor(won ? 0xFFFFF3C4 : 0xFFFFFFFF);
+        tvLine.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f);
+        tvLine.setMaxLines(2);
         tvLine.setEllipsize(TextUtils.TruncateAt.END);
         tvLine.setMaxWidth(maxText);
-        // Mikoo wording: مبروك NAME حصل على COINS مبروك GAME
         String line;
         if (won) {
             line = "مبروك " + who + " حصل على " + coins;
@@ -366,33 +373,64 @@ public final class NativeRoomEffectsView extends FrameLayout {
         card.addView(col);
         card.setTag("slot_result_bubble");
 
-        // Sit in the chat lane (lower-left), not mid-screen.
+        // Mid-screen horizontal crawl lane (slightly below true center).
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.START);
-        lp.bottomMargin = dp(12);
-        lp.setMarginStart(dp(6));
-        lp.setMarginEnd(dp(12));
+                Gravity.CENTER_VERTICAL | Gravity.START);
+        lp.topMargin = dp(28);
         addView(card, lp);
         setVisibility(VISIBLE);
         bringToFront();
 
+        playBubbleCrawl(card, won ? 2200L : 1600L);
+    }
+
+    /**
+     * Enter from start side → pause mid → crawl out to the opposite side.
+     */
+    private void playBubbleCrawl(View card, long holdMs) {
         card.setAlpha(0f);
-        card.setTranslationY(dp(24));
-        card.animate()
-                .alpha(1f).translationY(0f)
-                .setDuration(320)
-                .withEndAction(() ->
-                        card.animate().setStartDelay(won ? 3800 : 2600).alpha(0f).setDuration(380)
+        card.post(() -> {
+            int w = Math.max(card.getWidth(), dp(180));
+            int parentW = getWidth() > 0
+                    ? getWidth()
+                    : getResources().getDisplayMetrics().widthPixels;
+            final float enterFrom = -w - dp(24);
+            final float park = Math.max(dp(8), (parentW - w) / 2f);
+            final float exitTo = parentW + dp(28);
+
+            card.setTranslationX(enterFrom);
+            card.setAlpha(1f);
+            card.animate()
+                    .translationX(park)
+                    .setDuration(700)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .withEndAction(() -> card.postDelayed(() -> {
+                        if (card.getParent() == null) return;
+                        float distance = Math.abs(exitTo - park);
+                        long duration = Math.max(1400L, Math.min(2800L,
+                                (long) (distance / Math.max(1f,
+                                        getResources().getDisplayMetrics().density) * 8f)));
+                        card.animate()
+                                .translationX(exitTo)
+                                .setDuration(duration)
+                                .setInterpolator(new LinearInterpolator())
                                 .withEndAction(() -> {
                                     removeView(card);
                                     if (!hasSlotBubbles() && getChildCount() == 0) {
                                         setVisibility(GONE);
                                     }
                                 })
-                                .start())
-                .start();
+                                .start();
+                    }, holdMs))
+                    .start();
+        });
+    }
+
+    /** @deprecated stacking unused — crawl bubbles are single-lane. */
+    private void restackSlotBubbles() {
+        // no-op kept for event-bubble callers during transition
     }
 
     private boolean hasSlotBubbles() {
@@ -430,6 +468,96 @@ public final class NativeRoomEffectsView extends FrameLayout {
                                     @Nullable String gameIconUrl) {
         if (getContext() == null) return;
         post(() -> showResultBubble(displayName, avatarUrl, betCoins, gameTitle, gameIconUrl, false));
+    }
+
+    /**
+     * Mikoo dark event bubble for magic-ball / planet / custom room events
+     * (same lane as win bubbles — not Android Toast).
+     */
+    public void showRoomEventBubble(
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String message,
+            @Nullable String badgeUrl
+    ) {
+        if (getContext() == null) return;
+        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
+        String body = message != null && !message.isEmpty() ? message : "حدث في الغرفة";
+        // Reuse win bubble path with coins=0 wording overridden via gameTitle = full body.
+        post(() -> showEventBubbleCard(who, avatarUrl, body, badgeUrl));
+    }
+
+    private void showEventBubbleCard(
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String message,
+            @Nullable String badgeUrl
+    ) {
+        setVisibility(VISIBLE);
+        bringToFront();
+        for (int i = getChildCount() - 1; i >= 0; i--) {
+            View old = getChildAt(i);
+            if (old != null && "slot_result_bubble".equals(old.getTag())) {
+                old.animate().cancel();
+                removeViewAt(i);
+            }
+        }
+
+        LinearLayout card = new LinearLayout(getContext());
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        int padH = dp(10), padV = dp(6);
+        card.setPadding(padH, padV, padH, padV);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(dp(14));
+        bg.setColor(0xD9121820);
+        bg.setStroke(dp(1), 0x66FFD76A);
+        card.setBackground(bg);
+        card.setElevation(dp(6));
+
+        ImageView img = new ImageView(getContext());
+        int avatarSize = dp(28);
+        LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
+        imgLp.setMarginEnd(dp(8));
+        img.setLayoutParams(imgLp);
+        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(0xFF243038);
+        img.setBackground(circle);
+        img.setClipToOutline(true);
+        String url = avatarUrl != null && !avatarUrl.isEmpty() ? avatarUrl : badgeUrl;
+        if (url != null && !url.isEmpty()) {
+            try {
+                Glide.with(getContext()).load(AssetCatalog.absoluteUrl(url)).circleCrop().into(img);
+            } catch (Exception ignored) {
+            }
+        } else {
+            img.setImageResource(R.drawable.jeho_logo);
+        }
+        card.addView(img);
+
+        TextView tv = new TextView(getContext());
+        tv.setTextColor(0xFFFFF3C4);
+        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f);
+        tv.setMaxLines(2);
+        tv.setEllipsize(TextUtils.TruncateAt.END);
+        int maxText = Math.max(dp(140), Math.round(getResources().getDisplayMetrics().widthPixels * 0.42f));
+        tv.setMaxWidth(maxText);
+        String who = displayName != null ? displayName : "";
+        String body = message != null ? message : "";
+        tv.setText(who.isEmpty() ? body : (who + " · " + body));
+        card.addView(tv);
+        card.setTag("slot_result_bubble");
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_VERTICAL | Gravity.START);
+        lp.topMargin = dp(28);
+        addView(card, lp);
+        playBubbleCrawl(card, 2000L);
     }
 
     public void stopAll() {
@@ -621,9 +749,11 @@ public final class NativeRoomEffectsView extends FrameLayout {
     /**
      * Gift video: download (or use warm cache) then play local file — never leave the user
      * staring at a static icon because TextureView was INVISIBLE / stream never painted.
+     * Never re-stream a URL that already failed download (404/403) — try mapped fallback instead.
      */
     @Nullable
-    private View createGiftVideoStream(String absUrl, @Nullable String iconUrl) {
+    private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
+                                       @Nullable String fallbackUrl) {
         if (absUrl == null || absUrl.isEmpty()) return null;
         releaseGiftPlayer();
 
@@ -632,6 +762,16 @@ public final class NativeRoomEffectsView extends FrameLayout {
             String abs = AssetCatalog.absoluteUrl(absUrl);
             if (abs != null && !abs.isEmpty()) playUrl = abs;
         } catch (Exception ignored) {
+        }
+        String fallbackAbs = null;
+        if (fallbackUrl != null && !fallbackUrl.trim().isEmpty()) {
+            try {
+                String f = AssetCatalog.absoluteUrl(fallbackUrl.trim());
+                if (f != null && !f.isEmpty() && !f.equalsIgnoreCase(playUrl)) {
+                    fallbackAbs = f;
+                }
+            } catch (Exception ignored) {
+            }
         }
 
         FrameLayout stage = new FrameLayout(getContext());
@@ -674,8 +814,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         playerView.setVisibility(VISIBLE);
         playerView.setAlpha(0f);
         try {
+            // Fill the entire chat-stage bounds (cover), not a small letterboxed fit.
             playerView.setResizeMode(
-                    androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+                    androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         } catch (Exception ignored) {
         }
         stage.addView(playerView, new FrameLayout.LayoutParams(
@@ -685,23 +826,57 @@ public final class NativeRoomEffectsView extends FrameLayout {
 
         final int token = generation;
         final String finalUrl = playUrl;
+        final String altUrl = fallbackAbs;
         File warm = peekGiftMp4Cache(getContext(), finalUrl);
+        if (warm == null && altUrl != null) {
+            warm = peekGiftMp4Cache(getContext(), altUrl);
+            if (warm != null) {
+                bindGiftExoPlayer(stage, playerView, placeholder, warm, altUrl, iconUrl,
+                        token, true, null);
+                return stage;
+            }
+        }
         if (warm != null) {
-            bindGiftExoPlayer(stage, playerView, placeholder, warm, finalUrl, iconUrl, token, true);
+            bindGiftExoPlayer(stage, playerView, placeholder, warm, finalUrl, iconUrl,
+                    token, true, altUrl);
         } else {
-            android.util.Log.i("NativeRoomEffects", "gift video downloading url=" + finalUrl);
+            android.util.Log.i("NativeRoomEffects", "gift video downloading url=" + finalUrl
+                    + (altUrl != null ? (" alt=" + altUrl) : ""));
             final Context app = getContext().getApplicationContext();
             new Thread(() -> {
                 File file = cacheGiftMp4(app, finalUrl);
+                String chosenUrl = finalUrl;
+                File chosen = file;
+                if ((chosen == null || !chosen.exists() || chosen.length() <= 8_192)
+                        && altUrl != null) {
+                    File altFile = cacheGiftMp4(app, altUrl);
+                    if (altFile != null && altFile.exists() && altFile.length() > 8_192) {
+                        chosen = altFile;
+                        chosenUrl = altUrl;
+                    }
+                }
+                final File playFile = chosen;
+                final String playChosen = chosenUrl;
                 post(() -> {
                     if (token != generation) return;
-                    if (file != null && file.exists() && file.length() > 8_192) {
-                        bindGiftExoPlayer(stage, playerView, placeholder, file,
-                                finalUrl, iconUrl, token, true);
-                    } else {
-                        // Last resort: stream HTTP (still reveal on READY, not INVISIBLE).
+                    if (playFile != null && playFile.exists() && playFile.length() > 8_192) {
+                        bindGiftExoPlayer(stage, playerView, placeholder, playFile,
+                                playChosen, iconUrl, token, true,
+                                playChosen.equals(altUrl) ? null : altUrl);
+                    } else if (altUrl != null) {
+                        // Primary already failed download — stream fallback only, never dead URL.
                         bindGiftExoPlayer(stage, playerView, placeholder, null,
-                                finalUrl, iconUrl, token, false);
+                                altUrl, iconUrl, token, false, null);
+                    } else {
+                        // Both missing: keep icon, don't ExoPlayer-404 the same URL again.
+                        android.util.Log.w("NativeRoomEffects",
+                                "gift video missing after download, skip stream url=" + finalUrl);
+                        releaseGiftPlayer();
+                        placeholder.setAlpha(1f);
+                        placeholder.setVisibility(VISIBLE);
+                        postDelayed(() -> {
+                            if (token == generation) finishActive();
+                        }, 1600);
                     }
                 });
             }, "gift-mp4-fetch").start();
@@ -716,7 +891,8 @@ public final class NativeRoomEffectsView extends FrameLayout {
                                    String playUrl,
                                    @Nullable String iconUrl,
                                    int token,
-                                   boolean fromFile) {
+                                   boolean fromFile,
+                                   @Nullable String fallbackUrl) {
         if (token != generation) return;
         releaseGiftPlayer();
 
@@ -735,7 +911,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
         } else {
             mediaUri = android.net.Uri.parse(playUrl);
             dataSourceFactory = new androidx.media3.datasource.DefaultHttpDataSource.Factory()
-                    .setUserAgent("JEHO-Android/2.0.43 (ExoPlayer)")
+                    .setUserAgent("JEHO-Android/2.0.44 (ExoPlayer)")
                     .setAllowCrossProtocolRedirects(true)
                     .setConnectTimeoutMs(10_000)
                     .setReadTimeoutMs(30_000);
@@ -808,8 +984,25 @@ public final class NativeRoomEffectsView extends FrameLayout {
                             localFile.delete();
                         } catch (Exception ignored) {
                         }
+                        String next = (fallbackUrl != null && !fallbackUrl.equalsIgnoreCase(playUrl))
+                                ? fallbackUrl : null;
+                        if (next != null) {
+                            bindGiftExoPlayer(stage, playerView, placeholder, null,
+                                    next, iconUrl, token, false, null);
+                        } else {
+                            // Corrupt cache — do not re-stream same dead URL (404 loop).
+                            releaseGiftPlayer();
+                            placeholder.setAlpha(1f);
+                            placeholder.setVisibility(VISIBLE);
+                            postDelayed(() -> {
+                                if (token == generation) finishActive();
+                            }, 1600);
+                        }
+                        return;
+                    }
+                    if (fallbackUrl != null && !fallbackUrl.equalsIgnoreCase(playUrl)) {
                         bindGiftExoPlayer(stage, playerView, placeholder, null,
-                                playUrl, iconUrl, token, false);
+                                fallbackUrl, iconUrl, token, false, null);
                         return;
                     }
                     releaseGiftPlayer();
@@ -1005,13 +1198,46 @@ public final class NativeRoomEffectsView extends FrameLayout {
             anim = "";
         }
         String abs = anim.isEmpty() ? "" : AssetCatalog.absoluteUrl(anim);
-        String lower = abs.toLowerCase(Locale.US);
         CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
+
+        // Even when catalog has no MP4 (HTML/empty), remap known gifts to CDN entry videos.
+        if (kind != CosmeticMedia.Kind.VIDEO && kind != CosmeticMedia.Kind.SVGA) {
+            try {
+                String preferred = GiftMediaResolver.resolvePlayable(
+                        spec != null ? spec.name : null, remoteIconUrl, anim);
+                if (preferred != null && !preferred.isEmpty()) {
+                    String prefAbs = AssetCatalog.absoluteUrl(preferred);
+                    if (prefAbs != null && !prefAbs.isEmpty()) {
+                        abs = prefAbs;
+                        kind = CosmeticMedia.kind(abs);
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
 
         // Gift videos: always ExoPlayer with audio (TikTok-style). Never muted AnimView/VAP —
         // AnimView expects VAP alpha packs and was muting/failing normal MP4 gift uploads.
         if (kind == CosmeticMedia.Kind.VIDEO) {
-            View streamed = createGiftVideoStream(abs, remoteIconUrl);
+            String fallback = GiftMediaResolver.resolveMappedFallback(
+                    spec != null ? spec.name : null, remoteIconUrl);
+            try {
+                String preferred = GiftMediaResolver.resolvePlayable(
+                        spec != null ? spec.name : null, remoteIconUrl, abs);
+                if (preferred != null && !preferred.isEmpty()) {
+                    String prefAbs = AssetCatalog.absoluteUrl(preferred);
+                    if (prefAbs != null && !prefAbs.isEmpty()) abs = prefAbs;
+                }
+            } catch (Exception ignored) {
+            }
+            if (fallback != null) {
+                try {
+                    String fAbs = AssetCatalog.absoluteUrl(fallback);
+                    if (fAbs != null && fAbs.equalsIgnoreCase(abs)) fallback = null;
+                } catch (Exception ignored) {
+                }
+            }
+            View streamed = createGiftVideoStream(abs, remoteIconUrl, fallback);
             if (streamed != null) return streamed;
         }
 

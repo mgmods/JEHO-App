@@ -1,10 +1,13 @@
 package com.Dramizo.Series.widget;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
+import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -18,11 +21,10 @@ import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
 
 /**
- * Mikoo ComboGiftItemView — gift send toast.
- * Center pop → hold → fly away quickly; gift icon sits in its lane.
+ * Gift send toast: enters from one side above the chat lane, crawls slowly,
+ * then exits to the opposite side. Gift icon must always be visible.
  */
 public class ComboGiftView extends FrameLayout {
-    private View root;
     private ImageView bg;
     private ImageView avatar;
     private ImageView giftIcon;
@@ -31,6 +33,7 @@ public class ComboGiftView extends FrameLayout {
     private TextView comboNum;
     private boolean showing;
     @Nullable private Runnable hideRunnable;
+    @Nullable private Runnable crawlRunnable;
 
     public ComboGiftView(Context context) {
         super(context);
@@ -48,7 +51,7 @@ public class ComboGiftView extends FrameLayout {
     }
 
     private void init(Context context) {
-        root = LayoutInflater.from(context).inflate(R.layout.item_combo_gift_layout, this, true);
+        LayoutInflater.from(context).inflate(R.layout.item_combo_gift_layout, this, true);
         bg = findViewById(R.id.vComboAnimBg);
         avatar = findViewById(R.id.iv_avatar);
         giftIcon = findViewById(R.id.iv_gift);
@@ -56,6 +59,10 @@ public class ComboGiftView extends FrameLayout {
         recvDesc = findViewById(R.id.tvRecvDesc);
         comboNum = findViewById(R.id.tvComboNum);
         if (comboNum != null) comboNum.setText("1");
+        if (giftIcon != null) {
+            giftIcon.setElevation(dp(6));
+            giftIcon.bringToFront();
+        }
         setVisibility(GONE);
         setClipChildren(false);
         setClipToPadding(false);
@@ -86,62 +93,122 @@ public class ComboGiftView extends FrameLayout {
         if (avatar != null) {
             AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
         }
-        if (giftIcon != null) {
-            String url = AssetCatalog.absoluteUrl(giftIconUrl);
-            if (url != null) {
-                Glide.with(giftIcon.getContext().getApplicationContext())
-                        .load(url)
-                        .fitCenter()
-                        .into(giftIcon);
-            } else {
-                giftIcon.setImageResource(R.drawable.ic_asset_gift);
-            }
-        }
-        play();
+        bindGiftIcon(giftIconUrl);
+        playCrawl();
     }
 
-    private void play() {
+    private void bindGiftIcon(@Nullable String giftIconUrl) {
+        if (giftIcon == null) return;
+        giftIcon.setVisibility(VISIBLE);
+        giftIcon.setAlpha(1f);
+        giftIcon.setImageResource(R.drawable.ic_asset_gift);
+        String url = AssetCatalog.absoluteUrl(giftIconUrl);
+        if (url == null || url.isEmpty()) {
+            url = giftIconUrl != null ? giftIconUrl.trim() : null;
+        }
+        if (url == null || url.isEmpty()) return;
+        try {
+            Glide.with(giftIcon.getContext().getApplicationContext())
+                    .load(url)
+                    .placeholder(R.drawable.ic_asset_gift)
+                    .error(R.drawable.ic_asset_gift)
+                    .fitCenter()
+                    .into(giftIcon);
+        } catch (Exception e) {
+            giftIcon.setImageResource(R.drawable.ic_asset_gift);
+        }
+    }
+
+    /**
+     * Enter from the start side → park above chat → slow crawl → exit opposite side.
+     */
+    private void playCrawl() {
         animate().cancel();
         if (hideRunnable != null) {
             removeCallbacks(hideRunnable);
             hideRunnable = null;
         }
+        if (crawlRunnable != null) {
+            removeCallbacks(crawlRunnable);
+            crawlRunnable = null;
+        }
         setVisibility(VISIBLE);
         bringToFront();
-        setAlpha(0f);
-        setScaleX(0.72f);
-        setScaleY(0.72f);
-        setTranslationX(0f);
-        setTranslationY(getResources().getDisplayMetrics().density * 28f);
+        setAlpha(1f);
+        setScaleX(1f);
+        setScaleY(1f);
+        setTranslationY(0f);
         showing = true;
-        animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .translationY(0f)
-                .setDuration(280)
-                .setInterpolator(new DecelerateInterpolator(1.4f))
-                .start();
-        hideRunnable = () -> {
+
+        // Measure then animate so width is known.
+        crawlRunnable = () -> {
             if (!showing) return;
-            float fly = -getResources().getDisplayMetrics().density * 160f;
+            int w = Math.max(getWidth(), dp(240));
+            ViewGroup parent = getParent() instanceof ViewGroup ? (ViewGroup) getParent() : null;
+            int parentW = parent != null && parent.getWidth() > 0
+                    ? parent.getWidth()
+                    : getResources().getDisplayMetrics().widthPixels;
+
+            // Arabic/LTR rooms: enter from left, exit to the right (crawl across chat).
+            final float enterFrom = -w - dp(28);
+            final float park = dp(10);
+            final float exitTo = parentW + dp(24);
+
+            setTranslationX(enterFrom);
+            // Phase 1 — slide in
             animate()
-                    .translationY(fly)
-                    .alpha(0f)
-                    .scaleX(0.86f)
-                    .scaleY(0.86f)
-                    .setDuration(220)
+                    .translationX(park)
+                    .setDuration(900)
+                    .setInterpolator(new LinearInterpolator())
+                    .setListener(null)
                     .withEndAction(() -> {
-                        showing = false;
-                        setVisibility(GONE);
-                        setTranslationY(0f);
-                        setScaleX(1f);
-                        setScaleY(1f);
-                        setAlpha(1f);
+                        if (!showing) return;
+                        // Phase 2 — hold so user can read + see gift icon
+                        hideRunnable = () -> {
+                            if (!showing) return;
+                            // Phase 3 — slow crawl out to the other side
+                            float distance = Math.abs(exitTo - park);
+                            long duration = Math.max(1600L, Math.min(3200L,
+                                    (long) (distance / Math.max(1f, getResources().getDisplayMetrics().density) * 9f)));
+                            animate()
+                                    .translationX(exitTo)
+                                    .setDuration(duration)
+                                    .setInterpolator(new LinearInterpolator())
+                                    .setListener(new AnimatorListenerAdapter() {
+                                        @Override
+                                        public void onAnimationEnd(Animator animation) {
+                                            showing = false;
+                                            setVisibility(GONE);
+                                            setTranslationX(0f);
+                                            animate().setListener(null);
+                                        }
+                                    })
+                                    .start();
+                        };
+                        postDelayed(hideRunnable, 2600L);
                     })
                     .start();
         };
-        postDelayed(hideRunnable, 1600L);
+        post(crawlRunnable);
+    }
+
+    public void hideNow() {
+        showing = false;
+        animate().cancel();
+        if (hideRunnable != null) {
+            removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
+        if (crawlRunnable != null) {
+            removeCallbacks(crawlRunnable);
+            crawlRunnable = null;
+        }
+        setVisibility(GONE);
+        setTranslationX(0f);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     @DrawableRes

@@ -13,24 +13,68 @@
 
     <div class="glass p-3 mb-3">
       <div class="row g-2 align-items-end">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">{{ t('agencies.createPrice') }}</label>
           <input v-model.number="pricing.createPriceCoins" type="number" min="0" class="form-control" />
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">{{ t('agencies.defaultCommission') }}</label>
-          <input v-model.number="pricing.defaultCommissionPercent" type="number" min="0" max="50" class="form-control" />
+          <input
+            v-model.number="pricing.defaultCommissionPercent"
+            type="number"
+            min="0"
+            max="50"
+            class="form-control"
+            @input="onOwnerOrPlatformChange"
+          />
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">{{ t('agencies.platformCut') }}</label>
-          <input v-model.number="pricing.platformCutPercent" type="number" min="0" max="40" class="form-control" />
+          <input
+            v-model.number="pricing.platformCutPercent"
+            type="number"
+            min="0"
+            max="50"
+            class="form-control"
+            @input="onOwnerOrPlatformChange"
+          />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">{{ t('agencies.hostShare') }}</label>
+          <input
+            v-model.number="pricing.hostSharePercent"
+            type="number"
+            min="0"
+            max="100"
+            class="form-control"
+            @input="onHostShareChange"
+          />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label d-block">{{ t('agencies.autoApprove') }}</label>
+          <div class="form-check form-switch mt-2">
+            <input
+              id="agencyAutoApprove"
+              v-model="pricing.autoApproveAfterPayment"
+              class="form-check-input"
+              type="checkbox"
+            />
+            <label class="form-check-label small" for="agencyAutoApprove">
+              {{ pricing.autoApproveAfterPayment ? t('agencies.autoApproveOn') : t('agencies.autoApproveOff') }}
+            </label>
+          </div>
         </div>
         <div class="col-auto">
-          <button class="btn btn-outline-light" type="button" @click="savePricing" :disabled="savingPricing">{{ t('agencies.savePricing') }}</button>
+          <button class="btn btn-outline-light" type="button" @click="savePricing" :disabled="savingPricing">
+            {{ t('agencies.savePricing') }}
+          </button>
         </div>
       </div>
       <div class="small text-muted mt-2">
         {{ t('agencies.pricingHint') }}
+        <span class="ms-2" :class="sharesValid ? 'text-success' : 'text-danger'">
+          · {{ t('agencies.sharesSum', { value: sharesSum }) }}
+        </span>
         <span v-if="pricing.platformRevenueDiamonds != null" class="ms-2 text-warning">
           · {{ t('agencies.platformRevenue', { value: Number(pricing.platformRevenueDiamonds || 0).toLocaleString() }) }}
         </span>
@@ -43,11 +87,25 @@
         <h5 class="mb-0">{{ t('agencies.applications') }}</h5>
         <span class="badge bg-warning text-dark">{{ t('agencies.pendingApps', { count: pendingAppsCount }) }}</span>
       </div>
+      <div class="px-3 pt-2">
+        <BulkActionBar
+          :count="applications.length"
+          :selected-count="appSelectedCount"
+          :all-selected="appAllSelected"
+          :some-selected="appSomeSelected"
+          :busy="bulkBusy"
+          :actions="appBulkActions"
+          @toggle-all="appToggleAll"
+          @clear="appClear"
+          @action="onAppBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loadingApps" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle mb-0">
           <thead>
             <tr>
+              <th style="width:2.2rem"></th>
               <th>{{ t('agencies.applicant') }}</th>
               <th>{{ t('agencies.proposedName') }}</th>
               <th>{{ t('agencies.contactEmail') }}</th>
@@ -58,9 +116,17 @@
           </thead>
           <tbody>
             <tr v-if="!applications.length">
-              <td colspan="6" class="empty-state">{{ t('agencies.noApplications') }}</td>
+              <td colspan="7" class="empty-state">{{ t('agencies.noApplications') }}</td>
             </tr>
             <tr v-for="app in applications" :key="app.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="appIsSelected(app.id)"
+                  @change="appToggle(app.id)"
+                />
+              </td>
               <td>
                 <div class="fw-medium">{{ applicantName(app) }}</div>
                 <div class="small text-muted">{{ app.applicantId || app.applicant?.id || '—' }}</div>
@@ -110,11 +176,25 @@
     </div>
 
     <div class="glass p-0 overflow-hidden">
+      <div class="px-3 pt-2">
+        <BulkActionBar
+          :count="agencies.length"
+          :selected-count="agencySelectedCount"
+          :all-selected="agencyAllSelected"
+          :some-selected="agencySomeSelected"
+          :busy="bulkBusy"
+          :actions="agencyBulkActions"
+          @toggle-all="agencyToggleAll"
+          @clear="agencyClear"
+          @action="onAgencyBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle">
           <thead>
             <tr>
+              <th style="width:2.2rem"></th>
               <th>{{ t('common.agency') }}</th>
               <th>{{ t('common.owner') }}</th>
               <th>{{ t('agencies.hosts') }}</th>
@@ -126,9 +206,17 @@
           </thead>
           <tbody>
             <tr v-if="!agencies.length">
-              <td colspan="7" class="empty-state">{{ t('agencies.noAgencies') }}</td>
+              <td colspan="8" class="empty-state">{{ t('agencies.noAgencies') }}</td>
             </tr>
             <tr v-for="a in agencies" :key="a.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="agencyIsSelected(a.id)"
+                  @change="agencyToggle(a.id)"
+                />
+              </td>
               <td>
                 <div class="fw-medium">{{ a.name }}</div>
                 <div class="small text-muted">{{ t('common.diamonds') }}: {{ formatNumber(a.totalDiamonds || 0) }}</div>
@@ -276,11 +364,14 @@ import { agenciesApi, settingsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 
 const { t } = useI18n()
 
@@ -290,6 +381,7 @@ const loading = ref(false)
 const loadingApps = ref(false)
 const saving = ref(false)
 const savingPricing = ref(false)
+const bulkBusy = ref(false)
 const error = ref('')
 const success = ref('')
 const search = ref('')
@@ -300,7 +392,137 @@ const loadingMembers = ref(false)
 const membersAgency = ref(null)
 const members = ref([])
 const form = reactive({ id: null, name: '', contactEmail: '', commission: 20, ownerId: '' })
-const pricing = reactive({ createPriceCoins: 50000, defaultCommissionPercent: 10, platformCutPercent: 20, platformRevenueDiamonds: 0 })
+const pricing = reactive({
+  createPriceCoins: 50000,
+  defaultCommissionPercent: 15,
+  platformCutPercent: 30,
+  hostSharePercent: 55,
+  autoApproveAfterPayment: false,
+  platformRevenueDiamonds: 0,
+})
+
+const {
+  selectedIds: appSelectedIds,
+  selectedCount: appSelectedCount,
+  allSelected: appAllSelected,
+  someSelected: appSomeSelected,
+  isSelected: appIsSelected,
+  toggle: appToggle,
+  clear: appClear,
+  toggleAll: appToggleAll,
+} = useBulkSelection(applications)
+
+const {
+  selectedIds: agencySelectedIds,
+  selectedCount: agencySelectedCount,
+  allSelected: agencyAllSelected,
+  someSelected: agencySomeSelected,
+  isSelected: agencyIsSelected,
+  toggle: agencyToggle,
+  clear: agencyClear,
+  toggleAll: agencyToggleAll,
+} = useBulkSelection(agencies)
+
+const appBulkActions = computed(() => [
+  { key: 'approve', label: t('bulk.approveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'reject', label: t('bulk.rejectSelected'), icon: 'bi-x-lg', variant: 'btn-outline-danger' },
+])
+const agencyBulkActions = computed(() => [
+  { key: 'approve', label: t('bulk.approveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'suspend', label: t('bulk.suspendSelected'), icon: 'bi-pause', variant: 'btn-outline-warning' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onAppBulkAction(key) {
+  const ids = appSelectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'approve'
+    ? t('bulk.confirmApprove', { count: ids.length })
+    : t('bulk.confirmReject', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'agency-applications',
+      action: key,
+      ids,
+      reason: key === 'reject' ? t('agencies.defaultRejectNote') : undefined,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      appClear()
+      await Promise.all([loadApplications(), load()])
+    }
+  }
+  confirmOpen.value = true
+}
+
+async function onAgencyBulkAction(key) {
+  const ids = agencySelectedIds.value
+  if (!ids.length) return
+  const messages = {
+    approve: t('bulk.confirmApprove', { count: ids.length }),
+    suspend: t('bulk.confirmSuspend', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'agencies',
+      action: key,
+      ids,
+      reason: key === 'suspend' ? t('agencies.defaultSuspendReason') : undefined,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      agencyClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
+
+const sharesSum = computed(() =>
+  Number(pricing.defaultCommissionPercent || 0)
+  + Number(pricing.platformCutPercent || 0)
+  + Number(pricing.hostSharePercent || 0),
+)
+const sharesValid = computed(() => sharesSum.value === 100)
+
+function clampPct(n, max = 100) {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return 0
+  return Math.max(0, Math.min(max, Math.round(v)))
+}
+
+/** Keep host as residual when owner/platform change. */
+function onOwnerOrPlatformChange() {
+  pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 50)
+  pricing.platformCutPercent = clampPct(pricing.platformCutPercent, 50)
+  const rem = 100 - pricing.defaultCommissionPercent - pricing.platformCutPercent
+  pricing.hostSharePercent = Math.max(0, rem)
+}
+
+/** When host is edited, trim platform so the three still sum to 100. */
+function onHostShareChange() {
+  pricing.hostSharePercent = clampPct(pricing.hostSharePercent, 100)
+  pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 50)
+  let rem = 100 - pricing.defaultCommissionPercent - pricing.hostSharePercent
+  if (rem < 0) {
+    pricing.hostSharePercent = Math.max(0, 100 - pricing.defaultCommissionPercent)
+    rem = 0
+  }
+  pricing.platformCutPercent = clampPct(rem, 50)
+  // Recompute host if platform was capped.
+  pricing.hostSharePercent = Math.max(
+    0,
+    100 - pricing.defaultCommissionPercent - pricing.platformCutPercent,
+  )
+}
 
 const pendingAppsCount = computed(() =>
   applications.value.filter((a) => isPendingApp(a)).length,
@@ -333,6 +555,12 @@ async function loadPricing() {
   pricing.defaultCommissionPercent = Number(map.agency_default_commission_percent ?? pricing.defaultCommissionPercent)
   pricing.platformCutPercent = Number(map.agency_platform_cut_percent ?? pricing.platformCutPercent)
   pricing.platformRevenueDiamonds = Number(map.platform_gift_revenue_diamonds ?? pricing.platformRevenueDiamonds)
+  const autoRaw = String(map.agency_auto_approve_after_payment ?? 'false').toLowerCase()
+  pricing.autoApproveAfterPayment = autoRaw === 'true' || autoRaw === '1' || autoRaw === 'yes'
+  pricing.hostSharePercent = Math.max(
+    0,
+    100 - Number(pricing.defaultCommissionPercent || 0) - Number(pricing.platformCutPercent || 0),
+  )
 }
 
 async function loadApplications() {
@@ -536,6 +764,10 @@ async function runConfirm() {
   const action = pendingAction.value
   pendingAction.value = null
   if (!action) return
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
   if (action.type === 'deleteAgency') {
     const { error: err } = await agenciesApi.delete(action.payload.id)
     if (err) {
@@ -564,10 +796,19 @@ async function runConfirm() {
 async function savePricing() {
   savingPricing.value = true
   error.value = ''
+  onOwnerOrPlatformChange()
+  if (!sharesValid.value) {
+    savingPricing.value = false
+    error.value = t('agencies.sharesMustSum100')
+    toast().danger(error.value)
+    return
+  }
   const { error: err } = await settingsApi.update({
-    agency_create_price_coins: String(pricing.createPriceCoins),
+    agency_create_price_coins: String(Math.max(0, Math.floor(Number(pricing.createPriceCoins) || 0))),
     agency_default_commission_percent: String(pricing.defaultCommissionPercent),
     agency_platform_cut_percent: String(pricing.platformCutPercent),
+    agency_host_share_percent: String(pricing.hostSharePercent),
+    agency_auto_approve_after_payment: pricing.autoApproveAfterPayment ? 'true' : 'false',
   })
   savingPricing.value = false
   if (err) {
@@ -576,6 +817,7 @@ async function savePricing() {
   } else {
     success.value = t('agencies.pricingSaved')
     toast().success(success.value)
+    await loadPricing()
   }
 }
 

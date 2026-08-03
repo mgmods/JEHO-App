@@ -234,6 +234,10 @@ public class AuraLiveApp extends Application {
                     return;
                 }
                 if ("celebration:toast".equals(event) && payload != null) {
+                    if (container != null
+                            && container.getSessionManager().isMuteCelebrationPopups()) {
+                        return;
+                    }
                     String title = jsonString(payload, "title", "مبروك!");
                     String body = jsonString(payload, "body", "");
                     String avatar = jsonString(payload, "avatarUrl", null);

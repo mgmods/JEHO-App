@@ -25,10 +25,22 @@
     </div>
 
     <LoadingSpinner v-if="loading" />
-    <div v-else class="widget-grid">
-      <div v-if="!packages.length" class="glass p-4 empty-state">{{ t('coinPackages.empty') }}</div>
-      <article v-for="(p, idx) in packages" :key="p.id || idx" class="widget-card">
-        <div class="widget-card-media bag-visual">
+    <template v-else>
+      <BulkActionBar
+        :count="packages.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <div v-if="!packages.length" class="glass p-4 empty-state">{{ t('coinPackages.empty') }}</div>
+        <article v-for="(p, idx) in packages" :key="p.id || idx" class="widget-card position-relative" :class="{ 'is-selected': isSelected(p.id || String(idx)) }">
+          <BulkCheck :checked="isSelected(p.id || String(idx))" @toggle="toggle(p.id || String(idx))" />
+          <div class="widget-card-media bag-visual">
           <img v-if="packageIcon(p)" :src="packageIcon(p)" alt="" class="pkg-preview" />
           <div v-else class="pkg-preview pkg-preview-empty small text-muted">{{ t('coinPackages.noImage') }}</div>
           <div class="bag-amount">{{ formatNumber(p.coins) }}</div>
@@ -85,7 +97,8 @@
           </button>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <ConfirmDialog
       v-model="confirmOpen"
@@ -97,15 +110,18 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { walletApi, uploadsApi } from '@/api'
 import { formatNumber } from '@/composables/useUtils'
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -115,6 +131,33 @@ const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const packages = ref([])
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(packages, (row) => {
+  const idx = packages.value.indexOf(row)
+  return String(row.id || idx)
+})
+
+const bulkActions = computed(() => [
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+function onBulkAction(key) {
+  if (key !== 'delete') return
+  const ids = selectedIds.value
+  if (!ids.length) return
+  pendingRemoveIdx.value = -2
+  confirmMsg.value = t('bulk.confirmDelete', { count: ids.length })
+  confirmOpen.value = true
+}
 
 function packageIcon(p) {
   const url = p?.imageUrl || p?.iconUrl
@@ -167,6 +210,12 @@ function askRemovePackage(idx) {
 function doRemovePackage() {
   const idx = pendingRemoveIdx.value
   pendingRemoveIdx.value = -1
+  if (idx === -2) {
+    const ids = new Set(selectedIds.value)
+    packages.value = packages.value.filter((p, i) => !ids.has(String(p.id || i)))
+    clear()
+    return
+  }
   if (idx < 0) return
   packages.value.splice(idx, 1)
 }
@@ -236,5 +285,9 @@ onMounted(load)
   font-weight: 700;
   font-size: 1.25rem;
   color: #ffe08a;
+}
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
 }
 </style>

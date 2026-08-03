@@ -76,6 +76,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private boolean syncingTabs;
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
+    @Nullable private Long lastCoinsBalance;
     private static final String[] TAB_LABELS = {
             "عادي", "حظ", "كومبو", "مميز"
     };
@@ -638,7 +639,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (!(chips[i] instanceof android.widget.TextView tv)) continue;
             final int qty = values[i];
             boolean on = giftQty == qty;
-            tv.setText("×" + qty);
+            long unit = selected != null ? Math.max(0, selected.coinPrice) : 0L;
+            int targets = Math.max(1, previewTargetCount());
+            long cost = unit * qty * targets;
+            if (unit > 0) {
+                tv.setText("×" + qty + " · " + fmt(cost));
+            } else {
+                tv.setText("×" + qty);
+            }
             tv.setBackgroundColor(on ? 0x3355F2BC : 0x00000000);
             tv.setTextColor(ContextCompat.getColor(requireContext(),
                     on ? R.color.gift_select_stroke : R.color.mikoo_gift_text));
@@ -654,7 +662,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
         PopupWindow popup = new PopupWindow(
                 content,
-                Math.max(anchor.getWidth(), content.getMeasuredWidth()),
+                Math.max(Math.max(anchor.getWidth(), content.getMeasuredWidth()), dp(148)),
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 true);
         popup.setBackgroundDrawable(new ColorDrawable(0x00000000));
@@ -690,11 +698,57 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (binding == null) return;
         int qty = Math.max(1, effectiveQty());
         if (binding.bltvSendGiftCount != null) {
-            binding.bltvSendGiftCount.setText(String.valueOf(qty));
+            binding.bltvSendGiftCount.setText("×" + qty);
         }
         if (binding.bltvSendGift != null && !sending) {
             binding.bltvSendGift.setText(R.string.send);
         }
+        refreshCostPreview();
+    }
+
+    private int previewTargetCount() {
+        if (sendToAllMic) {
+            int n = uniqueMicCount();
+            return Math.max(1, n);
+        }
+        return 1;
+    }
+
+    private void refreshCostPreview() {
+        if (binding == null || binding.tvGiftCostPreview == null) return;
+        android.widget.TextView tv = binding.tvGiftCostPreview;
+        if (selected == null || selected.coinPrice <= 0) {
+            tv.setText("اختر هدية لعرض التكلفة");
+            tv.setTextColor(0x99FFFFFF);
+            return;
+        }
+        int qty = Math.max(1, effectiveQty());
+        int targets = Math.max(1, previewTargetCount());
+        long unit = selected.coinPrice;
+        long need = unit * qty * targets;
+        Long bal = lastCoinsBalance;
+        StringBuilder sb = new StringBuilder();
+        if (targets > 1) {
+            sb.append(fmt(unit)).append(" × ").append(qty)
+                    .append(" × ").append(targets)
+                    .append(" = ").append(fmt(need));
+        } else {
+            sb.append(fmt(unit)).append(" × ").append(qty)
+                    .append(" = ").append(fmt(need));
+        }
+        if (bal != null) {
+            long left = bal - need;
+            if (left >= 0) {
+                sb.append(" · يتبقى ").append(fmt(left));
+                tv.setTextColor(0xFFFFD54F);
+            } else {
+                sb.append(" · ناقص ").append(fmt(-left));
+                tv.setTextColor(0xFFFF6B6B);
+            }
+        } else {
+            tv.setTextColor(0xFFFFD54F);
+        }
+        tv.setText(sb.toString());
     }
 
     private void refreshSendBtn() {
@@ -705,6 +759,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         boolean enabled = ok && !sending;
         binding.bltvSendGift.setEnabled(enabled);
         binding.bltvSendGift.setAlpha(enabled ? 1f : 0.45f);
+        refreshCostPreview();
     }
 
     // ─── Selected gift ────────────────────────────────────────────────────────
@@ -1103,8 +1158,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void bindCoins(@Nullable Long coins) {
+        lastCoinsBalance = coins;
         if (binding == null || binding.tvGiftUserGold == null) return;
         binding.tvGiftUserGold.setText(coins == null ? "—" : fmt(coins));
+        refreshCostPreview();
     }
 
     private void openRechargeOnly() {

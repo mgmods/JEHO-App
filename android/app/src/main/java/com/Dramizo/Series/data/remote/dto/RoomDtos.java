@@ -206,6 +206,8 @@ public final class RoomDtos {
         @SerializedName("seatCount") public int seatCount;
         @SerializedName("coverUrl") public String coverUrl;
         @SerializedName("backgroundUrl") public String backgroundUrl;
+        /** Force personal STANDARD room even when the host is an agency host. */
+        @SerializedName("preferPersonal") public Boolean preferPersonal;
 
         public CreateRoomRequest(String title, String type, int seatCount, String password, boolean isPublic) {
             this(title, type, seatCount, password, isPublic, null);
@@ -219,7 +221,15 @@ public final class RoomDtos {
         }
 
         public static CreateRoomRequest agencyRoom(String agencyId, String title, String coverUrl) {
-            return new CreateRoomRequest(title, "voice", 10, null, true, coverUrl);
+            CreateRoomRequest r = new CreateRoomRequest(title, "voice", 10, null, true, coverUrl);
+            r.preferPersonal = false;
+            return r;
+        }
+
+        public static CreateRoomRequest personalRoom(String title, String coverUrl) {
+            CreateRoomRequest r = new CreateRoomRequest(title, "voice", 10, null, true, coverUrl);
+            r.preferPersonal = true;
+            return r;
         }
     }
 }

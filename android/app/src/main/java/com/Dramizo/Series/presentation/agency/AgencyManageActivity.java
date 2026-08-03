@@ -2,7 +2,6 @@ package com.Dramizo.Series.presentation.agency;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.LinearLayout;
@@ -20,7 +19,7 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.presentation.createroom.CreateRoomActivity;
+import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -97,8 +96,13 @@ public class AgencyManageActivity extends ThemedActivity {
                     @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
                 });
 
-        binding.btnOpenAgencyStream.setOnClickListener(v ->
-                startActivity(new Intent(this, CreateRoomActivity.class)));
+        binding.btnOpenAgencyStream.setOnClickListener(v -> {
+            String name = null;
+            if (myAgency != null && myAgency.agency != null && myAgency.agency.name != null) {
+                name = myAgency.agency.name;
+            }
+            AgencyRoomLauncher.open(this, agencyId, name);
+        });
 
         binding.btnDeleteAgencyManage.setOnClickListener(v -> confirmDeleteAgency());
 
@@ -115,6 +119,23 @@ public class AgencyManageActivity extends ThemedActivity {
             binding.etUserId.setText("");
             binding.getRoot().postDelayed(this::reload, 700);
         });
+
+        // Keep focused EditTexts above the soft keyboard inside NestedScrollView.
+        View.OnFocusChangeListener scrollOnFocus = (v, hasFocus) -> {
+            if (!hasFocus) return;
+            v.postDelayed(() -> {
+                try {
+                    v.requestRectangleOnScreen(
+                            new android.graphics.Rect(0, 0, v.getWidth(), v.getHeight() + 160),
+                            true);
+                } catch (Exception ignored) {
+                }
+            }, 280);
+        };
+        binding.etUserId.setOnFocusChangeListener(scrollOnFocus);
+        if (binding.etMemberSearch != null) {
+            binding.etMemberSearch.setOnFocusChangeListener(scrollOnFocus);
+        }
 
         vm.getMessage().observe(this, m -> {
             if ("agency_deleted".equals(m)) {

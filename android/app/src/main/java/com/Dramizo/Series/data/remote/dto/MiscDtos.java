@@ -74,6 +74,8 @@ public final class MiscDtos {
         @SerializedName("createPriceCoins") public int createPriceCoins;
         @SerializedName("defaultCommissionPercent") public double defaultCommissionPercent;
         @SerializedName("platformCutPercent") public double platformCutPercent;
+        @SerializedName("hostSharePercent") public double hostSharePercent;
+        @SerializedName("autoApproveAfterPayment") public boolean autoApproveAfterPayment;
         @SerializedName("isPaid") public boolean isPaid;
         @SerializedName("currency") public String currency;
     }

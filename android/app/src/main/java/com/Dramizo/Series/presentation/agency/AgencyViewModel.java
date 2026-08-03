@@ -40,16 +40,17 @@ public class AgencyViewModel extends ViewModel {
                 mine.postValue(m.data);
                 if (m.data.earnings != null) earnings.postValue(m.data.earnings);
                 else earnings.postValue(null);
+                // App shows ONLY this user's agency — never the full active-agencies directory.
+                if (m.data.agency != null) {
+                    agencies.postValue(Collections.singletonList(m.data.agency));
+                } else {
+                    agencies.postValue(Collections.emptyList());
+                }
             } else {
                 mine.postValue(null);
                 earnings.postValue(null);
-            }
-
-            Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> r = c.getAgenciesUseCase.execute(1);
-            if (r.success && r.data != null && r.data.items != null) {
-                agencies.postValue(r.data.items);
-            } else {
-                error.postValue(r.error);
+                agencies.postValue(Collections.emptyList());
+                if (!m.success && m.error != null) error.postValue(m.error);
             }
         });
     }

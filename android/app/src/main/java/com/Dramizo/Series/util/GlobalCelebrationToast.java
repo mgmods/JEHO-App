@@ -88,6 +88,14 @@ public final class GlobalCelebrationToast {
             @Nullable String roomId
     ) {
         if (activity == null || activity.isFinishing()) return;
+        try {
+            android.content.Context app = activity.getApplicationContext();
+            if (app instanceof com.Dramizo.Series.AuraLiveApp aura
+                    && aura.getContainer().getSessionManager().isMuteCelebrationPopups()) {
+                return;
+            }
+        } catch (Exception ignored) {
+        }
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
             return;

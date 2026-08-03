@@ -370,17 +370,7 @@ public class VoiceRoomForegroundService extends Service {
             ZegoEngineManager.getInstance().setSpeakerMuted(false);
         } catch (Exception ignored) {
         }
-        int foregroundTypes = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED
-                && ZegoEngineManager.getInstance().isPublishing()) {
-            foregroundTypes |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
-        }
-        ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                buildForegroundNotification(),
-                foregroundTypes);
+        enterForegroundSafe(resolveForegroundTypes());
         loadCoverAsync();
         postRoomBubble();
         ZegoEngineManager.getInstance().addRoomListener(rtcListener);
@@ -393,6 +383,45 @@ public class VoiceRoomForegroundService extends Service {
                 intent.getLongExtra(EXTRA_MUSIC_POSITION, 0L),
                 intent.getStringExtra(EXTRA_MUSIC_STARTED_AT));
         return START_STICKY;
+    }
+
+    /**
+     * targetSdk 34+/36: microphone FGS is only allowed while the app is in an eligible
+     * state (visible / while-in-use). Prefer mediaPlayback+microphone when publishing,
+     * but never crash the room if the OS rejects the microphone type.
+     */
+    private int resolveForegroundTypes() {
+        int types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK;
+        boolean micOk = ContextCompat.checkSelfPermission(
+                this, android.Manifest.permission.RECORD_AUDIO)
+                == PackageManager.PERMISSION_GRANTED;
+        if (micOk && ZegoEngineManager.getInstance().isPublishing()) {
+            types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+        }
+        return types;
+    }
+
+    private void enterForegroundSafe(int preferredTypes) {
+        Notification notification = buildForegroundNotification();
+        try {
+            ServiceCompat.startForeground(
+                    this, NOTIFICATION_ID, notification, preferredTypes);
+            return;
+        } catch (Exception ignored) {
+            // fall through — common on API 34+ when starting mic FGS from onStop
+        }
+        try {
+            ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } catch (Exception ignored) {
+            try {
+                startForeground(NOTIFICATION_ID, notification);
+            } catch (Exception ignored2) {
+            }
+        }
     }
 
     private void toggleMicFromNotification() {
@@ -443,11 +472,7 @@ public class VoiceRoomForegroundService extends Service {
                     try {
                         NotificationManagerCompat.from(this)
                                 .notify(NOTIFICATION_ID, buildForegroundNotification());
-                        ServiceCompat.startForeground(
-                                this,
-                                NOTIFICATION_ID,
-                                buildForegroundNotification(),
-                                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+                        enterForegroundSafe(resolveForegroundTypes());
                     } catch (Exception ignored) {
                     }
                 });

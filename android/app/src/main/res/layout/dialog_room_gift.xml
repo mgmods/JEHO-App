@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout android:orientation="vertical" android:id="@+id/ll_gift_container" android:layout_width="match_parent" android:layout_height="wrap_content"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto" xmlns:tools="http://schemas.android.com/tools">
     <LinearLayout android:gravity="bottom" android:orientation="vertical" android:id="@+id/fl_top" android:visibility="gone" android:layout_width="match_parent" android:layout_height="wrap_content" app:layout_constraintBottom_toTopOf="@id/line_top" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="parent">        <include android:layout_gravity="end" android:layout_width="214.0dip" android:layout_height="@dimen/dp_52" android:layout_marginEnd="@dimen/dp_9" layout="@layout/room_gift_expliant" />
         <include android:layout_gravity="end" android:layout_width="214.0dip" android:layout_height="@dimen/dp_52" android:layout_marginBottom="-20.0dip" layout="@layout/room_gift_best_couple_entry" />
         <LinearLayout android:layout_gravity="bottom" android:orientation="horizontal" android:visibility="gone" android:layout_width="fill_parent" android:layout_height="45.0dip">
@@ -67,11 +67,76 @@
         app:layout_constraintBottom_toTopOf="@id/cl_bottom"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
-    <androidx.constraintlayout.widget.ConstraintLayout android:gravity="start|center" android:orientation="horizontal" android:id="@+id/cl_bottom" android:background="@color/color_gift_dialog_bg" android:paddingTop="@dimen/dp_3" android:paddingBottom="@dimen/dp_10" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="43.0dip" android:layoutDirection="locale" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
-        <LinearLayout android:gravity="center_vertical" android:id="@+id/rl_wealth" android:layout_width="wrap_content" android:layout_height="@dimen/dp_30" android:layout_marginStart="@dimen/dp_15" app:layout_constraintBottom_toBottomOf="@id/line_send" app:layout_constraintStart_toStartOf="parent" app:layout_constraintTop_toTopOf="@id/line_send">
-            <TextView android:textSize="@dimen/sp_10" android:textColor="@color/white" android:ellipsize="end" android:gravity="center_vertical" android:id="@+id/tv_gift_user_gold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:maxLines="1" android:drawablePadding="@dimen/dp_4" app:drawableStartCompat="@drawable/me_bi_ic" />
-            <TextView android:textSize="@dimen/sp_10" android:textColor="@color/white" android:ellipsize="end" android:gravity="center_vertical" android:id="@+id/tv_gift_user_debris" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:maxLines="1" android:drawablePadding="@dimen/dp_4" android:layout_marginStart="@dimen/dp_8" app:drawableStartCompat="@mipmap/ic_debris" />
-            <TextView android:textSize="14.0sp" android:textColor="#ffffc800" android:gravity="center" android:id="@+id/ivFirstChargeAward" android:visibility="gone" android:layout_width="wrap_content" android:layout_height="wrap_content" android:scaleType="centerInside" android:text="@string/first_charge" android:drawablePadding="@dimen/dp_3" android:contentDescription="@null" android:drawableStart="@mipmap/icon_gift_dialog_charge_award" android:layout_marginStart="@dimen/dp_5" />
+    <androidx.constraintlayout.widget.ConstraintLayout android:gravity="start|center" android:orientation="horizontal" android:id="@+id/cl_bottom" android:background="@color/color_gift_dialog_bg" android:paddingTop="@dimen/dp_3" android:paddingBottom="@dimen/dp_10" android:layout_width="fill_parent" android:layout_height="wrap_content" android:minHeight="52.0dip" android:layoutDirection="locale" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintEnd_toEndOf="parent" app:layout_constraintStart_toStartOf="parent">
+        <LinearLayout
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:id="@+id/rl_wealth"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/dp_15"
+            android:layout_marginEnd="@dimen/dp_8"
+            app:layout_constraintBottom_toBottomOf="@id/line_send"
+            app:layout_constraintEnd_toStartOf="@id/line_send"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/line_send">
+            <LinearLayout
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content">
+                <TextView
+                    android:textSize="@dimen/sp_12"
+                    android:textColor="@color/white"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
+                    android:id="@+id/tv_gift_user_gold"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:maxLines="1"
+                    android:drawablePadding="@dimen/dp_4"
+                    app:drawableStartCompat="@drawable/me_bi_ic" />
+                <TextView
+                    android:textSize="@dimen/sp_10"
+                    android:textColor="@color/white"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
+                    android:id="@+id/tv_gift_user_debris"
+                    android:visibility="gone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:maxLines="1"
+                    android:drawablePadding="@dimen/dp_4"
+                    android:layout_marginStart="@dimen/dp_8"
+                    app:drawableStartCompat="@mipmap/ic_debris" />
+                <TextView
+                    android:textSize="14.0sp"
+                    android:textColor="#ffffc800"
+                    android:gravity="center"
+                    android:id="@+id/ivFirstChargeAward"
+                    android:visibility="gone"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:scaleType="centerInside"
+                    android:text="@string/first_charge"
+                    android:drawablePadding="@dimen/dp_3"
+                    android:contentDescription="@null"
+                    android:drawableStart="@mipmap/icon_gift_dialog_charge_award"
+                    android:layout_marginStart="@dimen/dp_5" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/tv_gift_cost_preview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="#FFD54F"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="100 × 17 = 1,700 · يتبقى 3,300" />
         </LinearLayout>
         <View android:id="@+id/vFirstChargeAwardRignt" android:visibility="gone" android:layout_width="0.0dip" android:layout_height="1.0dip" />
         <androidx.recyclerview.widget.RecyclerView android:orientation="horizontal" android:id="@+id/gift_number_rv" android:background="@drawable/shape_3d3d3d_corner_8dp" android:visibility="gone" android:layout_width="65.0dip" android:layout_height="wrap_content" android:layout_marginBottom="@dimen/dp_20" app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" app:layout_constraintBottom_toTopOf="@id/line_send" app:layout_constraintStart_toStartOf="@id/line_send" />

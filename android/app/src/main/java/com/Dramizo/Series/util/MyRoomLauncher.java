@@ -16,8 +16,8 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 
 /**
- * One-tap "My Room": enter owned room or create personal room using
- * profile name + avatar (no create-room form / title input).
+ * One-tap "My Room": enter/create a <b>personal</b> STANDARD room using
+ * profile name + avatar. Agency live is a separate flow ({@link AgencyRoomLauncher}).
  */
 public final class MyRoomLauncher {
     private MyRoomLauncher() {}
@@ -42,19 +42,19 @@ public final class MyRoomLauncher {
         }
 
         c.getIoExecutor().execute(() -> {
-            // Prefer existing owned room from list.
+            // Prefer existing PERSONAL owned room — never open agency room from "My room".
             Result<com.Dramizo.Series.data.remote.dto.MiscDtos.ListResult<RoomDtos.RoomDto>> listed =
                     ApiCall.execute(c.getRoomApi().list(1));
             if (listed.success && listed.data != null && listed.data.items != null) {
-                RoomDtos.RoomDto owned = MyRoomCardBinder.findOwned(listed.data.items, myId);
+                RoomDtos.RoomDto owned = MyRoomCardBinder.findOwnedPersonal(listed.data.items, myId);
                 if (owned != null && owned.id != null && !owned.id.isEmpty()) {
                     activity.runOnUiThread(() -> enter(activity, owned.id));
                     return;
                 }
             }
 
-            RoomDtos.CreateRoomRequest req = new RoomDtos.CreateRoomRequest(
-                    display.trim(), "voice", 10, null, true, avatar);
+            RoomDtos.CreateRoomRequest req =
+                    RoomDtos.CreateRoomRequest.personalRoom(display.trim(), avatar);
             Result<RoomDtos.JoinRoomResult> created = ApiCall.execute(c.getRoomApi().create(req));
             activity.runOnUiThread(() -> {
                 if (!created.success || created.data == null || created.data.room == null

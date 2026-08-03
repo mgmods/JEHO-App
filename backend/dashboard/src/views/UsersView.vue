@@ -39,12 +39,33 @@
       </div>
     </div>
 
+    <BulkActionBar
+      :count="users.length"
+      :selected-count="selectedCount"
+      :all-selected="allSelected"
+      :some-selected="someSelected"
+      :busy="bulkBusy"
+      :actions="bulkActions"
+      @toggle-all="toggleAll"
+      @clear="clear"
+      @action="onBulkAction"
+    />
+
     <div class="glass p-0 overflow-hidden">
       <LoadingSpinner v-if="loading" />
       <div v-else class="p-3">
         <div v-if="!users.length" class="empty-state p-5 text-center">{{ t('users.empty') }}</div>
         <div v-else class="widget-grid users-grid">
-          <UserCard v-for="u in users" :key="u.id" :user="u" @ban="banUser" @unban="unbanUser" @delete="deleteUser" />
+          <UserCard
+            v-for="u in users"
+            :key="u.id"
+            :user="u"
+            :selected="isSelected(u.id)"
+            @toggle-select="(row) => toggle(row.id)"
+            @ban="banUser"
+            @unban="unbanUser"
+            @delete="deleteUser"
+          />
         </div>
       </div>
       <div class="d-flex justify-content-between align-items-center p-3 border-top" style="border-color: var(--border-color) !important">
@@ -73,10 +94,13 @@ import { usersApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import UserCard from '@/components/UserCard.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -90,8 +114,48 @@ const status = ref('')
 const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(users)
+
+const bulkActions = computed(() => [
+  { key: 'ban', label: t('bulk.banSelected'), icon: 'bi-slash-circle', variant: 'btn-outline-danger' },
+  { key: 'unban', label: t('bulk.unbanSelected'), icon: 'bi-check2-circle', variant: 'btn-outline-success' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / limit.value) || 1))
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  const messages = {
+    ban: t('bulk.confirmBan', { count: ids.length }),
+    unban: t('bulk.confirmUnban', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'users', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 async function load() {
   loading.value = true

@@ -359,36 +359,13 @@
                         android:textAllCaps="false" />
                 </LinearLayout>
 
-                <!-- Browse header -->
-                <TextView
-                    android:id="@+id/tvBrowseTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:gravity="end"
-                    android:text="@string/browse_agencies"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvBrowseHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:gravity="end"
-                    android:text="@string/agency_browse_hint"
-                    android:textColor="@color/text_hint"
-                    android:textSize="12sp" />
-
+                <!-- Directory of all agencies removed — only cardMyAgency above. -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:clipToPadding="false"
-                    android:nestedScrollingEnabled="false"
-                    android:overScrollMode="never" />
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:nestedScrollingEnabled="false" />
 
                 <TextView
                     android:id="@+id/tvEmpty"
@@ -396,6 +373,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:padding="28dp"
+                    android:visibility="gone"
                     android:text="@string/agency_empty_active"
                     android:textColor="@color/text_hint"
                     android:textSize="14sp"

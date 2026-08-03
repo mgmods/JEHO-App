@@ -196,6 +196,15 @@ public class SessionManager {
         return prefs.getBoolean("mute_message_notifications", false);
     }
 
+    /** Mute win/game/profit popup bubbles and celebration toasts. */
+    public void setMuteCelebrationPopups(boolean muted) {
+        prefs.edit().putBoolean("mute_celebration_popups", muted).apply();
+    }
+
+    public boolean isMuteCelebrationPopups() {
+        return prefs.getBoolean("mute_celebration_popups", false);
+    }
+
     public void setFriendsOnlyMessages(boolean enabled) {
         prefs.edit().putBoolean("friends_only_messages", enabled).apply();
     }

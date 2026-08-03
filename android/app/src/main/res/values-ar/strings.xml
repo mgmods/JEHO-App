@@ -265,6 +265,8 @@
 <string name="dark_mode">الوضع الداكن</string>
 <string name="mute_message_notifications">كتم إشعارات الرسائل</string>
 <string name="mute_message_notifications_hint">عند التفعيل لن تصلك تنبيهات رسائل الدردشة</string>
+<string name="mute_celebration_popups">كتم فقاعات الربح والألعاب</string>
+<string name="mute_celebration_popups_hint">يخفي التوستات والفقاعات المنبثقة للأرباح واللعب والمبروك</string>
 <string name="consult_message_setting">إعدادات الرسائل الخاصة</string>
 <string name="setting_only_recv_friend_msg">قبول رسائل الأصدقاء فقط</string>
 <string name="security">الأمان</string>

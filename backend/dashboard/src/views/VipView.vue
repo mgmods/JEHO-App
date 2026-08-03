@@ -68,11 +68,25 @@
       <div class="widget-card-body border-bottom py-3" style="border-color: var(--border-color) !important">
         <h3 class="h6 mb-0">{{ t('vip.members') }}</h3>
       </div>
+      <div class="px-3 pt-2">
+        <BulkActionBar
+          :count="members.length"
+          :selected-count="memberSelectedCount"
+          :all-selected="memberAllSelected"
+          :some-selected="memberSomeSelected"
+          :busy="bulkBusy"
+          :actions="memberBulkActions"
+          @toggle-all="memberToggleAll"
+          @clear="memberClear"
+          @action="onMemberBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle mb-0">
           <thead>
             <tr>
+              <th style="width:2.2rem"></th>
               <th>{{ t('common.user') }}</th>
               <th>{{ t('vip.plan') }}</th>
               <th>{{ t('vip.expires') }}</th>
@@ -82,9 +96,17 @@
           </thead>
           <tbody>
             <tr v-if="!members.length">
-              <td colspan="5" class="empty-state">{{ t('vip.noMembers') }}</td>
+              <td colspan="6" class="empty-state">{{ t('vip.noMembers') }}</td>
             </tr>
             <tr v-for="m in members" :key="m.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="memberIsSelected(m.id)"
+                  @change="memberToggle(m.id)"
+                />
+              </td>
               <td>{{ m.userName || m.user?.displayName || m.user?.username || '—' }}</td>
               <td>{{ m.planName || m.plan?.name || m.level || '—' }}</td>
               <td>{{ formatDate(m.expiresAt || m.endDate) }}</td>
@@ -181,16 +203,19 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { vipApi } from '@/api'
 import { extractList, formatNumber, formatDate } from '@/composables/useUtils'
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -205,6 +230,39 @@ const showPlan = ref(false)
 const showAssign = ref(false)
 const planForm = reactive({ id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '' })
 const assignForm = reactive({ userId: '', planId: '' })
+const bulkBusy = ref(false)
+
+const {
+  selectedIds: memberSelectedIds,
+  selectedCount: memberSelectedCount,
+  allSelected: memberAllSelected,
+  someSelected: memberSomeSelected,
+  isSelected: memberIsSelected,
+  toggle: memberToggle,
+  clear: memberClear,
+  toggleAll: memberToggleAll,
+} = useBulkSelection(members)
+
+const memberBulkActions = computed(() => [
+  { key: 'revoke', label: t('bulk.revokeSelected'), icon: 'bi-x-circle', variant: 'btn-outline-danger' },
+])
+
+async function onMemberBulkAction(key) {
+  const ids = memberSelectedIds.value
+  if (!ids.length || key !== 'revoke') return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = `${t('bulk.revokeSelected')} (${ids.length})?`
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'vip', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      memberClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 function tierForLevel(level) {
   // Mikoo medals are VIP1–7 only.
@@ -314,6 +372,10 @@ async function runConfirm() {
   const action = pendingAction.value
   pendingAction.value = null
   if (!action) return
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
   if (action.type === 'deletePlan') await doRemovePlan(action.payload)
   else if (action.type === 'revoke') await doRevoke(action.payload)
 }

@@ -26,6 +26,10 @@ public class MessageSettingsActivity extends ThemedActivity {
         binding.switchMute.setOnCheckedChangeListener((b, checked) ->
                 vm.setMuteMessageNotifications(checked));
 
+        binding.switchMuteCelebrations.setChecked(vm.isMuteCelebrationPopups());
+        binding.switchMuteCelebrations.setOnCheckedChangeListener((b, checked) ->
+                vm.setMuteCelebrationPopups(checked));
+
         // Friends-only: reuse privacy prefs if present, else local flag on SettingsViewModel.
         binding.switchFriendsOnly.setChecked(vm.isFriendsOnlyMessages());
         binding.switchFriendsOnly.setOnCheckedChangeListener((b, checked) ->

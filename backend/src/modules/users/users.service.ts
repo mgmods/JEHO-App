@@ -175,7 +175,7 @@ export class UsersService {
     });
   }
 
-  async getById(id: string) {
+  async getById(id: string, viewerId?: string) {
     const user = await this.usersRepo.findOne({
       where: { id },
       relations: ['profile'],
@@ -190,9 +190,17 @@ export class UsersService {
       vip && (!vip.expiresAt || vip.expiresAt > now)
         ? Number(vip.level || 0)
         : 0;
+    let isFollowing = false;
+    if (viewerId && viewerId !== id) {
+      const follow = await this.followsRepo.findOne({
+        where: { followerId: viewerId, followingId: id },
+      });
+      isFollowing = !!follow;
+    }
     return this.withWearMeta({
       ...this.flatten(user),
       vipLevel: effectiveVipLevel(vipLevel, Number(user.profile?.totalSentCoins || 0)),
+      isFollowing,
     });
   }
 

@@ -29,9 +29,21 @@
     </div>
 
     <LoadingSpinner v-if="loading" />
-    <div v-else class="widget-grid">
-      <article v-for="(o, idx) in offers" :key="o.id || idx" class="widget-card">
-        <div class="widget-card-body">
+    <template v-else>
+      <BulkActionBar
+        :count="offers.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <article v-for="(o, idx) in offers" :key="o.id || idx" class="widget-card position-relative" :class="{ 'is-selected': isSelected(o.id || String(idx)) }">
+          <BulkCheck :checked="isSelected(o.id || String(idx))" @toggle="toggle(o.id || String(idx))" />
+          <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h3 class="widget-card-title mb-0">{{ t('offers.offerNumber', { number: idx + 1 }) }}</h3>
             <div class="form-check m-0">
@@ -74,7 +86,8 @@
           </button>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <ConfirmDialog
       v-model="confirmOpen"
@@ -86,13 +99,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi } from '@/api'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -103,6 +119,33 @@ const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(offers, (row) => {
+  const idx = offers.value.indexOf(row)
+  return String(row.id || idx)
+})
+
+const bulkActions = computed(() => [
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+function onBulkAction(key) {
+  if (key !== 'delete') return
+  const ids = selectedIds.value
+  if (!ids.length) return
+  pendingRemoveIdx.value = -2
+  confirmMsg.value = t('bulk.confirmDelete', { count: ids.length })
+  confirmOpen.value = true
+}
 
 function addOffer() {
   offers.value.push({
@@ -133,6 +176,12 @@ function askRemoveOffer(idx) {
 function doRemoveOffer() {
   const idx = pendingRemoveIdx.value
   pendingRemoveIdx.value = -1
+  if (idx === -2) {
+    const ids = new Set(selectedIds.value)
+    offers.value = offers.value.filter((o, i) => !ids.has(String(o.id || i)))
+    clear()
+    return
+  }
   if (idx < 0) return
   offers.value.splice(idx, 1)
 }
@@ -187,3 +236,10 @@ async function save() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
+}
+</style>

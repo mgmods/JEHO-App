@@ -11,10 +11,23 @@
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
     <LoadingSpinner v-if="loading" />
 
-    <div v-else class="widget-grid">
-      <div v-if="!boxes.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
-      <article v-for="box in boxes" :key="box.id" class="widget-card">
-        <div class="widget-card-body">
+    <template v-else>
+      <BulkActionBar
+        :count="boxes.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :busy="bulkBusy"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <div v-if="!boxes.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
+        <article v-for="box in boxes" :key="box.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(box.id) }">
+          <BulkCheck :checked="isSelected(box.id)" @toggle="toggle(box.id)" />
+          <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
             <div class="min-w-0">
               <h3 class="widget-card-title text-truncate">{{ box.title }}</h3>
@@ -41,7 +54,8 @@
           </div>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <div v-if="editing" class="glass p-4 mt-4">
       <h3 class="h6 fw-semibold mb-3">{{ form.id ? t('luckyBoxes.edit') : t('luckyBoxes.create') }}</h3>
@@ -88,21 +102,24 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      :title="t('common.delete')"
+      :title="confirmTitle"
       :message="confirmMsg"
-      @confirm="doRemove"
+      @confirm="runConfirm"
     />
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { luckyBoxesApi } from '@/api'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -115,6 +132,49 @@ const editing = ref(false)
 const error = ref('')
 const success = ref('')
 const rewardsText = ref('[{"type":"coins","amount":100,"weight":70},{"type":"diamonds","amount":5,"weight":30}]')
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(boxes)
+
+const bulkActions = computed(() => [
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  if (key !== 'delete') return
+  const ids = selectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('common.delete')
+  confirmMsg.value = t('bulk.confirmDelete', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    let ok = 0
+    let failed = 0
+    for (const id of ids) {
+      const { error: err } = await luckyBoxesApi.adminDelete(id)
+      if (err) failed += 1
+      else ok += 1
+    }
+    bulkBusy.value = false
+    const msg = t('bulk.done', { ok, failed })
+    if (failed > 0) toast().danger(msg)
+    else toast().success(msg)
+    if (ok > 0) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 const form = reactive({
   id: null,
@@ -229,13 +289,27 @@ async function toggleActive(box) {
 }
 
 const confirmOpen = ref(false)
+const confirmTitle = ref('')
 const confirmMsg = ref('')
 const pendingDelete = ref(null)
+const pendingAction = ref(null)
 
 function askRemove(box) {
   pendingDelete.value = box
+  pendingAction.value = null
+  confirmTitle.value = t('common.delete')
   confirmMsg.value = t('luckyBoxes.confirmDelete')
   confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
+  await doRemove()
 }
 
 async function doRemove() {
@@ -259,3 +333,10 @@ async function doRemove() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
+}
+</style>

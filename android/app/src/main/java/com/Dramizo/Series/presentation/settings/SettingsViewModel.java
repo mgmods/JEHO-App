@@ -46,6 +46,14 @@ public class SettingsViewModel extends ViewModel {
         c.getSessionManager().setMuteMessageNotifications(muted);
     }
 
+    public boolean isMuteCelebrationPopups() {
+        return c.getSessionManager().isMuteCelebrationPopups();
+    }
+
+    public void setMuteCelebrationPopups(boolean muted) {
+        c.getSessionManager().setMuteCelebrationPopups(muted);
+    }
+
     public boolean isFriendsOnlyMessages() {
         return c.getSessionManager().isFriendsOnlyMessages();
     }

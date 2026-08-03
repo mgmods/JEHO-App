@@ -309,6 +309,8 @@
 <string name="dark_mode">Dark mode</string>
 <string name="mute_message_notifications">Mute message notifications</string>
 <string name="mute_message_notifications_hint">When enabled, you will not receive chat message alerts</string>
+<string name="mute_celebration_popups">Mute win &amp; game popups</string>
+<string name="mute_celebration_popups_hint">Hides win/game profit bubbles and celebration toasts</string>
 <string name="consult_message_setting">Private chat message setting</string>
 <string name="setting_only_recv_friend_msg">Only accept friend messages</string>
 <string name="security">Security</string>

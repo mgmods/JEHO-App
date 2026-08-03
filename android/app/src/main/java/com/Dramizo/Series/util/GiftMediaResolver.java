@@ -21,24 +21,55 @@ public final class GiftMediaResolver {
             @Nullable String iconUrl,
             @Nullable String animationUrl
     ) {
+        String mapped = mapByName(giftName);
+        if (mapped == null) mapped = mapByIcon(iconUrl);
+
         String existing = CosmeticMedia.playableUrl(animationUrl);
         if (existing != null) {
-            // Prefer VIDEO/SVGA; keep GIF/IMAGE only if no better map.
             CosmeticMedia.Kind k = CosmeticMedia.kind(existing);
             if (k == CosmeticMedia.Kind.VIDEO || k == CosmeticMedia.Kind.SVGA) {
+                // Catalog often stores sibling .mp4 next to gift PNGs that 404 on CDN.
+                // Prefer known Mikoo entry videos when the catalog URL looks fragile.
+                if (mapped != null && looksFragileGiftUrl(existing)) {
+                    return mapped;
+                }
                 return existing;
             }
         }
 
-        String mapped = mapByName(giftName);
-        if (mapped == null) mapped = mapByIcon(iconUrl);
-        if (mapped == null && iconUrl != null && !iconUrl.isEmpty()) {
+        if (mapped != null) return mapped;
+        if (iconUrl != null && !iconUrl.isEmpty()) {
             String sibling = iconUrl.replaceAll("(?i)\\.(png|jpe?g|webp)(\\?.*)?$", ".mp4$2");
-            if (!sibling.equals(iconUrl) && CosmeticMedia.kind(sibling) == CosmeticMedia.Kind.VIDEO) {
-                mapped = sibling;
+            if (!sibling.equals(iconUrl) && CosmeticMedia.kind(sibling) == CosmeticMedia.Kind.VIDEO
+                    && !looksFragileGiftUrl(sibling)) {
+                return sibling;
             }
         }
+        return null;
+    }
+
+    /**
+     * CDN entry remap for a gift (name/icon) — used when the primary animation URL 404s.
+     */
+    @Nullable
+    public static String resolveMappedFallback(
+            @Nullable String giftName,
+            @Nullable String iconUrl
+    ) {
+        String mapped = mapByName(giftName);
+        if (mapped == null) mapped = mapByIcon(iconUrl);
         return mapped;
+    }
+
+    /** Gift-sprite / visual-system paths that frequently 404 when used as MP4. */
+    private static boolean looksFragileGiftUrl(@Nullable String url) {
+        if (url == null || url.isEmpty()) return false;
+        String u = url.toLowerCase(Locale.US);
+        return u.contains("/gifts/")
+                || u.contains("gift-")
+                || u.contains("gift_")
+                || u.contains("visual-system")
+                || (u.contains("/anims/") && !u.contains("/cosmetics/entries/"));
     }
 
     @Nullable

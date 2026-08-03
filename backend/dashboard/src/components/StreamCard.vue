@@ -1,5 +1,6 @@
 <template>
-  <div class="room-card glass widget-card overflow-hidden">
+  <div class="room-card glass widget-card overflow-hidden" :class="{ 'is-selected': selected }">
+    <BulkCheck :checked="selected" @toggle="$emit('toggle-select', stream)" />
     <div class="room-card__hero" :style="heroStyle">
       <div class="room-card__scrim" />
 
@@ -50,13 +51,15 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import { formatDate, formatNumber } from '@/composables/useUtils'
 
 const props = defineProps({
   stream: { type: Object, required: true },
+  selected: { type: Boolean, default: false },
 })
 const { t } = useI18n()
-defineEmits(['forceEnd'])
+defineEmits(['forceEnd', 'toggle-select'])
 
 const avatarError = ref(false)
 
@@ -179,6 +182,10 @@ const heroStyle = computed(() => {
   gap: 12px;
   padding: 12px 14px;
   border-top: 1px solid var(--border-color);
+}
+.room-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
 }
 </style>
 

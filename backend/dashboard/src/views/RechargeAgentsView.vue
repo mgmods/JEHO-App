@@ -149,16 +149,38 @@
         <h5 class="mb-0">طلبات الانضمام المدفوعة</h5>
         <span class="badge bg-warning text-dark">{{ pendingCount }} بانتظار المراجعة</span>
       </div>
+      <div class="px-3 pt-2">
+        <BulkActionBar
+          :count="applications.length"
+          :selected-count="appSelectedCount"
+          :all-selected="appAllSelected"
+          :some-selected="appSomeSelected"
+          :busy="bulkBusy"
+          :actions="appBulkActions"
+          @toggle-all="appToggleAll"
+          @clear="appClear"
+          @action="onAppBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle mb-0">
           <thead><tr>
+            <th style="width:2.2rem"></th>
             <th>المستخدم</th><th>التواصل</th><th>الرصيد المطلوب</th><th>المبلغ</th>
             <th>الدفع</th><th>الحالة</th><th></th>
           </tr></thead>
           <tbody>
-            <tr v-if="!applications.length"><td colspan="7" class="empty-state">لا توجد طلبات</td></tr>
+            <tr v-if="!applications.length"><td colspan="8" class="empty-state">لا توجد طلبات</td></tr>
             <tr v-for="item in applications" :key="item.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="appIsSelected(item.id)"
+                  @change="appToggle(item.id)"
+                />
+              </td>
               <td>
                 <div class="fw-semibold">{{ userName(item) }}</div>
                 <small class="text-muted">{{ item.user?.username }} · {{ item.userId }}</small>
@@ -188,16 +210,38 @@
 
     <div class="glass p-0 overflow-hidden">
       <div class="p-3 border-bottom"><h5 class="mb-0">الوكلاء (بيع داخلي + ظهور اختياري في الدليل)</h5></div>
+      <div class="px-3 pt-2">
+        <BulkActionBar
+          :count="agents.length"
+          :selected-count="agentSelectedCount"
+          :all-selected="agentAllSelected"
+          :some-selected="agentSomeSelected"
+          :busy="bulkBusy"
+          :actions="agentBulkActions"
+          @toggle-all="agentToggleAll"
+          @clear="agentClear"
+          @action="onAgentBulkAction"
+        />
+      </div>
       <LoadingSpinner v-if="loading" />
       <div v-else class="table-responsive">
         <table class="table table-glass table-hover align-middle mb-0">
           <thead><tr>
+            <th style="width:2.2rem"></th>
             <th>الوكيل</th><th>الرصيد</th><th>الدولة / تواصل</th><th>مبيعات اليوم</th>
             <th>العمولة</th><th>الحالة</th><th></th>
           </tr></thead>
           <tbody>
-            <tr v-if="!agents.length"><td colspan="7" class="empty-state">لا يوجد وكلاء</td></tr>
+            <tr v-if="!agents.length"><td colspan="8" class="empty-state">لا يوجد وكلاء</td></tr>
             <tr v-for="agent in agents" :key="agent.id">
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  :checked="agentIsSelected(agent.id)"
+                  @change="agentToggle(agent.id)"
+                />
+              </td>
               <td><div class="fw-semibold">{{ userName(agent) }}</div><small class="text-muted">{{ agent.userId }}</small></td>
               <td>{{ formatNumber(agent.floatCoins) }}</td>
               <td>
@@ -240,11 +284,14 @@ import { rechargeAgentsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import CountryFlag from '@/components/CountryFlag.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -256,6 +303,7 @@ const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const editingContact = ref(false)
+const bulkBusy = ref(false)
 const pricing = reactive({
   membershipFeeUsdt: 25,
   wholesalePer100CoinsUsdt: 0.01,
@@ -274,6 +322,86 @@ const contactForm = reactive({
   isActive: true,
   sortOrder: 0,
 })
+
+const {
+  selectedIds: appSelectedIds,
+  selectedCount: appSelectedCount,
+  allSelected: appAllSelected,
+  someSelected: appSomeSelected,
+  isSelected: appIsSelected,
+  toggle: appToggle,
+  clear: appClear,
+  toggleAll: appToggleAll,
+} = useBulkSelection(applications)
+
+const {
+  selectedIds: agentSelectedIds,
+  selectedCount: agentSelectedCount,
+  allSelected: agentAllSelected,
+  someSelected: agentSomeSelected,
+  isSelected: agentIsSelected,
+  toggle: agentToggle,
+  clear: agentClear,
+  toggleAll: agentToggleAll,
+} = useBulkSelection(agents)
+
+const appBulkActions = computed(() => [
+  { key: 'approve', label: t('bulk.approveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'reject', label: t('bulk.rejectSelected'), icon: 'bi-x-lg', variant: 'btn-outline-danger' },
+])
+
+const agentBulkActions = computed(() => [
+  { key: 'activate', label: t('bulk.activateSelected'), icon: 'bi-check2-circle', variant: 'btn-outline-success' },
+  { key: 'suspend', label: t('bulk.suspendSelected'), icon: 'bi-pause', variant: 'btn-outline-warning' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onAppBulkAction(key) {
+  const ids = appSelectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'approve'
+    ? t('bulk.confirmApprove', { count: ids.length })
+    : t('bulk.confirmReject', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'recharge-agent-applications',
+      action: key,
+      ids,
+      reason: key === 'reject' ? 'مرفوض من لوحة التحكم' : undefined,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      appClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
+
+async function onAgentBulkAction(key) {
+  const ids = agentSelectedIds.value
+  if (!ids.length) return
+  const messages = {
+    activate: t('bulk.confirmApprove', { count: ids.length }),
+    suspend: t('bulk.confirmSuspend', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'recharge-agents', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      agentClear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 const pendingCount = computed(() => applications.value.filter(x => x.status === 'pending').length)
 const stats = computed(() => [
@@ -567,6 +695,10 @@ async function runConfirm() {
   const action = pendingAction.value
   pendingAction.value = null
   if (!action) return
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
   if (action.type === 'removeContact') {
     const result = await rechargeAgentsApi.removeContact(action.payload.id)
     if (result.error) {

@@ -1405,4 +1405,227 @@ export class AdminController {
   adminDramaEpisodeDelete(@Param('id') id: string) {
     return this.dramaService.adminDeleteEpisode(id);
   }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk action on selected dashboard rows (max 200)' })
+  @Post('bulk')
+  async bulk(
+    @CurrentUser() user: { id?: string; sub?: string },
+    @Body()
+    body: {
+      resource?: string;
+      action?: string;
+      ids?: string[];
+      reason?: string;
+      note?: string;
+      force?: boolean;
+    },
+  ) {
+    const ids = [
+      ...new Set(
+        (Array.isArray(body?.ids) ? body.ids : [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (!ids.length) throw new BadRequestException('اختر عنصراً واحداً على الأقل');
+    if (ids.length > 200) throw new BadRequestException('الحد الأقصى 200 عنصر');
+
+    const resource = String(body?.resource || '')
+      .trim()
+      .toLowerCase();
+    const action = String(body?.action || '')
+      .trim()
+      .toLowerCase();
+    const reason =
+      String(body?.reason || body?.note || '').trim() || 'إجراء جماعي من لوحة التحكم';
+    const adminId = String(user?.id || user?.sub || '');
+    const key = `${resource}:${action}`;
+    const ok: string[] = [];
+    const failed: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        switch (key) {
+          case 'rooms:close':
+            await this.adminService.closeRoom(id);
+            break;
+          case 'rooms:delete':
+            await this.adminService.deleteRoom(id, {
+              allowAgency: !!body?.force,
+            });
+            break;
+          case 'rooms:force-end':
+          case 'streams:force-end':
+            await this.adminService.forceEndStream(id, reason);
+            break;
+          case 'users:ban':
+            await this.adminService.updateUserStatus(id, {
+              status: UserStatus.BANNED,
+            });
+            break;
+          case 'users:unban':
+            await this.adminService.updateUserStatus(id, {
+              status: UserStatus.ACTIVE,
+            });
+            break;
+          case 'users:delete':
+            await this.adminService.deleteUser(id, adminId);
+            break;
+          case 'gifts:delete':
+            await this.adminService.deleteGift(id);
+            break;
+          case 'gifts:activate':
+            await this.adminService.upsertGift(id, { isActive: true } as any);
+            break;
+          case 'gifts:deactivate':
+            await this.adminService.upsertGift(id, { isActive: false } as any);
+            break;
+          case 'cosmetics:delete':
+            await this.cosmeticsService.adminDelete(id);
+            break;
+          case 'cosmetics:activate':
+            await this.cosmeticsService.adminUpdate(id, { isActive: true } as any);
+            break;
+          case 'cosmetics:deactivate':
+            await this.cosmeticsService.adminUpdate(id, { isActive: false } as any);
+            break;
+          case 'agencies:approve':
+            await this.adminService.approveAgency(id);
+            break;
+          case 'agencies:suspend':
+            await this.adminService.suspendAgency(id, reason);
+            break;
+          case 'agencies:delete':
+            await this.adminService.deleteAgency(id);
+            break;
+          case 'agency-applications:approve':
+            await this.adminService.reviewAgencyApplication(
+              id,
+              adminId,
+              'approve',
+            );
+            break;
+          case 'agency-applications:reject':
+            await this.adminService.reviewAgencyApplication(
+              id,
+              adminId,
+              'reject',
+              reason,
+            );
+            break;
+          case 'withdraws:approve':
+            await this.adminService.reviewWithdraw(id, adminId, {
+              status: WithdrawStatus.PAID,
+            });
+            break;
+          case 'withdraws:reject':
+            await this.adminService.reviewWithdraw(id, adminId, {
+              status: WithdrawStatus.REJECTED,
+              adminNote: reason,
+            });
+            break;
+          case 'recharges:complete':
+            await this.adminService.completeRechargeOrder(id, undefined, reason);
+            break;
+          case 'recharges:cancel':
+            await this.adminService.cancelRechargeOrder(id);
+            break;
+          case 'reports:resolve':
+            await this.adminService.resolveReport(
+              id,
+              ReportStatus.RESOLVED,
+              reason,
+              adminId,
+            );
+            break;
+          case 'reports:dismiss':
+            await this.adminService.resolveReport(
+              id,
+              ReportStatus.REJECTED,
+              reason,
+              adminId,
+            );
+            break;
+          case 'contests:end':
+            await this.contestsService.adminEnd(id);
+            break;
+          case 'contests:delete':
+            await this.contestsService.adminDelete(id);
+            break;
+          case 'recharge-agents:suspend':
+            await this.rechargeAgentsService.adminPatchAgent(
+              id,
+              { status: 'suspended' } as any,
+              adminId,
+            );
+            break;
+          case 'recharge-agents:activate':
+            await this.rechargeAgentsService.adminPatchAgent(
+              id,
+              { status: 'active' } as any,
+              adminId,
+            );
+            break;
+          case 'recharge-agents:delete':
+            await this.rechargeAgentsService.adminDeleteAgent(id);
+            break;
+          case 'recharge-agent-applications:approve':
+            await this.rechargeAgentsService.adminReviewApplication(
+              id,
+              'approve',
+              adminId,
+              reason,
+            );
+            break;
+          case 'recharge-agent-applications:reject':
+            await this.rechargeAgentsService.adminReviewApplication(
+              id,
+              'reject',
+              adminId,
+              reason,
+            );
+            break;
+          case 'vip:revoke':
+            await this.adminService.revokeVip(id);
+            break;
+          case 'gender-verifications:approve':
+            await this.identityVerification.adminReview(
+              id,
+              'approve',
+              adminId,
+              reason,
+            );
+            break;
+          case 'gender-verifications:reject':
+            await this.identityVerification.adminReview(
+              id,
+              'reject',
+              adminId,
+              reason,
+            );
+            break;
+          default:
+            throw new BadRequestException(
+              `إجراء غير مدعوم: ${resource}/${action}`,
+            );
+        }
+        ok.push(id);
+      } catch (err: any) {
+        failed.push({
+          id,
+          error: String(err?.message || err || 'failed'),
+        });
+      }
+    }
+
+    return {
+      resource,
+      action,
+      ok: ok.length,
+      failed: failed.length,
+      results: { ok, failed },
+    };
+  }
 }

@@ -26,7 +26,7 @@ public final class MyRoomCardBinder {
             @Nullable View.OnClickListener ignoredCreate
     ) {
         if (card == null) return;
-        RoomDtos.RoomDto owned = findOwned(rooms, myUserId);
+        RoomDtos.RoomDto owned = findOwnedPersonal(rooms, myUserId);
         card.imgMyRoomCreateIcon.setVisibility(View.GONE);
         card.imgMyRoomAvatar.setVisibility(View.VISIBLE);
         String cover = null;
@@ -70,12 +70,44 @@ public final class MyRoomCardBinder {
             @Nullable List<RoomDtos.RoomDto> rooms,
             @Nullable String myUserId
     ) {
+        RoomDtos.RoomDto personal = findOwnedPersonal(rooms, myUserId);
+        if (personal != null) return personal;
+        return findOwnedAgency(rooms, myUserId);
+    }
+
+    /** Personal STANDARD room only (not agency). */
+    @Nullable
+    public static RoomDtos.RoomDto findOwnedPersonal(
+            @Nullable List<RoomDtos.RoomDto> rooms,
+            @Nullable String myUserId
+    ) {
         if (rooms == null || myUserId == null || myUserId.isEmpty()) return null;
         for (RoomDtos.RoomDto r : rooms) {
             if (r == null) continue;
-            if (myUserId.equals(r.hostId)) return r;
-            if (r.host != null && myUserId.equals(r.host.id)) return r;
+            if (!isOwnedBy(r, myUserId)) continue;
+            if (RoomUiHelper.isAgencyRoom(r)) continue;
+            return r;
         }
         return null;
+    }
+
+    /** Agency room owned/hosted by this user. */
+    @Nullable
+    public static RoomDtos.RoomDto findOwnedAgency(
+            @Nullable List<RoomDtos.RoomDto> rooms,
+            @Nullable String myUserId
+    ) {
+        if (rooms == null || myUserId == null || myUserId.isEmpty()) return null;
+        for (RoomDtos.RoomDto r : rooms) {
+            if (r == null) continue;
+            if (!isOwnedBy(r, myUserId)) continue;
+            if (RoomUiHelper.isAgencyRoom(r)) return r;
+        }
+        return null;
+    }
+
+    private static boolean isOwnedBy(RoomDtos.RoomDto r, String myUserId) {
+        if (myUserId.equals(r.hostId)) return true;
+        return r.host != null && myUserId.equals(r.host.id);
     }
 }

@@ -26,21 +26,41 @@ export class JwtAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) return true;
-
     const request = context.switchToHttp().getRequest();
-    const token = this.extractToken(request);
-    if (!token) {
-      throw new UnauthorizedException('Missing authentication token');
+
+    if (isPublic) {
+      // Optional auth on public routes (e.g. profile isFollowing for logged-in viewers).
+      await this.tryAttachUser(request, false);
+      return true;
     }
 
+    const attached = await this.tryAttachUser(request, true);
+    if (!attached) {
+      throw new UnauthorizedException('Missing authentication token');
+    }
+    return true;
+  }
+
+  /** Returns true when request.user was set. When required, invalid tokens throw. */
+  private async tryAttachUser(
+    request: { headers: { authorization?: string }; user?: Record<string, unknown> },
+    required: boolean,
+  ): Promise<boolean> {
+    const token = this.extractToken(request);
+    if (!token) {
+      if (required) throw new UnauthorizedException('Missing authentication token');
+      return false;
+    }
     try {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.configService.get<string>('app.jwt.secret'),
       });
       const user = await this.usersRepo.findOne({ where: { id: payload.sub } });
       if (!user || user.status !== UserStatus.ACTIVE) {
-        throw new UnauthorizedException('Account is restricted or unavailable');
+        if (required) {
+          throw new UnauthorizedException('Account is restricted or unavailable');
+        }
+        return false;
       }
       request.user = {
         ...payload,
@@ -53,7 +73,8 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error;
-      throw new UnauthorizedException('Invalid or expired token');
+      if (required) throw new UnauthorizedException('Invalid or expired token');
+      return false;
     }
   }
 

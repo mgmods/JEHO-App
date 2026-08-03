@@ -128,10 +128,23 @@
     </div>
 
     <LoadingSpinner v-if="loading" />
-    <div v-else class="widget-grid mb-4">
-      <div v-if="!contests.length" class="glass p-4 empty-state text-center">{{ t('contests.empty') }}</div>
-      <article v-for="c in contests" :key="c.id" class="widget-card">
-        <div class="widget-card-body">
+    <template v-else>
+      <BulkActionBar
+        :count="contests.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :busy="bulkBusy"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid mb-4">
+        <div v-if="!contests.length" class="glass p-4 empty-state text-center">{{ t('contests.empty') }}</div>
+        <article v-for="c in contests" :key="c.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(c.id) }">
+          <BulkCheck :checked="isSelected(c.id)" @toggle="toggle(c.id)" />
+          <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
             <h3 class="widget-card-title mb-0">{{ c.title }}</h3>
             <span class="badge" :class="statusClass(c.status)">{{ statusLabel(c.status) }}</span>
@@ -162,7 +175,8 @@
           </div>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <div class="glass p-3 mb-4">
       <h3 class="h6 mb-3">
@@ -229,6 +243,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { resolveAsset } from '@/utils/assets'
 import { formatNumber, extractList } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import { contestsApi } from '@/api'
 
 const { t, locale } = useI18n()
@@ -245,6 +263,42 @@ const loadingRank = ref(false)
 const saving = ref(false)
 const showEditor = ref(false)
 const editingId = ref(null)
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(contests)
+
+const bulkActions = computed(() => [
+  { key: 'end', label: t('bulk.endSelected'), icon: 'bi-stop-circle', variant: 'btn-outline-warning' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'end'
+    ? `${t('bulk.endSelected')} (${ids.length})?`
+    : t('bulk.confirmDelete', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'contests', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await loadContests()
+    }
+  }
+  confirmOpen.value = true
+}
 
 const form = reactive({
   title: '',
@@ -495,6 +549,10 @@ async function runConfirm() {
   const action = pendingAction.value
   pendingAction.value = null
   if (!action) return
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
   if (action.type === 'end') await doEndContest(action.payload)
   else if (action.type === 'endAll') await doEndAllContests()
   else if (action.type === 'delete') await doDeleteContest(action.payload)
@@ -556,5 +614,9 @@ onMounted(loadContests)
   max-height: 220px;
   object-fit: cover;
   display: block;
+}
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
 }
 </style>

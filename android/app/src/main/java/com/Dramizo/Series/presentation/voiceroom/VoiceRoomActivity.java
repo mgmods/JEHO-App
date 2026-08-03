@@ -2132,6 +2132,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomDisplaySettings(@Nullable RoomDtos.RoomDto room) {
         if (room == null) return;
         applyChatZone(room.chatZoneEnabled);
+        // Default open when unset; only hide when host explicitly disabled.
         applyRoomBanner(room.bannerEnabled);
     }
 
@@ -2215,6 +2216,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomBannerEnabled() {
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
         return room == null || room.bannerEnabled;
+    }
+
+    private boolean areCelebrationPopupsMuted() {
+        try {
+            return ContainerProvider.from(this).getSessionManager().isMuteCelebrationPopups();
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private void showRoomBlacklistSheet() {
@@ -5380,25 +5389,52 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (chat != null) chat.performClick();
             });
         }
-        sheet.findViewById(R.id.actFollow).setOnClickListener(v -> {
-            dialog.dismiss();
-            if (userId == null || userId.isEmpty()) return;
-            if (userId.equals(myUserId)) {
-                Toast.makeText(this, R.string.cannot_follow_yourself, Toast.LENGTH_SHORT).show();
-                return;
+        TextView actFollow = sheet.findViewById(R.id.actFollow);
+        if (actFollow != null) {
+            actFollow.setText(R.string.follow);
+            final boolean[] following = {false};
+            if (userId != null && !userId.isEmpty() && !userId.equals(myUserId)) {
+                AppContainer followContainer = ContainerProvider.from(this);
+                followContainer.getIoExecutor().execute(() -> {
+                    Result<AuthDtos.UserDto> profile = com.Dramizo.Series.util.ApiCall.execute(
+                            followContainer.getUserApi().getUser(userId));
+                    if (profile.success && profile.data != null
+                            && Boolean.TRUE.equals(profile.data.isFollowing)) {
+                        following[0] = true;
+                        runOnUiThread(() -> {
+                            if (actFollow.getWindowToken() != null) {
+                                actFollow.setText(R.string.unfollow);
+                            }
+                        });
+                    }
+                });
             }
-            AppContainer container = ContainerProvider.from(this);
-            container.getIoExecutor().execute(() -> {
-                try {
-                    retrofit2.Response<?> resp = container.getUserApi().follow(userId).execute();
-                    runOnUiThread(() -> Toast.makeText(this,
-                            resp.isSuccessful() ? "تمت المتابعة ✓" : getString(R.string.error_generic),
-                            Toast.LENGTH_SHORT).show());
-                } catch (Exception e) {
-                    runOnUiThread(() -> Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show());
+            actFollow.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (userId == null || userId.isEmpty()) return;
+                if (userId.equals(myUserId)) {
+                    Toast.makeText(this, R.string.cannot_follow_yourself, Toast.LENGTH_SHORT).show();
+                    return;
                 }
+                AppContainer container = ContainerProvider.from(this);
+                final boolean unfollow = following[0];
+                container.getIoExecutor().execute(() -> {
+                    try {
+                        retrofit2.Response<?> resp = (unfollow
+                                ? container.getUserApi().unfollow(userId)
+                                : container.getUserApi().follow(userId)).execute();
+                        runOnUiThread(() -> Toast.makeText(this,
+                                resp.isSuccessful()
+                                        ? (unfollow ? "تم إلغاء المتابعة ✓" : "تمت المتابعة ✓")
+                                        : getString(R.string.error_generic),
+                                Toast.LENGTH_SHORT).show());
+                    } catch (Exception e) {
+                        runOnUiThread(() -> Toast.makeText(this, getString(R.string.error_generic),
+                                Toast.LENGTH_SHORT).show());
+                    }
+                });
             });
-        });
+        }
         View actFriend = sheet.findViewById(R.id.actFriend);
         if (actFriend != null) {
             actFriend.setOnClickListener(v -> {
@@ -6340,7 +6376,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean shortScreen = heightDp < 680;
         boolean tablet = widthDp >= 600;
 
-        binding.roomBanner.setVisibility(View.GONE);
+        // Keep red promo banner open when enabled — do not force GONE on every layout pass.
+        applyRoomBanner(roomBannerEnabled());
         binding.tvRoomRules.setVisibility(shortScreen ? View.GONE : View.VISIBLE);
         // Give chat more vertical room so bubbles stay readable while typing.
         binding.chatPanel.setMinimumHeight(dp(shortScreen ? 180 : tablet ? 260 : 220));
@@ -7390,6 +7427,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int vipLevel,
             @Nullable String message
     ) {
+        if (areCelebrationPopupsMuted()) return;
         if (binding == null || binding.comingMsgView == null) return;
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
         binding.comingMsgView.setupView(displayName, avatarUrl, userLevel, vipLevel, msg);
@@ -7438,6 +7476,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String gameTitle,
             @Nullable String targetRoomId
     ) {
+        if (areCelebrationPopupsMuted()) return;
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String line = body != null && !body.isEmpty()
                 ? body
@@ -7452,14 +7491,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean otherRoom = targetRoomId != null && !targetRoomId.isEmpty()
                     && (roomId == null || !targetRoomId.equals(roomId));
             if (otherRoom) {
-                // Mikoo detonate strip with Go — jump to the summoning room.
+                // Other room summons keep a Go chip — still not a system Toast.
                 GlobalCelebrationToast.show(
                         this, title, line, avatarUrl, badgeUrl, dedupeKey,
                         56, 0, 0L, who, kind, targetRoomId);
-            } else {
-                String shortMsg = "استدعى كوكبًا رائعًا · " + (title != null ? title : "كوكب");
-                if (shortMsg.length() > 48) shortMsg = shortMsg.substring(0, 46) + "…";
-                showLuckyResultToast(who, avatarUrl, 1, 0, shortMsg);
+            } else if (bubbleFx != null) {
+                String msg = title != null && !title.isEmpty() ? title : line;
+                bubbleFx.showRoomEventBubble(who, avatarUrl, msg, badgeUrl);
+                if (binding != null && binding.giftChatEffects != null) {
+                    binding.giftChatEffects.setVisibility(View.VISIBLE);
+                    binding.giftChatEffects.bringToFront();
+                }
             }
             if (roomBannerEnabled()) {
                 appendChatLine(who, line, 0, 1, null, null, avatarUrl, badgeUrl);
@@ -7480,10 +7522,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.giftChatEffects.bringToFront();
                 binding.giftChatEffects.setElevation(42f);
             }
-            // Mikoo join-lane strip: avatar + مبروك حصل على …
-            String shortMsg = "مبروك حصل على " + Math.max(1L, coins)
-                    + (game != null && !game.isEmpty() ? (" مبروك " + game) : "");
-            showLuckyResultToast(who, avatarUrl, 1, 0, shortMsg);
+            // In-room: stacked dark bubbles only — no ComingMsg / Android Toast.
             String chat = "مبروك " + who + " حصل على " + Math.max(1L, coins)
                     + (game != null && !game.isEmpty() ? (" مبروك " + game) : "");
             if (roomBannerEnabled()) {
@@ -7508,15 +7547,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     binding.giftChatEffects.setVisibility(View.VISIBLE);
                     binding.giftChatEffects.bringToFront();
                 }
+            } else if (bubbleFx != null) {
+                bubbleFx.showRoomEventBubble(who, avatarUrl, toastMsg, badgeUrl);
             }
+            if (roomBannerEnabled()) {
+                appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
+            }
+            return;
         } else {
             toastMsg = line;
             chat = line;
         }
-        if (toastMsg.length() > 52) {
-            toastMsg = toastMsg.substring(0, 50) + "…";
+        if (bubbleFx != null) {
+            bubbleFx.showRoomEventBubble(who, avatarUrl, toastMsg, badgeUrl);
+            if (binding != null && binding.giftChatEffects != null) {
+                binding.giftChatEffects.setVisibility(View.VISIBLE);
+                binding.giftChatEffects.bringToFront();
+            }
         }
-        showLuckyResultToast(who, avatarUrl, 1, 0, toastMsg);
         if (roomBannerEnabled()) {
             appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
         }
@@ -7966,7 +8014,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 senderUserId, senderVipLevel, senderAvatarUrl, 1, null);
     }
 
-    /** Mikoo combo gift toast — center hold, then fly away. */
+    /** Gift send toast — crawl above chat (not center screen). */
     public void showGiftSendToast(@Nullable String senderName,
                                   @Nullable String giftName,
                                   @Nullable String senderAvatarUrl,
@@ -7977,13 +8025,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String recv = giftName != null && !giftName.isEmpty()
                 ? ("أرسل " + giftName)
                 : getString(R.string.send);
+        String icon = giftIconUrl;
+        if (icon == null || icon.trim().isEmpty()) {
+            String mapped = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
+                    giftName, null, null);
+            // Prefer static image sibling when only video URL is known.
+            if (mapped != null && mapped.toLowerCase(java.util.Locale.US).endsWith(".mp4")) {
+                icon = mapped.replaceAll("(?i)\\.mp4(\\?.*)?$", ".png$1");
+            } else if (mapped != null
+                    && !mapped.toLowerCase(java.util.Locale.US).endsWith(".mp4")
+                    && !mapped.toLowerCase(java.util.Locale.US).endsWith(".svga")) {
+                icon = mapped;
+            }
+        }
         binding.comboGiftView.bringToFront();
-        binding.comboGiftView.setElevation(40f);
+        binding.comboGiftView.setElevation(52f);
         binding.comboGiftView.show(
                 senderName,
                 recv,
                 senderAvatarUrl,
-                giftIconUrl,
+                icon,
                 Math.max(1, comboCount),
                 Math.max(0, totalCoins));
     }
@@ -8033,9 +8094,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (htmlPlayed && isVideoGift && binding.giftChatEffects != null) {
             binding.giftChatEffects.setVisibility(View.VISIBLE);
             binding.giftChatEffects.bringToFront();
-            binding.giftChatEffects.setElevation(42f);
+            binding.giftChatEffects.setElevation(48f);
+            // Keep combo toast above the gift stage but don't shrink the video layer.
             if (binding.comboGiftView != null) {
-                binding.comboGiftView.setElevation(36f);
+                binding.comboGiftView.bringToFront();
+                binding.comboGiftView.setElevation(52f);
+            }
+            if (binding.comingMsgView != null) {
+                binding.comingMsgView.bringToFront();
+            }
+            if (binding.bottomBar != null) {
+                binding.bottomBar.bringToFront();
             }
         } else if (htmlPlayed && binding.webVisualEffects != null) {
             binding.webVisualEffects.setVisibility(View.VISIBLE);
@@ -8044,7 +8113,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else if (htmlPlayed && binding.giftChatEffects != null) {
             binding.giftChatEffects.setVisibility(View.VISIBLE);
             binding.giftChatEffects.bringToFront();
-            binding.giftChatEffects.setElevation(31f);
+            binding.giftChatEffects.setElevation(48f);
         }
         // Keep giftOverlay while lucky coin rain / مردود is active.
         if (binding.giftOverlay != null
@@ -8187,6 +8256,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if ("playing".equalsIgnoreCase(currentMusicStatus)) {
             startMusicDiscAnimation();
         }
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        // Start FGS while still foreground-eligible (API 34+ microphone rules).
+        // Waiting until onStop often causes SecurityException with microphone type.
+        if (!exiting && !isChangingConfigurations()
+                && roomId != null && !roomId.isEmpty()
+                && pendingSession != null) {
+            ensuringRoomKeepAlive(true);
+        }
+        super.onUserLeaveHint();
     }
 
     @Override
@@ -9274,17 +9355,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String chat = "مبروك " + who + " حصل على " + win
                     + (gameTitle != null ? (" مبروك " + gameTitle) : "");
             appendChatLine(who, chat, 0, 1, null, uid, avatar, gameIcon);
-            RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
-            if (bubbleFx != null) {
-                bubbleFx.showSlotWinBubble(who, avatar, win, gameTitle, gameIcon);
+            if (!areCelebrationPopupsMuted()) {
+                RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
+                if (bubbleFx != null) {
+                    bubbleFx.showSlotWinBubble(who, avatar, win, gameTitle, gameIcon);
+                }
+                if (binding != null && binding.giftChatEffects != null) {
+                    binding.giftChatEffects.setVisibility(View.VISIBLE);
+                    binding.giftChatEffects.bringToFront();
+                }
             }
-            if (binding != null && binding.giftChatEffects != null) {
-                binding.giftChatEffects.setVisibility(View.VISIBLE);
-                binding.giftChatEffects.bringToFront();
-            }
-            showLuckyResultToast(who, avatar, 1, 0,
-                    "مبروك حصل على " + win
-                            + (gameTitle != null ? (" مبروك " + gameTitle) : ""));
+            // Stacked in-room bubble only — no ComingMsg strip for game wins.
         } else if ("room:slot_lose".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));

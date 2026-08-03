@@ -37,14 +37,27 @@
 
     <LoadingSpinner v-if="loading" />
 
-    <div v-else class="widget-grid">
-      <div v-if="!filtered.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
-      <article
-        v-for="item in filtered"
-        :key="item.id || item.code"
-        class="widget-card cosmetic-card"
-        :class="{ wide: isWide(item) }"
-      >
+    <template v-else>
+      <BulkActionBar
+        :count="filtered.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :busy="bulkBusy"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <div v-if="!filtered.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
+        <article
+          v-for="item in filtered"
+          :key="item.id || item.code"
+          class="widget-card cosmetic-card position-relative"
+          :class="{ wide: isWide(item), 'is-selected': isSelected(item.id) }"
+        >
+          <BulkCheck v-if="item.id" :checked="isSelected(item.id)" @toggle="toggle(item.id)" />
           <div class="widget-card-media preview-wrap" :class="[item.type || tab, { wide: isWide(item) }]">
             <template v-if="isFrameLike(item)">
               <img class="avatar-core" :src="avatarSvg" alt="" />
@@ -140,7 +153,8 @@
             </div>
           </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <div v-if="showModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.45)">
       <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -276,9 +290,9 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      :title="t('app.delete')"
+      :title="confirmTitle"
       :message="confirmMsg"
-      @confirm="doHardDelete"
+      @confirm="runConfirm"
     />
   </div>
 </template>
@@ -294,6 +308,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { cosmeticsApi, uploadsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 
 const { t } = useI18n()
 const loading = ref(true)
@@ -308,6 +326,7 @@ const playingId = ref(null)
 const showModal = ref(false)
 const editingId = ref(null)
 const form = ref(emptyForm())
+const bulkBusy = ref(false)
 
 const avatarSvg =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%231a2a3a'/%3E%3Cstop offset='1' stop-color='%230a1520'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='40' cy='40' r='36' fill='url(%23g)'/%3E%3Ccircle cx='40' cy='32' r='12' fill='%236a8899'/%3E%3Cellipse cx='40' cy='58' rx='18' ry='12' fill='%236a8899'/%3E%3C/svg%3E"
@@ -401,6 +420,45 @@ const filtered = computed(() => {
   rows = [...rows].sort((a, b) => vipSortKey(a) - vipSortKey(b))
   return rows
 })
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(filtered)
+
+const bulkActions = computed(() => [
+  { key: 'activate', label: t('bulk.activateSelected'), icon: 'bi-check2-circle', variant: 'btn-outline-success' },
+  { key: 'deactivate', label: t('bulk.deactivateSelected'), icon: 'bi-pause-circle', variant: 'btn-outline-warning' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  const messages = {
+    activate: t('bulk.confirmApprove', { count: ids.length }),
+    deactivate: t('bulk.confirmSuspend', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'cosmetics', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 function vipSortKey(item) {
   const code = String(item?.code || '')
@@ -645,15 +703,29 @@ async function save() {
 }
 
 const confirmOpen = ref(false)
+const confirmTitle = ref('')
 const confirmMsg = ref('')
 const pendingDelete = ref(null)
+const pendingAction = ref(null)
 
 function askHardDelete(item) {
   if (!item?.id) return
   const name = item.name || item.code || ''
   pendingDelete.value = item
+  pendingAction.value = null
+  confirmTitle.value = t('app.delete')
   confirmMsg.value = `${t('cosmetics.confirmDelete', { name })}\n\n${t('cosmetics.deleteHint')}`
   confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
+  await doHardDelete()
 }
 
 async function doHardDelete() {
@@ -739,4 +811,8 @@ onMounted(load)
   50% { transform: scale(1.04); }
 }
 .cosmetic-card:hover { transform: translateY(-3px); transition: transform .2s ease; }
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
+}
 </style>

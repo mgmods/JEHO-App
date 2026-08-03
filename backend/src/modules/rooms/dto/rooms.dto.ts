@@ -51,6 +51,12 @@ export class CreateRoomDto {
   @IsString()
   topic?: string;
 
+  /** When true, always open/create a personal STANDARD room even if the host is an agency host. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  preferPersonal?: boolean;
+
 }
 
 export class JoinRoomDto {

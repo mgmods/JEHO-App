@@ -173,6 +173,15 @@ public final class RoomVisualEffects {
         effectsView.showSlotLoseBubble(displayName, avatarUrl, betCoins, gameTitle, gameIconUrl);
     }
 
+    public void showRoomEventBubble(
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String message,
+            @Nullable String badgeUrl
+    ) {
+        effectsView.showRoomEventBubble(displayName, avatarUrl, message, badgeUrl);
+    }
+
     public void stopAll() {
         effectsView.stopAll();
     }

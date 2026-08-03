@@ -12,9 +12,22 @@
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
     <LoadingSpinner v-if="loading" />
-    <div v-else class="widget-grid">
-      <div v-if="!gifts.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
-      <article v-for="g in gifts" :key="g.id" class="widget-card">
+    <template v-else>
+      <BulkActionBar
+        :count="gifts.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :busy="bulkBusy"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+      <div class="widget-grid">
+        <div v-if="!gifts.length" class="glass p-4 empty-state">{{ t('app.none') }}</div>
+        <article v-for="g in gifts" :key="g.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(g.id) }">
+          <BulkCheck :checked="isSelected(g.id)" @toggle="toggle(g.id)" />
         <div class="widget-card-media">
           <video
             v-if="isVideo(g.animationUrl)"
@@ -56,7 +69,8 @@
           </div>
         </div>
       </article>
-    </div>
+      </div>
+    </template>
 
     <div v-if="showModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.45)">
       <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -179,23 +193,27 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      :title="t('common.delete')"
+      :title="confirmTitle"
       :message="confirmMsg"
-      @confirm="doRemove"
+      @confirm="runConfirm"
     />
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { giftsApi, uploadsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -208,6 +226,47 @@ const error = ref('')
 const success = ref('')
 const showModal = ref(false)
 const editingId = ref(null)
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(gifts)
+
+const bulkActions = computed(() => [
+  { key: 'activate', label: t('bulk.activateSelected'), icon: 'bi-check2-circle', variant: 'btn-outline-success' },
+  { key: 'deactivate', label: t('bulk.deactivateSelected'), icon: 'bi-pause-circle', variant: 'btn-outline-warning' },
+  { key: 'delete', label: t('bulk.deleteSelected'), icon: 'bi-trash', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  const messages = {
+    activate: t('bulk.confirmApprove', { count: ids.length }),
+    deactivate: t('bulk.confirmSuspend', { count: ids.length }),
+    delete: t('bulk.confirmDelete', { count: ids.length }),
+  }
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = messages[key] || messages.delete
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'gifts', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
+
 const form = reactive({
   name: '',
   coinPrice: 10,
@@ -353,8 +412,10 @@ async function save() {
 }
 
 const confirmOpen = ref(false)
+const confirmTitle = ref('')
 const confirmMsg = ref('')
 const pendingDelete = ref(null)
+const pendingAction = ref(null)
 
 function isVideo(url) {
   return /\.(mp4|webm|mov)(\?|$)/i.test(String(url || ''))
@@ -368,8 +429,20 @@ function isImageAnim(url) {
 
 function askRemove(g) {
   pendingDelete.value = g
+  pendingAction.value = null
+  confirmTitle.value = t('common.delete')
   confirmMsg.value = `${t('app.delete')} «${g.name}»؟`
   confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
+  await doRemove()
 }
 
 async function doRemove() {
@@ -400,3 +473,10 @@ function giftTypeLabel(type) {
   return t(map[key] || 'gifts.normal')
 }
 </script>
+
+<style scoped>
+.widget-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.65);
+  outline-offset: 2px;
+}
+</style>

@@ -30,12 +30,31 @@
       </div>
     </div>
 
+    <BulkActionBar
+      :count="streams.length"
+      :selected-count="selectedCount"
+      :all-selected="allSelected"
+      :some-selected="someSelected"
+      :busy="bulkBusy"
+      :actions="bulkActions"
+      @toggle-all="toggleAll"
+      @clear="clear"
+      @action="onBulkAction"
+    />
+
     <div class="glass p-0 overflow-hidden">
       <LoadingSpinner v-if="loading" />
       <div v-else class="p-3">
         <div v-if="!streams.length" class="empty-state p-5 text-center">{{ t('streams.empty') }}</div>
         <div v-else class="widget-grid rooms-grid">
-          <StreamCard v-for="s in streams" :key="s.id" :stream="s" @forceEnd="askForceEnd" />
+          <StreamCard
+            v-for="s in streams"
+            :key="s.id"
+            :stream="s"
+            :selected="isSelected(s.id)"
+            @toggle-select="(row) => toggle(row.id)"
+            @forceEnd="askForceEnd"
+          />
         </div>
       </div>
       <div class="d-flex justify-content-between align-items-center p-3 border-top" style="border-color: var(--border-color) !important">
@@ -50,23 +69,26 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      :title="t('common.confirm')"
+      :title="confirmTitle"
       :message="confirmMsg"
-      @confirm="doForceEnd"
+      @confirm="runConfirm"
     />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { streamsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StreamCard from '@/components/StreamCard.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -79,9 +101,44 @@ const status = ref('')
 const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
+const bulkBusy = ref(false)
 const confirmOpen = ref(false)
+const confirmTitle = ref('')
 const confirmMsg = ref('')
 const pendingStream = ref(null)
+const pendingAction = ref(null)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(streams)
+
+const bulkActions = computed(() => [
+  { key: 'force-end', label: t('bulk.forceEndSelected'), icon: 'bi-broadcast', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = t('bulk.confirmForceEnd', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({ resource: 'streams', action: key, ids, t })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 async function load() {
   loading.value = true
@@ -105,8 +162,20 @@ async function load() {
 
 function askForceEnd(s) {
   pendingStream.value = s
+  pendingAction.value = null
+  confirmTitle.value = t('common.confirm')
   confirmMsg.value = t('streams.confirmEnd', { title: s.title || s.id })
   confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
+  await doForceEnd()
 }
 
 async function doForceEnd() {

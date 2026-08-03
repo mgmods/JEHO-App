@@ -41,12 +41,25 @@
         </div>
       </div>
 
+      <BulkActionBar
+        :count="rows.length"
+        :selected-count="selectedCount"
+        :all-selected="allSelected"
+        :some-selected="someSelected"
+        :busy="bulkBusy"
+        :actions="bulkActions"
+        @toggle-all="toggleAll"
+        @clear="clear"
+        @action="onBulkAction"
+      />
+
       <div class="glass p-0 overflow-hidden">
         <LoadingSpinner v-if="loading" />
         <div v-else class="table-responsive">
           <table class="table table-glass table-hover align-middle">
             <thead>
               <tr>
+                <th style="width:2.2rem"></th>
                 <th>{{ t('common.user') }}</th>
                 <th>{{ t('genderVerifications.selfie') }}</th>
                 <th>{{ t('genderVerifications.liveness') }}</th>
@@ -57,9 +70,17 @@
             </thead>
             <tbody>
               <tr v-if="!rows.length">
-                <td colspan="6" class="empty-state">{{ t('genderVerifications.empty') }}</td>
+                <td colspan="7" class="empty-state">{{ t('genderVerifications.empty') }}</td>
               </tr>
               <tr v-for="row in rows" :key="row.id">
+                <td>
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    :checked="isSelected(row.id)"
+                    @change="toggle(row.id)"
+                  />
+                </td>
                 <td>
                   <div class="fw-semibold">{{ row.user?.displayName || row.user?.username || '—' }}</div>
                   <div class="small text-muted">{{ row.user?.username || shortId(row.userId) }}</div>
@@ -112,25 +133,28 @@
 
     <ConfirmDialog
       v-model="confirmOpen"
-      title="إيقاف التحقق"
+      :title="confirmTitle"
       :message="confirmMsg"
-      @confirm="doDisableFeature"
+      @confirm="runConfirm"
     />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { genderVerificationsApi, settingsApi } from '@/api'
 import { extractList, formatDate } from '@/composables/useUtils'
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { useBulkSelection } from '@/composables/useBulkSelection'
+import { runBulk } from '@/composables/useBulk'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
+import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
@@ -142,6 +166,48 @@ const success = ref('')
 const status = ref('pending')
 const featureEnabled = ref(false)
 const toggling = ref(false)
+const bulkBusy = ref(false)
+
+const {
+  selectedIds,
+  selectedCount,
+  allSelected,
+  someSelected,
+  isSelected,
+  toggle,
+  clear,
+  toggleAll,
+} = useBulkSelection(rows)
+
+const bulkActions = computed(() => [
+  { key: 'approve', label: t('bulk.approveSelected'), icon: 'bi-check2', variant: 'btn-outline-success' },
+  { key: 'reject', label: t('bulk.rejectSelected'), icon: 'bi-x-lg', variant: 'btn-outline-danger' },
+])
+
+async function onBulkAction(key) {
+  const ids = selectedIds.value
+  if (!ids.length) return
+  confirmTitle.value = t('bulk.selectAll')
+  confirmMsg.value = key === 'approve'
+    ? t('bulk.confirmApprove', { count: ids.length })
+    : t('bulk.confirmReject', { count: ids.length })
+  pendingAction.value = async () => {
+    bulkBusy.value = true
+    const data = await runBulk({
+      resource: 'gender-verifications',
+      action: key,
+      ids,
+      reason: key === 'reject' ? t('wallet.defaultRejectReason') : undefined,
+      t,
+    })
+    bulkBusy.value = false
+    if (data) {
+      clear()
+      await load()
+    }
+  }
+  confirmOpen.value = true
+}
 
 function shortId(id) {
   if (!id) return '—'
@@ -191,11 +257,26 @@ async function enableFeature() {
 }
 
 const confirmOpen = ref(false)
+const confirmTitle = ref('إيقاف التحقق')
 const confirmMsg = ref('إيقاف التحقق من المضيفات؟ لن يظهر فحص الهوية في التطبيق.')
+const pendingAction = ref(null)
 
 function disableFeature(e) {
   if (e?.target) e.target.checked = true
+  pendingAction.value = null
+  confirmTitle.value = 'إيقاف التحقق'
+  confirmMsg.value = 'إيقاف التحقق من المضيفات؟ لن يظهر فحص الهوية في التطبيق.'
   confirmOpen.value = true
+}
+
+async function runConfirm() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (typeof action === 'function') {
+    await action()
+    return
+  }
+  await doDisableFeature()
 }
 
 async function doDisableFeature() {

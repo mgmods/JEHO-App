@@ -38,6 +38,7 @@ import java.text.NumberFormat;
 public class ProfileActivity extends ThemedActivity {
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
+    private boolean isFollowingTarget;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,13 +67,21 @@ public class ProfileActivity extends ThemedActivity {
                 return;
             }
             binding.btnFollow.setEnabled(false);
+            final boolean unfollow = isFollowingTarget;
             container.getIoExecutor().execute(() -> {
                 Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
-                        container.getUserApi().follow(userId));
+                        unfollow
+                                ? container.getUserApi().unfollow(userId)
+                                : container.getUserApi().follow(userId));
                 runOnUiThread(() -> {
                     binding.btnFollow.setEnabled(true);
                     if (r.success) {
-                        Toast.makeText(this, "تمت المتابعة", Toast.LENGTH_SHORT).show();
+                        isFollowingTarget = !unfollow;
+                        binding.btnFollow.setText(
+                                isFollowingTarget ? R.string.unfollow : R.string.follow);
+                        Toast.makeText(this,
+                                isFollowingTarget ? "تمت المتابعة" : "تم إلغاء المتابعة",
+                                Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(this,
                                 r.error != null ? r.error : getString(R.string.error_generic),
@@ -263,6 +272,11 @@ public class ProfileActivity extends ThemedActivity {
             if (myId != null && myId.equals(user.id)) {
                 binding.btnFollow.setVisibility(View.GONE);
                 if (binding.btnFriend != null) binding.btnFriend.setVisibility(View.GONE);
+            } else {
+                binding.btnFollow.setVisibility(View.VISIBLE);
+                isFollowingTarget = Boolean.TRUE.equals(user.isFollowing);
+                binding.btnFollow.setText(
+                        isFollowingTarget ? R.string.unfollow : R.string.follow);
             }
         });
         vm.getError().observe(this, e -> {

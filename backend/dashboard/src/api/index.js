@@ -1,5 +1,9 @@
 import api, { safeRequest } from './client'
 
+export const bulkApi = {
+  run: (payload) => safeRequest(() => api.post('/admin/bulk', payload)),
+}
+
 export const authApi = {
   login: (payload) => safeRequest(() => api.post('/admin/auth/login', payload)),
   me: () => safeRequest(() => api.get('/admin/auth/me')),

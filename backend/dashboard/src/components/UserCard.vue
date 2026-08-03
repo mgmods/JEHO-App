@@ -1,5 +1,6 @@
 <template>
-  <div class="user-card glass widget-card">
+  <div class="user-card glass widget-card" :class="{ 'is-selected': selected }">
+    <BulkCheck :checked="selected" @toggle="$emit('toggle-select', user)" />
     <div class="user-card__row">
       <div class="user-card__avatarWrap">
         <img
@@ -119,14 +120,16 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusBadge from '@/components/StatusBadge.vue'
 import CountryFlag from '@/components/CountryFlag.vue'
+import BulkCheck from '@/components/BulkCheck.vue'
 import { formatDate, formatNumber } from '@/composables/useUtils'
 
 const props = defineProps({
   user: { type: Object, required: true },
+  selected: { type: Boolean, default: false },
 })
 const { t, locale } = useI18n()
 
-defineEmits(['ban', 'unban', 'delete'])
+defineEmits(['ban', 'unban', 'delete', 'toggle-select'])
 
 const avatarError = ref(false)
 
@@ -176,8 +179,13 @@ const initials = computed(() => {
 
 <style scoped>
 .user-card {
+  position: relative;
   border-radius: var(--al-radius);
   padding: 12px;
+}
+.user-card.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.75);
+  outline-offset: 1px;
 }
 
 .user-card__row {

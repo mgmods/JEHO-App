@@ -468,7 +468,7 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="4dp"
-        android:visibility="gone"
+        android:visibility="visible"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/headerRoom">
@@ -681,18 +681,19 @@
         android:nestedScrollingEnabled="false"
         android:overScrollMode="never"
         android:paddingHorizontal="4dp"
-        android:paddingBottom="4dp"
+        android:paddingBottom="14dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
 
-    <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles. -->
+    <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles.
+         Extra top margin so avatars clear seat 9/10 number badges. -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowTopHosts"
         android:layout_width="wrap_content"
         android:layout_height="26dp"
         android:layout_marginStart="12dp"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="18dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:layoutDirection="ltr"
@@ -1535,13 +1536,14 @@
         android:id="@+id/comboGiftView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:elevation="40dp"
+        android:layout_marginStart="0dp"
+        android:layout_marginBottom="96dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="52dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.42" />
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintStart_toStartOf="parent" />
 
     <com.Dramizo.Series.util.NativeRoomEffectsView
         android:id="@+id/giftChatEffects"
@@ -1549,14 +1551,16 @@
         android:layout_height="0dp"
         android:background="@android:color/transparent"
         android:clickable="false"
-        android:elevation="42dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="48dp"
         android:focusable="false"
         android:importantForAccessibility="no"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="@id/chatPanel"
-        app:layout_constraintEnd_toEndOf="@id/chatPanel"
-        app:layout_constraintStart_toStartOf="@id/chatPanel"
-        app:layout_constraintTop_toTopOf="@id/chatPanel" />
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recyclerSeats" />
 
     <FrameLayout
         android:id="@+id/gameOverlay"

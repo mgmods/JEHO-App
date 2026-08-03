@@ -713,7 +713,7 @@ export class GiftsService implements OnModuleInit {
         where: { key: 'agency_platform_cut_percent' },
       });
       if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
-        platformPct = Math.min(40, Math.max(0, Number(cutRow.value)));
+        platformPct = Math.min(50, Math.max(0, Number(cutRow.value)));
       }
 
       if (membership) {
@@ -1195,7 +1195,7 @@ export class GiftsService implements OnModuleInit {
       where: { key: 'agency_platform_cut_percent' },
     });
     if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
-      platformPct = Math.min(40, Math.max(0, Number(cutRow.value)));
+      platformPct = Math.min(50, Math.max(0, Number(cutRow.value)));
     }
     const platformCut = Math.floor((diamondPool * platformPct) / 100);
     const rem = Math.max(0, diamondPool - platformCut);

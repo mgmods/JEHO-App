@@ -121,8 +121,11 @@ export class UsersController {
 
   @Public()
   @Get(':id')
-  getById(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.getById(id);
+  getById(
+    @CurrentUser('sub') viewerId: string | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.getById(id, viewerId);
   }
 
   @Post(':id/visit')

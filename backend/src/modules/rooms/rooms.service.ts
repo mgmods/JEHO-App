@@ -468,11 +468,15 @@ export class RoomsService implements OnModuleInit {
       membership.agency?.status === AgencyStatus.ACTIVE &&
       [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role);
 
-    if (!isAgencyHost) {
+    // Agency hosts keep a separate personal room when the client asks for it
+    // ("My room") — agency live uses POST /agencies/:id/room/open instead.
+    if (!isAgencyHost || dto.preferPersonal === true) {
       return this.createPersonalRoom(hostId, host, displayName, dto);
     }
 
-    const title = dto.title?.trim() || `${membership!.agency.name} · ${displayName}`;
+    // Agency room title is ALWAYS the agency name — never the host's personal display name.
+    const agencyName = String(membership!.agency.name || '').trim() || 'وكالة';
+    const title = agencyName;
     const coverUrl = (
       dto.coverUrl ||
       this.defaultRoomCover({
@@ -489,8 +493,8 @@ export class RoomsService implements OnModuleInit {
       const hostCard =
         (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
       Object.assign(existing, {
-        // Keep permanent room name/cover once set — don't overwrite with host profile each open.
-        title: (existing.title && String(existing.title).trim()) || title,
+        // Force agency branding every open so lobby never shows a personal name.
+        title: agencyName,
         coverUrl: existing.coverUrl || coverUrl,
         backgroundUrl:
           dto.backgroundUrl !== undefined
@@ -1051,10 +1055,22 @@ export class RoomsService implements OnModuleInit {
       decorated.roomKind === RoomKind.AGENCY || !!decorated.agencyId;
     const isSupport = decorated.roomKind === RoomKind.SUPPORT;
     // Room identity is permanent (title + coverUrl), separate from host profile.
-    const listTitle =
+    // Agency rooms always surface the agency name in the lobby (never host displayName).
+    let listTitle =
       String(decorated.title || '').trim() ||
       String(decorated.host?.displayName || decorated.host?.username || '').trim() ||
       'غرفة';
+    if (isAgency && decorated.agencyId) {
+      try {
+        const agency = await this.agenciesRepo.findOne({
+          where: { id: decorated.agencyId },
+        });
+        const agencyName = String(agency?.name || '').trim();
+        if (agencyName) listTitle = agencyName;
+      } catch {
+        /* keep listTitle */
+      }
+    }
     return {
       ...decorated,
       title: listTitle,

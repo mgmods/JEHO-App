@@ -11,10 +11,59 @@
         <TextView android:textSize="11.0sp" android:textStyle="italic" android:textColor="#ff351803" android:ellipsize="marquee" android:gravity="center" android:id="@+id/tv_coin_proportion" android:background="@mipmap/ic_coins_back_times_level1" android:paddingLeft="@dimen/dp_5" android:paddingRight="@dimen/dp_5" android:layout_width="55.0dip" android:layout_height="19.0dip" android:singleLine="true" android:marqueeRepeatLimit="marquee_forever" android:paddingHorizontal="@dimen/dp_5" />
         <TextView android:textSize="10.0sp" android:textStyle="bold|italic" android:textColor="#ffffd44d" android:id="@+id/tv_coins" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_3" />
     </LinearLayout>
-    <ImageView android:layout_gravity="center_vertical" android:id="@+id/iv_gift" android:layout_width="50.0dip" android:layout_height="50.0dip" android:layout_marginBottom="@dimen/dp_3" android:src="@drawable/ic_asset_gift" android:scaleType="fitCenter" android:adjustViewBounds="true" android:layout_marginEnd="@dimen/dp_12" app:layout_constraintBottom_toBottomOf="@id/vComboAnimBg" app:layout_constraintEnd_toEndOf="@id/vComboAnimBg" app:layout_constraintTop_toTopOf="@id/vComboAnimBg" />
-    <ImageView android:layout_gravity="center_vertical" android:id="@+id/vComboX" android:layout_width="10.0dip" android:layout_height="20.0dip" android:src="@mipmap/icon_combo_gift_anim_x_num" android:layout_marginStart="20.0dip" app:layout_constraintBottom_toBottomOf="@id/vComboAnimBg" app:layout_constraintStart_toEndOf="@id/iv_gift" app:layout_constraintTop_toTopOf="@id/vComboAnimBg" />
-    <LinearLayout android:layout_gravity="center_vertical" android:orientation="horizontal" android:id="@+id/llComboNum" android:layout_width="wrap_content" android:layout_height="26.0dip" android:layout_marginTop="@dimen/dp_5" android:layout_marginEnd="24.0dip" app:layout_constraintBottom_toBottomOf="@id/vComboAnimBg" app:layout_constraintStart_toEndOf="@id/vComboX" app:layout_constraintTop_toTopOf="@id/vComboAnimBg">
-        <ImageView android:id="@+id/vCombo0" android:layout_width="14.0dip" android:layout_height="21.0dip" android:src="@mipmap/icon_combo_gift_anim_num_1" android:visibility="gone" />
-        <TextView android:id="@+id/tvComboNum" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1" android:textColor="@android:color/white" android:textSize="18sp" android:textStyle="bold|italic" />
+    <ImageView
+        android:layout_gravity="center_vertical"
+        android:id="@+id/iv_gift"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="2dp"
+        android:adjustViewBounds="true"
+        android:elevation="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_asset_gift"
+        app:layout_constraintBottom_toBottomOf="@id/vComboAnimBg"
+        app:layout_constraintEnd_toEndOf="@id/vComboAnimBg"
+        app:layout_constraintTop_toTopOf="@id/vComboAnimBg" />
+    <ImageView
+        android:layout_gravity="center_vertical"
+        android:id="@+id/vComboX"
+        android:layout_width="10dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="4dp"
+        android:src="@mipmap/icon_combo_gift_anim_x_num"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/vComboAnimBg"
+        app:layout_constraintStart_toEndOf="@id/iv_gift"
+        app:layout_constraintTop_toTopOf="@id/vComboAnimBg" />
+    <LinearLayout
+        android:layout_gravity="center_vertical"
+        android:orientation="horizontal"
+        android:id="@+id/llComboNum"
+        android:layout_width="wrap_content"
+        android:layout_height="26dp"
+        android:layout_marginEnd="4dp"
+        android:elevation="9dp"
+        app:layout_constraintBottom_toBottomOf="@id/iv_gift"
+        app:layout_constraintEnd_toStartOf="@id/iv_gift"
+        app:layout_constraintTop_toTopOf="@id/iv_gift">
+        <ImageView
+            android:id="@+id/vCombo0"
+            android:layout_width="14dp"
+            android:layout_height="21dp"
+            android:src="@mipmap/icon_combo_gift_anim_num_1"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/tvComboNum"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:shadowColor="#80000000"
+            android:shadowDx="1"
+            android:shadowDy="1"
+            android:shadowRadius="2"
+            android:text="1"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold|italic" />
     </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

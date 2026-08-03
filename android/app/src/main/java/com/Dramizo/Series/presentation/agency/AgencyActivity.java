@@ -22,11 +22,12 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.presentation.createroom.CreateRoomActivity;
+import com.Dramizo.Series.util.AgencyRoomLauncher;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.CountryCatalog;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import java.util.Collections;
 import java.util.Locale;
 
 public class AgencyActivity extends ThemedActivity {
@@ -113,8 +114,10 @@ public class AgencyActivity extends ThemedActivity {
             binding.btnDistributeAgencyEarnings.setOnClickListener(v -> showDistributeDialog());
         }
         vm.getAgencies().observe(this, list -> {
-            adapter.submit(list, myAgencyId, canLeave, canManage);
-            binding.tvEmpty.setVisibility(list == null || list.isEmpty() ? View.VISIBLE : View.GONE);
+            // Browse-all list retired — my agency card is the only surface.
+            adapter.submit(Collections.emptyList(), myAgencyId, canLeave, canManage);
+            binding.tvEmpty.setVisibility(View.GONE);
+            binding.recycler.setVisibility(View.GONE);
         });
         vm.getMine().observe(this, m -> {
             if (m != null && m.application != null && m.agency == null
@@ -146,7 +149,7 @@ public class AgencyActivity extends ThemedActivity {
                 } else {
                     binding.rowActivationCode.setVisibility(View.GONE);
                 }
-                adapter.submit(vm.getAgencies().getValue(), myAgencyId, canLeave, canManage);
+                adapter.submit(Collections.emptyList(), myAgencyId, canLeave, canManage);
                 if (pendingJoin) {
                     binding.tvEarnings.setVisibility(View.VISIBLE);
                     binding.tvEarnings.setText(R.string.agency_join_pending_hint);
@@ -167,7 +170,7 @@ public class AgencyActivity extends ThemedActivity {
                 if (binding.rowOwnerEarningsActions != null) {
                     binding.rowOwnerEarningsActions.setVisibility(View.GONE);
                 }
-                adapter.submit(vm.getAgencies().getValue(), null, false, false);
+                adapter.submit(Collections.emptyList(), null, false, false);
             }
             bindApplicationStatus(m);
             syncAgencyRoomButton();
@@ -222,8 +225,10 @@ public class AgencyActivity extends ThemedActivity {
         });
         binding.btnBecomeAgent.setOnClickListener(v ->
                 startActivity(new android.content.Intent(this, AgencyCreateActivity.class)));
-        binding.btnAgencyRoom.setOnClickListener(v ->
-                startActivity(new android.content.Intent(this, CreateRoomActivity.class)));
+        binding.btnAgencyRoom.setOnClickListener(v -> {
+            String name = myAgency != null && myAgency.agency != null ? myAgency.agency.name : null;
+            AgencyRoomLauncher.open(this, myAgencyId, name);
+        });
         binding.btnDeleteAgency.setOnClickListener(v -> confirmDeleteAgency());
         vm.load();
     }
@@ -557,16 +562,18 @@ public class AgencyActivity extends ThemedActivity {
         final android.widget.EditText etAmount = new android.widget.EditText(this);
         etAmount.setHint("كمية الألماس");
         etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         int pad = Math.round(16 * getResources().getDisplayMetrics().density);
-        box.setPadding(pad, pad / 2, pad, 0);
+        box.setPadding(pad, pad / 2, pad, pad);
         box.addView(etUser);
         box.addView(etAmount);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        scroll.addView(box);
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("توزيع أرباح الوكالة")
                 .setMessage("صاحب الوكالة فقط — يُخصم من رصيدك ويُضاف لعضو الوكالة.")
-                .setView(box)
+                .setView(scroll)
                 .setPositiveButton("توزيع", (d, w) -> {
                     String uid = etUser.getText() != null ? etUser.getText().toString().trim() : "";
                     long diamonds = 0;
@@ -598,7 +605,13 @@ public class AgencyActivity extends ThemedActivity {
                     });
                 })
                 .setNegativeButton(R.string.cancel, null)
-                .show();
+                .create();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setSoftInputMode(
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        dialog.show();
+        etUser.requestFocus();
     }
 
     private void openManage(String agencyId) {

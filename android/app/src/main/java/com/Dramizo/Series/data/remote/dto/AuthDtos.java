@@ -154,6 +154,8 @@ public final class AuthDtos {
         @SerializedName("showHiBadge") public boolean showHiBadge;
         @SerializedName("isNewUser") public boolean isNewUser;
         @SerializedName("isNewMale") public boolean isNewMale;
+        /** True when the authenticated viewer follows this user. */
+        @SerializedName("isFollowing") public Boolean isFollowing;
 
         /** App-facing ID: numeric publicId, never the login/store username. */
         public String displayPublicId() {
