@@ -32,6 +32,7 @@ import { NotificationType } from '../../database/entities/notification.entity';
 import { TasksService } from '../tasks/tasks.service';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { IdentityVerificationService } from './identity-verification.service';
+import { ContentModerationService } from '../moderation/content-moderation.service';
 import { HOST_NEW_USER_CHAT, levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
 
@@ -54,6 +55,7 @@ export class UsersService {
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
     private readonly identityVerification: IdentityVerificationService,
+    private readonly moderation: ContentModerationService,
     @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly tasksService?: TasksService,
   ) {}
@@ -113,8 +115,19 @@ export class UsersService {
     const p = user.profile;
     const economy = this.economyStats(p);
     const newbie = this.newUserFlags(user);
+    const staffRole = (() => {
+      const raw = String((user as any).staffRole || '')
+        .trim()
+        .toLowerCase();
+      if (raw === 'super' || raw === 'super_admin' || raw === 'superadmin') return 'super';
+      if (raw === 'manager' || raw === 'moderator' || raw === 'mod') return 'manager';
+      if (user.isAdmin) return 'super';
+      return 'none';
+    })();
     return {
       ...user,
+      staffRole,
+      isAdmin: !!user.isAdmin || staffRole === 'super',
       bio: p?.bio ?? user['bio'] ?? null,
       coverUrl: p?.coverUrl ?? null,
       entryEffectUrl: p?.entryEffectUrl ?? null,
@@ -218,7 +231,10 @@ export class UsersService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    if (dto.displayName !== undefined) user.displayName = dto.displayName;
+    if (dto.displayName !== undefined) {
+      this.moderation.assertNoAgencyImpersonation(dto.displayName, 'الاسم الظاهر');
+      user.displayName = dto.displayName;
+    }
     if (dto.avatarUrl !== undefined) {
       this.mediaCleanup.replaceUpload(user.avatarUrl, dto.avatarUrl);
       user.avatarUrl = dto.avatarUrl;
@@ -245,7 +261,10 @@ export class UsersService {
     if (!profile) {
       profile = this.profilesRepo.create({ userId });
     }
-    if (dto.bio !== undefined) profile.bio = dto.bio;
+    if (dto.bio !== undefined) {
+      this.moderation.assertNoAgencyImpersonation(dto.bio, 'النبذة');
+      profile.bio = dto.bio;
+    }
     if (dto.country !== undefined) {
       const nextCountry = (dto.country || '').trim();
       const prevCountry = (profile.country || '').trim();

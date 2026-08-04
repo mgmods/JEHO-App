@@ -4,32 +4,37 @@ import { ref, computed } from 'vue'
 const THEME_KEY = 'auralive_admin_theme'
 
 export const useThemeStore = defineStore('theme', () => {
+  // Admin UI is dark-only to match the design reference
   const mode = ref('dark')
 
-  const isDark = computed(() => mode.value === 'dark')
+  const isDark = computed(() => true)
 
   function apply() {
-    document.documentElement.setAttribute('data-theme', mode.value)
-    document.documentElement.setAttribute('data-bs-theme', mode.value === 'dark' ? 'dark' : 'light')
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.setAttribute('data-bs-theme', 'dark')
+    document.documentElement.style.background = '#0f111a'
+    document.documentElement.style.color = '#f4f6fb'
+    document.body && (document.body.style.background = '#0f111a')
+    document.body && (document.body.style.color = '#f4f6fb')
   }
 
   function init() {
-    const saved = localStorage.getItem(THEME_KEY)
-    if (saved === 'light' || saved === 'dark') mode.value = saved
-    else if (window.matchMedia('(prefers-color-scheme: light)').matches) mode.value = 'light'
+    mode.value = 'dark'
+    try {
+      localStorage.setItem(THEME_KEY, 'dark')
+    } catch {
+      /* ignore */
+    }
     apply()
   }
 
   function toggle() {
-    mode.value = mode.value === 'dark' ? 'light' : 'dark'
-    localStorage.setItem(THEME_KEY, mode.value)
-    apply()
+    // Dark-only shell — ignore light switch so pages never flash white
+    init()
   }
 
-  function setMode(next) {
-    mode.value = next === 'light' ? 'light' : 'dark'
-    localStorage.setItem(THEME_KEY, mode.value)
-    apply()
+  function setMode() {
+    init()
   }
 
   return { mode, isDark, init, toggle, setMode }

@@ -26,7 +26,7 @@ public final class MikooGamesCatalog {
         g.sortOrder = sortOrder;
         g.enabled = Boolean.TRUE;
         g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html?v=20260802g";
-        g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260801a";
+        g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260804g";
         return g;
     }
 
@@ -38,35 +38,68 @@ public final class MikooGamesCatalog {
             Locale loc = context.getResources().getConfiguration().getLocales().get(0);
             arabic = loc != null && "ar".equalsIgnoreCase(loc.getLanguage());
         }
+        MiscDtos.GameDto def = null;
+        if (g.id != null) {
+            for (MiscDtos.GameDto d : defaultSlots()) {
+                if (g.id.equalsIgnoreCase(d.id)) {
+                    def = d;
+                    break;
+                }
+            }
+        }
+        String ar = firstNonEmpty(g.title, def != null ? def.title : null);
+        String en = firstNonEmpty(g.titleEn, def != null ? def.titleEn : null, g.title);
+        // Server/dashboard sometimes store English in `title` only — use local AR when needed.
+        if (arabic && !hasArabic(ar) && def != null && hasArabic(def.title)) {
+            ar = def.title;
+        }
         if (arabic) {
-            if (g.title != null && !g.title.trim().isEmpty()) return g.title.trim();
-            if (g.titleEn != null && !g.titleEn.trim().isEmpty()) return g.titleEn.trim();
+            if (hasArabic(ar)) return ar;
+            if (ar != null && !ar.isEmpty()) return ar;
+            if (en != null && !en.isEmpty()) return en;
         } else {
-            if (g.titleEn != null && !g.titleEn.trim().isEmpty()) return g.titleEn.trim();
-            if (g.title != null && !g.title.trim().isEmpty()) return g.title.trim();
+            if (en != null && !en.isEmpty()) return en;
+            if (ar != null && !ar.isEmpty()) return ar;
         }
         return "لعبة";
     }
 
+    private static boolean hasArabic(@Nullable String s) {
+        if (s == null) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 0x0600 && c <= 0x06FF) return true;
+        }
+        return false;
+    }
+
+    private static String firstNonEmpty(String... vals) {
+        if (vals == null) return null;
+        for (String v : vals) {
+            if (v != null && !v.trim().isEmpty()) return v.trim();
+        }
+        return null;
+    }
+
     public static List<MiscDtos.GameDto> defaultSlots() {
         List<MiscDtos.GameDto> out = new ArrayList<>();
-        out.add(slot("7updown", "7 فوق تحت", "7 Up Down", 10));
+        out.add(slot("7updown", "٧ فوق تحت", "7 Up Down", 10));
         out.add(slot("cleopatra-slot", "كليوباترا", "Cleopatra Slot", 11));
-        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Slots", 12));
+        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Spins", 12));
         out.add(slot("crash", "كراش", "Crash", 13));
         out.add(slot("fishing", "صيد السمك", "Fishing", 14));
-        out.add(slot("football-plinko", "بلينكو كرة", "Football Plinko", 15));
+        out.add(slot("football-plinko", "بلينكو كرة القدم", "Football Plinko", 15));
         out.add(slot("fortune-slot", "جواهر الحظ", "Fortune Gems", 16));
-        out.add(slot("greedy-box", "صندوق الجشع", "Greedy Box", 17));
+        out.add(slot("greedy-box", "صندوق الطمع", "Greedy Box", 17));
         out.add(slot("hilo", "هاي لو", "Hilo", 18));
         out.add(slot("line-slots", "فتحات الخط", "Line Slots", 19));
-        out.add(slot("luck-car", "سيارة الحظ", "Luck Car", 20));
-        out.add(slot("lucky77", "لاكي 77", "Lucky 77", 21));
-        out.add(slot("megaways-slots", "ميجا وايز", "Megaways Slots", 22));
+        out.add(slot("luck-car", "سيارة الحظ", "Lucky Car", 20));
+        out.add(slot("lucky77", "لاكي ٧٧", "Lucky 77", 21));
+        out.add(slot("megaways-slots", "ميجاوايز", "Megaways Slots", 22));
         out.add(slot("olympians", "الأوليمبيون", "Olympians", 23));
         out.add(slot("pirate-king", "ملك القراصنة", "Pirate King", 24));
         out.add(slot("royal-battle", "المعركة الملكية", "Royal Battle", 25));
-        out.add(slot("slot777", "سلوت", "Slot", 26));
+        out.add(slot("slot777", "سلوت ٧٧٧", "Slot 777", 26));
         out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 27));
         out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 28));
         return out;
@@ -128,17 +161,19 @@ public final class MikooGamesCatalog {
             MiscDtos.GameDto override = apiById.get(id);
             MiscDtos.GameDto def = defaults.get(id);
             if (override != null) {
-                if ((override.coverUrl == null || override.coverUrl.isEmpty()) && def != null) {
+                if (def != null) {
+                    // Always serve package cover + AR/EN from local defaults when API is English-only.
                     override.coverUrl = def.coverUrl;
-                }
-                if ((override.playUrl == null || override.playUrl.isEmpty()) && def != null) {
-                    override.playUrl = def.playUrl;
-                }
-                if ((override.title == null || override.title.isEmpty()) && def != null) {
-                    override.title = def.title;
-                }
-                if ((override.titleEn == null || override.titleEn.isEmpty()) && def != null) {
-                    override.titleEn = def.titleEn;
+                    if (override.playUrl == null || override.playUrl.isEmpty()) {
+                        override.playUrl = def.playUrl;
+                    }
+                    if (override.titleEn == null || override.titleEn.trim().isEmpty()) {
+                        override.titleEn = def.titleEn;
+                    }
+                    if (override.title == null || override.title.trim().isEmpty()
+                            || !hasArabic(override.title)) {
+                        override.title = def.title;
+                    }
                 }
                 out.add(override);
             } else if (def != null) {

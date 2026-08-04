@@ -14,7 +14,9 @@ import retrofit2.http.Query;
 
 public interface AgencyApi {
     @GET("agencies")
-    Call<ApiResponse<MiscDtos.ListResult<MiscDtos.AgencyDto>>> list(@Query("page") int page);
+    Call<ApiResponse<MiscDtos.ListResult<MiscDtos.AgencyDto>>> list(
+            @Query("page") int page,
+            @Query("q") String q);
 
     @GET("agencies/{id}")
     Call<ApiResponse<MiscDtos.AgencyDto>> get(@Path("id") String id);
@@ -36,6 +38,30 @@ public interface AgencyApi {
     Call<ApiResponse<Map<String, Object>>> distribute(
             @Path("id") String id, @Body() Map<String, Object> body);
 
+    @POST("agencies/{id}/payout-requests")
+    Call<ApiResponse<MiscDtos.AgencyPayoutRequestDto>> createPayoutRequest(
+            @Path("id") String id, @Body Map<String, Object> body);
+
+    @GET("agencies/{id}/payout-requests")
+    Call<ApiResponse<MiscDtos.AgencyPayoutListDto>> listPayoutRequests(
+            @Path("id") String id, @Query("status") String status);
+
+    @POST("agencies/{id}/payout-requests/{requestId}/paid")
+    Call<ApiResponse<MiscDtos.AgencyPayoutRequestDto>> markPayoutPaid(
+            @Path("id") String id,
+            @Path("requestId") String requestId,
+            @Body Map<String, Object> body);
+
+    @POST("agencies/{id}/payout-requests/{requestId}/reject")
+    Call<ApiResponse<MiscDtos.AgencyPayoutRequestDto>> rejectPayout(
+            @Path("id") String id,
+            @Path("requestId") String requestId,
+            @Body Map<String, Object> body);
+
+    @POST("agencies/{id}/payout-requests/{requestId}/cancel")
+    Call<ApiResponse<MiscDtos.AgencyPayoutRequestDto>> cancelPayout(
+            @Path("id") String id, @Path("requestId") String requestId);
+
     @POST("agencies/join-by-code")
     Call<ApiResponse<Object>> joinByCode(@Body Map<String, String> body);
 
@@ -50,6 +76,14 @@ public interface AgencyApi {
 
     @GET("agencies/{id}/join-requests")
     Call<ApiResponse<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>>> joinRequests(@Path("id") String id);
+
+    @GET("agencies/{id}/members")
+    Call<ApiResponse<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>>> listMembers(
+            @Path("id") String id,
+            @Query("q") String q,
+            @Query("page") int page,
+            @Query("limit") int limit,
+            @Query("scope") String scope);
 
     @POST("agencies/{id}/join-requests/{userId}/approve")
     Call<ApiResponse<Object>> approveJoin(@Path("id") String id, @Path("userId") String userId);

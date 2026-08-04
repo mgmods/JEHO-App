@@ -413,6 +413,10 @@ public class MainActivity extends ThemedActivity {
         icon.setImageTintList(null);
     }
 
+    /**
+     * Drama tab show/hide comes only from dashboard {@code drama config.enabled}.
+     * Do not hard-code product policy here.
+     */
     private void loadDramaConfig(AppContainer container) {
         container.getIoExecutor().execute(() -> {
             com.Dramizo.Series.domain.model.Result<com.Dramizo.Series.data.remote.dto.DramaDtos.DramaConfigDto> r =
@@ -422,6 +426,10 @@ public class MainActivity extends ThemedActivity {
                 boolean show = r.success && r.data != null && r.data.enabled;
                 dramaEnabled = show;
                 binding.tabDramaWrap.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
+                if (show) {
+                    AssetIcons.loadTab(binding.tabDrama, currentPage == 1,
+                            AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED);
+                }
                 if (!show && mainPager != null && mainPager.getCurrentItem() == 1) {
                     mainPager.setCurrentItem(0, false);
                 }

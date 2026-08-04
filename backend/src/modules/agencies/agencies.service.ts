@@ -11,7 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
 import {
@@ -39,7 +39,14 @@ import {
   AgencyApplication,
   AgencyApplicationStatus,
 } from '../../database/entities/agency-application.entity';
-import { SubmitAgencyApplicationDto } from './dto/agencies.dto';
+import {
+  AgencyPayoutRequest,
+  AgencyPayoutStatus,
+} from '../../database/entities/agency-payout-request.entity';
+import {
+  SubmitAgencyApplicationDto,
+  CreateAgencyPayoutRequestDto,
+} from './dto/agencies.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 import {
@@ -50,11 +57,21 @@ import {
 } from './agency-activation';
 import { AGENCY_CREATE } from '../../common/pricing-catalog';
 import { purgeRoomReferencesBeforeDelete } from '../../common/room-delete-sql';
+import {
+  clampSharePct,
+  independentAgencyGiftSplit,
+} from './agency-gift-split';
+import {
+  isValidAgencyPublicId,
+  normalizeAgencyPublicId,
+} from './agency-perks';
 
 const DEFAULT_CREATE_PRICE = AGENCY_CREATE.defaultCoins;
 const DEFAULT_COMMISSION = 15;
 const DEFAULT_PLATFORM_CUT = 30;
+const DEFAULT_HOST_SHARE = 55;
 const DEFAULT_AGENCY_SEAT_COUNT = 11;
+const DEFAULT_DIAMOND_USD_RATE = 0.00005;
 
 @Injectable()
 export class AgenciesService implements OnModuleInit {
@@ -64,6 +81,8 @@ export class AgenciesService implements OnModuleInit {
     @InjectRepository(AgencyMember) private readonly membersRepo: Repository<AgencyMember>,
     @InjectRepository(AgencyApplication)
     private readonly applicationsRepo: Repository<AgencyApplication>,
+    @InjectRepository(AgencyPayoutRequest)
+    private readonly payoutsRepo: Repository<AgencyPayoutRequest>,
     @InjectRepository(GiftSend) private readonly giftSendsRepo: Repository<GiftSend>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
@@ -77,6 +96,29 @@ export class AgenciesService implements OnModuleInit {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private async diamondUsdRate(): Promise<number> {
+    const rate = await this.getSettingNumber('economy.diamondUsdRate', DEFAULT_DIAMOND_USD_RATE);
+    return rate > 0 ? rate : DEFAULT_DIAMOND_USD_RATE;
+  }
+
+  private diamondsToUsd(diamonds: number, rate: number): number {
+    const n = Math.max(0, Number(diamonds) || 0) * (rate > 0 ? rate : DEFAULT_DIAMOND_USD_RATE);
+    return Math.round(n * 10000) / 10000;
+  }
+
+  private withUsdSlice(slice: Record<string, any>, rate: number) {
+    if (!slice || typeof slice !== 'object') return slice;
+    const commission = Number(slice.ownerCommissionEarned || 0);
+    const host = Number(slice.estimatedHostShare || 0);
+    const gross = Number(slice.grossGiftsDiamonds || 0);
+    return {
+      ...slice,
+      ownerCommissionUsd: this.diamondsToUsd(commission, rate),
+      estimatedHostShareUsd: this.diamondsToUsd(host, rate),
+      grossGiftsUsd: this.diamondsToUsd(gross, rate),
+    };
+  }
+
   async onModuleInit() {
     try {
       await this.dataSource.query(`
@@ -87,6 +129,56 @@ export class AgenciesService implements OnModuleInit {
       `);
     } catch (err) {
       this.logger.warn(`ensure agency application payment columns: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE agencies
+          ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(16),
+          ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN NOT NULL DEFAULT false,
+          ADD COLUMN IF NOT EXISTS "verifiedAt" TIMESTAMPTZ,
+          ADD COLUMN IF NOT EXISTS "exclusiveFrameCode" VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS "exclusiveRoomCardCode" VARCHAR(64),
+          ADD COLUMN IF NOT EXISTS "exclusiveFrameUrl" VARCHAR(512)
+      `);
+      await this.dataSource.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agencies_publicId"
+        ON agencies ("publicId") WHERE "publicId" IS NOT NULL
+      `);
+    } catch (err) {
+      this.logger.warn(`ensure agency exclusive columns: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE gifts
+          ADD COLUMN IF NOT EXISTS "brandAgencyId" uuid
+      `);
+      await this.dataSource.query(`
+        CREATE INDEX IF NOT EXISTS "IDX_gifts_brandAgencyId"
+        ON gifts ("brandAgencyId") WHERE "brandAgencyId" IS NOT NULL
+      `);
+    } catch (err) {
+      this.logger.warn(`ensure gift brandAgencyId: ${(err as Error).message}`);
+    }
+    try {
+      // Mark catalog agency frames as admin-only exclusive when meta missing.
+      await this.dataSource.query(`
+        UPDATE cosmetics
+        SET meta = COALESCE(meta, '{}'::jsonb) || '{"agencyExclusive":true}'::jsonb
+        WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
+          AND (meta IS NULL OR meta->>'agencyExclusive' IS NULL OR meta->>'agencyExclusive' = 'false')
+      `);
+    } catch {
+      // meta may be json not jsonb on some DBs — best effort
+      try {
+        await this.dataSource.query(`
+          UPDATE cosmetics
+          SET meta = json_build_object('agencyExclusive', true)
+          WHERE (code ILIKE '%agency%' OR code ILIKE '%_agency%')
+            AND meta IS NULL
+        `);
+      } catch {
+        /* ignore */
+      }
     }
     try {
       const existing = await this.settingsRepo.findOne({
@@ -117,8 +209,8 @@ export class AgenciesService implements OnModuleInit {
       );
       await this.ensureSetting(
         'agency_host_share_percent',
-        String(100 - DEFAULT_COMMISSION - DEFAULT_PLATFORM_CUT),
-        'حصة المضيفة من هدايا الوكالة % (المتبقي بعد المنصة وصاحب الوكالة)',
+        String(DEFAULT_HOST_SHARE),
+        'حصة المضيفة من هدايا الوكالة % (مستقلة — غير مربوطة بحصص المنصة أو صاحب الوكالة)',
       );
       await this.ensureSetting(
         'agency_auto_approve_after_payment',
@@ -160,6 +252,31 @@ export class AgenciesService implements OnModuleInit {
     }
   }
 
+  /** Short shareable public agency ID (3–12 alnum). Admin-only assignment. */
+  async allocateAgencyPublicId(preferred?: string | null): Promise<string> {
+    if (preferred && isValidAgencyPublicId(preferred)) {
+      const id = normalizeAgencyPublicId(preferred);
+      const exists = await this.agenciesRepo.findOne({
+        where: { publicId: id },
+        select: ['id'],
+      });
+      if (exists) {
+        throw new ConflictException(`معرف الوكالة ${id} مستخدم مسبقاً`);
+      }
+      return id;
+    }
+    for (let attempt = 0; attempt < 40; attempt++) {
+      // Easy 5-digit display ID (never starts with 0).
+      const id = String(10000 + Math.floor(Math.random() * 90000));
+      const exists = await this.agenciesRepo.findOne({
+        where: { publicId: id },
+        select: ['id'],
+      });
+      if (!exists) return id;
+    }
+    throw new BadRequestException('تعذّر إنشاء معرف الوكالة — أعد المحاولة');
+  }
+
   /** Generate a unique activation code (retries on rare collisions). */
   async allocateActivationCode(): Promise<string> {
     for (let attempt = 0; attempt < 12; attempt++) {
@@ -194,15 +311,18 @@ export class AgenciesService implements OnModuleInit {
       AGENCY_CREATE.minCoins,
       Math.min(AGENCY_CREATE.maxCoins, Math.floor(raw)),
     );
-    const defaultCommissionPercent = Math.min(
-      50,
-      Math.max(0, await this.getSettingNumber('agency_default_commission_percent', DEFAULT_COMMISSION)),
+    const defaultCommissionPercent = clampSharePct(
+      await this.getSettingNumber('agency_default_commission_percent', DEFAULT_COMMISSION),
+      DEFAULT_COMMISSION,
     );
-    const platformCutPercent = Math.min(
-      50,
-      Math.max(0, await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT)),
+    const platformCutPercent = clampSharePct(
+      await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT),
+      DEFAULT_PLATFORM_CUT,
     );
-    const hostSharePercent = Math.max(0, 100 - defaultCommissionPercent - platformCutPercent);
+    const hostSharePercent = clampSharePct(
+      await this.getSettingNumber('agency_host_share_percent', DEFAULT_HOST_SHARE),
+      DEFAULT_HOST_SHARE,
+    );
     const platformRevenueDiamonds = await this.getSettingNumber(
       'platform_gift_revenue_diamonds',
       0,
@@ -264,20 +384,29 @@ export class AgenciesService implements OnModuleInit {
     const canHostRoom =
       activeMembership &&
       agency?.status === AgencyStatus.ACTIVE &&
-      [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(
-        membership!.role,
-      );
+      // Regular hosts are earnings-only; go-live is owner/manager (admin) only.
+      (membership!.role === AgencyRole.OWNER || membership!.role === AgencyRole.MANAGER);
     const room = canHostRoom
       ? await this.roomsRepo.findOne({
           where: { agencyId: membership!.agencyId, hostId: userId },
         })
       : null;
     const canViewEarnings =
-      canHostRoom &&
+      activeMembership &&
+      agency?.status === AgencyStatus.ACTIVE &&
       (membership!.role === AgencyRole.OWNER || membership!.role === AgencyRole.MANAGER);
     const canManage =
       activeMembership &&
       (membership!.role === AgencyRole.OWNER || membership!.role === AgencyRole.MANAGER);
+    const isHostMember =
+      activeMembership &&
+      agency?.status === AgencyStatus.ACTIVE &&
+      (membership!.role === AgencyRole.HOST || membership!.role === AgencyRole.MEMBER);
+    /** Performance board for hosts & regular members (not owner/manager agency rollup). */
+    const showHostDash =
+      activeMembership &&
+      agency?.status === AgencyStatus.ACTIVE &&
+      (membership!.role === AgencyRole.HOST || membership!.role === AgencyRole.MEMBER);
     if (canManage && agency && !agency.activationCode) {
       agency.activationCode = await this.allocateActivationCode();
       await this.agenciesRepo.save(agency);
@@ -296,6 +425,8 @@ export class AgenciesService implements OnModuleInit {
       canHostRoom,
       roomId: room?.id || null,
       earnings: canViewEarnings ? await this.earnings(agency!.id, userId) : null,
+      /** Performance board for hosts & regular members. */
+      hostDashboard: showHostDash ? await this.hostDashboard(userId) : null,
     };
   }
 
@@ -493,6 +624,15 @@ export class AgenciesService implements OnModuleInit {
         if (!clash) break;
         activationCode = generateActivationCode();
       }
+      let publicId = String(10000 + Math.floor(Math.random() * 90000));
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const clash = await manager.findOne(Agency, {
+          where: { publicId },
+          select: ['id'],
+        });
+        if (!clash) break;
+        publicId = String(10000 + Math.floor(Math.random() * 90000));
+      }
       const agency = await manager.save(
         manager.create(Agency, {
           name: application.proposedName,
@@ -503,6 +643,9 @@ export class AgenciesService implements OnModuleInit {
           totalDiamonds: 0,
           commissionPercent: Number(commissionRow?.value || DEFAULT_COMMISSION),
           activationCode,
+          publicId,
+          isVerified: false,
+          verifiedAt: null,
           notificationStyle: 'welcome',
         }),
       );
@@ -644,21 +787,96 @@ export class AgenciesService implements OnModuleInit {
   }
 
   async list(query: PaginationDto) {
-    const [items, total] = await this.agenciesRepo.findAndCount({
-      where: { status: AgencyStatus.ACTIVE },
-      relations: ['owner'],
-      skip: query.skip,
-      take: query.limit || 20,
-      order: { totalDiamonds: 'DESC' },
+    const q = String(query.search || query.q || '').trim();
+    const qb = this.agenciesRepo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.owner', 'owner')
+      .where('a.status = :st', { st: AgencyStatus.ACTIVE });
+    if (q) {
+      qb.andWhere(
+        '(a.publicId ILIKE :q OR a.name ILIKE :like OR CAST(a.id AS text) = :exact)',
+        { q: q.toUpperCase(), like: `%${q}%`, exact: q },
+      );
+    }
+    qb.orderBy('a.totalDiamonds', 'DESC')
+      .skip(query.skip)
+      .take(query.limit || 20);
+    const [items, total] = await qb.getManyAndCount();
+    const liveByAgency = await this.loadLiveAgencyRooms(items.map((a) => a.id));
+    const safe = items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id)));
+    // Live agencies first for a professional open-list feel.
+    safe.sort((x, y) => {
+      const liveDelta = Number(!!y.isLive) - Number(!!x.isLive);
+      if (liveDelta !== 0) return liveDelta;
+      return Number(y.liveViewerCount || 0) - Number(x.liveViewerCount || 0);
     });
-    const safe = items.map((a) => this.stripSecretFields(a));
     return paginate(safe, total, query.page || 1, query.limit || 20);
   }
 
+  /** Best live room per agency (open + active host). */
+  private async loadLiveAgencyRooms(agencyIds: string[]) {
+    const map = new Map<
+      string,
+      { id: string; coverUrl: string | null; roomCardUrl: string | null; viewerCount: number }
+    >();
+    const ids = agencyIds.filter(Boolean);
+    if (!ids.length) return map;
+    const rooms = await this.roomsRepo
+      .createQueryBuilder('r')
+      .where('r.agencyId IN (:...ids)', { ids })
+      .andWhere('r.activeHostId IS NOT NULL')
+      .andWhere('r.status IN (:...st)', { st: [RoomStatus.OPEN, RoomStatus.LOCKED] })
+      .orderBy('r.viewerCount', 'DESC')
+      .getMany();
+    for (const r of rooms) {
+      if (!r.agencyId || map.has(r.agencyId)) continue;
+      map.set(r.agencyId, {
+        id: r.id,
+        coverUrl: r.coverUrl,
+        roomCardUrl: r.roomCardUrl,
+        viewerCount: Number(r.viewerCount || 0),
+      });
+    }
+    return map;
+  }
+
+  private publicAgencyCard(
+    agency: Agency,
+    live?: {
+      id: string;
+      coverUrl: string | null;
+      roomCardUrl: string | null;
+      viewerCount: number;
+    } | null,
+  ) {
+    const base = this.stripSecretFields(agency) as Agency & Record<string, unknown>;
+    const logoUrl = agency.logoUrl || null;
+    const verified =
+      !!agency.isVerified && agency.status === AgencyStatus.ACTIVE;
+    return {
+      ...base,
+      logoUrl,
+      publicId: agency.publicId || null,
+      isVerified: verified,
+      verifiedAt: agency.verifiedAt || null,
+      coverUrl: live?.coverUrl || logoUrl,
+      // Prefer live room card frame, else exclusive admin-assigned frame art.
+      frameUrl: live?.roomCardUrl || agency.exclusiveFrameUrl || null,
+      exclusiveFrameCode: agency.exclusiveFrameCode || null,
+      exclusiveRoomCardCode: agency.exclusiveRoomCardCode || null,
+      exclusiveFrameUrl: agency.exclusiveFrameUrl || null,
+      isLive: !!live,
+      openRoomId: live?.id || null,
+      liveViewerCount: live ? Number(live.viewerCount || 0) : 0,
+      memberCount: Number(agency.memberCount || 0),
+    };
+  }
+
   async get(id: string) {
+    // Do not load full members list — agencies can be huge. Use listMembers instead.
     const agency = await this.agenciesRepo.findOne({
       where: { id },
-      relations: ['owner', 'members', 'members.user'],
+      relations: ['owner'],
     });
     if (!agency) throw new NotFoundException('Agency not found');
     const publicUser = (user: User | null | undefined) =>
@@ -672,22 +890,143 @@ export class AgenciesService implements OnModuleInit {
             level: user.level,
           }
         : null;
-    const { owner, members, activationCode: _code, ...safeAgency } = agency;
+    const { owner, activationCode: _code, ...safeAgency } = agency as Agency & {
+      owner?: User;
+    };
+    const verified =
+      !!agency.isVerified && agency.status === AgencyStatus.ACTIVE;
     return {
       ...safeAgency,
+      publicId: agency.publicId || null,
+      isVerified: verified,
+      verifiedAt: agency.verifiedAt || null,
+      exclusiveFrameCode: agency.exclusiveFrameCode || null,
+      exclusiveRoomCardCode: agency.exclusiveRoomCardCode || null,
+      exclusiveFrameUrl: agency.exclusiveFrameUrl || null,
+      frameUrl: agency.exclusiveFrameUrl || null,
       owner: publicUser(owner),
-      members: (members || [])
-        .filter((member) => member.status === AgencyMemberStatus.ACTIVE)
-        .map((member) => ({
-          id: member.id,
-          agencyId: member.agencyId,
-          userId: member.userId,
-          role: member.role,
-          status: member.status,
-          isActive: member.isActive,
-          joinedAt: member.joinedAt,
-          user: publicUser(member.user),
-        })),
+      members: [] as unknown[],
+      memberCount: Number(agency.memberCount || 0),
+    };
+  }
+
+  /**
+   * Search / page agency members. Never dumps the whole roster.
+   * Active members require a search query (min 1 char) unless scope=staff.
+   */
+  async listMembers(
+    agencyId: string,
+    actorId: string,
+    query: { q?: string; page?: number; limit?: number; scope?: string },
+  ) {
+    await this.assertManager(agencyId, actorId);
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(40, Math.max(1, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const q = String(query.q || '').trim();
+    const scope = String(query.scope || 'active').toLowerCase();
+
+    const mapRow = (member: AgencyMember) => ({
+      id: member.id,
+      agencyId: member.agencyId,
+      userId: member.userId,
+      role: member.role,
+      status: member.status,
+      isActive: member.isActive,
+      joinedAt: member.joinedAt,
+      user: member.user
+        ? {
+            id: member.user.id,
+            publicId: member.user.publicId,
+            username: member.user.username,
+            displayName: member.user.displayName,
+            avatarUrl: member.user.avatarUrl,
+            level: member.user.level,
+          }
+        : null,
+    });
+
+    if (scope === 'pending') {
+      const [items, total] = await this.membersRepo.findAndCount({
+        where: { agencyId, status: AgencyMemberStatus.PENDING },
+        relations: ['user'],
+        order: { joinedAt: 'DESC' },
+        skip,
+        take: limit,
+      });
+      return {
+        items: items.map(mapRow),
+        total,
+        page,
+        limit,
+      };
+    }
+
+    // Staff preview (owner + managers + hosts) without full roster — max one page.
+    if (scope === 'staff' && !q) {
+      const items = await this.membersRepo
+        .createQueryBuilder('m')
+        .leftJoinAndSelect('m.user', 'u')
+        .where('m.agencyId = :agencyId', { agencyId })
+        .andWhere('m.status = :st', { st: AgencyMemberStatus.ACTIVE })
+        .andWhere('m.role IN (:...roles)', {
+          roles: [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST],
+        })
+        .orderBy(
+          `CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 WHEN 'host' THEN 2 ELSE 3 END`,
+          'ASC',
+        )
+        .addOrderBy('m.joinedAt', 'DESC')
+        .take(limit)
+        .getMany();
+      return {
+        items: items.map(mapRow),
+        total: items.length,
+        page: 1,
+        limit,
+        scope: 'staff',
+      };
+    }
+
+    // Active/all members: search required (prevents loading "a million").
+    if (q.length < 1) {
+      const total = await this.membersRepo.count({
+        where: { agencyId, status: AgencyMemberStatus.ACTIVE },
+      });
+      return {
+        items: [],
+        total,
+        page,
+        limit,
+        requiresSearch: true,
+      };
+    }
+
+    const qb = this.membersRepo
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.user', 'u')
+      .where('m.agencyId = :agencyId', { agencyId })
+      .andWhere('m.status = :st', { st: AgencyMemberStatus.ACTIVE });
+
+    const like = `%${q.replace(/[%_]/g, '')}%`;
+    qb.andWhere(
+      `(u.username ILIKE :like OR u.displayName ILIKE :like OR CAST(u.publicId AS text) ILIKE :like OR u.id::text = :exact)`,
+      { like, exact: q },
+    );
+
+    const total = await qb.getCount();
+    const items = await qb
+      .orderBy('m.joinedAt', 'DESC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
+
+    return {
+      items: items.map(mapRow),
+      total,
+      page,
+      limit,
+      requiresSearch: false,
     };
   }
 
@@ -1028,12 +1367,15 @@ export class AgenciesService implements OnModuleInit {
 
   async listJoinRequests(agencyId: string, actorId: string) {
     await this.assertManager(agencyId, actorId);
-    const items = await this.membersRepo.find({
+    // Cap so a spam flood of pending requests cannot crash the admin UI.
+    const take = 40;
+    const [items, total] = await this.membersRepo.findAndCount({
       where: { agencyId, status: AgencyMemberStatus.PENDING },
       relations: ['user'],
       order: { joinedAt: 'DESC' },
+      take,
     });
-    return { items, total: items.length };
+    return { items, total, limit: take };
   }
 
   async approveJoin(agencyId: string, actorId: string, memberUserId: string) {
@@ -1189,12 +1531,8 @@ export class AgenciesService implements OnModuleInit {
     ) {
       throw new ForbiddenException('صاحب الوكالة فقط يرفع أو يزيل أدمن الوكالة');
     }
-    const wasHostCapable = [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(
-      member.role,
-    );
-    const willHostCapable = [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(
-      dto.role,
-    );
+    const wasHostCapable = [AgencyRole.OWNER, AgencyRole.MANAGER].includes(member.role);
+    const willHostCapable = [AgencyRole.OWNER, AgencyRole.MANAGER].includes(dto.role);
     const wasManager = member.role === AgencyRole.MANAGER;
     member.role = dto.role;
     const saved = await this.membersRepo.save(member);
@@ -1263,17 +1601,14 @@ export class AgenciesService implements OnModuleInit {
   }
 
   async stats(agencyId: string) {
-    const agency = await this.get(agencyId);
-    const memberIds = (agency.members || []).map((m) => m.userId);
-    let received = 0;
-    if (memberIds.length) {
-      const raw = await this.giftSendsRepo
-        .createQueryBuilder('g')
-        .select('COALESCE(SUM(g.diamondsAwarded), 0)', 'total')
-        .where('g.receiverId IN (:...ids)', { ids: memberIds })
-        .getRawOne();
-      received = Number(raw?.total || 0);
-    }
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    const members = await this.membersRepo.find({
+      where: { agencyId, status: AgencyMemberStatus.ACTIVE, isActive: true },
+      select: ['userId'],
+    });
+    const memberIds = members.map((m) => m.userId);
+    const received = await this.sumGiftsReceived(memberIds);
     return {
       agencyId,
       name: agency.name,
@@ -1284,7 +1619,148 @@ export class AgenciesService implements OnModuleInit {
     };
   }
 
-  /** Detailed earnings for agency owner: commission txs + split summary */
+  private periodStarts() {
+    const now = new Date();
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+    return { now, weekStart, monthStart };
+  }
+
+  private async sumGiftsReceived(receiverIds: string[], from?: Date): Promise<number> {
+    if (!receiverIds.length) return 0;
+    const qb = this.giftSendsRepo
+      .createQueryBuilder('g')
+      .select('COALESCE(SUM(g.diamondsAwarded), 0)', 'total')
+      .where('g.receiverId IN (:...ids)', { ids: receiverIds });
+    if (from) qb.andWhere('g.createdAt >= :from', { from });
+    const raw = await qb.getRawOne();
+    return Number(raw?.total || 0);
+  }
+
+  /** Net diamond credits from gift receives (host take-home after splits). */
+  private async sumGiftIncome(userId: string, from?: Date): Promise<number> {
+    const qb = this.dataSource
+      .getRepository(WalletTransaction)
+      .createQueryBuilder('t')
+      .select('COALESCE(SUM(t.amount), 0)', 'total')
+      .where('t.userId = :uid', { uid: userId })
+      .andWhere('t.amount > 0')
+      .andWhere('t.referenceType IN (:...types)', {
+        types: ['gift_receive', 'gift_receive_host', 'gift_receive_mic'],
+      });
+    if (from) qb.andWhere('t.createdAt >= :from', { from });
+    const raw = await qb.getRawOne();
+    return Number(raw?.total || 0);
+  }
+
+  private async sumOwnerCommission(
+    agencyId: string,
+    ownerId: string,
+    from?: Date,
+  ): Promise<number> {
+    const qb = this.dataSource
+      .getRepository(WalletTransaction)
+      .createQueryBuilder('t')
+      .select('COALESCE(SUM(t.amount), 0)', 'total')
+      .where('t.userId = :ownerId', { ownerId })
+      .andWhere('t.referenceType = :rt', { rt: 'agency_commission' })
+      .andWhere(
+        `(t."referenceId" = :agencyId OR CAST(t.metadata AS TEXT) LIKE :meta)`,
+        { agencyId, meta: `%${agencyId}%` },
+      );
+    if (from) qb.andWhere('t.createdAt >= :from', { from });
+    const raw = await qb.getRawOne();
+    return Number(raw?.total || 0);
+  }
+
+  private estimateSplit(
+    gross: number,
+    commissionPct: number,
+    platformPct: number,
+    hostPct?: number,
+  ) {
+    const hostShare = hostPct != null
+      ? clampSharePct(hostPct, DEFAULT_HOST_SHARE)
+      : DEFAULT_HOST_SHARE;
+    const split = independentAgencyGiftSplit(gross, hostShare, commissionPct, platformPct);
+    return {
+      estimatedPlatformCut: split.platformCut,
+      estimatedAgentShare: split.agentShare,
+      estimatedHostShare: split.hostDiamonds,
+    };
+  }
+
+  private async periodSlice(
+    agencyId: string,
+    ownerId: string,
+    memberIds: string[],
+    commissionPct: number,
+    platformPct: number,
+    hostPct: number,
+    from?: Date,
+  ) {
+    const [gross, ownerCommissionEarned] = await Promise.all([
+      this.sumGiftsReceived(memberIds, from),
+      this.sumOwnerCommission(agencyId, ownerId, from),
+    ]);
+    const split = this.estimateSplit(gross, commissionPct, platformPct, hostPct);
+    return {
+      from: from ? from.toISOString() : null,
+      grossGiftsDiamonds: gross,
+      ownerCommissionEarned,
+      ...split,
+    };
+  }
+
+  /** Per-host earnings dashboard (week / month / lifetime). */
+  async hostDashboard(userId: string) {
+    const { weekStart, monthStart } = this.periodStarts();
+    const [
+      grossWeek,
+      grossMonth,
+      grossAll,
+      diamondsWeek,
+      diamondsMonth,
+      diamondsAll,
+      wallet,
+    ] = await Promise.all([
+      this.sumGiftsReceived([userId], weekStart),
+      this.sumGiftsReceived([userId], monthStart),
+      this.sumGiftsReceived([userId]),
+      this.sumGiftIncome(userId, weekStart),
+      this.sumGiftIncome(userId, monthStart),
+      this.sumGiftIncome(userId),
+      this.walletsRepo.findOne({ where: { userId } }),
+    ]);
+    const rate = await this.diamondUsdRate();
+    const walletDiamonds = Number(wallet?.diamonds || 0);
+    const agencyDiamonds = Number((wallet as any)?.agencyDiamonds || 0);
+    return {
+      giftsGrossWeek: grossWeek,
+      giftsGrossMonth: grossMonth,
+      giftsGrossAllTime: grossAll,
+      diamondsEarnedWeek: diamondsWeek,
+      diamondsEarnedMonth: diamondsMonth,
+      diamondsEarnedAllTime: diamondsAll,
+      /** USD recognition of host profits (from gift share). */
+      usdEarnedWeek: this.diamondsToUsd(diamondsWeek, rate),
+      usdEarnedMonth: this.diamondsToUsd(diamondsMonth, rate),
+      usdEarnedAllTime: this.diamondsToUsd(diamondsAll, rate),
+      /** Personal-room withdrawable pool */
+      walletDiamonds,
+      walletUsd: this.diamondsToUsd(walletDiamonds, rate),
+      personalDiamonds: walletDiamonds,
+      personalUsd: this.diamondsToUsd(walletDiamonds, rate),
+      /** Agency-room host share — withdraw via agency payout only */
+      agencyDiamonds,
+      agencyUsd: this.diamondsToUsd(agencyDiamonds, rate),
+      diamondUsdRate: rate,
+      weekFrom: weekStart.toISOString(),
+      monthFrom: monthStart.toISOString(),
+    };
+  }
+
+  /** Detailed earnings for agency owner/manager: commission + period dashboard */
   async earnings(agencyId: string, viewerId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
@@ -1297,35 +1773,60 @@ export class AgenciesService implements OnModuleInit {
       }
     }
 
-    const platformPct = await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT);
-    const commissionPct = Number(agency.commissionPercent) || DEFAULT_COMMISSION;
+    const platformPct = clampSharePct(
+      await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT),
+      DEFAULT_PLATFORM_CUT,
+    );
+    const hostPct = clampSharePct(
+      await this.getSettingNumber('agency_host_share_percent', DEFAULT_HOST_SHARE),
+      DEFAULT_HOST_SHARE,
+    );
+    const commissionPct = clampSharePct(
+      Number(agency.commissionPercent) || DEFAULT_COMMISSION,
+      DEFAULT_COMMISSION,
+    );
     const platformRevenueAll = await this.getSettingNumber('platform_gift_revenue_diamonds', 0);
+    const { weekStart, monthStart } = this.periodStarts();
 
-    // Commission rows used to key referenceId=agencyId (broken unique constraint);
-    // new rows use referenceId=giftSendId and metadata.agencyId.
-    const commissionRows = await this.dataSource.getRepository(WalletTransaction).find({
-      where: {
-        userId: agency.ownerId,
-        referenceType: 'agency_commission',
-      },
-      order: { createdAt: 'DESC' },
-      take: 200,
+    const members = await this.membersRepo.find({
+      where: { agencyId, isActive: true, status: AgencyMemberStatus.ACTIVE },
+      select: ['userId'],
     });
-    const txs = commissionRows
+    const memberIds = members.map((m) => m.userId);
+
+    const [week, month, allTime, recentRows] = await Promise.all([
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct, weekStart),
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct, monthStart),
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct),
+      this.dataSource.getRepository(WalletTransaction).find({
+        where: {
+          userId: agency.ownerId,
+          referenceType: 'agency_commission',
+        },
+        order: { createdAt: 'DESC' },
+        take: 120,
+      }),
+    ]);
+
+    const txs = recentRows
       .filter((t) => {
-        const metaAgency = t.metadata && typeof t.metadata === 'object'
-          ? String((t.metadata as Record<string, unknown>).agencyId || '')
-          : '';
+        const metaAgency =
+          t.metadata && typeof t.metadata === 'object'
+            ? String((t.metadata as Record<string, unknown>).agencyId || '')
+            : '';
         return t.referenceId === agencyId || metaAgency === agencyId;
       })
-      .slice(0, 50);
+      .slice(0, 30);
 
-    const ownerCommissionEarned = txs.reduce((s, t) => s + Number(t.amount || 0), 0);
-    const stats = await this.stats(agencyId);
-    const gross = Number(stats.giftsReceivedDiamonds || 0);
-    const estimatedPlatform = Math.floor((gross * platformPct) / 100);
-    const estimatedAgent = Math.floor((gross * Math.min(50, commissionPct)) / 100);
-    const estimatedHost = Math.max(0, gross - estimatedAgent - estimatedPlatform);
+    const rate = await this.diamondUsdRate();
+    const weekUsd = this.withUsdSlice(week, rate);
+    const monthUsd = this.withUsdSlice(month, rate);
+    const allUsd = this.withUsdSlice(allTime, rate);
+    const ownerWallet = await this.walletsRepo.findOne({
+      where: { userId: agency.ownerId },
+    });
+    const agencyDiamonds = Number((ownerWallet as any)?.agencyDiamonds || 0);
+    const personalDiamonds = Number(ownerWallet?.diamonds || 0);
 
     return {
       agencyId,
@@ -1333,24 +1834,42 @@ export class AgenciesService implements OnModuleInit {
       ownerId: agency.ownerId,
       commissionPercent: commissionPct,
       platformCutPercent: platformPct,
-      hostSharePercent: Math.max(0, 100 - Math.min(50, commissionPct) - Math.min(50, platformPct)),
+      hostSharePercent: hostPct,
+      memberCount: memberIds.length,
+      diamondUsdRate: rate,
+      /** Back-compat flat totals = all-time */
       totals: {
-        grossGiftsDiamonds: gross,
+        grossGiftsDiamonds: allTime.grossGiftsDiamonds,
         agencyTotalDiamonds: Number(agency.totalDiamonds || 0),
-        ownerCommissionEarned,
-        estimatedHostShare: estimatedHost,
-        estimatedPlatformCut: estimatedPlatform,
-        estimatedAgentShare: estimatedAgent,
+        ownerCommissionEarned: allTime.ownerCommissionEarned,
+        ownerCommissionUsd: this.diamondsToUsd(allTime.ownerCommissionEarned, rate),
+        estimatedHostShare: allTime.estimatedHostShare,
+        estimatedHostShareUsd: this.diamondsToUsd(allTime.estimatedHostShare, rate),
+        estimatedPlatformCut: allTime.estimatedPlatformCut,
+        estimatedAgentShare: allTime.estimatedAgentShare,
         platformRevenueAllTime: platformRevenueAll,
+      },
+      periods: {
+        week: weekUsd,
+        month: monthUsd,
+        allTime: allUsd,
       },
       recentCommission: txs.map((t) => ({
         id: t.id,
         diamonds: Number(t.amount || 0),
+        amountUsd: this.diamondsToUsd(Number(t.amount || 0), rate),
         description: t.description,
         createdAt: t.createdAt,
       })),
+      /** Live withdrawable pools for the owner (never mixed). */
+      available: {
+        agencyDiamonds,
+        agencyUsd: this.diamondsToUsd(agencyDiamonds, rate),
+        personalDiamonds,
+        personalUsd: this.diamondsToUsd(personalDiamonds, rate),
+      },
       explanation: {
-        ar: `عند إرسال هدية لعضو في الوكالة: المنصة ${platformPct}%، صاحب الوكالة ${commissionPct}%، المضيفة ≈ ${Math.max(0, 100 - platformPct - commissionPct)}%. أرباح صاحب الوكالة تظهر هنا مفصّلة. وكيل الشحن منفصل ولا علاقة له بهذه النسب.`,
+        ar: `روم الوكالة وروم الشخصي منفصلان تماماً. عمولة الوكالة تُسحَب لإدارة المنصة من رصيد agency. أرباح الروم الشخصي تُسحَب من رصيد personal. سعر الماسة ≈ $${rate}.`,
       },
     };
   }
@@ -1365,7 +1884,7 @@ export class AgenciesService implements OnModuleInit {
     const diamonds = Math.floor(Number(amount) || 0);
     if (diamonds < 1) throw new BadRequestException('أدخل كمية ألماس صحيحة');
     if (!toUserId || toUserId === ownerId) {
-      throw new BadRequestException('اختر عضواً آخر في الوكالة');
+      throw new BadRequestException('اختر مضيفاً آخر في الوكالة');
     }
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
@@ -1380,7 +1899,10 @@ export class AgenciesService implements OnModuleInit {
         status: AgencyMemberStatus.ACTIVE,
       },
     });
-    if (!member) throw new BadRequestException('المستخدم ليس عضواً نشطاً في الوكالة');
+    if (!member) throw new BadRequestException('المستخدم ليس مضيفاً نشطاً في الوكالة');
+    if (![AgencyRole.HOST, AgencyRole.MANAGER, AgencyRole.MEMBER].includes(member.role)) {
+      throw new BadRequestException('التوزيع للمضيفين فقط');
+    }
 
     const refId = `agency_dist:${agencyId}:${ownerId}:${toUserId}:${Date.now()}`;
     return this.dataSource.transaction(async (manager) => {
@@ -1388,8 +1910,11 @@ export class AgenciesService implements OnModuleInit {
         where: { userId: ownerId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!sender || Number(sender.diamonds) < diamonds) {
-        throw new BadRequestException('رصيد الماس غير كافٍ للسحب/التوزيع');
+      const senderAgencyBal = Number((sender as any)?.agencyDiamonds || 0);
+      if (!sender || senderAgencyBal < diamonds) {
+        throw new BadRequestException(
+          'رصيد عمولة الوكالة غير كافٍ للتوزيع (منفصل عن أرباح الروم الشخصي)',
+        );
       }
       let receiver = await manager.findOne(Wallet, {
         where: { userId: toUserId },
@@ -1401,6 +1926,7 @@ export class AgenciesService implements OnModuleInit {
             userId: toUserId,
             coins: 0,
             diamonds: 0,
+            agencyDiamonds: 0,
             traderDiamonds: 0,
             gamePoints: 0,
           }),
@@ -1412,8 +1938,10 @@ export class AgenciesService implements OnModuleInit {
       }
       if (!receiver) throw new NotFoundException('محفظة المستلم غير موجودة');
 
-      sender.diamonds = Number(sender.diamonds) - diamonds;
-      receiver.diamonds = Number(receiver.diamonds) + diamonds;
+      // Keep agency pool ↔ agency pool; never touch personal-room diamonds.
+      (sender as any).agencyDiamonds = senderAgencyBal - diamonds;
+      (receiver as any).agencyDiamonds =
+        Number((receiver as any).agencyDiamonds || 0) + diamonds;
       await manager.save(sender);
       await manager.save(receiver);
       await manager.save(
@@ -1422,11 +1950,11 @@ export class AgenciesService implements OnModuleInit {
           type: TransactionType.EXCHANGE,
           currency: CurrencyType.DIAMONDS,
           amount: -diamonds,
-          balanceAfter: Number(sender.diamonds),
+          balanceAfter: Number((sender as any).agencyDiamonds || 0),
           referenceType: 'agency_distribute_send',
           referenceId: refId,
           description: `توزيع أرباح وكالة`,
-          metadata: { agencyId, toUserId, diamonds },
+          metadata: { agencyId, toUserId, diamonds, stream: 'agency' },
         }),
       );
       await manager.save(
@@ -1435,21 +1963,257 @@ export class AgenciesService implements OnModuleInit {
           type: TransactionType.EXCHANGE,
           currency: CurrencyType.DIAMONDS,
           amount: diamonds,
-          balanceAfter: Number(receiver.diamonds),
+          balanceAfter: Number((receiver as any).agencyDiamonds || 0),
           referenceType: 'agency_distribute_recv',
           referenceId: refId,
           description: `استلام توزيع من صاحب الوكالة`,
-          metadata: { agencyId, fromUserId: ownerId, diamonds },
+          metadata: { agencyId, fromUserId: ownerId, diamonds, stream: 'agency' },
         }),
       );
       return {
         ok: true,
         diamonds,
         toUserId,
-        senderBalance: Number(sender.diamonds),
-        receiverBalance: Number(receiver.diamonds),
+        senderBalance: Number((sender as any).agencyDiamonds || 0),
+        receiverBalance: Number((receiver as any).agencyDiamonds || 0),
+        stream: 'agency' as const,
       };
     });
+  }
+
+  private async assertActiveHost(agencyId: string, userId: string) {
+    const member = await this.membersRepo.findOne({
+      where: {
+        agencyId,
+        userId,
+        isActive: true,
+        status: AgencyMemberStatus.ACTIVE,
+      },
+    });
+    if (!member) throw new ForbiddenException('لست عضواً نشطاً في الوكالة');
+    if (![AgencyRole.HOST, AgencyRole.MEMBER, AgencyRole.MANAGER].includes(member.role)) {
+      throw new ForbiddenException('طلب السحب متاح للمضيفين');
+    }
+    return member;
+  }
+
+  private async assertOwnerOrManager(agencyId: string, userId: string) {
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    if (agency.ownerId === userId) return { agency, role: AgencyRole.OWNER };
+    const member = await this.membersRepo.findOne({
+      where: {
+        agencyId,
+        userId,
+        isActive: true,
+        status: AgencyMemberStatus.ACTIVE,
+      },
+    });
+    if (!member || ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(member.role)) {
+      throw new ForbiddenException('صلاحية الوكالة فقط');
+    }
+    return { agency, role: member.role };
+  }
+
+  private mapPayout(row: AgencyPayoutRequest, host?: User | null) {
+    return {
+      id: row.id,
+      agencyId: row.agencyId,
+      hostUserId: row.hostUserId,
+      diamonds: Number(row.diamonds),
+      amountUsd: Number(row.amountUsd),
+      diamondUsdRate: Number(row.diamondUsdRate),
+      method: row.method,
+      payoutDetails: row.payoutDetails || {},
+      status: row.status,
+      reviewNote: row.reviewNote,
+      reviewedById: row.reviewedById,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      host: host
+        ? {
+            id: host.id,
+            username: host.username,
+            displayName: host.displayName,
+            publicId: (host as any).publicId,
+            avatarUrl: host.avatarUrl,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Host→agency cash-out closed: hosts withdraw agencyDiamonds via platform
+   * (wallet.withdraw, source=agency_host). Owner commission uses agency_commission.
+   */
+  async createPayoutRequest(
+    agencyId: string,
+    hostUserId: string,
+    dto: CreateAgencyPayoutRequestDto,
+  ) {
+    void agencyId;
+    void hostUserId;
+    void dto;
+    throw new BadRequestException(
+      'تم إيقاف طلب السحب عبر الوكالة. قدّمي سحب أرباح روم الوكالة مباشرةً من التطبيق إلى إدارة المنصة.',
+    );
+  }
+
+  async listPayoutRequests(agencyId: string, viewerId: string, status?: string) {
+    const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
+    if (!agency) throw new NotFoundException('Agency not found');
+    let isStaff = agency.ownerId === viewerId;
+    if (!isStaff) {
+      const mgr = await this.membersRepo.findOne({
+        where: {
+          agencyId,
+          userId: viewerId,
+          isActive: true,
+          status: AgencyMemberStatus.ACTIVE,
+        },
+      });
+      isStaff = !!mgr && [AgencyRole.OWNER, AgencyRole.MANAGER].includes(mgr.role);
+    }
+
+    const where: any = { agencyId };
+    if (!isStaff) {
+      await this.assertActiveHost(agencyId, viewerId);
+      where.hostUserId = viewerId;
+    }
+    if (status && ['pending', 'paid', 'rejected', 'cancelled'].includes(status)) {
+      where.status = status;
+    }
+
+    const rows = await this.payoutsRepo.find({
+      where,
+      order: { createdAt: 'DESC' },
+      take: 80,
+    });
+    const hostIds = [...new Set(rows.map((r) => r.hostUserId))];
+    const hosts = hostIds.length
+      ? await this.usersRepo.find({ where: { id: In(hostIds) } })
+      : [];
+    const hostMap = new Map(hosts.map((u) => [u.id, u]));
+    return {
+      items: rows.map((r) => this.mapPayout(r, hostMap.get(r.hostUserId) || null)),
+      diamondUsdRate: await this.diamondUsdRate(),
+    };
+  }
+
+  async markPayoutPaid(
+    agencyId: string,
+    requestId: string,
+    reviewerId: string,
+    note?: string,
+  ) {
+    await this.assertOwnerOrManager(agencyId, reviewerId);
+    const row = await this.payoutsRepo.findOne({ where: { id: requestId, agencyId } });
+    if (!row) throw new NotFoundException('الطلب غير موجود');
+    if (row.status !== AgencyPayoutStatus.PENDING) {
+      throw new BadRequestException('الطلب ليس معلّقاً');
+    }
+    row.status = AgencyPayoutStatus.PAID;
+    row.reviewedById = reviewerId;
+    row.reviewNote = note?.trim() || 'تم التحويل للمضيفة';
+    await this.payoutsRepo.save(row);
+
+    try {
+      await this.notificationsService.create({
+        userId: row.hostUserId,
+        type: NotificationType.AGENCY,
+        title: 'تم تحويل أرباحك',
+        body: `حوّلت الوكالة لك $${Number(row.amountUsd).toFixed(2)}`,
+        data: { agencyId, payoutRequestId: row.id },
+      });
+    } catch {
+      /* ignore */
+    }
+    return this.mapPayout(row);
+  }
+
+  private async refundHeldPayout(
+    row: AgencyPayoutRequest,
+    status: AgencyPayoutStatus,
+    reviewerId: string,
+    note: string,
+  ) {
+    const diamonds = Number(row.diamonds);
+    const refId = `agency_payout_refund:${row.id}`;
+    await this.dataSource.transaction(async (manager) => {
+      const wallet = await manager.findOne(Wallet, {
+        where: { userId: row.hostUserId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!wallet) throw new NotFoundException('محفظة المضيفة');
+      (wallet as any).agencyDiamonds =
+        Number((wallet as any).agencyDiamonds || 0) + diamonds;
+      await manager.save(wallet);
+      await manager.save(
+        manager.create(WalletTransaction, {
+          userId: row.hostUserId,
+          type: TransactionType.REFUND,
+          currency: CurrencyType.DIAMONDS,
+          amount: diamonds,
+          balanceAfter: Number((wallet as any).agencyDiamonds || 0),
+          referenceType: 'agency_payout_refund',
+          referenceId: refId,
+          description: note,
+          metadata: { agencyId: row.agencyId, requestId: row.id, stream: 'agency' },
+        }),
+      );
+      row.status = status;
+      row.reviewedById = reviewerId;
+      row.reviewNote = note;
+      await manager.save(row);
+    });
+    return this.mapPayout(row);
+  }
+
+  async rejectPayoutRequest(
+    agencyId: string,
+    requestId: string,
+    reviewerId: string,
+    note?: string,
+  ) {
+    await this.assertOwnerOrManager(agencyId, reviewerId);
+    const row = await this.payoutsRepo.findOne({ where: { id: requestId, agencyId } });
+    if (!row) throw new NotFoundException('الطلب غير موجود');
+    if (row.status !== AgencyPayoutStatus.PENDING) {
+      throw new BadRequestException('الطلب ليس معلّقاً');
+    }
+    const mapped = await this.refundHeldPayout(
+      row,
+      AgencyPayoutStatus.REJECTED,
+      reviewerId,
+      note?.trim() || 'مرفوض من الوكالة',
+    );
+    try {
+      await this.notificationsService.create({
+        userId: row.hostUserId,
+        type: NotificationType.AGENCY,
+        title: 'رفض طلب سحب الأرباح',
+        body: note?.trim() || 'تم رفض طلب السحب وإرجاع الماس لمحفظتك',
+        data: { agencyId, payoutRequestId: row.id },
+      });
+    } catch {
+      /* ignore */
+    }
+    return mapped;
+  }
+
+  async cancelPayoutRequest(agencyId: string, requestId: string, hostUserId: string) {
+    const row = await this.payoutsRepo.findOne({ where: { id: requestId, agencyId } });
+    if (!row) throw new NotFoundException('الطلب غير موجود');
+    if (row.hostUserId !== hostUserId) throw new ForbiddenException();
+    if (row.status !== AgencyPayoutStatus.PENDING) {
+      throw new BadRequestException('لا يمكن إلغاء هذا الطلب');
+    }
+    return this.refundHeldPayout(
+      row,
+      AgencyPayoutStatus.CANCELLED,
+      hostUserId,
+      'ألغاه المضيف',
+    );
   }
 
   /** Creates or returns one permanent public/free room for an eligible agency host. */
@@ -1470,9 +2234,9 @@ export class AgenciesService implements OnModuleInit {
     });
     if (
       !membership ||
-      ![AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role)
+      ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)
     ) {
-      throw new ForbiddenException('Active owner, manager, or host membership required');
+      throw new ForbiddenException('Active owner or manager membership required to go live');
     }
 
     const existing = await this.roomsRepo.findOne({
@@ -1623,13 +2387,13 @@ export class AgenciesService implements OnModuleInit {
       },
     });
     const room = ownMembership &&
-      [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(ownMembership.role)
+      [AgencyRole.OWNER, AgencyRole.MANAGER].includes(ownMembership.role)
       ? await this.ensurePermanentRoom(agencyId, userId)
       : await this.ensurePermanentRoom(agencyId);
     return this.roomsService.join(room.id, userId, {});
   }
 
-  /** Open/reopen the authenticated host's own persistent room in this agency. */
+  /** Open/reopen the authenticated admin's own persistent room in this agency. */
   async openAgencyRoom(agencyId: string, userId: string, dto: CreateRoomDto) {
     const membership = await this.membersRepo.findOne({
       where: {
@@ -1643,9 +2407,9 @@ export class AgenciesService implements OnModuleInit {
     if (
       !membership ||
       membership.agency?.status !== AgencyStatus.ACTIVE ||
-      ![AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role)
+      ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)
     ) {
-      throw new ForbiddenException('Active owner, manager, or host membership required');
+      throw new ForbiddenException('فتح بث الوكالة لمالك الوكالة أو الأدمن فقط');
     }
     const agencyName = String(membership.agency.name || '').trim() || 'وكالة';
     return this.roomsService.create(userId, {

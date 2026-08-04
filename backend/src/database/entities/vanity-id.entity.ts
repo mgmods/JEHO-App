@@ -11,6 +11,8 @@ export enum VanityIdStatus {
   AVAILABLE = 'available',
   RESERVED = 'reserved',
   OWNED = 'owned',
+  /** Hidden from the app catalog; not sold until re-enabled. */
+  DISABLED = 'disabled',
 }
 
 @Entity('vanity_ids')

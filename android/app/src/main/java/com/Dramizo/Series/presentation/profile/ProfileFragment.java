@@ -65,7 +65,8 @@ public class ProfileFragment extends Fragment {
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
 
-        bindRow(binding.btnAppearance, v -> openMall(null));
+        bindRow(binding.btnAppearance, v ->
+                startActivity(new Intent(requireContext(), StoreHubActivity.class)));
         bindRow(binding.btnTaskCenter, v ->
                 startActivity(new Intent(requireContext(), TaskCenterActivity.class)));
         bindRow(binding.btnContests, v ->

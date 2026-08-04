@@ -63,6 +63,14 @@ export class Gift {
     outcomes?: { amount: number; weight: number }[];
   } | null;
 
+  /**
+   * Optional agency branding on this gift — when set, gift animations/payloads
+   * may show the agency logo / name (admin catalog only).
+   */
+  @Index()
+  @Column({ type: 'uuid', nullable: true })
+  brandAgencyId: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

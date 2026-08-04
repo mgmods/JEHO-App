@@ -49,12 +49,10 @@
           <div class="mb-2">
             <label class="form-label small">{{ t('coinPackages.coinImage') }}</label>
             <div class="d-flex flex-wrap gap-2 align-items-center">
-              <input v-model="p.imageUrl" class="form-control form-control-sm flex-grow-1" placeholder="/assets/pack/..." />
               <input
                 type="file"
                 accept="image/*,.webp"
                 class="form-control form-control-sm"
-                style="max-width: 160px"
                 @change="(e) => uploadPackageImage(e, p)"
               />
               <button

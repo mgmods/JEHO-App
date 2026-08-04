@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, UnauthorizedException, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, Not, Repository } from 'typeorm';
+import { DataSource, In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User, UserStatus } from '../../database/entities/user.entity';
@@ -25,7 +25,7 @@ import {
 } from '../../database/entities/report.entity';
 import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
-import { AbuseLog } from '../../database/entities/abuse-log.entity';
+import { AbuseLog, AbuseSeverity } from '../../database/entities/abuse-log.entity';
 import { WalletTransaction, TransactionType, CurrencyType } from '../../database/entities/wallet-transaction.entity';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
@@ -47,11 +47,16 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { AgenciesService } from '../agencies/agencies.service';
+import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { purgeRoomReferencesBeforeDelete } from '../../common/room-delete-sql';
 import {
   generateActivationCode,
 } from '../agencies/agency-activation';
+import {
+  isValidAgencyPublicId,
+  normalizeAgencyPublicId,
+} from '../agencies/agency-perks';
 import {
   IsString,
   IsOptional,
@@ -64,6 +69,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GiftType } from '../../database/entities/gift.entity';
 import { v4 as uuidv4 } from 'uuid';
 import { salaryLadderToHostTargetStages } from '../../common/host-salary-ladder';
+import {
+  normalizeStaffRole,
+  staffRank,
+  type PlatformStaffRole,
+} from '../../common/staff-role';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -161,6 +171,17 @@ export class UpsertGiftDto {
   @IsOptional()
   @IsObject()
   luckyConfig?: { minMultiplier: number; maxMultiplier: number; winChance: number };
+
+  /** Gift branded for an agency (logo/name on send payload) — admin only */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  brandAgencyId?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  category?: string;
 }
 
 export class UpdateUserStatusDto {
@@ -182,6 +203,8 @@ export class ReviewWithdrawDto {
 
 @Injectable()
 export class AdminService {
+  private staffRoleColumnReady = false;
+
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(UserProfile) private readonly profilesRepo: Repository<UserProfile>,
@@ -211,6 +234,7 @@ export class AdminService {
     private readonly notificationsService: NotificationsService,
     private readonly usersService: UsersService,
     private readonly agenciesService: AgenciesService,
+    private readonly cosmeticsService: CosmeticsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -310,6 +334,7 @@ export class AdminService {
   }
 
   async listUsers(query: PaginationDto) {
+    await this.ensureStaffRoleColumn();
     const qb = this.usersRepo
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.wallet', 'wallet')
@@ -340,12 +365,68 @@ export class AdminService {
     }
 
     const [items, total] = await qb.getManyAndCount();
-    const mapped = items.map((u) => this.mapAdminUser(u));
+    const frameByUser = await this.equippedFramesByUserIds(
+      items.map((u) => u.id),
+    );
+    const mapped = items.map((u) => {
+      const base = this.mapAdminUser(u) as Record<string, unknown>;
+      const equipped = frameByUser.get(u.id) || null;
+      const profileFrame =
+        (u.profile as any)?.vipBadgeUrl || (u.profile as any)?.hostBadgeUrl || null;
+      const frameUrl = equipped || profileFrame || null;
+      return {
+        ...base,
+        frameUrl,
+        frameAnimUrl: equipped || frameUrl,
+      };
+    });
     return paginate(mapped, total, query.page || 1, query.limit || 20);
   }
 
-  private mapAdminUser(user: User & { wallet?: Wallet; profile?: { country?: string | null; totalSentCoins?: number; totalReceivedDiamonds?: number } }) {
+  private async ensureStaffRoleColumn() {
+    if (this.staffRoleColumnReady) return;
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL
+      `);
+    } catch {
+      // column may already exist or DB user lacks ALTER
+    }
+    this.staffRoleColumnReady = true;
+  }
+
+  /** Equipped headwear frames (vip_badge / host_badge) keyed by userId. */
+  private async equippedFramesByUserIds(
+    userIds: string[],
+  ): Promise<Map<string, string>> {
+    const frameByUser = new Map<string, string>();
+    const ids = [...new Set(userIds.filter(Boolean))];
+    if (!ids.length) return frameByUser;
+    const equipped = await this.userCosmeticRepo
+      .createQueryBuilder('uc')
+      .innerJoinAndSelect('uc.cosmetic', 'c')
+      .where('uc.userId IN (:...ids)', { ids })
+      .andWhere('uc.equipped = true')
+      .andWhere('(uc.expiresAt IS NULL OR uc.expiresAt > NOW())')
+      .andWhere('c.isActive = true')
+      .andWhere('c.type IN (:...types)', {
+        types: ['vip_badge', 'host_badge'],
+      })
+      .getMany();
+    for (const row of equipped) {
+      const c: any = row.cosmetic;
+      const url = c?.animationUrl || c?.previewUrl;
+      if (url && !frameByUser.has(row.userId)) {
+        frameByUser.set(row.userId, String(url));
+      }
+    }
+    return frameByUser;
+  }
+
+  private mapAdminUser(user: User & { wallet?: Wallet; profile?: { country?: string | null; totalSentCoins?: number; totalReceivedDiamonds?: number; vipBadgeUrl?: string | null; hostBadgeUrl?: string | null } }) {
     const wallet = user.wallet;
+    const staffRole = normalizeStaffRole(user);
     return {
       ...user,
       name: user.displayName,
@@ -361,6 +442,10 @@ export class AdminService {
       genderVerified: !!user.genderVerified,
       isBanned: user.status === UserStatus.BANNED,
       isDeleted: user.status === UserStatus.DELETED,
+      staffRole,
+      isAdmin: !!user.isAdmin || staffRole === 'super',
+      isManager: staffRole === 'manager',
+      isSuperAdmin: staffRole === 'super',
     };
   }
 
@@ -401,6 +486,7 @@ export class AdminService {
 
     user.status = UserStatus.DELETED;
     user.isAdmin = false;
+    user.staffRole = null;
     user.refreshTokenHash = null;
     await this.usersRepo.save(user);
     await this.realtimeGateway.ejectUserEverywhere(userId, 'account_deleted');
@@ -609,6 +695,7 @@ export class AdminService {
     const qb = this.roomsRepo
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.host', 'host')
+      .leftJoinAndSelect('host.profile', 'hostProfile')
       .orderBy('r.createdAt', 'DESC')
       .skip(query.skip)
       .take(query.limit || 20);
@@ -622,6 +709,9 @@ export class AdminService {
       qb.andWhere('r.status = :st', { st: RoomStatus.CLOSED });
     } else if (status === 'all') {
       // no status filter
+    } else if (status === 'live') {
+      qb.andWhere('r.status = :open', { open: RoomStatus.OPEN });
+      qb.andWhere('r.activeHostId IS NOT NULL');
     } else {
       // Default: hide closed rooms so dashboard stays clean
       qb.andWhere('r.status != :closed', { closed: RoomStatus.CLOSED });
@@ -637,15 +727,59 @@ export class AdminService {
     }
 
     const [items, total] = await qb.getManyAndCount();
-    const mapped = items.map((r) => ({
-      ...r,
-      name: r.title,
-      ownerName: r.host?.displayName || r.host?.username || '—',
-      hostName: r.host?.displayName || r.host?.username || '—',
-      hostAvatarUrl: r.host?.avatarUrl || null,
-      membersCount: r.viewerCount ?? 0,
-      isSupport: r.roomKind === RoomKind.SUPPORT,
-    }));
+    const hostIds = [
+      ...new Set(
+        items
+          .map((r) => r.hostId || r.host?.id)
+          .filter((id): id is string => !!id),
+      ),
+    ];
+
+    /** Equipped headwear (vip_badge frame) for each host */
+    const frameByHost = new Map<string, string>();
+    if (hostIds.length) {
+      const equipped = await this.userCosmeticRepo
+        .createQueryBuilder('uc')
+        .innerJoinAndSelect('uc.cosmetic', 'c')
+        .where('uc.userId IN (:...ids)', { ids: hostIds })
+        .andWhere('uc.equipped = true')
+        .andWhere('(uc.expiresAt IS NULL OR uc.expiresAt > NOW())')
+        .andWhere('c.isActive = true')
+        .andWhere('c.type IN (:...types)', {
+          types: ['vip_badge', 'host_badge'],
+        })
+        .getMany();
+      for (const row of equipped) {
+        const c: any = row.cosmetic;
+        const url = c?.animationUrl || c?.previewUrl;
+        if (url && !frameByHost.has(row.userId)) {
+          frameByHost.set(row.userId, String(url));
+        }
+      }
+    }
+
+    const mapped = items.map((r) => {
+      const hostId = r.hostId || r.host?.id || '';
+      const profile = (r.host as any)?.profile;
+      const equippedFrame = hostId ? frameByHost.get(hostId) : null;
+      const profileFrame =
+        profile?.vipBadgeUrl || profile?.hostBadgeUrl || null;
+      const hostFrameUrl = equippedFrame || profileFrame || null;
+      const isLive = r.status === RoomStatus.OPEN && !!r.activeHostId;
+      return {
+        ...r,
+        name: r.title,
+        ownerName: r.host?.displayName || r.host?.username || '—',
+        hostName: r.host?.displayName || r.host?.username || '—',
+        hostAvatarUrl: r.host?.avatarUrl || null,
+        hostFrameUrl,
+        hostFrameAnimUrl: equippedFrame || hostFrameUrl,
+        membersCount: r.viewerCount ?? 0,
+        isSupport: r.roomKind === RoomKind.SUPPORT,
+        isLive,
+        status: isLive ? 'live' : r.status,
+      };
+    });
     return paginate(mapped, total, query.page || 1, query.limit || 20);
   }
 
@@ -781,33 +915,35 @@ export class AdminService {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
     const isAgencyRoom = room.roomKind === RoomKind.AGENCY || !!room.agencyId;
-    if (isAgencyRoom) {
+    if (isAgencyRoom && !opts.allowAgency) {
       throw new ForbiddenException(
         'Persistent agency rooms cannot be deleted; suspend the agency instead.',
       );
     }
-    await this.txRepo.manager.query(
-      `UPDATE gift_sends SET "roomId" = NULL WHERE "roomId" = $1`,
-      [roomId],
-    );
-    await this.txRepo.manager.query(
-      `DELETE FROM room_access WHERE "roomId" = $1`,
-      [roomId],
-    ).catch(() => undefined);
-    await this.txRepo.manager.query(
-      `UPDATE reports
-          SET description = ('deletedRoomTitle=' || $2::text || E'\n' || COALESCE(description, '')),
-              "roomId" = NULL
-        WHERE "roomId" = $1::uuid`,
-      [roomId, String(room.title || roomId)],
-    );
+
+    // Always force-end live + eject before hard delete so clients leave now
+    try {
+      await this.forceEndStream(roomId, 'admin_deleted');
+    } catch {
+      /* already closed / missing */
+    }
+
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
       event: 'room:closed',
       payload: { roomId, reason: 'admin_deleted' },
       at: new Date().toISOString(),
     });
-    await this.roomsRepo.delete(roomId);
+    await this.realtimeGateway.ejectRoom(roomId, 'admin_deleted').catch(() => undefined);
+
+    await this.dataSource.transaction(async (manager) => {
+      await purgeRoomReferencesBeforeDelete(
+        manager,
+        roomId,
+        String(room.title || roomId),
+      );
+      await manager.getRepository(Room).delete(roomId);
+    });
     return { deleted: true, id: roomId };
   }
 
@@ -964,6 +1100,13 @@ export class AdminService {
       type: dto.type ?? gift.type,
       isActive: dto.isActive ?? gift.isActive ?? true,
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
+      category: dto.category ?? (gift as any).category ?? 'normal',
+      brandAgencyId:
+        dto.brandAgencyId === undefined
+          ? (gift as any).brandAgencyId ?? null
+          : dto.brandAgencyId
+            ? String(dto.brandAgencyId)
+            : null,
       luckyConfig:
         (dto.type ?? gift.type) === GiftType.LUCKY
           ? (dto.luckyConfig ??
@@ -1005,11 +1148,31 @@ export class AdminService {
       order: { createdAt: 'DESC' },
     });
     return paginate(
-      items.map((w) => ({
-        ...w,
-        userName: w.user?.displayName || w.user?.username || '—',
-        amount: w.diamonds,
-      })),
+      items.map((w) => {
+        const details = (w.payoutDetails || {}) as Record<string, unknown>;
+        const src = String(details.source || details.channel || details.stream || '').toLowerCase();
+        const isAgency =
+          src.includes('agency') || src === 'agency_commission' || src === 'agency_host';
+        const stream = isAgency ? 'agency' : 'personal';
+        const agencyKind =
+          src.includes('host') && src.includes('agency')
+            ? 'host'
+            : src === 'agency_host'
+              ? 'host'
+              : isAgency
+                ? 'commission'
+                : null;
+        return {
+          ...w,
+          userName: w.user?.displayName || w.user?.username || '—',
+          amount: w.diamonds,
+          stream,
+          agencyKind,
+          isAgencyCommission: isAgency && agencyKind !== 'host',
+          isAgencyHost: isAgency && agencyKind === 'host',
+          isPersonalRoom: stream === 'personal',
+        };
+      }),
       total,
       query.page || 1,
       query.limit || 20,
@@ -1067,7 +1230,21 @@ export class AdminService {
           });
           if (wallet) {
             const amount = Number(req.diamonds);
-            wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+            const details = (req.payoutDetails || {}) as Record<string, unknown>;
+            const src = String(details.source || details.channel || '').toLowerCase();
+            const agencyPool =
+              src.includes('agency') ||
+              src === 'agency_commission' ||
+              src === 'agency_host' ||
+              src === 'agency' ||
+              src === 'agency_room' ||
+              String(details.stream || '') === 'agency';
+            if (agencyPool) {
+              (wallet as any).agencyDiamonds =
+                Number((wallet as any).agencyDiamonds || 0) + amount;
+            } else {
+              wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+            }
             await manager.save(wallet);
             await manager.save(
               manager.create(WalletTransaction, {
@@ -1075,10 +1252,17 @@ export class AdminService {
                 type: TransactionType.ADMIN_ADJUST,
                 currency: CurrencyType.DIAMONDS,
                 amount,
-                balanceAfter: Number(wallet.diamonds),
+                balanceAfter: agencyPool
+                  ? Number((wallet as any).agencyDiamonds || 0)
+                  : Number(wallet.diamonds),
                 referenceType: 'withdraw_refund',
                 referenceId: refundRef,
-                description: `Withdraw rejected refund ${req.id}`,
+                description: agencyPool
+                  ? src.includes('host')
+                    ? `رفض سحب أرباح مضيفة — إرجاع`
+                    : `رفض سحب عمولة وكالة — إرجاع`
+                  : `رفض سحب روم شخصي — إرجاع`,
+                metadata: { stream: agencyPool ? 'agency' : 'personal', source: src },
               }),
             );
           }
@@ -1609,6 +1793,7 @@ export class AdminService {
   }
 
   async getUser(id: string) {
+    await this.ensureStaffRoleColumn();
     const user = await this.usersRepo.findOne({
       where: { id },
       relations: ['wallet', 'profile'],
@@ -1621,10 +1806,20 @@ export class AdminService {
     });
     mapped.vipLevel =
       vip && vip.expiresAt && vip.expiresAt > new Date() ? Number(vip.level || 0) : 0;
+    const frameByUser = await this.equippedFramesByUserIds([id]);
+    const equipped = frameByUser.get(id) || null;
+    const profileFrame =
+      (user.profile as any)?.vipBadgeUrl ||
+      (user.profile as any)?.hostBadgeUrl ||
+      null;
+    const frameUrl = equipped || profileFrame || null;
+    mapped.frameUrl = frameUrl;
+    mapped.frameAnimUrl = equipped || frameUrl;
     return mapped;
   }
 
   async patchUser(id: string, body: Record<string, unknown>) {
+    await this.ensureStaffRoleColumn();
     const user = await this.usersRepo.findOne({
       where: { id },
       relations: ['profile', 'wallet'],
@@ -1648,8 +1843,37 @@ export class AdminService {
       user.gender = body.gender.trim().toLowerCase() as any;
     }
     if (typeof body.status === 'string') user.status = body.status as UserStatus;
-    if (typeof body.isAdmin === 'boolean') user.isAdmin = body.isAdmin;
     if (typeof body.genderVerified === 'boolean') user.genderVerified = body.genderVerified;
+
+    // Platform staff role (manager / super / none).
+    if (body.staffRole !== undefined && body.staffRole !== null) {
+      const role = normalizeStaffRole({
+        staffRole: String(body.staffRole),
+        isAdmin: false,
+      });
+      if (role === 'none') {
+        user.staffRole = null;
+        // Clearing role also clears isAdmin unless explicitly kept below.
+        if (body.isAdmin === undefined) user.isAdmin = false;
+      } else {
+        user.staffRole = role;
+        // Super can open dashboard (isAdmin). Manager is in-app staff only.
+        if (body.isAdmin === undefined) {
+          user.isAdmin = role === 'super';
+        }
+      }
+    } else if (typeof body.isAdmin === 'boolean') {
+      user.isAdmin = body.isAdmin;
+      if (body.isAdmin && normalizeStaffRole(user) === 'none') {
+        user.staffRole = 'super';
+      }
+      if (!body.isAdmin && normalizeStaffRole(user) === 'super') {
+        // Only drop staffRole when it came from isAdmin/super path.
+        if (String(user.staffRole || '').toLowerCase() === 'super' || !user.staffRole) {
+          user.staffRole = null;
+        }
+      }
+    }
 
     if (body.level != null && Number.isFinite(Number(body.level))) {
       user.level = Math.max(1, Math.min(9999, Math.floor(Number(body.level))));
@@ -2295,6 +2519,11 @@ export class AdminService {
       logoUrl: string;
       ownerId: string;
       status: AgencyStatus;
+      publicId: string | null;
+      isVerified: boolean;
+      exclusiveFrameCode: string | null;
+      exclusiveRoomCardCode: string | null;
+      exclusiveFrameUrl: string | null;
     }>,
   ) {
     const agency = await this.agencyRepo.findOne({ where: { id } });
@@ -2310,10 +2539,172 @@ export class AdminService {
     const commission = dto.commissionPercent ?? dto.commission;
     if (commission != null) agency.commissionPercent = Number(commission);
     if (dto.status) agency.status = dto.status;
+
+    // Admin-only short public ID.
+    if (dto.publicId !== undefined) {
+      if (dto.publicId === null || String(dto.publicId).trim() === '') {
+        agency.publicId = null;
+      } else {
+        if (!isValidAgencyPublicId(String(dto.publicId))) {
+          throw new BadRequestException(
+            'معرف الوكالة: حروف وأرقام إنجليزية فقط، 3–12 خانة',
+          );
+        }
+        const next = normalizeAgencyPublicId(String(dto.publicId));
+        if (next !== agency.publicId) {
+          const clash = await this.agencyRepo.findOne({
+            where: { publicId: next },
+            select: ['id'],
+          });
+          if (clash && clash.id !== agency.id) {
+            throw new ConflictException(`معرف الوكالة ${next} مستخدم مسبقاً`);
+          }
+          agency.publicId = next;
+        }
+      }
+    }
+
+    // Verification badge — admin only.
+    if (dto.isVerified !== undefined) {
+      const next = !!dto.isVerified;
+      agency.isVerified = next;
+      agency.verifiedAt = next ? agency.verifiedAt || new Date() : null;
+      if (next && !agency.publicId) {
+        agency.publicId = await this.agenciesService.allocateAgencyPublicId();
+      }
+    }
+
+    if (dto.exclusiveFrameCode !== undefined) {
+      agency.exclusiveFrameCode = dto.exclusiveFrameCode
+        ? String(dto.exclusiveFrameCode).trim()
+        : null;
+    }
+    if (dto.exclusiveRoomCardCode !== undefined) {
+      agency.exclusiveRoomCardCode = dto.exclusiveRoomCardCode
+        ? String(dto.exclusiveRoomCardCode).trim()
+        : null;
+    }
+    if (dto.exclusiveFrameUrl !== undefined) {
+      agency.exclusiveFrameUrl = dto.exclusiveFrameUrl
+        ? String(dto.exclusiveFrameUrl).trim()
+        : null;
+    }
+
     return this.agencyRepo.save(agency);
   }
 
+  /**
+   * Grant agency-exclusive cosmetics to owner (+ managers/hosts optionally).
+   * Mall purchase is blocked for these items.
+   */
+  async grantAgencyExclusives(
+    id: string,
+    body?: {
+      frameCode?: string;
+      roomCardCode?: string;
+      days?: number;
+      includeManagers?: boolean;
+      includeHosts?: boolean;
+      equip?: boolean;
+    },
+  ) {
+    const agency = await this.agencyRepo.findOne({ where: { id } });
+    if (!agency) throw new NotFoundException('الوكالة غير موجودة');
+    if (agency.status !== AgencyStatus.ACTIVE) {
+      throw new BadRequestException('الوكالة يجب أن تكون نشطة لمنح الحوافز الحصرية');
+    }
+
+    const frameCode =
+      (body?.frameCode && String(body.frameCode).trim()) ||
+      agency.exclusiveFrameCode ||
+      '';
+    const roomCardCode =
+      (body?.roomCardCode && String(body.roomCardCode).trim()) ||
+      agency.exclusiveRoomCardCode ||
+      '';
+    if (!frameCode && !roomCardCode) {
+      throw new BadRequestException(
+        'حدّدي رمز إطار حصري (frame) و/أو بطاقة روم (room card)',
+      );
+    }
+
+    if (frameCode) agency.exclusiveFrameCode = frameCode;
+    if (roomCardCode) agency.exclusiveRoomCardCode = roomCardCode;
+    await this.agencyRepo.save(agency);
+
+    const roles: AgencyRole[] = [AgencyRole.OWNER];
+    if (body?.includeManagers !== false) roles.push(AgencyRole.MANAGER);
+    if (body?.includeHosts) roles.push(AgencyRole.HOST);
+
+    const members = await this.agencyMembersRepo.find({
+      where: {
+        agencyId: id,
+        isActive: true,
+        status: AgencyMemberStatus.ACTIVE,
+        role: In(roles),
+      },
+    });
+    // Always include owner even if membership row is odd.
+    const userIds = new Set<string>([agency.ownerId, ...members.map((m) => m.userId)]);
+    const days = Math.max(7, Math.min(365, Math.floor(Number(body?.days) || 90)));
+    const granted: Array<{ userId: string; code: string; ok: boolean; error?: string }> = [];
+
+    for (const userId of userIds) {
+      for (const code of [frameCode, roomCardCode].filter(Boolean)) {
+        try {
+          await this.cosmeticsService.grantTemporary(userId, code, days);
+          if (body?.equip !== false) {
+            // grantTemporary already tries equip — best effort
+          }
+          granted.push({ userId, code, ok: true });
+        } catch (e) {
+          granted.push({
+            userId,
+            code,
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
+
+    try {
+      await this.notificationsService.create({
+        userId: agency.ownerId,
+        type: NotificationType.AGENCY,
+        title: 'حوافز حصرية للوكالة',
+        body: `تم منح وكالتك «${agency.name}» إطارات/بطاقات حصرية من إدارة التطبيق.`,
+        data: {
+          agencyId: agency.id,
+          publicId: agency.publicId,
+          exclusiveFrameCode: agency.exclusiveFrameCode,
+          exclusiveRoomCardCode: agency.exclusiveRoomCardCode,
+        },
+        sendPush: true,
+      });
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      agencyId: agency.id,
+      publicId: agency.publicId,
+      exclusiveFrameCode: agency.exclusiveFrameCode,
+      exclusiveRoomCardCode: agency.exclusiveRoomCardCode,
+      days,
+      granted,
+      okCount: granted.filter((g) => g.ok).length,
+    };
+  }
+
   async approveAgency(id: string) {
+    const current = await this.agencyRepo.findOne({ where: { id } });
+    if (!current) throw new NotFoundException('الوكالة غير موجودة');
+    // Auto-assign shareable publicId if missing when activating.
+    if (!current.publicId) {
+      current.publicId = await this.agenciesService.allocateAgencyPublicId();
+      await this.agencyRepo.save(current);
+    }
     const agency = await this.updateAgency(id, { status: AgencyStatus.ACTIVE });
     const rooms = await this.roomsRepo.find({ where: { agencyId: id } });
     for (const room of rooms) {
@@ -2354,7 +2745,11 @@ export class AdminService {
   }
 
   async suspendAgency(id: string, _reason?: string) {
-    const agency = await this.updateAgency(id, { status: AgencyStatus.SUSPENDED });
+    // Suspend + revoke verified badge until policy check again.
+    const agency = await this.updateAgency(id, {
+      status: AgencyStatus.SUSPENDED,
+      isVerified: false,
+    });
     const rooms = await this.roomsRepo.find({ where: { agencyId: id } });
     for (const room of rooms) {
       await this.roomSeatsRepo.update(
@@ -2492,5 +2887,160 @@ export class AdminService {
       order: { createdAt: 'DESC' },
     });
     return paginate(items, total, query.page || 1, query.limit || 20);
+  }
+
+  /** Live host / process metrics for admin dashboard cards. */
+  async systemHealth() {
+    const os = await import('os');
+    const fs = await import('fs/promises');
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = Math.max(0, totalMem - freeMem);
+    const memPct = totalMem > 0 ? (usedMem / totalMem) * 100 : 0;
+
+    const cpus = os.cpus() || [];
+    const cores = cpus.length || 1;
+    let cpuPct = 0;
+    try {
+      const start = process.cpuUsage();
+      const t0 = process.hrtime.bigint();
+      await new Promise((r) => setTimeout(r, 140));
+      const diff = process.cpuUsage(start);
+      const elapsedUs = Number(process.hrtime.bigint() - t0) / 1000;
+      if (elapsedUs > 0) {
+        const usedUs = diff.user + diff.system;
+        // process share of one core → normalize by cores for “machine feel”
+        cpuPct = Math.min(100, (usedUs / elapsedUs) * 100);
+        // scale: process-only can look tiny — blend with 1-min load when available
+        const load1 = os.loadavg()?.[0];
+        if (Number.isFinite(load1) && load1 > 0) {
+          const loadPct = Math.min(100, (load1 / cores) * 100);
+          cpuPct = Math.max(cpuPct, loadPct * 0.85);
+        }
+      }
+    } catch {
+      const load1 = os.loadavg()?.[0] ?? 0;
+      cpuPct = Math.min(100, (load1 / cores) * 100);
+    }
+
+    let disk: {
+      totalBytes: number;
+      freeBytes: number;
+      usedBytes: number;
+      usedPercent: number;
+      path: string;
+    } | null = null;
+    const diskPath = process.cwd();
+    try {
+      const statfs = (fs as any).statfs;
+      if (typeof statfs === 'function') {
+        const s = await statfs(diskPath);
+        const bsize = Number(s.bsize || s.blocksize || 4096);
+        const totalBytes = bsize * Number(s.blocks || 0);
+        const freeBytes = bsize * Number(s.bavail ?? s.bfree ?? 0);
+        const usedBytes = Math.max(0, totalBytes - freeBytes);
+        if (totalBytes > 0) {
+          disk = {
+            totalBytes,
+            freeBytes,
+            usedBytes,
+            usedPercent: (usedBytes / totalBytes) * 100,
+            path: diskPath,
+          };
+        }
+      }
+    } catch {
+      disk = null;
+    }
+
+    const heap = process.memoryUsage();
+    const [logsTotal, logsCritical, logsUnresolved] = await Promise.all([
+      this.abuseRepo.count(),
+      this.abuseRepo.count({ where: { severity: AbuseSeverity.CRITICAL } }),
+      this.abuseRepo.count({ where: { resolved: false } }),
+    ]);
+
+    const host = os.hostname();
+    const platform = `${os.type()} ${os.release()}`;
+    const uptimeSec = Math.floor(os.uptime());
+    const processUptimeSec = Math.floor(process.uptime());
+
+    return {
+      status: memPct >= 92 || cpuPct >= 95 ? 'critical' : memPct >= 80 || cpuPct >= 85 ? 'warn' : 'ok',
+      host,
+      platform,
+      node: process.version,
+      arch: os.arch(),
+      cores,
+      uptimeSec,
+      processUptimeSec,
+      cpu: {
+        percent: Math.round(cpuPct * 10) / 10,
+        model: cpus[0]?.model?.trim() || 'CPU',
+        cores,
+        loadAvg: os.loadavg(),
+      },
+      memory: {
+        totalBytes: totalMem,
+        freeBytes: freeMem,
+        usedBytes: usedMem,
+        usedPercent: Math.round(memPct * 10) / 10,
+      },
+      process: {
+        rssBytes: heap.rss,
+        heapUsedBytes: heap.heapUsed,
+        heapTotalBytes: heap.heapTotal,
+        externalBytes: heap.external,
+      },
+      disk,
+      logs: {
+        total: logsTotal,
+        critical: logsCritical,
+        unresolved: logsUnresolved,
+      },
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Purge abuse/system log rows.
+   * - olderThanDays > 0 → delete older than N days
+   * - olderThanDays omitted/0 → delete matching set (or all when no other filters)
+   */
+  async cleanupLogs(opts: {
+    olderThanDays?: number;
+    unresolvedOnly?: boolean;
+    resolvedOnly?: boolean;
+  } = {}) {
+    const days = Math.max(0, Math.floor(Number(opts.olderThanDays ?? 0)));
+    const where: Record<string, unknown> = {};
+
+    if (days > 0) {
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      where.createdAt = LessThan(cutoff);
+    }
+    if (opts.resolvedOnly) {
+      where.resolved = true;
+    } else if (opts.unresolvedOnly) {
+      where.resolved = false;
+    }
+
+    // Guard: wiping everything requires explicit empty filter + olderThanDays 0
+    // (allowed — admin confirmed from UI)
+    if (Object.keys(where).length === 0) {
+      const result = await this.abuseRepo
+        .createQueryBuilder()
+        .delete()
+        .from(AbuseLog)
+        .execute();
+      const deleted = Number(result.affected || 0);
+      const remaining = await this.abuseRepo.count();
+      return { deleted, remaining, olderThanDays: null };
+    }
+
+    const result = await this.abuseRepo.delete(where as any);
+    const deleted = Number(result.affected || 0);
+    const remaining = await this.abuseRepo.count();
+    return { deleted, remaining, olderThanDays: days || null };
   }
 }

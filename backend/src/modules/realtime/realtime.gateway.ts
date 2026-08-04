@@ -18,7 +18,7 @@ import { Server, Socket } from 'socket.io';
 import { ChatParticipant } from '../../database/entities/chat-participant.entity';
 import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
 import { RoomModerator } from '../../database/entities/room-moderator.entity';
-import { Room, RoomStatus } from '../../database/entities/room.entity';
+import { Room, RoomStatus, RoomKind } from '../../database/entities/room.entity';
 import { RoomBan } from '../../database/entities/room-ban.entity';
 import {
   RoomAccess,
@@ -500,12 +500,57 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       { id: roomId },
       { viewerCount: members.length },
     );
+    void this.syncPersonalEmptySince(roomId, members.length);
     this.server.to(`room:${roomId}`).emit('room:members', {
       roomId,
       members,
       viewerCount: members.length,
     });
     return { roomId, members, viewerCount: members.length };
+  }
+
+  /**
+   * Personal rooms only: start/stop empty timer based on realtime presence.
+   * Host alone (muted) still has a socket member → emptySince cleared.
+   */
+  private async syncPersonalEmptySince(roomId: string, viewerCount: number) {
+    try {
+      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+      if (!room?.activeHostId) return;
+      if (room.agencyId || room.roomKind === RoomKind.AGENCY) return;
+      if (room.roomKind === RoomKind.SUPPORT) return;
+      if (room.status === RoomStatus.CLOSED) return;
+      const [seated, sessions] = await Promise.all([
+        this.roomSeats
+          .createQueryBuilder('s')
+          .where('s.roomId = :roomId', { roomId })
+          .andWhere('s.userId IS NOT NULL')
+          .getCount(),
+        this.roomAccess
+          .createQueryBuilder('a')
+          .where('a.roomId = :roomId', { roomId })
+          .andWhere('a.grantType = :gt', { gt: RoomAccessGrant.SESSION })
+          .andWhere('(a.expiresAt IS NULL OR a.expiresAt > NOW())')
+          .getCount(),
+      ]);
+      const occupied = seated > 0 || sessions > 0 || viewerCount > 0;
+      if (occupied) {
+        if (room.emptySince) {
+          await this.roomsRepo.update({ id: roomId }, { emptySince: null });
+        }
+      } else if (!room.emptySince) {
+        await this.roomsRepo.update(
+          { id: roomId },
+          { emptySince: new Date() },
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `syncPersonalEmptySince ${roomId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   @SubscribeMessage('room:event')

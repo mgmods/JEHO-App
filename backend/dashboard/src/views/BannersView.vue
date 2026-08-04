@@ -50,9 +50,12 @@
           </div>
           <div class="row g-2">
             <div class="col-12">
-              <label class="form-label small">{{ t('common.imageUrl') }}</label>
-              <input v-model="row.imageUrl" class="form-control form-control-sm" placeholder="https://…/uploads/…" />
-              <input type="file" accept="image/*" class="form-control form-control-sm mt-2" @change="(e) => onFile(e, row)" />
+              <label class="form-label small">{{ t('banners.image') || t('common.image') || 'الصورة' }}</label>
+              <input type="file" accept="image/*" class="form-control form-control-sm" @change="(e) => onFile(e, row)" />
+              <div class="form-text">اختر صورة البنر — بدون لصق رابط</div>
+              <div v-if="row.imageUrl" class="mt-2">
+                <img :src="absUrl(row.imageUrl)" alt="" style="max-height: 72px; border-radius: 10px; object-fit: cover" />
+              </div>
             </div>
             <div class="col-12">
               <label class="form-label small">{{ t('common.title') }}</label>

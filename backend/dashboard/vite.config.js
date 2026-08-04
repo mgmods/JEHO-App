@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
     // Dashboard media is served from the API-root /assets and /uploads paths.
     // Do not duplicate backend/public inside every /admin build.
     publicDir: false,
+    assetsInclude: ['**/*.svga'],
     plugins: [vue()],
     resolve: {
       alias: {

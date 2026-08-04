@@ -12,12 +12,14 @@
         android:scaleType="centerCrop"
         android:src="@color/white"  />
 
-<LinearLayout android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:paddingHorizontal="16dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="24dp">
+    <LinearLayout
+        android:id="@+id/contentRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="24dp">
 
 
     <LinearLayout

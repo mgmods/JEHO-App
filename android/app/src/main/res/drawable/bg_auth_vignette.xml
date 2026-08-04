@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Soft top/bottom brand scrim so logo and CTA stay readable. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:centerColor="#180A1228"
+        android:endColor="#E6080C14"
+        android:startColor="#99070B14"
+        android:type="linear" />
+</shape>

@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -44,6 +46,10 @@ export class VanityIdsController {
     const where: any = {};
     if (status) where.status = status;
     else where.status = VanityIdStatus.AVAILABLE;
+    // Never expose disabled rows to the client catalog unless explicitly requested.
+    if (where.status === VanityIdStatus.DISABLED) {
+      return { items: [], leaseDays: VANITY_LEASE_DAYS };
+    }
     const items = await this.vanityRepo.find({
       where,
       order: { priceCoins: 'ASC', publicId: 'ASC' },
@@ -91,6 +97,9 @@ export class VanityIdsController {
   ) {
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
+    if (row.status === VanityIdStatus.DISABLED) {
+      throw new BadRequestException('ID is disabled');
+    }
     if (row.status === VanityIdStatus.OWNED && row.ownerUserId !== userId) {
       throw new BadRequestException('ID already owned');
     }
@@ -122,6 +131,9 @@ export class VanityIdsController {
   ) {
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
+    if (row.status === VanityIdStatus.DISABLED) {
+      throw new BadRequestException('ID is disabled');
+    }
     if (row.status === VanityIdStatus.OWNED && row.ownerUserId !== userId) {
       throw new BadRequestException('ID already owned');
     }
@@ -207,6 +219,8 @@ export class VanityIdsController {
     };
   }
 
+  // ─── Admin ────────────────────────────────────────────────────────
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('admin')
@@ -216,7 +230,6 @@ export class VanityIdsController {
     body: { publicId: string; priceCoins?: number; status?: string },
   ) {
     const publicId = String(body.publicId || '').trim();
-    // 3–12 digits (short vanity like 888 is allowed; max 12).
     if (!/^\d{3,12}$/.test(publicId)) {
       throw new BadRequestException(
         'الآي دي يجب أن يكون أرقاماً فقط من 3 إلى 12 خانة',
@@ -233,7 +246,10 @@ export class VanityIdsController {
       if (body.priceCoins != null) {
         row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
       }
-      if (body.status) row.status = body.status as VanityIdStatus;
+      if (body.status) {
+        this.assertAdminStatus(body.status);
+        row.status = body.status as VanityIdStatus;
+      }
     }
     return this.vanityRepo.save(row);
   }
@@ -241,7 +257,133 @@ export class VanityIdsController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('admin/all')
+  @ApiOperation({ summary: 'List all vanity IDs for dashboard' })
   adminList() {
     return this.vanityRepo.find({ order: { createdAt: 'DESC' }, take: 500 });
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('admin/:id')
+  @ApiOperation({ summary: 'Update vanity price / status (dashboard)' })
+  async adminPatch(
+    @Param('id') id: string,
+    @Body() body: { priceCoins?: number; status?: string },
+  ) {
+    const row = await this.requireRow(id);
+    if (body.priceCoins != null) {
+      row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
+    }
+    if (body.status) {
+      this.assertAdminStatus(body.status);
+      const next = body.status as VanityIdStatus;
+      // Moving away from owned/reserved → reclaim publicId if needed.
+      if (
+        (row.status === VanityIdStatus.OWNED ||
+          row.status === VanityIdStatus.RESERVED) &&
+        (next === VanityIdStatus.AVAILABLE || next === VanityIdStatus.DISABLED)
+      ) {
+        await this.restoreOwnerPublicId(row);
+        this.clearLeaseFields(row);
+      }
+      row.status = next;
+    }
+    return this.vanityRepo.save(row);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('admin/:id/release')
+  @ApiOperation({
+    summary: 'Force-release ownership back to market (restore previous publicId)',
+  })
+  async adminRelease(@Param('id') id: string) {
+    const row = await this.requireRow(id);
+    await this.restoreOwnerPublicId(row);
+    this.clearLeaseFields(row);
+    row.status = VanityIdStatus.AVAILABLE;
+    return this.vanityRepo.save(row);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('admin/:id/disable')
+  @ApiOperation({ summary: 'Disable ID: hide from shop; release owner if any' })
+  async adminDisable(@Param('id') id: string) {
+    const row = await this.requireRow(id);
+    if (
+      row.status === VanityIdStatus.OWNED ||
+      row.status === VanityIdStatus.RESERVED
+    ) {
+      await this.restoreOwnerPublicId(row);
+      this.clearLeaseFields(row);
+    }
+    row.status = VanityIdStatus.DISABLED;
+    return this.vanityRepo.save(row);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('admin/:id/enable')
+  @ApiOperation({ summary: 'Re-enable a disabled vanity ID for sale' })
+  async adminEnable(@Param('id') id: string) {
+    const row = await this.requireRow(id);
+    if (row.status === VanityIdStatus.OWNED) {
+      throw new BadRequestException('Cannot enable while owned — release first');
+    }
+    this.clearLeaseFields(row);
+    row.status = VanityIdStatus.AVAILABLE;
+    return this.vanityRepo.save(row);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('admin/:id')
+  @ApiOperation({ summary: 'Delete vanity ID (releases owner first if needed)' })
+  async adminDelete(@Param('id') id: string) {
+    const row = await this.requireRow(id);
+    if (
+      row.status === VanityIdStatus.OWNED ||
+      row.status === VanityIdStatus.RESERVED
+    ) {
+      await this.restoreOwnerPublicId(row);
+    }
+    await this.vanityRepo.remove(row);
+    return { ok: true, id };
+  }
+
+  // ─── helpers ──────────────────────────────────────────────────────
+
+  private async requireRow(id: string): Promise<VanityId> {
+    const row = await this.vanityRepo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('Vanity ID not found');
+    return row;
+  }
+
+  private assertAdminStatus(status: string) {
+    const allowed = new Set(Object.values(VanityIdStatus));
+    if (!allowed.has(status as VanityIdStatus)) {
+      throw new BadRequestException(`Invalid status: ${status}`);
+    }
+  }
+
+  private clearLeaseFields(row: VanityId) {
+    row.ownerUserId = null;
+    row.expiresAt = null;
+    row.previousPublicId = null;
+    row.purchasedAt = null;
+    row.reservedUntil = null;
+  }
+
+  /** If the owner currently displays this vanity, restore their previous publicId. */
+  private async restoreOwnerPublicId(row: VanityId) {
+    if (!row.ownerUserId) return;
+    const user = await this.usersRepo.findOne({ where: { id: row.ownerUserId } });
+    if (!user) return;
+    if (user.publicId === row.publicId) {
+      user.publicId =
+        row.previousPublicId || user.id.replace(/-/g, '').slice(0, 8);
+      await this.usersRepo.save(user);
+    }
   }
 }

@@ -202,6 +202,31 @@ export class ContentModerationService implements OnModuleInit {
     }
   }
 
+  /**
+   * Block “وكالة / agency” impersonation on personal identity fields
+   * (display name, bio, personal room title/description). Does not apply to
+   * real agency branding endpoints.
+   */
+  private readonly agencyImpersonationPatterns = [
+    /وكالة|وكاله|وكالات/i,
+    /\bagenc(?:y|ies)\b/i,
+  ];
+
+  containsAgencyImpersonation(text: string | null | undefined): boolean {
+    const raw = String(text || '').trim();
+    if (!raw) return false;
+    return this.agencyImpersonationPatterns.some((re) => re.test(raw));
+  }
+
+  assertNoAgencyImpersonation(text: string | null | undefined, fieldLabel = 'هذا الحقل'): void {
+    if (this.containsAgencyImpersonation(text)) {
+      throw new BadRequestException({
+        code: 'AGENCY_WORD_FORBIDDEN',
+        message: `لا يُسمح باستخدام كلمة «وكالة» في ${fieldLabel}. الاسم «وكالة» محجوز للوكالات الرسمية فقط.`,
+      });
+    }
+  }
+
   async getActiveChatMute(
     roomId: string,
     userId: string,

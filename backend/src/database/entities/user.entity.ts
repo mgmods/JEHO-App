@@ -29,6 +29,13 @@ export enum Gender {
   UNSPECIFIED = 'unspecified',
 }
 
+/** Platform staff role (in-app moderation + dashboard super). */
+export enum StaffRole {
+  NONE = 'none',
+  MANAGER = 'manager',
+  SUPER = 'super',
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -74,6 +81,14 @@ export class User {
 
   @Column({ type: 'boolean', default: false })
   isAdmin: boolean;
+
+  /**
+   * Platform staff: manager (room/people moderation in-app),
+   * super (full room powers + dashboard admin flag).
+   * Stored as varchar so prod (synchronize=false) can ALTER IF NOT EXISTS easily.
+   */
+  @Column({ type: 'varchar', length: 16, nullable: true, default: null })
+  staffRole: string | null;
 
   @Column({ type: 'boolean', default: false })
   emailVerified: boolean;

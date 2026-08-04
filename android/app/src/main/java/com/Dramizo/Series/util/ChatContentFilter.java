@@ -28,10 +28,28 @@ public final class ChatContentFilter {
             Pattern.compile("(?:porn|xxx|onlyfans|nude|naked|sex\\b)", Pattern.CASE_INSENSITIVE),
     };
 
+    /** Personal name / bio / personal room title — not for real agency names. */
+    private static final Pattern[] AGENCY_IMPERSONATION = new Pattern[] {
+            Pattern.compile("وكالة|وكاله|وكالات"),
+            Pattern.compile("\\bagenc(?:y|ies)\\b", Pattern.CASE_INSENSITIVE),
+    };
+
     private ChatContentFilter() {}
 
     public static final String BLOCK_REASON =
             "ممنوع الترويج أو الروابط أو المحتوى المخالف في الدردشة";
+
+    public static final String AGENCY_WORD_REASON =
+            "لا يُسمح باستخدام كلمة «وكالة» في الاسم أو النبذة أو اسم الروم الشخصي. الكلمة محجوزة للوكالات الرسمية.";
+
+    public static boolean containsAgencyImpersonation(@Nullable String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        String raw = text.trim();
+        for (Pattern p : AGENCY_IMPERSONATION) {
+            if (p.matcher(raw).find()) return true;
+        }
+        return false;
+    }
 
     public static boolean isBlocked(@Nullable String text, @Nullable List<String> extraKeywords) {
         if (TextUtils.isEmpty(text)) return false;

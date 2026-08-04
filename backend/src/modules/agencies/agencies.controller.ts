@@ -22,6 +22,8 @@ import {
   JoinByCodeDto,
   UpdateAgencySettingsDto,
   UpdateCommissionDto,
+  CreateAgencyPayoutRequestDto,
+  ReviewAgencyPayoutDto,
 } from './dto/agencies.dto';
 import { CreateRoomDto } from '../rooms/dto/rooms.dto';
 
@@ -121,7 +123,7 @@ export class AgenciesController {
   }
 
   @Post(':id/distribute')
-  @ApiOperation({ summary: 'Owner distributes diamonds from wallet to an agency member' })
+  @ApiOperation({ summary: 'Owner distributes diamonds from wallet to an agency host' })
   distribute(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('sub') userId: string,
@@ -133,6 +135,58 @@ export class AgenciesController {
       body?.userId,
       Number(body?.diamonds) || 0,
     );
+  }
+
+  @Post(':id/payout-requests')
+  @ApiOperation({ summary: 'Host requests USD payout from agency (holds diamonds)' })
+  createPayout(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: CreateAgencyPayoutRequestDto,
+  ) {
+    return this.agenciesService.createPayoutRequest(id, userId, dto);
+  }
+
+  @Get(':id/payout-requests')
+  @ApiOperation({ summary: 'List agency payout requests (owner/manager queue or host own)' })
+  listPayouts(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Query('status') status?: string,
+  ) {
+    return this.agenciesService.listPayoutRequests(id, userId, status);
+  }
+
+  @Post(':id/payout-requests/:requestId/paid')
+  @ApiOperation({ summary: 'Owner marks host payout paid after cash transfer' })
+  markPayoutPaid(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ReviewAgencyPayoutDto,
+  ) {
+    return this.agenciesService.markPayoutPaid(id, requestId, userId, dto?.note);
+  }
+
+  @Post(':id/payout-requests/:requestId/reject')
+  @ApiOperation({ summary: 'Owner rejects payout and refunds host diamonds' })
+  rejectPayout(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ReviewAgencyPayoutDto,
+  ) {
+    return this.agenciesService.rejectPayoutRequest(id, requestId, userId, dto?.note);
+  }
+
+  @Post(':id/payout-requests/:requestId/cancel')
+  @ApiOperation({ summary: 'Host cancels own pending payout request' })
+  cancelPayout(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('requestId', ParseUUIDPipe) requestId: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.agenciesService.cancelPayoutRequest(id, requestId, userId);
   }
 
   @Post('join-by-code')
@@ -180,6 +234,24 @@ export class AgenciesController {
     @CurrentUser('sub') userId: string,
   ) {
     return this.agenciesService.listJoinRequests(id, userId);
+  }
+
+  @Get(':id/members')
+  @ApiOperation({ summary: 'Search/page agency members (never full roster dump)' })
+  listMembers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Query('q') q?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('scope') scope?: string,
+  ) {
+    return this.agenciesService.listMembers(id, userId, {
+      q,
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 20,
+      scope,
+    });
   }
 
   @Post(':id/join-requests/:userId/approve')

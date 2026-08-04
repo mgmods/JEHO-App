@@ -17,6 +17,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { ModerationModule } from '../moderation/moderation.module';
 import { IdentityVerificationService } from './identity-verification.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { IdentityVerificationService } from './identity-verification.service';
     NotificationsModule,
     TasksModule,
     UploadsModule,
+    ModerationModule,
     TypeOrmModule.forFeature([
       User,
       UserProfile,

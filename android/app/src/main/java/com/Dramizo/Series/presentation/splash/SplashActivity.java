@@ -63,16 +63,24 @@ public class SplashActivity extends ThemedActivity {
                 getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
             }
 
-            ScaleAnimation scale = new ScaleAnimation(0.92f, 1f, 0.92f, 1f,
-                    Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
-            scale.setDuration(SPLASH_MIN_MS);
-            AlphaAnimation fade = new AlphaAnimation(0f, 1f);
-            fade.setDuration(SPLASH_MIN_MS);
-            android.view.animation.AnimationSet logoIn = new android.view.animation.AnimationSet(true);
-            logoIn.addAnimation(scale);
-            logoIn.addAnimation(fade);
-            logoIn.setFillAfter(true);
+            android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, SPLASH_MIN_MS);
             binding.imgSplashLogo.startAnimation(logoIn);
+
+            // Stagger brand text + tagline for a calmer premiere.
+            if (binding.tvSplashBrand != null) {
+                AlphaAnimation brandFade = new AlphaAnimation(0f, 1f);
+                brandFade.setDuration(420L);
+                brandFade.setStartOffset(120L);
+                brandFade.setFillAfter(true);
+                binding.tvSplashBrand.startAnimation(brandFade);
+            }
+            if (binding.tvSplashTagline != null) {
+                AlphaAnimation tagFade = new AlphaAnimation(0f, 1f);
+                tagFade.setDuration(480L);
+                tagFade.setStartOffset(220L);
+                tagFade.setFillAfter(true);
+                binding.tvSplashTagline.startAnimation(tagFade);
+            }
 
             mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
             mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
@@ -276,6 +284,21 @@ public class SplashActivity extends ThemedActivity {
         Intent i = new Intent(this, LoginActivity.class);
         putPendingExtras(i);
         startActivity(i);
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
         finish();
+    }
+
+    private static android.view.animation.AnimationSet brandEnter(float fromScale, float toScale, long ms) {
+        ScaleAnimation scale = new ScaleAnimation(
+                fromScale, toScale, fromScale, toScale,
+                Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        scale.setDuration(ms);
+        AlphaAnimation fade = new AlphaAnimation(0f, 1f);
+        fade.setDuration(ms);
+        android.view.animation.AnimationSet set = new android.view.animation.AnimationSet(true);
+        set.addAnimation(scale);
+        set.addAnimation(fade);
+        set.setFillAfter(true);
+        return set;
     }
 }

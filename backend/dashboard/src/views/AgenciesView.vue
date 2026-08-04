@@ -23,9 +23,9 @@
             v-model.number="pricing.defaultCommissionPercent"
             type="number"
             min="0"
-            max="50"
+            max="100"
             class="form-control"
-            @input="onOwnerOrPlatformChange"
+            @input="clampPricingFields"
           />
         </div>
         <div class="col-md-2">
@@ -34,9 +34,9 @@
             v-model.number="pricing.platformCutPercent"
             type="number"
             min="0"
-            max="50"
+            max="100"
             class="form-control"
-            @input="onOwnerOrPlatformChange"
+            @input="clampPricingFields"
           />
         </div>
         <div class="col-md-2">
@@ -47,7 +47,7 @@
             min="0"
             max="100"
             class="form-control"
-            @input="onHostShareChange"
+            @input="clampPricingFields"
           />
         </div>
         <div class="col-md-2">
@@ -72,8 +72,17 @@
       </div>
       <div class="small text-muted mt-2">
         {{ t('agencies.pricingHint') }}
-        <span class="ms-2" :class="sharesValid ? 'text-success' : 'text-danger'">
+        <span
+          class="ms-2"
+          :class="sharesOver100 ? 'text-danger' : (sharesSum === 100 ? 'text-success' : 'text-warning')"
+        >
           · {{ t('agencies.sharesSum', { value: sharesSum }) }}
+        </span>
+        <span v-if="sharesOver100" class="ms-2 text-danger">
+          · {{ t('agencies.sharesOver100Hint') }}
+        </span>
+        <span v-else-if="sharesSum !== 100" class="ms-2 text-warning">
+          · {{ t('agencies.sharesIndependentHint') }}
         </span>
         <span v-if="pricing.platformRevenueDiamonds != null" class="ms-2 text-warning">
           · {{ t('agencies.platformRevenue', { value: Number(pricing.platformRevenueDiamonds || 0).toLocaleString() }) }}
@@ -196,6 +205,7 @@
             <tr>
               <th style="width:2.2rem"></th>
               <th>{{ t('common.agency') }}</th>
+              <th>{{ t('agencies.publicId') }}</th>
               <th>{{ t('common.owner') }}</th>
               <th>{{ t('agencies.hosts') }}</th>
               <th>{{ t('agencies.commission') }}</th>
@@ -206,7 +216,7 @@
           </thead>
           <tbody>
             <tr v-if="!agencies.length">
-              <td colspan="8" class="empty-state">{{ t('agencies.noAgencies') }}</td>
+              <td colspan="9" class="empty-state">{{ t('agencies.noAgencies') }}</td>
             </tr>
             <tr v-for="a in agencies" :key="a.id">
               <td>
@@ -218,8 +228,19 @@
                 />
               </td>
               <td>
-                <div class="fw-medium">{{ a.name }}</div>
+                <div class="fw-medium d-flex align-items-center gap-1">
+                  <span>{{ a.name }}</span>
+                  <i
+                    v-if="a.isVerified"
+                    class="bi bi-patch-check-fill text-info"
+                    :title="t('agencies.verified')"
+                  ></i>
+                </div>
                 <div class="small text-muted">{{ t('common.diamonds') }}: {{ formatNumber(a.totalDiamonds || 0) }}</div>
+              </td>
+              <td>
+                <code v-if="a.publicId" class="font-monospace">{{ a.publicId }}</code>
+                <span v-else class="text-muted">—</span>
               </td>
               <td>{{ a.ownerName || a.owner?.displayName || a.owner?.username || a.ownerId || '—' }}</td>
               <td>{{ formatNumber(a.hostsCount ?? a.membersCount ?? a.memberCount ?? 0) }}</td>
@@ -291,9 +312,47 @@
                 <label class="form-label">{{ t('agencies.ownerId') }}</label>
                 <input v-model="form.ownerId" class="form-control" />
               </div>
+              <div class="mb-3" v-if="form.id">
+                <label class="form-label">{{ t('agencies.publicId') }}</label>
+                <input
+                  v-model="form.publicId"
+                  class="form-control font-monospace"
+                  maxlength="12"
+                  :placeholder="t('agencies.publicIdHint')"
+                />
+                <div class="form-text">{{ t('agencies.publicIdAdminOnly') }}</div>
+              </div>
+              <div class="form-check form-switch mb-3" v-if="form.id">
+                <input id="agencyVerified" v-model="form.isVerified" class="form-check-input" type="checkbox" />
+                <label class="form-check-label" for="agencyVerified">{{ t('agencies.verified') }}</label>
+              </div>
+              <div class="mb-3" v-if="form.id">
+                <label class="form-label">{{ t('agencies.exclusiveFrameCode') }}</label>
+                <input v-model="form.exclusiveFrameCode" class="form-control font-monospace" placeholder="frame_mikoo_235_monthly_a_agency" />
+              </div>
+              <div class="mb-3" v-if="form.id">
+                <label class="form-label">{{ t('agencies.exclusiveRoomCardCode') }}</label>
+                <input v-model="form.exclusiveRoomCardCode" class="form-control font-monospace" />
+              </div>
+              <div class="mb-3" v-if="form.id">
+                <label class="form-label">{{ t('agencies.exclusiveFrameUrl') }}</label>
+                <input v-model="form.exclusiveFrameUrl" class="form-control" placeholder="/assets/cosmetics/frames/..." />
+              </div>
+              <div class="alert alert-info small py-2" v-if="form.id">
+                {{ t('agencies.exclusiveHint') }}
+              </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer flex-wrap gap-2">
               <button type="button" class="btn btn-ghost" @click="showModal = false">{{ t('common.cancel') }}</button>
+              <button
+                v-if="form.id"
+                type="button"
+                class="btn btn-outline-warning"
+                :disabled="grantingExclusives"
+                @click="grantExclusives"
+              >
+                {{ t('agencies.grantExclusives') }}
+              </button>
               <button type="submit" class="btn btn-aurora" :disabled="saving">{{ t('common.save') }}</button>
             </div>
           </form>
@@ -391,7 +450,19 @@ const showMembers = ref(false)
 const loadingMembers = ref(false)
 const membersAgency = ref(null)
 const members = ref([])
-const form = reactive({ id: null, name: '', contactEmail: '', commission: 20, ownerId: '' })
+const form = reactive({
+  id: null,
+  name: '',
+  contactEmail: '',
+  commission: 20,
+  ownerId: '',
+  publicId: '',
+  isVerified: false,
+  exclusiveFrameCode: '',
+  exclusiveRoomCardCode: '',
+  exclusiveFrameUrl: '',
+})
+const grantingExclusives = ref(false)
 const pricing = reactive({
   createPriceCoins: 50000,
   defaultCommissionPercent: 15,
@@ -491,7 +562,7 @@ const sharesSum = computed(() =>
   + Number(pricing.platformCutPercent || 0)
   + Number(pricing.hostSharePercent || 0),
 )
-const sharesValid = computed(() => sharesSum.value === 100)
+const sharesOver100 = computed(() => sharesSum.value > 100)
 
 function clampPct(n, max = 100) {
   const v = Number(n)
@@ -499,29 +570,11 @@ function clampPct(n, max = 100) {
   return Math.max(0, Math.min(max, Math.round(v)))
 }
 
-/** Keep host as residual when owner/platform change. */
-function onOwnerOrPlatformChange() {
-  pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 50)
-  pricing.platformCutPercent = clampPct(pricing.platformCutPercent, 50)
-  const rem = 100 - pricing.defaultCommissionPercent - pricing.platformCutPercent
-  pricing.hostSharePercent = Math.max(0, rem)
-}
-
-/** When host is edited, trim platform so the three still sum to 100. */
-function onHostShareChange() {
+/** Each share is independent — do not auto-link residual math. */
+function clampPricingFields() {
+  pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 100)
+  pricing.platformCutPercent = clampPct(pricing.platformCutPercent, 100)
   pricing.hostSharePercent = clampPct(pricing.hostSharePercent, 100)
-  pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 50)
-  let rem = 100 - pricing.defaultCommissionPercent - pricing.hostSharePercent
-  if (rem < 0) {
-    pricing.hostSharePercent = Math.max(0, 100 - pricing.defaultCommissionPercent)
-    rem = 0
-  }
-  pricing.platformCutPercent = clampPct(rem, 50)
-  // Recompute host if platform was capped.
-  pricing.hostSharePercent = Math.max(
-    0,
-    100 - pricing.defaultCommissionPercent - pricing.platformCutPercent,
-  )
 }
 
 const pendingAppsCount = computed(() =>
@@ -557,10 +610,11 @@ async function loadPricing() {
   pricing.platformRevenueDiamonds = Number(map.platform_gift_revenue_diamonds ?? pricing.platformRevenueDiamonds)
   const autoRaw = String(map.agency_auto_approve_after_payment ?? 'false').toLowerCase()
   pricing.autoApproveAfterPayment = autoRaw === 'true' || autoRaw === '1' || autoRaw === 'yes'
-  pricing.hostSharePercent = Math.max(
-    0,
-    100 - Number(pricing.defaultCommissionPercent || 0) - Number(pricing.platformCutPercent || 0),
-  )
+  const hostRaw = map.agency_host_share_percent
+  pricing.hostSharePercent = hostRaw != null && hostRaw !== ''
+    ? Number(hostRaw)
+    : Math.max(0, 100 - Number(pricing.defaultCommissionPercent || 0) - Number(pricing.platformCutPercent || 0))
+  clampPricingFields()
 }
 
 async function loadApplications() {
@@ -653,7 +707,18 @@ async function regenCode(a) {
 }
 
 function openCreate() {
-  Object.assign(form, { id: null, name: '', contactEmail: '', commission: 20, ownerId: '' })
+  Object.assign(form, {
+    id: null,
+    name: '',
+    contactEmail: '',
+    commission: 20,
+    ownerId: '',
+    publicId: '',
+    isVerified: false,
+    exclusiveFrameCode: '',
+    exclusiveRoomCardCode: '',
+    exclusiveFrameUrl: '',
+  })
   showModal.value = true
 }
 
@@ -662,8 +727,13 @@ function openEdit(a) {
     id: a.id,
     name: a.name || '',
     contactEmail: a.contactEmail || a.email || '',
-    commission: a.commission ?? a.commissionRate ?? 20,
+    commission: a.commission ?? a.commissionRate ?? a.commissionPercent ?? 20,
     ownerId: a.ownerId || '',
+    publicId: a.publicId || '',
+    isVerified: !!a.isVerified,
+    exclusiveFrameCode: a.exclusiveFrameCode || '',
+    exclusiveRoomCardCode: a.exclusiveRoomCardCode || '',
+    exclusiveFrameUrl: a.exclusiveFrameUrl || '',
   })
   showModal.value = true
 }
@@ -677,6 +747,13 @@ async function save() {
     commissionRate: form.commission,
     ownerId: form.ownerId || undefined,
   }
+  if (form.id) {
+    payload.publicId = form.publicId || null
+    payload.isVerified = !!form.isVerified
+    payload.exclusiveFrameCode = form.exclusiveFrameCode || null
+    payload.exclusiveRoomCardCode = form.exclusiveRoomCardCode || null
+    payload.exclusiveFrameUrl = form.exclusiveFrameUrl || null
+  }
   const result = form.id
     ? await agenciesApi.update(form.id, payload)
     : await agenciesApi.create(payload)
@@ -688,6 +765,29 @@ async function save() {
   }
   showModal.value = false
   success.value = t('agencies.saved')
+  toast().success(success.value)
+  await load()
+}
+
+async function grantExclusives() {
+  if (!form.id) return
+  grantingExclusives.value = true
+  error.value = ''
+  const { data, error: err } = await agenciesApi.grantExclusives(form.id, {
+    frameCode: form.exclusiveFrameCode || undefined,
+    roomCardCode: form.exclusiveRoomCardCode || undefined,
+    days: 90,
+    includeManagers: true,
+    includeHosts: false,
+  })
+  grantingExclusives.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const ok = data?.okCount ?? data?.data?.okCount ?? 0
+  success.value = t('agencies.exclusivesGranted', { count: ok })
   toast().success(success.value)
   await load()
 }
@@ -796,10 +896,10 @@ async function runConfirm() {
 async function savePricing() {
   savingPricing.value = true
   error.value = ''
-  onOwnerOrPlatformChange()
-  if (!sharesValid.value) {
+  clampPricingFields()
+  if (sharesOver100.value) {
     savingPricing.value = false
-    error.value = t('agencies.sharesMustSum100')
+    error.value = t('agencies.sharesOver100Hint')
     toast().danger(error.value)
     return
   }

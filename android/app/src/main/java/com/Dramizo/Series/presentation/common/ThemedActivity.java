@@ -148,8 +148,40 @@ public abstract class ThemedActivity extends AppCompatActivity {
         if (!(root instanceof ViewGroup)) return root;
 
         ViewGroup group = (ViewGroup) root;
+        // Prefer explicit content root (wallpaper layouts keep bg full-bleed).
         View named = group.findViewById(R.id.contentRoot);
         if (named != null) return named;
+
+        // FrameLayout pattern: full-bleed ImageView bg + content column.
+        if (group instanceof android.widget.FrameLayout || group instanceof androidx.constraintlayout.widget.ConstraintLayout) {
+            boolean hasFullBleedBg = false;
+            View nonBg = null;
+            int nonBgCount = 0;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                View child = group.getChildAt(i);
+                int id = child.getId();
+                if (id == R.id.imgThemeBg || id == R.id.imgHomeBg || id == R.id.imgRoomBg) {
+                    hasFullBleedBg = true;
+                    continue;
+                }
+                if (child instanceof ImageView
+                        && child.getLayoutParams() != null
+                        && child.getLayoutParams().width == ViewGroup.LayoutParams.MATCH_PARENT
+                        && child.getLayoutParams().height == ViewGroup.LayoutParams.MATCH_PARENT) {
+                    hasFullBleedBg = true;
+                    continue;
+                }
+                nonBg = child;
+                nonBgCount++;
+            }
+            // Wallpaper + single content column → pad the column only.
+            if (hasFullBleedBg && nonBgCount == 1 && nonBg != null) {
+                return nonBg;
+            }
+            // ConstraintLayout / single-root screens (medals, lists, …): pad whole root
+            // so toolbar and list clear status + nav bars together.
+            return root;
+        }
 
         for (int i = 0; i < group.getChildCount(); i++) {
             View child = group.getChildAt(i);

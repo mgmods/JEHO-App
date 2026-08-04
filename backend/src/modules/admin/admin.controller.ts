@@ -878,6 +878,19 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('agencies/:id/grant-exclusives')
+  @ApiOperation({
+    summary: 'Grant exclusive agency frames/room cards (admin-only, not mall)',
+  })
+  grantAgencyExclusives(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.grantAgencyExclusives(id, body as any);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('agencies/:id/activation-code')
   regenerateAgencyActivationCode(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.regenerateAgencyActivationCode(id);
@@ -1156,6 +1169,29 @@ export class AdminController {
   @Get('logs')
   logs(@Query() query: PaginationDto) {
     return this.adminService.listLogs(query);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('system/health')
+  @ApiOperation({ summary: 'Server / process health for admin dashboard' })
+  systemHealth() {
+    return this.adminService.systemHealth();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('logs/cleanup')
+  @ApiOperation({ summary: 'Delete old or all abuse/system logs' })
+  cleanupLogs(
+    @Body()
+    body: {
+      olderThanDays?: number;
+      unresolvedOnly?: boolean;
+      resolvedOnly?: boolean;
+    },
+  ) {
+    return this.adminService.cleanupLogs(body || {});
   }
 
   // ─── Contests ──────────────────────────────────────────────
@@ -1468,7 +1504,12 @@ export class AdminController {
       try {
         switch (key) {
           case 'rooms:close':
-            await this.adminService.closeRoom(id);
+            // End live + close: forceEnd works for personal and agency rooms
+            try {
+              await this.adminService.forceEndStream(id, reason || 'admin_close');
+            } catch {
+              await this.adminService.closeRoom(id);
+            }
             break;
           case 'rooms:delete':
             await this.adminService.deleteRoom(id, {

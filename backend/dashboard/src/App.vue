@@ -24,6 +24,9 @@ import { usePromptHost } from '@/composables/usePrompt'
 const theme = useThemeStore()
 const prompt = usePromptHost()
 
+// Apply dark theme immediately (before paint of child routes)
+theme.init()
+
 onMounted(() => {
   theme.init()
 })

@@ -2,6 +2,12 @@
   <div>
     <PageHeader :title="t('logs.title')" :subtitle="t('logs.subtitle')">
       <template #actions>
+        <button class="btn btn-ghost btn-sm" type="button" :disabled="cleaning" @click="clean({ olderThanDays: 30 })">
+          <i class="bi bi-calendar-x me-1"></i> {{ t('system.cleanOld') }} (30d)
+        </button>
+        <button class="btn btn-outline-danger btn-sm" type="button" :disabled="cleaning" @click="clean({})">
+          <i class="bi bi-trash me-1"></i> {{ t('system.cleanAll') }}
+        </button>
         <button class="btn btn-ghost btn-sm" type="button" @click="load" :disabled="loading">
           <i class="bi bi-arrow-clockwise me-1"></i> {{ t('common.refresh') }}
         </button>
@@ -97,12 +103,29 @@ const search = ref('')
 const level = ref('')
 const page = ref(1)
 const limit = ref(40)
+const cleaning = ref(false)
 
 function levelClass(level) {
   const l = String(level || 'info').toLowerCase()
   if (l === 'error' || l === 'security') return 'badge-soft-danger'
   if (l === 'warn' || l === 'warning') return 'badge-soft-warning'
   return 'badge-soft-info'
+}
+
+async function clean(body) {
+  const isAll = !body?.olderThanDays && !body?.resolvedOnly
+  const msg = isAll ? t('system.confirmCleanAll') : t('system.confirmCleanOld')
+  if (!window.confirm(msg)) return
+  cleaning.value = true
+  const { data, error: err } = await logsApi.cleanup(body || {})
+  cleaning.value = false
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  toast().success(t('system.cleaned', { count: data?.deleted ?? 0 }))
+  page.value = 1
+  await load()
 }
 
 async function load() {

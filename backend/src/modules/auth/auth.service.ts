@@ -27,7 +27,7 @@ import {
   SocialLoginDto,
   ChangePasswordDto,
 } from './dto/auth.dto';
-
+import { normalizeStaffRole } from '../../common/staff-role';
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
@@ -418,12 +418,14 @@ export class AuthService implements OnModuleInit {
       user.publicId = await this.allocatePublicId();
       await this.usersRepo.update(user.id, { publicId: user.publicId });
     }
+    const staffRole = normalizeStaffRole(user);
     const payload = {
       sub: user.id,
       username: user.username,
       publicId: user.publicId,
-      isAdmin: user.isAdmin,
-      role: user.isAdmin ? 'admin' : 'user',
+      isAdmin: user.isAdmin || staffRole === 'super',
+      staffRole,
+      role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
       isGuest: user.isGuest,
     };
 
@@ -466,7 +468,8 @@ export class AuthService implements OnModuleInit {
         level: user.level,
         vipLevel,
         isGuest: user.isGuest,
-        isAdmin: user.isAdmin,
+        isAdmin: user.isAdmin || staffRole === 'super',
+        staffRole,
       },
     };
   }
@@ -475,3 +478,4 @@ export class AuthService implements OnModuleInit {
     return createHash('sha256').update(code).digest('hex');
   }
 }
+

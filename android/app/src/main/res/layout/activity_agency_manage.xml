@@ -20,29 +20,33 @@
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="56dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="8dp">
+            android:paddingHorizontal="4dp">
 
             <ImageView
                 android:id="@+id/btnBack"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:contentDescription="@string/back"
-                android:padding="11dp"
+                android:padding="12dp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
                 android:layout_weight="1"
+                android:gravity="center"
                 android:text="@string/agency_manage_title"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <View
+                android:layout_width="48dp"
+                android:layout_height="48dp" />
         </LinearLayout>
 
         <androidx.core.widget.NestedScrollView
@@ -53,7 +57,7 @@
             android:clipToPadding="false"
             android:fillViewport="true"
             android:overScrollMode="never"
-            android:paddingBottom="24dp">
+            android:paddingBottom="32dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -61,284 +65,43 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="16dp">
 
-                <!-- Premium hero -->
                 <LinearLayout
                     android:id="@+id/boxAgencyHero"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="14dp">
+                    android:background="@drawable/bg_agency_hero"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="20dp">
 
                     <ImageView
                         android:id="@+id/imgAgencyLogo"
-                        android:layout_width="64dp"
-                        android:layout_height="64dp"
+                        android:layout_width="72dp"
+                        android:layout_height="72dp"
                         android:background="@drawable/bg_voice_seat_circle"
                         android:contentDescription="@null"
                         android:scaleType="centerCrop"
                         android:src="@drawable/icon_agency" />
 
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:id="@+id/tvAgencyHeroName"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="end"
-                            android:text="—"
-                            android:textColor="@color/text_primary"
-                            android:textSize="20sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvAgencyHeroMeta"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:gravity="end"
-                            android:text="@string/agency_manage_hint"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="12sp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOpenAgencyStream"
-                    style="@style/Widget.AuraLive.Button.Gold"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/agency_go_live"
-                    android:textAllCaps="false"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/boxAgencyPowers"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
                     <TextView
+                        android:id="@+id/tvAgencyHeroName"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_powers_title"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvAgencyPowers"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="end"
-                        android:lineSpacingExtra="4dp"
-                        android:text="@string/agency_powers_body"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/boxAgencyBranding"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_branding_title"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilAgencyName"
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:hint="@string/agency_name_hint">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etAgencyName"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="text"
-                            android:maxLength="64"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilAgencyWelcome"
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:hint="@string/agency_welcome_hint">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etAgencyWelcome"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="textMultiLine"
-                            android:maxLength="500"
-                            android:minLines="2"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnSaveAgencyBranding"
-                        style="@style/Widget.AuraLive.Button"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/agency_save_branding"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/rowAgencyMallShortcuts"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:orientation="horizontal">
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnAgencyMallFrames"
-                        style="@style/Widget.AuraLive.Button.Outlined"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginEnd="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/agency_mall_frames"
-                        android:textAllCaps="false" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnAgencyMallBadges"
-                        style="@style/Widget.AuraLive.Button.Outlined"
-                        android:layout_width="0dp"
-                        android:layout_height="44dp"
-                        android:layout_marginStart="6dp"
-                        android:layout_weight="1"
-                        android:text="@string/agency_mall_badges"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/tvManageHint"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="end"
-                    android:text="@string/agency_manage_hint"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:id="@+id/boxActivationCode"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_activation_code"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvActivationCode"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="12dp"
                         android:gravity="center"
-                        android:letterSpacing="0.12"
                         android:text="—"
                         android:textColor="@color/text_primary"
                         android:textSize="22sp"
                         android:textStyle="bold" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnCopyActivationCode"
-                        style="@style/Widget.AuraLive.Button.Outlined"
-                        android:layout_width="match_parent"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/agency_copy_code"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/boxNoticeStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
                     <TextView
+                        android:id="@+id/tvAgencyHeroMeta"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_notice_section"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
-
-                    <Spinner
-                        android:id="@+id/spinnerNotificationStyle"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="8dp"
-                        android:background="#18000000"
-                        android:paddingHorizontal="8dp" />
-                </LinearLayout>
-
-                <!-- Commission: read-only — set by platform admin only -->
-                <LinearLayout
-                    android:id="@+id/boxCommission"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_commission_label"
-                        android:textColor="@color/text_primary"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
+                        android:layout_marginTop="4dp"
+                        android:gravity="center"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/tvCommission"
@@ -346,142 +109,134 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:text="—"
-                        android:textColor="#FFB300"
-                        android:textSize="28sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:gravity="end"
-                        android:text="@string/agency_commission_readonly_hint"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
+                        android:textColor="@color/text_hint"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
                 </LinearLayout>
 
                 <ProgressBar
                     android:id="@+id/progressMembers"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="center_horizontal"
-                    android:layout_marginTop="18dp"
-                    android:indeterminate="true"
-                    android:visibility="gone" />
-
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/tilUserId"
-                    style="@style/Widget.AuraLive.TextInput"
-                    android:layout_width="match_parent"
+                    style="?android:attr/progressBarStyleSmall"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:hint="@string/agency_member_id_hint"
-                    android:visibility="gone">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etUserId"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="text"
-                        android:textColor="@color/text_primary" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone" />
 
                 <TextView
-                    android:id="@+id/tvAddRoleLabel"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="end"
-                    android:text="@string/agency_add_role_label"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/agency_manage_section_team"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
-                    android:visibility="gone" />
+                    android:textStyle="bold" />
 
-                <Spinner
-                    android:id="@+id/spinnerAddRole"
+                <!-- Custom menu rows (not Material buttons) -->
+                <include
+                    android:id="@+id/menuSearchHosts"
+                    layout="@layout/item_agency_menu_row"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:paddingHorizontal="8dp"
-                    android:visibility="gone" />
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnAddMember"
-                    style="@style/Widget.AuraLive.Button"
+                <include
+                    android:id="@+id/menuAddHost"
+                    layout="@layout/item_agency_menu_row"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:text="@string/agency_add_member"
-                    android:textAllCaps="false"
-                    android:visibility="gone" />
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
 
-                <LinearLayout
-                    android:id="@+id/sectionMembers"
+                <include
+                    android:id="@+id/menuPending"
+                    layout="@layout/item_agency_menu_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/agency_manage_section_tools"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <include
+                    android:id="@+id/menuCode"
+                    layout="@layout/item_agency_menu_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
+
+                <include
+                    android:id="@+id/menuStyle"
+                    layout="@layout/item_agency_menu_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
+
+                <include
+                    android:id="@+id/menuBranding"
+                    layout="@layout/item_agency_menu_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone" />
+
+                <include
+                    android:id="@+id/menuMall"
+                    layout="@layout/item_agency_menu_row"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp" />
+
+                <LinearLayout
+                    android:id="@+id/menuLive"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_glass_grouped"
-                    android:orientation="vertical"
-                    android:padding="14dp">
+                    android:background="@drawable/bg_agency_menu_row_gold"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:id="@+id/tvMenuLive"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:text="@string/agency_members"
-                        android:textColor="@color/text_primary"
+                        android:text="@string/agency_manage_menu_live"
+                        android:textColor="#9A6700"
                         android:textSize="15sp"
                         android:textStyle="bold" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilMemberSearch"
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:hint="@string/agency_member_search_hint">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etMemberSearch"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="text"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <LinearLayout
-                        android:id="@+id/boxMembers"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:minHeight="40dp"
-                        android:orientation="vertical" />
-
-                    <TextView
-                        android:id="@+id/tvEmptyMembers"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:text="@string/agency_no_members"
-                        android:textColor="@color/text_hint"
-                        android:textSize="13sp"
-                        android:visibility="gone" />
                 </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDeleteAgencyManage"
-                    style="@style/Widget.AuraLive.Button.Outlined"
+                <LinearLayout
+                    android:id="@+id/menuDelete"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="16dp"
-                    android:text="@string/agency_delete"
-                    android:textAllCaps="false"
-                    android:textColor="#FFFF8A80"
-                    android:visibility="gone"
-                    app:strokeColor="#FFFF8A80" />
+                    android:layout_height="52dp"
+                    android:layout_marginTop="20dp"
+                    android:background="@drawable/bg_agency_menu_row_danger"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvMenuDelete"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/agency_manage_menu_delete"
+                        android:textColor="#E57373"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
     </LinearLayout>

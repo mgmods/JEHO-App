@@ -1,23 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Auth: full-bleed 3D wallpaper + centered brand + Google sign-in -->
+<!-- Auth: brand night plane + centered mark + glass CTA plate -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_auth_surface" />
+
     <ImageView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:alpha="0.40"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
         android:src="@drawable/bg_auth_3d" />
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_auth_vignette" />
+
+    <View
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginTop="40dp"
+        android:background="@drawable/bg_auth_glow_rose" />
+
+    <View
+        android:layout_width="240dp"
+        android:layout_height="240dp"
+        android:layout_gravity="start|bottom"
+        android:layout_marginStart="-48dp"
+        android:layout_marginBottom="180dp"
+        android:background="@drawable/bg_auth_glow_gold" />
+
+    <!-- Theme wallpaper hook (ThemedActivity may target this). -->
     <ImageView
         android:id="@+id/imgThemeBg"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:visibility="gone"
-        android:contentDescription="@null" />
+        android:contentDescription="@null"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -25,85 +52,166 @@
         android:layout_height="match_parent"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingHorizontal="32dp"
-        android:paddingBottom="40dp">
+        android:paddingTop="24dp">
 
-        <com.google.android.material.imageview.ShapeableImageView
-            android:id="@+id/imgLogo"
-            android:layout_width="128dp"
-            android:layout_height="128dp"
-            android:layout_marginTop="72dp"
-            android:contentDescription="@string/app_name"
-            android:scaleType="centerCrop"
-            android:src="@drawable/jeho_logo"
-            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-            app:strokeColor="#33FFFFFF"
-            app:strokeWidth="2dp" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/app_name"
-            android:textColor="#FFFFFFFF"
-            android:textSize="28sp"
-            android:textStyle="bold" />
-
-        <View
-            android:layout_width="1dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <FrameLayout
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp">
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingHorizontal="32dp">
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="0dp"
+                android:layout_weight="0.55" />
+
+            <FrameLayout
+                android:layout_width="156dp"
+                android:layout_height="156dp">
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_auth_logo_ring" />
+
+                <View
+                    android:layout_width="130dp"
+                    android:layout_height="130dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_auth_logo_plate" />
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/imgLogo"
+                    android:layout_width="124dp"
+                    android:layout_height="124dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/app_name"
+                    android:padding="5dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/jeho_logo"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+                    app:strokeColor="#18FE2C55"
+                    app:strokeWidth="1.5dp" />
+            </FrameLayout>
 
             <TextView
-                android:id="@+id/btnGoogle"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_login_google_pill"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center"
-                android:text="@string/continue_with_google"
-                android:textColor="#222222"
-                android:textSize="16sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:letterSpacing="0.08"
+                android:text="@string/app_name"
+                android:textAllCaps="true"
+                android:textColor="#FFFFFFFF"
+                android:textSize="28sp"
                 android:textStyle="bold" />
 
-            <ImageView
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_gravity="center_vertical|start"
-                android:layout_marginStart="20dp"
-                android:contentDescription="@null"
-                android:src="@drawable/lg_gg" />
-        </FrameLayout>
+            <View
+                android:layout_width="48dp"
+                android:layout_height="3dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_auth_accent_line" />
 
-        <TextView
-            android:id="@+id/tvLoginHint"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:letterSpacing="0.04"
+                android:text="@string/splash_tagline"
+                android:textColor="#B8FFFFFF"
+                android:textSize="14sp" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="0dp"
+                android:layout_weight="0.45" />
+        </LinearLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:text="@string/login_google_only_hint"
-            android:textColor="#CCFFFFFF"
-            android:textSize="14sp" />
+            android:background="@drawable/bg_login_sheet"
+            android:orientation="vertical"
+            android:paddingHorizontal="28dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="28dp">
 
-        <ProgressBar
-            android:id="@+id/progress"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginTop="12dp"
-            android:indeterminateTint="#FFFFFF"
-            android:visibility="gone" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/login_title"
+                android:textColor="#FFFFFFFF"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:text="@string/login_subtitle"
+                android:textColor="#99FFFFFF"
+                android:textSize="14sp" />
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="24dp">
+
+                <TextView
+                    android:id="@+id/btnGoogle"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_login_google_pill"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center"
+                    android:paddingStart="52dp"
+                    android:paddingEnd="20dp"
+                    android:text="@string/continue_with_google"
+                    android:textColor="#1A1A1A"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center_vertical|start"
+                    android:layout_marginStart="22dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/lg_gg" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/tvLoginHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="@string/login_google_only_hint"
+                android:textColor="#66FFFFFF"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/progress"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="14dp"
+                android:indeterminateTint="@color/gift_accent"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
+    <!-- Legacy hooks kept for binding/API compatibility -->
     <ImageView
         android:id="@+id/imgLoginHero"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:visibility="gone"
-        android:contentDescription="@null" />
+        android:contentDescription="@null"
+        android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnPhoneLogin"

@@ -1,79 +1,118 @@
-/* JEHO Command — 2026 admin design tokens */
-:root {
-  --font-sans: 'IBM Plex Sans Arabic', 'Sora', system-ui, sans-serif;
-  --font-display: 'Sora', 'IBM Plex Sans Arabic', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-
-  --al-emerald: #3ddc97;
-  --al-emerald-bright: #6ef0b5;
-  --al-emerald-dim: #1fa86a;
-  --al-gold: #e8c47c;
-  --al-gold-bright: #f3d9a0;
-  --al-ink: #0a0c10;
-  --al-panel: #12151c;
-  --al-panel-2: #181c26;
-  --al-line: rgba(255, 255, 255, 0.08);
-  --al-coral: #ff6b7a;
-  --al-sky: #5eb8ff;
-
-  /* aliases kept for existing components */
-  --al-teal: var(--al-emerald);
-  --al-teal-bright: var(--al-emerald-bright);
-  --al-cyan: #4fd1c5;
-  --al-cyan-soft: #9ae8df;
-  --al-rose-gold: #d4a574;
-  --al-night: var(--al-ink);
-  --al-aurora-1: var(--al-emerald-dim);
-  --al-aurora-2: #2a9d8f;
-  --al-aurora-3: var(--al-emerald-bright);
-  --al-glass: rgba(255, 255, 255, 0.04);
-  --al-glass-border: rgba(61, 220, 151, 0.16);
-  --al-radius: 14px;
-  --al-radius-sm: 10px;
-  --al-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+/* Souty admin — dark-first tokens (reference image) */
+:root,
+[data-theme='dark'],
+:root[data-theme='dark'] {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Noto Sans Arabic', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Noto Sans Arabic', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --al-font: var(--font-sans);
   --al-display: var(--font-display);
-  --sidebar-width: 280px;
 
+  --cc-purple: #6c5ce7;
+  --cc-purple-soft: #8b7ff0;
+  --cc-purple-dim: #5848d4;
+  --cc-blue: #3b82f6;
+  --cc-cyan: #38bdf8;
+  --cc-lime: #00c566;
+  --cc-green: #00c566;
+  --cc-gold: #f5b942;
+  --cc-rose: #ff5a7a;
+  --cc-orange: #fb923c;
+
+  --cc-night: #0b0c14;
+  --cc-ink: #0f111a;
+  --cc-panel: #1c1e2d;
+  --cc-panel-2: #22243a;
+  --cc-elevated: #25273a;
+  --cc-line: rgba(255, 255, 255, 0.06);
+
+  --al-emerald: var(--cc-purple);
+  --al-emerald-bright: var(--cc-purple-soft);
+  --al-emerald-dim: var(--cc-purple-dim);
+  --al-gold: var(--cc-gold);
+  --al-gold-bright: #ffd666;
+  --al-ink: var(--cc-ink);
+  --al-panel: var(--cc-panel);
+  --al-panel-2: var(--cc-panel-2);
+  --al-line: var(--cc-line);
+  --al-coral: var(--cc-rose);
+  --al-sky: var(--cc-blue);
+
+  --al-teal: var(--cc-purple);
+  --al-teal-bright: var(--cc-purple-soft);
+  --al-cyan: var(--cc-cyan);
+  --al-cyan-soft: #67e8f9;
+  --al-rose-gold: #e8a878;
+  --al-night: var(--cc-night);
+  --al-aurora-1: var(--cc-purple-dim);
+  --al-aurora-2: var(--cc-blue);
+  --al-aurora-3: var(--cc-purple-soft);
+  --al-glass: rgba(255, 255, 255, 0.03);
+  --al-glass-border: rgba(108, 92, 231, 0.22);
+  --al-radius: 16px;
+  --al-radius-sm: 12px;
+  --al-shadow: 0 10px 32px rgba(0, 0, 0, 0.4);
+  --al-font: var(--font-sans);
+  --al-display: var(--font-display);
+  --sidebar-width: 260px;
+
+  /* dark is the only production look */
+  --bg-primary: #0f111a;
+  --bg-secondary: #12141f;
+  --bg-elevated: #1c1e2d;
+  --bg-sidebar: #0f111a;
+  --text-primary: #f4f6fb;
+  --text-secondary: #a0a8c0;
+  --text-muted: #7a829c;
+  --text-inverse: #f4f6fb;
+  --border-color: rgba(255, 255, 255, 0.06);
+  --card-bg: #1c1e2d;
+  --input-bg: #151722;
+  --accent: var(--cc-purple);
+  --accent-2: var(--cc-gold);
+  --danger: #f0435b;
+  --warning: #f59e0b;
+  --success: #00c566;
+  --info: #3b82f6;
+  --topbar-bg: rgba(15, 17, 26, 0.92);
+  --aurora-opacity: 0.4;
+  --surface-hover: rgba(108, 92, 231, 0.1);
+  --ring: 0 0 0 3px rgba(108, 92, 231, 0.28);
+
+  /* Bootstrap 5 CSS vars — force dark surfaces everywhere */
+  --bs-body-bg: #0f111a;
+  --bs-body-color: #f4f6fb;
+  --bs-emphasis-color: #fff;
+  --bs-secondary-color: rgba(244, 246, 251, 0.7);
+  --bs-secondary-bg: #1c1e2d;
+  --bs-tertiary-bg: #151722;
+  --bs-border-color: rgba(255, 255, 255, 0.08);
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.08);
+  --bs-heading-color: #f4f6fb;
+  --bs-link-color: #8b7ff0;
+  --bs-link-hover-color: #b4a8ff;
+  --bs-code-color: #f5b942;
+  --bs-form-control-bg: #151722;
+  --bs-form-valid-color: #00c566;
+  --bs-form-invalid-color: #ff5a7a;
+}
+
+/* light kept for rare explicit opt-in only */
+[data-theme='light'] {
   --bg-primary: #f3f5f8;
   --bg-secondary: #e8ecf1;
   --bg-elevated: #ffffff;
-  --bg-sidebar: #0a0c10;
+  --bg-sidebar: #0f111a;
   --text-primary: #10141c;
   --text-secondary: #3d4656;
   --text-muted: #6b7485;
-  --text-inverse: #f2f5f8;
+  --text-inverse: #eef1f8;
   --border-color: rgba(16, 20, 28, 0.1);
   --card-bg: #ffffff;
   --input-bg: #ffffff;
-  --accent: var(--al-emerald-dim);
-  --accent-2: var(--al-gold);
-  --danger: #e5484d;
-  --warning: #e5a100;
-  --success: #1fa86a;
-  --info: #3b82f6;
   --topbar-bg: rgba(243, 245, 248, 0.86);
-  --aurora-opacity: 0.35;
-  --surface-hover: rgba(16, 20, 28, 0.04);
-  --ring: 0 0 0 3px rgba(61, 220, 151, 0.28);
-}
-
-[data-theme='dark'] {
-  --bg-primary: #0a0c10;
-  --bg-secondary: #0f1218;
-  --bg-elevated: #12151c;
-  --bg-sidebar: #06070a;
-  --text-primary: #eef1f6;
-  --text-secondary: #a8b0c0;
-  --text-muted: #7a8498;
-  --text-inverse: #eef1f6;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --card-bg: #12151c;
-  --input-bg: #0f1218;
-  --topbar-bg: rgba(10, 12, 16, 0.82);
-  --aurora-opacity: 0.5;
-  --al-glass: rgba(255, 255, 255, 0.03);
-  --al-glass-border: rgba(61, 220, 151, 0.18);
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --al-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  --bs-body-bg: #f3f5f8;
+  --bs-body-color: #10141c;
 }

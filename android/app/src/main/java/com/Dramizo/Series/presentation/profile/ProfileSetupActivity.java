@@ -221,6 +221,12 @@ public class ProfileSetupActivity extends ThemedActivity {
         String birthday = normalizeBirthday(text(binding.etBirthday));
         int genderIndex = binding.spinnerGender.getSelectedItemPosition();
         String bio = text(binding.etBio);
+        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(bio)) {
+            Toast.makeText(this,
+                    com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         if (!nonEmpty(avatarUrl)) {
             Toast.makeText(this, "اختر صورة البروفايل", Toast.LENGTH_SHORT).show();
             return;

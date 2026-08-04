@@ -264,6 +264,14 @@ public class EditProfileActivity extends ThemedActivity {
             Toast.makeText(this, "أدخل الاسم الظاهر", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(name)
+                || com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(
+                        text(binding.etBio))) {
+            Toast.makeText(this,
+                    com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
         if (countryLocked) {
             String next = selectedCountryValue();
             String prev = originalCountryCode != null ? originalCountryCode : "";

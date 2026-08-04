@@ -21,25 +21,25 @@ export type MikooGameDef = {
 const ORIGIN = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
 
 export const MIKOO_GAMES: MikooGameDef[] = [
-  { id: '7updown', title: '7 Up Down', titleEn: '7 Up Down', entry: 'index.html', bridge: 'hash', gameType: 1, sortOrder: 10 },
-  { id: 'cleopatra-slot', title: 'Cleopatra Slot', titleEn: 'Cleopatra Slot', entry: 'index.html', bridge: 'baishun', bsModuleId: 1107, sortOrder: 11 },
-  { id: 'cleopatra-slots', title: 'Cleopatra Slots', titleEn: 'Cleopatra Slots', entry: 'index.html', bridge: 'hash', gameType: 2, sortOrder: 12 },
-  { id: 'crash', title: 'Crash', titleEn: 'Crash', entry: 'index.html', bridge: 'hash', gameType: 3, wsPath: 'crash', sortOrder: 13 },
-  { id: 'fishing', title: 'Fishing', titleEn: 'Fishing', entry: 'index.html', bridge: 'baishun', bsModuleId: 1022, sortOrder: 14 },
-  { id: 'football-plinko', title: 'Football Plinko', titleEn: 'Football Plinko', entry: 'index.html', bridge: 'baishun', bsModuleId: 1184, sortOrder: 15 },
+  { id: '7updown', title: '٧ فوق تحت', titleEn: '7 Up Down', entry: 'index.html', bridge: 'hash', gameType: 1, sortOrder: 10 },
+  { id: 'cleopatra-slot', title: 'كليوباترا', titleEn: 'Cleopatra Slot', entry: 'index.html', bridge: 'baishun', bsModuleId: 1107, sortOrder: 11 },
+  { id: 'cleopatra-slots', title: 'فتحات كليوباترا', titleEn: 'Cleopatra Spins', entry: 'index.html', bridge: 'hash', gameType: 2, sortOrder: 12 },
+  { id: 'crash', title: 'كراش', titleEn: 'Crash', entry: 'index.html', bridge: 'hash', gameType: 3, wsPath: 'crash', sortOrder: 13 },
+  { id: 'fishing', title: 'صيد السمك', titleEn: 'Fishing', entry: 'index.html', bridge: 'baishun', bsModuleId: 1022, sortOrder: 14 },
+  { id: 'football-plinko', title: 'بلينكو كرة القدم', titleEn: 'Football Plinko', entry: 'index.html', bridge: 'baishun', bsModuleId: 1184, sortOrder: 15 },
   { id: 'fortune-slot', title: 'جواهر الحظ', titleEn: 'Fortune Gems', entry: 'index.html', bridge: 'hash', gameType: 4, sortOrder: 16 },
-  { id: 'greedy-box', title: 'Greedy Box', titleEn: 'Greedy Box', entry: 'index.html', bridge: 'hash', gameType: 5, sortOrder: 17 },
-  { id: 'hilo', title: 'Hilo', titleEn: 'Hilo', entry: 'index.html', bridge: 'baishun', bsModuleId: 1072, sortOrder: 18 },
-  { id: 'line-slots', title: 'Line Slots', titleEn: 'Line Slots', entry: 'index.html', bridge: 'hash', gameType: 6, sortOrder: 19 },
-  { id: 'luck-car', title: 'سيارة الحظ', titleEn: 'Luck Car', entry: 'index.html', bridge: 'hash', gameType: 7, sortOrder: 20 },
-  { id: 'lucky77', title: 'لاكي 77', titleEn: 'Lucky 77', entry: 'index.html', bridge: 'hash', gameType: 12, sortOrder: 21 },
-  { id: 'megaways-slots', title: 'Megaways Slots', titleEn: 'Megaways Slots', entry: 'index.html', bridge: 'hash', gameType: 8, sortOrder: 22 },
-  { id: 'olympians', title: 'Olympians', titleEn: 'Olympians', entry: 'index.html', bridge: 'hash', gameType: 9, sortOrder: 23 },
-  { id: 'pirate-king', title: 'Pirate King', titleEn: 'Pirate King', entry: 'index.html', bridge: 'hash', gameType: 10, sortOrder: 24 },
-  { id: 'royal-battle', title: 'Royal Battle', titleEn: 'Royal Battle', entry: 'index.html', bridge: 'baishun', bsModuleId: 1174, sortOrder: 25 },
-  { id: 'slot777', title: 'سلوت', titleEn: 'Slot', entry: 'index.html', bridge: 'baishun', bsModuleId: 1098, sortOrder: 26 },
-  { id: 'sugar-rush', title: 'Sugar Rush', titleEn: 'Sugar Rush', entry: 'index.html', bridge: 'hash', gameType: 11, sortOrder: 27 },
-  { id: 'swimsuit-party', title: 'Swimsuit Party', titleEn: 'Swimsuit Party', entry: 'index.html', bridge: 'baishun', bsModuleId: 1183, sortOrder: 28 },
+  { id: 'greedy-box', title: 'صندوق الطمع', titleEn: 'Greedy Box', entry: 'index.html', bridge: 'hash', gameType: 5, sortOrder: 17 },
+  { id: 'hilo', title: 'هاي لو', titleEn: 'Hilo', entry: 'index.html', bridge: 'baishun', bsModuleId: 1072, sortOrder: 18 },
+  { id: 'line-slots', title: 'فتحات الخط', titleEn: 'Line Slots', entry: 'index.html', bridge: 'hash', gameType: 6, sortOrder: 19 },
+  { id: 'luck-car', title: 'سيارة الحظ', titleEn: 'Lucky Car', entry: 'index.html', bridge: 'hash', gameType: 7, sortOrder: 20 },
+  { id: 'lucky77', title: 'لاكي ٧٧', titleEn: 'Lucky 77', entry: 'index.html', bridge: 'hash', gameType: 12, sortOrder: 21 },
+  { id: 'megaways-slots', title: 'ميجاوايز', titleEn: 'Megaways Slots', entry: 'index.html', bridge: 'hash', gameType: 8, sortOrder: 22 },
+  { id: 'olympians', title: 'الأوليمبيون', titleEn: 'Olympians', entry: 'index.html', bridge: 'hash', gameType: 9, sortOrder: 23 },
+  { id: 'pirate-king', title: 'ملك القراصنة', titleEn: 'Pirate King', entry: 'index.html', bridge: 'hash', gameType: 10, sortOrder: 24 },
+  { id: 'royal-battle', title: 'المعركة الملكية', titleEn: 'Royal Battle', entry: 'index.html', bridge: 'baishun', bsModuleId: 1174, sortOrder: 25 },
+  { id: 'slot777', title: 'سلوت ٧٧٧', titleEn: 'Slot 777', entry: 'index.html', bridge: 'baishun', bsModuleId: 1098, sortOrder: 26 },
+  { id: 'sugar-rush', title: 'سكر راش', titleEn: 'Sugar Rush', entry: 'index.html', bridge: 'hash', gameType: 11, sortOrder: 27 },
+  { id: 'swimsuit-party', title: 'حفلة السباحة', titleEn: 'Swimsuit Party', entry: 'index.html', bridge: 'baishun', bsModuleId: 1183, sortOrder: 28 },
 ];
 
 export function mikooPlayUrl(gameId: string) {
@@ -47,7 +47,7 @@ export function mikooPlayUrl(gameId: string) {
 }
 
 export function mikooCoverUrl(gameId: string) {
-  return `${ORIGIN}/games/mikoo/covers/${gameId}.png?v=20260801a`;
+  return `${ORIGIN}/games/mikoo/covers/${gameId}.png?v=20260804g`;
 }
 
 export function mikooSplashUrl(gameId: string) {
@@ -129,8 +129,37 @@ export function classifyCatalogItem(item: Record<string, unknown>) {
   const game = findMikooGame(id);
   const enabled = item.enabled === false || item.visible === false ? false : true;
 
+  const rawTitle = item.title != null ? String(item.title).trim() : '';
+  const rawTitleEn = item.titleEn != null ? String(item.titleEn).trim() : '';
+  const looksEnglishOnly =
+    !!rawTitle && !/[\u0600-\u06FF]/.test(rawTitle) && !/[\u0600-\u06FF]/.test(rawTitleEn);
+  // Prefer catalog Arabic when saved settings still store English-only titles.
+  const title =
+    (rawTitle && /[\u0600-\u06FF]/.test(rawTitle) && rawTitle) ||
+    game?.title ||
+    rawTitle ||
+    rawTitleEn ||
+    id;
+  const titleEn =
+    rawTitleEn ||
+    (looksEnglishOnly ? rawTitle : '') ||
+    game?.titleEn ||
+    (rawTitle && !/[\u0600-\u06FF]/.test(rawTitle) ? rawTitle : '') ||
+    id;
+
+  let coverUrl = item.coverUrl != null ? String(item.coverUrl).trim() : '';
+  // Always prefer current package cover path (stale .jpg / old cache-bust params break the hub).
+  if (!coverUrl || coverUrl.includes('/games/mikoo/covers/') || coverUrl.endsWith('.jpg')) {
+    coverUrl = mikooCoverUrl(id);
+  }
+
   return {
     ...item,
+    id,
+    title,
+    titleEn,
+    coverUrl,
+    playUrl: item.playUrl || (game ? mikooPlayUrl(id) : item.playUrl),
     mode,
     enabled,
     bridge: item.bridge ?? game?.bridge ?? null,
@@ -163,6 +192,12 @@ export function sanitizeGamesCatalog(
   if (options.forClient) {
     out = out.filter((g) => g.enabled !== false);
   }
+
+  // Force fresh cover cache-bust + localized titles on every client response
+  // even when admin-saved JSON has English-only names or old .jpg paths.
+  out = out.map((g) => classifyCatalogItem(g) || g).filter(Boolean) as Array<
+    Record<string, unknown>
+  >;
 
   return out.sort(
     (a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0),

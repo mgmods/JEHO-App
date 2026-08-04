@@ -367,16 +367,18 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Kenar / room card frame — match cover bounds, above cover, under text badges -->
     <ImageView
         android:id="@+id/imgCardFrame"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:elevation="2dp"
         android:scaleType="fitXY"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintBottom_toBottomOf="@id/imgCover"
+        app:layout_constraintEnd_toEndOf="@id/imgCover"
+        app:layout_constraintStart_toStartOf="@id/imgCover"
+        app:layout_constraintTop_toTopOf="@id/imgCover" />
 
     <TextView
         android:id="@+id/tvHost"

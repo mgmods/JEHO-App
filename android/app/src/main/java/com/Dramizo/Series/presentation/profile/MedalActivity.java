@@ -24,7 +24,7 @@ import com.bumptech.glide.Glide;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Honour/medals — VIP 1–7 only, light JEHO chrome. */
+/** Honour/medals (شارات) — VIP 1–7, system-bar safe. */
 public class MedalActivity extends ThemedActivity {
     private static final int MAX_VIP = 7;
 
@@ -46,6 +46,7 @@ public class MedalActivity extends ThemedActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_medal);
+        // contentRoot is padded by ThemedActivity (status + nav) like the rest of the app.
         findViewById(R.id.vBack).setOnClickListener(v -> navigateUp());
         rv = findViewById(R.id.rvMedals);
         empty = findViewById(R.id.llEmpty);

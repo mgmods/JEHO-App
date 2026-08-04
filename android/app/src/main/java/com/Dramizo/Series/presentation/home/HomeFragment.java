@@ -61,6 +61,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -228,7 +229,8 @@ public class HomeFragment extends Fragment {
         });
         viewModel.getFollowingRooms().observe(getViewLifecycleOwner(), list -> reapplyFeedPages());
         viewModel.getBanners().observe(getViewLifecycleOwner(), this::bindServerBanners);
-        showDefaultBannerSlider();
+        // No local default slides — wait for server banners only.
+        hideBannerSlider();
         viewModel.getRichRanking().observe(getViewLifecycleOwner(), list -> {
                 bindTileAvatars(list,
                         new ImageView[]{binding.imgRichAvatar1, binding.imgRichAvatar2, binding.imgRichAvatar3},
@@ -805,7 +807,7 @@ public class HomeFragment extends Fragment {
         if (binding == null || homeBannerAdapter == null) return;
         List<MiscDtos.BannerDto> filtered = filterBannersForLocale(all);
         if (filtered.isEmpty()) {
-            showDefaultBannerSlider();
+            hideBannerSlider();
             return;
         }
 
@@ -847,26 +849,29 @@ public class HomeFragment extends Fragment {
         }
     }
 
-    private void showDefaultBannerSlider() {
+    /** Hide carousel when dashboard has zero live banners — no local/default art. */
+    private void hideBannerSlider() {
         if (binding == null) return;
-        binding.bannerRow.setVisibility(View.GONE);
-        List<MiscDtos.BannerDto> defaults = new ArrayList<>();
-        int[] arts = {R.drawable.home_bg_wealth, R.drawable.home_bg_cp, R.drawable.home_bg_charm};
-        String[] links = {"rich", "gifts", "popular"};
-        for (int i = 0; i < arts.length; i++) {
-            MiscDtos.BannerDto b = new MiscDtos.BannerDto();
-            b.imageUrl = "drawable://" + getResources().getResourceEntryName(arts[i]);
-            b.link = links[i];
-            b.title = links[i];
-            defaults.add(b);
+        handler.removeCallbacks(bannerAutoScroll);
+        if (homeBannerAdapter != null) {
+            homeBannerAdapter.submit(Collections.emptyList());
         }
-        applyBannerSlider(defaults);
+        if (binding.bannerRow != null) binding.bannerRow.setVisibility(View.GONE);
+        if (binding.pagerBanners != null) binding.pagerBanners.setVisibility(View.GONE);
+        if (binding.bannerDots != null) {
+            binding.bannerDots.removeAllViews();
+            binding.bannerDots.setVisibility(View.GONE);
+        }
+        View carousel = binding.pagerBanners != null
+                ? (View) binding.pagerBanners.getParent()
+                : null;
+        if (carousel != null) carousel.setVisibility(View.GONE);
     }
 
     private void applyLoadedBanners(List<MiscDtos.BannerDto> ready) {
         if (binding == null || !isAdded()) return;
         if (ready == null || ready.isEmpty()) {
-            showDefaultBannerSlider();
+            hideBannerSlider();
             return;
         }
         List<MiscDtos.BannerDto> slides = ready.size() > 3 ? new ArrayList<>(ready.subList(0, 3)) : ready;
@@ -874,7 +879,12 @@ public class HomeFragment extends Fragment {
     }
 
     private void applyBannerSlider(List<MiscDtos.BannerDto> slides) {
-        if (binding == null || homeBannerAdapter == null || slides == null || slides.isEmpty()) return;
+        if (binding == null || homeBannerAdapter == null || slides == null || slides.isEmpty()) {
+            hideBannerSlider();
+            return;
+        }
+        View carousel = (View) binding.pagerBanners.getParent();
+        if (carousel != null) carousel.setVisibility(View.VISIBLE);
         homeBannerAdapter.submit(slides);
         binding.bannerRow.setVisibility(View.GONE);
         binding.pagerBanners.setVisibility(View.VISIBLE);

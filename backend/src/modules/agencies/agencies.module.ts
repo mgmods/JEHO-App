@@ -13,6 +13,7 @@ import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { RoomModerator } from '../../database/entities/room-moderator.entity';
 import { User } from '../../database/entities/user.entity';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
+import { AgencyPayoutRequest } from '../../database/entities/agency-payout-request.entity';
 import { RoomsModule } from '../rooms/rooms.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -22,6 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       Agency,
       AgencyMember,
       AgencyApplication,
+      AgencyPayoutRequest,
       GiftSend,
       Wallet,
       WalletTransaction,

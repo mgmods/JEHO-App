@@ -19,7 +19,8 @@
               <h3 class="settings-card-title">Fourthwall — الدفع بالبطاقة</h3>
               <p class="text-secondary small mb-2">
                 من هنا تدخل/تشوف بيانات المطور (API User / Password / Storefront Token / Webhook Secret).
-                التطبيق يأخذ سعر الباقة وعدد الكوينز تلقائياً وينشئ منتج الدفع عند الحاجة.
+                عند الدفع يُنشئ Fourthwall منتجات رقمية بأسماء كتب (eBook) — وليس كوينز — والشحن الداخلي يبقى حسب SKU.
+                بعد تحديث الإعداد اضغط «مزامنة الباقات» لإعادة تسمية المنتجات القديمة.
               </p>
             </div>
             <button

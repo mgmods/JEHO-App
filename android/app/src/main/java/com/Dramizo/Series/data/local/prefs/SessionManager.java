@@ -310,6 +310,28 @@ public class SessionManager {
         return new java.util.ArrayList<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
     }
 
+    /** Full saved account cards (display name, avatar, frame, public ID). */
+    public java.util.List<SavedAccountInfo> listSavedAccountDetails() {
+        java.util.ArrayList<SavedAccountInfo> out = new java.util.ArrayList<>();
+        for (String username : listSavedAccounts()) {
+            if (username == null) continue;
+            String blob = prefs.getString("acc_" + username, null);
+            SavedAccountInfo info = new SavedAccountInfo();
+            info.usernameKey = username;
+            if (blob != null) {
+                try {
+                    SavedAccount a = gson.fromJson(blob, SavedAccount.class);
+                    if (a != null && a.user != null) {
+                        info.user = a.user;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            out.add(info);
+        }
+        return out;
+    }
+
     public boolean switchToAccount(String username) {
         String blob = prefs.getString("acc_" + username, null);
         if (blob == null) return false;
@@ -329,6 +351,35 @@ public class SessionManager {
         java.util.HashSet<String> set = new java.util.HashSet<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
         set.remove(username);
         prefs.edit().remove("acc_" + username).putStringSet("saved_accounts", set).apply();
+    }
+
+    public static final class SavedAccountInfo {
+        public String usernameKey;
+        public AuthDtos.UserDto user;
+
+        public String displayName() {
+            if (user != null) {
+                if (user.displayName != null && !user.displayName.trim().isEmpty()) {
+                    return user.displayName.trim();
+                }
+                if (user.username != null) return user.username;
+            }
+            return usernameKey != null ? usernameKey : "—";
+        }
+
+        public String publicId() {
+            return user != null ? user.displayPublicId() : "";
+        }
+
+        public String avatarUrl() {
+            return user != null ? user.avatarUrl : null;
+        }
+
+        /** Personal VIP avatar frame only (same as profile). */
+        public String frameUrl() {
+            if (user == null) return null;
+            return user.vipBadgeUrl;
+        }
     }
 
     private static class SavedAccount {

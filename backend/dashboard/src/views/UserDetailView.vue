@@ -36,19 +36,35 @@
 
           <div class="d-flex align-items-center gap-3 mb-3">
 
-            <div class="avatar-lg rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-
-              style="width:64px;height:64px;background:linear-gradient(135deg,var(--al-teal),var(--al-cyan));font-size:1.4rem">
-
-              {{ (user.name || user.username || 'U').charAt(0).toUpperCase() }}
-
+            <div class="user-detail-wear">
+              <div class="user-detail-avatar">
+                <img v-if="avatarUrl" :src="avatarUrl" alt="" @error="avatarError = true" />
+                <span v-else>{{ (user.name || user.username || 'U').charAt(0).toUpperCase() }}</span>
+              </div>
+              <div v-if="frameUrl" class="user-detail-frame" aria-hidden="true">
+                <SvgaPreview v-if="isSvgaFrame" class="user-detail-frame-media" :src="frameUrl" />
+                <video
+                  v-else-if="isVideoFrame"
+                  class="user-detail-frame-media"
+                  :src="frameUrl"
+                  muted
+                  loop
+                  autoplay
+                  playsinline
+                />
+                <img v-else class="user-detail-frame-media" :src="frameUrl" alt="" />
+              </div>
             </div>
 
             <div>
 
               <h2 class="h5 mb-1">{{ user.name || user.username || '—' }}</h2>
 
-              <StatusBadge :status="user.status || (user.isBanned ? 'banned' : 'active')" />
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <StatusBadge :status="user.status || (user.isBanned ? 'banned' : 'active')" />
+                <span v-if="form.staffRole === 'super'" class="badge text-bg-warning">{{ t('users.roleSuper') }}</span>
+                <span v-else-if="form.staffRole === 'manager'" class="badge text-bg-info">{{ t('users.roleManager') }}</span>
+              </div>
 
             </div>
 
@@ -329,6 +345,24 @@
 
             </div>
 
+            <div class="col-md-4">
+
+              <label class="form-label">{{ t('userDetail.staffRole') }}</label>
+
+              <select v-model="form.staffRole" class="form-select">
+
+                <option value="none">{{ t('userDetail.roleNone') }}</option>
+
+                <option value="manager">{{ t('userDetail.roleManager') }}</option>
+
+                <option value="super">{{ t('userDetail.roleSuper') }}</option>
+
+              </select>
+
+              <div class="form-text">{{ t('userDetail.staffRoleHint') }}</div>
+
+            </div>
+
             <div class="col-md-6">
 
               <div class="form-check form-switch mt-4">
@@ -372,7 +406,7 @@
 
 <script setup>
 
-import { onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { useRoute, useRouter } from 'vue-router'
@@ -382,6 +416,7 @@ import { usersApi, walletApi } from '@/api'
 import { formatDate } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
+import { resolveAsset } from '@/utils/assets'
 
 import PageHeader from '@/components/PageHeader.vue'
 
@@ -395,6 +430,7 @@ import StatusBadge from '@/components/StatusBadge.vue'
 import StatCard from '@/components/StatCard.vue'
 
 import CountryFlag from '@/components/CountryFlag.vue'
+import SvgaPreview from '@/components/SvgaPreview.vue'
 
 const { t } = useI18n()
 
@@ -419,6 +455,7 @@ const walletSuccess = ref('')
 const error = ref('')
 
 const resetting = ref(false)
+const avatarError = ref(false)
 
 const form = reactive({
   name: '',
@@ -436,7 +473,34 @@ const form = reactive({
   coins: 0,
   diamonds: 0,
   genderVerified: false,
+  staffRole: 'none',
 })
+
+const avatarUrl = computed(() => {
+  if (avatarError.value || !user.value) return null
+  const url = user.value.avatarUrl || user.value.avatar
+  if (!url) return null
+  if (String(url).startsWith('http')) return url
+  return resolveAsset(url)
+})
+
+const frameUrl = computed(() => {
+  if (!user.value) return null
+  const raw =
+    user.value.frameAnimUrl
+    || user.value.frameUrl
+    || user.value.vipBadgeUrl
+    || user.value.hostBadgeUrl
+    || null
+  if (!raw) return null
+  if (String(raw).startsWith('http')) return raw
+  return resolveAsset(raw)
+})
+
+const isSvgaFrame = computed(() => /\.svga(\?|$)/i.test(String(frameUrl.value || '')))
+const isVideoFrame = computed(() =>
+  /\.(mp4|webm|mov)(\?|$)/i.test(String(frameUrl.value || '')),
+)
 
 const walletForm = reactive({
 
@@ -483,6 +547,15 @@ watch(user, (u) => {
   form.diamonds = Number(u.diamonds || 0)
 
   form.genderVerified = !!u.genderVerified
+
+  const roleRaw = String(u.staffRole || '').toLowerCase()
+  if (roleRaw === 'super' || roleRaw === 'super_admin' || u.isSuperAdmin || (u.isAdmin && roleRaw !== 'manager')) {
+    form.staffRole = 'super'
+  } else if (roleRaw === 'manager' || u.isManager) {
+    form.staffRole = 'manager'
+  } else {
+    form.staffRole = 'none'
+  }
 
 })
 
@@ -709,4 +782,44 @@ async function runConfirm() {
 onMounted(load)
 
 </script>
+
+<style scoped>
+.user-detail-wear {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+}
+.user-detail-avatar {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--al-teal, #14b8a6), var(--al-cyan, #22d3ee));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.4rem;
+  z-index: 1;
+}
+.user-detail-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-detail-frame {
+  position: absolute;
+  inset: -10%;
+  z-index: 2;
+  pointer-events: none;
+}
+.user-detail-frame-media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+</style>
 

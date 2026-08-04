@@ -7,6 +7,7 @@ import androidx.room.Room;
 import com.Dramizo.Series.BuildConfig;
 import com.Dramizo.Series.billing.BillingHelper;
 import com.Dramizo.Series.data.local.db.AuraDatabase;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
 import com.Dramizo.Series.data.remote.api.AgencyApi;
 import com.Dramizo.Series.data.remote.api.AuthApi;
@@ -101,6 +102,7 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class AppContainer {
     private final Context appContext;
     private final SessionManager sessionManager;
+    private final EncryptedFeatureCache featureCache;
     private final AuraDatabase database;
     private final ExecutorService ioExecutor;
     private final Retrofit retrofit;
@@ -172,6 +174,7 @@ public class AppContainer {
     public AppContainer(Context context) {
         appContext = context.getApplicationContext();
         sessionManager = new SessionManager(appContext);
+        featureCache = new EncryptedFeatureCache(appContext);
         ioExecutor = Executors.newFixedThreadPool(4);
         database = Room.databaseBuilder(appContext, AuraDatabase.class, "auralive.db")
                 .fallbackToDestructiveMigration()
@@ -297,6 +300,7 @@ public class AppContainer {
     }
 
     public SessionManager getSessionManager() { return sessionManager; }
+    public EncryptedFeatureCache getFeatureCache() { return featureCache; }
     public AuraDatabase getDatabase() { return database; }
     public ExecutorService getIoExecutor() { return ioExecutor; }
     public BillingHelper getBillingHelper() { return billingHelper; }

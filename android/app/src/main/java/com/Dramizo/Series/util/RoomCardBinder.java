@@ -194,10 +194,18 @@ public final class RoomCardBinder {
             b.itemCard.setBackgroundResource(android.R.color.transparent);
         }
         if (b.imgCardFrame == null) return;
+        // Prefer room frame; fall back to host-equipped mall card (same as in-room header).
         String url = room != null ? room.roomCardUrl : null;
+        if ((url == null || url.isEmpty()) && room != null && room.host != null) {
+            url = room.host.roomCardUrl;
+        }
         String key = room != null ? room.id : null;
-        // Stretch kenar to card bounds (Mikoo Host-signals room frame).
-        RoomKenarHelper.bind(b.imgCardFrame, b.itemCard, url, key, false, false);
+        String lower = url != null ? url.toLowerCase(Locale.ROOT) : "";
+        boolean animated = lower.contains(".gif")
+                || lower.contains(".webp")
+                || RoomKenarHelper.isRoomFrameUrl(url);
+        // fillItem=false: keep ConstraintLayout constraints on list cards (see RoomKenarHelper).
+        RoomKenarHelper.bind(b.imgCardFrame, b.itemCard, url, key, animated, false);
     }
 
     private static void bindAvatars(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {

@@ -848,13 +848,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             }
-            // Appointed mods still listed as staff should open room tools reliably.
-            if (isRoomStaff()) {
+            // Platform staff (manager / super) get room moderation tools in every room.
+            if (isPlatformManager()) {
+                canMuteUsers = true;
+                canKickUsers = true;
+                canBanUsers = true;
+                canManageSeats = true;
+                canInviteMic = true;
+            }
+            if (isPlatformSuper()) {
+                canManageMusic = true;
+                canChangeFrames = true;
+                canControlGames = true;
+                canMuteUsers = true;
+                canKickUsers = true;
+                canBanUsers = true;
+                canManageSeats = true;
+                canInviteMic = true;
+                canManageRoom = true;
+            }
+            // Appointed room mods (and hosts) should open room tools reliably.
+            boolean appointed =
+                    (myUserId != null && roomModeratorIds.contains(myUserId))
+                    || isHost
+                    || isOwner
+                    || (myUserId != null && sameUser(myUserId, roomCohostId));
+            if (appointed || isPlatformSuper()) {
                 canManageRoom = true;
                 canManageSeats = true;
                 canChangeFrames = true;
                 canBanUsers = true;
                 canManageMusic = true;
+            }
+            // Manager (platform) stays person-focused: mute/kick/ban, not full host settings.
+            if (isPlatformManager() && !isPlatformSuper() && !appointed) {
+                canMuteUsers = true;
+                canKickUsers = true;
+                canBanUsers = true;
+                canManageSeats = true;
+                canInviteMic = true;
+                canManageRoom = false;
+                canManageMusic = false;
+                canChangeFrames = false;
+                canControlGames = false;
             }
             applyMusicState(room.musicUrl, room.musicTitle, room.musicArtist,
                     room.musicStatus, room.musicPositionMs, room.musicStartedAt);
@@ -5808,16 +5844,50 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean canModerateRoom() {
         // Full room settings / admin panel: host, owner, or explicit canManageRoom only.
         // Presence in moderatorIds alone must NOT unlock room admin for everyone.
+        if (isPlatformSuper()) return true;
+        if (isPlatformManager()) return true;
         if (isHost || isOwner) return true;
         return canManageRoom;
     }
 
     /** Soft staff (appointed mods) — used for seat long-press / limited actions. */
     private boolean isRoomStaff() {
+        if (isPlatformStaff()) return true;
         if (isHost || isOwner) return true;
         if (myUserId == null) return false;
         if (myUserId.equals(roomHostId) || myUserId.equals(roomCohostId)) return true;
         return roomModeratorIds.contains(myUserId);
+    }
+
+    /** Platform manager: mute/kick/ban people in any room. */
+    private boolean isPlatformManager() {
+        try {
+            AuthDtos.UserDto u = ContainerProvider.from(this).getSessionManager().getUser();
+            if (u == null) return false;
+            String role = u.staffRole != null ? u.staffRole.trim().toLowerCase() : "";
+            return "manager".equals(role) || "moderator".equals(role) || "mod".equals(role);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    /** Platform super admin (or legacy isAdmin): full room + host-level powers. */
+    private boolean isPlatformSuper() {
+        try {
+            AuthDtos.UserDto u = ContainerProvider.from(this).getSessionManager().getUser();
+            if (u == null) return false;
+            String role = u.staffRole != null ? u.staffRole.trim().toLowerCase() : "";
+            if ("super".equals(role) || "super_admin".equals(role) || "superadmin".equals(role)) {
+                return true;
+            }
+            return u.isAdmin;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private boolean isPlatformStaff() {
+        return isPlatformSuper() || isPlatformManager();
     }
 
     private boolean isFreeMicEnabled() {
@@ -10837,6 +10907,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                     if (next.startsWith("وكالة · ")) next = next.substring("وكالة · ".length()).trim();
                     if (next.startsWith("وكالة ")) next = next.substring("وكالة ".length()).trim();
+                    if (!agency && com.Dramizo.Series.util.ChatContentFilter.containsAgencyImpersonation(next)) {
+                        Toast.makeText(this,
+                                com.Dramizo.Series.util.ChatContentFilter.AGENCY_WORD_REASON,
+                                Toast.LENGTH_LONG).show();
+                        return;
+                    }
                     if (agency && room.agencyId != null && !room.agencyId.isEmpty()) {
                         final String agencyId = room.agencyId;
                         final String name = next;

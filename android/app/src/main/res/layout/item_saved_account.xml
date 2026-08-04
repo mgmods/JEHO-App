@@ -1,41 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    android:background="@drawable/bg_list_card"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingHorizontal="14dp"
-    android:paddingVertical="12dp">
+    android:layout_marginBottom="10dp"
+    app:cardBackgroundColor="#FFFFFFFF"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeColor="#14000000"
+    app:strokeWidth="1dp">
 
-    <TextView
-        android:id="@+id/tvName"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:textColor="@color/text_primary"
-        android:textSize="14sp"
-        android:textStyle="bold" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
 
-    <TextView
-        android:id="@+id/btnSwitch"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_seat_host_chip"
-        android:paddingHorizontal="10dp"
-        android:paddingVertical="4dp"
-        android:text="تبديل"
-        android:textColor="@color/aurora_gold"
-        android:textSize="12sp" />
+        <FrameLayout
+            android:layout_width="58dp"
+            android:layout_height="58dp">
 
-    <TextView
-        android:id="@+id/btnRemove"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:padding="6dp"
-        android:text="حذف"
-        android:textColor="#FF8A9B"
-        android:textSize="12sp" />
-</LinearLayout>
+            <ImageView
+                android:id="@+id/imgAvatar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar" />
+
+            <ImageView
+                android:id="@+id/imgFrame"
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSwitch"
+            style="@style/Widget.AuraLive.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:minWidth="72dp"
+            android:text="@string/account_switch_action"
+            android:textAllCaps="false"
+            android:textSize="12sp" />
+
+        <ImageView
+            android:id="@+id/btnRemove"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/account_remove_action"
+            android:padding="10dp"
+            android:src="@android:drawable/ic_menu_delete"
+            app:tint="#E57373" />
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

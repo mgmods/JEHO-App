@@ -132,8 +132,8 @@ async function onSubmit() {
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   font-weight: 700;
-  color: #04140c;
-  background: linear-gradient(135deg, #e8c47c, #3ddc97);
+  color: #0b0e14;
+  background: linear-gradient(135deg, #9b7cff, #7c4dff);
   margin-bottom: 1.1rem;
 }
 
@@ -164,11 +164,11 @@ async function onSubmit() {
   padding: 0.85rem 1rem;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(61, 220, 151, 0.14);
+  border: 1px solid rgba(124, 77, 255, 0.18);
 }
 
 .login-stats strong {
-  color: #3ddc97;
+  color: #9b7cff;
   font-family: var(--font-display), var(--al-display);
 }
 
@@ -180,7 +180,7 @@ async function onSubmit() {
 .login-logo {
   border-radius: 18px;
   object-fit: cover;
-  filter: drop-shadow(0 8px 24px rgba(61, 220, 151, 0.35));
+  filter: drop-shadow(0 8px 24px rgba(124, 77, 255, 0.4));
 }
 
 .login-sub {
@@ -194,7 +194,7 @@ async function onSubmit() {
 }
 
 .login-hint code {
-  color: #e8c47c;
+  color: #f5c542;
   font-size: 0.78rem;
 }
 
@@ -202,9 +202,9 @@ async function onSubmit() {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 50% 45% at 18% 28%, rgba(61, 220, 151, 0.28), transparent 60%),
-    radial-gradient(ellipse 45% 40% at 82% 68%, rgba(232, 196, 124, 0.14), transparent 55%),
-    radial-gradient(ellipse 40% 35% at 55% 100%, rgba(31, 168, 106, 0.12), transparent 50%);
+    radial-gradient(ellipse 50% 45% at 18% 28%, rgba(124, 77, 255, 0.3), transparent 60%),
+    radial-gradient(ellipse 45% 40% at 82% 68%, rgba(61, 139, 253, 0.14), transparent 55%),
+    radial-gradient(ellipse 40% 35% at 55% 100%, rgba(124, 77, 255, 0.1), transparent 50%);
   animation: aurora-drift 12s ease-in-out infinite alternate;
   z-index: 0;
 }
@@ -213,8 +213,8 @@ async function onSubmit() {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(61, 220, 151, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(61, 220, 151, 0.05) 1px, transparent 1px);
+    linear-gradient(rgba(124, 77, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 77, 255, 0.06) 1px, transparent 1px);
   background-size: 48px 48px;
   mask-image: radial-gradient(circle at center, black, transparent 75%);
   z-index: 1;

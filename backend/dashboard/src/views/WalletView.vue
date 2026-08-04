@@ -99,21 +99,19 @@
                     </div>
                     <span v-if="p.popular" class="badge text-bg-warning">{{ t('common.popular') }}</span>
                   </div>
-                  <div class="mb-2"><strong>{{ formatNumber(p.coins) }}</strong> {{ t('common.coins') }}
+                  <div class="mb-2"><strong class="text-white">{{ formatNumber(p.coins) }}</strong> {{ t('common.coins') }}
                     <span v-if="p.bonusCoins" class="text-success small"> +{{ formatNumber(p.bonusCoins) }}</span>
                   </div>
-                  <div class="mb-2 text-warning">${{ Number(p.priceUsd || 0).toFixed(2) }}</div>
+                  <div class="mb-2"><span class="neo-price">${{ Number(p.priceUsd || 0).toFixed(2) }}</span></div>
                 </div>
               </div>
               <div class="mb-2">
                 <label class="form-label mb-1 small">{{ t('coinPackages.coinImage') }}</label>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <input v-model="p.imageUrl" class="form-control form-control-sm flex-grow-1" placeholder="/assets/pack/..." />
                   <input
                     type="file"
                     accept="image/*,.webp"
                     class="form-control form-control-sm"
-                    style="max-width: 140px"
                     @change="(e) => uploadPackageImage(e, p)"
                   />
                   <button
@@ -196,8 +194,28 @@
 
     <div v-else class="glass p-0 overflow-hidden">
       <div v-if="tab === 'withdraws'" class="px-3 pt-2">
+        <div class="stream-filter-row mb-3">
+          <button
+            type="button"
+            class="stream-chip"
+            :class="{ active: withdrawStreamFilter === 'all' }"
+            @click="withdrawStreamFilter = 'all'"
+          >الكل</button>
+          <button
+            type="button"
+            class="stream-chip stream-chip--personal"
+            :class="{ active: withdrawStreamFilter === 'personal' }"
+            @click="withdrawStreamFilter = 'personal'"
+          >روم شخصي</button>
+          <button
+            type="button"
+            class="stream-chip stream-chip--agency"
+            :class="{ active: withdrawStreamFilter === 'agency' }"
+            @click="withdrawStreamFilter = 'agency'"
+          >وكالة</button>
+        </div>
         <BulkActionBar
-          :count="rows.length"
+          :count="filteredWithdrawRows.length"
           :selected-count="withdrawSelectedCount"
           :all-selected="withdrawAllSelected"
           :some-selected="withdrawSomeSelected"
@@ -232,12 +250,12 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="!rows.length">
+            <tr v-if="!displayRows.length">
               <td :colspan="(tab === 'withdraws' || tab === 'recharges' ? 1 : 0) + headers.length + (tab === 'withdraws' || tab === 'recharges' ? 1 : 0)" class="empty-state">{{ t('common.noRecords') }}</td>
             </tr>
 
             <template v-if="tab === 'transactions'">
-              <tr v-for="r in rows" :key="r.id">
+              <tr v-for="r in displayRows" :key="r.id">
                 <td class="small text-muted">{{ shortId(r.id) }}</td>
                 <td>
                   <div class="fw-medium">{{ displayUser(r) }}</div>
@@ -251,7 +269,7 @@
             </template>
 
             <template v-else-if="tab === 'withdraws'">
-              <tr v-for="r in rows" :key="r.id">
+              <tr v-for="r in displayRows" :key="r.id">
                 <td>
                   <input
                     type="checkbox"
@@ -267,8 +285,23 @@
                 </td>
                 <td>{{ formatNumber(r.amount ?? r.diamonds ?? 0) }} {{ t('common.diamonds') }}</td>
                 <td>
-                  <div>{{ r.method || r.paymentMethod || '—' }}</div>
+                  <div class="d-flex flex-wrap gap-1 mb-1">
+                    <span
+                      v-if="isAgencyHostWithdraw(r)"
+                      class="badge stream-badge stream-badge--agency"
+                    >مضيف وكالة</span>
+                    <span
+                      v-else-if="isAgencyCommissionWithdraw(r)"
+                      class="badge stream-badge stream-badge--agency"
+                    >عمولة وكالة</span>
+                    <span
+                      v-else
+                      class="badge stream-badge stream-badge--personal"
+                    >روم شخصي</span>
+                    <span class="badge text-bg-secondary">{{ r.method || r.paymentMethod || '—' }}</span>
+                  </div>
                   <div class="small text-warning" v-if="payoutAccount(r)">{{ payoutAccount(r) }}</div>
+                  <div class="small text-muted" v-if="agencyNameFromWithdraw(r)">{{ agencyNameFromWithdraw(r) }}</div>
                   <div class="small text-muted" v-if="r.amountFiat != null">${{ Number(r.amountFiat).toFixed(2) }}</div>
                 </td>
                 <td><StatusBadge :status="r.status || 'pending'" /></td>
@@ -399,8 +432,22 @@ const tabs = computed(() => [
 
 const tab = ref('packages')
 const rows = ref([])
+const withdrawStreamFilter = ref('all')
 const packages = ref([])
 const withdrawPackages = ref([])
+
+const filteredWithdrawRows = computed(() => {
+  if (tab.value !== 'withdraws') return rows.value
+  if (withdrawStreamFilter.value === 'all') return rows.value
+  return rows.value.filter((r) => {
+    const agency = isAgencyCommissionWithdraw(r) || isAgencyHostWithdraw(r)
+    return withdrawStreamFilter.value === 'agency' ? agency : !agency
+  })
+})
+
+const displayRows = computed(() =>
+  tab.value === 'withdraws' ? filteredWithdrawRows.value : rows.value,
+)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -538,6 +585,31 @@ function payoutAccount(r) {
   if (!details) return ''
   if (typeof details === 'string') return details
   return details.account || details.email || details.iban || details.wallet || details.address || JSON.stringify(details)
+}
+
+function isAgencyCommissionWithdraw(r) {
+  if (r?.isAgencyHost === true || r?.agencyKind === 'host') return false
+  if (r?.isAgencyCommission === true || r?.stream === 'agency') return true
+  const d = r?.payoutDetails
+  if (!d || typeof d !== 'object') return false
+  const src = String(d.source || d.channel || d.stream || '').toLowerCase()
+  if (src.includes('host')) return false
+  return src.includes('agency')
+}
+
+function isAgencyHostWithdraw(r) {
+  if (r?.isAgencyHost === true || r?.agencyKind === 'host') return true
+  const d = r?.payoutDetails
+  if (!d || typeof d !== 'object') return false
+  const src = String(d.source || d.channel || d.stream || '').toLowerCase()
+  return src === 'agency_host' || (src.includes('agency') && src.includes('host'))
+}
+
+function agencyNameFromWithdraw(r) {
+  const d = r?.payoutDetails
+  if (!d || typeof d !== 'object') return ''
+  const name = d.agencyName ? String(d.agencyName) : ''
+  return name ? `وكالة: ${name}` : ''
 }
 
 function switchTab(id) {
@@ -815,6 +887,48 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.stream-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.stream-chip {
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(0, 0, 0, 0.28);
+  color: #c4b5fd;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.stream-chip.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.45), rgba(56, 189, 248, 0.25));
+  border-color: rgba(167, 139, 250, 0.7);
+  color: #fff;
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.25);
+}
+.stream-chip--personal.active {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.4), rgba(56, 189, 248, 0.2));
+}
+.stream-chip--agency.active {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.35), rgba(245, 158, 11, 0.2));
+  color: #fef3c7;
+}
+.stream-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.stream-badge--personal {
+  background: rgba(34, 211, 238, 0.18);
+  color: #a5f3fc;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+}
+.stream-badge--agency {
+  background: rgba(251, 191, 36, 0.16);
+  color: #fde68a;
+  border: 1px solid rgba(251, 191, 36, 0.4);
+}
 .pkg-thumb {
   width: 72px;
   height: 72px;

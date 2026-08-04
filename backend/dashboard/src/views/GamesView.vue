@@ -126,8 +126,16 @@
           <input v-model="editDraft.titleEn" class="form-control" dir="ltr" />
         </div>
         <div class="mb-3">
-          <label class="form-label small">{{ t('games.coverUrl') }}</label>
-          <input v-model="editDraft.coverUrl" class="form-control" dir="ltr" />
+          <label class="form-label small">{{ t('games.cover') || 'غلاف اللعبة' }}</label>
+          <input type="file" accept="image/*,.webp" class="form-control" @change="onCoverFile" />
+          <div class="form-text">اختر صورة الغلاف — بدون رابط</div>
+          <img
+            v-if="editDraft.coverUrl"
+            :src="editDraft.coverUrl"
+            alt=""
+            class="mt-2 rounded"
+            style="max-height: 96px; object-fit: cover"
+          />
         </div>
         <div class="form-check form-switch mb-4">
           <input id="edit-enabled" v-model="editDraft.enabled" class="form-check-input" type="checkbox" />
@@ -188,7 +196,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { settingsApi, gameStoreApi } from '@/api'
+import { settingsApi, gameStoreApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -219,24 +227,25 @@ const boss = reactive({
 
 const ORIGIN = 'https://api.adnova.bbs.tr'
 const MIKOO = [
-  ['7updown', '7 Up Down'],
-  ['cleopatra-slot', 'Cleopatra Slot'],
-  ['cleopatra-slots', 'Cleopatra Slots'],
-  ['crash', 'Crash'],
-  ['fishing', 'Fishing'],
-  ['football-plinko', 'Football Plinko'],
+  ['7updown', '٧ فوق تحت', '7 Up Down'],
+  ['cleopatra-slot', 'كليوباترا', 'Cleopatra Slot'],
+  ['cleopatra-slots', 'فتحات كليوباترا', 'Cleopatra Spins'],
+  ['crash', 'كراش', 'Crash'],
+  ['fishing', 'صيد السمك', 'Fishing'],
+  ['football-plinko', 'بلينكو كرة القدم', 'Football Plinko'],
   ['fortune-slot', 'جواهر الحظ', 'Fortune Gems'],
-  ['greedy-box', 'Greedy Box'],
-  ['hilo', 'Hilo'],
-  ['line-slots', 'Line Slots'],
-  ['luck-car', 'Luck Car'],
-  ['megaways-slots', 'Megaways Slots'],
-  ['olympians', 'Olympians'],
-  ['pirate-king', 'Pirate King'],
-  ['royal-battle', 'Royal Battle'],
-  ['slot777', 'Slot 777'],
-  ['sugar-rush', 'Sugar Rush'],
-  ['swimsuit-party', 'Swimsuit Party'],
+  ['greedy-box', 'صندوق الطمع', 'Greedy Box'],
+  ['hilo', 'هاي لو', 'Hilo'],
+  ['line-slots', 'فتحات الخط', 'Line slots'],
+  ['luck-car', 'سيارة الحظ', 'Lucky Car'],
+  ['lucky77', 'لاكي ٧٧', 'Lucky 77'],
+  ['megaways-slots', 'ميجاوايز', 'Megaways Slots'],
+  ['olympians', 'الأوليمبيون', 'Olympians'],
+  ['pirate-king', 'ملك القراصنة', 'Pirate King'],
+  ['royal-battle', 'المعركة الملكية', 'Royal Battle'],
+  ['slot777', 'سلوت ٧٧٧', 'Slot 777'],
+  ['sugar-rush', 'سكر راش', 'Sugar Rush'],
+  ['swimsuit-party', 'حفلة السباحة', 'Swimsuit Party'],
 ]
 
 function isLegacyHtmlGame(g) {
@@ -259,7 +268,7 @@ function buildDefaults() {
     id,
     title,
     titleEn: titleEn || title,
-    coverUrl: `${ORIGIN}/games/mikoo/covers/${id}.png?v=20260728c`,
+    coverUrl: `${ORIGIN}/games/mikoo/covers/${id}.png?v=20260804g`,
     playUrl: `${ORIGIN}/games/mikoo/${id}/index.html`,
     sortOrder: order++,
     mode: 'mikoo_slot',
@@ -312,6 +321,23 @@ function openEdit(idx) {
 function closeEdit() {
   editIdx.value = null
   editDraft.value = null
+}
+
+async function onCoverFile(e) {
+  const file = e.target.files?.[0]
+  if (!file || !editDraft.value) return
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  let url = data?.url || data?.data?.url || ''
+  if (url && !String(url).startsWith('http')) {
+    url = `${ORIGIN}${String(url).startsWith('/') ? '' : '/'}${url}`
+  }
+  editDraft.value.coverUrl = url
+  toast().success(t('app.success') || 'تم')
+  e.target.value = ''
 }
 
 function applyEdit() {

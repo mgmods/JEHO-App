@@ -11,6 +11,7 @@ import { IS_PUBLIC_KEY } from '../decorators';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
+import { normalizeStaffRole } from '../staff-role';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -62,12 +63,14 @@ export class JwtAuthGuard implements CanActivate {
         }
         return false;
       }
+      const staffRole = normalizeStaffRole(user);
       request.user = {
         ...payload,
         sub: user.id,
         username: user.username,
-        isAdmin: user.isAdmin,
-        role: user.isAdmin ? 'admin' : 'user',
+        isAdmin: user.isAdmin || staffRole === 'super',
+        staffRole,
+        role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
         isGuest: user.isGuest,
       };
       return true;

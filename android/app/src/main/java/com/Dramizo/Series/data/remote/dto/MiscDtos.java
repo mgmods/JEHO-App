@@ -47,6 +47,9 @@ public final class MiscDtos {
         @SerializedName("id") public String id;
         @SerializedName("name") public String name;
         @SerializedName("logoUrl") public String logoUrl;
+        @SerializedName("coverUrl") public String coverUrl;
+        /** Decorative frame / room card overlay when live. */
+        @SerializedName("frameUrl") public String frameUrl;
         @SerializedName("description") public String description;
         @SerializedName("memberCount") public int memberCount;
         @SerializedName("ownerId") public String ownerId;
@@ -56,6 +59,17 @@ public final class MiscDtos {
         @SerializedName("activationCode") public String activationCode;
         @SerializedName("notificationStyle") public String notificationStyle;
         @SerializedName("members") public java.util.List<AgencyMemberDto> members;
+        /** Short shareable agency ID (admin-assigned). */
+        @SerializedName("publicId") public String publicId;
+        /** Official verified badge for active agencies. */
+        @SerializedName("isVerified") public boolean isVerified;
+        @SerializedName("exclusiveFrameCode") public String exclusiveFrameCode;
+        @SerializedName("exclusiveRoomCardCode") public String exclusiveRoomCardCode;
+        @SerializedName("exclusiveFrameUrl") public String exclusiveFrameUrl;
+        /** True when an agency voice room is open with an active host. */
+        @SerializedName("isLive") public boolean isLive;
+        @SerializedName("openRoomId") public String openRoomId;
+        @SerializedName("liveViewerCount") public int liveViewerCount;
     }
 
     public static class AgencyMemberDto {
@@ -414,21 +428,95 @@ public final class MiscDtos {
     public static class AgencyEarningsDto {
         @SerializedName("agencyId") public String agencyId;
         @SerializedName("name") public String name;
+        @SerializedName("ownerId") public String ownerId;
         @SerializedName("commissionPercent") public double commissionPercent;
         @SerializedName("platformCutPercent") public double platformCutPercent;
         @SerializedName("hostSharePercent") public double hostSharePercent;
+        @SerializedName("memberCount") public int memberCount;
+        @SerializedName("diamondUsdRate") public double diamondUsdRate;
         @SerializedName("totals") public AgencyEarningsTotals totals;
+        @SerializedName("periods") public AgencyEarningsPeriods periods;
+        /** Live withdrawable pools — agency vs personal never mixed */
+        @SerializedName("available") public AgencyAvailableBalances available;
         @SerializedName("explanation") public Map<String, String> explanation;
+    }
+
+    public static class AgencyAvailableBalances {
+        @SerializedName("agencyDiamonds") public long agencyDiamonds;
+        @SerializedName("agencyUsd") public double agencyUsd;
+        @SerializedName("personalDiamonds") public long personalDiamonds;
+        @SerializedName("personalUsd") public double personalUsd;
+    }
+
+    public static class AgencyEarningsPeriods {
+        @SerializedName("week") public AgencyPeriodSlice week;
+        @SerializedName("month") public AgencyPeriodSlice month;
+        @SerializedName("allTime") public AgencyPeriodSlice allTime;
+    }
+
+    public static class AgencyPeriodSlice {
+        @SerializedName("from") public String from;
+        @SerializedName("grossGiftsDiamonds") public long grossGiftsDiamonds;
+        @SerializedName("ownerCommissionEarned") public long ownerCommissionEarned;
+        @SerializedName("ownerCommissionUsd") public double ownerCommissionUsd;
+        @SerializedName("estimatedHostShare") public long estimatedHostShare;
+        @SerializedName("estimatedHostShareUsd") public double estimatedHostShareUsd;
+        @SerializedName("estimatedAgentShare") public long estimatedAgentShare;
+        @SerializedName("estimatedPlatformCut") public long estimatedPlatformCut;
+        @SerializedName("grossGiftsUsd") public double grossGiftsUsd;
+    }
+
+    public static class AgencyHostDashboardDto {
+        @SerializedName("giftsGrossWeek") public long giftsGrossWeek;
+        @SerializedName("giftsGrossMonth") public long giftsGrossMonth;
+        @SerializedName("giftsGrossAllTime") public long giftsGrossAllTime;
+        @SerializedName("diamondsEarnedWeek") public long diamondsEarnedWeek;
+        @SerializedName("diamondsEarnedMonth") public long diamondsEarnedMonth;
+        @SerializedName("diamondsEarnedAllTime") public long diamondsEarnedAllTime;
+        @SerializedName("usdEarnedWeek") public double usdEarnedWeek;
+        @SerializedName("usdEarnedMonth") public double usdEarnedMonth;
+        @SerializedName("usdEarnedAllTime") public double usdEarnedAllTime;
+        @SerializedName("walletDiamonds") public long walletDiamonds;
+        @SerializedName("walletUsd") public double walletUsd;
+        @SerializedName("personalDiamonds") public long personalDiamonds;
+        @SerializedName("personalUsd") public double personalUsd;
+        @SerializedName("agencyDiamonds") public long agencyDiamonds;
+        @SerializedName("agencyUsd") public double agencyUsd;
+        @SerializedName("diamondUsdRate") public double diamondUsdRate;
+        @SerializedName("weekFrom") public String weekFrom;
+        @SerializedName("monthFrom") public String monthFrom;
     }
 
     public static class AgencyEarningsTotals {
         @SerializedName("grossGiftsDiamonds") public long grossGiftsDiamonds;
         @SerializedName("agencyTotalDiamonds") public long agencyTotalDiamonds;
         @SerializedName("ownerCommissionEarned") public long ownerCommissionEarned;
+        @SerializedName("ownerCommissionUsd") public double ownerCommissionUsd;
         @SerializedName("estimatedHostShare") public long estimatedHostShare;
+        @SerializedName("estimatedHostShareUsd") public double estimatedHostShareUsd;
         @SerializedName("estimatedPlatformCut") public long estimatedPlatformCut;
         @SerializedName("estimatedAgentShare") public long estimatedAgentShare;
         @SerializedName("platformRevenueAllTime") public long platformRevenueAllTime;
+    }
+
+    public static class AgencyPayoutRequestDto {
+        @SerializedName("id") public String id;
+        @SerializedName("agencyId") public String agencyId;
+        @SerializedName("hostUserId") public String hostUserId;
+        @SerializedName("diamonds") public long diamonds;
+        @SerializedName("amountUsd") public double amountUsd;
+        @SerializedName("diamondUsdRate") public double diamondUsdRate;
+        @SerializedName("method") public String method;
+        @SerializedName("payoutDetails") public Map<String, Object> payoutDetails;
+        @SerializedName("status") public String status;
+        @SerializedName("reviewNote") public String reviewNote;
+        @SerializedName("createdAt") public String createdAt;
+        @SerializedName("host") public AuthDtos.UserDto host;
+    }
+
+    public static class AgencyPayoutListDto {
+        @SerializedName("items") public java.util.List<AgencyPayoutRequestDto> items;
+        @SerializedName("diamondUsdRate") public double diamondUsdRate;
     }
 
     public static class AgencyMineDto {
@@ -440,6 +528,7 @@ public final class MiscDtos {
         @SerializedName("roomId") public String roomId;
         @SerializedName("application") public AgencyApplicationDto application;
         @SerializedName("earnings") public AgencyEarningsDto earnings;
+        @SerializedName("hostDashboard") public AgencyHostDashboardDto hostDashboard;
 
         public boolean isEligibleHost() {
             if (!canHostRoom || agency == null || agency.id == null) return false;
@@ -451,9 +540,9 @@ public final class MiscDtos {
                     || agencyStatus.isEmpty()
                     || "active".equalsIgnoreCase(agencyStatus)
                     || "approved".equalsIgnoreCase(agencyStatus);
+            // Broadcast only for agency owner / manager (admin). Regular hosts: stats only.
             boolean roleAllowed = "owner".equalsIgnoreCase(role)
-                    || "manager".equalsIgnoreCase(role)
-                    || "host".equalsIgnoreCase(role);
+                    || "manager".equalsIgnoreCase(role);
             return activeMembership && activeAgency && roleAllowed;
         }
     }

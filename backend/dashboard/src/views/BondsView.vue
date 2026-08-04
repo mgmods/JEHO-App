@@ -7,24 +7,35 @@
     <AlertMessage v-if="error" :message="error" type="danger" class="mb-3" />
     <AlertMessage v-if="ok" :message="ok" type="success" class="mb-3" />
 
-    <div class="glass p-3 mb-3">
-      <h5 class="mb-3">أيقونات الارتباط</h5>
-      <div class="row g-3">
-        <div v-for="b in bonds" :key="b.key" class="col-md-6">
-          <label class="form-label">{{ b.label }} — رابط الأيقونة</label>
-          <input v-model.trim="icons[b.key]" class="form-control" :placeholder="`/assets/bonds/${b.key}.png`" />
-        </div>
-      </div>
-    </div>
-
-    <div class="glass p-3 mb-3">
-      <h5 class="mb-3">تكلفة هدية الارتباط (كوينز — تُخصم من طالب الارتباط عند الموافقة)</h5>
-      <div class="row g-3">
-        <div v-for="b in bonds" :key="'c-' + b.key" class="col-md-4">
-          <label class="form-label">{{ b.label }}</label>
+    <div class="widget-grid mb-3">
+      <article v-for="b in bonds" :key="b.key" class="widget-card">
+        <div class="widget-card-body">
+          <h4 class="widget-card-title mb-2">{{ b.label }}</h4>
+          <div class="bond-preview mb-2">
+            <img v-if="icons[b.key]" :src="absUrl(icons[b.key])" alt="" />
+            <span v-else class="text-muted small">بدون أيقونة</span>
+          </div>
+          <label class="form-label small">أيقونة</label>
+          <input
+            type="file"
+            accept="image/*,.webp,.gif"
+            class="form-control form-control-sm"
+            @change="(e) => onIconFile(e, b.key)"
+          />
+          <div class="form-text">اختر ملف — بدون رابط</div>
+          <button
+            v-if="icons[b.key]"
+            class="btn btn-sm btn-outline-danger mt-2"
+            type="button"
+            @click="icons[b.key] = ''"
+          >
+            مسح
+          </button>
+          <hr class="my-3 opacity-25" />
+          <label class="form-label small">تكلفة (كوينز)</label>
           <input v-model.number="costs[b.key]" type="number" min="0" class="form-control" />
         </div>
-      </div>
+      </article>
     </div>
 
     <button class="btn btn-aurora" type="button" :disabled="saving" @click="save">
@@ -35,10 +46,12 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { settingsApi } from '@/api'
+import { settingsApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
+
+const ORIGIN = 'https://api.adnova.bbs.tr'
 
 const bonds = [
   { key: 'sibling', label: 'أخوة' },
@@ -57,15 +70,31 @@ bonds.forEach((b) => {
   costs[b.key] = b.key === 'couple' ? 2000 : b.key === 'love' ? 1000 : b.key === 'fans' ? 200 : 500
 })
 
-const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const ok = ref('')
 
+function absUrl(u) {
+  if (!u) return ''
+  if (String(u).startsWith('http')) return u
+  return `${ORIGIN}${String(u).startsWith('/') ? '' : '/'}${u}`
+}
+
+async function onIconFile(e, key) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  icons[key] = absUrl(data?.url || data?.data?.url || '')
+  toast().success('تم رفع الأيقونة')
+  e.target.value = ''
+}
+
 async function load() {
-  loading.value = true
   const { data, error: err } = await settingsApi.get()
-  loading.value = false
   if (err) {
     error.value = err.message
     toast().danger(err.message)
@@ -106,3 +135,21 @@ async function save() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.bond-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(139, 92, 246, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.bond-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+</style>

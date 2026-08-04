@@ -3,17 +3,24 @@ package com.Dramizo.Series.presentation.agency;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivityAgencyManageBinding;
 import com.Dramizo.Series.databinding.DialogAgencyConfirmBinding;
+import com.Dramizo.Series.databinding.DialogAgencySheetFormBinding;
+import com.Dramizo.Series.databinding.DialogAgencySheetListBinding;
+import com.Dramizo.Series.databinding.ItemAgencyMenuRowBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
@@ -30,9 +37,11 @@ import com.Dramizo.Series.util.RoomOpenChooser;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-/** Full-screen agency management (members, code, notice) — not a bottom sheet. */
+/** Agency manage hub — custom menu rows + custom bottom-sheet dialogs. */
 public class AgencyManageActivity extends ThemedActivity {
     public static final String EXTRA_AGENCY_ID = "agency_id";
 
@@ -41,9 +50,10 @@ public class AgencyManageActivity extends ThemedActivity {
     private String agencyId;
     private boolean isOwner;
     private MiscDtos.AgencyMineDto myAgency;
-    private String[] addRoleKeys = new String[]{"host", "member"};
-    private final java.util.List<MiscDtos.AgencyMemberDto> allMembers = new java.util.ArrayList<>();
-    private String memberQuery = "";
+    private String activationCode = "";
+    private int knownTotalMembers = 0;
+    private final List<MiscDtos.AgencyMemberDto> pendingMembers = new ArrayList<>();
+    private String notificationStyle = "welcome";
 
     private final String[] styleKeys = {"welcome", "elite", "family", "spark"};
     private final String[] styleLabels = {
@@ -69,98 +79,23 @@ public class AgencyManageActivity extends ThemedActivity {
         vm = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(AgencyViewModel.class);
 
-        android.widget.ArrayAdapter<String> styleAdapter = new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, styleLabels);
-        binding.spinnerNotificationStyle.setAdapter(styleAdapter);
+        setupMenuRow(binding.menuSearchHosts, R.string.agency_manage_menu_search, v -> dialogSearchHosts());
+        setupMenuRow(binding.menuAddHost, R.string.agency_manage_menu_add, v -> dialogAddHost());
+        setupMenuRow(binding.menuPending, R.string.agency_manage_menu_pending, v -> dialogPending());
+        setupMenuRow(binding.menuCode, R.string.agency_manage_menu_code, v -> dialogActivationCode());
+        setupMenuRow(binding.menuStyle, R.string.agency_manage_menu_style, v -> dialogNoticeStyle());
+        setupMenuRow(binding.menuBranding, R.string.agency_manage_menu_branding, v -> dialogBranding());
+        setupMenuRow(binding.menuMall, R.string.agency_manage_menu_mall, v -> openMall("host_badge"));
 
-        binding.btnCopyActivationCode.setOnClickListener(v -> {
-            CharSequence code = binding.tvActivationCode.getText();
-            if (code == null || code.length() == 0 || "—".contentEquals(code)) {
-                Toast.makeText(this, "لا يوجد كود بعد — اطلبه من لوحة الإدارة", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            if (clipboard != null) {
-                clipboard.setPrimaryClip(ClipData.newPlainText("activationCode", code));
-                Toast.makeText(this, R.string.agency_copied, Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        binding.spinnerNotificationStyle.setOnItemSelectedListener(
-                new android.widget.AdapterView.OnItemSelectedListener() {
-                    private boolean ready;
-                    @Override
-                    public void onItemSelected(android.widget.AdapterView<?> parent, View view,
-                                               int position, long id) {
-                        if (!ready) {
-                            ready = true;
-                            return;
-                        }
-                        if (position < 0 || position >= styleKeys.length) return;
-                        vm.updateNotificationStyle(agencyId, styleKeys[position]);
-                    }
-                    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-                });
-
-        binding.btnOpenAgencyStream.setOnClickListener(v -> {
+        binding.menuLive.setOnClickListener(v -> {
             if (myAgency != null && myAgency.isEligibleHost()) {
                 RoomOpenChooser.showChooser(this, myAgency);
             } else {
-                String name = null;
-                if (myAgency != null && myAgency.agency != null && myAgency.agency.name != null) {
-                    name = myAgency.agency.name;
-                }
+                String name = myAgency != null && myAgency.agency != null ? myAgency.agency.name : null;
                 AgencyRoomLauncher.open(this, agencyId, name);
             }
         });
-
-        binding.btnDeleteAgencyManage.setOnClickListener(v -> confirmDeleteAgency());
-
-        binding.btnAddMember.setOnClickListener(v -> {
-            String uid = binding.etUserId.getText() != null
-                    ? binding.etUserId.getText().toString().trim() : "";
-            if (uid.isEmpty()) {
-                Toast.makeText(this, "أدخل ID المستخدم من الملف الشخصي", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            int roleIdx = binding.spinnerAddRole.getSelectedItemPosition();
-            if (roleIdx < 0 || roleIdx >= addRoleKeys.length) roleIdx = 0;
-            vm.addMember(agencyId, uid, addRoleKeys[roleIdx]);
-            binding.etUserId.setText("");
-            binding.getRoot().postDelayed(this::reload, 700);
-        });
-
-        // Keep focused EditTexts above the soft keyboard inside NestedScrollView.
-        EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etUserId);
-        if (binding.etMemberSearch != null) {
-            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etMemberSearch);
-        }
-        if (binding.etAgencyName != null) {
-            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etAgencyName);
-        }
-        if (binding.etAgencyWelcome != null) {
-            EdgeToEdgeHelper.keepAboveImeOnFocus(binding.etAgencyWelcome);
-        }
-
-        if (binding.btnSaveAgencyBranding != null) {
-            binding.btnSaveAgencyBranding.setOnClickListener(v -> {
-                String name = binding.etAgencyName.getText() != null
-                        ? binding.etAgencyName.getText().toString().trim() : "";
-                String welcome = binding.etAgencyWelcome.getText() != null
-                        ? binding.etAgencyWelcome.getText().toString().trim() : "";
-                if (name.length() < 2) {
-                    Toast.makeText(this, "أدخل اسم وكالة صالحاً", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                vm.updateAgencyBranding(agencyId, name, welcome);
-            });
-        }
-        if (binding.btnAgencyMallFrames != null) {
-            binding.btnAgencyMallFrames.setOnClickListener(v -> openMall("host_badge"));
-        }
-        if (binding.btnAgencyMallBadges != null) {
-            binding.btnAgencyMallBadges.setOnClickListener(v -> openMall("level_badge"));
-        }
+        binding.menuDelete.setOnClickListener(v -> confirmDeleteAgency());
 
         vm.getMessage().observe(this, m -> {
             if ("agency_deleted".equals(m)) {
@@ -175,25 +110,17 @@ public class AgencyManageActivity extends ThemedActivity {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_LONG).show();
         });
 
-        if (binding.etMemberSearch != null) {
-            binding.etMemberSearch.addTextChangedListener(new android.text.TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                @Override
-                public void afterTextChanged(android.text.Editable s) {
-                    memberQuery = s != null ? s.toString().trim() : "";
-                    renderMembers();
-                }
-            });
-        }
-
         reload();
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // Fresh data when returning from other screens; skip first frame after onCreate.
+    private void setupMenuRow(ItemAgencyMenuRowBinding row, int labelRes, View.OnClickListener click) {
+        if (row == null) return;
+        row.tvMenuLabel.setText(labelRes);
+        row.getRoot().setOnClickListener(click);
+    }
+
+    private void setMenuLabel(ItemAgencyMenuRowBinding row, CharSequence text) {
+        if (row != null && row.tvMenuLabel != null) row.tvMenuLabel.setText(text);
     }
 
     private void reload() {
@@ -203,6 +130,8 @@ public class AgencyManageActivity extends ThemedActivity {
             Result<MiscDtos.AgencyDto> r = ApiCall.execute(c.getAgencyApi().get(agencyId));
             Result<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>> pendingResult =
                     ApiCall.execute(c.getAgencyApi().joinRequests(agencyId));
+            Result<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>> countProbe =
+                    ApiCall.execute(c.getAgencyApi().listMembers(agencyId, "", 1, 1, "active"));
             Result<MiscDtos.AgencyMineDto> mineResult = c.getAgencyRepository().mine();
             runOnUiThread(() -> {
                 if (isFinishing() || binding == null) return;
@@ -214,6 +143,12 @@ public class AgencyManageActivity extends ThemedActivity {
                     finish();
                     return;
                 }
+                if (countProbe.success && countProbe.data != null) {
+                    knownTotalMembers = countProbe.data.resolveTotal();
+                } else if (r.data.memberCount > 0) {
+                    knownTotalMembers = r.data.memberCount;
+                }
+
                 if (mineResult.success && mineResult.data != null) {
                     myAgency = mineResult.data;
                     String role = mineResult.data.role != null
@@ -223,102 +158,317 @@ public class AgencyManageActivity extends ThemedActivity {
                             && agencyId.equals(mineResult.data.agency.id);
                     if (mineResult.data.agency != null) {
                         MiscDtos.AgencyDto ag = mineResult.data.agency;
-                        if (binding.tvAgencyHeroName != null) {
-                            binding.tvAgencyHeroName.setText(
-                                    ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                        binding.tvAgencyHeroName.setText(
+                                ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                        binding.tvAgencyHeroMeta.setText(getString(
+                                R.string.agency_manage_meta_format,
+                                Math.max(0, knownTotalMembers > 0
+                                        ? knownTotalMembers : ag.memberCount),
+                                roleAr(role)));
+                        if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
+                            Glide.with(this)
+                                    .load(AssetCatalog.absoluteUrl(ag.logoUrl))
+                                    .circleCrop()
+                                    .placeholder(R.drawable.icon_agency)
+                                    .into(binding.imgAgencyLogo);
                         }
-                        if (binding.tvAgencyHeroMeta != null) {
-                            binding.tvAgencyHeroMeta.setText(
-                                    "أعضاء " + Math.max(0, ag.memberCount)
-                                            + " · " + roleAr(role));
-                        }
-                        if (binding.imgAgencyLogo != null) {
-                            if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
-                                Glide.with(this)
-                                        .load(AssetCatalog.absoluteUrl(ag.logoUrl))
-                                        .circleCrop()
-                                        .placeholder(R.drawable.icon_agency)
-                                        .into(binding.imgAgencyLogo);
-                            } else {
-                                binding.imgAgencyLogo.setImageResource(R.drawable.icon_agency);
-                            }
-                        }
-                        if (binding.boxAgencyBranding != null) {
-                            binding.boxAgencyBranding.setVisibility(isOwner ? View.VISIBLE : View.GONE);
-                            if (isOwner) {
-                                if (binding.etAgencyName != null) {
-                                    binding.etAgencyName.setText(ag.name != null ? ag.name : "");
-                                }
-                                if (binding.etAgencyWelcome != null) {
-                                    String welcome = ag.description != null ? ag.description : "";
-                                    binding.etAgencyWelcome.setText(welcome);
-                                }
-                            }
-                        }
-                        String code = mineResult.data.agency.activationCode;
-                        if (code != null && !code.isEmpty()) {
-                            binding.tvActivationCode.setText(code);
-                        }
-                        String style = mineResult.data.agency.notificationStyle;
-                        if (style != null) {
-                            for (int i = 0; i < styleKeys.length; i++) {
-                                if (styleKeys[i].equalsIgnoreCase(style)) {
-                                    binding.spinnerNotificationStyle.setSelection(i);
-                                    break;
-                                }
-                            }
-                        }
-                        // Read-only commission — admin sets it from dashboard.
-                        binding.boxCommission.setVisibility(View.VISIBLE);
+                        activationCode = ag.activationCode != null ? ag.activationCode : "";
+                        if (ag.notificationStyle != null) notificationStyle = ag.notificationStyle;
+                        binding.tvCommission.setVisibility(View.VISIBLE);
                         binding.tvCommission.setText(String.format(Locale.US,
                                 getString(R.string.agency_commission_value_format),
-                                mineResult.data.agency.commissionPercent));
+                                ag.commissionPercent));
                     }
                 }
-                binding.btnDeleteAgencyManage.setVisibility(isOwner ? View.VISIBLE : View.GONE);
 
-                addRoleKeys = isOwner
-                        ? new String[]{"host", "manager", "member"}
-                        : new String[]{"host", "member"};
-                String[] addRoleLabels = isOwner
-                        ? new String[]{"مضيف (يفتح البث)", "أدمن وكالة", "عضو"}
-                        : new String[]{"مضيف (يفتح البث)", "عضو"};
-                binding.spinnerAddRole.setAdapter(new android.widget.ArrayAdapter<>(
-                        this, android.R.layout.simple_spinner_dropdown_item, addRoleLabels));
-
-                java.util.ArrayList<MiscDtos.AgencyMemberDto> merged = new java.util.ArrayList<>();
-                java.util.HashSet<String> seen = new java.util.HashSet<>();
+                pendingMembers.clear();
                 if (pendingResult.success && pendingResult.data != null
                         && pendingResult.data.items != null) {
                     for (MiscDtos.AgencyMemberDto m : pendingResult.data.items) {
                         if (m == null || m.userId == null || m.userId.isEmpty()) continue;
                         if (!m.isPending()) m.status = "pending";
-                        merged.add(m);
-                        seen.add(m.userId);
+                        pendingMembers.add(m);
                     }
                 }
-                if (r.data.members != null) {
-                    for (MiscDtos.AgencyMemberDto m : r.data.members) {
-                        if (m == null || m.userId == null || m.userId.isEmpty()) continue;
-                        if (seen.contains(m.userId)) continue;
-                        merged.add(m);
-                        seen.add(m.userId);
-                    }
-                }
-                r.data.members = merged;
-                allMembers.clear();
-                allMembers.addAll(merged);
+                setMenuLabel(binding.menuPending, pendingMembers.isEmpty()
+                        ? getString(R.string.agency_manage_menu_pending)
+                        : getString(R.string.agency_manage_menu_pending)
+                        + " (" + pendingMembers.size() + ")");
 
-                binding.tilUserId.setVisibility(View.VISIBLE);
-                binding.btnAddMember.setVisibility(View.VISIBLE);
-                binding.tvAddRoleLabel.setVisibility(View.VISIBLE);
-                binding.spinnerAddRole.setVisibility(View.VISIBLE);
+                if (binding.menuBranding != null) {
+                    binding.menuBranding.getRoot().setVisibility(isOwner ? View.VISIBLE : View.GONE);
+                }
+                binding.menuDelete.setVisibility(isOwner ? View.VISIBLE : View.GONE);
                 boolean canOpen = myAgency != null && myAgency.isEligibleHost()
                         && myAgency.agency != null && agencyId.equals(myAgency.agency.id);
-                binding.btnOpenAgencyStream.setVisibility(canOpen ? View.VISIBLE : View.GONE);
-                renderMembers();
+                binding.menuLive.setVisibility(canOpen ? View.VISIBLE : View.GONE);
             });
         });
+    }
+
+    // ─── Custom bottom sheets ───────────────────────────────────────────
+
+    @NonNull
+    private BottomSheetDialog openSheet(@NonNull View content) {
+        BottomSheetDialog sheet = AuraDialogHelper.bottomSheet(this);
+        AuraDialogHelper.applyContent(content);
+        sheet.setContentView(content);
+        sheet.show();
+        return sheet;
+    }
+
+    private void dialogSearchHosts() {
+        DialogAgencySheetFormBinding form = DialogAgencySheetFormBinding.inflate(getLayoutInflater());
+        form.tvSheetTitle.setText(R.string.agency_manage_menu_search);
+        form.tvSheetMessage.setVisibility(View.VISIBLE);
+        form.tvSheetMessage.setText(R.string.agency_members_search_min);
+        form.etSheetInput.setHint(R.string.agency_members_search_min);
+        form.btnSheetOk.setText(R.string.agency_search_members);
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        EdgeToEdgeHelper.keepAboveImeOnFocus(form.etSheetInput);
+        form.btnSheetCancel.setOnClickListener(v -> sheet.dismiss());
+        form.btnSheetOk.setOnClickListener(v -> {
+            String q = textOf(form.etSheetInput);
+            if (q.isEmpty()) {
+                Toast.makeText(this, R.string.agency_members_search_min, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            sheet.dismiss();
+            runSearchAndShow(q);
+        });
+    }
+
+    private void runSearchAndShow(String q) {
+        binding.progressMembers.setVisibility(View.VISIBLE);
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.ListResult<MiscDtos.AgencyMemberDto>> r =
+                    ApiCall.execute(c.getAgencyApi().listMembers(agencyId, q, 1, 20, "active"));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                binding.progressMembers.setVisibility(View.GONE);
+                List<MiscDtos.AgencyMemberDto> hits = new ArrayList<>();
+                if (r.success && r.data != null && r.data.items != null) hits.addAll(r.data.items);
+                if (hits.isEmpty()) {
+                    Toast.makeText(this, R.string.agency_no_search_hits, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                ArrayList<String> labels = new ArrayList<>();
+                ArrayList<Runnable> actions = new ArrayList<>();
+                for (MiscDtos.AgencyMemberDto m : hits) {
+                    String name = m.user != null
+                            ? (m.user.displayName != null ? m.user.displayName : m.user.username)
+                            : m.userId;
+                    String pid = m.user != null ? m.user.displayPublicId() : "";
+                    labels.add((name != null ? name : "—")
+                            + (pid.isEmpty() ? "" : (" · ID " + pid))
+                            + " · " + roleAr(m.role));
+                    actions.add(() -> showMemberActions(
+                            m, name, pid, m.isActive == null || !m.isActive));
+                }
+                showCustomList(getString(R.string.agency_manage_menu_search), labels, actions);
+            });
+        });
+    }
+
+    private void dialogAddHost() {
+        DialogAgencySheetFormBinding form = DialogAgencySheetFormBinding.inflate(getLayoutInflater());
+        form.tvSheetTitle.setText(R.string.agency_manage_menu_add);
+        form.tvSheetMessage.setVisibility(View.VISIBLE);
+        form.tvSheetMessage.setText("أدخل آي دي المضيف من الملف الشخصي");
+        form.etSheetInput.setHint("ID المضيف");
+        form.btnSheetOk.setText(R.string.agency_manage_menu_add);
+
+        final String[] roleKeys = isOwner
+                ? new String[]{"host", "manager"}
+                : new String[]{"host"};
+        final String[] roleLabels = isOwner
+                ? new String[]{"مضيف (أرباح فقط)", "أدمن وكالة (بث)"}
+                : new String[]{"مضيف (أرباح فقط)"};
+        final int[] roleIdx = {0};
+        form.boxRoleChoices.setVisibility(View.VISIBLE);
+        form.boxRoleChoices.removeAllViews();
+        TextView[] chips = new TextView[roleLabels.length];
+        for (int i = 0; i < roleLabels.length; i++) {
+            final int idx = i;
+            TextView chip = (TextView) LayoutInflater.from(this)
+                    .inflate(R.layout.item_agency_sheet_choice, form.boxRoleChoices, false);
+            chip.setText(roleLabels[i]);
+            chips[i] = chip;
+            chip.setOnClickListener(v -> {
+                roleIdx[0] = idx;
+                styleRoleChips(chips, idx);
+            });
+            form.boxRoleChoices.addView(chip);
+        }
+        styleRoleChips(chips, 0);
+
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        EdgeToEdgeHelper.keepAboveImeOnFocus(form.etSheetInput);
+        form.btnSheetCancel.setOnClickListener(v -> sheet.dismiss());
+        form.btnSheetOk.setOnClickListener(v -> {
+            String uid = textOf(form.etSheetInput);
+            if (uid.isEmpty()) {
+                Toast.makeText(this, "أدخل ID المضيف", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            int i = Math.max(0, Math.min(roleIdx[0], roleKeys.length - 1));
+            sheet.dismiss();
+            vm.addMember(agencyId, uid, roleKeys[i]);
+            binding.getRoot().postDelayed(this::reload, 700);
+        });
+    }
+
+    private void styleRoleChips(TextView[] chips, int selected) {
+        for (int i = 0; i < chips.length; i++) {
+            if (chips[i] == null) continue;
+            boolean on = i == selected;
+            chips[i].setBackgroundResource(on
+                    ? R.drawable.bg_agency_menu_row_gold
+                    : R.drawable.bg_agency_menu_row);
+            chips[i].setTextColor(on ? 0xFF9A6700 : getColor(R.color.text_primary));
+        }
+    }
+
+    private void dialogPending() {
+        if (pendingMembers.isEmpty()) {
+            Toast.makeText(this, "لا توجد طلبات انضمام", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Runnable> actions = new ArrayList<>();
+        for (MiscDtos.AgencyMemberDto m : pendingMembers) {
+            String name = m.user != null
+                    ? (m.user.displayName != null ? m.user.displayName : m.user.username)
+                    : m.userId;
+            String pid = m.user != null ? m.user.displayPublicId() : "";
+            String label = (name != null ? name : "—") + (pid.isEmpty() ? "" : (" · ID " + pid));
+            labels.add(label);
+            actions.add(() -> showPendingReview(m, label));
+        }
+        showCustomList(getString(R.string.agency_manage_menu_pending), labels, actions);
+    }
+
+    private void showPendingReview(MiscDtos.AgencyMemberDto m, String label) {
+        DialogAgencyConfirmBinding form = DialogAgencyConfirmBinding.inflate(getLayoutInflater());
+        form.tvConfirmTitle.setText(R.string.agency_join_request_badge);
+        form.tvConfirmTitle.setGravity(android.view.Gravity.CENTER);
+        form.tvConfirmMessage.setText(label);
+        form.tvConfirmMessage.setGravity(android.view.Gravity.CENTER);
+        form.btnConfirmYes.setText(R.string.agency_approve_join);
+        form.btnConfirmNo.setText(R.string.agency_reject_join);
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        form.btnConfirmYes.setOnClickListener(v -> {
+            sheet.dismiss();
+            vm.approveJoin(agencyId, m.userId);
+            binding.getRoot().postDelayed(this::reload, 700);
+        });
+        form.btnConfirmNo.setOnClickListener(v -> {
+            sheet.dismiss();
+            vm.rejectJoin(agencyId, m.userId);
+            binding.getRoot().postDelayed(this::reload, 700);
+        });
+    }
+
+    private void dialogActivationCode() {
+        DialogAgencyConfirmBinding form = DialogAgencyConfirmBinding.inflate(getLayoutInflater());
+        form.tvConfirmTitle.setText(R.string.agency_manage_menu_code);
+        form.tvConfirmTitle.setGravity(android.view.Gravity.CENTER);
+        String code = activationCode == null || activationCode.isEmpty() ? "—" : activationCode;
+        form.tvConfirmMessage.setText(code);
+        form.tvConfirmMessage.setGravity(android.view.Gravity.CENTER);
+        form.tvConfirmMessage.setTextSize(22);
+        form.tvConfirmMessage.setTextColor(getColor(R.color.text_primary));
+        form.btnConfirmYes.setText(R.string.copy);
+        form.btnConfirmNo.setText(R.string.cancel);
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        form.btnConfirmYes.setOnClickListener(v -> {
+            if (activationCode == null || activationCode.isEmpty()) {
+                Toast.makeText(this, "لا يوجد كود بعد", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("activationCode", activationCode));
+                Toast.makeText(this, R.string.agency_copied, Toast.LENGTH_SHORT).show();
+            }
+            sheet.dismiss();
+        });
+        form.btnConfirmNo.setOnClickListener(v -> sheet.dismiss());
+    }
+
+    private void dialogNoticeStyle() {
+        int selected = 0;
+        for (int i = 0; i < styleKeys.length; i++) {
+            if (styleKeys[i].equalsIgnoreCase(notificationStyle)) {
+                selected = i;
+                break;
+            }
+        }
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Runnable> actions = new ArrayList<>();
+        for (int i = 0; i < styleLabels.length; i++) {
+            final int idx = i;
+            String mark = (idx == selected) ? "✓ " : "";
+            labels.add(mark + styleLabels[i]);
+            actions.add(() -> {
+                notificationStyle = styleKeys[idx];
+                vm.updateNotificationStyle(agencyId, styleKeys[idx]);
+            });
+        }
+        showCustomList(getString(R.string.agency_manage_menu_style), labels, actions);
+    }
+
+    private void dialogBranding() {
+        if (!isOwner) return;
+        String curName = myAgency != null && myAgency.agency != null ? myAgency.agency.name : "";
+        String curWelcome = myAgency != null && myAgency.agency != null
+                ? (myAgency.agency.description != null ? myAgency.agency.description : "") : "";
+        DialogAgencySheetFormBinding form = DialogAgencySheetFormBinding.inflate(getLayoutInflater());
+        form.tvSheetTitle.setText(R.string.agency_manage_menu_branding);
+        form.etSheetInput.setHint("اسم الوكالة");
+        form.etSheetInput.setText(curName != null ? curName : "");
+        form.etSheetInput2.setVisibility(View.VISIBLE);
+        form.etSheetInput2.setHint("نص الترحيب");
+        form.etSheetInput2.setText(curWelcome);
+        form.btnSheetOk.setText(R.string.settings_saved);
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        EdgeToEdgeHelper.keepAboveImeOnFocus(form.etSheetInput);
+        EdgeToEdgeHelper.keepAboveImeOnFocus(form.etSheetInput2);
+        form.btnSheetCancel.setOnClickListener(v -> sheet.dismiss());
+        form.btnSheetOk.setOnClickListener(v -> {
+            String name = textOf(form.etSheetInput);
+            String welcome = textOf(form.etSheetInput2);
+            if (name.length() < 2) {
+                Toast.makeText(this, "أدخل اسم وكالة صالحاً", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            sheet.dismiss();
+            vm.updateAgencyBranding(agencyId, name, welcome);
+            binding.getRoot().postDelayed(this::reload, 700);
+        });
+    }
+
+    private void showCustomList(
+            @NonNull CharSequence title,
+            @NonNull List<String> labels,
+            @NonNull List<Runnable> actions) {
+        DialogAgencySheetListBinding form = DialogAgencySheetListBinding.inflate(getLayoutInflater());
+        form.tvSheetTitle.setText(title);
+        form.listSheetItems.removeAllViews();
+        BottomSheetDialog sheet = openSheet(form.getRoot());
+        form.btnSheetCancel.setOnClickListener(v -> sheet.dismiss());
+        for (int i = 0; i < labels.size(); i++) {
+            final int idx = i;
+            TextView item = (TextView) LayoutInflater.from(this)
+                    .inflate(R.layout.item_agency_sheet_choice, form.listSheetItems, false);
+            item.setText(labels.get(i));
+            item.setOnClickListener(v -> {
+                sheet.dismiss();
+                if (idx >= 0 && idx < actions.size()) actions.get(idx).run();
+            });
+            form.listSheetItems.addView(item);
+        }
     }
 
     private void confirmDeleteAgency() {
@@ -333,131 +483,15 @@ public class AgencyManageActivity extends ThemedActivity {
                 () -> vm.deleteAgency(agencyId));
     }
 
-    private void renderMembers() {
-        java.util.ArrayList<MiscDtos.AgencyMemberDto> filtered = new java.util.ArrayList<>();
-        String q = memberQuery == null ? "" : memberQuery.toLowerCase(Locale.US);
-        for (MiscDtos.AgencyMemberDto m : allMembers) {
-            if (m == null || m.userId == null) continue;
-            if (m.status != null && "rejected".equalsIgnoreCase(m.status)) continue;
-            if (!q.isEmpty()) {
-                String name = m.user != null
-                        ? (m.user.displayName != null ? m.user.displayName : m.user.username)
-                        : "";
-                String publicId = m.user != null ? m.user.displayPublicId() : "";
-                String username = m.user != null ? m.user.username : "";
-                String hay = ((name != null ? name : "") + " "
-                        + (publicId != null ? publicId : "") + " "
-                        + (username != null ? username : "") + " "
-                        + m.userId).toLowerCase(Locale.US);
-                if (!hay.contains(q)) continue;
-            }
-            filtered.add(m);
-        }
-        bindMembersList(filtered);
-    }
-
-    private void bindMembersList(java.util.List<MiscDtos.AgencyMemberDto> members) {
-        LinearLayout box = binding.boxMembers;
-        box.removeAllViews();
-        int pad = (int) (12 * getResources().getDisplayMetrics().density);
-        int count = 0;
-        int textPrimary = getColor(R.color.text_primary);
-        int textSecondary = getColor(R.color.text_secondary);
-        if (members != null) {
-            for (MiscDtos.AgencyMemberDto m : members) {
-                if (m == null || m.userId == null) continue;
-                count++;
-                String name = m.user != null
-                        ? (m.user.displayName != null ? m.user.displayName : m.user.username)
-                        : m.userId;
-                String publicId = m.user != null ? m.user.displayPublicId() : "";
-                String role = roleAr(m.role);
-                boolean pending = m.isPending();
-                boolean suspended = !pending && (m.isActive == null || !m.isActive);
-
-                LinearLayout rowWrap = new LinearLayout(this);
-                rowWrap.setOrientation(LinearLayout.VERTICAL);
-                rowWrap.setPadding(pad, pad, pad, pad);
-                rowWrap.setBackgroundResource(R.drawable.bg_wallet_section);
-                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT);
-                lp.topMargin = pad / 2;
-                rowWrap.setLayoutParams(lp);
-                if (pending) rowWrap.setBackgroundColor(0x22FFB74D);
-                else if (suspended) rowWrap.setBackgroundColor(0x22FF5252);
-
-                TextView title = new TextView(this);
-                title.setText(name != null ? name : "عضو");
-                title.setTextColor(textPrimary);
-                title.setTextSize(15);
-                title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
-                rowWrap.addView(title);
-
-                TextView meta = new TextView(this);
-                String statusLabel = pending ? "طلب انضمام" : (suspended ? "معلّق · " + role : role);
-                String line = statusLabel;
-                if (publicId != null && !publicId.isEmpty()) {
-                    line = "ID " + publicId + " · " + statusLabel;
-                }
-                meta.setText(line);
-                meta.setTextColor(textSecondary);
-                meta.setTextSize(12);
-                meta.setPadding(0, pad / 4, 0, 0);
-                rowWrap.addView(meta);
-
-                if (pending) {
-                    LinearLayout actions = new LinearLayout(this);
-                    actions.setOrientation(LinearLayout.HORIZONTAL);
-                    actions.setPadding(0, pad / 2, 0, 0);
-                    TextView approve = new TextView(this);
-                    approve.setText("قبول");
-                    approve.setTextColor(getColor(R.color.aurora_mint));
-                    approve.setTextSize(14);
-                    approve.setPadding(pad, pad / 2, pad * 2, pad / 2);
-                    approve.setOnClickListener(v -> {
-                        vm.approveJoin(agencyId, m.userId);
-                        binding.getRoot().postDelayed(this::reload, 700);
-                    });
-                    TextView reject = new TextView(this);
-                    reject.setText("رفض");
-                    reject.setTextColor(0xFFE57373);
-                    reject.setTextSize(14);
-                    reject.setPadding(pad, pad / 2, pad, pad / 2);
-                    reject.setOnClickListener(v -> {
-                        vm.rejectJoin(agencyId, m.userId);
-                        binding.getRoot().postDelayed(this::reload, 700);
-                    });
-                    actions.addView(approve);
-                    actions.addView(reject);
-                    rowWrap.addView(actions);
-                } else {
-                    boolean isOwnerMember = "owner".equalsIgnoreCase(m.role);
-                    if (!isOwnerMember) {
-                        rowWrap.setOnClickListener(v -> showMemberActions(
-                                m, name, publicId, suspended));
-                    }
-                }
-                box.addView(rowWrap);
-            }
-        }
-        binding.tvEmptyMembers.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
-        binding.tvEmptyMembers.setTextColor(textSecondary);
-        if (count == 0 && memberQuery != null && !memberQuery.isEmpty()) {
-            binding.tvEmptyMembers.setText("لا نتائج للبحث");
-        } else {
-            binding.tvEmptyMembers.setText(R.string.agency_no_members);
-        }
-    }
-
     private void showMemberActions(
             MiscDtos.AgencyMemberDto m,
             String name,
             String publicId,
             boolean suspended) {
+        if (m == null || "owner".equalsIgnoreCase(m.role)) return;
         String idHint = publicId != null && !publicId.isEmpty() ? " (ID " + publicId + ")" : "";
-        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
-        java.util.ArrayList<Runnable> actions = new java.util.ArrayList<>();
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Runnable> actions = new ArrayList<>();
 
         if (suspended) {
             labels.add("إلغاء التعليق");
@@ -467,7 +501,7 @@ public class AgencyManageActivity extends ThemedActivity {
             });
         } else {
             if (isOwner && !"manager".equalsIgnoreCase(m.role)) {
-                labels.add("رفع أدمن وكالة");
+                labels.add("رفع أدمن وكالة (بث)");
                 actions.add(() -> {
                     vm.updateMemberRole(agencyId, m.userId, "manager");
                     binding.getRoot().postDelayed(this::reload, 700);
@@ -481,33 +515,21 @@ public class AgencyManageActivity extends ThemedActivity {
                 });
             }
             if (!"host".equalsIgnoreCase(m.role) && !"manager".equalsIgnoreCase(m.role)) {
-                labels.add("تعيين مضيف (يفتح البث)");
+                labels.add("تعيين مضيف");
                 actions.add(() -> {
                     vm.updateMemberRole(agencyId, m.userId, "host");
                     binding.getRoot().postDelayed(this::reload, 700);
                 });
             }
-            if ("host".equalsIgnoreCase(m.role)
-                    || (isOwner && "manager".equalsIgnoreCase(m.role))) {
-                labels.add("تخفيض إلى عضو");
-                actions.add(() -> {
-                    vm.updateMemberRole(agencyId, m.userId, "member");
-                    binding.getRoot().postDelayed(this::reload, 700);
-                });
-            }
-            labels.add("تعليق العضو");
-            actions.add(() -> showConfirmSheet(
-                    "تعليق عضو",
-                    "تعليق " + name + idHint + "؟ لن يستطيع فتح بث الوكالة حتى يُلغى التعليق.",
-                    "تعليق",
-                    () -> {
-                        vm.suspendMember(agencyId, m.userId);
-                        binding.getRoot().postDelayed(this::reload, 700);
-                    }));
+            labels.add("تعليق المضيف");
+            actions.add(() -> {
+                vm.suspendMember(agencyId, m.userId);
+                binding.getRoot().postDelayed(this::reload, 700);
+            });
         }
-        labels.add("طرد نهائياً");
+        labels.add("طرد نهائي");
         actions.add(() -> showConfirmSheet(
-                "طرد عضو",
+                "طرد مضيف",
                 "طرد " + name + idHint + "؟",
                 "طرد",
                 () -> {
@@ -515,38 +537,36 @@ public class AgencyManageActivity extends ThemedActivity {
                     binding.getRoot().postDelayed(this::reload, 700);
                 }));
 
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(name + idHint)
-                .setItems(labels.toArray(new String[0]), (d, which) -> {
-                    if (which >= 0 && which < actions.size()) actions.get(which).run();
-                })
-                .setNegativeButton("إلغاء", null)
-                .show();
+        showCustomList(name + idHint, labels, actions);
     }
 
     private void showConfirmSheet(String title, String message, String yesLabel, Runnable onYes) {
-        BottomSheetDialog sheet = AuraDialogHelper.bottomSheet(this);
         DialogAgencyConfirmBinding form = DialogAgencyConfirmBinding.inflate(getLayoutInflater());
         form.tvConfirmTitle.setText(title);
+        form.tvConfirmTitle.setGravity(android.view.Gravity.CENTER);
         form.tvConfirmMessage.setText(message);
+        form.tvConfirmMessage.setGravity(android.view.Gravity.CENTER);
         form.btnConfirmYes.setText(yesLabel);
+        // Convert Material buttons look — styles already AuraLive custom.
+        BottomSheetDialog sheet = openSheet(form.getRoot());
         form.btnConfirmYes.setOnClickListener(v -> {
             sheet.dismiss();
             onYes.run();
         });
         form.btnConfirmNo.setOnClickListener(v -> sheet.dismiss());
-        AuraDialogHelper.applyContent(form.getRoot());
-        sheet.setContentView(form.getRoot());
-        sheet.show();
+    }
+
+    private static String textOf(@Nullable EditText et) {
+        return et != null && et.getText() != null ? et.getText().toString().trim() : "";
     }
 
     private static String roleAr(String role) {
-        if (role == null) return "عضو";
+        if (role == null) return "مضيف";
         switch (role.toLowerCase(Locale.US)) {
             case "owner": return "مالك";
             case "manager": return "مدير";
             case "host": return "مضيف";
-            default: return "عضو";
+            default: return "مضيف";
         }
     }
 

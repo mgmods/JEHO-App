@@ -11,20 +11,21 @@
     <AlertMessage v-if="ok" :message="ok" type="success" @dismiss="ok = ''" />
     <LoadingSpinner v-if="loading" />
     <template v-else-if="catalog">
-      <div class="glass p-3 mb-3">
+      <div class="neo-card promo-hero mb-3">
         <div class="fw-semibold mb-1">إصدار الكتالوج</div>
         <div class="small text-muted">{{ catalog.version }}</div>
       </div>
 
       <h3 class="h6 mb-2">العروض الشهرية</h3>
       <div class="widget-grid mb-4">
-        <article v-for="o in catalog.monthlyOffers || []" :key="o.id" class="widget-card">
+        <article v-for="o in catalog.monthlyOffers || []" :key="o.id" class="widget-card promo-card">
           <div class="widget-card-body">
+            <div class="promo-ic"><i class="bi bi-calendar-heart"></i></div>
             <h4 class="widget-card-title">{{ o.titleAr || o.titleEn }}</h4>
             <p class="small text-muted mb-2">{{ o.descriptionAr || o.descriptionEn }}</p>
             <div class="d-flex gap-2 flex-wrap">
-              <span class="badge text-bg-primary">${{ o.thresholdUsd }}</span>
-              <span class="badge text-bg-success">{{ o.rewardDays }} يوم</span>
+              <span class="neo-price">${{ o.thresholdUsd }}</span>
+              <span class="neo-pill neo-pill--talk">{{ o.rewardDays }} يوم</span>
             </div>
           </div>
         </article>
@@ -32,12 +33,13 @@
 
       <h3 class="h6 mb-2">سياسة الوكلاء (بونص على الرصيد)</h3>
       <div class="widget-grid mb-4">
-        <article v-for="t in catalog.agentTiers || []" :key="t.id" class="widget-card">
+        <article v-for="t in catalog.agentTiers || []" :key="t.id" class="widget-card promo-card">
           <div class="widget-card-body">
+            <div class="promo-ic is-gold"><i class="bi bi-percent"></i></div>
             <h4 class="widget-card-title">{{ t.titleAr }}</h4>
             <div class="d-flex gap-2 flex-wrap">
-              <span class="badge text-bg-primary">شحن ${{ t.thresholdUsd }}</span>
-              <span class="badge text-bg-warning">+{{ t.bonusPercent }}%</span>
+              <span class="neo-price">شحن ${{ t.thresholdUsd }}</span>
+              <span class="neo-pill neo-pill--heat">+{{ t.bonusPercent }}%</span>
             </div>
           </div>
         </article>
@@ -45,14 +47,15 @@
 
       <h3 class="h6 mb-2">عروض الداعمين</h3>
       <div class="widget-grid mb-4">
-        <article v-for="p in catalog.supporterPacks || []" :key="p.id" class="widget-card">
+        <article v-for="p in catalog.supporterPacks || []" :key="p.id" class="widget-card promo-card">
           <div class="widget-card-body">
+            <div class="promo-ic is-cyan"><i class="bi bi-award"></i></div>
             <h4 class="widget-card-title">{{ p.titleAr || p.titleEn }}</h4>
             <p class="small text-muted mb-2">{{ p.descriptionAr || p.descriptionEn }}</p>
             <div class="d-flex gap-2 flex-wrap">
-              <span class="badge text-bg-primary">${{ p.thresholdUsd }}</span>
-              <span class="badge text-bg-success">{{ p.rewardDays }} يوم</span>
-              <span class="badge text-bg-secondary">إطار + ID</span>
+              <span class="neo-price">${{ p.thresholdUsd }}</span>
+              <span class="neo-pill neo-pill--talk">{{ p.rewardDays }} يوم</span>
+              <span class="neo-pill neo-pill--heat">إطار + ID</span>
             </div>
           </div>
         </article>
@@ -63,14 +66,14 @@
         <article
           v-for="d in catalog.vipDurations || []"
           :key="d.id"
-          class="widget-card"
-          :style="{ borderTop: `3px solid ${d.color || '#888'}` }"
+          class="widget-card promo-card"
+          :style="{ borderTop: `3px solid ${d.color || '#8b5cf6'}` }"
         >
           <div class="widget-card-body">
             <h4 class="widget-card-title">{{ d.labelAr }} / {{ d.labelEn }}</h4>
             <div class="d-flex gap-2 flex-wrap">
-              <span class="badge text-bg-dark">{{ d.days }} يوم</span>
-              <span class="badge text-bg-info">×{{ d.priceMultiplier }} من السعر الشهري</span>
+              <span class="neo-pill neo-pill--talk">{{ d.days }} يوم</span>
+              <span class="neo-price">×{{ d.priceMultiplier }}</span>
             </div>
           </div>
         </article>
@@ -121,3 +124,29 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.promo-hero {
+  padding: 1rem 1.15rem;
+}
+.promo-card .promo-ic {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+  color: #c4b5fd;
+  background: rgba(139, 92, 246, 0.16);
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.25);
+}
+.promo-card .promo-ic.is-gold {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.14);
+}
+.promo-card .promo-ic.is-cyan {
+  color: #67e8f9;
+  background: rgba(34, 211, 238, 0.14);
+}
+</style>

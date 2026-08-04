@@ -27,6 +27,7 @@ import {
   AgencyMember,
   AgencyMemberStatus,
 } from '../../database/entities/agency-member.entity';
+import { independentAgencyGiftSplit } from '../agencies/agency-gift-split';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { SendGiftDto, SendAllMicGiftDto } from './dto/gifts.dto';
@@ -36,7 +37,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { HostTargetService } from '../host-target/host-target.service';
 import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
-import { Room, RoomStatus } from '../../database/entities/room.entity';
+import { Room, RoomStatus, RoomKind } from '../../database/entities/room.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { resolvePlayableGiftAnimation } from './gift-media.resolve';
@@ -696,43 +697,72 @@ export class GiftsService implements OnModuleInit {
         }),
       );
 
-      // Gift diamond split:
-      // - With active agency: platform / agency owner / recipient (defaults 30/15/55)
-      // - Without agency: platform / recipient (defaults 30/70)
+      // Gift diamond split — TWO SEPARATE WALLET POOLS:
+      // - Personal room (no agency room / no matching agency membership):
+      //     platform / host → wallet.diamonds  (personal withdraw to platform)
+      // - Agency room (room.agencyId + active agency member of THAT agency):
+      //     platform / agency owner / host → wallet.agencyDiamonds for both owner commission + host share
+      // Agency commission never mixes with personal-room balances.
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       let platformCut = 0;
       let agencyId: string | null = null;
-      const membership = await manager.findOne(AgencyMember, {
-        where: {
-          userId: dto.receiverId,
-          isActive: true,
-          status: AgencyMemberStatus.ACTIVE,
-        },
-      });
+      let earningsStream: 'personal' | 'agency' = 'personal';
+
+      let giftRoom: Room | null = null;
+      if (dto.roomId) {
+        giftRoom = await manager.findOne(Room, { where: { id: dto.roomId } });
+      }
+      const roomAgencyId =
+        giftRoom?.agencyId ||
+        (giftRoom?.roomKind === RoomKind.AGENCY ? giftRoom.agencyId : null) ||
+        null;
+
+      let membership: AgencyMember | null = null;
+      if (roomAgencyId) {
+        membership = await manager.findOne(AgencyMember, {
+          where: {
+            userId: dto.receiverId,
+            agencyId: roomAgencyId,
+            isActive: true,
+            status: AgencyMemberStatus.ACTIVE,
+          },
+        });
+      }
+
       let platformPct = 30;
       const cutRow = await manager.findOne(AppSetting, {
         where: { key: 'agency_platform_cut_percent' },
       });
       if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
-        platformPct = Math.min(50, Math.max(0, Number(cutRow.value)));
+        platformPct = Math.min(100, Math.max(0, Number(cutRow.value)));
+      }
+      let hostSharePct = 55;
+      const hostShareRow = await manager.findOne(AppSetting, {
+        where: { key: 'agency_host_share_percent' },
+      });
+      if (hostShareRow?.value && Number.isFinite(Number(hostShareRow.value))) {
+        hostSharePct = Math.min(100, Math.max(0, Number(hostShareRow.value)));
       }
 
-      if (membership) {
+      if (membership && roomAgencyId) {
         const agency = await manager.findOne(Agency, { where: { id: membership.agencyId } });
         if (agency?.status === AgencyStatus.ACTIVE) {
           agencyId = agency.id;
-          const agencyPct = Math.min(50, Math.max(0, Number(agency.commissionPercent) || 15));
-          agentShare = Math.floor((diamondsAwarded * agencyPct) / 100);
-          platformCut = Math.floor((diamondsAwarded * platformPct) / 100);
+          earningsStream = 'agency';
+          const agencyPct = Math.min(100, Math.max(0, Number(agency.commissionPercent) || 15));
           const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
-          if (receiverIsOwner) {
-            // Owner receives gift: keep agency cut, only platform is deducted
-            agentShare = 0;
-            hostDiamonds = Math.max(0, diamondsAwarded - platformCut);
-          } else {
-            hostDiamonds = Math.max(0, diamondsAwarded - agentShare - platformCut);
-            if (agentShare > 0 && agency.ownerId) {
+          const split = independentAgencyGiftSplit(
+            diamondsAwarded,
+            hostSharePct,
+            agencyPct,
+            platformPct,
+            { ownerIsReceiver: receiverIsOwner },
+          );
+          agentShare = split.agentShare;
+          platformCut = split.platformCut;
+          hostDiamonds = split.hostDiamonds;
+          if (agentShare > 0 && agency.ownerId) {
               let agentWallet = await manager.findOne(Wallet, {
                 where: { userId: agency.ownerId },
                 lock: { mode: 'pessimistic_write' },
@@ -740,7 +770,8 @@ export class GiftsService implements OnModuleInit {
               if (!agentWallet) {
                 agentWallet = manager.create(Wallet, { userId: agency.ownerId });
               }
-              agentWallet.diamonds = Number(agentWallet.diamonds) + agentShare;
+              (agentWallet as any).agencyDiamonds =
+                Number((agentWallet as any).agencyDiamonds || 0) + agentShare;
               await manager.save(agentWallet);
               await manager.save(
                 manager.create(WalletTransaction, {
@@ -748,22 +779,28 @@ export class GiftsService implements OnModuleInit {
                   type: TransactionType.GIFT_RECEIVE,
                   currency: CurrencyType.DIAMONDS,
                   amount: agentShare,
-                  balanceAfter: Number(agentWallet.diamonds),
+                  balanceAfter: Number((agentWallet as any).agencyDiamonds || 0),
                   referenceType: 'agency_commission',
                   referenceId: send.id,
-                  description: `Agency owner commission from gift`,
-                  metadata: { agencyId: agency.id, giftSendId: send.id },
+                  description: `عمولة وكالة (روم وكالة) — ${gift.name}`,
+                  metadata: {
+                    agencyId: agency.id,
+                    giftSendId: send.id,
+                    stream: 'agency',
+                    roomId: dto.roomId || null,
+                  },
                 }),
               );
-            }
           }
           await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', diamondsAwarded);
         }
       }
 
-      if (!agencyId) {
+      if (earningsStream === 'personal') {
         platformCut = Math.floor((diamondsAwarded * platformPct) / 100);
         hostDiamonds = Math.max(0, diamondsAwarded - platformCut);
+        agentShare = 0;
+        agencyId = null;
       }
 
       if (platformCut > 0) {
@@ -789,7 +826,12 @@ export class GiftsService implements OnModuleInit {
         });
         recvWallet = found ?? manager.create(Wallet, { userId: dto.receiverId });
       }
-      recvWallet.diamonds = Number(recvWallet.diamonds) + hostDiamonds;
+      if (earningsStream === 'agency') {
+        (recvWallet as any).agencyDiamonds =
+          Number((recvWallet as any).agencyDiamonds || 0) + hostDiamonds;
+      } else {
+        recvWallet.diamonds = Number(recvWallet.diamonds) + hostDiamonds;
+      }
       await manager.save(recvWallet);
 
       await manager.save(
@@ -832,15 +874,24 @@ export class GiftsService implements OnModuleInit {
           type: TransactionType.GIFT_RECEIVE,
           currency: CurrencyType.DIAMONDS,
           amount: hostDiamonds,
-          balanceAfter: Number(recvWallet.diamonds),
-          referenceType: 'gift_receive',
+          balanceAfter:
+            earningsStream === 'agency'
+              ? Number((recvWallet as any).agencyDiamonds || 0)
+              : Number(recvWallet.diamonds),
+          referenceType:
+            earningsStream === 'agency' ? 'gift_receive_agency' : 'gift_receive',
           referenceId: send.id,
-          description: `Received ${qty}x ${gift.name}`,
+          description:
+            earningsStream === 'agency'
+              ? `هدية روم وكالة ${qty}x ${gift.name}`
+              : `هدية روم شخصي ${qty}x ${gift.name}`,
           metadata: {
             ...(luckyMultiplier ? { luckyMultiplier } : {}),
             platformCut,
             hostDiamonds,
+            stream: earningsStream,
             ...(agencyId ? { agencyId, agentShare } : {}),
+            roomId: dto.roomId || null,
           },
         }),
       );
@@ -865,8 +916,12 @@ export class GiftsService implements OnModuleInit {
         hostDiamonds,
         platformCut,
         agentShare,
+        stream: earningsStream,
         senderBalance: Number(wallet.coins),
-        receiverDiamonds: Number(recvWallet.diamonds),
+        receiverDiamonds:
+          earningsStream === 'agency'
+            ? Number((recvWallet as any).agencyDiamonds || 0)
+            : Number(recvWallet.diamonds),
         success: true,
         coinsSpent: totalCoins,
         // Transparent Mikoo-style breakdown for client UI.
@@ -878,10 +933,12 @@ export class GiftsService implements OnModuleInit {
           diamondsPlatform: platformCut,
           diamondsAgency: agentShare,
           diamondPool: diamondsAwarded,
+          stream: earningsStream,
         },
         wallet: {
           coins: Number(wallet.coins),
-          diamonds: Number(wallet.diamonds || 0),
+          diamonds: Number(recvWallet.diamonds || 0),
+          agencyDiamonds: Number((recvWallet as any).agencyDiamonds || 0),
           silverCoins: Number(wallet.silverCoins || 0),
           gamePoints: Number(wallet.gamePoints || 0),
         },
@@ -999,7 +1056,7 @@ export class GiftsService implements OnModuleInit {
         receiverRoomGiftTotal = Number(totalRow?.total || 0);
       }
 
-      const animationPayload = {
+      const animationPayload: Record<string, unknown> = {
         giftId: gift.id,
         giftName: gift.name,
         giftType: gift.type,
@@ -1035,6 +1092,10 @@ export class GiftsService implements OnModuleInit {
         receiverVipBadgeUrl: receiverProfile?.vipBadgeUrl || null,
         receiverSeatIndex,
         receiverRoomGiftTotal,
+        brandAgencyId: null as string | null,
+        brandAgencyName: null as string | null,
+        brandAgencyLogoUrl: null as string | null,
+        brandAgencyPublicId: null as string | null,
         roomId: dto.roomId || null,
         quantity: qty,
         comboCount,
@@ -1044,6 +1105,30 @@ export class GiftsService implements OnModuleInit {
         luckyCoinsWon: result.luckyCoinsWon || 0,
         at: new Date().toISOString(),
       };
+
+      // Optional branded gift (admin-linked agency on gift catalog).
+      const brandId = (gift as any).brandAgencyId || null;
+      if (brandId) {
+        const brandAgency = await this.dataSource.getRepository(Agency).findOne({
+          where: { id: brandId },
+        });
+        if (brandAgency) {
+          animationPayload.brandAgencyId = brandAgency.id;
+          animationPayload.brandAgencyName = brandAgency.name;
+          animationPayload.brandAgencyLogoUrl = brandAgency.logoUrl;
+          animationPayload.brandAgencyPublicId = brandAgency.publicId || null;
+        }
+      } else if (taskRoom?.agencyId) {
+        const brandAg = await this.dataSource.getRepository(Agency).findOne({
+          where: { id: taskRoom.agencyId },
+        });
+        if (brandAg && brandAg.isVerified && brandAg.status === AgencyStatus.ACTIVE) {
+          animationPayload.brandAgencyId = brandAg.id;
+          animationPayload.brandAgencyName = brandAg.name;
+          animationPayload.brandAgencyLogoUrl = brandAg.logoUrl;
+          animationPayload.brandAgencyPublicId = brandAg.publicId || null;
+        }
+      }
       if (dto.roomId) {
         this.realtime?.emitToRoom(dto.roomId, 'room:event', {
           roomId: dto.roomId,
@@ -1081,8 +1166,14 @@ export class GiftsService implements OnModuleInit {
           this.broadcastLuckyCelebration({
             roomId: dto.roomId,
             senderId,
-            displayName: animationPayload.senderName ?? undefined,
-            avatarUrl: animationPayload.senderAvatarUrl ?? undefined,
+            displayName:
+              typeof animationPayload.senderName === 'string'
+                ? animationPayload.senderName
+                : undefined,
+            avatarUrl:
+              typeof animationPayload.senderAvatarUrl === 'string'
+                ? animationPayload.senderAvatarUrl
+                : undefined,
             giftName: gift.name,
             giftIconUrl: gift.iconUrl,
             coinPrice: gift.coinPrice,
@@ -1305,6 +1396,8 @@ export class GiftsService implements OnModuleInit {
       }
 
       // Credit each mic their share (self-target share stays with platform).
+      // Agency rooms → agencyDiamonds; personal rooms → diamonds (never mixed).
+      const roomAgencyId = room.agencyId || null;
       let selfMicReturned = 0;
       for (let i = 0; i < receiverIds.length; i++) {
         const rid = receiverIds[i];
@@ -1319,7 +1412,24 @@ export class GiftsService implements OnModuleInit {
           lock: { mode: 'pessimistic_write' },
         });
         if (!rw) rw = manager.create(Wallet, { userId: rid });
-        rw.diamonds = Number(rw.diamonds) + share;
+        let toAgencyPool = false;
+        if (roomAgencyId) {
+          const mem = await manager.findOne(AgencyMember, {
+            where: {
+              userId: rid,
+              agencyId: roomAgencyId,
+              isActive: true,
+              status: AgencyMemberStatus.ACTIVE,
+            },
+          });
+          toAgencyPool = !!mem;
+        }
+        if (toAgencyPool) {
+          (rw as any).agencyDiamonds =
+            Number((rw as any).agencyDiamonds || 0) + share;
+        } else {
+          rw.diamonds = Number(rw.diamonds) + share;
+        }
         await manager.save(rw);
         await manager.save(
           manager.create(WalletTransaction, {
@@ -1327,11 +1437,23 @@ export class GiftsService implements OnModuleInit {
             type: TransactionType.GIFT_RECEIVE,
             currency: CurrencyType.DIAMONDS,
             amount: share,
-            balanceAfter: Number(rw.diamonds),
-            referenceType: 'gift_receive_mic',
+            balanceAfter: toAgencyPool
+              ? Number((rw as any).agencyDiamonds || 0)
+              : Number(rw.diamonds),
+            referenceType: toAgencyPool
+              ? 'gift_receive_mic_agency'
+              : 'gift_receive_mic',
             referenceId: sends[i].id,
-            description: `All-mic share ${qty}x ${gift.name}`,
-            metadata: { allMic: true, personCount, platformCut },
+            description: toAgencyPool
+              ? `حصة مايك (روم وكالة) ${qty}x ${gift.name}`
+              : `All-mic share ${qty}x ${gift.name}`,
+            metadata: {
+              allMic: true,
+              personCount,
+              platformCut,
+              stream: toAgencyPool ? 'agency' : 'personal',
+              ...(roomAgencyId ? { agencyId: roomAgencyId } : {}),
+            },
           }),
         );
         await manager.increment(
@@ -1363,7 +1485,24 @@ export class GiftsService implements OnModuleInit {
           lock: { mode: 'pessimistic_write' },
         });
         if (!hw) hw = manager.create(Wallet, { userId: roomHostId });
-        hw.diamonds = Number(hw.diamonds) + hostDiamonds;
+        let hostToAgency = false;
+        if (roomAgencyId) {
+          const hostMem = await manager.findOne(AgencyMember, {
+            where: {
+              userId: roomHostId,
+              agencyId: roomAgencyId,
+              isActive: true,
+              status: AgencyMemberStatus.ACTIVE,
+            },
+          });
+          hostToAgency = !!hostMem;
+        }
+        if (hostToAgency) {
+          (hw as any).agencyDiamonds =
+            Number((hw as any).agencyDiamonds || 0) + hostDiamonds;
+        } else {
+          hw.diamonds = Number(hw.diamonds) + hostDiamonds;
+        }
         await manager.save(hw);
         await manager.save(
           manager.create(WalletTransaction, {
@@ -1371,15 +1510,23 @@ export class GiftsService implements OnModuleInit {
             type: TransactionType.GIFT_RECEIVE,
             currency: CurrencyType.DIAMONDS,
             amount: hostDiamonds,
-            balanceAfter: Number(hw.diamonds),
-            referenceType: 'gift_receive_host',
+            balanceAfter: hostToAgency
+              ? Number((hw as any).agencyDiamonds || 0)
+              : Number(hw.diamonds),
+            referenceType: hostToAgency
+              ? 'gift_receive_host_agency'
+              : 'gift_receive_host',
             referenceId: primary.id,
-            description: `All-mic host 50% from ${gift.name}`,
+            description: hostToAgency
+              ? `حصة المضيف 50% (روم وكالة) ${gift.name}`
+              : `All-mic host 50% from ${gift.name}`,
             metadata: {
               allMic: true,
               personCount,
               platformCut,
               micsPool,
+              stream: hostToAgency ? 'agency' : 'personal',
+              ...(roomAgencyId ? { agencyId: roomAgencyId } : {}),
             },
           }),
         );
@@ -1398,6 +1545,10 @@ export class GiftsService implements OnModuleInit {
         totalCoins,
       );
 
+      const senderWalletOut = await manager.findOne(Wallet, {
+        where: { userId: senderId },
+      });
+
       return {
         send: primary,
         gift,
@@ -1412,6 +1563,7 @@ export class GiftsService implements OnModuleInit {
         micsDiamonds: micsPool,
         platformCut,
         agentShare: 0,
+        stream: roomAgencyId ? 'agency' : 'personal',
         senderBalance: Number(wallet.coins),
         success: true,
         coinsSpent: totalCoins,
@@ -1426,10 +1578,16 @@ export class GiftsService implements OnModuleInit {
           diamondsPlatform: platformCut,
           diamondsAgency: 0,
           diamondPool,
+          stream: roomAgencyId ? 'agency' : 'personal',
         },
         wallet: {
           coins: Number(wallet.coins),
-          diamonds: Number(wallet.diamonds || 0),
+          diamonds: Number(senderWalletOut?.diamonds || wallet.diamonds || 0),
+          agencyDiamonds: Number(
+            (senderWalletOut as any)?.agencyDiamonds ||
+              (wallet as any).agencyDiamonds ||
+              0,
+          ),
           silverCoins: Number(wallet.silverCoins || 0),
           gamePoints: Number(wallet.gamePoints || 0),
         },

@@ -92,6 +92,13 @@ export class WalletService implements OnModuleInit {
       this.logger.warn(`ensure traderDiamonds: ${(err as Error).message}`);
     }
     try {
+      await this.dataSource.query(
+        `ALTER TABLE wallets ADD COLUMN IF NOT EXISTS "agencyDiamonds" BIGINT NOT NULL DEFAULT 0`,
+      );
+    } catch (err) {
+      this.logger.warn(`ensure agencyDiamonds: ${(err as Error).message}`);
+    }
+    try {
       // Retire silver: fold any remaining balance into gold coins and zero the column.
       const result = await this.dataSource.query(`
         UPDATE wallets
@@ -184,19 +191,29 @@ export class WalletService implements OnModuleInit {
       wallet = await this.walletsRepo.save(wallet);
     }
     const diamonds = Number(wallet.diamonds);
+    const agencyDiamonds = Number((wallet as any).agencyDiamonds || 0);
     const traderDiamonds = Number(wallet.traderDiamonds || 0);
     const economy = await this.economyConfig();
     const target = economy.withdrawTargetDiamonds;
+    const fiatRate = economy.diamondUsdRate;
     return {
       ...wallet,
       coins: Number(wallet.coins),
+      /** Personal-room gift earnings — platform withdraw pool */
       diamonds,
+      /** Agency-room host share + owner commission — agency withdraw pool */
+      agencyDiamonds,
       traderDiamonds,
+      personalDiamonds: diamonds,
+      personalUsd: Number((diamonds * fiatRate).toFixed(4)),
+      agencyUsd: Number((agencyDiamonds * fiatRate).toFixed(4)),
       silverCoins: 0,
       gamePoints: 0,
       withdrawTargetDiamonds: target,
       withdrawProgress: target > 0 ? Math.min(1, diamonds / target) : 1,
       canWithdraw: diamonds >= target,
+      canWithdrawAgency: agencyDiamonds >= target,
+      diamondUsdRate: fiatRate,
     };
   }
 
@@ -718,6 +735,21 @@ export class WalletService implements OnModuleInit {
     }
 
     const viaAgent = dto.method === 'agent';
+    const sourceRaw = String((dto.payoutDetails as any)?.source || '')
+      .trim()
+      .toLowerCase();
+    const isAgencySource =
+      sourceRaw === 'agency_commission' ||
+      sourceRaw === 'agency_host' ||
+      sourceRaw === 'agency' ||
+      sourceRaw === 'agency_room' ||
+      sourceRaw === 'agency_earnings';
+    // Personal diamond withdraw vs agency-room pool (host share / owner commission) — never mixed.
+    if (viaAgent && isAgencySource) {
+      throw new BadRequestException(
+        'سحب أرباح روم الوكالة يتم عبر إدارة المنصة مباشرة — وليس عبر وكيل الشحن',
+      );
+    }
     let agentId: string | null = null;
     if (viaAgent) {
       const rawAgentId = (dto.agentId || '').trim();
@@ -745,13 +777,37 @@ export class WalletService implements OnModuleInit {
         where: { userId },
         lock: { mode: 'pessimistic_write' },
       });
-      if (!wallet || Number(wallet.diamonds) < dto.diamonds) {
+      if (!wallet) {
         throw new BadRequestException('Insufficient diamonds');
       }
-      wallet.diamonds = Number(wallet.diamonds) - dto.diamonds;
+      const personalBal = Number(wallet.diamonds || 0);
+      const agencyBal = Number((wallet as any).agencyDiamonds || 0);
+      if (isAgencySource) {
+        if (agencyBal < dto.diamonds) {
+          throw new BadRequestException(
+            'رصيد أرباح الوكالة غير كافٍ (منفصل عن أرباح الروم الشخصي)',
+          );
+        }
+        (wallet as any).agencyDiamonds = agencyBal - dto.diamonds;
+      } else {
+        if (personalBal < dto.diamonds) {
+          throw new BadRequestException(
+            'رصيد أرباح الروم الشخصي غير كافٍ (منفصل عن عمولة الوكالة)',
+          );
+        }
+        wallet.diamonds = personalBal - dto.diamonds;
+      }
       await manager.save(wallet);
 
       const amountFiat = Number((dto.diamonds * fiatRate).toFixed(2));
+      const stream = isAgencySource ? 'agency' : 'personal';
+      const agencyKind =
+        sourceRaw === 'agency_host' || sourceRaw === 'host'
+          ? 'agency_host'
+          : 'agency_commission';
+      const sourceTag = isAgencySource
+        ? agencyKind
+        : 'personal_room';
       const request = await manager.save(
         manager.create(WithdrawRequest, {
           userId,
@@ -761,7 +817,13 @@ export class WalletService implements OnModuleInit {
           agentId,
           payoutDetails: {
             ...(dto.payoutDetails || {}),
-            channel: viaAgent ? 'agent' : 'self',
+            channel: viaAgent
+              ? 'agent'
+              : isAgencySource
+                ? 'agency_pool'
+                : 'personal_room',
+            source: sourceTag,
+            stream,
           },
           status: WithdrawStatus.PENDING,
         }),
@@ -773,12 +835,19 @@ export class WalletService implements OnModuleInit {
           type: TransactionType.WITHDRAW,
           currency: CurrencyType.DIAMONDS,
           amount: -dto.diamonds,
-          balanceAfter: Number(wallet.diamonds),
-          referenceType: 'withdraw_request',
+          balanceAfter: isAgencySource
+            ? Number((wallet as any).agencyDiamonds || 0)
+            : Number(wallet.diamonds),
+          referenceType: isAgencySource
+            ? 'withdraw_request_agency'
+            : 'withdraw_request_personal',
           referenceId: request.id,
-          description: viaAgent
-            ? `Withdraw via agent ${dto.diamonds} diamonds`
-            : `Withdraw request ${dto.diamonds} diamonds`,
+          description: isAgencySource
+            ? agencyKind === 'agency_host'
+              ? `سحب أرباح مضيفة (روم وكالة) ${dto.diamonds} ماسة`
+              : `سحب عمولة وكالة ${dto.diamonds} ماسة`
+            : `سحب أرباح روم شخصي ${dto.diamonds} ماسة`,
+          metadata: { stream, source: sourceTag, method: dto.method },
         }),
       );
       return request;

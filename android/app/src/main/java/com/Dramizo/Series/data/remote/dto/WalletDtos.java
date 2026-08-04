@@ -10,13 +10,21 @@ public final class WalletDtos {
         @SerializedName("id") public String id;
         @SerializedName("userId") public String userId;
         @SerializedName("coins") public long coins;
+        /** Personal-room gift pool — platform withdraw */
         @SerializedName("diamonds") public long diamonds;
+        /** Agency-room host share + owner commission pool */
+        @SerializedName("agencyDiamonds") public long agencyDiamonds;
+        @SerializedName("personalUsd") public double personalUsd;
+        @SerializedName("agencyUsd") public double agencyUsd;
+        @SerializedName("diamondUsdRate") public double diamondUsdRate;
         /** Host↔host trade collection (التاجر). */
         @SerializedName("traderDiamonds") public long traderDiamonds;
         @SerializedName("silverCoins") public long silverCoins;
         @SerializedName("gamePoints") public long gamePoints;
         @SerializedName("totalRecharged") public long totalRecharged;
         @SerializedName("currency") public String currency;
+        @SerializedName("canWithdraw") public boolean canWithdraw;
+        @SerializedName("canWithdrawAgency") public boolean canWithdrawAgency;
     }
 
     public static class EconomyConfig {

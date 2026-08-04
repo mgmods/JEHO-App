@@ -1,73 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo-style agency row on white surface -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Professional agency directory card: cover + frame + live / members -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="10dp"
-    android:background="@drawable/bg_mikoo_card"
-    android:foreground="?attr/selectableItemBackground"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:padding="14dp">
-
-    <com.google.android.material.imageview.ShapeableImageView
-        android:id="@+id/imgAgencyDefault"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
-        android:contentDescription="@string/agency"
-        android:scaleType="centerCrop"
-        android:src="@drawable/icon_agency"
-        app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded8" />
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#14000000"
+    app:strokeWidth="1dp">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="10dp"
-        android:layout_weight="1"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/tvName"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/text_primary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:layout_height="148dp">
 
-        <TextView
-            android:id="@+id/tvDesc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:textColor="@color/text_hint"
-            android:textSize="12sp" />
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imgCover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/agency"
+                android:scaleType="centerCrop"
+                android:src="@drawable/icon_agency"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.RoundedTop16" />
 
-        <TextView
-            android:id="@+id/tvMembers"
+            <ImageView
+                android:id="@+id/imgFrame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:scaleType="fitXY"
+                android:visibility="gone" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_agency_card_scrim" />
+
+            <TextView
+                android:id="@+id/tvLiveBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start|top"
+                android:layout_margin="10dp"
+                android:background="@drawable/bg_agency_live_badge"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:text="@string/agency_card_live"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:visibility="visible" />
+
+            <TextView
+                android:id="@+id/tvLiveViewers"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end|top"
+                android:layout_margin="10dp"
+                android:background="@drawable/bg_agency_live_badge"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="4dp"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="128"
+                tools:visibility="visible" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/imgAgencyDefault"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:contentDescription="@string/agency"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/icon_agency"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded8"
+                    app:strokeColor="#FFFFFFFF"
+                    app:strokeWidth="2dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="وكالة الذهب" />
+
+                    <TextView
+                        android:id="@+id/tvDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#E6FFFFFF"
+                        android:textSize="12sp"
+                        tools:text="وصف الوكالة" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="12dp">
+
+            <TextView
+                android:id="@+id/tvMembers"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                tools:text="42 عضواً" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnJoin"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:backgroundTint="#43D3A2"
+                android:minWidth="88dp"
+                android:text="@string/agency_join"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                app:cornerRadius="20dp" />
+        </LinearLayout>
     </LinearLayout>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnJoin"
-        style="@style/Widget.Material3.Button"
-        android:layout_width="wrap_content"
-        android:layout_height="40dp"
-        android:backgroundTint="#43D3A2"
-        android:minWidth="80dp"
-        android:text="@string/agency_join"
-        android:textAllCaps="false"
-        android:textColor="#FFFFFF"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        app:cornerRadius="20dp" />
-</LinearLayout>
+</com.google.android.material.card.MaterialCardView>

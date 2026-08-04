@@ -121,6 +121,8 @@ public final class AuthDtos {
         @SerializedName("experience") public long experience;
         @SerializedName("isGuest") public boolean isGuest;
         @SerializedName("isAdmin") public boolean isAdmin;
+        /** Platform staff: "manager" | "super" | null/none */
+        @SerializedName("staffRole") public String staffRole;
         @SerializedName("followersCount") public int followersCount;
         @SerializedName("followingCount") public int followingCount;
         @SerializedName("friendsCount") public int friendsCount;

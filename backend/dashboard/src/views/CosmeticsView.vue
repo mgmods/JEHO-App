@@ -200,11 +200,7 @@
                   <label class="form-label">{{ t('cosmetics.description') }}</label>
                   <textarea v-model="form.description" class="form-control" rows="2" />
                 </div>
-                <div class="col-md-8">
-                  <label class="form-label">{{ t('cosmetics.previewUrl') }}</label>
-                  <input v-model="form.previewUrl" class="form-control" required placeholder="/uploads/host-preview.png" />
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                   <label class="form-label">{{ t('cosmetics.uploadPreview') }}</label>
                   <input
                     type="file"
@@ -212,16 +208,9 @@
                     accept="image/*,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov"
                     @change="onPreviewFile"
                   />
+                  <div class="form-text">اختر ملف المعاينة — بدون رابط</div>
                 </div>
-                <div class="col-md-8">
-                  <label class="form-label">{{ t('cosmetics.animationUrl') }}</label>
-                  <input
-                    v-model="form.animationUrl"
-                    class="form-control"
-                    placeholder="/uploads/host-loop.mp4 أو .gif"
-                  />
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                   <label class="form-label">{{ t('cosmetics.uploadAnimation') }}</label>
                   <input
                     type="file"
@@ -229,6 +218,7 @@
                     accept="image/gif,image/webp,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov,.svga,application/octet-stream"
                     @change="onAnimFile"
                   />
+                  <div class="form-text">ملف الحركة / الدخولية</div>
                 </div>
                 <div class="col-12">
                   <div class="form-text">{{ t('cosmetics.acceptHint') }}</div>

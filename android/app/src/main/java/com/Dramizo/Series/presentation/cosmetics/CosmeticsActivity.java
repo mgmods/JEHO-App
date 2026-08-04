@@ -14,12 +14,14 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
 import com.Dramizo.Series.databinding.ActivityCosmeticsBinding;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.bumptech.glide.Glide;
@@ -72,6 +74,8 @@ public class CosmeticsActivity extends ThemedActivity {
         refreshBagButton();
         setupTabs();
         observeVm();
+        // Show self + wear immediately (profile-style)
+        previewItem(null);
     }
 
     private void setupTabs() {
@@ -113,12 +117,29 @@ public class CosmeticsActivity extends ThemedActivity {
     private void previewItem(@Nullable CosmeticDtos.CosmeticDto item) {
         if (binding == null) return;
         if (item == null) {
-            binding.tvHeroName.setText(R.string.mall_preview);
+            AuthDtos.UserDto me = session.getUser();
+            if (me != null) {
+                String n = me.displayName != null && !me.displayName.isEmpty()
+                        ? me.displayName
+                        : (me.username != null ? me.username : getString(R.string.mall_preview));
+                binding.tvHeroName.setText(n);
+                GenderVerifiedBadge.bind(binding.tvHeroName, null, me);
+            } else {
+                binding.tvHeroName.setText(R.string.mall_preview);
+            }
             binding.tvHeroHint.setText(R.string.mall_preview_hint);
             binding.tvHeroDays.setVisibility(View.GONE);
-            binding.nativeHeroFrame.clearSignal();
-            binding.heroMedia.setVisibility(View.GONE);
-            lastWearUrl = null;
+            // Keep frame wear on avatar when no catalog selection.
+            if (me != null) {
+                lastWearUrl = null;
+                binding.heroMedia.setVisibility(View.GONE);
+                binding.nativeHeroFrame.setVisibility(View.VISIBLE);
+                binding.nativeHeroFrame.bind(me.vipBadgeUrl, me.avatarUrl, null, 1);
+            } else {
+                binding.nativeHeroFrame.clearSignal();
+                binding.heroMedia.setVisibility(View.GONE);
+            }
+            lastWearUrl = me != null ? me.vipBadgeUrl : null;
             return;
         }
         binding.tvHeroName.setText(item.name != null && !item.name.isEmpty()

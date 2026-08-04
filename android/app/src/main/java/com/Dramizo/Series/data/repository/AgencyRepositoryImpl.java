@@ -13,7 +13,11 @@ public class AgencyRepositoryImpl implements AgencyRepository {
     public AgencyRepositoryImpl(AgencyApi api, ExecutorService io) { this.api = api; }
 
     @Override public Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page) {
-        return ApiCall.execute(api.list(page));
+        return ApiCall.execute(api.list(page, null));
+    }
+
+    public Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page, String query) {
+        return ApiCall.execute(api.list(page, query));
     }
 
     @Override public Result<MiscDtos.AgencyMineDto> mine() {

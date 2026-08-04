@@ -131,31 +131,20 @@
                     <option value="inactive">{{ t('app.inactive') }}</option>
                   </select>
                 </div>
-                <div class="col-md-8">
-                  <label class="form-label">{{ t('gifts.icon') }} URL</label>
-                  <input v-model="form.iconUrl" class="form-control" required />
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">{{ t('gifts.uploadIcon') }}</label>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('gifts.icon') }}</label>
                   <input type="file" accept="image/*,.gif,.webp" class="form-control" @change="onFile" />
+                  <div class="form-text">اختر ملف الأيقونة (صورة)</div>
                 </div>
-                <div class="col-md-8">
-                  <label class="form-label">{{ t('gifts.animation') }} (GIF / فيديو MP4)</label>
-                  <input
-                    v-model="form.animationUrl"
-                    class="form-control"
-                    placeholder="رابط GIF أو MP4 أو اتركه فارغاً"
-                  />
-                  <div class="form-text">ارفع فيديو أو GIF للهدايا الثابتة داخل الروم — بدون ملفات حركة Lottie.</div>
-                </div>
-                <div class="col-md-4">
-                  <label class="form-label">رفع GIF / فيديو</label>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('gifts.animation') }} GIF / فيديو</label>
                   <input
                     type="file"
                     accept="image/gif,image/webp,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov"
                     class="form-control"
                     @change="onAnimFile"
                   />
+                  <div class="form-text">ارفع GIF أو فيديو — بدون رابط</div>
                 </div>
                 <div class="col-6" v-if="form.iconUrl">
                   <div class="small text-muted mb-1">أيقونة</div>
@@ -178,7 +167,6 @@
                     alt=""
                     style="max-width: 160px; max-height: 160px; object-fit: contain"
                   />
-                  <div v-else class="small text-muted">{{ form.animationUrl }}</div>
                 </div>
               </div>
             </div>
@@ -375,6 +363,11 @@ async function onAnimFile(e) {
 }
 
 async function save() {
+  if (!form.iconUrl) {
+    error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أولاً'
+    toast().danger(error.value)
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''

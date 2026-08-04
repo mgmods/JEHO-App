@@ -179,3 +179,33 @@ export class UpdateAgencySettingsDto {
   @MaxLength(512)
   logoUrl?: string;
 }
+
+export class CreateAgencyPayoutRequestDto {
+  @ApiProperty({ description: 'Diamonds to settle as USD cash from agency' })
+  @IsInt()
+  @Min(100)
+  diamonds: number;
+
+  @ApiProperty({ enum: ['paypal', 'bank', 'usdt', 'cash', 'other'] })
+  @IsString()
+  @MaxLength(32)
+  method: string;
+
+  @ApiPropertyOptional({ description: 'Payment account fields (email, IBAN, wallet…)' })
+  @IsOptional()
+  payoutDetails?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Free-text account line if not using structured map' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  account?: string;
+}
+
+export class ReviewAgencyPayoutDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}

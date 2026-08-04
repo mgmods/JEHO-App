@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.remote.dto.PromoDtos;
 import com.Dramizo.Series.data.remote.dto.WalletDtos;
 import com.Dramizo.Series.databinding.ActivityBagBinding;
@@ -34,7 +35,9 @@ import com.Dramizo.Series.databinding.ItemWithdrawRequestBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.offers.OffersBottomSheet;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.QrBitmap;
@@ -122,6 +125,21 @@ public class BagActivity extends ThemedActivity {
         binding.recyclerPackages.setHasFixedSize(false);
         binding.recyclerPackages.setAdapter(adapter);
         setupAgentsStrip();
+        if (binding.btnMonthlyOffers != null) {
+            binding.btnMonthlyOffers.setOnClickListener(v -> showMonthlyOffersSheet());
+        }
+
+        // Paint cached packages immediately for instant UX.
+        String uid = c.getSessionManager().getUserId();
+        if (uid != null) {
+            WalletDtos.PackagesResult cached = c.getFeatureCache().getJson(
+                    uid, EncryptedFeatureCache.NS_RECHARGE_PACKAGES,
+                    WalletDtos.PackagesResult.class,
+                    java.util.concurrent.TimeUnit.DAYS.toMillis(3));
+            if (cached != null && cached.items != null && !cached.items.isEmpty()) {
+                adapter.submit(new ArrayList<>(cached.items));
+            }
+        }
 
         if (binding.btnOpenAgentPortal != null) {
             binding.btnOpenAgentPortal.setOnClickListener(v ->
@@ -402,37 +420,16 @@ public class BagActivity extends ThemedActivity {
 
     private void applyPromoProgress(@Nullable PromoDtos.MyProgress progress) {
         if (binding == null || binding.sectionPromoOffers == null) return;
-        if (progress == null) {
-            binding.sectionPromoOffers.setVisibility(View.GONE);
-            return;
-        }
-        binding.sectionPromoOffers.setVisibility(View.VISIBLE);
-        if (binding.tvPromoSpent != null) {
-            binding.tvPromoSpent.setText(String.format(Locale.US,
-                    "مصروف هذا الشهر: $%.0f", progress.usdSpent));
-        }
-        if (binding.tvPromoLines != null) {
-            StringBuilder sb = new StringBuilder();
-            for (PromoDtos.OfferProgress o : progress.safeMonthly()) {
-                appendPromoLine(sb, o, "هدية");
-            }
-            for (PromoDtos.OfferProgress o : progress.safeSupporter()) {
-                appendPromoLine(sb, o, "داعم");
-            }
-            if (sb.length() == 0) {
-                sb.append("اشحن $200 للحصول على إطار + ID مميز");
-            }
-            binding.tvPromoLines.setText(sb.toString().trim());
-        }
+        // Offers are a separate entry — never inline dump over packages.
+        lastPromoProgress = progress;
+        boolean has = progress != null;
+        binding.sectionPromoOffers.setVisibility(has ? View.VISIBLE : View.GONE);
     }
 
-    private static void appendPromoLine(StringBuilder sb, PromoDtos.OfferProgress o, String kind) {
-        if (o == null) return;
-        if (sb.length() > 0) sb.append('\n');
-        String title = o.titleAr != null && !o.titleAr.isEmpty() ? o.titleAr : kind;
-        String status = o.claimed ? "✓ مستلم" : (o.unlocked ? "جاهز" : String.format(Locale.US,
-                "$%.0f / $%.0f", o.progressUsd, o.thresholdUsd));
-        sb.append("• ").append(title).append(" — ").append(status);
+    private PromoDtos.MyProgress lastPromoProgress;
+
+    private void showMonthlyOffersSheet() {
+        OffersBottomSheet.show(getSupportFragmentManager());
     }
 
     /** Hub shows balance + menu; each action opens this activity focused on one form. */
@@ -1006,9 +1003,42 @@ public class BagActivity extends ThemedActivity {
     }
 
     private void load() {
+        final boolean showLoader = adapter == null || adapter.getItemCount() == 0;
+        if (showLoader) AppLoadingOverlay.showUntilReady(this);
         c.getIoExecutor().execute(() -> {
-            Result<WalletDtos.WalletDto> w = c.getWalletUseCase.execute();
+            // Paint packages as soon as they arrive — do not wait for wallet/history.
             Result<WalletDtos.PackagesResult> p = c.getWalletRepository().getPackages();
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || binding == null) return;
+                if (showLoader) AppLoadingOverlay.hide(this);
+                List<WalletDtos.RechargePackageDto> pkgs = new ArrayList<>();
+                if (p.success && p.data != null && p.data.items != null && !p.data.items.isEmpty()) {
+                    pkgs.addAll(p.data.items);
+                    adapter.submit(pkgs);
+                    String uid = c.getSessionManager().getUserId();
+                    if (uid != null) {
+                        c.getFeatureCache().putJson(
+                                uid, EncryptedFeatureCache.NS_RECHARGE_PACKAGES, p.data);
+                    }
+                    List<String> skus = new ArrayList<>();
+                    for (WalletDtos.RechargePackageDto pkg : pkgs) {
+                        if (pkg != null && pkg.sku != null && !pkg.sku.isEmpty()) skus.add(pkg.sku);
+                    }
+                    if (!skus.isEmpty()) {
+                        c.getBillingHelper().queryProducts(skus, () -> {
+                            c.getBillingHelper().applyPlayPrices(pkgs);
+                            adapter.submit(pkgs);
+                        });
+                    }
+                } else if (adapter.getItemCount() == 0) {
+                    adapter.submit(Collections.emptyList());
+                    Toast.makeText(BagActivity.this,
+                            "تعذر تحميل باقات الشحن — حاول لاحقاً",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+
+            Result<WalletDtos.WalletDto> w = c.getWalletUseCase.execute();
             Result<WalletDtos.WithdrawList> withdraws = ApiCall.execute(c.getWalletApi().withdraws());
             Result<WalletDtos.EconomyConfig> economy =
                     ApiCall.execute(c.getWalletApi().economyConfig());
@@ -1043,26 +1073,6 @@ public class BagActivity extends ThemedActivity {
                 if (w.success) applyWallet(w.data);
                 bindHostMonthlyTarget(hostTarget);
                 renderWithdrawHistory(withdraws);
-                List<WalletDtos.RechargePackageDto> pkgs = new ArrayList<>();
-                if (p.success && p.data != null && p.data.items != null && !p.data.items.isEmpty()) {
-                    pkgs.addAll(p.data.items);
-                    adapter.submit(pkgs);
-                    List<String> skus = new ArrayList<>();
-                    for (WalletDtos.RechargePackageDto pkg : pkgs) {
-                        if (pkg != null && pkg.sku != null && !pkg.sku.isEmpty()) skus.add(pkg.sku);
-                    }
-                    if (!skus.isEmpty()) {
-                        c.getBillingHelper().queryProducts(skus, () -> {
-                            c.getBillingHelper().applyPlayPrices(pkgs);
-                            adapter.submit(pkgs);
-                        });
-                    }
-                } else {
-                    adapter.submit(Collections.emptyList());
-                    Toast.makeText(BagActivity.this,
-                            "تعذر تحميل باقات الشحن — حاول لاحقاً",
-                            Toast.LENGTH_LONG).show();
-                }
             });
         });
     }

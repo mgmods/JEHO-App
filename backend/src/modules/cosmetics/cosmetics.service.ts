@@ -420,6 +420,14 @@ export class CosmeticsService implements OnModuleInit {
     const cosmetic = await this.cosmeticsRepo.findOne({ where: { id: cosmeticId, isActive: true } });
     if (!cosmetic) throw new NotFoundException('Cosmetic not found');
 
+    // Agency exclusive frames/cards: admin grant only — never mall purchase.
+    const { isAgencyExclusiveCosmetic } = await import('../agencies/agency-perks');
+    if (isAgencyExclusiveCosmetic(cosmetic.meta, cosmetic.code)) {
+      throw new BadRequestException(
+        'هذا الإطار/البطاقة حصرية للوكالات المعتمدة — تُمنح من إدارة التطبيق فقط',
+      );
+    }
+
     await this.assertCosmeticRequirements(userId, cosmetic);
 
     const fullPrice = Math.max(0, Math.floor(Number(cosmetic.coinPrice) || 0));

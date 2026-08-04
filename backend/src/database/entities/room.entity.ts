@@ -150,6 +150,14 @@ export class Room {
   @Column({ type: 'timestamptz', nullable: true })
   liveSessionStartedAt: Date | null;
 
+  /**
+   * Personal rooms only: first moment the live room had zero presence
+   * (no seated users, no live sessions, no sockets). Cleared when someone returns.
+   * After ~30 minutes the idle sweeper ends the stream permanently.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  emptySince: Date | null;
+
   /** free | paid (per session) | permanent (one-time unlock) */
   @Column({ type: 'varchar', length: 16, default: RoomAccessMode.FREE })
   accessMode: RoomAccessMode;

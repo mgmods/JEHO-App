@@ -6,28 +6,17 @@
       <div class="room-card__halo"></div>
       <div class="room-card__wings" aria-hidden="true"></div>
       <div class="room-card__top">
-        <StatusBadge :status="room.status || 'active'" />
+        <span class="neo-pill" :class="room.isLive ? 'neo-pill--live' : 'neo-pill--talk'">
+          <i class="bi" :class="room.isLive ? 'bi-broadcast' : 'bi-mic-fill'"></i>
+          {{ room.isLive ? 'LIVE' : (room.status || 'active') }}
+        </span>
         <span class="room-card__viewers">
           <i class="bi bi-people-fill me-1"></i>
           {{ formatNumber(room.membersCount ?? room.memberCount ?? room.onlineCount ?? room.viewerCount ?? 0) }}
         </span>
       </div>
-      <div class="room-card__bottom">
-        <div class="room-card__title">{{ room.name || room.title || t('common.untitled') }}</div>
-        <div class="room-card__access small mt-1">
-          <span class="badge bg-dark border border-secondary">
-            {{ accessLabel }}
-          </span>
-          <span v-if="room.isLive" class="badge bg-danger ms-1">مباشر</span>
-          <span v-if="room.roomKind === 'support' || room.isSupport" class="badge bg-success ms-1">
-            خدمة عملاء
-          </span>
-          <span v-else-if="room.isPersistent || room.roomKind === 'agency'" class="badge bg-info ms-1">
-            {{ t('rooms.agency') }}
-          </span>
-          <span v-if="entryFee > 0" class="text-warning ms-1">{{ formatNumber(entryFee) }} {{ t('common.coins') }}</span>
-        </div>
-        <div class="room-card__host">
+      <div class="room-card__center">
+        <div class="room-card__host-wear">
           <div class="room-card__host-frame">
             <img
               v-if="hostAvatar"
@@ -38,9 +27,39 @@
             />
             <div v-else class="room-card__host-avatarFallback">{{ hostInitial }}</div>
           </div>
-          <span>{{ hostName }}</span>
+          <!-- Equipped head frame / VIP badge (static or SVGA) -->
+          <div v-if="hostFrameUrl" class="room-card__frame-layer" aria-hidden="true">
+            <SvgaPreview v-if="isSvgaFrame" class="room-card__frame-media" :src="hostFrameUrl" />
+            <video
+              v-else-if="isVideoFrame"
+              class="room-card__frame-media"
+              :src="hostFrameUrl"
+              muted
+              loop
+              autoplay
+              playsinline
+            />
+            <img v-else class="room-card__frame-media" :src="hostFrameUrl" alt="" />
+          </div>
         </div>
-        <div class="small text-warning mt-1">ID: {{ roomPublicId }}</div>
+      </div>
+      <div class="room-card__bottom">
+        <div class="room-card__title">{{ room.name || room.title || t('common.untitled') }}</div>
+        <div class="room-card__host-name">{{ hostName }}</div>
+        <div class="room-card__access small mt-1">
+          <span class="neo-pill neo-pill--heat">
+            <i class="bi bi-fire"></i>
+            {{ accessLabel }}
+          </span>
+          <span v-if="room.roomKind === 'support' || room.isSupport" class="badge bg-success ms-1">
+            خدمة عملاء
+          </span>
+          <span v-else-if="room.isPersistent || room.roomKind === 'agency'" class="badge bg-info ms-1">
+            {{ t('rooms.agency') }}
+          </span>
+          <span v-if="entryFee > 0" class="text-warning ms-1">{{ formatNumber(entryFee) }} {{ t('common.coins') }}</span>
+        </div>
+        <div v-if="roomPublicId" class="small text-warning mt-1">ID: {{ roomPublicId }}</div>
       </div>
     </div>
     <div class="room-card__actions">
@@ -93,9 +112,10 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import StatusBadge from '@/components/StatusBadge.vue'
 import BulkCheck from '@/components/BulkCheck.vue'
+import SvgaPreview from '@/components/SvgaPreview.vue'
 import { formatNumber, formatDate } from '@/composables/useUtils'
+import { resolveAsset } from '@/utils/assets'
 
 const props = defineProps({
   room: { type: Object, required: true },
@@ -123,17 +143,51 @@ const hostName = computed(() =>
   || '—',
 )
 
+function absUrl(url) {
+  if (!url) return null
+  if (String(url).startsWith('http')) return url
+  return resolveAsset(url) || `https://api.adnova.bbs.tr${String(url).startsWith('/') ? '' : '/'}${url}`
+}
+
 const hostAvatar = computed(() => {
   if (avatarError.value) return null
   const url = props.room.hostAvatarUrl
     || props.room.host?.avatarUrl
     || props.room.coverUrl
-  if (!url) return null
-  if (url.startsWith('http')) return url
-  return `https://api.adnova.bbs.tr${url.startsWith('/') ? '' : '/'}${url}`
+  return absUrl(url)
 })
 
-const roomPublicId = computed(() => props.room.publicId || props.room.id || '—')
+const hostFrameUrl = computed(() => {
+  const raw =
+    props.room.hostFrameAnimUrl
+    || props.room.hostFrameUrl
+    || props.room.host?.vipBadgeUrl
+    || props.room.host?.hostBadgeUrl
+    || null
+  return absUrl(raw)
+})
+
+const isSvgaFrame = computed(() => /\.svga(\?|$)/i.test(String(hostFrameUrl.value || '')))
+const isVideoFrame = computed(() =>
+  /\.(mp4|webm|mov)(\?|$)/i.test(String(hostFrameUrl.value || '')),
+)
+
+const roomPublicId = computed(() => {
+  const candidates = [
+    props.room.publicId,
+    props.room.roomCode,
+    props.room.displayId,
+    props.room.shortId,
+  ]
+  for (const c of candidates) {
+    if (c == null || c === '') continue
+    const s = String(c)
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) continue
+    if (s.length > 16) continue
+    return s
+  }
+  return ''
+})
 
 const accessLabel = computed(() => {
   const mode = (props.room.accessMode || 'free').toLowerCase()
@@ -154,7 +208,7 @@ const heroStyle = computed(() => {
     return { backgroundImage: `url(${hostAvatar.value})` }
   }
   return {
-    backgroundImage: 'linear-gradient(135deg, #0B1220 0%, #12352F 45%, #00C2A8 100%)',
+    backgroundImage: 'linear-gradient(145deg, #1a0b3a 0%, #0e0b1f 45%, #2a1458 100%)',
   }
 })
 </script>
@@ -162,17 +216,18 @@ const heroStyle = computed(() => {
 <style scoped>
 .room-card {
   position: relative;
-  border-radius: var(--al-radius);
+  border-radius: 22px;
   overflow: hidden;
 }
 .room-card.is-selected {
-  outline: 2px solid rgba(45, 212, 191, 0.75);
+  outline: 2px solid rgba(167, 139, 250, 0.8);
   outline-offset: 1px;
+  box-shadow: 0 0 32px rgba(139, 92, 246, 0.35);
 }
 
 .room-card__hero {
   position: relative;
-  min-height: 200px;
+  min-height: 240px;
   background-size: cover;
   background-position: center top;
   isolation: isolate;
@@ -181,34 +236,27 @@ const heroStyle = computed(() => {
 .room-card__scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(7, 17, 28, 0.15) 0%, rgba(7, 17, 28, 0.92) 100%);
+  background:
+    linear-gradient(180deg, rgba(14, 11, 31, 0.2) 0%, rgba(14, 11, 31, 0.55) 40%, rgba(14, 11, 31, 0.96) 100%),
+    radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.25), transparent 55%);
 }
 
 .room-card__halo {
   position: absolute;
-  inset: 18px;
-  border-radius: 32px;
-  border: 1px solid rgba(255, 215, 130, 0.45);
-  box-shadow:
-    0 0 0 2px rgba(255, 255, 255, 0.06),
-    0 0 30px rgba(255, 191, 0, 0.18);
+  inset: 16px;
+  border-radius: 28px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 36px rgba(139, 92, 246, 0.2);
   z-index: 0;
+  pointer-events: none;
 }
 
 .room-card__wings {
-  position: absolute;
-  inset-inline: 22px;
-  top: 18px;
-  bottom: 18px;
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at left center, rgba(255, 218, 128, 0.28), transparent 28%),
-    radial-gradient(circle at right center, rgba(255, 218, 128, 0.28), transparent 28%);
-  opacity: 0.95;
-  z-index: 0;
+  display: none;
 }
 
 .room-card__top,
+.room-card__center,
 .room-card__bottom {
   position: relative;
   z-index: 1;
@@ -218,69 +266,111 @@ const heroStyle = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px 0;
+  padding: 14px 14px 0;
 }
 
 .room-card__viewers {
   background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(0, 194, 168, 0.35);
+  border: 1px solid rgba(167, 139, 250, 0.35);
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.78rem;
   color: #fff;
+  backdrop-filter: blur(8px);
 }
 
-.room-card__bottom {
-  padding: 48px 14px 14px;
+.room-card__center {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
 }
 
-.room-card__title {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: #fff;
-  line-height: 1.2;
-}
-
-.room-card__host {
+.room-card__host-wear {
+  position: relative;
+  width: 110px;
+  height: 110px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  color: var(--al-teal-bright);
-  font-size: 0.9rem;
+  justify-content: center;
 }
 
 .room-card__host-frame {
-  width: 38px;
-  height: 38px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
+  padding: 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.6), transparent 34%),
-    linear-gradient(135deg, rgba(255, 215, 130, 0.95), rgba(255, 143, 85, 0.92));
-  box-shadow: 0 8px 22px rgba(255, 166, 0, 0.2);
+  background: linear-gradient(135deg, #a78bfa, #22d3ee, #f472b6);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18), 0 0 28px rgba(139, 92, 246, 0.45);
+  position: relative;
+  z-index: 1;
 }
 
-.room-card__host-avatar {
-  width: 30px;
-  height: 30px;
+.room-card__host-avatar,
+.room-card__host-avatarFallback {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(255, 255, 255, 0.75);
+  border: 2px solid #0e0b1f;
 }
 
 .room-card__host-avatarFallback {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-weight: 800;
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.95), rgba(6, 182, 212, 0.95));
+  font-size: 1.4rem;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+}
+
+.room-card__frame-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-card__frame-media {
+  width: 110px !important;
+  height: 110px !important;
+  object-fit: contain;
+  background: transparent !important;
+}
+
+.room-card__bottom {
+  padding: 14px 16px 16px;
+  text-align: center;
+}
+
+.room-card__title {
+  font-weight: 800;
+  font-size: 1.12rem;
+  color: #fff;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.room-card__host-name {
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+  color: #c4b5fd;
+  font-weight: 600;
+}
+
+.room-card__access {
+  margin-top: 0.55rem !important;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  align-items: center;
 }
 
 .room-card__actions {
@@ -289,6 +379,14 @@ const heroStyle = computed(() => {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(14, 11, 31, 0.65);
+}
+
+.action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
 }
 </style>

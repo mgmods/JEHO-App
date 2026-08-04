@@ -220,15 +220,32 @@ async function runConfirm() {
   const action = pendingAction.value
   pendingAction.value = null
   if (!action) return
+  // Bulk actions store a callback, not { type, payload }
+  if (typeof action === 'function') {
+    try {
+      await action()
+    } catch (e) {
+      const msg = e?.message || String(e)
+      error.value = msg
+      toast().danger(msg)
+    }
+    return
+  }
   const r = action.payload
   let err
   if (action.type === 'close') {
-    ;({ error: err } = await roomsApi.close(r.id))
+    // force-end first so live sessions really stop (personal + agency)
+    ;({ error: err } = await roomsApi.forceEnd(r.id, { reason: 'Admin close' }))
+    if (err && !(r.roomKind === 'agency' || r.agencyId || r.isPersistent)) {
+      ;({ error: err } = await roomsApi.close(r.id))
+    }
   } else if (action.type === 'forceEnd') {
     ;({ error: err } = await roomsApi.forceEnd(r.id, { reason: 'Admin force end' }))
   } else if (action.type === 'support') {
     ;({ error: err } = await roomsApi.setCustomerService(r.id, !!action.enable))
   } else if (action.type === 'delete') {
+    // force end then delete
+    await roomsApi.forceEnd(r.id, { reason: 'Admin delete' })
     ;({ error: err } = await roomsApi.delete(r.id, { force: !!action.force }))
   }
   if (err) {

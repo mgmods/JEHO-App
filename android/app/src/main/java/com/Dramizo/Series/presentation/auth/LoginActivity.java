@@ -4,6 +4,9 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.Animation;
+import android.view.animation.ScaleAnimation;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -92,6 +95,21 @@ public class LoginActivity extends ThemedActivity {
                 .requestProfile()
                 .build();
         googleClient = GoogleSignIn.getClient(this, gso);
+
+        // Soft entrance matching splash brand motion.
+        if (binding.imgLogo != null) {
+            ScaleAnimation scale = new ScaleAnimation(
+                    0.94f, 1f, 0.94f, 1f,
+                    Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+            scale.setDuration(420L);
+            AlphaAnimation fade = new AlphaAnimation(0f, 1f);
+            fade.setDuration(420L);
+            android.view.animation.AnimationSet enter = new android.view.animation.AnimationSet(true);
+            enter.addAnimation(scale);
+            enter.addAnimation(fade);
+            enter.setFillAfter(true);
+            binding.imgLogo.startAnimation(enter);
+        }
 
         binding.btnGoogle.setOnClickListener(v -> {
             binding.progress.setVisibility(View.VISIBLE);

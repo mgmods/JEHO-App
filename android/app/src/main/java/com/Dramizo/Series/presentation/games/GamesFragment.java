@@ -513,14 +513,19 @@ public class GamesFragment extends Fragment {
             String fallback = null;
             if (MikooGameBridge.isMikooSlot(g.mode, g.playUrl) && g.id != null && !g.id.isEmpty()) {
                 fallback = com.Dramizo.Series.util.ApiOrigin.origin()
-                        + "/games/mikoo/covers/" + g.id + ".png?v=20260728c";
-                if (cover != null && !cover.isEmpty() && !cover.contains("v=")) {
-                    cover = cover + (cover.contains("?") ? "&" : "?") + "v=20260728c";
+                        + "/games/mikoo/covers/" + g.id + ".png?v=20260804g";
+                if (cover == null || cover.isEmpty()
+                        || cover.contains("/games/mikoo/covers/")
+                        || cover.endsWith(".jpg")) {
+                    cover = fallback;
+                } else if (!cover.contains("v=")) {
+                    cover = cover + (cover.contains("?") ? "&" : "?") + "v=20260804g";
                 }
             }
+            String loadUrl = (cover != null && !cover.isEmpty()) ? cover : fallback;
 
             com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> req =
-                    Glide.with(h.b.imgCover).load(cover)
+                    Glide.with(h.b.imgCover).load(loadUrl)
                             .placeholder(ImagePlaceholder.game());
             if (fallback != null && !fallback.isEmpty()) {
                 req = req.error(Glide.with(h.b.imgCover).load(fallback)

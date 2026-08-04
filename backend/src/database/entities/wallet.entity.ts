@@ -28,6 +28,13 @@ export class Wallet {
   diamonds: number;
 
   /**
+   * Diamonds earned from agency-room gifts (host share + owner commission).
+   * Separate from personal-room `diamonds` — own withdraw/payout path.
+   */
+  @Column({ type: 'bigint', default: 0 })
+  agencyDiamonds: number;
+
+  /**
    * Diamonds received from host↔host trades (التاجر).
    * Separate from withdrawable `diamonds` so swaps accumulate as trader collection.
    */

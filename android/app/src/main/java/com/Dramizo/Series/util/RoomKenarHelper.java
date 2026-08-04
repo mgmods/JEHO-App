@@ -116,22 +116,31 @@ public final class RoomKenarHelper {
         target.setTag(R.id.tag_room_kenar_url, abs);
         final Runnable apply = () -> {
             if (!abs.equals(target.getTag(R.id.tag_room_kenar_url))) return;
-            int w = 1;
-            int h = 1;
-            if (fillItem && cardBody != null && cardBody.getWidth() > 0 && cardBody.getHeight() > 0) {
-                sizeToCard(target, cardBody);
-                w = cardBody.getWidth();
-                h = cardBody.getHeight();
-            } else if (target.getWidth() > 0 && target.getHeight() > 0) {
-                w = target.getWidth();
-                h = target.getHeight();
-            } else if (cardBody != null) {
-                w = Math.max(1, cardBody.getWidth());
-                h = Math.max(1, cardBody.getHeight());
+            int w = 0;
+            int h = 0;
+            if (cardBody != null && cardBody.getWidth() > 0 && cardBody.getHeight() > 0) {
+                if (fillItem) {
+                    sizeToCard(target, cardBody);
+                }
+                w = Math.max(w, cardBody.getWidth());
+                h = Math.max(h, cardBody.getHeight());
+            }
+            if (target.getWidth() > 0 && target.getHeight() > 0) {
+                w = Math.max(w, target.getWidth());
+                h = Math.max(h, target.getHeight());
+            }
+            // Cover ratio fallback when list item just became visible after GONE.
+            if ((w <= 1 || h <= 1) && target.getResources() != null) {
+                float d = target.getResources().getDisplayMetrics().density;
+                w = Math.round(175 * d);
+                h = Math.round(195 * d);
+            }
+            if (w <= 1 || h <= 1) {
+                return;
             }
             String lower = abs.toLowerCase(Locale.US);
             RequestOptions opts = new RequestOptions()
-                    .override(Math.max(1, w), Math.max(1, h))
+                    .override(w, h)
                     .dontTransform()
                     .dontAnimate();
             if (lower.contains(".gif") && !lower.contains(".webp")) {
@@ -146,20 +155,18 @@ public final class RoomKenarHelper {
             }
         };
 
-        if (fillItem && cardBody != null) {
-            View.OnLayoutChangeListener sync =
-                    (v, l, t, r, b, ol, ot, or, ob) -> {
-                        if ((r - l) > 0 && (b - t) > 0) apply.run();
-                    };
-            target.setTag(TAG_SYNC, new SyncState(cardBody, sync));
-            cardBody.addOnLayoutChangeListener(sync);
-            if (cardBody.getWidth() > 0 && cardBody.getHeight() > 0) {
-                apply.run();
-            } else {
-                cardBody.post(apply);
-            }
+        // Always resync when card size becomes known (home grid recycle).
+        View measureSource = cardBody != null ? cardBody : target;
+        View.OnLayoutChangeListener sync =
+                (v, l, t, r, b, ol, ot, or, ob) -> {
+                    if ((r - l) > 1 && (b - t) > 1) apply.run();
+                };
+        target.setTag(TAG_SYNC, new SyncState(measureSource, sync));
+        measureSource.addOnLayoutChangeListener(sync);
+        if (measureSource.getWidth() > 1 && measureSource.getHeight() > 1) {
+            apply.run();
         } else {
-            target.post(apply);
+            measureSource.post(apply);
         }
     }
 
@@ -167,13 +174,13 @@ public final class RoomKenarHelper {
         int w = cardBody.getWidth();
         int h = cardBody.getHeight();
         if (w <= 0 || h <= 0) return;
-        // Exact card size — one frame only (no second border from overhang).
-        FrameLayout.LayoutParams flp;
-        if (target.getLayoutParams() instanceof FrameLayout.LayoutParams) {
-            flp = (FrameLayout.LayoutParams) target.getLayoutParams();
-        } else {
-            flp = new FrameLayout.LayoutParams(w, h);
+        // Only safe when parent is FrameLayout (in-room header). Never replace
+        // ConstraintLayout.LayoutParams on home list cards.
+        ViewGroup.LayoutParams lp = target.getLayoutParams();
+        if (!(lp instanceof FrameLayout.LayoutParams)) {
+            return;
         }
+        FrameLayout.LayoutParams flp = (FrameLayout.LayoutParams) lp;
         flp.width = w;
         flp.height = h;
         flp.gravity = Gravity.TOP | Gravity.START;

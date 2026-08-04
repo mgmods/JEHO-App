@@ -10,7 +10,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.ImagePlaceholder;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.google.android.material.imageview.ShapeableImageView;
@@ -52,21 +51,13 @@ public class HomeBannerAdapter extends RecyclerView.Adapter<HomeBannerAdapter.VH
     public void onBindViewHolder(@NonNull VH holder, int position) {
         MiscDtos.BannerDto banner = items.get(position);
         String raw = banner.imageUrl != null ? banner.imageUrl.trim() : "";
-        if (raw.startsWith("drawable://")) {
-            String name = raw.substring("drawable://".length());
-            int resId = holder.img.getResources()
-                    .getIdentifier(name, "drawable", holder.img.getContext().getPackageName());
-            if (resId != 0) {
-                holder.img.setImageResource(resId);
-            } else {
-                holder.img.setImageResource(R.drawable.home_bg_wealth);
-            }
+        // Remote server banners only — never fill with local default art.
+        String url = AssetCatalog.absoluteUrl(raw);
+        if (url == null || url.isEmpty()) {
+            holder.img.setImageDrawable(null);
         } else {
-            String url = AssetCatalog.absoluteUrl(raw);
             Glide.with(holder.img)
                     .load(url)
-                    .placeholder(ImagePlaceholder.cover())
-                    .error(ImagePlaceholder.cover())
                     .centerCrop()
                     .transition(DrawableTransitionOptions.withCrossFade(180))
                     .into(holder.img);

@@ -47,6 +47,51 @@ export class FourthwallClient {
     return { value, currency: 'USD' };
   }
 
+  /**
+   * Store-facing catalog label for Fourthwall orders/receipts.
+   * Must NOT mention virtual currency / coins / diamond / recharge — Fourthwall
+   * flags that language. Credit mapping stays only via hidden JEHO_SKU lines.
+   */
+  private storefrontEbookMeta(input: {
+    sku: string;
+    priceUsd: number;
+  }): { name: string; description: string; edition: number; series: string } {
+    const sku = String(input.sku || '').trim();
+    const priceUsd = Math.round(Number(input.priceUsd) * 100) / 100;
+    const seriesCatalog = [
+      'Harbor Quiet Fables',
+      'Starlight Pocket Reader',
+      'Cedar Grove Anthology',
+      'Moonlit Trail Stories',
+      'Silver Quill Collection',
+      'Amber Window Tales',
+      'Linen Shelf Classics',
+      'Blue Lantern Library',
+      'Olive Press Mini Guide',
+      'Northwind Storybook',
+      'Garden Path Reader',
+      'Ivory Desk Companion',
+    ];
+    let hash = 0;
+    for (let i = 0; i < sku.length; i += 1) {
+      hash = (hash * 31 + sku.charCodeAt(i)) >>> 0;
+    }
+    const series = seriesCatalog[hash % seriesCatalog.length];
+    // Edition band also tracks price tier (stable ops label, not "coins").
+    const edition = Math.max(1, Math.round(priceUsd * 100) + (hash % 17));
+    const name = `${series} — Digital eBook · Edition ${edition}`;
+    const marker = `JEHO_SKU:${sku}`;
+    const priceMarker = `JEHO_PRICE_USD:${priceUsd}`;
+    const description = [
+      marker,
+      priceMarker,
+      `${series} is a short digital storybook / reading guide delivered instantly after purchase.`,
+      `Edition ${edition}. Format: text eBook (instant download).`,
+      'For entertainment reading. Non-refundable digital download once fulfilled.',
+    ].join('\n');
+    return { name, description, edition, series };
+  }
+
   /** Preferred: cartId checkout with forced currency (avoids geo local-currency mismatch). */
   checkoutUrlForVariant(variantId: string, currency = 'USD'): string {
     const domain = this.shopHost();
@@ -109,7 +154,7 @@ export class FourthwallClient {
 
   /**
    * Ensure a purchasable digital product exists for this JEHO package.
-   * Always re-syncs price/name from the live wallet package so admin $200 ≠ stale $0.99.
+   * Always re-syncs price + storefront eBook title (never coin wording).
    * Products must be available (published) or checkout shows $0 / hangs.
    */
   async ensureCoinPackageProduct(input: {
@@ -120,28 +165,19 @@ export class FourthwallClient {
   }): Promise<FourthwallProductSummary> {
     const sku = String(input.sku || '').trim();
     if (!sku) throw new Error('sku required');
-    const coins = Math.max(0, Number(input.coins) || 0);
-    const bonus = Math.max(0, Number(input.bonusCoins) || 0);
     const priceUsd = Math.round(Number(input.priceUsd) * 100) / 100;
     if (!(priceUsd > 0)) {
       throw new Error(`Invalid package price for ${sku}: ${input.priceUsd}`);
     }
-    const marker = `JEHO_SKU:${sku}`;
-    const name = `JEHO ${coins.toLocaleString('en-US')} Coins ($${priceUsd})`;
-    const description = [
-      marker,
-      `JEHO_PRICE_USD:${priceUsd}`,
-      'JEHO Chat in-app coin recharge.',
-      `Coins: ${coins}${bonus ? ` +${bonus} bonus` : ''}`,
-      `Price: $${priceUsd}`,
-    ].join('\n');
+    const catalog = this.storefrontEbookMeta({ sku, priceUsd });
+    const { name, description, edition, series } = catalog;
 
     const existing = await this.findProductBySkuMarker(sku);
     if (existing?.variantId && existing.productId) {
       await this.makeProductPurchasable(existing.productId);
       const live = await this.readProductSummary(existing.productId, existing);
       if (live && this.moneyEquals(live.priceUsd, priceUsd)) {
-        // Keep title/desc in sync for ops clarity (best-effort).
+        // Rename old "… Coins" products → eBook catalog (best-effort).
         await this.touchProductMeta(live.productId, name, description).catch(() => undefined);
         return { productId: live.productId, variantId: live.variantId, name, priceUsd };
       }
@@ -171,7 +207,7 @@ export class FourthwallClient {
     const productId = created.productId;
 
     try {
-      await this.attachTinyDigitalFile(productId, sku, coins);
+      await this.attachTinyDigitalFile(productId, sku, series, edition);
     } catch (e) {
       this.logger.warn(
         `digital file attach skipped: ${(e as Error).message || e}`,
@@ -591,14 +627,27 @@ export class FourthwallClient {
   private async attachTinyDigitalFile(
     productId: string,
     sku: string,
-    coins: number,
+    series: string,
+    edition: number,
   ) {
+    // Neutral eBook payload only — no currency wording (ToS / compliance).
     const content = Buffer.from(
-      `JEHO Chat coin recharge\nSKU=${sku}\nCOINS=${coins}\n`,
+      [
+        `${series}`,
+        `Digital eBook · Edition ${edition}`,
+        `Instant download · text format`,
+        `Catalog ref: ${sku}`,
+        '',
+      ].join('\n'),
       'utf8',
     );
     const size = content.byteLength;
-    const fileName = `jeho-${sku}.txt`;
+    const safeSeries = series
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 32);
+    const fileName = `${safeSeries || 'ebook'}-ed${edition}.txt`;
     const up = await this.openFetch(
       `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/digital-files/upload-url`,
       {

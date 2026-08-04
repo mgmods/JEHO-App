@@ -6,6 +6,7 @@ import {
   ConflictException,
   Optional,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -67,12 +68,20 @@ import {
 import { RoomMusicTrack } from '../../database/entities/room-music-track.entity';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import { ContentModerationService } from '../moderation/content-moderation.service';
+import {
+  normalizeStaffRole,
+  staffRank,
+  type PlatformStaffRole,
+} from '../../common/staff-role';
 
 const DEFAULT_ROOM_SEAT_COUNT = 11; // host stage + numbered seats 1..10
+/** Personal empty live rooms auto-end after this many minutes (owner-away / ghost rooms). */
+const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
 
 @Injectable()
-export class RoomsService implements OnModuleInit {
+export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
+  private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
   /** Default list/cover art when a room has no custom cover (backgrounds pack). */
   private readonly roomCoverCards = [
     'backgrounds/room_default',
@@ -123,6 +132,9 @@ export class RoomsService implements OnModuleInit {
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "liveSessionStartedAt" TIMESTAMPTZ`,
       );
       await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "emptySince" TIMESTAMPTZ`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatZoneEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
@@ -140,6 +152,9 @@ export class RoomsService implements OnModuleInit {
       await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "lowGiftEffectsEnabled" boolean NOT NULL DEFAULT true`,
       );
+      await this.dataSource.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
+      );
     } catch (err) {
       this.log.warn(
         `rooms column ensure skipped: ${
@@ -147,6 +162,133 @@ export class RoomsService implements OnModuleInit {
         }`,
       );
     }
+    // Personal rooms: end live if nobody is in (host away + empty) for ~30 minutes.
+    this.personalEmptySweepTimer = setInterval(() => {
+      void this.sweepEmptyPersonalRooms().catch((err) =>
+        this.log.warn(
+          `personal empty sweep: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, 60_000);
+  }
+
+  onModuleDestroy() {
+    if (this.personalEmptySweepTimer) {
+      clearInterval(this.personalEmptySweepTimer);
+      this.personalEmptySweepTimer = null;
+    }
+  }
+
+  private isPersonalLiveRoom(room: Pick<Room, 'roomKind' | 'agencyId' | 'activeHostId' | 'status'>) {
+    if (room.agencyId || room.roomKind === RoomKind.AGENCY) return false;
+    if (room.roomKind === RoomKind.SUPPORT) return false;
+    if (!room.activeHostId) return false;
+    if (room.status === RoomStatus.CLOSED) return false;
+    return true;
+  }
+
+  /** Anyone still "in" the room? Host muted on stage counts; away with empty room does not. */
+  private async countLivePresence(roomId: string): Promise<number> {
+    const [seated, sessions, room] = await Promise.all([
+      this.seatsRepo
+        .createQueryBuilder('s')
+        .where('s.roomId = :roomId', { roomId })
+        .andWhere('s.userId IS NOT NULL')
+        .getCount(),
+      this.accessRepo
+        .createQueryBuilder('a')
+        .where('a.roomId = :roomId', { roomId })
+        .andWhere('a.grantType = :gt', { gt: RoomAccessGrant.SESSION })
+        .andWhere('(a.expiresAt IS NULL OR a.expiresAt > NOW())')
+        .getCount(),
+      this.roomsRepo.findOne({
+        where: { id: roomId },
+        select: ['id', 'viewerCount'],
+      }),
+    ]);
+    const viewers = Math.max(0, Number(room?.viewerCount || 0));
+    return seated + sessions + viewers;
+  }
+
+  /**
+   * Track emptySince for personal live rooms.
+   * Presence = mic seats OR session joins OR realtime viewers.
+   * Owner alone + muted mic still has seat/viewer → never auto-closed.
+   */
+  async syncPersonalRoomEmptyState(roomId: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room || !this.isPersonalLiveRoom(room)) return;
+    const presence = await this.countLivePresence(roomId);
+    if (presence > 0) {
+      if (room.emptySince) {
+        room.emptySince = null;
+        await this.roomsRepo.save(room);
+      }
+      return;
+    }
+    if (!room.emptySince) {
+      room.emptySince = new Date();
+      await this.roomsRepo.save(room);
+    }
+  }
+
+  /** End personal lives that have been fully empty for the configured window. */
+  async sweepEmptyPersonalRooms() {
+    const minutes = await this.numberSetting(
+      'rooms.personal_empty_close_minutes',
+      DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES,
+    );
+    const cutoff = new Date(Date.now() - Math.max(5, minutes) * 60_000);
+    const candidates = await this.roomsRepo
+      .createQueryBuilder('room')
+      .where('room.activeHostId IS NOT NULL')
+      .andWhere('room.status != :closed', { closed: RoomStatus.CLOSED })
+      .andWhere('room.agencyId IS NULL')
+      .andWhere("(room.roomKind IS NULL OR room.roomKind = :std)", {
+        std: RoomKind.STANDARD,
+      })
+      .getMany();
+
+    let closed = 0;
+    for (const room of candidates) {
+      if (!this.isPersonalLiveRoom(room)) continue;
+      const presence = await this.countLivePresence(room.id);
+      if (presence > 0) {
+        if (room.emptySince) {
+          room.emptySince = null;
+          await this.roomsRepo.save(room);
+        }
+        continue;
+      }
+      if (!room.emptySince) {
+        room.emptySince = new Date();
+        await this.roomsRepo.save(room);
+        continue;
+      }
+      if (room.emptySince > cutoff) continue;
+      await this.endLiveSession(room);
+      this.realtimeGateway.emitToRoom(room.id, 'room:event', {
+        roomId: room.id,
+        event: 'room:auto_closed',
+        payload: {
+          roomId: room.id,
+          reason: 'personal_empty_timeout',
+          emptyMinutes: minutes,
+        },
+        at: new Date().toISOString(),
+      });
+      closed += 1;
+      this.log.log(
+        `Auto-closed empty personal room ${room.id} after ${minutes}m idle`,
+      );
+    }
+    return { scanned: candidates.length, closed };
+  }
+
+  private async numberSetting(key: string, fallback: number): Promise<number> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    const n = Number(row?.value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
   }
 
   private async boolSetting(key: string, fallback: boolean): Promise<boolean> {
@@ -468,7 +610,7 @@ export class RoomsService implements OnModuleInit {
     const isAgencyHost =
       !!membership &&
       membership.agency?.status === AgencyStatus.ACTIVE &&
-      [AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role);
+      [AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role);
 
     // Agency hosts keep a separate personal room when the client asks for it
     // ("My room") — agency live uses POST /agencies/:id/room/open instead.
@@ -595,6 +737,10 @@ export class RoomsService implements OnModuleInit {
     dto: CreateRoomDto,
   ) {
     const title = dto.title?.trim() || `${displayName}`;
+    this.moderation.assertNoAgencyImpersonation(title, 'اسم الروم');
+    if (dto.description !== undefined) {
+      this.moderation.assertNoAgencyImpersonation(dto.description, 'وصف الروم');
+    }
     const coverUrl = (
       dto.coverUrl ||
       this.defaultRoomCover({
@@ -626,6 +772,7 @@ export class RoomsService implements OnModuleInit {
         status: RoomStatus.OPEN,
         activeHostId: hostId,
         liveSessionStartedAt: existing.liveSessionStartedAt || new Date(),
+        emptySince: null,
         isPersistent: false,
         isPublic: true,
         accessMode: RoomAccessMode.FREE,
@@ -715,7 +862,9 @@ export class RoomsService implements OnModuleInit {
   async endLiveSession(room: Room) {
     room.activeHostId = null;
     room.liveSessionStartedAt = null;
+    room.emptySince = null;
     room.status = RoomStatus.CLOSED;
+    room.viewerCount = 0;
     await this.roomsRepo.save(room);
     await this.seatsRepo.update(
       { roomId: room.id },
@@ -763,10 +912,10 @@ export class RoomsService implements OnModuleInit {
     });
     if (
       !membership ||
-      ![AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role)
+      ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)
     ) {
       throw new ForbiddenException(
-        'Active owner, manager, or host membership required to go live',
+        'فتح بث الوكالة لمالك الوكالة أو الأدمن فقط',
       );
     }
   }
@@ -1024,17 +1173,16 @@ export class RoomsService implements OnModuleInit {
           false,
         ),
       ]);
-    // Prefer room-level frame; fall back to host profile wear (mall equip).
+    // Prefer room-level frame; fall back to host profile / host DTO (mall equip).
     const fromRoom =
       typeof room.roomCardUrl === 'string' && room.roomCardUrl.trim()
         ? room.roomCardUrl.trim()
         : null;
     const hostProfile = room.host?.profile as { roomCardUrl?: string | null } | undefined;
-    const fromHost =
+    const fromHostProfile =
       typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
         ? hostProfile.roomCardUrl.trim()
         : null;
-    const roomCardUrl = fromRoom || fromHost || null;
     const decoratedSeats = await Promise.all(
       (room.seats || []).map(async (s: any) => {
         const uid = s.userId || s.user?.id;
@@ -1044,10 +1192,16 @@ export class RoomsService implements OnModuleInit {
         };
       }),
     );
+    const hostDto = await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
+    const fromHostDto =
+      hostDto && typeof (hostDto as any).roomCardUrl === 'string'
+        ? String((hostDto as any).roomCardUrl).trim() || null
+        : null;
+    const roomCardUrl = fromRoom || fromHostProfile || fromHostDto || null;
     const decorated = {
       ...room,
       roomCardUrl,
-      host: await this.attachFrame(room.host, vipMap.get(room.hostId) || 0),
+      host: hostDto,
       seats: decoratedSeats,
     };
     const coverUrl = decorated.coverUrl?.trim()
@@ -1401,6 +1555,7 @@ export class RoomsService implements OnModuleInit {
       }
       room.activeHostId = userId;
       room.status = RoomStatus.OPEN;
+      room.emptySince = null;
       if (!room.liveSessionStartedAt) {
         room.liveSessionStartedAt = new Date();
       }
@@ -1457,6 +1612,7 @@ export class RoomsService implements OnModuleInit {
           .catch(() => undefined);
       }, (120 + 2) * 1000);
     }
+    void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return {
       room: full,
       token: zego.token,
@@ -2124,6 +2280,7 @@ export class RoomsService implements OnModuleInit {
       payload: { roomId, userId },
       at: new Date().toISOString(),
     });
+    void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true };
   }
 
@@ -2216,6 +2373,7 @@ export class RoomsService implements OnModuleInit {
     }
     await this.seatSignalsRepo.delete({ roomId, userId });
     this.notifyRoomUpdated(roomId);
+    void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     // Mic time task: each seat take counts toward mic_N
     void this.tasksService
       .recordProgress(userId, 'mic', 1, {
@@ -2349,6 +2507,7 @@ export class RoomsService implements OnModuleInit {
       payload: { roomId, ...member },
       at: new Date().toISOString(),
     });
+    void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return this.getRoom(roomId);
   }
 
@@ -2370,6 +2529,7 @@ export class RoomsService implements OnModuleInit {
       },
       at: new Date().toISOString(),
     });
+    void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true, userId };
   }
 
@@ -2415,9 +2575,9 @@ export class RoomsService implements OnModuleInit {
       });
       if (
         !membership ||
-        ![AgencyRole.OWNER, AgencyRole.MANAGER, AgencyRole.HOST].includes(membership.role)
+        ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)
       ) {
-        throw new ForbiddenException('Cohost must be an eligible active agency host');
+        throw new ForbiddenException('Cohost must be an agency owner or manager');
       }
     }
     room.cohostId = dto.userId || null;
@@ -2793,6 +2953,8 @@ export class RoomsService implements OnModuleInit {
     await this.seatSignalsRepo.delete({ roomId });
     room.activeHostId = null;
     room.liveSessionStartedAt = null;
+    room.emptySince = null;
+    room.viewerCount = 0;
     room.status = RoomStatus.CLOSED;
     await this.roomsRepo.save(room);
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
@@ -2832,6 +2994,15 @@ export class RoomsService implements OnModuleInit {
     );
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
+    const isAgencyRoom = room.roomKind === RoomKind.AGENCY || !!room.agencyId;
+    if (!isAgencyRoom) {
+      if (dto.title !== undefined) {
+        this.moderation.assertNoAgencyImpersonation(dto.title, 'اسم الروم');
+      }
+      if (dto.description !== undefined && dto.description) {
+        this.moderation.assertNoAgencyImpersonation(dto.description, 'وصف الروم');
+      }
+    }
     if (dto.title !== undefined) room.title = dto.title;
     if (dto.description !== undefined) room.description = dto.description || null;
     if (dto.coverUrl !== undefined) {
@@ -3067,6 +3238,12 @@ export class RoomsService implements OnModuleInit {
     ) {
       return;
     }
+    // Platform staff: super = full room powers; manager = mute/kick/ban/seats/invite.
+    const staff = await this.platformStaffRole(actorId);
+    if (staff === 'super') return;
+    if (staff === 'manager' && permission !== 'canManageRoom') {
+      return;
+    }
     await this.assertAgencyRoomActive(room);
     // Agency owner may manage agency rooms for settings/moderation APIs.
     if (room.agencyId) {
@@ -3096,6 +3273,7 @@ export class RoomsService implements OnModuleInit {
     ) {
       return;
     }
+    if ((await this.platformStaffRole(actorId)) === 'super') return;
     const mod = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
     if (!mod?.canManageMusic) {
       throw new ForbiddenException('Music permission is required');
@@ -3113,6 +3291,7 @@ export class RoomsService implements OnModuleInit {
     ) {
       return;
     }
+    if ((await this.platformStaffRole(actorId)) === 'super') return;
     const mod = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
     if (!mod?.canChangeFrames) {
       throw new ForbiddenException('Frame permission is required');
@@ -3123,8 +3302,22 @@ export class RoomsService implements OnModuleInit {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
     await this.assertAgencyRoomActive(room);
+    if ((await this.platformStaffRole(actorId)) === 'super') return;
     if (room.hostId !== actorId) {
       throw new ForbiddenException('Only the room owner can manage moderators');
+    }
+  }
+
+  private async platformStaffRole(userId: string): Promise<PlatformStaffRole> {
+    if (!userId) return 'none';
+    try {
+      const user = await this.usersRepo.findOne({
+        where: { id: userId },
+        select: ['id', 'isAdmin', 'staffRole'] as any,
+      });
+      return normalizeStaffRole(user as any);
+    } catch {
+      return 'none';
     }
   }
 
@@ -3157,7 +3350,10 @@ export class RoomsService implements OnModuleInit {
     );
   }
 
-  /** Mods/cohosts cannot kick/ban the room owner or themselves. */
+  /**
+   * Mods/cohosts cannot kick/ban the room owner or themselves.
+   * Super admin may target anyone except equal/higher platform staff.
+   */
   private async assertCanTargetUser(roomId: string, actorId: string, targetUserId: string) {
     if (!targetUserId) throw new BadRequestException('معرّف المستخدم مطلوب');
     if (actorId === targetUserId) {
@@ -3165,6 +3361,23 @@ export class RoomsService implements OnModuleInit {
     }
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
+
+    const actorStaff = await this.platformStaffRole(actorId);
+    const targetStaff = await this.platformStaffRole(targetUserId);
+    if (staffRank(targetStaff) > 0 && staffRank(actorStaff) < staffRank(targetStaff)) {
+      throw new ForbiddenException('لا يمكن استهداف طاقم المنصة الأعلى رتبة');
+    }
+    if (
+      staffRank(targetStaff) > 0 &&
+      staffRank(actorStaff) === staffRank(targetStaff) &&
+      actorStaff !== 'super'
+    ) {
+      throw new ForbiddenException('لا يمكن لمشرف المنصة استهداف زميل بنفس الرتبة');
+    }
+
+    // Super admin may moderate even the room owner.
+    if (actorStaff === 'super') return;
+
     if (room.hostId === targetUserId) {
       throw new ForbiddenException('لا يمكن طرد صاحب الغرفة');
     }

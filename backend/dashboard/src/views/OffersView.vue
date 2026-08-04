@@ -77,8 +77,24 @@
               <input v-model="o.sku" class="form-control" />
             </div>
             <div class="col-12">
-              <label class="form-label small">رابط أنيميشن (GIF/MP4 اختياري)</label>
-              <input v-model="o.lottieUrl" class="form-control" placeholder="https://.../gift.gif أو .mp4" />
+              <label class="form-label small">أنيميشن / أيقونة العرض</label>
+              <input
+                type="file"
+                accept="image/*,video/mp4,video/webm,.gif,.webp,.mp4"
+                class="form-control"
+                @change="(e) => uploadOfferMedia(e, o)"
+              />
+              <div class="form-text">اختر ملف صورة أو GIF/MP4 — بدون رابط</div>
+              <div v-if="o.lottieUrl || o.imageUrl" class="mt-2 d-flex align-items-center gap-2">
+                <img
+                  v-if="isImageMedia(o.lottieUrl || o.imageUrl)"
+                  :src="mediaAbs(o.lottieUrl || o.imageUrl)"
+                  alt=""
+                  style="max-height: 56px; border-radius: 10px"
+                />
+                <span class="small text-success">تم الرفع ✓</span>
+                <button class="btn btn-sm btn-outline-danger" type="button" @click="clearOfferMedia(o)">مسح</button>
+              </div>
             </div>
           </div>
           <button class="btn btn-sm btn-outline-danger mt-3 w-100" type="button" @click="askRemoveOffer(idx)">
@@ -101,7 +117,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { settingsApi } from '@/api'
+import { settingsApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -112,6 +128,36 @@ import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
+
+const ORIGIN = 'https://api.adnova.bbs.tr'
+
+function mediaAbs(u) {
+  if (!u) return ''
+  if (String(u).startsWith('http')) return u
+  return `${ORIGIN}${String(u).startsWith('/') ? '' : '/'}${u}`
+}
+function isImageMedia(u) {
+  const s = String(u || '').toLowerCase()
+  return !s.match(/\.(mp4|webm|mov)(\?|$)/)
+}
+async function uploadOfferMedia(e, o) {
+  const file = e.target.files?.[0]
+  if (!file || !o) return
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  const url = mediaAbs(data?.url || data?.data?.url || '')
+  o.lottieUrl = url
+  o.imageUrl = url
+  toast().success(t('app.success') || 'تم')
+  e.target.value = ''
+}
+function clearOfferMedia(o) {
+  o.lottieUrl = ''
+  o.imageUrl = ''
+}
 
 const offers = ref([])
 const fabVisible = ref(true)

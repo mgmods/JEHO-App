@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.agency;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
+import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -32,25 +33,47 @@ public class AgencyViewModel extends ViewModel {
 
     public void load() {
         c.getIoExecutor().execute(() -> {
+            // Instant paint from encrypted disk cache while network refreshes.
+            String uid = c.getSessionManager().getUserId();
+            if (uid != null) {
+                MiscDtos.AgencyMineDto cached = c.getFeatureCache().getJson(
+                        uid,
+                        EncryptedFeatureCache.NS_AGENCY_MINE,
+                        MiscDtos.AgencyMineDto.class,
+                        java.util.concurrent.TimeUnit.DAYS.toMillis(7));
+                if (cached != null) {
+                    mine.postValue(cached);
+                    if (cached.earnings != null) earnings.postValue(cached.earnings);
+                }
+            }
+
             Result<MiscDtos.AgencyPricingDto> p = c.getAgencyRepository().pricing();
             if (p.success && p.data != null) pricing.postValue(p.data);
 
             Result<MiscDtos.AgencyMineDto> m = c.getAgencyRepository().mine();
             if (m.success && m.data != null) {
                 mine.postValue(m.data);
+                if (uid != null) {
+                    c.getFeatureCache().putJson(uid, EncryptedFeatureCache.NS_AGENCY_MINE, m.data);
+                }
                 if (m.data.earnings != null) earnings.postValue(m.data.earnings);
                 else earnings.postValue(null);
-                // App shows ONLY this user's agency — never the full active-agencies directory.
-                if (m.data.agency != null) {
-                    agencies.postValue(Collections.singletonList(m.data.agency));
-                } else {
-                    agencies.postValue(Collections.emptyList());
-                }
             } else {
-                mine.postValue(null);
-                earnings.postValue(null);
-                agencies.postValue(Collections.emptyList());
+                // Keep cached mine if network fails — do not flash guest UI.
+                if (mine.getValue() == null) {
+                    mine.postValue(null);
+                    earnings.postValue(null);
+                }
                 if (!m.success && m.error != null) error.postValue(m.error);
+            }
+
+            // Public active-agency directory (professional cards).
+            Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list =
+                    c.getAgencyRepository().list(1);
+            if (list.success && list.data != null && list.data.items != null) {
+                agencies.postValue(list.data.items);
+            } else if (agencies.getValue() == null) {
+                agencies.postValue(Collections.emptyList());
             }
         });
     }

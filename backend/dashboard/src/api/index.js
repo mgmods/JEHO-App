@@ -13,6 +13,12 @@ export const dashboardApi = {
   overview: () => safeRequest(() => api.get('/admin/dashboard/overview')),
   charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params })),
   liveStats: () => safeRequest(() => api.get('/admin/dashboard/live')),
+  systemHealth: () => safeRequest(() => api.get('/admin/system/health')),
+}
+
+export const logsApi = {
+  list: (params) => safeRequest(() => api.get('/admin/logs', { params })),
+  cleanup: (data = {}) => safeRequest(() => api.post('/admin/logs/cleanup', data)),
 }
 
 export const policyBrochureApi = {
@@ -110,6 +116,8 @@ export const agenciesApi = {
     safeRequest(() => api.post(`/admin/agencies/applications/${id}/reject`, data)),
   regenerateActivationCode: (id) =>
     safeRequest(() => api.post(`/admin/agencies/${id}/activation-code`)),
+  grantExclusives: (id, data = {}) =>
+    safeRequest(() => api.post(`/admin/agencies/${id}/grant-exclusives`, data)),
 }
 
 export const rechargeAgentsApi = {
@@ -192,10 +200,6 @@ export const luckyBoxesApi = {
 export const roomCupApi = {
   leaderboard: () => safeRequest(() => api.get('/room-cup/leaderboard')),
   endSeason: () => safeRequest(() => api.post('/room-cup/admin/end-season')),
-}
-
-export const logsApi = {
-  list: (params) => safeRequest(() => api.get('/admin/logs', { params })),
 }
 
 export const cosmeticsApi = {
