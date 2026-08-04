@@ -849,12 +849,25 @@ export class PaymentsService {
   }
 
   async getFourthwallOrderStatus(userId: string, orderId: string) {
-    const order = await this.ordersRepo.findOne({ where: { id: orderId } });
+    let order = await this.ordersRepo.findOne({ where: { id: orderId } });
     if (!order || order.userId !== userId) {
       throw new NotFoundException('Order not found');
     }
     if (order.provider !== PaymentProvider.FOURTHWALL) {
       throw new BadRequestException('Not a Fourthwall order');
+    }
+    // After card success Fourthwall often shows an "order" page while the webhook is late.
+    // Poll path actively reconciles via Open API so the app can leave checkout → wallet.
+    if (order.status === RechargeStatus.PENDING) {
+      try {
+        await this.reconcilePendingFourthwallOrder(order);
+        order =
+          (await this.ordersRepo.findOne({ where: { id: orderId } })) || order;
+      } catch (e) {
+        this.logger.warn(
+          `Fourthwall status reconcile failed: ${(e as Error).message || e}`,
+        );
+      }
     }
     return {
       id: order.id,
@@ -868,6 +881,149 @@ export class PaymentsService {
       checkoutUrl: (order.providerPayload as any)?.checkoutUrl || null,
       completedAt: order.completedAt,
     };
+  }
+
+  /**
+   * When webhook doesn't arrive (or is delayed), match our pending JEHO order to a
+   * recent Fourthwall order using cartId / email / SKU / amount and credit coins.
+   */
+  private async reconcilePendingFourthwallOrder(
+    order: RechargeOrder,
+  ): Promise<boolean> {
+    if (order.status === RechargeStatus.COMPLETED) return true;
+
+    const payload = (order.providerPayload || {}) as Record<string, any>;
+    const lastAt = payload.lastReconcileAt
+      ? new Date(String(payload.lastReconcileAt)).getTime()
+      : 0;
+    // Avoid hammering Open API on every 1–2s poll from the app.
+    if (lastAt && Date.now() - lastAt < 6000) {
+      return false;
+    }
+    order.providerPayload = {
+      ...payload,
+      lastReconcileAt: new Date().toISOString(),
+    };
+    await this.ordersRepo.save(order);
+
+    const client = await this.fourthwallClient();
+    if (!client.configured) return false;
+
+    const email = String(payload.userEmail || '')
+      .trim()
+      .toLowerCase();
+    const cartId = String(order.providerOrderId || payload.cartId || '').trim();
+    const createdAt = order.createdAt
+      ? new Date(order.createdAt)
+      : new Date(Date.now() - 60 * 60 * 1000);
+    const since = new Date(createdAt.getTime() - 10 * 60 * 1000).toISOString();
+
+    let rows: Record<string, any>[] = [];
+    if (email.includes('@')) {
+      try {
+        rows = await client.listOrders({
+          size: 15,
+          email,
+          createdAtGt: since,
+        });
+      } catch (e) {
+        this.logger.warn(
+          `Fourthwall listOrders by email: ${(e as Error).message || e}`,
+        );
+      }
+    }
+    if (!rows.length) {
+      try {
+        rows = await client.listOrders({ size: 25, createdAtGt: since });
+      } catch (e) {
+        this.logger.warn(
+          `Fourthwall listOrders recent: ${(e as Error).message || e}`,
+        );
+      }
+    }
+
+    for (const raw of rows) {
+      if (!this.fourthwallOrderMatchesLocal(order, raw)) continue;
+      const data = {
+        ...raw,
+        cartId:
+          raw.cartId ||
+          raw.cart?.id ||
+          raw.checkout?.cartId ||
+          cartId ||
+          undefined,
+        // Help credit matcher when webhook payload is incomplete.
+        note: `JEHO_SKU:${order.sku} ${this.claimCodeForOrder(order.id)}`,
+      };
+      const ok = await this.creditFourthwallOrder(data);
+      if (ok) {
+        this.logger.log(
+          `Fourthwall reconciled order=${order.id} via Open API list fw=${raw.id || raw.friendlyId}`,
+        );
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private fourthwallOrderMatchesLocal(
+    order: RechargeOrder,
+    data: Record<string, any>,
+  ): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const status = String(data.status || data.orderStatus || '').toUpperCase();
+    if (status && /CANCEL|FAIL|REFUND|VOID/.test(status)) return false;
+
+    const cartId = String(
+      data.cartId || data.cart?.id || data.checkout?.cartId || '',
+    ).trim();
+    const localCart = String(
+      order.providerOrderId ||
+        (order.providerPayload as any)?.cartId ||
+        '',
+    ).trim();
+    if (cartId && localCart && cartId === localCart) return true;
+
+    const blob = JSON.stringify(data);
+    const skuMatch = blob.match(/JEHO_SKU:([a-zA-Z0-9_\-]+)/i);
+    const skuFromDesc = skuMatch ? skuMatch[1] : '';
+    if (skuFromDesc && skuFromDesc !== order.sku) return false;
+
+    const total = Number(
+      data?.amounts?.total?.value ??
+        data?.amounts?.subtotal?.value ??
+        data?.total?.value ??
+        data?.total ??
+        NaN,
+    );
+    const amountOk =
+      !Number.isFinite(total) ||
+      Math.abs(total - Number(order.amountFiat || 0)) < 0.08;
+
+    const email = String(
+      data.email ||
+        data.customer?.email ||
+        data.supporter?.email ||
+        data.username ||
+        '',
+    )
+      .trim()
+      .toLowerCase();
+    const localEmail = String(
+      (order.providerPayload as any)?.userEmail || '',
+    )
+      .trim()
+      .toLowerCase();
+    const emailOk =
+      !email ||
+      !localEmail ||
+      email === localEmail;
+
+    // Prefer amount match (unique pack prices); email alone is too loose for shops
+    // with multiple open carts — but we only credit ONE matching pending via credit().
+    if (amountOk && emailOk) return true;
+    if (skuFromDesc && amountOk) return true;
+    return false;
   }
 
   async handleFourthwallWebhook(rawBody: Buffer, signatureHeader?: string) {

@@ -545,6 +545,41 @@ export class FourthwallClient {
     }
   }
 
+  async getOrderByFriendlyId(friendlyId: string): Promise<Record<string, any>> {
+    const id = encodeURIComponent(String(friendlyId || '').trim());
+    return this.openFetch(
+      `https://api.fourthwall.com/open-api/v1.0/order/by-friendly-id/${id}`,
+    );
+  }
+
+  /**
+   * Recent shop orders (for post-checkout reconcile when webhook is slow/missing).
+   * GET /open-api/v1.0/order?page=&size=&email=&createdAt[gt]=
+   */
+  async listOrders(opts: {
+    size?: number;
+    page?: number;
+    email?: string;
+    createdAtGt?: string;
+  } = {}): Promise<Record<string, any>[]> {
+    const q = new URLSearchParams();
+    q.set('page', String(opts.page ?? 0));
+    q.set('size', String(opts.size ?? 20));
+    if (opts.email) q.set('email', String(opts.email).trim().toLowerCase());
+    if (opts.createdAtGt) q.set('createdAt[gt]', opts.createdAtGt);
+    const res = await this.openFetch(
+      `https://api.fourthwall.com/open-api/v1.0/order?${q.toString()}`,
+    );
+    const rows =
+      (Array.isArray(res?.content) && res.content) ||
+      (Array.isArray(res?.results) && res.results) ||
+      (Array.isArray(res?.items) && res.items) ||
+      (Array.isArray(res?.data) && res.data) ||
+      (Array.isArray(res) && res) ||
+      [];
+    return rows as Record<string, any>[];
+  }
+
   private extractVariantId(product: Record<string, any> | null): string {
     if (!product) return '';
     const variants = product.variants || product.offer?.variants || [];

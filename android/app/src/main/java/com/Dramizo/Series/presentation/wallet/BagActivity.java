@@ -348,6 +348,41 @@ public class BagActivity extends ThemedActivity {
         showPanel(startTab);
         setWithdrawChannel(false);
         applyDiamondActionMode(diamondActionMode);
+        handleRechargeReturn(getIntent());
+    }
+
+    /** After card (Fourthwall) checkout — toast + refresh balance. */
+    private void handleRechargeReturn(@Nullable Intent intent) {
+        if (intent == null) return;
+        if (!intent.getBooleanExtra(CardCheckoutActivity.EXTRA_RECHARGE_SUCCESS, false)) {
+            return;
+        }
+        int coins = intent.getIntExtra(CardCheckoutActivity.EXTRA_RECHARGE_COINS, 0);
+        boolean pending = intent.getBooleanExtra("extra_recharge_pending", false);
+        // Consume so rotation / resume doesn't re-toast.
+        intent.removeExtra(CardCheckoutActivity.EXTRA_RECHARGE_SUCCESS);
+        intent.removeExtra(CardCheckoutActivity.EXTRA_RECHARGE_COINS);
+        intent.removeExtra("extra_recharge_pending");
+
+        if (pending) {
+            Toast.makeText(this, R.string.card_checkout_success_pending_hint, Toast.LENGTH_LONG).show();
+        } else if (coins > 0) {
+            RewardBurstOverlay.showCoins(
+                    this,
+                    getString(R.string.card_checkout_success),
+                    String.format(Locale.US, "+%,d", coins));
+        } else {
+            Toast.makeText(this, R.string.card_checkout_success, Toast.LENGTH_LONG).show();
+        }
+        // Force wallet refresh now (onResume also reloads).
+        if (c != null) {
+            c.getIoExecutor().execute(() -> {
+                Result<WalletDtos.WalletDto> w = ApiCall.execute(c.getWalletApi().getWallet());
+                runOnUiThread(() -> {
+                    if (!isFinishing() && w.success) applyWallet(w.data);
+                });
+            });
+        }
     }
 
     @Override
@@ -458,11 +493,13 @@ public class BagActivity extends ThemedActivity {
         diamondActionMode = intent.getStringExtra(EXTRA_DIAMOND_ACTION);
         int startTab = intent.getIntExtra(EXTRA_TAB, -1);
         if (diamondActionMode != null && !diamondActionMode.isEmpty()) startTab = 1;
-        if (startTab < 0 || startTab > 2) return;
-        TabLayout.Tab tab = binding.tabs.getTabAt(startTab);
-        if (tab != null) binding.tabs.selectTab(tab);
-        showPanel(startTab);
-        applyDiamondActionMode(diamondActionMode);
+        if (startTab >= 0 && startTab <= 2) {
+            TabLayout.Tab tab = binding.tabs.getTabAt(startTab);
+            if (tab != null) binding.tabs.selectTab(tab);
+            showPanel(startTab);
+            applyDiamondActionMode(diamondActionMode);
+        }
+        handleRechargeReturn(intent);
     }
 
     private void setWithdrawChannel(boolean viaAgent) {

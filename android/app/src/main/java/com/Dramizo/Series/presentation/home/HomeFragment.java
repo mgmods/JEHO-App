@@ -43,6 +43,7 @@ import com.Dramizo.Series.presentation.wallet.BagActivity;
 import com.Dramizo.Series.presentation.web.PromoWebActivity;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.AssetIcons;
 import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AuraDialogHelper;
@@ -183,6 +184,9 @@ public class HomeFragment extends Fragment {
         setupFeedPager();
         refreshLocationTabChrome();
         onLogicalTabSelected(activeTab);
+        // Home header icons from assets/icons by original file name.
+        AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
+        AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
         binding.btnFilter.setOnClickListener(v -> showCountryPicker());
@@ -577,7 +581,7 @@ public class HomeFragment extends Fragment {
             binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
         }
         if (binding.imgFilterIcon != null) {
-            binding.imgFilterIcon.setImageResource(R.drawable.ic_country_filter);
+            AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         }
         refreshLocationTabChrome();
     }

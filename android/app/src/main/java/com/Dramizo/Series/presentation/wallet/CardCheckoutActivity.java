@@ -30,14 +30,18 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.util.ApiCall;
-import com.Dramizo.Series.util.RewardBurstOverlay;
 
 import java.util.Locale;
 
 /**
  * In-app card checkout: app chrome + loading → secure payment WebView.
+ * After Fourthwall shows the post-pay "order" page we confirm crediting and
+ * return to {@link BagActivity} with a clear recharge-success result.
  */
 public class CardCheckoutActivity extends ThemedActivity {
+
+    public static final String EXTRA_RECHARGE_SUCCESS = "extra_recharge_success";
+    public static final String EXTRA_RECHARGE_COINS = "extra_recharge_coins";
 
     private AppContainer c;
     private WalletDtos.RechargePackageDto pkg;
@@ -50,6 +54,8 @@ public class CardCheckoutActivity extends ThemedActivity {
     /** True after the first checkout page is shown — later navigations use thin progress only. */
     private boolean firstPageShown;
     private boolean finishedSuccess;
+    /** User reached Fourthwall thank-you / order page after paying. */
+    private boolean looksPaidPage;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Runnable pollRunnable;
     private Runnable loadTimeoutRunnable;
@@ -142,13 +148,16 @@ public class CardCheckoutActivity extends ThemedActivity {
 
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                // After first reveal: NEVER cover the WebView again (stuck "opening…" bug).
+                // After first reveal: NEVER cover the WebView again (stuck "opening…" bug),
+                // unless we already know payment finished and we are confirming credit.
                 if (!firstPageShown) {
                     showLoading(getString(R.string.card_checkout_opening));
                     if (tvLoadingHint != null) {
                         tvLoadingHint.setText(R.string.card_checkout_opening_hint);
                     }
                     armLoadTimeout();
+                } else if (looksPaidPage) {
+                    showConfirmingUi();
                 } else if (progressTop != null) {
                     progressTop.setVisibility(View.VISIBLE);
                     progressTop.setProgress(5);
@@ -158,7 +167,9 @@ public class CardCheckoutActivity extends ThemedActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                revealFirstPage();
+                if (!looksPaidPage) {
+                    revealFirstPage();
+                }
                 maybeHandleCheckoutUrl(url);
                 injectAccountEmail(view);
             }
@@ -212,7 +223,7 @@ public class CardCheckoutActivity extends ThemedActivity {
     }
 
     private void revealFirstPage() {
-        if (isFinishing()) return;
+        if (isFinishing() || looksPaidPage) return;
         firstPageShown = true;
         cancelLoadTimeout();
         hideLoading();
@@ -259,32 +270,76 @@ public class CardCheckoutActivity extends ThemedActivity {
         }
     }
 
-    /** Thank-you / order-complete pages → poll faster and show "confirming". */
+    /**
+     * Thank-you / order-complete pages → confirm credit and leave checkout quickly.
+     * Fourthwall does not redirect back to the app; it stays on their order page.
+     */
     private void maybeHandleCheckoutUrl(@Nullable String url) {
         if (url == null || url.isEmpty() || finishedSuccess) return;
         String u = url.toLowerCase(Locale.US);
+
+        // Still mid-checkout — do not treat as paid.
+        if (u.contains("/cart/checkout")
+                || u.contains("/checkout?")
+                || (u.contains("/checkout/")
+                && !u.contains("thank")
+                && !u.contains("complete")
+                && !u.contains("success")
+                && !u.contains("order"))) {
+            // Pure /checkout/{id} is the payment form; keep paying.
+            if (!(u.contains("thank") || u.contains("confirmation")
+                    || u.contains("/order") || u.contains("purchase"))) {
+                return;
+            }
+        }
+
         boolean looksPaid = u.contains("thank")
+                || u.contains("thankyou")
+                || u.contains("thank-you")
                 || u.contains("success")
                 || u.contains("order-confirmation")
                 || u.contains("order_confirmation")
                 || u.contains("/confirmation")
                 || u.contains("checkout/complete")
                 || u.contains("payment-complete")
+                || u.contains("purchase-complete")
+                || u.contains("paid")
+                || u.contains("order-status")
+                || u.contains("orderstatus")
+                || u.contains("/order/")
+                || u.contains("/orders/")
+                || (u.contains("order") && (u.contains("complete")
+                || u.contains("confirm")
+                || u.contains("status")
+                || u.contains("summary")
+                || u.contains("receipt")))
                 || (u.contains("checkout") && u.contains("complete"));
+
         if (!looksPaid) return;
-        revealFirstPage();
-        if (tvLoading != null) {
-            // Soft hint in header summary area only — do not block WebView.
+
+        looksPaidPage = true;
+        firstPageShown = true;
+        showConfirmingUi();
+        // Kick an immediate status check (backend also reconciles pending vs FW Open API).
+        if (pollRunnable != null) {
+            handler.removeCallbacks(pollRunnable);
+            handler.post(pollRunnable);
         }
-        // Kick an immediate status check.
-        handler.removeCallbacks(pollRunnable);
-        handler.post(pollRunnable);
+    }
+
+    private void showConfirmingUi() {
+        cancelLoadTimeout();
+        showLoading(getString(R.string.card_checkout_confirming));
+        if (tvLoadingHint != null) {
+            tvLoadingHint.setText(R.string.card_checkout_confirming_hint);
+        }
+        if (progressTop != null) progressTop.setVisibility(View.GONE);
     }
 
     private void armLoadTimeout() {
         cancelLoadTimeout();
         loadTimeoutRunnable = () -> {
-            if (isFinishing() || firstPageShown) return;
+            if (isFinishing() || firstPageShown || looksPaidPage) return;
             // Don't close — just uncover whatever loaded so user can continue.
             revealFirstPage();
         };
@@ -318,19 +373,29 @@ public class CardCheckoutActivity extends ThemedActivity {
                     runOnUiThread(() -> {
                         if (isFinishing() || finishedSuccess) return;
                         if (st.success && st.data != null && isPaidStatus(st.data.status)) {
-                            onPaymentCompleted(st.data);
+                            onPaymentCompleted(st.data, true);
                             return;
                         }
-                        if (pollAttempts < 90) {
-                            long delay = pollAttempts < 6 ? 2500L : 4000L;
+                        // After user lands on order page: recon for longer / faster.
+                        int maxAttempts = looksPaidPage ? 90 : 60;
+                        long delay;
+                        if (looksPaidPage) {
+                            delay = pollAttempts < 20 ? 1500L : 2500L;
+                        } else {
+                            delay = pollAttempts < 6 ? 2500L : 4000L;
+                        }
+                        if (pollAttempts < maxAttempts) {
                             handler.postDelayed(this, delay);
+                        } else if (looksPaidPage) {
+                            // Paid page seen but credit still pending — don't leave them stuck on FW order.
+                            onPaymentCompleted(st.data, false);
                         }
                     });
                 });
             }
         };
         // Start sooner — payment can finish quickly.
-        handler.postDelayed(pollRunnable, 4000);
+        handler.postDelayed(pollRunnable, 3500);
     }
 
     private static boolean isPaidStatus(@Nullable String status) {
@@ -339,27 +404,48 @@ public class CardCheckoutActivity extends ThemedActivity {
         return "completed".equals(s) || "paid".equals(s) || "success".equals(s);
     }
 
-    private void onPaymentCompleted(WalletDtos.FourthwallOrderStatus data) {
+    private void onPaymentCompleted(@Nullable WalletDtos.FourthwallOrderStatus data,
+                                    boolean creditedKnown) {
         if (finishedSuccess || isFinishing()) return;
         finishedSuccess = true;
         handler.removeCallbacks(pollRunnable);
         cancelLoadTimeout();
-        hideLoading();
-        int total = data.coins + Math.max(0, data.bonusCoins);
+
+        int total = 0;
+        if (data != null) {
+            total = data.coins + Math.max(0, data.bonusCoins);
+        }
         if (total <= 0 && pkg != null) {
             total = pkg.coins + Math.max(0, pkg.bonusCoins);
         }
-        if (total > 0) {
-            RewardBurstOverlay.showCoins(
-                    this,
-                    getString(R.string.card_checkout_success),
-                    String.format(Locale.US, "+%,d", total));
+
+        if (creditedKnown && total > 0) {
+            hideLoading();
+            // Navigation to Bag shows the success burst once (avoid double overlay).
+            final int coinsForNav = total;
+            handler.postDelayed(() -> goToWalletSuccess(coinsForNav, true), 400);
         } else {
-            Toast.makeText(this, R.string.card_checkout_success, Toast.LENGTH_LONG).show();
+            showLoading(getString(R.string.card_checkout_success));
+            if (tvLoadingHint != null) {
+                tvLoadingHint.setText(R.string.card_checkout_success_pending_hint);
+            }
+            final int coinsForNav = total;
+            handler.postDelayed(() -> goToWalletSuccess(coinsForNav, creditedKnown), 900);
         }
-        handler.postDelayed(() -> {
-            if (!isFinishing()) finish();
-        }, 1600);
+    }
+
+    private void goToWalletSuccess(int coins, boolean credited) {
+        if (isFinishing()) return;
+        Intent bag = new Intent(this, BagActivity.class);
+        bag.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        bag.putExtra(EXTRA_RECHARGE_SUCCESS, true);
+        bag.putExtra(EXTRA_RECHARGE_COINS, Math.max(0, coins));
+        bag.putExtra(BagActivity.EXTRA_TAB, 0);
+        if (!credited) {
+            bag.putExtra("extra_recharge_pending", true);
+        }
+        startActivity(bag);
+        finish();
     }
 
     private void showLoading(String msg) {
@@ -373,8 +459,13 @@ public class CardCheckoutActivity extends ThemedActivity {
 
     @Override
     public void onBackPressed() {
-        if (finishedSuccess) {
-            finish();
+        if (finishedSuccess || looksPaidPage) {
+            // Never leave user "stuck" on Fourthwall order via back stack thrashing.
+            if (!finishedSuccess) {
+                onPaymentCompleted(null, false);
+            } else {
+                finish();
+            }
             return;
         }
         if (webView != null && webView.canGoBack()) {

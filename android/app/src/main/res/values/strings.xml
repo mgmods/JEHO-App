@@ -147,7 +147,10 @@
 <string name="card_checkout_opening">Opening payment page…</string>
 <string name="card_checkout_opening_hint">Enter your card details on the next screen</string>
 <string name="card_checkout_load_failed">Could not open the payment page. Try again.</string>
+<string name="card_checkout_confirming">Confirming your top-up…</string>
+<string name="card_checkout_confirming_hint">Payment received — adding coins to your wallet</string>
 <string name="card_checkout_success">Coins added successfully!</string>
+<string name="card_checkout_success_pending_hint">Payment done. Coins may appear in a few seconds — check your balance.</string>
 <string name="pay_package_summary">%1$s · %2$,d coins · %3$s</string>
 <string name="pay_crypto_network_title">Choose network</string>
 <string name="pay_crypto_network_hint">Select the USDT network that matches your wallet</string>

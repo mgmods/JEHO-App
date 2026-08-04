@@ -103,7 +103,10 @@
 <string name="card_checkout_opening">جاري فتح صفحة الدفع…</string>
 <string name="card_checkout_opening_hint">أدخل بيانات البطاقة في الشاشة التالية</string>
 <string name="card_checkout_load_failed">تعذر فتح صفحة الدفع. حاول مرة أخرى.</string>
-<string name="card_checkout_success">تم إضافة العملات بنجاح!</string>
+<string name="card_checkout_confirming">جاري تأكيد الشحن…</string>
+<string name="card_checkout_confirming_hint">تم الدفع — نضيف الكوينز لمحفظتك الآن</string>
+<string name="card_checkout_success">تم الشحن بنجاح! تم إضافة العملات</string>
+<string name="card_checkout_success_pending_hint">تم الدفع. قد تظهر الكوينز خلال ثوانٍ — راجع رصيدك.</string>
 <string name="pay_package_summary">%1$s · %2$,d عملة · %3$s</string>
 <string name="pay_crypto_network_title">اختر الشبكة</string>
 <string name="pay_crypto_network_hint">اختر شبكة USDT المطابقة لمحفظتك</string>

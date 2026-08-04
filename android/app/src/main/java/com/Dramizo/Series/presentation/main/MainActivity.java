@@ -37,6 +37,7 @@ import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.service.VoiceRoomForegroundService;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.AssetIcons;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.bumptech.glide.Glide;
 import com.Dramizo.Series.util.AppFeatures;
@@ -336,12 +337,17 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void highlightPage(int page) {
-        highlight(page == 0, binding.tabParty, binding.labelParty);
+        highlightTab(page == 0, binding.tabParty, binding.labelParty,
+                AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED);
+        // Drama keeps existing drawable until a dedicated asset is provided.
         highlight(page == 1, binding.tabDrama, binding.labelDrama);
-        highlight(page == 2, binding.tabGames, binding.labelGames);
+        highlightTab(page == 2, binding.tabGames, binding.labelGames,
+                AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED);
         highlight(false, binding.tabCreateRoom, binding.labelCreateRoom);
-        highlight(page == 3, binding.tabChat, binding.labelChat);
-        highlight(page == 4, binding.tabMe, binding.labelMe);
+        highlightTab(page == 3, binding.tabChat, binding.labelChat,
+                AssetIcons.TAB_CHAT_NORMAL, AssetIcons.TAB_CHAT_SELECTED);
+        highlightTab(page == 4, binding.tabMe, binding.labelMe,
+                AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED);
     }
 
     private static String pageScreenKey(int page) {
@@ -392,13 +398,13 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void applyNavIcons() {
-        // Tab icons come from activity_main.xml android:src — only clear tints here.
-        clearNavIconTint(binding.tabParty);
+        // Load tab art from assets/icons by file name (normal state).
+        AssetIcons.load(binding.tabParty, AssetIcons.TAB_PARTY_NORMAL);
+        AssetIcons.load(binding.tabGames, AssetIcons.TAB_GAME_NORMAL);
+        AssetIcons.load(binding.tabChat, AssetIcons.TAB_CHAT_NORMAL);
+        AssetIcons.load(binding.tabMe, AssetIcons.TAB_ME_NORMAL);
         clearNavIconTint(binding.tabDrama);
-        clearNavIconTint(binding.tabGames);
         clearNavIconTint(binding.tabCreateRoom);
-        clearNavIconTint(binding.tabChat);
-        clearNavIconTint(binding.tabMe);
     }
 
     private static void clearNavIconTint(ImageView icon) {
@@ -697,6 +703,7 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void highlight(boolean on, ImageView icon, TextView label) {
+        if (icon == null || label == null) return;
         icon.setAlpha(on ? 1f : 0.55f);
         label.setAlpha(1f);
         label.setTextColor(getColor(on
@@ -708,6 +715,17 @@ public class MainActivity extends ThemedActivity {
         icon.setScaleX(on ? 1.05f : 1f);
         icon.setScaleY(on ? 1.05f : 1f);
         icon.setBackground(null);
+    }
+
+    /** Same as {@link #highlight} but swaps SVG asset (selected vs normal) by name. */
+    private void highlightTab(boolean on, ImageView icon, TextView label,
+                              String normalAsset, String selectedAsset) {
+        highlight(on, icon, label);
+        if (icon != null) {
+            // Selected art already carries active styling; keep alpha full for both.
+            icon.setAlpha(1f);
+            AssetIcons.loadTab(icon, on, normalAsset, selectedAsset);
+        }
     }
 
     private void attachTaskInviteListener(AppContainer container) {

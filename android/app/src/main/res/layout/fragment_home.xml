@@ -183,8 +183,7 @@
                     android:layout_height="28dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/country"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/h_create" />
+                    android:scaleType="fitCenter" />
             </FrameLayout>
 
             <FrameLayout
@@ -200,8 +199,7 @@
                     android:layout_height="28dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/search"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/h_sear" />
+                    android:scaleType="fitCenter" />
             </FrameLayout>
         </LinearLayout>
 
