@@ -339,8 +339,8 @@ public class MainActivity extends ThemedActivity {
     private void highlightPage(int page) {
         highlightTab(page == 0, binding.tabParty, binding.labelParty,
                 AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED);
-        // Drama keeps existing drawable until a dedicated asset is provided.
-        highlight(page == 1, binding.tabDrama, binding.labelDrama);
+        highlightTab(page == 1, binding.tabDrama, binding.labelDrama,
+                AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED);
         highlightTab(page == 2, binding.tabGames, binding.labelGames,
                 AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED);
         highlight(false, binding.tabCreateRoom, binding.labelCreateRoom);
@@ -400,10 +400,10 @@ public class MainActivity extends ThemedActivity {
     private void applyNavIcons() {
         // Load tab art from assets/icons by file name (normal state).
         AssetIcons.load(binding.tabParty, AssetIcons.TAB_PARTY_NORMAL);
+        AssetIcons.load(binding.tabDrama, AssetIcons.TAB_DRAMA_NORMAL);
         AssetIcons.load(binding.tabGames, AssetIcons.TAB_GAME_NORMAL);
         AssetIcons.load(binding.tabChat, AssetIcons.TAB_CHAT_NORMAL);
         AssetIcons.load(binding.tabMe, AssetIcons.TAB_ME_NORMAL);
-        clearNavIconTint(binding.tabDrama);
         clearNavIconTint(binding.tabCreateRoom);
     }
 

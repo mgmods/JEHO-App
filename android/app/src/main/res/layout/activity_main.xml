@@ -84,8 +84,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:contentDescription="@string/tab_party"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_tab_party" />
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/labelParty"
@@ -106,15 +105,15 @@
             android:layout_weight="1"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingVertical="2dp">
+            android:paddingVertical="2dp"
+            android:visibility="gone">
 
             <ImageView
                 android:id="@+id/tabDrama"
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:contentDescription="@string/tab_drama"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_tab_drama" />
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/labelDrama"
@@ -141,8 +140,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:contentDescription="@string/nav_games"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_tab_games" />
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/labelGames"
@@ -210,8 +208,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:contentDescription="@string/nav_messages"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_tab_social" />
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/labelChat"
@@ -238,8 +235,7 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:contentDescription="@string/nav_profile"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_tab_me" />
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:id="@+id/labelMe"
