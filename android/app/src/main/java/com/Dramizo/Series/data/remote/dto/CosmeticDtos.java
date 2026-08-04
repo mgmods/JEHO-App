@@ -26,6 +26,8 @@ public final class CosmeticDtos {
         @SerializedName("id") public String id;
         @SerializedName("cosmeticId") public String cosmeticId;
         @SerializedName("equipped") public boolean equipped;
+        /** ISO timestamp; null/absent = permanent ownership. */
+        @SerializedName("expiresAt") public String expiresAt;
         @SerializedName("cosmetic") public CosmeticDto cosmetic;
     }
 

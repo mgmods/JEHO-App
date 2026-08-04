@@ -56,17 +56,29 @@ public class RoomPrivateMsgSheet extends BottomSheetDialogFragment {
         if (close != null) close.setOnClickListener(v -> dismissAllowingStateLoss());
 
         ChatPreviewAdapter adapter = new ChatPreviewAdapter(item -> {
-            Intent i = new Intent(requireContext(), ChatConversationActivity.class);
-            i.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, item.id);
             String title = item.title != null ? item.title
                     : (item.peer != null
                     ? (item.peer.displayName != null ? item.peer.displayName : item.peer.username)
                     : "محادثة");
-            i.putExtra(ChatConversationActivity.EXTRA_TITLE, title);
-            if (item.peer != null && item.peer.id != null) {
-                i.putExtra(ChatConversationActivity.EXTRA_PEER_ID, item.peer.id);
+            String peerId = item.peer != null ? item.peer.id : null;
+            String avatar = item.peer != null ? item.peer.avatarUrl : null;
+            // Stay in the voice room — keep Zego/realtime via room keep-alive.
+            if (getActivity() instanceof VoiceRoomActivity) {
+                ((VoiceRoomActivity) getActivity()).openPrivateConversation(
+                        item.id, peerId, title, avatar);
+            } else {
+                Intent i = new Intent(requireContext(), ChatConversationActivity.class);
+                i.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, item.id);
+                i.putExtra(ChatConversationActivity.EXTRA_TITLE, title);
+                if (peerId != null) {
+                    i.putExtra(ChatConversationActivity.EXTRA_PEER_ID, peerId);
+                }
+                if (avatar != null) {
+                    i.putExtra(ChatConversationActivity.EXTRA_AVATAR, avatar);
+                }
+                startActivity(i);
             }
-            startActivity(i);
+            dismissAllowingStateLoss();
         });
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);

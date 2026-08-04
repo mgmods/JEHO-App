@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6RsMiQ9Cb3LBeyhGrt44kuR7ozdtTHTnmgfcX3APqZdHFQQnFjNVxFScpsazyFn
+\restrict pUjD4ZbV1OLns6QJ7vp9r96KQP30ajW9mX4OSauClQrixM9Oiz0SKETmMcn4KqI
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -82,6 +82,7 @@ DROP INDEX IF EXISTS public.uq_room_agency_host;
 DROP INDEX IF EXISTS public.uq_agencies_name_ci;
 DROP INDEX IF EXISTS public.idx_withdraw_requests_agent;
 DROP INDEX IF EXISTS public.idx_users_public_id;
+DROP INDEX IF EXISTS public."IDX_room_chat_penalties_room_user";
 DROP INDEX IF EXISTS public."IDX_lucky_open_user_box_day";
 DROP INDEX IF EXISTS public."IDX_ffa48c8c78e4c4d0cb29bd6d12";
 DROP INDEX IF EXISTS public."IDX_febd82d58a786b258d29c20952";
@@ -147,6 +148,7 @@ DROP INDEX IF EXISTS public."IDX_8abdc3af0797198cc1edb6de94";
 DROP INDEX IF EXISTS public."IDX_891986e15af0e6c9936d3d25f9";
 DROP INDEX IF EXISTS public."IDX_87fdb064cf16b6ae164eb4862c";
 DROP INDEX IF EXISTS public."IDX_8256f8fefaf42f4fdb204f58f4";
+DROP INDEX IF EXISTS public."IDX_7e7cbcfb689216ad5d9700657b";
 DROP INDEX IF EXISTS public."IDX_7d6d35ff9fc2fd3f8ef1a47fe1";
 DROP INDEX IF EXISTS public."IDX_7b92071328fdd5212b978ad248";
 DROP INDEX IF EXISTS public."IDX_7ac096a8bfe8bad3810cf3b01b";
@@ -158,6 +160,7 @@ DROP INDEX IF EXISTS public."IDX_6c939085068c5539bad393be6b";
 DROP INDEX IF EXISTS public."IDX_69454773f1e666a14c6a953935";
 DROP INDEX IF EXISTS public."IDX_692a909ee0fa9383e7859f9b40";
 DROP INDEX IF EXISTS public."IDX_5f8501202b13cd3f35e2929e01";
+DROP INDEX IF EXISTS public."IDX_5e82de8927486c513b9cc14374";
 DROP INDEX IF EXISTS public."IDX_5e08ad421ea4742ab0b892130f";
 DROP INDEX IF EXISTS public."IDX_599c2d45b92f3aca0cbb687a86";
 DROP INDEX IF EXISTS public."IDX_4e6b1097a3e2f1cfa1eae0ea49";
@@ -168,6 +171,7 @@ DROP INDEX IF EXISTS public."IDX_46dc0b73131f2f646709f1b6ad";
 DROP INDEX IF EXISTS public."IDX_45aef1da935b11cdf48a1adacc";
 DROP INDEX IF EXISTS public."IDX_45745953065384cc9c4264c2a3";
 DROP INDEX IF EXISTS public."IDX_4353be8309ce86650def2f8572";
+DROP INDEX IF EXISTS public."IDX_431a010b81af0807f39bd11c84";
 DROP INDEX IF EXISTS public."IDX_41d42c9f76df6bacf81bdc16e5";
 DROP INDEX IF EXISTS public."IDX_3b4e13a1d9b6878a602b486ef7";
 DROP INDEX IF EXISTS public."IDX_3a02b8ce593ee323902ae1403d";
@@ -193,6 +197,7 @@ DROP INDEX IF EXISTS public."IDX_14cf5cb9c3da401f4981574408";
 DROP INDEX IF EXISTS public."IDX_1083039a84464289149324b7a6";
 DROP INDEX IF EXISTS public."IDX_0ff026204b1ec2fe6e94ad89c1";
 DROP INDEX IF EXISTS public."IDX_0e6521dead3cae78f5dfb99619";
+DROP INDEX IF EXISTS public."IDX_03b0333dc1339155fe9ca667b8";
 DROP INDEX IF EXISTS public."IDX_017e195ed5231583b12a25a335";
 ALTER TABLE IF EXISTS ONLY public.vanity_ids DROP CONSTRAINT IF EXISTS vanity_ids_pkey;
 ALTER TABLE IF EXISTS ONLY public.host_target_claims DROP CONSTRAINT IF EXISTS uq_host_target_claim;
@@ -240,6 +245,7 @@ ALTER TABLE IF EXISTS ONLY public.reports DROP CONSTRAINT IF EXISTS "PK_d9013193
 ALTER TABLE IF EXISTS ONLY public.lucky_reward_grants DROP CONSTRAINT IF EXISTS "PK_cc275bfe953b2e866f52d50752f";
 ALTER TABLE IF EXISTS ONLY public.user_vips DROP CONSTRAINT IF EXISTS "PK_c84a4422f457962181145c047b1";
 ALTER TABLE IF EXISTS ONLY public.plaza_event_subscriptions DROP CONSTRAINT IF EXISTS "PK_c3482dc3b92266719eb2a64a01c";
+ALTER TABLE IF EXISTS ONLY public.room_chat_penalties DROP CONSTRAINT IF EXISTS "PK_c2151e64c2dbe9fb92022d8bf64";
 ALTER TABLE IF EXISTS ONLY public.devices DROP CONSTRAINT IF EXISTS "PK_b1514758245c12daf43486dd1f0";
 ALTER TABLE IF EXISTS ONLY public.drama_reactions DROP CONSTRAINT IF EXISTS "PK_ac087a86f783bc8d873220da0a3";
 ALTER TABLE IF EXISTS ONLY public.abuse_logs DROP CONSTRAINT IF EXISTS "PK_aa2916720a09f5d9c716da05bff";
@@ -302,6 +308,7 @@ DROP TABLE IF EXISTS public.room_music_tracks;
 DROP TABLE IF EXISTS public.room_moderators;
 DROP TABLE IF EXISTS public.room_host_follows;
 DROP TABLE IF EXISTS public.room_games;
+DROP TABLE IF EXISTS public.room_chat_penalties;
 DROP TABLE IF EXISTS public.room_bans;
 DROP TABLE IF EXISTS public.room_access;
 DROP TABLE IF EXISTS public.reports;
@@ -1663,6 +1670,21 @@ CREATE TABLE public.room_bans (
 
 
 --
+-- Name: room_chat_penalties; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.room_chat_penalties (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    "roomId" uuid NOT NULL,
+    "userId" uuid NOT NULL,
+    "strikeCount" integer DEFAULT 0 NOT NULL,
+    "chatMutedUntil" timestamp with time zone,
+    "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+    "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: room_games; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2424,6 +2446,14 @@ ALTER TABLE ONLY public.devices
 
 
 --
+-- Name: room_chat_penalties PK_c2151e64c2dbe9fb92022d8bf64; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.room_chat_penalties
+    ADD CONSTRAINT "PK_c2151e64c2dbe9fb92022d8bf64" PRIMARY KEY (id);
+
+
+--
 -- Name: plaza_event_subscriptions PK_c3482dc3b92266719eb2a64a01c; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2799,6 +2829,13 @@ CREATE INDEX "IDX_017e195ed5231583b12a25a335" ON public.room_access USING btree 
 
 
 --
+-- Name: IDX_03b0333dc1339155fe9ca667b8; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "IDX_03b0333dc1339155fe9ca667b8" ON public.room_chat_penalties USING btree ("roomId", "userId");
+
+
+--
 -- Name: IDX_0e6521dead3cae78f5dfb99619; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2974,6 +3011,13 @@ CREATE INDEX "IDX_41d42c9f76df6bacf81bdc16e5" ON public.profile_visits USING btr
 
 
 --
+-- Name: IDX_431a010b81af0807f39bd11c84; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_431a010b81af0807f39bd11c84" ON public.room_chat_penalties USING btree ("chatMutedUntil");
+
+
+--
 -- Name: IDX_4353be8309ce86650def2f8572; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3041,6 +3085,13 @@ CREATE INDEX "IDX_599c2d45b92f3aca0cbb687a86" ON public.contests USING btree (st
 --
 
 CREATE INDEX "IDX_5e08ad421ea4742ab0b892130f" ON public.payment_webhook_events USING btree (provider);
+
+
+--
+-- Name: IDX_5e82de8927486c513b9cc14374; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_5e82de8927486c513b9cc14374" ON public.room_chat_penalties USING btree ("userId");
 
 
 --
@@ -3118,6 +3169,13 @@ CREATE INDEX "IDX_7b92071328fdd5212b978ad248" ON public.gifts USING btree (name)
 --
 
 CREATE UNIQUE INDEX "IDX_7d6d35ff9fc2fd3f8ef1a47fe1" ON public.agencies USING btree ("activationCode");
+
+
+--
+-- Name: IDX_7e7cbcfb689216ad5d9700657b; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_7e7cbcfb689216ad5d9700657b" ON public.room_chat_penalties USING btree ("roomId");
 
 
 --
@@ -3573,6 +3631,13 @@ CREATE INDEX "IDX_ffa48c8c78e4c4d0cb29bd6d12" ON public.chat_participants USING 
 --
 
 CREATE INDEX "IDX_lucky_open_user_box_day" ON public.lucky_box_opens USING btree ("userId", "boxId", "dayKey");
+
+
+--
+-- Name: IDX_room_chat_penalties_room_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "IDX_room_chat_penalties_room_user" ON public.room_chat_penalties USING btree ("roomId", "userId");
 
 
 --
@@ -4086,5 +4151,5 @@ ALTER TABLE ONLY public.chat_participants
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6RsMiQ9Cb3LBeyhGrt44kuR7ozdtTHTnmgfcX3APqZdHFQQnFjNVxFScpsazyFn
+\unrestrict pUjD4ZbV1OLns6QJ7vp9r96KQP30ajW9mX4OSauClQrixM9Oiz0SKETmMcn4KqI
 

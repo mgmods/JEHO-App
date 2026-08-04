@@ -19,6 +19,7 @@ import {
   vipPackForDays,
   vipPriceForDays,
 } from '../../common/promo-catalog';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 export class PurchaseVipDto {
   @ApiProperty({ minimum: 1, maximum: 100 })
@@ -77,8 +78,15 @@ export class VipService {
     });
   }
 
-  /** Ensure VIP1–100 plans exist and stay in sync. Medals are Mikoo VIP1–7 art. */
+  /** Use existing VIP plan rows as-is. Never invent/overwrite prices from code. */
   private async ensurePlans() {
+    const count = await this.plansRepo.count();
+    if (count > 0 && !bootCatalogSeedEnabled()) {
+      return;
+    }
+    if (count > 0 && bootCatalogSeedEnabled()) {
+      // Seed mode with data: fill any missing levels only, never override existing.
+    }
     for (let level = 1; level <= VipService.MAX_VIP_LEVEL; level++) {
       const price = VipService.vipPriceForLevel(level);
       const medalUrl = vipMedalUrl(level);
@@ -102,26 +110,18 @@ export class VipService {
         ].filter((item): item is string => !!item),
       };
       const existing = await this.plansRepo.findOne({ where: { level } });
-      if (!existing) {
-        await this.plansRepo.save(
-          this.plansRepo.create({
-            level,
-            name: `VIP${level}`,
-            coinPriceMonthly: price,
-            badgeUrl: medalUrl,
-            benefits,
-            isActive: true,
-          }),
-        );
-        continue;
-      }
-      existing.name = `VIP${level}`;
-      existing.coinPriceMonthly = price;
-      // Always keep Mikoo medal sequence VIP1→medal1 … VIP7→medal7 (higher → medal7).
-      existing.badgeUrl = medalUrl;
-      existing.benefits = { ...(existing.benefits || {}), ...benefits };
-      existing.isActive = true;
-      await this.plansRepo.save(existing);
+      if (existing) continue;
+      if (!bootCatalogSeedEnabled() && count > 0) continue;
+      await this.plansRepo.save(
+        this.plansRepo.create({
+          level,
+          name: `VIP${level}`,
+          coinPriceMonthly: price,
+          badgeUrl: medalUrl,
+          benefits,
+          isActive: true,
+        }),
+      );
     }
   }
 

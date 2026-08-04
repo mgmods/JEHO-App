@@ -1,6 +1,13 @@
 {
-  "version": "mikoo-gift-import-2-partial",
-  "count": 1,
+  "version": "mikoo-gift-import-2-countries",
+  "count": 45,
+  "digest": "c7739b6b9ed4a00d",
+  "note": "Country gifts from countries.json (public flags). Full Mikoo gift list (bag/normal/lucky/cp/…) still needs /gift/listV3 ticket.",
+  "playback": {
+    "mp4Field": "mp4Url",
+    "svgaField": "vggUrl",
+    "android": "AnimView+.svga"
+  },
   "items": [
     {
       "code": "mikoo_gift_cache_1784286192159",
@@ -13,12 +20,490 @@
       "mikooId": 1784286192159,
       "hasMp4": true,
       "hasSvga": false
+    },
+    {
+      "code": "mikoo_country_53",
+      "name": "علم البرتغال",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/flag/ic_portugal.png",
+      "animationUrl": null,
+      "mikooCountryId": 53,
+      "countryShort": "PT"
+    },
+    {
+      "code": "mikoo_country_2",
+      "name": "علم الولايات",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_usa.png",
+      "animationUrl": null,
+      "mikooCountryId": 2,
+      "countryShort": "US"
+    },
+    {
+      "code": "mikoo_country_49",
+      "name": "علم البرازيل",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://res.coccolive.com/country/flag/ic_brazil.png",
+      "animationUrl": null,
+      "mikooCountryId": 49,
+      "countryShort": "BR"
+    },
+    {
+      "code": "mikoo_country_55",
+      "name": "علم كولومبيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/flag/ic_Colombia.png",
+      "animationUrl": null,
+      "mikooCountryId": 55,
+      "countryShort": "CO"
+    },
+    {
+      "code": "mikoo_country_10",
+      "name": "علم كندا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_canada.png",
+      "animationUrl": null,
+      "mikooCountryId": 10,
+      "countryShort": "CA"
+    },
+    {
+      "code": "mikoo_country_14",
+      "name": "علم ألمانيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_germany.png",
+      "animationUrl": null,
+      "mikooCountryId": 14,
+      "countryShort": "DE"
+    },
+    {
+      "code": "mikoo_country_61",
+      "name": "علم المكسيك",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/flag/ic_Mexico.png",
+      "animationUrl": null,
+      "mikooCountryId": 61,
+      "countryShort": "MX"
+    },
+    {
+      "code": "mikoo_country_184",
+      "name": "علم نيجيريا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_nigeria.png",
+      "animationUrl": null,
+      "mikooCountryId": 184,
+      "countryShort": "NG"
+    },
+    {
+      "code": "mikoo_country_35",
+      "name": "علم روسيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_russia.png",
+      "animationUrl": null,
+      "mikooCountryId": 35,
+      "countryShort": "RU"
+    },
+    {
+      "code": "mikoo_country_36",
+      "name": "علم إسبانيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_spain.png",
+      "animationUrl": null,
+      "mikooCountryId": 36,
+      "countryShort": "ES"
+    },
+    {
+      "code": "mikoo_country_52",
+      "name": "علم فنزويلا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_venezuela.png",
+      "animationUrl": null,
+      "mikooCountryId": 52,
+      "countryShort": "VE"
+    },
+    {
+      "code": "mikoo_country_33",
+      "name": "علم الفلبين",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_philippines.png",
+      "animationUrl": null,
+      "mikooCountryId": 33,
+      "countryShort": "PH"
+    },
+    {
+      "code": "mikoo_country_16",
+      "name": "علم إندونيسيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_indonesia.png",
+      "animationUrl": null,
+      "mikooCountryId": 16,
+      "countryShort": "ID"
+    },
+    {
+      "code": "mikoo_country_144",
+      "name": "علم كمبوديا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_cambodia.png",
+      "animationUrl": null,
+      "mikooCountryId": 144,
+      "countryShort": "KH"
+    },
+    {
+      "code": "mikoo_country_27",
+      "name": "علم ماليزيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_malaysia.png",
+      "animationUrl": null,
+      "mikooCountryId": 27,
+      "countryShort": "MY"
+    },
+    {
+      "code": "mikoo_country_204",
+      "name": "علم سنغافورة",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_singapore.png",
+      "animationUrl": null,
+      "mikooCountryId": 204,
+      "countryShort": "SG"
+    },
+    {
+      "code": "mikoo_country_39",
+      "name": "علم تايلاند",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_thailand.png",
+      "animationUrl": null,
+      "mikooCountryId": 39,
+      "countryShort": "TH"
+    },
+    {
+      "code": "mikoo_country_46",
+      "name": "علم فيتنام",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_vietnam.png",
+      "animationUrl": null,
+      "mikooCountryId": 46,
+      "countryShort": "VN"
+    },
+    {
+      "code": "mikoo_country_9",
+      "name": "علم بنغلاديش",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_bangladesh.png",
+      "animationUrl": null,
+      "mikooCountryId": 9,
+      "countryShort": "BD"
+    },
+    {
+      "code": "mikoo_country_15",
+      "name": "علم الهند",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_india.png",
+      "animationUrl": null,
+      "mikooCountryId": 15,
+      "countryShort": "IN"
+    },
+    {
+      "code": "mikoo_country_31",
+      "name": "علم باكستان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_pakistan.png",
+      "animationUrl": null,
+      "mikooCountryId": 31,
+      "countryShort": "PK"
+    },
+    {
+      "code": "mikoo_country_22",
+      "name": "علم السعودية",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_saudi_arabia.png",
+      "animationUrl": null,
+      "mikooCountryId": 22,
+      "countryShort": "SA"
+    },
+    {
+      "code": "mikoo_country_11",
+      "name": "علم مصر",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_egypt.png",
+      "animationUrl": null,
+      "mikooCountryId": 11,
+      "countryShort": "EG"
+    },
+    {
+      "code": "mikoo_country_34",
+      "name": "علم قطر",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_qatar.png",
+      "animationUrl": null,
+      "mikooCountryId": 34,
+      "countryShort": "QA"
+    },
+    {
+      "code": "mikoo_country_5",
+      "name": "علم الجزائر",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_algeria.png",
+      "animationUrl": null,
+      "mikooCountryId": 5,
+      "countryShort": "DZ"
+    },
+    {
+      "code": "mikoo_country_18",
+      "name": "علم العراق",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_iraq.png",
+      "animationUrl": null,
+      "mikooCountryId": 18,
+      "countryShort": "IQ"
+    },
+    {
+      "code": "mikoo_country_21",
+      "name": "علم الأردن",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_jordan.png",
+      "animationUrl": null,
+      "mikooCountryId": 21,
+      "countryShort": "JO"
+    },
+    {
+      "code": "mikoo_country_24",
+      "name": "علم الكويت",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_kuwait.png",
+      "animationUrl": null,
+      "mikooCountryId": 24,
+      "countryShort": "KW"
+    },
+    {
+      "code": "mikoo_country_26",
+      "name": "علم ليبيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_libya.png",
+      "animationUrl": null,
+      "mikooCountryId": 26,
+      "countryShort": "LY"
+    },
+    {
+      "code": "mikoo_country_25",
+      "name": "علم لبنان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_lebanon.png",
+      "animationUrl": null,
+      "mikooCountryId": 25,
+      "countryShort": "LB"
+    },
+    {
+      "code": "mikoo_country_28",
+      "name": "علم المغرب",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_morocco.png",
+      "animationUrl": null,
+      "mikooCountryId": 28,
+      "countryShort": "MA"
+    },
+    {
+      "code": "mikoo_country_30",
+      "name": "علم عمان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_oman.png",
+      "animationUrl": null,
+      "mikooCountryId": 30,
+      "countryShort": "OM"
+    },
+    {
+      "code": "mikoo_country_32",
+      "name": "علم فلسطين",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_palestine.png",
+      "animationUrl": null,
+      "mikooCountryId": 32,
+      "countryShort": "PS"
+    },
+    {
+      "code": "mikoo_country_38",
+      "name": "علم سوريا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://res.coccolive.com/country/flag/ic_syria.png",
+      "animationUrl": null,
+      "mikooCountryId": 38,
+      "countryShort": "SY"
+    },
+    {
+      "code": "mikoo_country_41",
+      "name": "علم تركيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_turkey.png",
+      "animationUrl": null,
+      "mikooCountryId": 41,
+      "countryShort": "TR"
+    },
+    {
+      "code": "mikoo_country_40",
+      "name": "علم تونس",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_tunisia.png",
+      "animationUrl": null,
+      "mikooCountryId": 40,
+      "countryShort": "TN"
+    },
+    {
+      "code": "mikoo_country_42",
+      "name": "علم الامارات",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_the_united_arab_emirates.png",
+      "animationUrl": null,
+      "mikooCountryId": 42,
+      "countryShort": "AE"
+    },
+    {
+      "code": "mikoo_country_45",
+      "name": "علم اليمن",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_yemen.png",
+      "animationUrl": null,
+      "mikooCountryId": 45,
+      "countryShort": "YE"
+    },
+    {
+      "code": "mikoo_country_77",
+      "name": "علم أذربيجان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_azerbaijan.png",
+      "animationUrl": null,
+      "mikooCountryId": 77,
+      "countryShort": "AZ"
+    },
+    {
+      "code": "mikoo_country_70",
+      "name": "علم ألبانيا",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_albania.png",
+      "animationUrl": null,
+      "mikooCountryId": 70,
+      "countryShort": "AL"
+    },
+    {
+      "code": "mikoo_country_67",
+      "name": "علم أفغانستان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_afghanistan.png",
+      "animationUrl": null,
+      "mikooCountryId": 67,
+      "countryShort": "AF"
+    },
+    {
+      "code": "mikoo_country_17",
+      "name": "علم إيران",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_iran.png",
+      "animationUrl": null,
+      "mikooCountryId": 17,
+      "countryShort": "IR"
+    },
+    {
+      "code": "mikoo_country_221",
+      "name": "علم طاجيكستان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_tajikistan.png",
+      "animationUrl": null,
+      "mikooCountryId": 221,
+      "countryShort": "TJ"
+    },
+    {
+      "code": "mikoo_country_231",
+      "name": "علم أوزبكستان",
+      "category": "country",
+      "type": "normal",
+      "coinPrice": 99,
+      "iconUrl": "https://pic.vchat-onlie.com/country/flag/ic_uzbekistan.png",
+      "animationUrl": null,
+      "mikooCountryId": 231,
+      "countryShort": "UZ"
     }
-  ],
-  "note": "Partial: full list needs MIKOO_TICKET. This one MP4 came from Mikoo device cache.",
-  "playback": {
-    "mp4Field": "mp4Url",
-    "svgaField": "vggUrl",
-    "android": "AnimView+.svga"
-  }
+  ]
 }

@@ -92,7 +92,7 @@ async function seed() {
           level,
           name: `VIP${level}`,
           coinPriceMonthly: price,
-          badgeUrl: `/assets/cosmetics/vip/vip_medal_mikoo_${Math.min(7, Math.max(1, level))}.png?v=20260801vip7`,
+          badgeUrl: `/assets/pack/vip_medal_${badgeTier}.png?v=20260717c`,
           benefits: vipBenefits(level),
           isActive: true,
         }),
@@ -100,7 +100,7 @@ async function seed() {
       console.log(`  VIP${level} created`);
     } else {
       existing.coinPriceMonthly = price;
-      existing.badgeUrl = `/assets/cosmetics/vip/vip_medal_mikoo_${Math.min(7, Math.max(1, level))}.png?v=20260801vip7`;
+      existing.badgeUrl = existing.badgeUrl || `/assets/pack/vip_medal_${badgeTier}.png?v=20260717c`;
       existing.isActive = true;
       await vipRepo.save(existing);
       console.log(`  VIP${level} price updated → ${price}`);
@@ -276,9 +276,9 @@ async function seed() {
         } as any),
       );
     } else {
+      // Keep dashboard coinPrice; seed only refreshes assets/name for existing rows.
       existing.previewUrl = previewUrl;
       existing.name = name;
-      existing.coinPrice = price;
       existing.isActive = true;
       await cosmeticRepo.save(existing);
     }

@@ -632,11 +632,11 @@
         : 'احصل مجاناً · 30 يوم';
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
-      el.btnPrimary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
-      el.btnPrimary.className = 'btn btn-buy';
-      el.btnPrimary.disabled = state.busy;
+      el.btnPrimary.textContent = left != null ? ('مُرتدى · ' + left + ' يوم') : 'مُرتدى';
+      el.btnPrimary.className = 'btn btn-owned';
+      el.btnPrimary.disabled = true;
       el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'إزالة';
+      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
       el.btnSecondary.disabled = state.busy;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
@@ -944,11 +944,6 @@
     var item = selectedItem();
     if (!item || state.busy) return;
     if (!isActiveOwned(item.id)) return;
-    // Equipped wearables: secondary removes. Room backgrounds / unequipped: renew.
-    if (state.type !== 'room_background' && state.equipped[item.id]) {
-      await onUnequip();
-      return;
-    }
     state.busy = true;
     syncActionButtons(item);
     try {

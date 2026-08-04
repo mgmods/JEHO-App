@@ -1,20 +1,32 @@
 package com.Dramizo.Series.presentation.cosmetics;
 
+import androidx.annotation.Nullable;
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
+
 import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
+
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class CosmeticsViewModel extends ViewModel {
     public static final String EXTRA_TYPE = "cosmetic_type";
+    /** Default mall lease length — matches backend mallLeaseDays(). */
+    public static final int LEASE_DAYS = 30;
 
     public static final class CatalogPage {
         public final String type;
@@ -31,8 +43,11 @@ public class CosmeticsViewModel extends ViewModel {
             new MutableLiveData<>(new CatalogPage(null, Collections.emptyList()));
     private final MutableLiveData<String> message = new MutableLiveData<>();
     private final MutableLiveData<String> error = new MutableLiveData<>();
+    private final MutableLiveData<String> selectedId = new MutableLiveData<>(null);
+    private final MutableLiveData<CosmeticDtos.CosmeticDto> selectedItem = new MutableLiveData<>(null);
     private final Set<String> ownedIds = new HashSet<>();
     private final Set<String> equippedIds = new HashSet<>();
+    private final Map<String, String> expiresAtById = new HashMap<>();
     private final AtomicInteger loadSeq = new AtomicInteger();
     private volatile String filterType;
     private volatile boolean bagMode;
@@ -46,6 +61,8 @@ public class CosmeticsViewModel extends ViewModel {
     public LiveData<CatalogPage> getCatalogPage() { return catalogPage; }
     public LiveData<String> getMessage() { return message; }
     public LiveData<String> getError() { return error; }
+    public LiveData<String> getSelectedId() { return selectedId; }
+    public LiveData<CosmeticDtos.CosmeticDto> getSelectedItem() { return selectedItem; }
 
     public String getFilterType() { return filterType; }
 
@@ -56,15 +73,66 @@ public class CosmeticsViewModel extends ViewModel {
     public void setBagMode(boolean bagMode) { this.bagMode = bagMode; }
 
     public boolean isOwned(String cosmeticId) {
+        if (cosmeticId == null) return false;
         synchronized (ownedIds) {
-            return ownedIds.contains(cosmeticId);
+            if (!ownedIds.contains(cosmeticId)) return false;
+            return !isExpired(cosmeticId);
         }
     }
 
     public boolean isEquipped(String cosmeticId) {
-        synchronized (equippedIds) {
-            return equippedIds.contains(cosmeticId);
+        if (cosmeticId == null) return false;
+        synchronized (ownedIds) {
+            return equippedIds.contains(cosmeticId) && isOwned(cosmeticId);
         }
+    }
+
+    /** Days left (1+) or null if permanent / not owned. 0 if expired. */
+    @Nullable
+    public Integer daysLeft(String cosmeticId) {
+        if (cosmeticId == null) return null;
+        String exp;
+        synchronized (ownedIds) {
+            if (!ownedIds.contains(cosmeticId)) return null;
+            exp = expiresAtById.get(cosmeticId);
+        }
+        if (exp == null || exp.isEmpty()) return null;
+        long end = parseExpiresMs(exp);
+        if (end <= 0L) return null;
+        long ms = end - System.currentTimeMillis();
+        if (ms <= 0L) return 0;
+        return (int) Math.max(1L, (ms + 86_399_999L) / 86_400_000L);
+    }
+
+    public boolean isExpired(String cosmeticId) {
+        Integer d = daysLeftInternal(cosmeticId);
+        return d != null && d == 0;
+    }
+
+    @Nullable
+    private Integer daysLeftInternal(String cosmeticId) {
+        String exp = expiresAtById.get(cosmeticId);
+        if (exp == null || exp.isEmpty()) return null;
+        long end = parseExpiresMs(exp);
+        if (end <= 0L) return null;
+        long ms = end - System.currentTimeMillis();
+        if (ms <= 0L) return 0;
+        return (int) Math.max(1L, (ms + 86_399_999L) / 86_400_000L);
+    }
+
+    public void select(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (item == null) {
+            selectedId.postValue(null);
+            selectedItem.postValue(null);
+            return;
+        }
+        selectedId.postValue(item.id);
+        selectedItem.postValue(item);
+    }
+
+    public void clearSelection() {
+        selectedId.setValue(null);
+        selectedItem.setValue(null);
     }
 
     public void load() {
@@ -88,9 +156,14 @@ public class CosmeticsViewModel extends ViewModel {
                     synchronized (ownedIds) {
                         ownedIds.clear();
                         equippedIds.clear();
+                        expiresAtById.clear();
                         for (CosmeticDtos.UserCosmeticDto row : inv.data) {
-                            if (row.cosmeticId != null) ownedIds.add(row.cosmeticId);
-                            if (row.equipped && row.cosmeticId != null) equippedIds.add(row.cosmeticId);
+                            if (row.cosmeticId == null) continue;
+                            ownedIds.add(row.cosmeticId);
+                            if (row.expiresAt != null && !row.expiresAt.isEmpty()) {
+                                expiresAtById.put(row.cosmeticId, row.expiresAt);
+                            }
+                            if (row.equipped) equippedIds.add(row.cosmeticId);
                         }
                     }
                     inventoryLoadedAtMs = System.currentTimeMillis();
@@ -106,7 +179,7 @@ public class CosmeticsViewModel extends ViewModel {
                     List<CosmeticDtos.CosmeticDto> ownedOnly = new ArrayList<>();
                     synchronized (ownedIds) {
                         for (CosmeticDtos.CosmeticDto row : items) {
-                            if (row != null && row.id != null && ownedIds.contains(row.id)) {
+                            if (row != null && row.id != null && isOwned(row.id)) {
                                 ownedOnly.add(row);
                             }
                         }
@@ -114,6 +187,26 @@ public class CosmeticsViewModel extends ViewModel {
                     items = ownedOnly;
                 }
                 catalogPage.postValue(new CatalogPage(loadType, items));
+                // Keep selection if still in this page.
+                CosmeticDtos.CosmeticDto sel = selectedItem.getValue();
+                if (sel != null && loadType != null && loadType.equals(filterType)) {
+                    CosmeticDtos.CosmeticDto found = null;
+                    for (CosmeticDtos.CosmeticDto row : items) {
+                        if (row != null && sel.id != null && sel.id.equals(row.id)) {
+                            found = row;
+                            break;
+                        }
+                    }
+                    if (found == null && !items.isEmpty()) {
+                        select(items.get(0));
+                    } else if (found != null) {
+                        selectedItem.postValue(found);
+                    }
+                } else if ((selectedItem.getValue() == null) && !items.isEmpty()
+                        && loadType != null && loadType.equals(filterType)) {
+                    // Auto-preview first item when opening a tab (Majlis-like feel).
+                    select(items.get(0));
+                }
             } else {
                 error.postValue(cat.error);
             }
@@ -128,6 +221,12 @@ public class CosmeticsViewModel extends ViewModel {
             if (!r.success) {
                 error.postValue(r.error);
                 return;
+            }
+            if (r.data != null && r.data.expiresAt != null) {
+                synchronized (ownedIds) {
+                    ownedIds.add(cosmeticId);
+                    expiresAtById.put(cosmeticId, r.data.expiresAt);
+                }
             }
             // Server already auto-equips; call equip again to sync worn URLs into session.
             Result<CosmeticDtos.EquipResult> eq =
@@ -145,6 +244,11 @@ public class CosmeticsViewModel extends ViewModel {
             message.postValue("تم الشراء والارتداء");
             loadForType(type);
         });
+    }
+
+    /** Buy again / half-price extend — same API as purchase when already owned. */
+    public void renew(String cosmeticId) {
+        purchase(cosmeticId);
     }
 
     public void equip(String cosmeticId) {
@@ -205,5 +309,32 @@ public class CosmeticsViewModel extends ViewModel {
         cached.vipBadgeUrl = profile.vipBadgeUrl;
         cached.hostBadgeUrl = profile.hostBadgeUrl;
         container.getSessionManager().updateCachedUser(cached);
+    }
+
+    private static long parseExpiresMs(String raw) {
+        if (raw == null || raw.isEmpty()) return 0L;
+        String s = raw.trim();
+        try {
+            // Instant / ISO-8601 with Z
+            return java.time.Instant.parse(s).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        String[] patterns = {
+                "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+                "yyyy-MM-dd'T'HH:mm:ssXXX",
+                "yyyy-MM-dd HH:mm:ss"
+        };
+        for (String p : patterns) {
+            try {
+                SimpleDateFormat f = new SimpleDateFormat(p, Locale.US);
+                f.setTimeZone(TimeZone.getTimeZone("UTC"));
+                Date d = f.parse(s);
+                if (d != null) return d.getTime();
+            } catch (ParseException ignored) {
+            }
+        }
+        return 0L;
     }
 }

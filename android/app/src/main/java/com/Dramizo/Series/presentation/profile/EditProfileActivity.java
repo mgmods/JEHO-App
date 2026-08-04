@@ -23,6 +23,7 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivityEditProfileBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
@@ -62,6 +63,10 @@ public class EditProfileActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityEditProfileBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Explicit system padding on contentRoot (layout id) — avoids toolbar-only pad
+        // which caused overlapping status/fields on edge-to-edge Android 14+.
+        EdgeToEdgeHelper.apply(this);
+        EdgeToEdgeHelper.padSystemBarsWithIme(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());
         c = ContainerProvider.from(this);
         vm = new ViewModelProvider(this, new ViewModelFactory(c)).get(ProfileViewModel.class);
@@ -143,6 +148,12 @@ public class EditProfileActivity extends ThemedActivity {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_LONG).show();
         });
         vm.loadMe();
+    }
+
+    @Override
+    protected boolean wantsContentSystemPadding() {
+        // Handled manually in onCreate with padSystemBarsWithIme on contentRoot.
+        return false;
     }
 
     private void wireCountrySpinner() {

@@ -17,5 +17,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AuraLive"
+rootProject.name = "JEHOO CHAT"
 include ':app'

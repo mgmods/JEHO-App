@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -12,21 +13,19 @@
         android:scaleType="centerCrop"
         android:src="@color/white" />
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:id="@+id/contentRoot"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
         <LinearLayout
             android:id="@+id/toolbar"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="48dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="8dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            android:paddingHorizontal="8dp">
 
             <ImageView
                 android:id="@+id/btnBack"
@@ -73,35 +72,97 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Native SVGA preview (same engine as live room) — قطاع الراس -->
-        <FrameLayout
+        <!-- Native hero: HostSignalView (SVGA) for frames — same engine as live room. -->
+        <LinearLayout
             android:id="@+id/nativeHeroWrap"
-            android:layout_width="0dp"
-            android:layout_height="148dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginHorizontal="12dp"
             android:layout_marginTop="4dp"
             android:background="@drawable/bg_mall_native_hero"
-            android:padding="10dp"
-            android:visibility="gone"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/toolbar">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
 
-            <com.Dramizo.Series.util.HostSignalView
-                android:id="@+id/nativeHeroFrame"
-                android:layout_width="128dp"
-                android:layout_height="128dp"
-                android:layout_gravity="center" />
-        </FrameLayout>
+            <FrameLayout
+                android:layout_width="132dp"
+                android:layout_height="132dp">
 
-        <WebView
-            android:id="@+id/webMall"
-            android:layout_width="0dp"
+                <com.Dramizo.Series.util.HostSignalView
+                    android:id="@+id/nativeHeroFrame"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="center" />
+
+                <ImageView
+                    android:id="@+id/heroMedia"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvHeroName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="إطار ذهبي" />
+
+                <TextView
+                    android:id="@+id/tvHeroHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/mall_preview_hint"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvHeroDays"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_cosmetic_price_chip"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="3dp"
+                    android:textColor="#FF8A4B08"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="متبقي 12 يوم"
+                    tools:visibility="visible" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabs"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            app:tabGravity="fill"
+            app:tabIndicatorColor="@color/aurora_gold"
+            app:tabIndicatorFullWidth="false"
+            app:tabMode="scrollable"
+            app:tabSelectedTextColor="@color/text_primary"
+            app:tabTextColor="@color/text_hint" />
+
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/pager"
+            android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="4dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/nativeHeroWrap" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
+            android:layout_weight="1" />
+    </LinearLayout>
 </FrameLayout>

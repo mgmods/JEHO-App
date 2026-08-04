@@ -1,57 +1,61 @@
 package com.Dramizo.Series.presentation.cosmetics;
 
-import android.annotation.SuppressLint;
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
+import androidx.lifecycle.ViewModelProvider;
+import androidx.viewpager2.adapter.FragmentStateAdapter;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
+import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
 import com.Dramizo.Series.databinding.ActivityCosmeticsBinding;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
-import com.Dramizo.Series.util.ApiOrigin;
+import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.HostSignalView;
+import com.Dramizo.Series.util.ImagePlaceholder;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.google.android.material.tabs.TabLayoutMediator;
 
-import org.json.JSONObject;
+import java.util.Locale;
 
 /**
- * Appearance mall — HTML catalog in WebView.
- * قطاع الراس preview uses native {@link HostSignalView} (same SVGA engine as the live room).
+ * Appearance mall — fully native (no WebView).
+ * قطاع الراس uses {@link HostSignalView} SVGA — same engine as the live room.
  */
 public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
 
-    /** Order kept for Intent type mapping from older callers. */
     static final String[] TYPES = {
             "vip_badge", "entry_effect",
             "level_badge", "room_card", "room_background"
     };
 
     private ActivityCosmeticsBinding binding;
+    private CosmeticsViewModel vm;
     private SessionManager session;
     private boolean bagMode;
     private String initialType = "vip_badge";
     @Nullable private String roomId;
-    private boolean pageReady;
     @Nullable private String lastWearUrl;
 
-    @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityCosmeticsBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         session = ContainerProvider.from(this).getSessionManager();
+        vm = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
+                .get(CosmeticsViewModel.class);
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.btnRecharge.setOnClickListener(v ->
@@ -64,96 +68,124 @@ public class CosmeticsActivity extends ThemedActivity {
         if (roomId == null || roomId.isEmpty()) {
             roomId = getIntent().getStringExtra("roomId");
         }
+        vm.setBagMode(bagMode);
         refreshBagButton();
-        setNativeHeroVisible("vip_badge".equals(initialType));
-        setupWebView();
-        loadMall();
+        setupTabs();
+        observeVm();
     }
 
-    private void setupWebView() {
-        WebView web = binding.webMall;
-        WebSettings s = web.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setLoadWithOverviewMode(true);
-        s.setUseWideViewPort(true);
-        s.setSupportZoom(false);
-        s.setBuiltInZoomControls(false);
-        s.setDisplayZoomControls(false);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        // Cache heavy assets (PNG/SVGA). HTML is busted via ?nocache= timestamp on each open.
-        s.setCacheMode(WebSettings.LOAD_DEFAULT);
-        web.setWebChromeClient(new WebChromeClient());
-        web.addJavascriptInterface(new MallBridge(), "MallBridge");
-        web.setWebViewClient(new WebViewClient() {
+    private void setupTabs() {
+        binding.pager.setAdapter(new Pager(this));
+        binding.pager.setOffscreenPageLimit(1);
+        new TabLayoutMediator(binding.tabs, binding.pager, (tab, position) ->
+                tab.setText(tabLabel(position))).attach();
+        int start = tabForType(initialType);
+        binding.pager.setCurrentItem(start, false);
+        vm.setFilterType(TYPES[start]);
+        binding.pager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false;
-            }
-
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                pageReady = true;
-                injectConfig();
+            public void onPageSelected(int position) {
+                if (position < 0 || position >= TYPES.length) return;
+                vm.setFilterType(TYPES[position]);
+                vm.clearSelection();
+                lastWearUrl = null;
+                if (binding != null) {
+                    binding.nativeHeroFrame.clearSignal();
+                    binding.heroMedia.setVisibility(View.GONE);
+                    Glide.with(binding.heroMedia).clear(binding.heroMedia);
+                    binding.tvHeroName.setText(R.string.mall_preview);
+                    binding.tvHeroDays.setVisibility(View.GONE);
+                }
             }
         });
     }
 
-    private void loadMall() {
-        // Fresh HTML/JS only — keep disk cache for frame PNGs / one selected SVGA.
-        long bust = System.currentTimeMillis();
-        StringBuilder url = new StringBuilder(ApiOrigin.origin())
-                .append("/mall/index.html?nocache=").append(bust)
-                .append("&type=").append(initialType)
-                .append("&bag=").append(bagMode ? "1" : "0");
-        if (roomId != null && !roomId.isEmpty()) {
-            url.append("&roomId=").append(roomId);
+    private void observeVm() {
+        vm.getSelectedItem().observe(this, this::previewItem);
+        vm.getMessage().observe(this, m -> {
+            if (m != null && !m.isEmpty()) Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
+        });
+        vm.getError().observe(this, e -> {
+            if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
+        });
+    }
+
+    private void previewItem(@Nullable CosmeticDtos.CosmeticDto item) {
+        if (binding == null) return;
+        if (item == null) {
+            binding.tvHeroName.setText(R.string.mall_preview);
+            binding.tvHeroHint.setText(R.string.mall_preview_hint);
+            binding.tvHeroDays.setVisibility(View.GONE);
+            binding.nativeHeroFrame.clearSignal();
+            binding.heroMedia.setVisibility(View.GONE);
+            lastWearUrl = null;
+            return;
         }
-        binding.webMall.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
-        binding.webMall.loadUrl(url.toString());
-    }
-
-    private void injectConfig() {
-        if (!pageReady || binding == null) return;
-        try {
-            JSONObject cfg = new JSONObject();
-            cfg.put("apiBase", ApiOrigin.apiV1());
-            cfg.put("token", session.getAccessToken() != null ? session.getAccessToken() : "");
-            String avatar = session.getAvatarUrl();
-            cfg.put("avatarUrl", avatar != null ? AssetCatalog.absoluteUrl(avatar) : "");
-            cfg.put("displayName", session.getDisplayName() != null ? session.getDisplayName() : "");
-            cfg.put("roomId", roomId != null ? roomId : "");
-            cfg.put("bagMode", bagMode);
-            cfg.put("type", initialType);
-            cfg.put("nativeFramePreview", false);
-            String js = "window.MallPage&&window.MallPage.setConfig(" + cfg + ");";
-            binding.webMall.evaluateJavascript(js, null);
-        } catch (Exception ignored) {
+        binding.tvHeroName.setText(item.name != null && !item.name.isEmpty()
+                ? item.name : (item.code != null ? item.code : "—"));
+        binding.tvHeroHint.setText(hintForType(item.type != null ? item.type : vm.getFilterType()));
+        Integer days = vm.daysLeft(item.id);
+        if (days != null && days > 0) {
+            binding.tvHeroDays.setVisibility(View.VISIBLE);
+            binding.tvHeroDays.setText(getString(R.string.mall_days_left, days));
+        } else if (vm.isOwned(item.id) && days == null) {
+            binding.tvHeroDays.setVisibility(View.VISIBLE);
+            binding.tvHeroDays.setText(R.string.mall_permanent);
+        } else {
+            binding.tvHeroDays.setVisibility(View.GONE);
         }
-    }
 
-    private void setNativeHeroVisible(boolean show) {
-        if (binding == null || binding.nativeHeroWrap == null) return;
-        // Hidden: mall plays selected-frame SVGA in WebView (avoids HostSignalView
-        // download semaphore starving when the live room already holds SVGA slots).
-        binding.nativeHeroWrap.setVisibility(View.GONE);
-        lastWearUrl = null;
-    }
+        String type = normalizeType(item.type != null ? item.type : vm.getFilterType());
+        String wear = firstNonEmpty(item.animationUrl, item.previewUrl);
+        String avatar = session.getAvatarUrl();
 
-    private void previewNativeFrame(@Nullable String wearUrl) {
-        // No-op — WebView mall.js plays the single selected SVGA.
+        if ("vip_badge".equals(type) || "host_badge".equals(type)) {
+            binding.heroMedia.setVisibility(View.GONE);
+            Glide.with(binding.heroMedia).clear(binding.heroMedia);
+            String abs = wear;
+            if (abs != null && abs.equals(lastWearUrl) && binding.nativeHeroFrame.getVisibility() == View.VISIBLE) {
+                return;
+            }
+            lastWearUrl = abs;
+            binding.nativeHeroFrame.setVisibility(View.VISIBLE);
+            binding.nativeHeroFrame.bind(abs, avatar, item.meta, 1);
+        } else {
+            lastWearUrl = null;
+            binding.nativeHeroFrame.clearSignal();
+            binding.heroMedia.setVisibility(View.VISIBLE);
+            String still = stillPngUrl(item.previewUrl, item.animationUrl);
+            String abs = AssetCatalog.absoluteUrl(still);
+            if (abs == null || abs.isEmpty()) {
+                binding.heroMedia.setImageResource(ImagePlaceholder.cover());
+            } else {
+                Glide.with(binding.heroMedia)
+                        .load(abs)
+                        .fitCenter()
+                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .placeholder(ImagePlaceholder.cover())
+                        .error(ImagePlaceholder.cover())
+                        .into(binding.heroMedia);
+            }
+        }
     }
 
     private void toggleBagMode() {
         bagMode = !bagMode;
+        vm.setBagMode(bagMode);
         refreshBagButton();
         Toast.makeText(this,
                 bagMode ? getString(R.string.my_bag_mall) : getString(R.string.appearance_store),
                 Toast.LENGTH_SHORT).show();
-        if (pageReady) {
-            binding.webMall.evaluateJavascript(
-                    "window.MallPage&&window.MallPage.setBagMode(" + bagMode + ");", null);
+        vm.clearSelection();
+        // Reload active fragment page.
+        int page = binding.pager.getCurrentItem();
+        for (Fragment f : getSupportFragmentManager().getFragments()) {
+            if (f instanceof CosmeticsCategoryFragment) {
+                ((CosmeticsCategoryFragment) f).reload();
+            }
+        }
+        if (page >= 0 && page < TYPES.length) {
+            vm.loadForType(TYPES[page]);
         }
     }
 
@@ -191,95 +223,68 @@ public class CosmeticsActivity extends ThemedActivity {
         return 0;
     }
 
+    private String tabLabel(int position) {
+        switch (position) {
+            case 0: return getString(R.string.mall_tab_frames);
+            case 1: return getString(R.string.mall_tab_entry);
+            case 2: return getString(R.string.mall_tab_level);
+            case 3: return getString(R.string.mall_tab_room_card);
+            case 4: return getString(R.string.mall_tab_room_bg);
+            default: return "";
+        }
+    }
+
+    private String hintForType(String type) {
+        String n = normalizeType(type);
+        switch (n) {
+            case "vip_badge": return getString(R.string.mall_hint_frames);
+            case "entry_effect": return getString(R.string.mall_hint_entry);
+            case "level_badge": return getString(R.string.mall_hint_level);
+            case "room_card": return getString(R.string.mall_hint_room_card);
+            case "room_background": return getString(R.string.mall_hint_room_bg);
+            default: return getString(R.string.mall_preview_hint);
+        }
+    }
+
     @Override
     protected void onDestroy() {
-        if (binding != null && binding.webMall != null) {
-            binding.webMall.removeJavascriptInterface("MallBridge");
-            binding.webMall.destroy();
+        if (binding != null) {
+            try {
+                binding.nativeHeroFrame.destroy();
+            } catch (Exception ignored) {
+            }
         }
         super.onDestroy();
     }
 
-    private final class MallBridge {
-        @JavascriptInterface
-        public String getApiBase() {
-            return ApiOrigin.apiV1();
+    private static String firstNonEmpty(String a, String b) {
+        if (a != null && !a.isEmpty()) return a;
+        if (b != null && !b.isEmpty()) return b;
+        return null;
+    }
+
+    private static String stillPngUrl(String preview, String anim) {
+        String base = firstNonEmpty(preview, anim);
+        if (base == null) return null;
+        String lower = base.toLowerCase(Locale.US);
+        if (lower.contains(".svga") || lower.contains(".mp4") || lower.contains(".webm")
+                || lower.contains(".html")) {
+            return base.replaceAll("(?i)\\.(svga|mp4|webm|html)(\\?.*)?$", ".png$1");
+        }
+        return base;
+    }
+
+    private static final class Pager extends FragmentStateAdapter {
+        Pager(@NonNull FragmentActivity activity) { super(activity); }
+
+        @NonNull
+        @Override
+        public Fragment createFragment(int position) {
+            String type = TYPES[Math.max(0, Math.min(position, TYPES.length - 1))];
+            return CosmeticsCategoryFragment.newInstance(type, "");
         }
 
-        @JavascriptInterface
-        public String getToken() {
-            String t = session.getAccessToken();
-            return t != null ? t : "";
-        }
-
-        @JavascriptInterface
-        public String getAvatarUrl() {
-            String a = session.getAvatarUrl();
-            return a != null ? AssetCatalog.absoluteUrl(a) : "";
-        }
-
-        @JavascriptInterface
-        public String getDisplayName() {
-            String n = session.getDisplayName();
-            return n != null ? n : "";
-        }
-
-        @JavascriptInterface
-        public String getRoomId() {
-            return roomId != null ? roomId : "";
-        }
-
-        @JavascriptInterface
-        public boolean hasNativeFramePreview() {
-            return false;
-        }
-
-        /** Kept for JS bridge compatibility — motion is played inside the mall WebView. */
-        @JavascriptInterface
-        public void previewWear(String type, String wearUrl, String previewUrl) {
-            // no-op
-        }
-
-        @JavascriptInterface
-        public void clearWear() {
-            runOnUiThread(() -> setNativeHeroVisible(false));
-        }
-
-        @JavascriptInterface
-        public void toast(String msg) {
-            runOnUiThread(() -> {
-                if (msg != null && !msg.isEmpty()) {
-                    Toast.makeText(CosmeticsActivity.this, msg, Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        /** Open coin packages when mall purchase fails for low balance. */
-        @JavascriptInterface
-        public void openRecharge() {
-            runOnUiThread(() ->
-                    com.Dramizo.Series.util.BalanceRedirect.openRecharge(CosmeticsActivity.this));
-        }
-
-        @JavascriptInterface
-        public void openRechargeIfNeeded(String msg) {
-            runOnUiThread(() -> {
-                if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(msg)) {
-                    com.Dramizo.Series.util.BalanceRedirect.handle(CosmeticsActivity.this, msg);
-                } else if (msg != null && !msg.isEmpty()) {
-                    Toast.makeText(CosmeticsActivity.this, msg, Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
-
-        @JavascriptInterface
-        public void onEquipped(String cosmeticId, String type) {
-            // Profile wear URLs are updated server-side; room refreshes on next bind/resume.
-        }
-
-        @JavascriptInterface
-        public void close() {
-            runOnUiThread(CosmeticsActivity.this::navigateUp);
-        }
+        @Override
+        public int getItemCount() { return TYPES.length; }
     }
 }

@@ -26,6 +26,7 @@ import {
 } from '../../database/entities/agency-member.entity';
 import { AdminUpsertBoxDto } from './dto/lucky-boxes.dto';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 const CURRENCY_MAP: Record<string, CurrencyType> = {
   coins: CurrencyType.COINS,
@@ -492,6 +493,12 @@ export class LuckyBoxesService implements OnModuleInit {
   }
 
   private async ensureDefaults() {
+    // Never rewrite live boxes/rewards. Only seed empty installs when opt-in.
+    if (!bootCatalogSeedEnabled()) {
+      this.logger.log('Lucky boxes: DB authoritative (no boot mutate)');
+      return;
+    }
+
     // Enforce free box = one claim for life (fixes repeat claiming).
     await this.boxRepo
       .createQueryBuilder()

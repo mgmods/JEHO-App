@@ -172,6 +172,8 @@ export const paymentSettingsApi = {
   testBinancePay: () => safeRequest(() => api.post('/admin/payment-settings/binance-pay/test')),
   reconcileBinanceWallet: () => safeRequest(() => api.post('/admin/payment-settings/binance-pay/reconcile')),
   getFourthwall: () => safeRequest(() => api.get('/admin/payment-settings/fourthwall')),
+  revealFourthwall: () =>
+    safeRequest(() => api.post('/admin/payment-settings/fourthwall/reveal')),
   updateFourthwall: (data) => safeRequest(() => api.patch('/admin/payment-settings/fourthwall', data)),
   testFourthwall: () => safeRequest(() => api.post('/admin/payment-settings/fourthwall/test')),
   syncFourthwallPackages: () =>

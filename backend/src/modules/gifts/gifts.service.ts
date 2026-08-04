@@ -38,6 +38,7 @@ import { User } from '../../database/entities/user.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Room, RoomStatus } from '../../database/entities/room.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { resolvePlayableGiftAnimation } from './gift-media.resolve';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import {
@@ -79,7 +80,12 @@ export class GiftsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
+    if (!bootCatalogSeedEnabled()) {
+      this.log.log('Gifts catalog: DB authoritative (no boot seed)');
+      return;
+    }
     await this.ensureDefaultLuckyGift();
     await this.ensureMikooGiftTabs();
   }
@@ -210,12 +216,8 @@ export class GiftsService implements OnModuleInit {
           existing.animationUrl = null as any;
           dirty = true;
         }
-        if (Number(existing.coinPrice) !== seed.coinPrice) {
-          existing.coinPrice = seed.coinPrice;
-          existing.diamondValue = Math.floor(seed.coinPrice * LUCKY_GIFT_DIAMOND_RATIO);
-          dirty = true;
-        }
-        if (existing.sortOrder !== seed.sortOrder) {
+        // Price/sort stay from DB (dashboard edits). Seeds only create missing rows.
+        if (existing.sortOrder == null) {
           existing.sortOrder = seed.sortOrder;
           dirty = true;
         }
@@ -536,11 +538,11 @@ export class GiftsService implements OnModuleInit {
         upserted += 1;
         continue;
       }
+      // Keep coinPrice from DB — catalog file must not overwrite dashboard prices.
       existing.iconUrl = iconUrl;
       existing.animationUrl = item.animationUrl || existing.animationUrl;
       (existing as any).category = category;
       existing.type = type;
-      existing.coinPrice = coinPrice;
       existing.isActive = true;
       await this.giftsRepo.save(existing);
       upserted += 1;

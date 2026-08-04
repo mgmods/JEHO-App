@@ -18,6 +18,7 @@ import {
   currentMonthKey,
   agentFloatBonusPercent,
 } from '../../common/promo-catalog';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 @Injectable()
 export class PromotionsService implements OnModuleInit, OnModuleDestroy {
@@ -40,8 +41,12 @@ export class PromotionsService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     try {
       await this.ensureCatalogSetting();
-      await this.ensurePromoCosmetics();
-      await this.ensurePromoVanityPool();
+      if (bootCatalogSeedEnabled()) {
+        await this.ensurePromoCosmetics();
+        await this.ensurePromoVanityPool();
+      } else {
+        this.logger.log('Promotions: DB authoritative (no boot promo seed)');
+      }
     } catch (err) {
       this.logger.warn(`promo init: ${(err as Error).message}`);
     }
@@ -281,20 +286,21 @@ export class PromotionsService implements OnModuleInit, OnModuleDestroy {
 
   private async ensureCatalogSetting() {
     const key = 'promo_catalog';
-    const value = JSON.stringify(this.getCatalog());
-    let row = await this.settingsRepo.findOne({ where: { key } });
-    if (!row) {
-      await this.settingsRepo.save(
-        this.settingsRepo.create({
-          key,
-          value,
-          description: 'Monthly / agent / supporter / VIP duration promos',
-        }),
-      );
+    const existing = await this.settingsRepo.findOne({ where: { key } });
+    // Never overwrite dashboard/production promo catalog with code defaults.
+    if (existing?.value) return;
+    if (!bootCatalogSeedEnabled()) {
+      this.logger.log('Promo catalog: DB authoritative (empty, seed disabled)');
       return;
     }
-    row.value = value;
-    await this.settingsRepo.save(row);
+    const value = JSON.stringify(this.getCatalog());
+    await this.settingsRepo.save(
+      this.settingsRepo.create({
+        key,
+        value,
+        description: 'Monthly / agent / supporter / VIP duration promos',
+      }),
+    );
   }
 
   private async ensurePromoCosmetics() {

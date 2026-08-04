@@ -3068,9 +3068,18 @@ export class RoomsService implements OnModuleInit {
       return;
     }
     await this.assertAgencyRoomActive(room);
+    // Agency owner may manage agency rooms for settings/moderation APIs.
+    if (room.agencyId) {
+      const agency = await this.agenciesRepo.findOne({ where: { id: room.agencyId } });
+      if (agency && agency.ownerId === actorId) return;
+    }
     const moderator = await this.modsRepo.findOne({
       where: { roomId, userId: actorId },
     });
+    // Display / room management: any appointed moderator (or one with the flag).
+    if (permission === 'canManageRoom' && moderator) {
+      return;
+    }
     if (!moderator || moderator[permission] !== true) {
       throw new ForbiddenException(message);
     }

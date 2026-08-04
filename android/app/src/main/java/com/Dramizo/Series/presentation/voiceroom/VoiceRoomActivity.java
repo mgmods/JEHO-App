@@ -159,6 +159,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean isAgencyRoom;
     private boolean roomWelcomePosted;
     @Nullable private String welcomePostedForRoomId;
+    /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
+    private boolean roomChatZoneVisible = true;
     private String myUserId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -828,7 +830,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             canBanUsers = fullStaff;
             canManageSeats = fullStaff;
             canInviteMic = fullStaff;
-            canManageRoom = isHost || isOwner;
+            // Host / cohost / owner always manage room settings (not only owner flags).
+            canManageRoom = fullStaff || isOwner || isHost;
             if (room.moderatorPermissions != null) {
                 for (RoomDtos.ModeratorPermissionDto permission : room.moderatorPermissions) {
                     if (permission != null && myUserId != null
@@ -844,6 +847,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         canManageRoom = canManageRoom || permission.canManageRoom;
                     }
                 }
+            }
+            // Appointed mods still listed as staff should open room tools reliably.
+            if (isRoomStaff()) {
+                canManageRoom = true;
+                canManageSeats = true;
+                canChangeFrames = true;
+                canBanUsers = true;
+                canManageMusic = true;
             }
             applyMusicState(room.musicUrl, room.musicTitle, room.musicArtist,
                     room.musicStatus, room.musicPositionMs, room.musicStartedAt);
@@ -1328,7 +1339,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.roomChatComposer.setVisibility(View.GONE);
             binding.roomChatComposer.setPadding(0, 0, 0, 0);
         }
-        if (binding.tvChatInputTips != null) binding.tvChatInputTips.setVisibility(View.VISIBLE);
+        if (binding.tvChatInputTips != null) {
+            binding.tvChatInputTips.setVisibility(View.VISIBLE);
+        }
     }
 
     private void focusRoomChatComposer(String text, int selection) {
@@ -2034,15 +2047,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
                 return room == null || room.chatZoneEnabled;
             }
-            @Override public boolean bannerOn() {
-                RoomDtos.RoomDto room = viewModel.getRoom().getValue();
-                return room == null || room.bannerEnabled;
-            }
             @Override public boolean micInteractOn() {
                 RoomDtos.RoomDto room = viewModel.getRoom().getValue();
                 return room == null || room.micInteractEnabled;
             }
             @Override public boolean roomSpeakerMuted() { return roomSpeakerMuted; }
+            @Override public boolean canControlMusic() {
+                return canManageMusic || isHost || isOwner || isRoomStaff();
+            }
             @Override public String roomId() { return roomId; }
             @Override public String roomTitle() {
                 return binding != null && binding.tvRoomTitle.getText() != null
@@ -2079,21 +2091,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 break;
             case "mic_mode":
-                if (canManageSeats) showSeatLockManager();
+                if (canManageSeats || canManageRoom || isHost || isOwner) showSeatLockManager();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "theme":
-                if (canChangeFrames) showRoomBackgroundPicker();
+                if (canChangeFrames || canManageRoom || isHost || isOwner) showRoomBackgroundPicker();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "chat_zone": {
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
                 RoomDtos.RoomDto r = viewModel.getRoom().getValue();
                 boolean next = !(r == null || r.chatZoneEnabled);
                 applyChatZone(next);
+                if (r != null) r.chatZoneEnabled = next;
                 patchDisplaySetting("chatZoneEnabled", next);
                 Toast.makeText(this, withOnOff(R.string.room_more_chat_zone, next), Toast.LENGTH_SHORT).show();
                 break;
@@ -2102,7 +2115,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 confirmClearRoomChat();
                 break;
             case "charm": {
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
@@ -2114,7 +2127,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 break;
             }
             case "gift_sound":
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
@@ -2122,32 +2135,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 boolean enabled = room == null || room.giftSoundsEnabled;
                 boolean nextGift = !enabled;
                 applyRoomGiftSounds(nextGift);
+                if (room != null) room.giftSoundsEnabled = nextGift;
                 viewModel.setGiftSounds(roomId, nextGift);
                 Toast.makeText(this,
                         nextGift ? R.string.room_gift_sounds_on : R.string.room_gift_sounds_off,
                         Toast.LENGTH_SHORT).show();
                 break;
-            case "banner": {
-                if (!canManageRoom) {
-                    Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            case "music": {
+                if (!(canManageMusic || isHost || isOwner || isRoomStaff())) {
+                    Toast.makeText(this, "التحكم بالموسيقى للمضيف والمشرف فقط", Toast.LENGTH_SHORT).show();
                     break;
                 }
-                RoomDtos.RoomDto r = viewModel.getRoom().getValue();
-                boolean next = !(r == null || r.bannerEnabled);
-                applyRoomBanner(next);
-                patchDisplaySetting("bannerEnabled", next);
-                Toast.makeText(this, withOnOff(R.string.room_more_banner, next), Toast.LENGTH_SHORT).show();
+                // Open floating player + library (YouTube / device).
+                showMusicPanelOrPicker();
+                showSavedMusicLibrary();
                 break;
             }
             case "blacklist":
                 showRoomBlacklistSheet();
                 break;
             case "admin":
-                if (isOwner) showModeratorTools();
+                if (isOwner || isHost) showModeratorTools();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "mic_interact": {
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
@@ -2159,7 +2171,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 break;
             }
             case "photo":
-                if (canChangeFrames) showRoomBackgroundPicker();
+                if (canChangeFrames || canManageRoom || isHost || isOwner) showRoomBackgroundPicker();
                 else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "mute":
@@ -2178,7 +2190,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 break;
             }
             case "entry_effect": {
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
@@ -2192,7 +2204,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 break;
             }
             case "low_gift": {
-                if (!canManageRoom) {
+                if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
                     Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                     break;
                 }
@@ -2223,49 +2235,66 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomDisplaySettings(@Nullable RoomDtos.RoomDto room) {
         if (room == null) return;
         applyChatZone(room.chatZoneEnabled);
-        // Default open when unset; only hide when host explicitly disabled.
-        applyRoomBanner(room.bannerEnabled);
+        // Room promo banner permanently removed.
+        applyRoomBanner(false);
     }
 
     private void applyChatZone(boolean enabled) {
         if (binding == null) return;
-        // منطقة الدردشة: يخفي لوحة الشات العامة + حبة الكتابة (لا مساحة فاضية).
+        // "منطقة الدردشة" = أيقونة الرسائل الخاصة (btnPrivateMsg) فقط —
+        // لا تخفي بث الشات العام ولا صندوق "اكتب…".
+        roomChatZoneVisible = enabled;
         int vis = enabled ? View.VISIBLE : View.GONE;
-        if (binding.chatPanel != null) binding.chatPanel.setVisibility(vis);
-        if (binding.scrollChat != null) binding.scrollChat.setVisibility(vis);
-        if (binding.chatLog != null) binding.chatLog.setVisibility(vis);
-        if (binding.tvChatInputTips != null) {
-            binding.tvChatInputTips.setVisibility(vis);
+        if (binding.btnPrivateMsg != null) {
+            binding.btnPrivateMsg.setVisibility(vis);
+            binding.btnPrivateMsg.setEnabled(enabled);
+            binding.btnPrivateMsg.setClickable(enabled);
         }
-        if (!enabled) {
-            try {
-                closeRoomChatComposer(false);
-            } catch (Exception ignored) {
-            }
+        // Ensure public room chat UI stays available.
+        if (binding.chatPanel != null && binding.chatPanel.getVisibility() != View.VISIBLE) {
+            binding.chatPanel.setVisibility(View.VISIBLE);
         }
+        if (binding.scrollChat != null) binding.scrollChat.setVisibility(View.VISIBLE);
+        if (binding.chatLog != null) binding.chatLog.setVisibility(View.VISIBLE);
+        if (binding.rowOfficialNews != null) binding.rowOfficialNews.setVisibility(View.VISIBLE);
+        if (binding.tvChatInputTips != null && !roomComposerOpen) {
+            binding.tvChatInputTips.setVisibility(View.VISIBLE);
+            binding.tvChatInputTips.setEnabled(true);
+            binding.tvChatInputTips.setClickable(true);
+        }
+    }
+
+    /** Open DM conversation without leaving the voice room (FGS keep-alive). */
+    public void openPrivateConversation(
+            @Nullable String conversationId,
+            @Nullable String peerId,
+            @Nullable String title,
+            @Nullable String avatarUrl
+    ) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        Intent i = new Intent(this, com.Dramizo.Series.presentation.chat.ChatConversationActivity.class);
+        i.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_CONVERSATION_ID,
+                conversationId);
+        if (peerId != null) {
+            i.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_PEER_ID, peerId);
+        }
+        i.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_TITLE,
+                title != null && !title.isEmpty() ? title : "محادثة");
+        if (avatarUrl != null && !avatarUrl.isEmpty()) {
+            i.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_AVATAR, avatarUrl);
+        }
+        startActivityKeepingRoom(i);
     }
 
     private void applyRoomBanner(boolean enabled) {
         if (binding == null || binding.roomBanner == null) return;
-        if (!enabled) {
-            binding.roomBanner.setVisibility(View.GONE);
-            return;
-        }
-        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
-        String title = room != null && room.title != null && !room.title.isEmpty()
-                ? room.title
-                : (binding.tvRoomTitle != null && binding.tvRoomTitle.getText() != null
-                ? binding.tvRoomTitle.getText().toString()
-                : getString(R.string.voice_room));
-        if (binding.tvRoomBannerTitle != null) {
-            binding.tvRoomBannerTitle.setText(title);
-        }
-        String cover = currentRoomCoverUrl;
-        if ((cover == null || cover.isEmpty()) && room != null) cover = room.coverUrl;
-        if (binding.imgRoomBannerCover != null) {
-            AvatarImageLoader.load(binding.imgRoomBannerCover, cover);
-        }
-        binding.roomBanner.setVisibility(View.VISIBLE);
+        // Feature removed — never show the strip.
+        binding.roomBanner.setVisibility(View.GONE);
+    }
+
+    /** Celebrations always allowed in chat (banner feature retired). */
+    private boolean roomBannerEnabled() {
+        return true;
     }
 
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
@@ -2304,11 +2333,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return room == null || room.lowGiftEffectsEnabled;
     }
 
-    private boolean roomBannerEnabled() {
-        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
-        return room == null || room.bannerEnabled;
-    }
-
     private boolean areCelebrationPopupsMuted() {
         try {
             return ContainerProvider.from(this).getSessionManager().isMuteCelebrationPopups();
@@ -2319,7 +2343,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void showRoomBlacklistSheet() {
         if (roomId == null || roomId.isEmpty()) return;
-        if (!(canBanUsers || canModerateRoom() || isHost || isOwner)) {
+        if (!(canBanUsers || canModerateRoom() || isHost || isOwner || isRoomStaff() || canManageRoom)) {
             Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
             return;
         }
@@ -2599,6 +2623,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             enableFloatingDrag(binding.musicFloatWrap);
         }
         if (binding.llMusicLibraryChip != null) {
+            // Top "موسيقى" chip removed — staff use tools menu + circular float disc only.
             binding.llMusicLibraryChip.setVisibility(View.GONE);
             binding.llMusicLibraryChip.setOnClickListener(null);
         }
@@ -2727,29 +2752,99 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private final Runnable musicProgressRunnable = new Runnable() {
         @Override public void run() {
-            if (binding != null && !binding.seekMusic.isPressed()) {
-                if (isLocalMusicUrl(currentMusicUrl)) {
-                    long duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
-                    long position = ZegoEngineManager.getInstance().getLocalMusicPositionMs();
-                    if (duration > 0) {
-                        int progress = (int) Math.min(1000, position * 1000L / duration);
-                        binding.seekMusic.setProgress(progress);
-                    }
-                } else if (isYoutubeMusicUrl(currentMusicUrl)
-                        && ZegoEngineManager.getInstance().getLocalMusicDurationMs() > 0) {
-                    long duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
-                    long position = ZegoEngineManager.getInstance().getLocalMusicPositionMs();
-                    int progress = (int) Math.min(1000, position * 1000L / duration);
-                    binding.seekMusic.setProgress(progress);
-                } else if (roomMusicPlayer != null && roomMusicPlayer.getDuration() > 0) {
-                    int progress = (int) Math.min(1000,
-                            roomMusicPlayer.getCurrentPosition() * 1000L / roomMusicPlayer.getDuration());
-                    binding.seekMusic.setProgress(progress);
-                }
+            if (binding != null) {
+                updateMusicProgressUi();
             }
-            handler.postDelayed(this, 1000);
+            handler.postDelayed(this, 500);
         }
     };
+
+    private static String formatMusicClock(long ms) {
+        if (ms < 0) ms = 0;
+        long totalSec = ms / 1000L;
+        long min = totalSec / 60L;
+        long sec = totalSec % 60L;
+        if (min >= 100) {
+            return String.format(java.util.Locale.US, "%d:%02d", min, sec);
+        }
+        return String.format(java.util.Locale.US, "%d:%02d", min, sec);
+    }
+
+    /** Resolve current/total from Zego local mix, ExoPlayer, or startedAt wall clock. */
+    private long[] resolveMusicPositionAndDurationMs() {
+        long duration = 0L;
+        long position = 0L;
+        try {
+            if (isLocalMusicUrl(currentMusicUrl)
+                    || (isYoutubeMusicUrl(currentMusicUrl)
+                    && ZegoEngineManager.getInstance().getLocalMusicDurationMs() > 0)) {
+                duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
+                position = ZegoEngineManager.getInstance().getLocalMusicPositionMs();
+            }
+        } catch (Exception ignored) {
+        }
+        if (duration <= 0 && roomMusicPlayer != null) {
+            try {
+                long d = roomMusicPlayer.getDuration();
+                if (d > 0 && d != androidx.media3.common.C.TIME_UNSET) {
+                    duration = d;
+                    position = Math.max(0L, roomMusicPlayer.getCurrentPosition());
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        // Wall-clock fallback while duration still unknown (e.g. embed warmup).
+        if (position <= 0 && currentMusicStartedAt != null
+                && "playing".equalsIgnoreCase(currentMusicStatus)) {
+            long started = parseMusicStartedAtMs(currentMusicStartedAt);
+            if (started > 0) {
+                position = Math.max(0L, System.currentTimeMillis() - started);
+            }
+        }
+        if (duration <= 0 && position > 0) {
+            // Keep seek near end rather than frozen at 0 while duration arrives.
+            duration = Math.max(position + 1000L, position);
+        }
+        return new long[]{position, duration};
+    }
+
+    private static long parseMusicStartedAtMs(@Nullable String startedAt) {
+        if (startedAt == null || startedAt.trim().isEmpty()) return 0L;
+        String s = startedAt.trim();
+        try {
+            return java.time.Instant.parse(s).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        try {
+            // 2026-08-04T12:00:00.000Z already covered; try offset formats
+            return java.time.OffsetDateTime.parse(s).toInstant().toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        try {
+            return Long.parseLong(s);
+        } catch (Exception ignored) {
+        }
+        return 0L;
+    }
+
+    private void updateMusicProgressUi() {
+        if (binding == null) return;
+        long[] pair = resolveMusicPositionAndDurationMs();
+        long position = pair[0];
+        long duration = pair[1];
+        if (binding.seekMusic != null && !binding.seekMusic.isPressed() && duration > 0) {
+            int progress = (int) Math.min(1000L, Math.max(0L, position * 1000L / duration));
+            binding.seekMusic.setProgress(progress);
+        }
+        if (binding.tvMusicElapsed != null) {
+            binding.tvMusicElapsed.setText(formatMusicClock(position));
+        }
+        if (binding.tvMusicDuration != null) {
+            binding.tvMusicDuration.setText(duration > 0
+                    ? formatMusicClock(duration)
+                    : "--:--");
+        }
+    }
 
     @SuppressLint("NewApi")
     private void applyMusicState(
@@ -2848,6 +2943,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnMusicSkip.setEnabled(canManageMusic);
         binding.btnMusicStop.setEnabled(canManageMusic);
         binding.seekMusic.setEnabled(canManageMusic);
+        updateMusicProgressUi();
         binding.btnMusicPlayPause.setImageResource(playing
                 ? android.R.drawable.ic_media_pause
                 : android.R.drawable.ic_media_play);
@@ -5749,6 +5845,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.btnPlus != null) {
             binding.btnPlus.setVisibility(View.VISIBLE);
         }
+        if (binding.llMusicLibraryChip != null) {
+            binding.llMusicLibraryChip.setVisibility(View.GONE);
+        }
         if (showRequestsBell && roomId != null) {
             viewModel.loadSeatRequests(roomId);
         } else {
@@ -6479,10 +6578,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean tablet = widthDp >= 600;
 
         // Keep red promo banner open when enabled — do not force GONE on every layout pass.
-        applyRoomBanner(roomBannerEnabled());
+        applyRoomBanner(false);
         binding.tvRoomRules.setVisibility(shortScreen ? View.GONE : View.VISIBLE);
         // Give chat more vertical room so bubbles stay readable while typing.
         binding.chatPanel.setMinimumHeight(dp(shortScreen ? 180 : tablet ? 260 : 220));
+        // Keep private-msg icon sync with host toggle (does not hide public chat).
+        applyChatZone(roomChatZoneVisible);
 
         androidx.constraintlayout.widget.ConstraintLayout.LayoutParams chatParams =
                 (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams)

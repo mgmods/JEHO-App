@@ -77,3 +77,10 @@ scripts/_mikoo_catalogs/
 scripts/__pycache__/
 # Local SSH deploy password â€” never commit
 scripts/deploy.local.env
+
+# Production DB dumps / local mirrors — never commit
+database/auralive_*.sql
+database/*_prod_*.sql
+**/__pycache__/
+**/*.cursor-upload-*
+scripts/_target_table_zoom.png

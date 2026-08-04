@@ -2,9 +2,13 @@
 <!-- Mikoo-style edit profile: gray page, white chrome, clear avatar hero + form rows. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/white"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:fitsSystemWindows="false"
     android:orientation="vertical">
 
     <ImageView
@@ -19,7 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:background="@color/white"
-
+        android:elevation="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="4dp">
@@ -64,17 +68,20 @@
         android:layout_weight="1">
 
         <ScrollView
+            android:id="@+id/scrollEditProfile"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
             android:fillViewport="true"
-            android:overScrollMode="never"
-            android:paddingBottom="28dp">
+            android:overScrollMode="ifContentScrolls"
+            android:paddingBottom="40dp"
+            android:scrollbars="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingBottom="16dp">
 
                 <!-- Avatar hero -->
                 <LinearLayout

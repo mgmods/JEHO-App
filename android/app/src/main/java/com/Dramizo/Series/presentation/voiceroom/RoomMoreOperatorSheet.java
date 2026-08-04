@@ -50,9 +50,9 @@ final class RoomMoreOperatorSheet {
         boolean lowGiftEffectsOn();
         boolean charmOn();
         boolean chatZoneOn();
-        boolean bannerOn();
         boolean micInteractOn();
         boolean roomSpeakerMuted();
+        boolean canControlMusic();
         @Nullable String roomId();
         @Nullable String roomTitle();
         void onMoreAction(@NonNull String action);
@@ -182,12 +182,6 @@ final class RoomMoreOperatorSheet {
                         : R.drawable.icon_room_opera_gift_sound_close,
                 withState(host, R.string.room_more_gift_sound, host.giftSoundsOn()),
                 "gift_sound"));
-        list.add(item(
-                host.bannerOn()
-                        ? R.drawable.icon_room_room_ban_open
-                        : R.drawable.icon_room_room_ban_close,
-                withState(host, R.string.room_more_banner, host.bannerOn()),
-                "banner"));
         list.add(item(R.drawable.icon_room_opera_blacklist, R.string.room_more_blacklist, "blacklist"));
         if (host.isOwner()) {
             list.add(item(R.drawable.icon_room_opera_admin, R.string.room_more_admin, "admin"));
@@ -209,6 +203,10 @@ final class RoomMoreOperatorSheet {
                 muted ? R.drawable.mute_close : R.drawable.mute_open,
                 muted ? R.string.room_more_mute_off : R.string.room_more_mute_on,
                 "mute"));
+        // Single music entry: tools tab — use 162dp mikoo more-btn asset (has circle bg).
+        if (host.canControlMusic()) {
+            list.add(item(R.drawable.icon_room_send_music, R.string.music_play, "music"));
+        }
         list.add(item(R.drawable.icon_room_opera_invatation_friend,
                 R.string.room_more_invite_friends, "invite"));
         list.add(item(R.mipmap.icon_room_tool_link, R.string.room_more_copy_link, "copy_link"));

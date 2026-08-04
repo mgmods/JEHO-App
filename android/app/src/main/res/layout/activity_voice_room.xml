@@ -457,58 +457,33 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!-- roomBanner removed permanently — keep gone stubs so ViewBinding compiles. -->
     <LinearLayout
         android:id="@+id/roomBanner"
         android:layout_width="0dp"
-        android:layout_height="48dp"
-        android:layout_marginStart="48dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginEnd="48dp"
-        android:background="@drawable/bg_room_header_rose"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="4dp"
-        android:visibility="visible"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_height="0dp"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/headerRoom">
 
         <ImageView
             android:id="@+id/imgRoomBannerCover"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
-            android:background="@drawable/bg_voice_seat_circle"
-            android:contentDescription="@null"
-            android:padding="1dp"
-            android:scaleType="centerCrop" />
-
-        <LinearLayout
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_height="0dp"
+            android:contentDescription="@null"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvRoomBannerTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/tvRoomBannerTitle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/tvRoomBannerSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="غرفة صوتية مباشرة"
-                android:textColor="#BFFFFFFF"
-                android:textSize="10sp" />
-        </LinearLayout>
+        <TextView
+            android:id="@+id/tvRoomBannerSubtitle"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <LinearLayout
@@ -923,8 +898,8 @@
     <!-- Floating music player — Mikoo mc_bg style -->
     <RelativeLayout
         android:id="@+id/musicCard"
-        android:layout_width="287dp"
-        android:layout_height="80dp"
+        android:layout_width="310dp"
+        android:layout_height="92dp"
         android:layout_marginTop="100dp"
         android:background="@drawable/mc_bg"
         android:clickable="true"
@@ -997,39 +972,67 @@
         <LinearLayout
             android:id="@+id/musicMetaBlock"
             android:layout_width="match_parent"
-            android:layout_height="26dp"
+            android:layout_height="36dp"
             android:layout_alignParentBottom="true"
-            android:layout_marginStart="12dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="9dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="6dp"
+            android:layout_marginBottom="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:contentDescription="@null"
                 android:scaleType="centerInside"
                 android:src="@drawable/icon_room_music_voice" />
 
+            <TextView
+                android:id="@+id/tvMusicElapsed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:minWidth="32dp"
+                android:text="0:00"
+                android:textColor="#E6FFFFFF"
+                android:textSize="11sp" />
+
             <SeekBar
                 android:id="@+id/seekMusic"
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="8dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="2dp"
+                android:layout_marginEnd="2dp"
                 android:layout_weight="1"
                 android:max="1000"
-                android:maxHeight="6dp"
-                android:minHeight="6dp"
+                android:maxHeight="12dp"
+                android:minHeight="12dp"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
                 android:progressDrawable="@drawable/music_voice_seekbar"
+                android:splitTrack="false"
                 android:thumb="@drawable/icon_room_voice_point"
                 android:thumbOffset="0dp" />
 
+            <TextView
+                android:id="@+id/tvMusicDuration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="4dp"
+                android:fontFamily="monospace"
+                android:gravity="center"
+                android:minWidth="32dp"
+                android:text="0:00"
+                android:textColor="#E6FFFFFF"
+                android:textSize="11sp" />
+
             <ImageButton
                 android:id="@+id/btnMusicPlayPause"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginEnd="14dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="10dp"
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/music_play"
                 android:padding="0dp"
@@ -1038,9 +1041,9 @@
 
             <ImageButton
                 android:id="@+id/btnMusicSkip"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginEnd="14dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="10dp"
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/music_skip"
                 android:padding="0dp"
@@ -1049,9 +1052,9 @@
 
             <ImageButton
                 android:id="@+id/btnMusicStop"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_marginEnd="8dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="6dp"
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/music_library_title"
                 android:padding="0dp"

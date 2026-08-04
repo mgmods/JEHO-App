@@ -13,11 +13,6 @@ import { User } from './user.entity';
 
 export enum RoomGameType {
   TIC_TAC_TOE = 'tic_tac_toe',
-  XO = 'xo',
-  LUDO = 'ludo',
-  DOMINO = 'domino',
-  UNO = 'uno',
-  HTML5 = 'html5',
 }
 
 export enum RoomGameStatus {
@@ -72,13 +67,6 @@ export class RoomGame {
 
   @Column({ type: 'varchar', length: 8, nullable: true })
   winner: RoomGameWinner;
-
-  /** Generic state blob for HTML5 multiplayer games (ludo/uno/domino/…). */
-  @Column({ type: 'simple-json', nullable: true })
-  stateJson: Record<string, unknown> | null;
-
-  @Column({ type: 'varchar', length: 64, nullable: true })
-  htmlGameKey: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;

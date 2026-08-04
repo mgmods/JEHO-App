@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.common;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +32,16 @@ public abstract class ThemedActivity extends AppCompatActivity {
         } catch (Exception ignored) {
         }
         super.attachBaseContext(LocaleHelper.wrap(newBase, lang));
+    }
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // Never follow device auto-rotate — keep the whole app portrait.
+        try {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        } catch (Exception ignored) {
+        }
+        super.onCreate(savedInstanceState);
     }
 
     @Override

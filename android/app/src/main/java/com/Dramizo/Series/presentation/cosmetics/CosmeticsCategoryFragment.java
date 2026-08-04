@@ -4,7 +4,6 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -50,22 +49,32 @@ public class CosmeticsCategoryFragment extends Fragment {
         Bundle args = getArguments();
         type = args != null ? args.getString(ARG_TYPE) : "vip_badge";
         String hint = args != null ? args.getString(ARG_HINT) : "";
-        binding.tvCosmeticsHint.setText(hint != null ? hint : "");
+        if (hint != null && !hint.isEmpty()) {
+            binding.tvCosmeticsHint.setVisibility(View.VISIBLE);
+            binding.tvCosmeticsHint.setText(hint);
+        } else {
+            binding.tvCosmeticsHint.setVisibility(View.GONE);
+        }
 
         vm = new ViewModelProvider(requireActivity(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(CosmeticsViewModel.class);
 
         adapter = new CosmeticsAdapter(new CosmeticsAdapter.Listener() {
+            @Override public void onSelect(com.Dramizo.Series.data.remote.dto.CosmeticDtos.CosmeticDto item) {
+                vm.select(item);
+            }
             @Override public void onPurchase(String cosmeticId) { vm.purchase(cosmeticId); }
             @Override public void onEquip(String cosmeticId) { vm.equip(cosmeticId); }
             @Override public void onUnequip(String cosmeticId) { vm.unequip(cosmeticId); }
             @Override public boolean isOwned(String cosmeticId) { return vm.isOwned(cosmeticId); }
             @Override public boolean isEquipped(String cosmeticId) { return vm.isEquipped(cosmeticId); }
+            @Override public Integer daysLeft(String cosmeticId) { return vm.daysLeft(cosmeticId); }
+            @Override public String selectedId() { return vm.getSelectedId().getValue(); }
         });
         binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 2));
         binding.recycler.setHasFixedSize(true);
-        binding.recycler.setItemViewCacheSize(6);
+        binding.recycler.setItemViewCacheSize(8);
         binding.recycler.setAdapter(adapter);
 
         vm.getCatalogPage().observe(getViewLifecycleOwner(), page -> {
@@ -82,17 +91,10 @@ public class CosmeticsCategoryFragment extends Fragment {
                         : "لا توجد عناصر في هذا القسم حالياً");
             }
         });
-        vm.getMessage().observe(getViewLifecycleOwner(), m -> {
-            if (m != null && isResumed()) {
-                Toast.makeText(requireContext(), m, Toast.LENGTH_SHORT).show();
-            }
+        vm.getSelectedId().observe(getViewLifecycleOwner(), id -> {
+            if (adapter != null) adapter.notifyDataSetChanged();
         });
-        vm.getError().observe(getViewLifecycleOwner(), e -> {
-            hideLoading();
-            if (e != null && isResumed()) {
-                com.Dramizo.Series.util.BalanceRedirect.handle(requireActivity(), e);
-            }
-        });
+        vm.getError().observe(getViewLifecycleOwner(), e -> hideLoading());
     }
 
     @Override
@@ -104,7 +106,7 @@ public class CosmeticsCategoryFragment extends Fragment {
     void reload() {
         if (vm == null) return;
         showLoading();
-        binding.tvEmpty.setVisibility(View.GONE);
+        if (binding != null) binding.tvEmpty.setVisibility(View.GONE);
         vm.loadForType(type);
     }
 

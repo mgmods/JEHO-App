@@ -42,6 +42,7 @@ import {
   STANDARD_RECHARGE_PACKAGES,
   HOST_DIAMOND_TRADE,
 } from '../../common/pricing-catalog';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { CreateRechargeDto, ExchangeDto, WithdrawDto } from './dto/wallet.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -110,46 +111,22 @@ export class WalletService implements OnModuleInit {
     }
   }
 
-  /** Force-sync store packages to the safe canonical catalog (no fat legacy packs). */
+  /** DB packages win. Code defaults only for empty installs when BOOT_SEED_CATALOGS=1. */
   async ensureCanonicalPackages() {
-    const verKey = 'pricing.version';
-    const verRow = await this.settingsRepo.findOne({ where: { key: verKey } });
-    const versionOk = verRow?.value === PRICING_VERSION;
-    let needsWrite = !versionOk;
     const pkgRow = await this.settingsRepo.findOne({
       where: { key: 'recharge_packages' },
     });
-    if (!needsWrite && pkgRow?.value) {
-      try {
-        const parsed = JSON.parse(pkgRow.value);
-        if (!Array.isArray(parsed) || parsed.length !== STANDARD_RECHARGE_PACKAGES.length) {
-          needsWrite = true;
-        } else {
-          const bySku = new Map<string, (typeof STANDARD_RECHARGE_PACKAGES)[number]>(
-            STANDARD_RECHARGE_PACKAGES.map((p) => [p.sku, p]),
-          );
-          for (const item of parsed) {
-            const canonical = bySku.get(String(item?.sku || ''));
-            if (!canonical) {
-              needsWrite = true;
-              break;
-            }
-            const bonus = Math.max(0, Number(item?.bonusCoins) || 0);
-            const coins = Math.max(0, Number(item?.coins) || 0);
-            if (bonus > canonical.bonusCoins || coins !== canonical.coins) {
-              needsWrite = true;
-              break;
-            }
-          }
-        }
-      } catch {
-        needsWrite = true;
-      }
-    } else if (!pkgRow?.value) {
-      needsWrite = true;
+    if (pkgRow?.value) {
+      // Live dashboard / production packages — never force-reset from code.
+      return;
+    }
+    if (!bootCatalogSeedEnabled()) {
+      this.logger.log('Recharge packages: DB authoritative (empty, seed disabled)');
+      return;
     }
 
-    if (!needsWrite) return;
+    const verKey = 'pricing.version';
+    const verRow = await this.settingsRepo.findOne({ where: { key: verKey } });
 
     await this.savePackages([...STANDARD_RECHARGE_PACKAGES] as any);
 
@@ -189,7 +166,7 @@ export class WalletService implements OnModuleInit {
       verRow.value = PRICING_VERSION;
       await this.settingsRepo.save(verRow);
     }
-    this.logger.log(`Synced recharge packages to ${PRICING_VERSION}`);
+    this.logger.log(`Seeded empty recharge packages to ${PRICING_VERSION}`);
   }
 
   async getWallet(userId: string) {

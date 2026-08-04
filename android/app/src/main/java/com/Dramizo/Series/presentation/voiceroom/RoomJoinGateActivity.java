@@ -39,6 +39,10 @@ public class RoomJoinGateActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        try {
+            setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        } catch (Exception ignored) {
+        }
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_room_join_gate);
         String roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);

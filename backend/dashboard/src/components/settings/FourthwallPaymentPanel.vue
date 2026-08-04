@@ -14,11 +14,24 @@
     <form v-else class="row g-3" @submit.prevent="save">
       <div class="col-12">
         <div class="settings-card">
-          <h3 class="settings-card-title">Fourthwall — الدفع بالبطاقة</h3>
-          <p class="text-secondary small mb-2">
-            من هنا تدخل بيانات المطور (API User / Password / Storefront Token / Webhook Secret).
-            التطبيق يأخذ سعر الباقة وعدد الكوينز تلقائياً وينشئ منتج الدفع عند الحاجة.
-          </p>
+          <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+            <div>
+              <h3 class="settings-card-title">Fourthwall — الدفع بالبطاقة</h3>
+              <p class="text-secondary small mb-2">
+                من هنا تدخل/تشوف بيانات المطور (API User / Password / Storefront Token / Webhook Secret).
+                التطبيق يأخذ سعر الباقة وعدد الكوينز تلقائياً وينشئ منتج الدفع عند الحاجة.
+              </p>
+            </div>
+            <button
+              class="btn btn-sm btn-ghost"
+              type="button"
+              :disabled="revealing"
+              @click="toggleReveal"
+            >
+              <span v-if="revealing" class="spinner-border spinner-border-sm me-1"></span>
+              {{ showingKeys ? 'إخفاء الأسرار' : 'إظهار الأسرار' }}
+            </button>
+          </div>
           <div class="small mb-0">
             <div>
               <span class="text-secondary">Webhook URL:</span>
@@ -28,7 +41,13 @@
               الحالة:
               <span class="fw-medium">{{ masked.configured ? 'جاهز' : 'غير مكتمل' }}</span>
               · Shop:
-              <span class="fw-medium">{{ masked.shopDomain || '—' }}</span>
+              <span class="fw-medium">{{ form.shopDomain || masked.shopDomain || '—' }}</span>
+              · Password:
+              <span class="fw-medium">{{ masked.apiPasswordConfigured ? 'محفوظ' : 'فارغ' }}</span>
+              · Token:
+              <span class="fw-medium">{{ masked.storefrontTokenConfigured ? 'محفوظ' : 'فارغ' }}</span>
+              · Webhook secret:
+              <span class="fw-medium">{{ masked.webhookSecretConfigured ? 'محفوظ' : 'فارغ' }}</span>
             </div>
           </div>
         </div>
@@ -51,11 +70,19 @@
             <label class="form-label">API Password</label>
             <input
               v-model="form.apiPassword"
-              type="password"
+              :type="showingKeys ? 'text' : 'password'"
               class="form-control font-monospace"
               dir="ltr"
               autocomplete="off"
-              :placeholder="masked.apiPasswordConfigured ? 'اتركه فارغ للإبقاء' : ''"
+              :placeholder="
+                showingKeys
+                  ? masked.apiPasswordConfigured
+                    ? ''
+                    : 'غير محفوظ'
+                  : masked.apiPasswordConfigured
+                    ? '••••••••  (اضغط إظهار الأسرار)'
+                    : ''
+              "
             />
             <div class="form-check mt-2">
               <input id="fwClearPass" v-model="form.clearApiPassword" class="form-check-input" type="checkbox" />
@@ -66,11 +93,19 @@
             <label class="form-label">Storefront Token (ptkn_…)</label>
             <input
               v-model="form.storefrontToken"
-              type="password"
+              :type="showingKeys ? 'text' : 'password'"
               class="form-control font-monospace"
               dir="ltr"
               autocomplete="off"
-              :placeholder="masked.storefrontTokenConfigured ? 'اتركه فارغ للإبقاء' : ''"
+              :placeholder="
+                showingKeys
+                  ? masked.storefrontTokenConfigured
+                    ? ''
+                    : 'غير محفوظ'
+                  : masked.storefrontTokenConfigured
+                    ? '••••••••  (اضغط إظهار الأسرار)'
+                    : ''
+              "
             />
             <div class="form-check mt-2">
               <input id="fwClearTok" v-model="form.clearStorefrontToken" class="form-check-input" type="checkbox" />
@@ -96,11 +131,19 @@
             <label class="form-label">Webhook Secret</label>
             <input
               v-model="form.webhookSecret"
-              type="password"
+              :type="showingKeys ? 'text' : 'password'"
               class="form-control font-monospace"
               dir="ltr"
               autocomplete="off"
-              :placeholder="masked.webhookSecretConfigured ? 'اتركه فارغ للإبقاء' : 'من صفحة Webhooks'"
+              :placeholder="
+                showingKeys
+                  ? masked.webhookSecretConfigured
+                    ? ''
+                    : 'غير محفوظ — أنشئ Webhook في Fourthwall وانسخ الـ secret'
+                  : masked.webhookSecretConfigured
+                    ? '••••••••  (اضغط إظهار الأسرار)'
+                    : 'من صفحة Webhooks'
+              "
             />
             <div class="form-check mt-2">
               <input id="fwClearWh" v-model="form.clearWebhookSecret" class="form-check-input" type="checkbox" />
@@ -108,6 +151,7 @@
             </div>
             <div class="form-text">
               انسخه من Fourthwall → Settings → For developers → Webhooks بعد Create webhook
+              (مو HMAC الـ embed، بل Webhook Secret الخاص بالأحداث ORDER_PLACED / UPDATED).
             </div>
           </div>
         </div>
@@ -142,6 +186,8 @@ const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
 const syncing = ref(false)
+const revealing = ref(false)
+const showingKeys = ref(false)
 const error = ref('')
 const success = ref('')
 const testMessage = ref('')
@@ -170,20 +216,68 @@ const form = reactive({
   clearWebhookSecret: false,
 })
 
+function unwrap(res) {
+  if (res?.error) throw res.error
+  return res?.data ?? {}
+}
+
+function applyRevealed(data) {
+  const r = data || {}
+  if (r.apiUser) form.apiUser = r.apiUser
+  form.apiPassword = r.apiPassword || ''
+  form.storefrontToken = r.storefrontToken || ''
+  form.webhookSecret = r.webhookSecret || ''
+  if (r.shopDomain) form.shopDomain = r.shopDomain
+  showingKeys.value = true
+}
+
+async function fillSecrets() {
+  revealing.value = true
+  try {
+    const data = unwrap(await paymentSettingsApi.revealFourthwall())
+    applyRevealed(data)
+  } finally {
+    revealing.value = false
+  }
+}
+
+async function toggleReveal() {
+  if (showingKeys.value) {
+    showingKeys.value = false
+    form.apiPassword = ''
+    form.storefrontToken = ''
+    form.webhookSecret = ''
+    return
+  }
+  error.value = ''
+  try {
+    await fillSecrets()
+  } catch (e) {
+    error.value = e?.message || 'تعذر إظهار الأسرار'
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
+  showingKeys.value = false
   try {
-    const data = await paymentSettingsApi.getFourthwall()
+    const data = unwrap(await paymentSettingsApi.getFourthwall())
     Object.assign(masked, data || {})
     form.shopDomain = data?.shopDomain || ''
-    form.apiUser = ''
+    form.apiUser = data?.apiUser || ''
     form.apiPassword = ''
     form.storefrontToken = ''
     form.webhookSecret = ''
     form.clearApiPassword = false
     form.clearStorefrontToken = false
     form.clearWebhookSecret = false
+    // Admin expects to see saved secrets when the tab opens.
+    try {
+      await fillSecrets()
+    } catch {
+      // Masked view remains usable if reveal fails.
+    }
   } catch (e) {
     error.value = e?.message || 'تعذر تحميل إعدادات Fourthwall'
   } finally {
@@ -206,13 +300,16 @@ async function save() {
       clearStorefrontToken: form.clearStorefrontToken || undefined,
       clearWebhookSecret: form.clearWebhookSecret || undefined,
     }
-    const data = await paymentSettingsApi.updateFourthwall(payload)
+    const data = unwrap(await paymentSettingsApi.updateFourthwall(payload))
     Object.assign(masked, data || {})
+    form.shopDomain = data?.shopDomain || form.shopDomain
+    form.apiUser = data?.apiUser || form.apiUser || ''
+    form.clearApiPassword = false
+    form.clearStorefrontToken = false
+    form.clearWebhookSecret = false
     success.value = 'تم حفظ إعدادات Fourthwall'
-    toast.success(success.value)
-    form.apiPassword = ''
-    form.storefrontToken = ''
-    form.webhookSecret = ''
+    toast().success(success.value)
+    await fillSecrets()
   } catch (e) {
     error.value = e?.message || 'فشل الحفظ'
   } finally {
@@ -224,11 +321,14 @@ async function runTest() {
   testing.value = true
   testMessage.value = ''
   try {
-    const data = await paymentSettingsApi.testFourthwall()
+    const data = unwrap(await paymentSettingsApi.testFourthwall())
     testOk.value = !!data?.ok
     testMessage.value = data?.ok
-      ? `متصل: ${data.name || ''} · ${data.publicDomain || ''}`
+      ? `متصل: ${data.name || ''} · ${data.publicDomain || data.domain || ''}`
       : 'فشل الاختبار'
+    if (data?.publicDomain || data?.domain) {
+      form.shopDomain = String(data.publicDomain || data.domain).replace(/^https?:\/\//i, '')
+    }
   } catch (e) {
     testOk.value = false
     testMessage.value = e?.message || 'فشل الاختبار'
@@ -242,12 +342,12 @@ async function runSync() {
   error.value = ''
   success.value = ''
   try {
-    const data = await paymentSettingsApi.syncFourthwallPackages()
+    const data = unwrap(await paymentSettingsApi.syncFourthwallPackages())
     const items = data?.items || []
     const ok = items.filter((i) => i.ok).length
     const bad = items.length - ok
     success.value = `مزامنة الباقات: نجح ${ok} · فشل ${bad}`
-    toast.success(success.value)
+    toast().success(success.value)
     await load()
   } catch (e) {
     error.value = e?.message || 'فشلت المزامنة'

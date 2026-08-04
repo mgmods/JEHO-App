@@ -59,26 +59,19 @@ export class InvitesService implements OnModuleInit {
     const row = await this.settingsRepo.findOne({ where: { key: 'invite.rewards' } });
     let inviterCoins = 100;
     let inviteeCoins = 50;
-    let enabled = true;
     try {
       if (row?.value) {
         const parsed = JSON.parse(row.value) as {
           inviterCoins?: number;
           inviteeCoins?: number;
-          enabled?: boolean;
         };
-        if (parsed.enabled === false) enabled = false;
-        inviterCoins = Math.max(0, Math.floor(Number(parsed.inviterCoins) || 0));
-        inviteeCoins = Math.max(0, Math.floor(Number(parsed.inviteeCoins) || 0));
+        inviterCoins = Math.max(0, Math.floor(Number(parsed.inviterCoins) || 100));
+        inviteeCoins = Math.max(0, Math.floor(Number(parsed.inviteeCoins) || 50));
       }
     } catch {
       /* defaults */
     }
-    if (!enabled) {
-      inviterCoins = 0;
-      inviteeCoins = 0;
-    }
-    return { inviterCoins, inviteeCoins, enabled };
+    return { inviterCoins, inviteeCoins };
   }
 
   async me(userId: string) {

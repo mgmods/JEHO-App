@@ -117,11 +117,16 @@ const form = reactive({
   instructions: '',
 })
 
+function unwrap(res) {
+  if (res?.error) throw res.error
+  return res?.data ?? {}
+}
+
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    const data = await paymentSettingsApi.getShamCash()
+    const data = unwrap(await paymentSettingsApi.getShamCash())
     form.enabled = data?.enabled !== false
     form.whatsapp = data?.whatsapp || ''
     form.displayName = data?.displayName || 'شام كاش'
@@ -144,14 +149,14 @@ async function save() {
     if (accountId.length < 8) {
       throw new Error('أدخل رقم حساب شام كاش (المعرّف) — بدون رقم حساب يظهر للمستخدم «قريباً»')
     }
-    const data = await paymentSettingsApi.updateShamCash({
+    const data = unwrap(await paymentSettingsApi.updateShamCash({
       enabled: true,
       whatsapp: String(form.whatsapp || '').trim(),
       displayName: String(form.displayName || '').trim() || 'شام كاش',
       accountName: String(form.accountName || '').trim() || 'شام كاش',
       accountId,
       instructions: String(form.instructions || '').trim(),
-    })
+    }))
     form.whatsapp = data?.whatsapp || ''
     form.displayName = data?.displayName || 'شام كاش'
     form.accountName = data?.accountName || ''

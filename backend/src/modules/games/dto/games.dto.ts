@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsObject, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoomGameType } from '../../../database/entities/room-game.entity';
 
@@ -11,11 +11,6 @@ export class StartGameDto {
   @IsOptional()
   @IsUUID()
   opponentId?: string;
-
-  @ApiPropertyOptional({ description: 'HTML5 catalog key for multiplayer room games' })
-  @IsOptional()
-  @IsString()
-  htmlGameKey?: string;
 }
 
 export class GameMoveDto {
@@ -24,10 +19,4 @@ export class GameMoveDto {
   @Min(0)
   @Max(8)
   cell: number;
-}
-
-export class GameStateDto {
-  @ApiProperty({ description: 'Opaque HTML5 game state blob' })
-  @IsObject()
-  state: Record<string, unknown>;
 }

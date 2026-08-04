@@ -17,6 +17,7 @@ import {
 } from '../../database/entities/wallet-transaction.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 const SAFE_RICH_PRIZE = 5000;
 const SAFE_GIFTS_PRIZE = 8000;
@@ -39,6 +40,8 @@ export class ContestsService {
   ) {}
 
   async ensureDefaults() {
+    // Never clamp live contest prizes after dashboard edits.
+    if (!bootCatalogSeedEnabled()) return;
     await this.dataSource.transaction(async (manager) => {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         'contests:rolling-defaults',

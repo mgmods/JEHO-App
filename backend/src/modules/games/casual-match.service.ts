@@ -527,6 +527,7 @@ export class CasualMatchService {
           byId.get(userId)?.displayName ||
           byId.get(userId)?.username ||
           'لاعب',
+        publicId: byId.get(userId)?.publicId || null,
         avatarUrl: byId.get(userId)?.avatarUrl || null,
       }))
       .sort((a, b) => b.wins - a.wins)

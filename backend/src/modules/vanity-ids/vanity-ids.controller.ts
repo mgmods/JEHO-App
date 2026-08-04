@@ -147,75 +147,64 @@ export class VanityIdsController {
     const renew = activeLease;
     const price = renew ? Math.ceil(fullPrice / 2) : fullPrice;
 
-    const result = await this.vanityRepo.manager.transaction(async (manager) => {
-      if (price > 0) {
-        const wallet = await manager.findOne(Wallet, {
-          where: { userId },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (!wallet || Number(wallet.coins) < price) {
-          throw new BadRequestException('Insufficient coins');
-        }
-        wallet.coins = Number(wallet.coins) - price;
-        await manager.save(Wallet, wallet);
-        await manager.save(
-          WalletTransaction,
-          manager.create(WalletTransaction, {
-            userId,
-            type: TransactionType.GIFT_SEND,
-            currency: CurrencyType.COINS,
-            amount: -price,
-            balanceAfter: Number(wallet.coins),
-            referenceType: 'vanity_id',
-            // Unique per charge — renews must not reuse vanity row id.
-            referenceId: `${row.id}:${Date.now()}`,
-            description: renew
-              ? `تجديد آي دي مميز ${publicId} (30 يوم)`
-              : `شراء آي دي مميز ${publicId} (30 يوم)`,
-          }),
-        );
+    const wallet = await this.walletsRepo.findOne({ where: { userId } });
+    if (price > 0 && (!wallet || Number(wallet.coins) < price)) {
+      throw new BadRequestException('Insufficient coins');
+    }
+    if (price > 0 && wallet) {
+      wallet.coins = Number(wallet.coins) - price;
+      await this.walletsRepo.save(wallet);
+      await this.txRepo.save(
+        this.txRepo.create({
+          userId,
+          type: TransactionType.GIFT_SEND,
+          currency: CurrencyType.COINS,
+          amount: -price,
+          balanceAfter: Number(wallet.coins),
+          referenceType: 'vanity_id',
+          referenceId: row.id,
+          description: renew
+            ? `تجديد آي دي مميز ${publicId} (30 يوم)`
+            : `شراء آي دي مميز ${publicId} (30 يوم)`,
+        }),
+      );
+    }
+
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!renew) {
+      // Capture previous public ID once when first applying this vanity.
+      if (!row.previousPublicId || user.publicId !== publicId) {
+        row.previousPublicId =
+          user.publicId && user.publicId !== publicId
+            ? user.publicId
+            : row.previousPublicId;
       }
+      user.publicId = publicId;
+      await this.usersRepo.save(user);
+    }
 
-      const user = await manager.findOne(User, { where: { id: userId } });
-      if (!user) throw new NotFoundException('User not found');
+    const baseMs =
+      renew && row.expiresAt && row.expiresAt.getTime() > now.getTime()
+        ? row.expiresAt.getTime()
+        : now.getTime();
+    row.expiresAt = new Date(baseMs + VANITY_LEASE_DAYS * 24 * 60 * 60 * 1000);
+    row.status = VanityIdStatus.OWNED;
+    row.ownerUserId = userId;
+    row.purchasedAt = now;
+    row.reservedUntil = null;
+    await this.vanityRepo.save(row);
 
-      const vanity = await manager.findOne(VanityId, { where: { id: row.id } });
-      if (!vanity) throw new NotFoundException('ID not found');
-
-      if (!renew) {
-        if (!vanity.previousPublicId || user.publicId !== publicId) {
-          vanity.previousPublicId =
-            user.publicId && user.publicId !== publicId
-              ? user.publicId
-              : vanity.previousPublicId;
-        }
-        user.publicId = publicId;
-        await manager.save(User, user);
-      }
-
-      const baseMs =
-        renew && vanity.expiresAt && vanity.expiresAt.getTime() > now.getTime()
-          ? vanity.expiresAt.getTime()
-          : now.getTime();
-      vanity.expiresAt = new Date(baseMs + VANITY_LEASE_DAYS * 24 * 60 * 60 * 1000);
-      vanity.status = VanityIdStatus.OWNED;
-      vanity.ownerUserId = userId;
-      vanity.purchasedAt = now;
-      vanity.reservedUntil = null;
-      await manager.save(VanityId, vanity);
-
-      return {
-        publicId,
-        priceCoins: price,
-        fullPriceCoins: fullPrice,
-        renew,
-        leaseDays: VANITY_LEASE_DAYS,
-        expiresAt: vanity.expiresAt,
-        userId,
-      };
-    });
-
-    return result;
+    return {
+      publicId,
+      priceCoins: price,
+      fullPriceCoins: fullPrice,
+      renew,
+      leaseDays: VANITY_LEASE_DAYS,
+      expiresAt: row.expiresAt,
+      userId,
+    };
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

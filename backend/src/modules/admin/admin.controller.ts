@@ -1068,6 +1068,14 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('payment-settings/fourthwall/reveal')
+  @ApiOperation({ summary: 'Reveal Fourthwall secrets (admin only)' })
+  revealFourthwallSettings() {
+    return this.paymentsService.revealFourthwallAdminSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Patch('payment-settings/fourthwall')
   @ApiOperation({ summary: 'Update Fourthwall card-payment settings' })
   patchFourthwallSettings(@Body() body: Record<string, unknown>) {

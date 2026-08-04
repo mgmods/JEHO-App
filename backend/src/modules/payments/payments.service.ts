@@ -369,6 +369,17 @@ export class PaymentsService {
         `تعذر تجهيز باقة البطاقة على Fourthwall: ${(e as Error).message || e}`,
       );
     }
+    // Guard: never open checkout with a stale Fourthwall price (e.g. $0.99 for a $200 pack).
+    const want = Number(pkg.priceUsd);
+    const got = Number(product.priceUsd);
+    if (want > 0 && got > 0 && Math.abs(want - got) > 0.05) {
+      this.logger.error(
+        `Fourthwall price mismatch sku=${pkg.sku} package=$${want} product=$${got} productId=${product.productId}`,
+      );
+      throw new BadRequestException(
+        `سعر باقة البطاقة غير متزامن ($${got} بدل $${want}). أعد المحاولة أو من لوحة التحكم: مزامنة Fourthwall.`,
+      );
+    }
     const variantId = product.variantId;
 
     // One pending card checkout per user — cancel older open ones.
@@ -467,12 +478,15 @@ export class PaymentsService {
       variantMap = {};
     }
     return {
+      // Full email shown in dashboard so admin can edit it anytime.
+      apiUser: cfg.apiUser || null,
       apiUserConfigured: !!cfg.apiUser,
       apiPasswordConfigured: !!cfg.apiPassword,
       storefrontTokenConfigured: !!cfg.storefrontToken,
       webhookSecretConfigured: !!cfg.webhookSecret,
-      apiUserHint: cfg.apiUser ? cfg.apiUser.slice(-12) : null,
+      apiUserHint: cfg.apiUser ? cfg.apiUser.slice(-18) : null,
       shopDomain: cfg.shopDomain || null,
+      shopName: null as string | null,
       webhookUrl: 'https://api.adnova.bbs.tr/api/v1/payments/fourthwall/webhook',
       variantMap,
       configured: !!(
@@ -481,6 +495,18 @@ export class PaymentsService {
         cfg.storefrontToken &&
         cfg.shopDomain
       ),
+    };
+  }
+
+  /** Full secrets for dashboard "show keys" — admin session only. */
+  async revealFourthwallAdminSettings() {
+    const cfg = await this.loadFourthwallConfig();
+    return {
+      apiUser: cfg.apiUser || '',
+      apiPassword: cfg.apiPassword || '',
+      storefrontToken: cfg.storefrontToken || '',
+      shopDomain: cfg.shopDomain || '',
+      webhookSecret: cfg.webhookSecret || '',
     };
   }
 
@@ -756,10 +782,23 @@ export class PaymentsService {
       throw new BadRequestException('Fourthwall credentials incomplete');
     }
     const shop = await client.getShop();
+    const publicDomain = String(
+      shop?.publicDomain || shop?.domain || shop?.baseUrl || '',
+    )
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/+$/, '');
+    // Persist domain when discovered so checkout can open.
+    if (publicDomain) {
+      const cfg = await this.loadFourthwallConfig();
+      if (!cfg.shopDomain || cfg.shopDomain !== publicDomain) {
+        await this.updateFourthwallAdminSettings({ shopDomain: publicDomain });
+      }
+    }
     return {
       ok: true,
       name: shop?.name || null,
-      publicDomain: shop?.publicDomain || shop?.domain || null,
+      publicDomain: publicDomain || null,
+      domain: publicDomain || null,
       status: shop?.status || null,
     };
   }
@@ -769,27 +808,38 @@ export class PaymentsService {
     if (!client.configured) {
       throw new BadRequestException('Fourthwall credentials incomplete');
     }
+    // Always sync dashboard/DB packages (includes custom $100 / $200 etc).
+    const catalog = await this.walletService.listPackages();
+    const packages = Array.isArray(catalog?.items) && catalog.items.length
+      ? catalog.items
+      : STANDARD_RECHARGE_PACKAGES;
     const results: Array<Record<string, unknown>> = [];
-    for (const pkg of STANDARD_RECHARGE_PACKAGES) {
+    for (const raw of packages as Array<Record<string, unknown>>) {
+      const sku = String(raw.sku || '').trim();
+      if (!sku) continue;
+      const coins = Number(raw.coins) || 0;
+      const bonusCoins = Number(raw.bonusCoins) || 0;
+      const priceUsd = Number(raw.priceUsd) || 0;
       try {
         const product = await client.ensureCoinPackageProduct({
-          sku: pkg.sku,
-          coins: pkg.coins,
-          bonusCoins: pkg.bonusCoins,
-          priceUsd: pkg.priceUsd,
+          sku,
+          coins,
+          bonusCoins,
+          priceUsd,
         });
-        await this.rememberFourthwallVariant(pkg.sku, product.variantId);
+        await this.rememberFourthwallVariant(sku, product.variantId);
         results.push({
-          sku: pkg.sku,
+          sku,
           ok: true,
           variantId: product.variantId,
           productId: product.productId,
-          priceUsd: pkg.priceUsd,
-          coins: pkg.coins,
+          priceUsd,
+          livePriceUsd: product.priceUsd,
+          coins,
         });
       } catch (e) {
         results.push({
-          sku: pkg.sku,
+          sku,
           ok: false,
           error: (e as Error).message || String(e),
         });

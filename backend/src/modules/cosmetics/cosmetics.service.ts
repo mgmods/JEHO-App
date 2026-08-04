@@ -30,6 +30,7 @@ import {
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
+import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 type MikooCatalogItem = {
   type: CosmeticType | string;
@@ -66,6 +67,11 @@ export class CosmeticsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Live DB is the catalog. Boot mutators only when BOOT_SEED_CATALOGS=1.
+    if (!bootCatalogSeedEnabled()) {
+      this.logger.log('Cosmetics catalog: DB authoritative (no boot seed)');
+      return;
+    }
     try {
       await this.ensureRoomBackgroundCatalog();
       await this.ensureAristocracyCatalog();
@@ -83,13 +89,7 @@ export class CosmeticsService implements OnModuleInit {
 
   async catalog(type?: CosmeticType) {
     this.assertSupportedType(type);
-    await this.ensureAristocracyCatalog();
-    await this.ensureRoomCardCatalog();
-    await this.ensureHostBadgeCatalog();
-    await this.ensureMikooCosmeticsCatalog();
-    await this.purgeBrokenEntryEffects();
-    await this.ensureMallPricing();
-    await this.ensurePublicBranding();
+    // Read-only from DB — never re-sync prices on every API hit.
     const where: any = { isActive: true };
     if (type) where.type = type;
     return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', coinPrice: 'ASC' } });
@@ -97,10 +97,6 @@ export class CosmeticsService implements OnModuleInit {
 
   async adminList(type?: CosmeticType) {
     this.assertSupportedType(type);
-    await this.ensureAristocracyCatalog();
-    await this.ensureRoomCardCatalog();
-    await this.purgeBrokenEntryEffects();
-    await this.ensurePublicBranding();
     const where: any = {};
     if (type) where.type = type;
     return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
@@ -461,8 +457,7 @@ export class CosmeticsService implements OnModuleInit {
             amount: -price,
             balanceAfter: wallet.coins,
             referenceType: 'cosmetic_purchase',
-            // Unique per charge — renews must not reuse cosmeticId (uq_wallet_tx_user_reference).
-            referenceId: `${cosmeticId}:${Date.now()}`,
+            referenceId: cosmeticId,
             description: renew
               ? `تجديد ${cosmetic.name || cosmetic.code} (${leaseDays} يوم · نصف السعر)`
               : `شراء ${cosmetic.name || cosmetic.code} (${leaseDays} يوم)`,
@@ -758,6 +753,10 @@ export class CosmeticsService implements OnModuleInit {
    */
   async ensureMallPricing() {
     if (this.mallPricingEnsured) return;
+    if (!bootCatalogSeedEnabled()) {
+      this.mallPricingEnsured = true;
+      return;
+    }
     const verKey = 'pricing.cosmetics_version';
     const row = await this.settingsRepo.findOne({ where: { key: verKey } });
     if (row?.value === PRICING_VERSION) {
@@ -958,11 +957,8 @@ export class CosmeticsService implements OnModuleInit {
         existing.name = row.name;
         dirty = true;
       }
-      if (Number(existing.coinPrice) !== row.coinPrice) {
-        existing.coinPrice = row.coinPrice;
-        dirty = true;
-      }
-      if (existing.sortOrder !== row.sortOrder) {
+      // coinPrice stays from DB (dashboard). Seeds only create missing rows.
+      if (existing.sortOrder == null) {
         existing.sortOrder = row.sortOrder;
         dirty = true;
       }
@@ -1124,10 +1120,7 @@ export class CosmeticsService implements OnModuleInit {
         existing.description = nextDesc;
         dirty = true;
       }
-      if (Number(existing.coinPrice) !== b.price) {
-        existing.coinPrice = b.price;
-        dirty = true;
-      }
+      // coinPrice stays from DB (dashboard).
       if (!existing.isActive) {
         existing.isActive = true;
         dirty = true;
@@ -1300,11 +1293,9 @@ export class CosmeticsService implements OnModuleInit {
         existing.animationUrl = animationUrl;
         dirty = true;
       }
-      // Never re-zero a paid mall item from catalog import (pricing sync owns free→paid).
-      if (coinPrice > 0 && Number(existing.coinPrice) !== coinPrice) {
-        existing.coinPrice = coinPrice;
-        dirty = true;
-      } else if (coinPrice > 0 && Number(existing.coinPrice) <= 0) {
+      // coinPrice stays from DB — catalog never overwrites dashboard prices.
+      // Only fill price when the row is still free/zero and catalog has a paid price.
+      if (Number(existing.coinPrice) <= 0 && coinPrice > 0) {
         existing.coinPrice = coinPrice;
         dirty = true;
       }

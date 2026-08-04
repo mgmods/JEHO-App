@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>الدومينو · AuraLive</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;background:radial-gradient(ellipse at top,#163a5a,#081018 60%);color:#fff;font-family:Tahoma,Arial,sans-serif;display:flex;flex-direction:column;padding:12px;gap:10px}
+.top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:22px;color:#9ad7ff;font-weight:900}
+.badge{background:rgba(255,255,255,.1);border-radius:999px;padding:6px 12px;font-size:12px;border:1px solid rgba(154,215,255,.3)}
+.aura-badge{display:none;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 8px;border-radius:999px;background:rgba(0,0,0,.35);border:1px solid rgba(255,214,120,.45);font-size:16px;margin-inline-start:6px}
+.aura-badge.on{display:inline-flex}
+.board{flex:1;min-height:180px;background:rgba(0,0,0,.25);border:1px solid rgba(154,215,255,.25);border-radius:18px;padding:12px;display:flex;flex-wrap:wrap;gap:6px;align-content:center;justify-content:center;align-items:center}
+.tile{width:42px;height:84px;border-radius:8px;background:linear-gradient(180deg,#f7fbff,#d7e8f7);color:#123;display:flex;flex-direction:column;border:2px solid #8eb6d8;box-shadow:0 4px 10px rgba(0,0,0,.35);overflow:hidden}
+.tile.flat{width:84px;height:42px;flex-direction:row}
+.half{flex:1;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;position:relative}
+.tile:not(.flat) .half+.half{border-top:2px solid #8eb6d8}
+.tile.flat .half+.half{border-right:2px solid #8eb6d8;border-top:0}
+.hand{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:100px}
+.hand .tile{cursor:pointer;transition:transform .12s}
+.hand .tile:active{transform:scale(.94)}
+.hand .tile.ok{outline:2px solid #46e08a}
+.actions{display:flex;gap:10px;justify-content:center}
+button{border:0;border-radius:16px;padding:12px 18px;font-weight:800;color:#fff}
+#draw{background:linear-gradient(90deg,#00c6ff,#0072ff)}
+#new{background:linear-gradient(90deg,#ff9a3c,#ff4d6d)}
+#msg{text-align:center;color:#cde9ff;min-height:22px;font-size:14px}
+.opp{text-align:center;opacity:.85;font-size:13px}
+</style>
+</head>
+<body>
+<div class="top"><h1>الدومينو</h1><div style="display:flex;align-items:center"><span class="aura-badge" id="stampBadge"></span><span class="aura-badge" id="emojiBadge"></span><div class="badge" id="score">أنت 0 · خصم 0</div></div></div>
+<div class="opp" id="opp">خصم · 7 قطع</div>
+<div class="board" id="board"></div>
+<div id="msg">ضع قطعة تطابق أحد الطرفين</div>
+<div class="hand" id="hand"></div>
+<div class="actions">
+  <button id="draw">اسحب من الكومة</button>
+  <button id="new">جولة جديدة</button>
+</div>
+<script>
+let boneyard=[], hand=[], bot=[], chain=[], leftEnd=null, rightEnd=null, turn='you', score={you:0,opp:0,bot:0};
+function tile(a,b){return {a,b};}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;}
+function allTiles(){const t=[]; for(let i=0;i<=6;i++) for(let j=i;j<=6;j++) t.push(tile(i,j)); return shuffle(t);}
+function canPlace(t){ if(!chain.length) return true; return t.a===leftEnd||t.b===leftEnd||t.a===rightEnd||t.b===rightEnd; }
+function place(t, side){
+  if(!chain.length){ chain=[t]; leftEnd=t.a; rightEnd=t.b; return; }
+  if(side==='L'){
+    if(t.b===leftEnd){ leftEnd=t.a; chain.unshift(t); }
+    else if(t.a===leftEnd){ leftEnd=t.b; chain.unshift(tile(t.b,t.a)); }
+  } else {
+    if(t.a===rightEnd){ rightEnd=t.b; chain.push(t); }
+    else if(t.b===rightEnd){ rightEnd=t.a; chain.push(tile(t.b,t.a)); }
+  }
+}
+function preferredSide(t){
+  if(!chain.length) return 'R';
+  const L=t.a===leftEnd||t.b===leftEnd;
+  const R=t.a===rightEnd||t.b===rightEnd;
+  if(L&&!R) return 'L'; if(R&&!L) return 'R'; return Math.random()<.5?'L':'R';
+}
+function renderTile(t, flat){
+  const el=document.createElement('div');
+  el.className='tile'+(flat?' flat':'');
+  el.innerHTML='<div class="half">'+t.a+'</div><div class="half">'+t.b+'</div>';
+  return el;
+}
+function render(){
+  document.getElementById('opp').textContent=(pvp?'خصم حقيقي':'خصم')+' · '+(pvp?(role===1?p2Hand.length:p1Hand.length):bot.length)+' قطع';
+  document.getElementById('score').textContent='أنت '+score.you+' · خصم '+score.opp;
+  const board=document.getElementById('board'); board.innerHTML='';
+  chain.forEach((t,i)=>board.appendChild(renderTile(t, i%2===1)));
+  const handEl=document.getElementById('hand'); handEl.innerHTML='';
+  hand.forEach((t,i)=>{
+    const el=renderTile(t,false);
+    if(canPlace(t) && turn==='you') el.classList.add('ok');
+    el.onclick=()=>{
+      if(turn!=='you') return;
+      if(!canPlace(t)){ document.getElementById('msg').textContent='لا تطابق الطرفين'; return; }
+      place(t, preferredSide(t)); hand.splice(i,1);
+      if(pvp){ if(role===1) p1Hand=hand.slice(); else p2Hand=hand.slice(); }
+      if(!hand.length){
+        if(pvp){ if(role===1) score._1=(score._1||0)+1; else score._2=(score._2||0)+1; score.you++; }
+        else score.you++;
+        document.getElementById('msg').textContent='فزت! 🎉'; render();
+        if(pvp){ pushDomino('win'); setTimeout(()=>{ if(role===1) deal(true); },900); }
+        else setTimeout(deal,900); return;
+      }
+      if(pvp){ turnN=role===1?2:1; syncDomino(); render(); pushDomino('move'); }
+      else { turn='bot'; document.getElementById('msg').textContent='دور الخصم'; render(); setTimeout(botPlay,500); }
+    };
+    handEl.appendChild(el);
+  });
+}
+function botPlay(){
+  if(pvp) return;
+  const idx=bot.findIndex(canPlace);
+  if(idx>=0){
+    const t=bot.splice(idx,1)[0];
+    place(t, preferredSide(t));
+    document.getElementById('msg').textContent='الخصم لعب';
+    if(!bot.length){ score.bot++; score.opp=score.bot; document.getElementById('msg').textContent='الخصم فاز'; render(); setTimeout(deal,900); return; }
+  } else if(boneyard.length){
+    bot.push(boneyard.pop());
+    document.getElementById('msg').textContent='الخصم سحب';
+  } else document.getElementById('msg').textContent='الخصم مرّر';
+  turn='you'; render();
+}
+let pvp=false, role=1, p1Hand=[], p2Hand=[], turnN=1, applying=false;
+function isPvp(){ return !!(window.__AURA_PVP__&&window.__AURA_PVP__.active)||(window.AuraBridge&&AuraBridge.isPvP&&AuraBridge.isPvP()); }
+function myRole(){ if(window.__AURA_PVP__&&window.__AURA_PVP__.role) return window.__AURA_PVP__.role; try{return AuraBridge.myRole()}catch(e){return 1} }
+function syncDomino(){
+  role=myRole();
+  hand = role===1 ? p1Hand.slice() : p2Hand.slice();
+  turn = turnN===role ? 'you' : 'opp';
+  score.you = role===1 ? (score._1||0) : (score._2||0);
+  score.opp = role===1 ? (score._2||0) : (score._1||0);
+}
+function pushDomino(msg){
+  if(!pvp||applying) return;
+  try{ AuraBridge.postState(JSON.stringify({
+    p1Hand,p2Hand,boneyard,chain,leftEnd,rightEnd,turn:turnN,
+    score:{_1:score._1||0,_2:score._2||0}, msg:msg||'', kind:'domino'
+  })); }catch(e){}
+}
+function deal(force){
+  if(pvp && role!==1 && !force){ document.getElementById('msg').textContent='انتظار المضيف…'; return; }
+  const all=allTiles();
+  p1Hand=all.splice(0,7); p2Hand=all.splice(0,7); boneyard=all; chain=[]; leftEnd=rightEnd=null;
+  const first=p1Hand.shift(); place(first,'R');
+  turnN=1; score._1=score._1||0; score._2=score._2||0;
+  document.getElementById('msg').textContent='ضع قطعة تطابق الطرفين';
+  if(pvp){ syncDomino(); render(); pushDomino('deal'); }
+  else { hand=p1Hand.slice(); bot=p2Hand.slice(); turn='you'; score={you:score.you||0,opp:score.opp||0,bot:score.opp||0}; render(); }
+}
+document.getElementById('draw').onclick=()=>{
+  if(turn!=='you') return;
+  if(!hand.some(canPlace) && boneyard.length){ hand.push(boneyard.pop()); if(pvp){ if(role===1)p1Hand=hand.slice(); else p2Hand=hand.slice(); render(); pushDomino('draw'); } else render(); return; }
+  if(!hand.some(canPlace)){
+    if(pvp){ turnN=role===1?2:1; syncDomino(); document.getElementById('msg').textContent='مررت الدور'; render(); pushDomino('pass'); }
+    else { turn='bot'; document.getElementById('msg').textContent='مررت الدور'; setTimeout(botPlay,400); }
+    return;
+  }
+  document.getElementById('msg').textContent='لديك حركة متاحة';
+};
+document.getElementById('new').onclick=()=>{ if(pvp&&role!==1){document.getElementById('msg').textContent='فقط المضيف';return;} deal(true); };
+window.applyAuraState=function(raw){
+  try{
+    applying=true; const s=typeof raw==='string'?JSON.parse(raw):raw; if(!s) return;
+    pvp=true; role=myRole();
+    p1Hand=s.p1Hand||[]; p2Hand=s.p2Hand||[]; boneyard=s.boneyard||[]; chain=s.chain||[];
+    leftEnd=s.leftEnd; rightEnd=s.rightEnd; turnN=s.turn||1;
+    score._1=(s.score&&s.score._1)||0; score._2=(s.score&&s.score._2)||0;
+    syncDomino(); if(s.msg) document.getElementById('msg').textContent=s.msg; render();
+  }catch(e){} finally{ applying=false; }
+};
+window.onAuraPvPReady=function(){ pvp=true; role=myRole(); if(role===1) deal(true); else document.getElementById('msg').textContent='انتظار التوزيع…'; };
+const TILE_CSS={
+  tile_classic:{bg:'linear-gradient(180deg,#f7fbff,#d7e8f7)',border:'#8eb6d8'},
+  tile_rose:{bg:'linear-gradient(180deg,#ffe8f3,#f5b8d4)',border:'#e91e8c'},
+  tile_royal:{bg:'linear-gradient(180deg,#f3e8ff,#d4b8f5)',border:'#9b59b6'}
+};
+const STAMPS={stamp_heart:'💖',stamp_crown:'👑',stamp_vip:'⭐'};
+const EMOJIS={emoji_laugh:'😂',emoji_fire:'🔥',emoji_crown:'👑'};
+function setBadge(el,text){
+  if(!el) return;
+  if(text){ el.textContent=text; el.classList.add('on'); }
+  else { el.textContent=''; el.classList.remove('on'); }
+}
+window.applyAuraCosmetics=function(c){
+  c=c||window.__AURA_COSMETICS__||{};
+  const skin=c.tiles&&TILE_CSS[c.tiles];
+  if(skin){
+    document.querySelectorAll('.tile').forEach(el=>{
+      el.style.background=skin.bg; el.style.borderColor=skin.border;
+    });
+  }
+  setBadge(document.getElementById('stampBadge'), STAMPS[c.stamp]||'');
+  setBadge(document.getElementById('emojiBadge'), EMOJIS[c.emoji]||'');
+};
+if(window.__AURA_COSMETICS__) window.applyAuraCosmetics(window.__AURA_COSMETICS__);
+(function boot(){ pvp=isPvp(); if(pvp){ role=myRole(); if(role===1) deal(true); else document.getElementById('msg').textContent='انتظار الخصم…'; } else deal(); })();
+</script>
+</body>
+</html>

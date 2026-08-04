@@ -38,6 +38,15 @@ export class FourthwallClient {
       .replace(/\/+$/, '');
   }
 
+  private moneyEquals(a: number, b: number): boolean {
+    return Math.abs(Number(a || 0) - Number(b || 0)) < 0.021;
+  }
+
+  private moneyBody(priceUsd: number) {
+    const value = Math.round(Number(priceUsd) * 100) / 100;
+    return { value, currency: 'USD' };
+  }
+
   /** Preferred: cartId checkout with forced currency (avoids geo local-currency mismatch). */
   checkoutUrlForVariant(variantId: string, currency = 'USD'): string {
     const domain = this.shopHost();
@@ -100,6 +109,7 @@ export class FourthwallClient {
 
   /**
    * Ensure a purchasable digital product exists for this JEHO package.
+   * Always re-syncs price/name from the live wallet package so admin $200 ≠ stale $0.99.
    * Products must be available (published) or checkout shows $0 / hangs.
    */
   async ensureCoinPackageProduct(input: {
@@ -109,48 +119,56 @@ export class FourthwallClient {
     priceUsd: number;
   }): Promise<FourthwallProductSummary> {
     const sku = String(input.sku || '').trim();
+    if (!sku) throw new Error('sku required');
     const coins = Math.max(0, Number(input.coins) || 0);
     const bonus = Math.max(0, Number(input.bonusCoins) || 0);
     const priceUsd = Math.round(Number(input.priceUsd) * 100) / 100;
+    if (!(priceUsd > 0)) {
+      throw new Error(`Invalid package price for ${sku}: ${input.priceUsd}`);
+    }
     const marker = `JEHO_SKU:${sku}`;
-    const name = `JEHO ${coins.toLocaleString('en-US')} Coins`;
+    const name = `JEHO ${coins.toLocaleString('en-US')} Coins ($${priceUsd})`;
+    const description = [
+      marker,
+      `JEHO_PRICE_USD:${priceUsd}`,
+      'JEHO Chat in-app coin recharge.',
+      `Coins: ${coins}${bonus ? ` +${bonus} bonus` : ''}`,
+      `Price: $${priceUsd}`,
+    ].join('\n');
 
     const existing = await this.findProductBySkuMarker(sku);
     if (existing?.variantId && existing.productId) {
       await this.makeProductPurchasable(existing.productId);
-      // Refresh variant after availability flip
-      const details = await this.getProduct(existing.productId).catch(() => null);
-      const variantId =
-        this.extractVariantId(details) || existing.variantId;
-      return {
-        productId: existing.productId,
-        variantId,
-        name: existing.name || name,
-        priceUsd: existing.priceUsd || priceUsd,
-      };
+      const live = await this.readProductSummary(existing.productId, existing);
+      if (live && this.moneyEquals(live.priceUsd, priceUsd)) {
+        // Keep title/desc in sync for ops clarity (best-effort).
+        await this.touchProductMeta(live.productId, name, description).catch(() => undefined);
+        return { productId: live.productId, variantId: live.variantId, name, priceUsd };
+      }
+      // Stale price (e.g. pack edited to $200 but Fourthwall still $0.99) — force update.
+      const fixed = await this.forceMatchPrice(
+        existing.productId,
+        existing.variantId,
+        priceUsd,
+        name,
+        description,
+      );
+      if (fixed?.variantId && this.moneyEquals(fixed.priceUsd, priceUsd)) {
+        return { productId: fixed.productId, variantId: fixed.variantId, name, priceUsd };
+      }
+      // Cannot reprice (API limits) — hide old offer and create a fresh product.
+      this.logger.warn(
+        `Fourthwall price stuck for ${sku} (have ${live?.priceUsd ?? existing.priceUsd}, want ${priceUsd}) — recreating product`,
+      );
+      await this.archiveProduct(existing.productId).catch(() => undefined);
     }
 
-    const created = await this.openFetch(
-      'https://api.fourthwall.com/open-api/v1.0/products',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'digital',
-          name,
-          description: `${marker}\nJEHO Chat in-app coin recharge.\nCoins: ${coins}${bonus ? ` +${bonus} bonus` : ''}\nPrice: $${priceUsd}`,
-          price: priceUsd,
-          publishOnCreate: false,
-        }),
-      },
-    );
-    const productId = String(
-      created?.productId || created?.id || created?.product?.id || '',
-    );
-    if (!productId) {
-      throw new Error(
-        `Fourthwall product create returned no id: ${JSON.stringify(created).slice(0, 400)}`,
-      );
-    }
+    const created = await this.createDigitalProduct({
+      name,
+      description,
+      priceUsd,
+    });
+    const productId = created.productId;
 
     try {
       await this.attachTinyDigitalFile(productId, sku, coins);
@@ -172,7 +190,190 @@ export class FourthwallClient {
     if (!variantId) {
       throw new Error(`Fourthwall product ${productId} has no variant yet`);
     }
-    return { productId, variantId, name, priceUsd };
+
+    // Confirm posted price; reprice once if API ignored create payload.
+    let summary = this.summaryFromProduct(details, productId, name, priceUsd);
+    if (!this.moneyEquals(summary.priceUsd, priceUsd)) {
+      const fixed = await this.forceMatchPrice(
+        productId,
+        variantId,
+        priceUsd,
+        name,
+        description,
+      );
+      if (fixed) summary = fixed;
+    }
+    if (!summary.variantId) summary.variantId = variantId;
+    if (!this.moneyEquals(summary.priceUsd, priceUsd)) {
+      // Still wrong — refuse silent $0.99 checkouts for a $200 package.
+      throw new Error(
+        `Fourthwall product price mismatch for ${sku}: live=$${summary.priceUsd} package=$${priceUsd} (productId=${productId})`,
+      );
+    }
+    return {
+      productId: summary.productId || productId,
+      variantId: summary.variantId || variantId,
+      name,
+      priceUsd,
+    };
+  }
+
+  private async createDigitalProduct(input: {
+    name: string;
+    description: string;
+    priceUsd: number;
+  }): Promise<{ productId: string }> {
+    const money = this.moneyBody(input.priceUsd);
+    // Fourthwall has accepted both bare numbers and Money objects historically.
+    const payloads: Array<Record<string, unknown>> = [
+      {
+        type: 'digital',
+        name: input.name,
+        description: input.description,
+        price: money,
+        publishOnCreate: false,
+      },
+      {
+        type: 'digital',
+        name: input.name,
+        description: input.description,
+        price: money.value,
+        unitPrice: money,
+        publishOnCreate: false,
+      },
+    ];
+    let lastErr: Error | null = null;
+    for (const body of payloads) {
+      try {
+        const created = await this.openFetch(
+          'https://api.fourthwall.com/open-api/v1.0/products',
+          { method: 'POST', body: JSON.stringify(body) },
+        );
+        const productId = String(
+          created?.productId || created?.id || created?.product?.id || '',
+        );
+        if (productId) return { productId };
+        lastErr = new Error(
+          `Fourthwall product create returned no id: ${JSON.stringify(created).slice(0, 400)}`,
+        );
+      } catch (e) {
+        lastErr = e as Error;
+      }
+    }
+    throw lastErr || new Error('Fourthwall product create failed');
+  }
+
+  /**
+   * Best-effort reprice + rename so checkout displays JEHO package USD.
+   */
+  private async forceMatchPrice(
+    productId: string,
+    variantId: string,
+    priceUsd: number,
+    name: string,
+    description: string,
+  ): Promise<FourthwallProductSummary | null> {
+    const money = this.moneyBody(priceUsd);
+    const attempts: Array<{ url: string; method: string; body: unknown }> = [
+      {
+        url: `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
+        method: 'PUT',
+        body: { unitPrice: money },
+      },
+      {
+        url: `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
+        method: 'PATCH',
+        body: { unitPrice: money },
+      },
+      {
+        url: `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}`,
+        method: 'PUT',
+        body: { name, description, price: money },
+      },
+      {
+        url: `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}`,
+        method: 'PATCH',
+        body: { name, description, price: money.value, unitPrice: money },
+      },
+      {
+        url: `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/price`,
+        method: 'PUT',
+        body: money,
+      },
+    ];
+    for (const a of attempts) {
+      try {
+        await this.openFetch(a.url, {
+          method: a.method,
+          body: JSON.stringify(a.body),
+        });
+      } catch (e) {
+        this.logger.warn(
+          `reprice try ${a.method} ${a.url.split('/v1.0/')[1] || ''}: ${(e as Error).message || e}`,
+        );
+      }
+    }
+    await this.touchProductMeta(productId, name, description).catch(() => undefined);
+    await this.makeProductPurchasable(productId);
+    const details = await this.getProduct(productId).catch(() => null);
+    if (!details) return null;
+    return this.summaryFromProduct(details, productId, name, priceUsd);
+  }
+
+  private async touchProductMeta(
+    productId: string,
+    name: string,
+    description: string,
+  ): Promise<void> {
+    const bodies = [
+      { name, description },
+      { name },
+    ];
+    for (const body of bodies) {
+      try {
+        await this.openFetch(
+          `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}`,
+          { method: 'PUT', body: JSON.stringify(body) },
+        );
+        return;
+      } catch {
+        try {
+          await this.openFetch(
+            `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}`,
+            { method: 'PATCH', body: JSON.stringify(body) },
+          );
+          return;
+        } catch {
+          /* try next */
+        }
+      }
+    }
+  }
+
+  private async archiveProduct(productId: string): Promise<void> {
+    try {
+      await this.openFetch(
+        `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/availability`,
+        { method: 'PUT', body: JSON.stringify({ available: false }) },
+      );
+    } catch {
+      /* ignore */
+    }
+    try {
+      await this.openFetch(
+        `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/state`,
+        { method: 'PUT', body: JSON.stringify({ state: 'ARCHIVED' }) },
+      );
+    } catch {
+      try {
+        await this.openFetch(
+          `https://api.fourthwall.com/open-api/v1.0/products/${encodeURIComponent(productId)}/state`,
+          { method: 'PUT', body: JSON.stringify({ state: 'HIDDEN' }) },
+        );
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   /** Make offer visible + buyable on storefront. */
@@ -226,29 +427,95 @@ export class FourthwallClient {
     sku: string,
   ): Promise<FourthwallProductSummary | null> {
     const marker = `JEHO_SKU:${sku}`.toLowerCase();
-    const products = await this.listProducts(100);
-    for (const p of products) {
+    // Paginate a bit — shops with many digital packs can exceed one page.
+    const pages: any[] = [];
+    const first = await this.listProducts(100);
+    pages.push(...first);
+    for (const p of pages) {
       const desc = String(p?.description || '').toLowerCase();
-      const name = String(p?.name || '');
       const id = String(p?.id || p?.productId || '');
       if (!id) continue;
-      if (desc.includes(marker) || name.toLowerCase().includes(sku.toLowerCase())) {
-        const variantId = this.extractVariantId(p);
-        if (!variantId) continue;
-        const price =
-          Number(p?.variants?.[0]?.unitPrice?.value) ||
-          Number(p?.price?.value) ||
-          Number(p?.price) ||
-          0;
-        return {
-          productId: id,
-          variantId,
-          name: name || sku,
-          priceUsd: price,
-        };
-      }
+      // Exact marker only — never fuzzy name.match(sku) (that maps wrong packs to $0.99).
+      if (!desc.includes(marker)) continue;
+      // Prefer rows where marker is a dedicated line (avoid partial collisions).
+      const lines = desc.split(/\r?\n/).map((l) => l.trim());
+      const hasExact = lines.some(
+        (l) => l === marker || l.startsWith(`${marker}|`) || l.startsWith(`${marker} `),
+      );
+      if (!hasExact && !desc.includes(marker)) continue;
+      const variantId = this.extractVariantId(p);
+      if (!variantId) continue;
+      return this.summaryFromProduct(p, id, String(p?.name || sku), 0);
     }
     return null;
+  }
+
+  private async readProductSummary(
+    productId: string,
+    fallback: FourthwallProductSummary,
+  ): Promise<FourthwallProductSummary> {
+    const details = await this.getProduct(productId).catch(() => null);
+    if (!details) return fallback;
+    const live = this.summaryFromProduct(
+      details,
+      productId,
+      fallback.name,
+      fallback.priceUsd,
+    );
+    // If API omitted price fields, keep previous known product price.
+    if (!(live.priceUsd > 0) && fallback.priceUsd > 0) {
+      live.priceUsd = fallback.priceUsd;
+    }
+    if (!live.variantId && fallback.variantId) {
+      live.variantId = fallback.variantId;
+    }
+    return live;
+  }
+
+  private summaryFromProduct(
+    product: Record<string, any>,
+    productId: string,
+    nameFallback: string,
+    priceFallback: number,
+    opts?: { trustFallback?: boolean },
+  ): FourthwallProductSummary {
+    const variantId = this.extractVariantId(product);
+    const extracted = this.extractPriceUsd(product);
+    const price =
+      extracted > 0
+        ? extracted
+        : opts?.trustFallback && priceFallback > 0
+          ? priceFallback
+          : 0;
+    return {
+      productId,
+      variantId: variantId || '',
+      name: String(product?.name || nameFallback || ''),
+      priceUsd: price,
+    };
+  }
+
+  /** Normalize Money / cents / string into USD major units. */
+  private extractPriceUsd(product: Record<string, any> | null): number {
+    if (!product) return 0;
+    const candidates: unknown[] = [
+      product?.variants?.[0]?.unitPrice?.value,
+      product?.variants?.[0]?.unitPrice?.amount,
+      product?.variants?.[0]?.price?.value,
+      product?.variants?.[0]?.price,
+      product?.price?.value,
+      product?.price?.amount,
+      product?.price,
+      product?.unitPrice?.value,
+    ];
+    for (const c of candidates) {
+      const n = Number(c);
+      if (!Number.isFinite(n) || n <= 0) continue;
+      // Heuristic: values ≥ 1000 with no decimal are likely cents of large packs;
+      // keep normal $0.99–$999 as-is (Fourthwall Money.value is major units).
+      return Math.round(n * 100) / 100;
+    }
+    return 0;
   }
 
   async ensureWebhook(

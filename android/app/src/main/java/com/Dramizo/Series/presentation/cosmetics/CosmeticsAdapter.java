@@ -7,6 +7,7 @@ import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.AuraLiveApp;
@@ -23,16 +24,19 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Mall grid adapter — PNG-only previews. Never binds HostSignalView / SVGA here
- * (that caused OutOfMemoryError and closed the app when opening قطاع الراس).
+ * Mall grid adapter — PNG-only cell previews.
+ * Selection drives the activity hero ({@link HostSignalView} SVGA) — never decode SVGA here.
  */
 public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> {
     public interface Listener {
+        void onSelect(CosmeticDtos.CosmeticDto item);
         void onPurchase(String cosmeticId);
         void onEquip(String cosmeticId);
         void onUnequip(String cosmeticId);
         boolean isOwned(String cosmeticId);
         boolean isEquipped(String cosmeticId);
+        @Nullable Integer daysLeft(String cosmeticId);
+        @Nullable String selectedId();
     }
 
     private final List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
@@ -56,11 +60,25 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
     public void onBindViewHolder(@NonNull VH holder, int position) {
         CosmeticDtos.CosmeticDto item = items.get(position);
         holder.b.tvName.setText(item.name != null ? item.name : item.code);
-        holder.b.tvPrice.setText(item.coinPrice > 0
-                ? (item.coinPrice + " عملة")
-                : "مجاني");
         boolean owned = listener.isOwned(item.id);
         boolean equipped = listener.isEquipped(item.id);
+        Integer days = listener.daysLeft(item.id);
+        if (owned && days != null && days > 0) {
+            holder.b.tvPrice.setText(holder.itemView.getContext()
+                    .getString(R.string.mall_days_left, days));
+        } else if (owned && days == null) {
+            holder.b.tvPrice.setText(R.string.mall_permanent);
+        } else {
+            holder.b.tvPrice.setText(item.coinPrice > 0
+                    ? holder.itemView.getContext().getString(
+                            R.string.mall_price_days, item.coinPrice, CosmeticsViewModel.LEASE_DAYS)
+                    : holder.itemView.getContext().getString(R.string.mall_free_days, CosmeticsViewModel.LEASE_DAYS));
+        }
+        String sel = listener.selectedId();
+        boolean selected = sel != null && sel.equals(item.id);
+        holder.b.getRoot().setStrokeWidth(selected ? 3 : 1);
+        holder.b.getRoot().setStrokeColor(selected ? 0xFFE8A317 : 0x1A000000);
+
         holder.b.btnPurchase.setVisibility(owned ? View.GONE : View.VISIBLE);
         holder.b.btnEquip.setVisibility(owned ? View.VISIBLE : View.GONE);
         holder.b.btnEquip.setEnabled(true);
@@ -76,6 +94,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             if (equipped) listener.onUnequip(item.id);
             else listener.onEquip(item.id);
         });
+        holder.itemView.setOnClickListener(v -> listener.onSelect(item));
 
         boolean headwear = "vip_badge".equalsIgnoreCase(item.type)
                 || "host_badge".equalsIgnoreCase(item.type)
@@ -172,7 +191,6 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                 || lower.contains(".html")) {
             String png = base.replaceAll("(?i)\\.(svga|gif|webp|mp4|webm|json|html)(\\?.*)?$", ".png$1");
             if (!png.equals(base)) return png;
-            // No PNG sibling — fall back to preview if it was already a still.
             if (preview != null && preview.toLowerCase(Locale.US).contains(".png")) return preview;
             return null;
         }

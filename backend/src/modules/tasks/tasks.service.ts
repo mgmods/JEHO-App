@@ -190,7 +190,7 @@ export const DEFAULT_HOST_TASKS: DailyTask[] = [
   },
   {
     id: 'h9',
-    title: `ادعِي 3 مستخدمين جدد لغرفتك (+${HOST_ROOM_INVITE_REWARD.diamonds}◆ لكل دعوة مكتملة)`,
+    title: 'ادعِي 3 مستخدمين جدد لغرفتك (+40◆ لكل دعوة مكتملة)',
     rewardPoints: 100,
     rewardSilver: 30,
     rewardDiamonds: 0,
@@ -391,8 +391,8 @@ export class TasksService {
     return tasks.map((t) => {
       const audience: TaskAudience = t.audience === 'host' ? 'host' : 'all';
       const title =
-        t.id === 'h9'
-          ? `ادعِي 3 مستخدمين جدد لغرفتك (+${HOST_ROOM_INVITE_REWARD.diamonds}◆ لكل دعوة مكتملة)`
+        t.id === 'h9' && String(t.title || '').includes('ماسة')
+          ? 'ادعِي 3 مستخدمين جدد لغرفتك'
           : t.title;
       return {
         ...t,
@@ -974,8 +974,7 @@ export class TasksService {
    * Track male↔female DM for daily chat tasks.
    * Counts one round per agency-hostess peer/day when both sides exchange messages
    * (5–10 total) within a 3-minute window. Eligible: newly registered males only.
-   * Chat-task claims stay points/silver; room-invite dwell grants diamonds from
-   * HOST_ROOM_INVITE_REWARD (agency hosts).
+   * Chat-task claims stay points/silver; room-invite dwell grants 40◆ (agency hosts).
    */
   async trackChatForTasks(params: {
     conversationId: string;
