@@ -126,4 +126,7 @@ public final class EncryptedFeatureCache {
 
     public static final String NS_AGENCY_MINE = "agency_mine";
     public static final String NS_RECHARGE_PACKAGES = "recharge_packages";
+    /** App-wide bottom nav icons JSON (userId = {@link #UID_APP}). */
+    public static final String NS_NAV_ICONS = "nav_icons";
+    public static final String UID_APP = "app";
 }

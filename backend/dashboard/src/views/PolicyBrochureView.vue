@@ -157,6 +157,31 @@
               </ul>
             </section>
 
+            <section v-if="enabled.agency" class="pb-page">
+              <div class="pb-topbar"><img :src="logoSrc" alt="" /><span>JEHO CHAT</span></div>
+              <header class="pb-head"><span>٢ب</span> برنامج الوكالات — المزايا والمكافآت</header>
+              <p>الوكالة: كيان رسمي يجمع المضيفات تحت إدارة واحدة. العمولة والتحقق والأطر الحصرية تُدار من لوحة الإدارة، وتظهر للمستخدمين في التطبيق.</p>
+              <ul class="pb-list">
+                <li>رمز تفعيل / معرّف عام للوكالة (Public ID) للبحث والتحقق داخل التطبيق</li>
+                <li>شارة «موثّقة» بعد مراجعة الإدارة — تعطي ثقة للمضيفات والداعمين</li>
+                <li>عمولة الوكالة من هدايا الرومات المنسوبة لها (حسب نسبة التقسيم أعلاه)</li>
+                <li>أطر / دخولية حصرية للوكالة يمكن منحها للأعضاء عند التفعيل</li>
+                <li>لوحة الوكالة لصاحبها: أعضاء، أرباح، رموز دعوة</li>
+                <li>انضمام المضيفة: قبول من المالك بعد طلب أو رمز تفعيل</li>
+                <li>ممنوع فتح وكالات وهمية أو تكرار الحسابات لسحب العمولة</li>
+              </ul>
+              <table class="pb-table">
+                <thead><tr><th>المكافأة / الميزات</th><th>لمن؟</th></tr></thead>
+                <tbody>
+                  <tr><td>نسبة عمولة من الهدايا</td><td>مالك الوكالة</td></tr>
+                  <tr><td>راتب تارجت (وكيل) عند إكمال مراحل المضيفة</td><td>الوكيل المرتبط</td></tr>
+                  <tr><td>ألماس دعوة ضيف جديد مكمل</td><td>مضيفة في وكالة نشطة</td></tr>
+                  <tr><td>إطارات/دخولية حصرية للوكالة</td><td>أعضاء عند منح الإدارة</td></tr>
+                  <tr><td>شارة موثّقة + ID عام</td><td>الوكالة بعد الاعتماد</td></tr>
+                </tbody>
+              </table>
+            </section>
+
             <section v-if="enabled.gifts" class="pb-page">
               <div class="pb-topbar"><img :src="logoSrc" alt="" /><span>JEHO CHAT</span></div>
               <header class="pb-head"><span>٣</span> كتالوج الهدايا</header>
@@ -373,11 +398,16 @@
 
             <section v-if="enabled.tasks" class="pb-page">
               <div class="pb-topbar"><img :src="logoSrc" alt="" /><span>JEHO CHAT</span></div>
-              <header class="pb-head"><span>١٣</span> المهام والدعوات</header>
+              <header class="pb-head"><span>١٣</span> المهام اليومية والمكافآت</header>
               <ul class="pb-list">
-                <li>مركز المهام يومياً — نقاط/فضة/عملات حسب المهمة</li>
+                <li>مركز المهام يومياً — نقاط/عملات عند «استلام» بعد إكمال الهدف</li>
+                <li>حضور يومي: زر «حضور» داخل المهمة</li>
+                <li>مشاهدة إعلان AdMob مكافأة: مهام ad_1 / ad_3 / ad_5 (نقاط بعد المشاهدة والاستلام)</li>
+                <li>إعلان مكافأة من الألعاب قد يمنح عملات مباشرة + يتقدّم مهام الإعلانات</li>
+                <li>مهام المضيفة (أنثى في وكالة نشطة): فتح روم، ميك، استقبال هدايا، دعوات، دردشة</li>
                 <li>دعوة روم مكتملة: {{ economy.hostInviteDiamonds }} ألماسة (مضيفة وكالة · حد {{ economy.hostInviteMaxPerDay }}/يوم)</li>
-                <li>الألماس الأساسي من الهدايا والتارجت والدعوات</li>
+                <li>هدايا الدول (أعلام) وفيديو فاخر ضمن كتالوج الهدايا — سكّ ألماس حسب نوع الهدية</li>
+                <li>الألماس الأساسي من الهدايا والتارجت والدعوات (وليس من الحظ كالمصدر الوحيد)</li>
               </ul>
             </section>
 
@@ -422,17 +452,20 @@
 
             <section v-if="enabled.rules" class="pb-page">
               <div class="pb-topbar"><img :src="logoSrc" alt="" /><span>JEHO CHAT</span></div>
-              <header class="pb-head"><span>١٦</span> قواعد عامة</header>
+              <header class="pb-head"><span>١٦</span> قواعد عامة وصلاحيات الطاقم</header>
               <ul class="pb-list">
                 <li>الاحتيال والحسابات المتعددة = إيقاف المكافآت أو الحظر</li>
+                <li>مانجر المنصة: صلاحيات اعتدال داخل الغرف (كتم/طرد/مقاعد) — بلا لوحة إدارة المتصفح</li>
+                <li>سوبر أدمن: إدارة كاملة + لوحة التحكم على المتصفح فقط لمن يخوّله المالك</li>
+                <li>سياسة الأطفال والخصوصية متاحة من إعدادات التطبيق</li>
                 <li>التفسير النهائي لإدارة JEHO CHAT</li>
-                <li>الأسعار والعروض قابلة للتحديث — اعتمد النسخة الأحدث</li>
+                <li>الأسعار والعروض والجداول قابلة للتحديث — اعتمد أحدث PDF من لوحة الإدارة</li>
               </ul>
               <div class="pb-footer">
                 <img :src="logoSrc" alt="JEHO CHAT" />
                 <div>
                   <strong>JEHO CHAT</strong>
-                  <div>Voice rooms · Gifts · Agencies · Play</div>
+                  <div>Voice rooms · Gifts · Agencies · Tasks · Play</div>
                 </div>
               </div>
             </section>
@@ -465,7 +498,8 @@ const brochureEl = ref(null)
 const sectionDefs = [
   { id: 'toc', label: 'فهرس المحتوى' },
   { id: 'economy', label: 'الاقتصاد والعملات والسحب' },
-  { id: 'split', label: 'تقسيم الهدايا والوكالة' },
+  { id: 'split', label: 'تقسيم الهدايا (نسب)' },
+  { id: 'agency', label: 'برنامج الوكالات والمكافآت' },
   { id: 'gifts', label: 'كتالوج الهدايا' },
   { id: 'luckyTiers', label: 'هدايا الحظ' },
   { id: 'packages', label: 'باقات الشحن' },
@@ -476,10 +510,10 @@ const sectionDefs = [
   { id: 'cosmetics', label: 'الإطارات والدخولية' },
   { id: 'lucky', label: 'صناديق الحظ' },
   { id: 'hostTarget', label: 'تارجت المضيفة + جدول الرواتب' },
-  { id: 'tasks', label: 'المهام والدعوات' },
+  { id: 'tasks', label: 'المهام وإعلانات AdMob والدعوات' },
   { id: 'engage', label: 'مسابقات / ألعاب / دراما / بنرات' },
   { id: 'payments', label: 'الدفع ووكلاء الشحن' },
-  { id: 'rules', label: 'القواعد العامة' },
+  { id: 'rules', label: 'القواعد العامة والطاقم' },
 ]
 
 const enabled = reactive(Object.fromEntries(sectionDefs.map((s) => [s.id, true])))
@@ -488,9 +522,9 @@ const meta = reactive({
   title: 'دليل سياسة JEHO CHAT',
   audience: 'للمضيفات · فتح الوكالات · الداعمين',
   intro:
-    'JEHO CHAT تطبيق غرف صوتية مباشرة: تلتقي بالمضيفات، ترسل الهدايا، تفتح وكالة، وتكسب من التارجت والنشاط داخل الروم. هذا الدليل يشرح الاقتصاد، الرواتب، والشحن بلغة واضحة.',
+    'JEHO CHAT تطبيق غرف صوتية: مضيفات، هدايا (عادية / حظ / دول / فيديو)، وكالات، تارجت ورواتب، مهام يومية وإعلانات مكافأة، ألعاب، وسحب ألماس. هذا الدليل الرسمي يشرح الاقتصاد والمكافآت بلغة واضحة.',
   coverExtra:
-    'استخدم هذا الملف كمرجع رسمي قبل فتح وكالة أو بدء الاستضافة أو الشحن. الأسعار والجداول قابلة للتحديث من لوحة الإدارة.',
+    'استخدم هذا الملف كمرجع قبل فتح وكالة أو الاستضافة أو الشحن. يشمل تقسيم الهدايا، مزايا الوكالة، المهام وAdMob، والتارجت. الأسعار والجداول تُحدَّث من لوحة الإدارة — نزّل أحدث PDF دائماً.',
   appDownloadUrl: 'https://play.google.com/store/apps/details?id=com.Dramizo.Series',
   appDownloadLabel: 'تحميل تطبيق JEHO CHAT',
 })

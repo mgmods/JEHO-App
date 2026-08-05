@@ -54,6 +54,11 @@ public class ZegoEngineManager {
     /** Publish requested before room login finished — flush on LOGINED. */
     @Nullable private String pendingPublishStreamId;
     private boolean publisherStreaming;
+    /**
+     * When false (LiveKit is the room RTC), ignore captured/remote sound levels so
+     * near-zero Zego callbacks do not wipe seat speaking waves from the active engine.
+     */
+    private volatile boolean voiceSessionActive = true;
     private final Set<String> playingStreamIds = new HashSet<>();
     private final Map<String, String> playingStreamRooms = new HashMap<>();
     /** Streams paused by speaker-mute — restored on unmute so minimize keeps working. */
@@ -269,19 +274,22 @@ public class ZegoEngineManager {
 
             @Override
             public void onCapturedSoundLevelUpdate(float soundLevel) {
-                if (currentUserId != null) {
-                    for (RoomListener listener : roomListeners) {
-                        try {
-                            listener.onSoundLevel(currentUserId, soundLevel);
-                        } catch (Throwable ignored) {
-                        }
+                if (!voiceSessionActive || currentUserId == null || currentRoomId == null) {
+                    return;
+                }
+                for (RoomListener listener : roomListeners) {
+                    try {
+                        listener.onSoundLevel(currentUserId, soundLevel);
+                    } catch (Throwable ignored) {
                     }
                 }
             }
 
             @Override
             public void onRemoteSoundLevelUpdate(HashMap<String, Float> soundLevels) {
-                if (roomListeners.isEmpty() || soundLevels == null) return;
+                if (!voiceSessionActive || roomListeners.isEmpty() || soundLevels == null) {
+                    return;
+                }
                 for (java.util.Map.Entry<String, Float> entry : soundLevels.entrySet()) {
                     String streamId = entry.getKey();
                     String userId = streamId != null && streamId.endsWith("_audio")
@@ -372,6 +380,26 @@ public class ZegoEngineManager {
         return initialized && engine != null;
     }
 
+    /** Enable/disable Zego as the room's sound-level source (paired with LiveKit). */
+    public void setVoiceSessionActive(boolean active) {
+        voiceSessionActive = active;
+        if (!active) {
+            try {
+                if (engine != null) engine.stopSoundLevelMonitor();
+            } catch (Throwable ignored) {
+            }
+        } else if (engine != null && initialized) {
+            try {
+                engine.startSoundLevelMonitor();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    public boolean isVoiceSessionActive() {
+        return voiceSessionActive;
+    }
+
     public void loginRoom(String roomId, String userId, String token) {
         ensureEngine();
         if (engine == null) {
@@ -386,9 +414,14 @@ public class ZegoEngineManager {
             Log.w(TAG, "loginRoom skipped — token required (no AppSign fallback)");
             return;
         }
+        voiceSessionActive = true;
         if (roomId.equals(currentRoomId) && userId.equals(currentUserId)
                 && engine != null && initialized) {
             renewRoomToken(roomId, token);
+            try {
+                engine.startSoundLevelMonitor();
+            } catch (Throwable ignored) {
+            }
             Log.i(TAG, "adopted existing room session room=" + roomId);
             return;
         }
@@ -413,6 +446,7 @@ public class ZegoEngineManager {
             engine.muteSpeaker(speakerMuted);
             if (!speakerMuted) engine.setAudioRouteToSpeaker(true);
             engine.muteMicrophone(!micEnabled);
+            engine.startSoundLevelMonitor();
         } catch (Exception e) {
             Log.w(TAG, "audio route setup failed", e);
         }
@@ -587,7 +621,12 @@ public class ZegoEngineManager {
         publisherStreaming = false;
         micEnabled = false;
         speakerMuted = true;
+        voiceSessionActive = false;
         if (engine != null) {
+            try {
+                engine.stopSoundLevelMonitor();
+            } catch (Throwable ignored) {
+            }
             try {
                 engine.muteMicrophone(true);
                 engine.muteSpeaker(true);
@@ -602,6 +641,8 @@ public class ZegoEngineManager {
             }
         }
         currentRoomId = null;
+        // Clear so leftover monitor callbacks cannot zero-out speaking waves for another RTC.
+        currentUserId = null;
         Log.i(TAG, "hardLeaveRoom done");
     }
 

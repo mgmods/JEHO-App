@@ -15,6 +15,7 @@ import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.RoomShareCodec;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -27,9 +28,48 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     public ChatPreviewAdapter(Listener listener) { this.listener = listener; }
 
     public void submit(List<ChatDtos.ConversationDto> data) {
+        if (sameList(items, data)) {
+            // Presence / unread only: soft update existing views without clearing avatars.
+            List<ChatDtos.ConversationDto> next = data != null ? data : Collections.emptyList();
+            for (int i = 0; i < items.size() && i < next.size(); i++) {
+                ChatDtos.ConversationDto a = items.get(i);
+                ChatDtos.ConversationDto b = next.get(i);
+                if (!samePreview(a, b)) {
+                    items.set(i, b);
+                    notifyItemChanged(i);
+                }
+            }
+            return;
+        }
         items.clear();
         if (data != null) items.addAll(data);
         notifyDataSetChanged();
+    }
+
+    private static boolean sameList(
+            List<ChatDtos.ConversationDto> a, List<ChatDtos.ConversationDto> b) {
+        if (a == b) return true;
+        if (a == null || b == null || a.size() != b.size()) return false;
+        for (int i = 0; i < a.size(); i++) {
+            String idA = a.get(i) != null ? a.get(i).id : null;
+            String idB = b.get(i) != null ? b.get(i).id : null;
+            if (idA == null ? idB != null : !idA.equals(idB)) return false;
+        }
+        return true;
+    }
+
+    private static boolean samePreview(
+            ChatDtos.ConversationDto a, ChatDtos.ConversationDto b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        if (a.unreadCount != b.unreadCount) return false;
+        String ca = a.lastMessage != null ? a.lastMessage.content : null;
+        String cb = b.lastMessage != null ? b.lastMessage.content : null;
+        if (ca == null ? cb != null : !ca.equals(cb)) return false;
+        Boolean oa = a.peer != null ? a.peer.isOnline : null;
+        Boolean ob = b.peer != null ? b.peer.isOnline : null;
+        if (oa == null ? ob != null : !oa.equals(ob)) return false;
+        return true;
     }
 
     @NonNull
@@ -117,16 +157,12 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         }
 
         if (item.peer != null) {
-            AvatarCosmetics.bindAvatar(holder.b.imgAvatar, item.peer.avatarUrl);
-            // Chat list: personal VIP frame only (host signal is agency-room wear).
-            AvatarCosmetics.applyHostWear(
-                    holder.b.imgFrame,
-                    holder.b.imgHostBadge,
-                    holder.b.imgAvatar,
-                    item.peer.vipBadgeUrl,
-                    null,
-                    null,
-                    null);
+            // VIP/head frame for every peer (admin / manager / super included).
+            AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, item.peer);
+            if (holder.b.imgHostBadge != null) {
+                holder.b.imgHostBadge.setVisibility(View.GONE);
+                holder.b.imgHostBadge.setImageDrawable(null);
+            }
         } else {
             AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, null, null);
             if (holder.b.imgHostBadge != null) {

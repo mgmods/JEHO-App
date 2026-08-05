@@ -10,10 +10,26 @@ export function normalizeStaffRole(user: {
   const raw = String(user.staffRole || '')
     .trim()
     .toLowerCase();
-  if (raw === 'super' || raw === 'super_admin' || raw === 'superadmin') return 'super';
+  if (
+    raw === 'super' ||
+    raw === 'super_admin' ||
+    raw === 'superadmin' ||
+    raw === 'admin'
+  ) {
+    return 'super';
+  }
   if (raw === 'manager' || raw === 'moderator' || raw === 'mod') return 'manager';
+  // Legacy dashboard flag without staffRole column filled in.
   if (user.isAdmin) return 'super';
   return 'none';
+}
+
+/** Browser dashboard + every /admin API: Super only (full powers). */
+export function isDashboardSuper(user: {
+  staffRole?: string | null;
+  isAdmin?: boolean;
+} | null | undefined): boolean {
+  return normalizeStaffRole(user) === 'super';
 }
 
 export function staffRank(role: PlatformStaffRole): number {

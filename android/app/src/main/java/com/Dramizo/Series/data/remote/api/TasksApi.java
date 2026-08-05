@@ -22,6 +22,10 @@ public interface TasksApi {
     @POST("tasks/checkin")
     Call<ApiResponse<Map<String, Object>>> checkin();
 
+    /** After a full AdMob rewarded video watch — advances ad_1 / ad_3 / ad_5 tasks. */
+    @POST("tasks/rewarded-ad/watch")
+    Call<ApiResponse<Map<String, Object>>> watchRewardedAd();
+
     @POST("tasks/daily/{id}/claim")
     Call<ApiResponse<Map<String, Object>>> claim(@Path("id") String id);
 }

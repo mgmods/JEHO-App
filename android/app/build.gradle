@@ -23,8 +23,8 @@ android {
         applicationId "com.Dramizo.Series"
         minSdk 24
         targetSdk 36
-        versionCode 36
-        versionName "2.0.44"
+        versionCode 38
+        versionName "2.0.45"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // Never bake ZEGO AppSign into the APK. AppID comes from the server (/config/zego + join token).
         buildConfigField "long", "ZEGO_APP_ID", "0L"
@@ -173,6 +173,8 @@ dependencies {
     // Load SVG icons from assets/icons by file name (no res conversion).
     implementation 'com.caverock:androidsvg-aar:1.4'
     implementation 'im.zego:express-video:3.24.0'
+    // Free open-source voice alternative (self-hosted LiveKit server).
+    implementation 'io.livekit:livekit-android:2.27.0'
     implementation('io.socket:socket.io-client:2.1.0') {
         exclude group: 'org.json', module: 'json'
     }

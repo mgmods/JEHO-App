@@ -84,14 +84,30 @@ public class ComboGiftView extends FrameLayout {
             recvDesc.setText(label);
             recvDesc.setSelected(true);
         }
+        int combo = Math.max(1, comboCount);
         if (comboNum != null) {
-            comboNum.setText(String.valueOf(Math.max(1, comboCount)));
+            // Mikoo: "x" + count to the right of gift strip digits.
+            comboNum.setText(combo >= 2 ? ("x" + combo) : String.valueOf(combo));
+            comboNum.setTextSize(combo >= 10 ? 20f : 22f);
+            comboNum.setVisibility(VISIBLE);
+            comboNum.animate().cancel();
+            comboNum.setScaleX(0.6f);
+            comboNum.setScaleY(0.6f);
+            comboNum.animate().scaleX(1.15f).scaleY(1.15f).setDuration(160)
+                    .withEndAction(() -> comboNum.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(100).start()).start();
+        }
+        View xMark = findViewById(R.id.vComboX);
+        if (xMark != null) {
+            // Number already includes "x" — hide separate X asset to avoid xx.
+            xMark.setVisibility(GONE);
         }
         if (bg != null) {
-            bg.setImageResource(comboBgForCombo(comboCount, totalCoins));
+            bg.setImageResource(comboBgForCombo(combo, totalCoins));
         }
         if (avatar != null) {
             AvatarCosmetics.bindAvatar(avatar, senderAvatarUrl);
+            avatar.setVisibility(VISIBLE);
         }
         bindGiftIcon(giftIconUrl);
         playCrawl();

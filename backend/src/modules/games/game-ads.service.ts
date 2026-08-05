@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { WalletService } from '../wallet/wallet.service';
+import { TasksService } from '../tasks/tasks.service';
 
 export const GAMES_ADMOB_KEY = 'games.admob';
 
@@ -49,6 +50,7 @@ export class GameAdsService implements OnModuleInit {
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly walletService: WalletService,
+    @Optional() private readonly tasksService?: TasksService,
   ) {}
 
   async onModuleInit() {
@@ -146,10 +148,21 @@ export class GameAdsService implements OnModuleInit {
     if (cfg.rewardedCoins <= 0) {
       throw new BadRequestException('Rewarded coins not configured');
     }
-    return this.walletService.creditGameAdReward(
+    const result = await this.walletService.creditGameAdReward(
       userId,
       cfg.rewardedCoins,
       cfg.rewardedDailyCap,
     );
+    // Count a completed watch toward daily AdMob tasks when coins were granted.
+    if (result?.credited === true) {
+      try {
+        await this.tasksService?.recordProgress(userId, 'ad', 1);
+      } catch (err) {
+        this.logger.warn(
+          `task ad progress: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    return result;
   }
 }

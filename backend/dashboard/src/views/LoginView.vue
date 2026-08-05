@@ -26,6 +26,7 @@
           />
           <h1 class="display-font h3 mb-1 text-white">{{ t('login.title') }}</h1>
           <p class="mb-0 login-sub">{{ t('login.subtitle') }}</p>
+          <p class="mb-0 mt-2 small text-white-50">دخول سوبر أدمن فقط — المانجر والحسابات العادية مرفوضون.</p>
         </div>
 
         <AlertMessage v-if="auth.error" :message="auth.error" type="danger" @dismiss="auth.error = null" />

@@ -34,6 +34,7 @@ import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.RoomOpenChooser;
+import com.Dramizo.Series.util.StaffRoleHelper;
 
 import java.util.Calendar;
 import java.text.NumberFormat;
@@ -43,6 +44,8 @@ public class ProfileFragment extends Fragment {
     private ProfileViewModel viewModel;
     private String myId;
     private MiscDtos.AgencyMineDto agencyMine;
+    private long lastWalletRefreshAtMs = 0L;
+    private static final long MIN_WALLET_REFRESH_MS = 15_000L;
 
     @Nullable
     @Override
@@ -145,6 +148,7 @@ public class ProfileFragment extends Fragment {
             myId = user.id;
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
+            bindStaffUi(user);
             final String publicId = user.displayPublicId();
             binding.tvUsername.setText(publicId.isEmpty() ? "ID: —" : ("ID: " + publicId));
             if (binding.btnCopyId != null) {
@@ -308,18 +312,56 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        if (viewModel != null) viewModel.loadMe();
+        // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
+        if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
-        refreshWalletBalances();
-        if (binding != null && binding.webProfileHostSignal != null
-                && binding.webProfileHostSignal.getVisibility() == View.VISIBLE) {
-            binding.webProfileHostSignal.resumeMotion();
+        refreshWalletBalances(false);
+    }
+
+    private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null) return;
+        String role = StaffRoleHelper.normalize(user);
+        boolean isStaff = StaffRoleHelper.isStaff(user);
+        if (binding.tvStaffBadge != null) {
+            if (isStaff) {
+                binding.tvStaffBadge.setVisibility(View.VISIBLE);
+                binding.tvStaffBadge.setText(StaffRoleHelper.badgeAr(user));
+                binding.tvStaffBadge.setBackgroundResource(
+                        StaffRoleHelper.SUPER.equals(role)
+                                ? R.drawable.bg_chip_staff_super
+                                : R.drawable.bg_chip_staff_manager);
+            } else {
+                binding.tvStaffBadge.setVisibility(View.GONE);
+            }
+        }
+        if (binding.panelStaffPowers != null) {
+            if (isStaff) {
+                binding.panelStaffPowers.setVisibility(View.VISIBLE);
+                if (binding.tvStaffPanelTitle != null) {
+                    binding.tvStaffPanelTitle.setText(
+                            StaffRoleHelper.SUPER.equals(role)
+                                    ? "صلاحيات سوبر أدمن"
+                                    : "صلاحيات المانجر");
+                }
+                if (binding.tvStaffPowers != null) {
+                    binding.tvStaffPowers.setText(StaffRoleHelper.powersAr(user));
+                }
+            } else {
+                binding.panelStaffPowers.setVisibility(View.GONE);
+            }
         }
     }
 
-    private void refreshWalletBalances() {
+    private void refreshWalletBalances(boolean force) {
         if (binding == null || binding.tvWalletCoins == null) return;
         if (!isAdded()) return;
+        long now = System.currentTimeMillis();
+        if (!force && now - lastWalletRefreshAtMs < MIN_WALLET_REFRESH_MS
+                && binding.tvWalletCoins.getText() != null
+                && !"—".equals(binding.tvWalletCoins.getText().toString())) {
+            return;
+        }
+        lastWalletRefreshAtMs = now;
         final androidx.fragment.app.FragmentActivity act = getActivity();
         if (act == null) return;
         final com.Dramizo.Series.di.AppContainer container = ContainerProvider.from(act);
@@ -331,11 +373,15 @@ public class ProfileFragment extends Fragment {
                 if (!isAdded() || binding == null) return;
                 if (r.success && r.data != null) {
                     NumberFormat nf = NumberFormat.getInstance();
-                    if (binding.tvWalletCoins != null) {
-                        binding.tvWalletCoins.setText(nf.format(Math.max(0, r.data.coins)));
+                    String coins = nf.format(Math.max(0, r.data.coins));
+                    String diamonds = nf.format(Math.max(0, r.data.diamonds));
+                    if (binding.tvWalletCoins != null
+                            && !coins.contentEquals(binding.tvWalletCoins.getText())) {
+                        binding.tvWalletCoins.setText(coins);
                     }
-                    if (binding.tvWalletDiamonds != null) {
-                        binding.tvWalletDiamonds.setText(nf.format(Math.max(0, r.data.diamonds)));
+                    if (binding.tvWalletDiamonds != null
+                            && !diamonds.contentEquals(binding.tvWalletDiamonds.getText())) {
+                        binding.tvWalletDiamonds.setText(diamonds);
                     }
                 }
             });

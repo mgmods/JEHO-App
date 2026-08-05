@@ -68,9 +68,10 @@ export class JwtAuthGuard implements CanActivate {
         ...payload,
         sub: user.id,
         username: user.username,
-        isAdmin: user.isAdmin || staffRole === 'super',
+        isAdmin: staffRole === 'super',
+        isSuperAdmin: staffRole === 'super',
         staffRole,
-        role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
+        role: staffRole === 'super' ? 'admin' : 'user',
         isGuest: user.isGuest,
       };
       return true;

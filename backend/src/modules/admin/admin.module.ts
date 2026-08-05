@@ -26,6 +26,7 @@ import { UserGameItem } from '../../database/entities/user-game-item.entity';
 import { WalletModule } from '../wallet/wallet.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { ZegoModule } from '../zego/zego.module';
+import { LiveKitModule } from '../livekit/livekit.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ContestsModule } from '../contests/contests.module';
@@ -40,6 +41,7 @@ import { DramaModule } from '../drama/drama.module';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { AgenciesModule } from '../agencies/agencies.module';
+import { GiftsModule } from '../gifts/gifts.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -68,6 +70,7 @@ import { AgenciesModule } from '../agencies/agencies.module';
     WalletModule,
     PaymentsModule,
     ZegoModule,
+    LiveKitModule,
     RealtimeModule,
     NotificationsModule,
     ContestsModule,
@@ -80,6 +83,7 @@ import { AgenciesModule } from '../agencies/agencies.module';
     RechargeAgentsModule,
     DramaModule,
     AgenciesModule,
+    GiftsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

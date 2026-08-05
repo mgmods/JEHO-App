@@ -142,6 +142,8 @@ public final class GlobalCelebrationToast {
         TextView btnGo = banner.findViewById(R.id.btnCelebrationGo);
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
+        boolean gameOrLucky = kind != null && (
+                "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
@@ -155,19 +157,25 @@ public final class GlobalCelebrationToast {
             tvTitle.setText(title != null && !title.isEmpty() ? title : "مبروك!");
         }
 
-        String absAvatar = AssetCatalog.absoluteUrl(avatarUrl);
+        // Game/luck home strip: game cover/gift icon only — never a personal portrait bubble.
+        String leftUrl = gameOrLucky
+                ? firstNonEmpty(badgeUrl, null)
+                : avatarUrl;
+        String absLeft = AssetCatalog.absoluteUrl(leftUrl);
         if (avatar != null) {
-            if (absAvatar != null && !absAvatar.isEmpty()) {
+            if (absLeft != null && !absLeft.isEmpty()) {
                 try {
                     Glide.with(activity.getApplicationContext())
-                            .load(absAvatar)
-                            .circleCrop()
+                            .load(absLeft)
+                            .centerCrop()
                             .into(avatar);
                 } catch (Exception ignored) {
-                    avatar.setImageResource(R.drawable.jeho_logo);
+                    avatar.setImageResource(R.drawable.ic_screen_chat_lottery);
                 }
             } else {
-                avatar.setImageResource(R.drawable.jeho_logo);
+                avatar.setImageResource(gameOrLucky
+                        ? R.drawable.ic_screen_chat_lottery
+                        : R.drawable.jeho_logo);
             }
         }
 
@@ -192,7 +200,8 @@ public final class GlobalCelebrationToast {
             if (badge != null) badge.setVisibility(View.GONE);
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
-            String absBadge = AssetCatalog.absoluteUrl(badgeUrl);
+            // Game/luck already put badge on the left icon — hide trailing personal badge.
+            String absBadge = gameOrLucky ? null : AssetCatalog.absoluteUrl(badgeUrl);
             if (badge != null && !showGo) {
                 if (absBadge != null && !absBadge.isEmpty()) {
                     badge.setVisibility(View.VISIBLE);
@@ -283,5 +292,12 @@ public final class GlobalCelebrationToast {
 
     private static int dp(Activity activity, int value) {
         return Math.round(value * activity.getResources().getDisplayMetrics().density);
+    }
+
+    @Nullable
+    private static String firstNonEmpty(@Nullable String a, @Nullable String b) {
+        if (a != null && !a.trim().isEmpty()) return a.trim();
+        if (b != null && !b.trim().isEmpty()) return b.trim();
+        return null;
     }
 }

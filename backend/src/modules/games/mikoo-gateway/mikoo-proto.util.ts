@@ -1,5 +1,18 @@
 /** Minimal protobuf encode/decode for Mikoo hash-game messages. */
 
+import {
+  BOUNTY_AREA_RATIOS,
+  BOUNTY_BET_CHIPS,
+  GREEDY_BOX_RATIOS,
+  LUCK_CAR_RATIOS_MILLI,
+  LUCKY77_AREA_RATIOS,
+  MIKOO_BET_CHIPS,
+  MIKOO_CRASH_CHIPS,
+  MIKOO_WIN_MULTS,
+  chipsList,
+  randomWinMult,
+} from './mikoo-game-economy';
+
 function writeVarint(n: number): Buffer {
   const out: number[] = [];
   let v = n >>> 0;
@@ -279,6 +292,19 @@ export function encodeGetUserDataFor(
     ]);
   }
 
+  // bounty-football: code@1 desc@2 id@3 name@4 head@5 erbanNo@7 userMoney@9(double)
+  if (slug === 'bounty-football') {
+    return encodeMessage([
+      pbInt32(1, data.code),
+      pbString(2, data.desc),
+      pbInt32(3, id),
+      pbString(4, name),
+      pbString(5, head),
+      pbInt32(7, id),
+      pbDouble(9, data.userMoney),
+    ]);
+  }
+
   // Layout B — crash / luck-car / megaways (tipType before id)
   if (slug === 'crash' || slug === 'luck-car' || slug === 'megaways-slots') {
     return encodeMessage([
@@ -344,9 +370,9 @@ export function encodeGreedyTableInfoRes(data: {
   userMoney: number;
   chips?: number[];
 }): Buffer {
-  const chips = data.chips ?? [100, 500, 1000, 5000, 10000];
+  const chips = data.chips ?? chipsList();
   const boxes: Buffer[] = [];
-  const ratios = [2, 3, 5, 8, 10, 15, 20, 50];
+  const ratios = [...GREEDY_BOX_RATIOS];
   for (let i = 0; i < 8; i++) {
     const box = encodeMessage([
       pbUInt32(1, i + 1),
@@ -468,9 +494,226 @@ export function encodeGreedyResultBroadcast(data: {
   ]);
 }
 
+/** BountyFootball (gameType 100) — multi-icon bet table. 10 areas. */
+export const BOUNTY_FOOTBALL_RATIOS = [...BOUNTY_AREA_RATIOS];
+export const BOUNTY_FOOTBALL_CHIPS = [...BOUNTY_BET_CHIPS];
+
+function pbBool(field: number, value: boolean): Buffer {
+  return Buffer.concat([tag(field, 0), writeVarint(value ? 1 : 0)]);
+}
+
+function pbPackedInt32(field: number, values: number[]): Buffer {
+  const payload = Buffer.concat(values.map((v) => writeVarint(v | 0)));
+  return Buffer.concat([tag(field, 2), writeVarint(payload.length), payload]);
+}
+
+function encodeBountyBetStu(iconId: number, money: number): Buffer {
+  return encodeMessage([
+    pbInt32(1, iconId | 0),
+    pbDouble(2, Math.max(0, Number(money) || 0)),
+  ]);
+}
+
+function encodeBountyOpenAward(data: {
+  name: string;
+  head: string;
+  totalBet: number;
+  totalGain: number;
+}): Buffer {
+  return encodeMessage([
+    pbString(1, data.name || 'Player'),
+    pbString(2, data.head || ''),
+    pbInt32(3, Math.max(0, Math.floor(data.totalBet))),
+    pbInt32(4, Math.max(0, Math.floor(data.totalGain))),
+  ]);
+}
+
+function encodeBountyAnimateTime(turnTime = 4, rankTime = 2): Buffer {
+  return encodeMessage([pbDouble(1, turnTime), pbDouble(2, rankTime)]);
+}
+
+function encodeBountyBetStuArr(bets: Array<{ iconId: number; money: number }>): Buffer {
+  const parts: Buffer[] = [];
+  for (const b of bets) {
+    const row = encodeBountyBetStu(b.iconId, b.money);
+    parts.push(Buffer.concat([tag(1, 2), writeVarint(row.length), row]));
+  }
+  return encodeMessage(parts);
+}
+
+/** bounty-football TableInfoRes — unlocks board after login. */
+export function encodeBountyFootballTableInfoRes(data: {
+  state: number;
+  timeLeft: number;
+  curTurn: number;
+  history?: number[];
+  allAreaBets?: Array<{ iconId: number; money: number }>;
+  myBets?: Array<{ iconId: number; money: number }>;
+  todayWin?: number;
+  totalGain?: number;
+  myTotalBet?: number;
+  totalBet?: number;
+  curTurnRewardIcon?: number;
+  /** Wheel light stop 1..16 (never 0). */
+  turnPos?: number;
+}): Buffer {
+  const chips = BOUNTY_FOOTBALL_CHIPS;
+  const ratios = BOUNTY_FOOTBALL_RATIOS;
+  const history = (data.history ?? []).slice(-12);
+  const turnPos = Math.max(1, Math.min(16, data.turnPos || 1));
+  const parts: Buffer[] = [
+    pbInt32(1, data.state | 0),
+    pbUInt32(2, Math.max(0, data.timeLeft | 0)),
+    Buffer.concat([
+      tag(3, 2),
+      writeVarint(encodeBountyAnimateTime().length),
+      encodeBountyAnimateTime(),
+    ]),
+  ];
+  for (const b of data.allAreaBets ?? []) {
+    const row = encodeBountyBetStu(b.iconId, b.money);
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbPackedInt32(5, chips));
+  parts.push(pbInt32(6, turnPos));
+  if (history.length) parts.push(pbPackedInt32(7, history));
+  parts.push(pbDouble(8, Math.max(0, data.todayWin ?? 0)));
+  for (const b of data.myBets ?? []) {
+    const row = encodeBountyBetStu(b.iconId, b.money);
+    parts.push(Buffer.concat([tag(9, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbDouble(10, Math.max(0, data.totalGain ?? 0)));
+  parts.push(pbInt32(12, data.curTurnRewardIcon ?? 0));
+  parts.push(pbInt32(13, data.curTurn | 0));
+  parts.push(pbPackedUInt32(15, ratios));
+  parts.push(pbDouble(18, Math.max(0, data.myTotalBet ?? 0)));
+  parts.push(pbDouble(19, Math.max(0, data.totalBet ?? 0)));
+  parts.push(pbInt32(20, 0)); // lastSpeed
+  parts.push(pbBool(21, false)); // hasRepeat
+  return encodeMessage(parts);
+}
+
+export function encodeBountyFootballStartBetBroadcast(
+  state: number,
+  betTime: number,
+  curTurn: number,
+): Buffer {
+  return encodeMessage([
+    pbInt32(1, state),
+    pbInt32(2, Math.max(0, betTime | 0)),
+    pbInt32(3, curTurn | 0),
+    pbBool(4, false),
+  ]);
+}
+
+export function encodeBountyFootballBetRes(data: {
+  code: number;
+  desc: string;
+  userMoney: number;
+  tipType?: number;
+  allAreaBets?: Array<{ iconId: number; money: number }>;
+  curBet?: { iconId: number; money: number };
+  myBets?: Array<{ iconId: number; money: number }>;
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, data.code),
+    pbString(2, data.desc),
+    pbDouble(3, Math.max(0, Number(data.userMoney) || 0)),
+  ];
+  if (data.allAreaBets?.length) {
+    const arr = encodeBountyBetStuArr(data.allAreaBets);
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(arr.length), arr]));
+  }
+  if (data.curBet) {
+    const row = encodeBountyBetStu(data.curBet.iconId, data.curBet.money);
+    parts.push(Buffer.concat([tag(5, 2), writeVarint(row.length), row]));
+  }
+  if (data.myBets?.length) {
+    const arr = encodeBountyBetStuArr(data.myBets);
+    parts.push(Buffer.concat([tag(6, 2), writeVarint(arr.length), arr]));
+  }
+  parts.push(pbInt32(7, data.tipType ?? 0));
+  return encodeMessage(parts);
+}
+
+export function encodeBountyFootballOtherPlayerBetBroadcast(data: {
+  allAreaBets: Array<{ iconId: number; money: number }>;
+  playerId: number;
+  bet: { iconId: number; money: number };
+}): Buffer {
+  const parts: Buffer[] = [];
+  for (const b of data.allAreaBets) {
+    const row = encodeBountyBetStu(b.iconId, b.money);
+    parts.push(Buffer.concat([tag(1, 2), writeVarint(row.length), row]));
+  }
+  const userBet = encodeMessage([
+    pbInt32(1, data.playerId | 0),
+    Buffer.concat([
+      tag(2, 2),
+      writeVarint(encodeBountyBetStu(data.bet.iconId, data.bet.money).length),
+      encodeBountyBetStu(data.bet.iconId, data.bet.money),
+    ]),
+  ]);
+  parts.push(Buffer.concat([tag(2, 2), writeVarint(userBet.length), userBet]));
+  return encodeMessage(parts);
+}
+
+export function encodeBountyFootballResultBroadcast(data: {
+  state?: number;
+  betTime: number;
+  betRank?: Array<{ name: string; head: string; totalBet: number; totalGain: number }>;
+  myReward?: { name: string; head: string; totalBet: number; totalGain: number };
+  curTurnRewardIcon: number;
+  turnPos?: number;
+  curTurn: number;
+  userMoney: number;
+  todayWin?: number;
+  rewardHistory?: number[];
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, data.state ?? 0), // SETTLEMENT
+    pbInt32(2, Math.max(0, data.betTime | 0)),
+  ];
+  for (const r of data.betRank ?? []) {
+    const row = encodeBountyOpenAward(r);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  if (data.myReward) {
+    const row = encodeBountyOpenAward(data.myReward);
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(row.length), row]));
+  }
+  // Field 5 unused; curTurnRewardIcon@6 turnPos@7 curTurn@8 userMoney@9 todayWin@10 history@11
+  parts.push(pbInt32(6, data.curTurnRewardIcon | 0));
+  parts.push(pbInt32(7, data.turnPos ?? 0));
+  parts.push(pbInt32(8, data.curTurn | 0));
+  parts.push(pbDouble(9, Math.max(0, Number(data.userMoney) || 0)));
+  parts.push(pbInt32(10, Math.max(0, Math.floor(data.todayWin ?? 0))));
+  if (data.rewardHistory?.length) {
+    parts.push(pbPackedInt32(11, data.rewardHistory));
+  }
+  return encodeMessage(parts);
+}
+
+export function encodeBountyFootballGetRankDataRes(
+  ranks: Array<{ playerId?: number; name: string; head: string; winMoney: number }>,
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const r of ranks) {
+    const row = encodeMessage([
+      pbInt32(1, Math.max(0, Math.floor(r.playerId ?? 0))),
+      pbString(2, r.name || 'Player'),
+      pbString(3, r.head || ''),
+      pbDouble(4, Math.max(0, Number(r.winMoney) || 0)),
+    ]);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  return encodeMessage(parts);
+}
+
 /** 7updown TableInfo — different from crash. */
 const SEVEN_UP_AREA_RATIOS: Record<number, number> = { 1: 2, 2: 5, 3: 2 };
-const SEVEN_UP_CHIPS = [10, 50, 100, 500, 1000];
+const SEVEN_UP_CHIPS = chipsList();
+const SEVEN_UP_CHIP_CSV = MIKOO_BET_CHIPS.join(',');
 
 function encode7UpBetArea(data: {
   id: number;
@@ -595,8 +838,8 @@ export function encodeTableInfo7UpDown(data: {
   }
   // betConf@9 chips: id, betMin, conf csv
   const chips = [
-    { id: 1, min: 10, conf: '10,50,100,500,1000' },
-    { id: 2, min: 100, conf: '100,500,1000,5000' },
+    { id: 1, min: 50, conf: SEVEN_UP_CHIP_CSV },
+    { id: 2, min: 100, conf: SEVEN_UP_CHIP_CSV },
   ];
   for (const c of chips) {
     const row = encodeMessage([
@@ -606,7 +849,7 @@ export function encodeTableInfo7UpDown(data: {
     ]);
     parts.push(Buffer.concat([tag(9, 2), writeVarint(row.length), row]));
   }
-  // AvailableChips@14 int32 — unlocks 10/50/100/500 tray
+  // AvailableChips@14 int32 — unlocks expanded bet tray
   for (const chip of SEVEN_UP_CHIPS) {
     parts.push(pbInt32(14, chip));
   }
@@ -770,7 +1013,7 @@ export function encodeTableInfoCrash(data: {
   parts.push(pbInt32(13, data.cashOutConfType ?? 0));
   parts.push(pbInt32(14, data.cashOutConfRatio ?? 101)); // 1.01x default
   // Crash UI only has chip0..chip3 (AMOUNDNUM=4). Extra chips → null.getChildByName freeze.
-  const chips = (data.availableChips ?? [100, 500, 1000, 5000]).slice(0, 4);
+  const chips = (data.availableChips ?? [...MIKOO_CRASH_CHIPS]).slice(0, 4);
   for (const chip of chips) {
     parts.push(pbInt32(15, Math.max(1, Math.floor(Number(chip) || 0))));
   }
@@ -852,29 +1095,43 @@ export function encodeOlympiansBetRes(data: {
   selfMoney: number;
   winMoney: number;
   tipType?: number;
+  /** Actual payout mult (x2..x50) — painted on win line cells. */
+  mult?: number;
 }): Buffer {
   const cols = 6;
   const rows = 5;
   const win = Math.max(0, Math.floor(data.winMoney || 0));
   const winSymbol = 1 + Math.floor(Math.random() * 8);
+  const paidMult =
+    data.mult && data.mult > 0
+      ? data.mult
+      : win > 0
+        ? randomWinMult()
+        : 0;
 
   type Cell = { row: number; col: number; number: number; mul: number };
   const board: Cell[] = [];
   for (let col = 0; col < cols; col++) {
     for (let row = 0; row < rows; row++) {
+      // Scatter decorative mults so players see x2 / x10 / x50 values on symbols.
+      const decor =
+        Math.random() < 0.18 ? randomWinMult() : 1;
       board.push({
         row,
         col,
         number: 1 + Math.floor(Math.random() * 9),
-        mul: 1,
+        mul: decor,
       });
     }
   }
-  // Visual match line when winning (display only — cascade list omitted to avoid freeze).
+  // Visual match line when winning — paint paid mult so UI shows the true x.
   if (win > 0) {
     for (let col = 0; col < Math.min(5, cols); col++) {
       const cell = board.find((c) => c.col === col && c.row === 2);
-      if (cell) cell.number = winSymbol;
+      if (cell) {
+        cell.number = winSymbol;
+        cell.mul = Math.max(1, paidMult || randomWinMult());
+      }
     }
   }
 
@@ -915,22 +1172,31 @@ export function encodeSugarBetRes(data: {
   money: number;
   tipType?: number;
   winMoney?: number;
+  mult?: number;
 }): Buffer {
+  const win = Math.max(0, Math.floor(data.winMoney ?? 0));
+  const paidMult = data.mult && data.mult > 0 ? data.mult : win > 0 ? randomWinMult() : 1;
   const matrix: Buffer[] = [];
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col < 6; col++) {
+      const mul =
+        win > 0 && row === 2 && col < 5
+          ? Math.max(1, paidMult)
+          : Math.random() < 0.15
+            ? randomWinMult()
+            : 1;
       matrix.push(
         encodeMessage([
           pbInt32(1, row),
           pbInt32(2, col),
           pbInt32(3, 1 + Math.floor(Math.random() * 8)),
-          pbInt32(4, 1),
+          pbInt32(4, mul),
         ]),
       );
     }
   }
   const symbolInfo = encodeMessage([
-    pbInt32(1, Math.max(0, Math.floor(data.winMoney ?? 0))),
+    pbInt32(1, win),
     pbInt32(2, 0),
     ...matrix.map((m) => Buffer.concat([tag(3, 2), writeVarint(m.length), m])),
   ]);
@@ -1078,6 +1344,7 @@ export function encodeFortuneGemsRes(data: {
   userMoney: number;
   winMoney: number;
   tipType?: number;
+  mult?: number;
 }): Buffer {
   const icons: Buffer[] = [];
   // 5x3 grid typical for fortune gems
@@ -1085,6 +1352,7 @@ export function encodeFortuneGemsRes(data: {
     icons.push(pbUInt32(6, 1 + Math.floor(Math.random() * 8)));
   }
   const isWin = data.winMoney > 0 ? 1 : 0;
+  const winMult = Math.max(0, Math.floor(data.mult ?? (isWin ? randomWinMult() : 0)));
   return encodeMessage([
     pbUInt32(1, data.code),
     pbString(2, data.desc),
@@ -1093,7 +1361,7 @@ export function encodeFortuneGemsRes(data: {
     pbDouble(5, data.userMoney),
     ...icons,
     pbUInt32(8, 0), // lineReturn
-    pbUInt32(10, isWin ? 1 : 0), // winMultiplier
+    pbUInt32(10, winMult), // winMultiplier — show x2..x50
     pbUInt32(11, 0), // WheelWinMoney
     pbUInt32(12, Math.max(0, Math.floor(data.winMoney))),
     pbInt32(13, data.tipType ?? 0),
@@ -1102,11 +1370,11 @@ export function encodeFortuneGemsRes(data: {
 
 /** Minimal GameCfgRes for fortune gems (unlocks spin UI). */
 export function encodeFortuneGameCfgRes(): Buffer {
-  const betMult = [1, 2, 5, 10, 20, 50, 100].map((n) => pbUInt32(4, n));
+  const betMult = MIKOO_BET_CHIPS.map((n) => pbUInt32(4, n));
   const cfg = encodeMessage([
     pbUInt32(1, 1), // gameSwitch on
     pbUInt32(2, 10000), // maxBet
-    pbUInt32(3, 1), // minBet
+    pbUInt32(3, 50), // minBet
     ...betMult,
   ]);
   return encodeMessage([
@@ -1123,24 +1391,25 @@ export function encodeFortuneGameCfgRes(): Buffer {
  */
 export function encodeLineSlotsGameCfgRsp(): Buffer {
   const defaultCfg = encodeMessage([
-    pbInt32(1, 10), // BasicBetLimit
-    pbInt32(2, 1), // MinBet
+    pbInt32(1, 50), // BasicBetLimit
+    pbInt32(2, 50), // MinBet
     pbInt32(3, 3), // ScrollGrid (rows)
     pbInt32(4, 0), // BonusTrunCount
-    pbString(5, '[1,2,5,10,20,50,100]'), // BetMult — JSON array
+    pbString(5, JSON.stringify([...MIKOO_BET_CHIPS])), // BetMult — stake tray
     pbString(6, '[10,20,50,100]'), // AutoSpinCount — JSON array
   ]);
   const symbols: Buffer[] = [];
+  // Score mults lean into product x2..x50 range (3/4/5-of-a-kind).
   const mults = [
-    [5, 10, 20],
-    [5, 15, 30],
-    [8, 20, 40],
+    [2, 3, 4],
+    [3, 4, 10],
+    [4, 10, 20],
+    [10, 20, 25],
+    [20, 25, 50],
+    [3, 10, 25],
+    [4, 20, 50],
     [10, 25, 50],
-    [15, 40, 80],
-    [20, 50, 100],
-    [25, 75, 150],
-    [40, 100, 250],
-    [50, 150, 500],
+    [2, 20, 50],
   ];
   for (let i = 1; i <= 9; i++) {
     const m = mults[i - 1] || [5, 10, 20];
@@ -1204,7 +1473,7 @@ export function encodeLineSlotsGetUserRecordRes(): Buffer {
 }
 
 /** megaways / sugar chip list — unlocks bet UI after splash. */
-export function encodeChipCfgRes(chips: number[] = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]): Buffer {
+export function encodeChipCfgRes(chips: number[] = chipsList()): Buffer {
   return encodeMessage([
     pbInt32(1, 0),
     pbString(2, 'OK'),
@@ -1213,7 +1482,7 @@ export function encodeChipCfgRes(chips: number[] = [1, 2, 5, 10, 20, 50, 100, 20
   ]);
 }
 
-const DEFAULT_SPIN_CHIPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+const DEFAULT_SPIN_CHIPS = chipsList();
 
 /** olympians TableInfo: availableChips@1*, free@2, extra@3 — unlocks +/- bet (avoids NaN). */
 export function encodeOlympiansTableInfo(
@@ -1255,9 +1524,8 @@ export function encodeCleopatraTableInfo(
   ]);
 }
 
-/** UI ratios are milli (ratio/1000 → x2). Settlement still uses real 2..25. */
-const LUCK_CAR_RATIOS_MILLI = [2000, 3000, 4000, 5000, 8000, 10000, 15000, 25000];
-const LUCK_CAR_CHIPS = [100, 500, 1000, 5000, 10000, 50000];
+/** UI ratios are milli (ratio/1000 → x2). Settlement uses real ratios from economy module. */
+const LUCK_CAR_CHIPS = chipsList();
 
 function encodeLuckCarBetArea(id: number, ratio: number, totalBet = 0, myBet = 0): Buffer {
   return encodeMessage([
@@ -1523,7 +1791,7 @@ export function encodeOkCodeDesc(code = 0, desc = 'OK'): Buffer {
 /** Lucky77 wheel positions 1..9 → area types 1/2/3 (client bets iconId 0/1/2). */
 export const LUCKY77_ROUNDNO = [1, 2, 1, 2, 1, 2, 1, 2, 3] as const;
 /** Payout ratios for bet icons 0,1,2 — matches TableInfoRes.ratios. */
-export const LUCKY77_RATIOS = [2, 2, 8] as const;
+export const LUCKY77_RATIOS = [...LUCKY77_AREA_RATIOS] as [number, number, number];
 
 function encodeLucky77BetStruct(icon: number, money: number): Buffer {
   return encodeMessage([
@@ -1557,7 +1825,7 @@ export function encodeLucky77TableInfoRes(data: {
   myAreaBet?: Array<{ icon: number; money: number }>;
   betTotal?: Array<{ icon: number; money: number }>;
 }): Buffer {
-  const chips = data.chips ?? [100, 500, 1000, 5000];
+  const chips = data.chips ?? chipsList();
   const ratios = data.ratios ?? [...LUCKY77_RATIOS];
   const history = data.history ?? [1, 2, 3, 4, 5, 9, 1, 2];
   const parts: Buffer[] = [

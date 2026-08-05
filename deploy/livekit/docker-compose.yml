@@ -1,0 +1,15 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: jeho-livekit
+    restart: unless-stopped
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    command: --config /etc/livekit.yaml --keys "$$LIVEKIT_KEYS"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      # Format: "APIKEY: secret" (same values as Nest LIVEKIT_API_KEY / LIVEKIT_API_SECRET)
+      LIVEKIT_KEYS: ${LIVEKIT_KEYS:?Set LIVEKIT_KEYS in .env like APIJEHOVOICE: your_secret}

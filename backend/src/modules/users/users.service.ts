@@ -28,6 +28,7 @@ import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { UpdateProfileDto, ReportUserDto } from './dto/users.dto';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { normalizeStaffRole } from '../../common/staff-role';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { TasksService } from '../tasks/tasks.service';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
@@ -115,19 +116,12 @@ export class UsersService {
     const p = user.profile;
     const economy = this.economyStats(p);
     const newbie = this.newUserFlags(user);
-    const staffRole = (() => {
-      const raw = String((user as any).staffRole || '')
-        .trim()
-        .toLowerCase();
-      if (raw === 'super' || raw === 'super_admin' || raw === 'superadmin') return 'super';
-      if (raw === 'manager' || raw === 'moderator' || raw === 'mod') return 'manager';
-      if (user.isAdmin) return 'super';
-      return 'none';
-    })();
+    const staffRole = normalizeStaffRole(user);
     return {
       ...user,
       staffRole,
-      isAdmin: !!user.isAdmin || staffRole === 'super',
+      isAdmin: staffRole === 'super',
+      isSuperAdmin: staffRole === 'super',
       bio: p?.bio ?? user['bio'] ?? null,
       coverUrl: p?.coverUrl ?? null,
       entryEffectUrl: p?.entryEffectUrl ?? null,

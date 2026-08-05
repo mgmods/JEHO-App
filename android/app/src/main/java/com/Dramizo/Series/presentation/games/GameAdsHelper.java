@@ -141,17 +141,43 @@ public final class GameAdsHelper {
     }
 
     public void showRewardedForCoins(@NonNull Activity activity, @NonNull RewardUiCallback cb) {
+        showRewardedInternal(activity, true, cb, null);
+    }
+
+    /**
+     * Show rewarded ad for task progress only (no game-coin claim).
+     * Caller should POST /tasks/rewarded-ad/watch on success.
+     */
+    public void showRewardedForTask(@NonNull Activity activity, @NonNull TaskWatchCallback cb) {
+        showRewardedInternal(activity, false, null, cb);
+    }
+
+    public interface TaskWatchCallback {
+        void onPreparing();
+        /** true if user earned the reward (watched full ad). */
+        void onFinished(boolean earned, @Nullable String message);
+    }
+
+    private void showRewardedInternal(
+            @NonNull Activity activity,
+            boolean claimCoins,
+            @Nullable RewardUiCallback coinCb,
+            @Nullable TaskWatchCallback taskCb) {
         boundActivity = activity;
         ensureSdk(activity);
         if (!isRewardedEnabled()) {
-            cb.onResult(false, 0, 0, "إعلانات المكافأة غير مفعّلة");
+            String msg = "إعلانات المكافأة غير مفعّلة — فعّلها من لوحة التحكم (ألعاب / AdMob)";
+            if (coinCb != null) coinCb.onResult(false, 0, 0, msg);
+            if (taskCb != null) taskCb.onFinished(false, msg);
             return;
         }
         if (showing) return;
 
         Runnable show = () -> {
             if (rewardedAd == null) {
-                cb.onResult(false, 0, 0, "الإعلان غير جاهز، حاول لاحقاً");
+                String msg = "الإعلان غير جاهز، حاول لاحقاً";
+                if (coinCb != null) coinCb.onResult(false, 0, 0, msg);
+                if (taskCb != null) taskCb.onFinished(false, msg);
                 preloadRewarded(activity);
                 return;
             }
@@ -159,16 +185,23 @@ public final class GameAdsHelper {
             final boolean[] earned = {false};
             final RewardedAd ad = rewardedAd;
             rewardedAd = null;
-            cb.onPreparing();
+            if (coinCb != null) coinCb.onPreparing();
+            if (taskCb != null) taskCb.onPreparing();
             ad.setFullScreenContentCallback(new FullScreenContentCallback() {
                 @Override
                 public void onAdDismissedFullScreenContent() {
                     showing = false;
                     preloadRewarded(activity);
                     if (earned[0]) {
-                        claimReward(activity, cb);
+                        if (claimCoins && coinCb != null) {
+                            claimReward(activity, coinCb);
+                        } else if (taskCb != null) {
+                            taskCb.onFinished(true, null);
+                        }
                     } else {
-                        cb.onResult(false, 0, 0, "أكمل مشاهدة الإعلان للحصول على المكافأة");
+                        String msg = "أكمل مشاهدة الإعلان للحصول على المكافأة";
+                        if (coinCb != null) coinCb.onResult(false, 0, 0, msg);
+                        if (taskCb != null) taskCb.onFinished(false, msg);
                     }
                 }
 
@@ -176,7 +209,9 @@ public final class GameAdsHelper {
                 public void onAdFailedToShowFullScreenContent(@NonNull AdError error) {
                     showing = false;
                     preloadRewarded(activity);
-                    cb.onResult(false, 0, 0, "تعذر عرض الإعلان");
+                    String msg = "تعذر عرض الإعلان";
+                    if (coinCb != null) coinCb.onResult(false, 0, 0, msg);
+                    if (taskCb != null) taskCb.onFinished(false, msg);
                 }
             });
             ad.show(activity, (OnUserEarnedRewardListener) item -> earned[0] = true);
@@ -186,7 +221,8 @@ public final class GameAdsHelper {
             show.run();
             return;
         }
-        cb.onPreparing();
+        if (coinCb != null) coinCb.onPreparing();
+        if (taskCb != null) taskCb.onPreparing();
         preloadRewarded(activity);
         handler.postDelayed(() -> {
             if (activity.isFinishing() || activity.isDestroyed()) return;

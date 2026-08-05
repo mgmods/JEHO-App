@@ -167,6 +167,7 @@ public class RealtimeClient {
             socket.on("room:slot_lose", onSlotLose);
             socket.on("room:slot_ended", onSlotEnded);
             socket.on("room:gift_sounds", onRoomGiftSounds);
+            socket.on("room:display_settings", onRoomDisplaySettings);
             socket.on("task:progress", onTaskProgress);
             socket.on("contest:score", onContestScore);
             socket.on("social:request", onSocialRequest);
@@ -519,6 +520,8 @@ public class RealtimeClient {
             args -> dispatchRoomBroadcast(args, "room:slot_ended");
     private final Emitter.Listener onRoomGiftSounds =
             args -> dispatchRoomBroadcast(args, "room:gift_sounds");
+    private final Emitter.Listener onRoomDisplaySettings =
+            args -> dispatchRoomBroadcast(args, "room:display_settings");
 
     private void dispatchRoomBroadcast(Object[] args, String event) {
         if (args.length == 0 || roomListeners.isEmpty()) return;

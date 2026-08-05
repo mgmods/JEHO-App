@@ -99,6 +99,30 @@ export const DEFAULT_TASKS: DailyTask[] = [
   { id: 't18', title: 'اربح جولة لعبة', rewardPoints: 120, rewardSilver: 35, type: 'win_1', audience: 'all' },
   { id: 't19', title: 'اربح 3 جولات ألعاب', rewardPoints: 220, rewardSilver: 70, type: 'win_3', audience: 'all' },
   { id: 't20', title: 'ادخل 5 غرف صوتية', rewardPoints: 180, rewardSilver: 50, type: 'rooms_5', audience: 'all' },
+  {
+    id: 't21',
+    title: 'شاهد إعلان مكافأة (AdMob)',
+    rewardPoints: 80,
+    rewardSilver: 20,
+    type: 'ad_1',
+    audience: 'all',
+  },
+  {
+    id: 't22',
+    title: 'شاهد 3 إعلانات مكافأة',
+    rewardPoints: 180,
+    rewardSilver: 50,
+    type: 'ad_3',
+    audience: 'all',
+  },
+  {
+    id: 't23',
+    title: 'شاهد 5 إعلانات مكافأة',
+    rewardPoints: 300,
+    rewardSilver: 80,
+    type: 'ad_5',
+    audience: 'all',
+  },
 ];
 
 /** Host-only daily tasks — points/silver only (no cashout diamonds). */
@@ -477,6 +501,17 @@ export class TasksService {
     if (t.startsWith('recharge') || t.startsWith('exchange')) return 'recharge';
     if (t.startsWith('game')) return 'game';
     if (t.startsWith('win')) return 'win';
+    // AdMob rewarded watches (task center + optional game ad bonus progress).
+    if (
+      t.startsWith('ad_') ||
+      t.startsWith('admob') ||
+      t.startsWith('watch_ad') ||
+      t.startsWith('rewarded_ad') ||
+      t === 'ad' ||
+      t === 'admob'
+    ) {
+      return 'ad';
+    }
     return 'custom';
   }
 
@@ -663,6 +698,16 @@ export class TasksService {
   async checkIn(userId: string) {
     await this.recordProgress(userId, 'checkin', 1);
     await this.recordProgress(userId, 'host_checkin', 1);
+    return { ok: true, tasks: await this.listForUser(userId) };
+  }
+
+  /**
+   * After a completed AdMob rewarded video (client must show ad first).
+   * Advances daily tasks with type ad_1 / ad_3 / ad_5 (family "ad").
+   */
+  async watchRewardedAd(userId: string) {
+    if (!userId) throw new BadRequestException('مستخدم غير صالح');
+    await this.recordProgress(userId, 'ad', 1);
     return { ok: true, tasks: await this.listForUser(userId) };
   }
 

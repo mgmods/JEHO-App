@@ -272,19 +272,30 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         java.util.Map<String, Object> hostBadgeMeta = null;
 
         if (mine) {
-            avatarUrl = me != null ? me.avatarUrl : null;
+            // Always re-read session so equipped VIP/head frames show for all roles (incl. staff).
+            AuthDtos.UserDto liveMe = me;
+            try {
+                AuthDtos.UserDto sessionMe = com.Dramizo.Series.presentation.common.ContainerProvider
+                        .from(holder.itemView.getContext())
+                        .getSessionManager()
+                        .getUser();
+                if (sessionMe != null) liveMe = sessionMe;
+            } catch (Exception ignored) {
+            }
+            avatarUrl = liveMe != null ? liveMe.avatarUrl : null;
             // Private chat: personal VIP frame only (host signal is agency-room wear).
-            frameUrl = me != null ? me.vipBadgeUrl : null;
+            frameUrl = liveMe != null ? liveMe.vipBadgeUrl : null;
             hostBadgeUrl = null;
             // Same rule as chat header: displayName first, then username.
             name = firstNonEmpty(
-                    me != null ? me.displayName : null,
-                    me != null ? me.username : null,
+                    liveMe != null ? liveMe.displayName : null,
+                    liveMe != null ? liveMe.username : null,
                     "أنت");
         } else {
             AuthDtos.UserDto sender = msg.sender;
             avatarUrl = sender != null && sender.avatarUrl != null
                     ? sender.avatarUrl : peerAvatarUrl;
+            // Prefer sender payload frame, then conversation peer VIP frame (not host-signal).
             frameUrl = firstNonEmpty(
                     sender != null ? sender.vipBadgeUrl : null,
                     peerHostBadgeUrl);
@@ -298,6 +309,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
 
         AvatarCosmetics.bindAvatar(holder.b.imgAvatar, avatarUrl);
+        // Stack VIP frame on top of the face (staff roles included — no role-based strip).
         AvatarCosmetics.applyHostWear(
                 holder.b.imgFrame,
                 holder.b.imgHostBadge,
@@ -306,6 +318,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 hostBadgeUrl,
                 frameMeta,
                 hostBadgeMeta);
+        if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
+            holder.b.imgFrame.bringToFront();
+        }
 
         holder.b.tvSender.setVisibility(View.VISIBLE);
         holder.b.tvSender.setText(name);

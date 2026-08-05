@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <radialGradient id="g" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#2a2040"/>
+      <stop offset="100%" stop-color="#0a0a14"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe9a0"/>
+      <stop offset="50%" stop-color="#d4a017"/>
+      <stop offset="100%" stop-color="#fff0c0"/>
+    </linearGradient>
+    <clipPath id="circ"><circle cx="100" cy="100" r="72"/></clipPath>
+  </defs>
+  <circle cx="100" cy="100" r="92" fill="url(#g)"/>
+  <g clip-path="url(#circ)">
+    <rect x="28" y="28" width="144" height="144" fill="#CE1126">
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -3; 0 0; 0 3; 0 0" dur="2.2s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+  <circle cx="100" cy="100" r="76" fill="none" stroke="url(#gold)" stroke-width="6">
+    <animate attributeName="stroke-dasharray" values="20 10; 8 22; 20 10" dur="2s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="6s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="100" cy="100" r="84" fill="none" stroke="#ffd76a" stroke-opacity="0.35" stroke-width="2">
+    <animate attributeName="r" values="82;88;82" dur="1.8s" repeatCount="indefinite"/>
+  </circle>
+  <!-- flag:iq -->
+</svg>

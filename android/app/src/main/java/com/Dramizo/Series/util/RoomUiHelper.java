@@ -35,18 +35,16 @@ public final class RoomUiHelper {
             badge.setVisibility(View.GONE);
             return;
         }
+        badge.setVisibility(View.VISIBLE);
         if (isSupportRoom(room)) {
-            badge.setVisibility(View.VISIBLE);
             badge.setText(R.string.room_badge_support);
-            badge.setBackgroundResource(R.drawable.bg_viewer_pill_rose);
+            badge.setBackgroundResource(R.drawable.bg_room_badge_support);
         } else if (isAgencyRoom(room)) {
-            badge.setVisibility(View.VISIBLE);
             badge.setText(R.string.room_badge_agency);
-            badge.setBackgroundResource(R.drawable.bg_viewer_pill_rose);
+            badge.setBackgroundResource(R.drawable.bg_room_badge_agency);
         } else {
-            badge.setVisibility(View.VISIBLE);
             badge.setText(R.string.room_badge_personal);
-            badge.setBackgroundResource(R.drawable.bg_hiyoo_viewer_pill);
+            badge.setBackgroundResource(R.drawable.bg_room_badge_personal);
         }
     }
 

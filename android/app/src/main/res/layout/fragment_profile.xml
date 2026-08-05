@@ -115,6 +115,19 @@
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
+                    <TextView
+                        android:id="@+id/tvStaffBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:paddingVertical="2dp"
+                        android:textColor="@android:color/white"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
                     <LinearLayout
                         android:id="@+id/rowUserId"
                         android:layout_width="wrap_content"
@@ -380,6 +393,45 @@
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <!-- Platform staff powers (super / manager) — only shown when staffRole is set -->
+            <LinearLayout
+                android:id="@+id/panelStaffPowers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_staff_panel"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tvStaffPanelTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvStaffPowers"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="استخدم: اضغط مطوّلاً على أي شخص داخل الغرفة لإدارة (كتم / طرد / حظر)."
+                    android:textColor="@color/text_hint"
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <!-- Wallet row — clear Mikoo-style card with live balances -->

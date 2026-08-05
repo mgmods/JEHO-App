@@ -804,7 +804,7 @@ export class BaishunWsHandler {
             const req = decodeSpinReq(buffer);
             if (req.chipMultiple > 0) chipMultiple = req.chipMultiple;
             if (req.chipIdx >= 0) chipIdx = req.chipIdx;
-            const betAmount = Math.max(100, Math.floor(chipMultiple || CHIP_LIST[0]));
+            const betAmount = Math.max(50, Math.floor(chipMultiple || CHIP_LIST[0]));
             if (betAmount > 10_000) {
               this.sendBin(
                 ws,

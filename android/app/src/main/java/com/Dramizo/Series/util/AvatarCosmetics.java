@@ -21,7 +21,7 @@ public final class AvatarCosmetics {
         applyFrame(frameView, frameUrl, null);
     }
 
-    public static void applyFrame(
+    private static void applyFrame(
             @Nullable ImageView frameView,
             @Nullable String frameUrl,
             @Nullable Map<String, ?> meta) {
@@ -37,6 +37,11 @@ public final class AvatarCosmetics {
         frameView.setAlpha(1f);
         loadWearImage(frameView, frameUrl);
         applyWearMeta(frameView, meta, 1f);
+        // Keep the frame above the circular face in every stack.
+        try {
+            frameView.bringToFront();
+        } catch (Exception ignored) {
+        }
         // ImageView frames stay static. Live-style motion lives only in HostSignalView.
     }
 
@@ -436,6 +441,7 @@ public final class AvatarCosmetics {
             bindWear(avatarView, frameView, null, null, null, null, null);
             return;
         }
+        // Staff (admin / manager / super) keep their worn VIP frame like any other user.
         bindWear(
                 avatarView,
                 frameView,
@@ -459,6 +465,21 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
+        String wearKey = String.valueOf(avatarUrl) + '|' + String.valueOf(vipFrameUrl);
+        if (hostSignal != null) {
+            Object prev = hostSignal.getTag(R.id.tag_wear_key);
+            if (wearKey.equals(prev)
+                    && (hostSignal.getVisibility() == View.VISIBLE
+                    || (avatarView != null && avatarView.getVisibility() == View.VISIBLE))) {
+                // Already bound this wear — skip clear/reload flash on every /me refresh.
+                return;
+            }
+            hostSignal.setTag(R.id.tag_wear_key, wearKey);
+        } else if (avatarView != null) {
+            Object prev = avatarView.getTag(R.id.tag_wear_key);
+            if (wearKey.equals(prev)) return;
+            avatarView.setTag(R.id.tag_wear_key, wearKey);
+        }
         // Personal profile: animate VIP frame via HostSignalView when present.
         if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()) {
             boolean live = bindHostLikeLive(

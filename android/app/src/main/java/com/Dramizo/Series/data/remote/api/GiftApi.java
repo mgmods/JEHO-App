@@ -12,6 +12,9 @@ public interface GiftApi {
     @GET("gifts")
     Call<ApiResponse<GiftDtos.GiftList>> list();
 
+    @GET("gifts/categories")
+    Call<ApiResponse<GiftDtos.GiftCategoryList>> categories();
+
     @POST("gifts/send")
     Call<ApiResponse<GiftDtos.SendGiftResult>> send(@Body GiftDtos.SendGiftRequest body);
 

@@ -11,7 +11,9 @@ public class GiftEntity {
     public String iconUrl;
     public String animationUrl;
     public int coinPrice;
+    public int diamondValue;
     public String type;
+    public String category;
     public int sortOrder;
     public long cachedAt;
 }

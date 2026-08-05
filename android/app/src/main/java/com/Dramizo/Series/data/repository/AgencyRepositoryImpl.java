@@ -13,10 +13,11 @@ public class AgencyRepositoryImpl implements AgencyRepository {
     public AgencyRepositoryImpl(AgencyApi api, ExecutorService io) { this.api = api; }
 
     @Override public Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page) {
-        return ApiCall.execute(api.list(page, null));
+        // Public API requires a code/id — empty query returns an empty list.
+        return ApiCall.execute(api.list(page, ""));
     }
 
-    public Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page, String query) {
+    @Override public Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page, String query) {
         return ApiCall.execute(api.list(page, query));
     }
 

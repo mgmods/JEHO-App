@@ -19,6 +19,9 @@ public interface ConfigApi {
     @GET("config/games")
     Call<ApiResponse<List<MiscDtos.GameDto>>> games();
 
+    @GET("config/nav-icons")
+    Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons();
+
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 

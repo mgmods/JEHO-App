@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Public } from '../../common/decorators';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
+import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @ApiTags('Config')
@@ -15,14 +16,24 @@ export class ConfigController {
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
     private readonly zegoSettingsService: ZegoSettingsService,
+    private readonly liveKitSettingsService: LiveKitSettingsService,
     private readonly moderation: ContentModerationService,
   ) {}
 
   @Public()
   @Get('zego')
-  @ApiOperation({ summary: 'Public ZEGOCLOUD client config (AppID + AppSign only)' })
+  @ApiOperation({ summary: 'Public ZEGOCLOUD client config (AppID only)' })
   getZego() {
     return this.zegoSettingsService.getPublicClientConfig();
+  }
+
+  @Public()
+  @Get('voice-rtc')
+  @ApiOperation({
+    summary: 'Active voice RTC provider (zego | livekit) + public LiveKit URL',
+  })
+  getVoiceRtc() {
+    return this.liveKitSettingsService.getPublicClientConfig();
   }
 
   @Public()
@@ -224,6 +235,29 @@ export class ConfigController {
     } catch {
       return defaults.filter((o) => o.active !== false);
     }
+  }
+
+  @Public()
+  @Get('nav-icons')
+  @ApiOperation({
+    summary: 'Bottom navigation tab icons (PNG/JPG) managed from dashboard',
+  })
+  async navIcons() {
+    const {
+      emptyNavIconsConfig,
+      sanitizeNavIconsConfig,
+      navIconsClientPayload,
+    } = await import('./nav-icons.util');
+    const row = await this.settingsRepo.findOne({ where: { key: 'app_nav_icons' } });
+    let cfg = emptyNavIconsConfig();
+    if (row?.value) {
+      try {
+        cfg = sanitizeNavIconsConfig(JSON.parse(row.value));
+      } catch {
+        cfg = sanitizeNavIconsConfig(row.value);
+      }
+    }
+    return navIconsClientPayload(cfg);
   }
 
   @Public()

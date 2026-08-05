@@ -334,6 +334,23 @@ public final class MiscDtos {
         @SerializedName("instructions") public String instructions;
     }
 
+    /** Bottom tab icons from GET /config/nav-icons (PNG/JPG URLs). */
+    public static class NavIconsDto {
+        @SerializedName("version") public int version;
+        @SerializedName("updatedAt") public String updatedAt;
+        @SerializedName("party") public NavIconPairDto party;
+        @SerializedName("drama") public NavIconPairDto drama;
+        @SerializedName("games") public NavIconPairDto games;
+        @SerializedName("chat") public NavIconPairDto chat;
+        @SerializedName("me") public NavIconPairDto me;
+    }
+
+    public static class NavIconPairDto {
+        @SerializedName("normal") public String normal;
+        @SerializedName("selected") public String selected;
+        @SerializedName("icon") public String icon;
+    }
+
     public static class ThemeDto {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;

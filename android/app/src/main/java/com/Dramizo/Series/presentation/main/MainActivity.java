@@ -38,6 +38,8 @@ import com.Dramizo.Series.service.VoiceRoomForegroundService;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AssetIcons;
+import com.Dramizo.Series.util.RemoteNavIcons;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.bumptech.glide.Glide;
 import com.Dramizo.Series.util.AppFeatures;
@@ -95,6 +97,16 @@ public class MainActivity extends ThemedActivity {
             return;
         }
         applyNavIcons();
+        // Encrypted disk paint first, then refresh nav icons from dashboard.
+        RemoteNavIcons.hydrateFromCache(container);
+        applyNavIcons();
+        container.getIoExecutor().execute(() -> {
+            RemoteNavIcons.refreshBlocking(container);
+            runOnUiThread(() -> {
+                if (binding == null) return;
+                highlightPage(currentPage);
+            });
+        });
         com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(this, "home");
         binding.labelCreateRoom.setText(R.string.my_room);
 
@@ -276,12 +288,15 @@ public class MainActivity extends ThemedActivity {
         }
     }
 
+    /** First open of each tab may show a short loader; revisits stay stable (no flash). */
+    private final boolean[] pageWarmed = new boolean[5];
+
     public void go(int destId) {
         int page = destToPage(destId);
         if (page < 0 || mainPager == null) return;
         if (page == 1 && !dramaEnabled) return;
         if (mainPager.getCurrentItem() == page) return;
-        if (destId != R.id.nav_create_room) {
+        if (destId != R.id.nav_create_room && page < pageWarmed.length && !pageWarmed[page]) {
             com.Dramizo.Series.util.AppLoadingOverlay.showUntilReady(this);
         } else {
             com.Dramizo.Series.util.AppLoadingOverlay.hide(this);
@@ -319,6 +334,9 @@ public class MainActivity extends ThemedActivity {
             @Override
             public void onPageSelected(int position) {
                 currentPage = position;
+                if (position >= 0 && position < pageWarmed.length) {
+                    pageWarmed[position] = true;
+                }
                 highlightPage(position);
                 com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(
                         MainActivity.this, pageScreenKey(position));
@@ -338,15 +356,20 @@ public class MainActivity extends ThemedActivity {
 
     private void highlightPage(int page) {
         highlightTab(page == 0, binding.tabParty, binding.labelParty,
+                RemoteNavIcons.TAB_PARTY,
                 AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED);
         highlightTab(page == 1, binding.tabDrama, binding.labelDrama,
+                RemoteNavIcons.TAB_DRAMA,
                 AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED);
         highlightTab(page == 2, binding.tabGames, binding.labelGames,
+                RemoteNavIcons.TAB_GAMES,
                 AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED);
         highlight(false, binding.tabCreateRoom, binding.labelCreateRoom);
         highlightTab(page == 3, binding.tabChat, binding.labelChat,
+                RemoteNavIcons.TAB_CHAT,
                 AssetIcons.TAB_CHAT_NORMAL, AssetIcons.TAB_CHAT_SELECTED);
         highlightTab(page == 4, binding.tabMe, binding.labelMe,
+                RemoteNavIcons.TAB_ME,
                 AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED);
     }
 
@@ -398,12 +421,16 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void applyNavIcons() {
-        // Load tab art from assets/icons by file name (normal state).
-        AssetIcons.load(binding.tabParty, AssetIcons.TAB_PARTY_NORMAL);
-        AssetIcons.load(binding.tabDrama, AssetIcons.TAB_DRAMA_NORMAL);
-        AssetIcons.load(binding.tabGames, AssetIcons.TAB_GAME_NORMAL);
-        AssetIcons.load(binding.tabChat, AssetIcons.TAB_CHAT_NORMAL);
-        AssetIcons.load(binding.tabMe, AssetIcons.TAB_ME_NORMAL);
+        RemoteNavIcons.bind(binding.tabParty, RemoteNavIcons.TAB_PARTY, false,
+                AssetIcons.TAB_PARTY_NORMAL, AssetIcons.TAB_PARTY_SELECTED);
+        RemoteNavIcons.bind(binding.tabDrama, RemoteNavIcons.TAB_DRAMA, false,
+                AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED);
+        RemoteNavIcons.bind(binding.tabGames, RemoteNavIcons.TAB_GAMES, false,
+                AssetIcons.TAB_GAME_NORMAL, AssetIcons.TAB_GAME_SELECTED);
+        RemoteNavIcons.bind(binding.tabChat, RemoteNavIcons.TAB_CHAT, false,
+                AssetIcons.TAB_CHAT_NORMAL, AssetIcons.TAB_CHAT_SELECTED);
+        RemoteNavIcons.bind(binding.tabMe, RemoteNavIcons.TAB_ME, false,
+                AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED);
         clearNavIconTint(binding.tabCreateRoom);
     }
 
@@ -427,7 +454,7 @@ public class MainActivity extends ThemedActivity {
                 dramaEnabled = show;
                 binding.tabDramaWrap.setVisibility(show ? android.view.View.VISIBLE : android.view.View.GONE);
                 if (show) {
-                    AssetIcons.loadTab(binding.tabDrama, currentPage == 1,
+                    RemoteNavIcons.bind(binding.tabDrama, RemoteNavIcons.TAB_DRAMA, currentPage == 1,
                             AssetIcons.TAB_DRAMA_NORMAL, AssetIcons.TAB_DRAMA_SELECTED);
                 }
                 if (!show && mainPager != null && mainPager.getCurrentItem() == 1) {
@@ -547,7 +574,7 @@ public class MainActivity extends ThemedActivity {
 
     private void syncMiniRoomMicUi(ImageView micBtn) {
         if (micBtn == null) return;
-        boolean micOn = ZegoEngineManager.getInstance().isMicEnabled();
+        boolean micOn = RoomRtcEngine.getInstance().isMicEnabled();
         micBtn.setImageResource(
                 micOn ? R.drawable.ic_asset_mic_open : R.drawable.ic_asset_mic_close);
         micBtn.setBackgroundResource(
@@ -558,8 +585,8 @@ public class MainActivity extends ThemedActivity {
     }
 
     private void toggleMiniRoomMic(String activeRoomId, ImageView micBtn) {
-        boolean nextOn = !ZegoEngineManager.getInstance().isMicEnabled();
-        ZegoEngineManager.getInstance().setMicEnabled(nextOn);
+        boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
+        RoomRtcEngine.getInstance().setMicEnabled(nextOn);
         syncMiniRoomMicUi(micBtn);
         Toast.makeText(this,
                 nextOn ? R.string.mini_mic_enabled_toast : R.string.mini_mic_muted_toast,
@@ -725,14 +752,14 @@ public class MainActivity extends ThemedActivity {
         icon.setBackground(null);
     }
 
-    /** Same as {@link #highlight} but swaps SVG asset (selected vs normal) by name. */
+    /** Same as {@link #highlight} but loads remote (or asset) icon for the tab. */
     private void highlightTab(boolean on, ImageView icon, TextView label,
+                              String tabKey,
                               String normalAsset, String selectedAsset) {
         highlight(on, icon, label);
         if (icon != null) {
-            // Selected art already carries active styling; keep alpha full for both.
             icon.setAlpha(1f);
-            AssetIcons.loadTab(icon, on, normalAsset, selectedAsset);
+            RemoteNavIcons.bind(icon, tabKey, on, normalAsset, selectedAsset);
         }
     }
 

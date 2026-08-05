@@ -90,6 +90,7 @@ import com.Dramizo.Series.util.GameUrls;
 import com.Dramizo.Series.util.MikooGameBridge;
 import com.Dramizo.Series.util.MikooGamesCatalog;
 import com.Dramizo.Series.util.MikooHashBridge;
+import com.Dramizo.Series.util.DeviceMusicScanner;
 import com.Dramizo.Series.util.PermissionHelper;
 import com.bumptech.glide.Glide;
 import com.Dramizo.Series.data.remote.dto.SlotGameDtos;
@@ -105,7 +106,6 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.Dramizo.Series.util.RoomKenarHelper;
 import com.Dramizo.Series.util.RoomSoundFx;
@@ -118,15 +118,18 @@ import com.Dramizo.Series.util.YoutubeAudioResolver;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -262,6 +265,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             handler.postDelayed(this, 60_000L);
         }
     };
+    private final Runnable roomGmtClockTick = new Runnable() {
+        @Override
+        public void run() {
+            updateRoomGmtClock();
+            if (!exiting && !isFinishing()) {
+                handler.postDelayed(this, 30_000L);
+            }
+        }
+    };
 
     private String roomHostId;
     private String roomCohostId;
@@ -321,6 +333,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             uri -> {
                 if (uri != null) addLocalMusicAndPlay(uri);
             });
+    @Nullable private Runnable pendingDeviceMusicPermissionAction;
+    private final ActivityResultLauncher<String[]> deviceMusicPermissionLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.RequestMultiplePermissions(),
+                    result -> {
+                        boolean ok = true;
+                        for (Boolean v : result.values()) {
+                            if (!Boolean.TRUE.equals(v)) {
+                                ok = false;
+                                break;
+                            }
+                        }
+                        Runnable pending = pendingDeviceMusicPermissionAction;
+                        pendingDeviceMusicPermissionAction = null;
+                        if (ok) {
+                            if (pending != null) {
+                                try {
+                                    pending.run();
+                                } catch (Exception ignored) {
+                                }
+                            }
+                        } else {
+                            Toast.makeText(this,
+                                    "يلزم إذن الوصول للملفات الصوتية لعرض أغاني الجهاز",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+    @Nullable private List<DeviceMusicScanner.Track> cachedDeviceMusicTracks;
     private final ActivityResultLauncher<String> roomCoverPicker = registerForActivityResult(
             new ActivityResultContracts.GetContent(),
             uri -> {
@@ -330,7 +370,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdgeHelper.apply(this);
+        EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
@@ -456,6 +496,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 });
         PermissionHelper.ensureMediaPermissions(this, false);
         applyRoomToolbarIcons();
+        startRoomGmtClock();
         setupRealtime();
         setupZegoListener();
         setupLuckyBoxUi();
@@ -580,10 +621,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnClose.setVisibility(View.VISIBLE);
         binding.btnClose.setOnClickListener(v -> confirmExit());
         binding.btnCloseGameOverlay.setOnClickListener(v -> closeGameOverlay());
+        // Seat count lives under أدوات → غرفة (not header chrome).
         if (binding.btnHeaderHome != null) {
             binding.btnHeaderHome.setVisibility(View.GONE);
-            binding.btnHeaderHome.setContentDescription("ضبط المقاعد");
-            binding.btnHeaderHome.setOnClickListener(v -> showSeatCountSheet());
+            binding.btnHeaderHome.setOnClickListener(null);
+        }
+        if (binding.btnPlusWrap != null) {
+            binding.btnPlusWrap.setVisibility(View.GONE);
         }
         if (binding.btnHeaderMore != null) {
             binding.btnHeaderMore.setVisibility(View.VISIBLE);
@@ -656,7 +700,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             micOn = !micOn;
             userChoseMute = !micOn;
             if (roomId != null) viewModel.setMic(roomId, !micOn);
-            ZegoEngineManager.getInstance().setMicEnabled(micOn);
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncVoiceAudio(currentSeats);
             syncMicUi();
             Toast.makeText(this, micOn ? R.string.mic_on : R.string.mic_off, Toast.LENGTH_SHORT).show();
@@ -693,7 +737,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnTools.setOnClickListener(v -> showOtherTools());
         binding.btnHeaderMore.setOnClickListener(v -> openRoomSharePicker());
         if (binding.btnHeaderHome != null) {
-            binding.btnHeaderHome.setOnClickListener(v -> showSeatCountSheet());
+            binding.btnHeaderHome.setVisibility(View.GONE);
+            binding.btnHeaderHome.setOnClickListener(null);
         }
         // Tasks float disabled for now — keep views GONE so they never overlay the room.
         if (binding.taskFloatWrap != null) {
@@ -998,10 +1043,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 try {
                     if (modMuted || userChoseMute) {
                         micOn = false;
-                        ZegoEngineManager.getInstance().setMicEnabled(false);
+                        RoomRtcEngine.getInstance().setMicEnabled(false);
                     } else {
                         micOn = true;
-                        ZegoEngineManager.getInstance().setMicEnabled(true);
+                        RoomRtcEngine.getInstance().setMicEnabled(true);
                         if (roomId != null) viewModel.setMic(roomId, false);
                     }
                 } catch (Exception zegoErr) {
@@ -1012,8 +1057,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 micOn = false;
                 userChoseMute = false;
                 try {
-                    ZegoEngineManager.getInstance().setMicEnabled(false);
-                    ZegoEngineManager.getInstance().stopPublishing();
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
+                    RoomRtcEngine.getInstance().stopPublishing();
                 } catch (Exception ignored) {
                 }
             } else if (mySeat != null && mySeat.isModeratorMuted) {
@@ -1022,7 +1067,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (micOn) {
                     micOn = false;
                     try {
-                        ZegoEngineManager.getInstance().setMicEnabled(false);
+                        RoomRtcEngine.getInstance().setMicEnabled(false);
                     } catch (Exception ignored) {
                     }
                 }
@@ -1031,7 +1076,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Host already seated on first open (no wasOnSeat edge) — still open mic.
                 micOn = true;
                 try {
-                    ZegoEngineManager.getInstance().setMicEnabled(true);
+                    RoomRtcEngine.getInstance().setMicEnabled(true);
                 } catch (Exception ignored) {
                 }
             }
@@ -1065,14 +1110,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ContainerProvider.from(this).getSessionManager().updateCachedUser(me.data);
                 }
             });
-            if (session.appId > 0L) {
-                ZegoEngineManager.getInstance().applyAppId(this, session.appId);
-            }
             if (zegoLoggedIn) return;
             zegoLoggedIn = true;
-            String zegoRoom = session.zegoRoomId != null ? session.zegoRoomId : roomId;
-            String userId = session.userId != null ? session.userId : myUserId;
-            ZegoEngineManager.getInstance().loginRoom(zegoRoom, userId != null ? userId : "guest", session.token);
+            RoomRtcEngine.getInstance().applyJoinSession(
+                    this, session, roomId, myUserId);
             if (session.room != null && myUserId != null && myUserId.equals(session.room.hostId)) {
                 isHost = true;
             }
@@ -1089,13 +1130,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 }
             }
-            ZegoEngineManager.getInstance().setMicEnabled(micOn);
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
             // Unmute speakers for this session (leave path leaves them muted).
             // Clear any stash first so unmute cannot revive streams from the previous room hop.
             roomSpeakerMuted = false;
             try {
-                ZegoEngineManager.getInstance().clearPausedPlayStreams();
-                ZegoEngineManager.getInstance().setSpeakerMuted(false);
+                RoomRtcEngine.getInstance().clearPausedPlayStreams();
+                RoomRtcEngine.getInstance().setSpeakerMuted(false);
                 RoomSoundFx.setMuted(false);
             } catch (Exception ignored) {
             }
@@ -1142,7 +1183,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         isHost = ars.isHost() || getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         isAgencyRoom = ars.isAgencyRoom();
         try {
-            micOn = ZegoEngineManager.getInstance().isMicEnabled();
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
         } catch (Exception ignored) {
             micOn = ars.isMicOn();
         }
@@ -1305,8 +1346,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         // Primary path: Zego in-room broadcast (same platform as voice).
-        boolean zegoOk = ZegoEngineManager.getInstance().isInRoom(roomId)
-                && ZegoEngineManager.getInstance().sendRoomChatMessage(
+        boolean zegoOk = RoomRtcEngine.getInstance().isInRoom(roomId)
+                && RoomRtcEngine.getInstance().sendRoomChatMessage(
                         roomId, payload.toString(), (ok, err) -> {
                             if (!ok) {
                                 runOnUiThread(() -> {
@@ -1389,12 +1430,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /** Marker name for game/luck celebration rows (no white name / no profile photo). */
+    private static final String CHAT_NAME_GAME_CEL = "\u200B#game_cel";
+
     private void appendChatLine(String name, String text, int vipLevel, int userLevel) {
         appendChatLine(name, text, vipLevel, userLevel, null);
     }
 
     private void appendChatLine(String name, String text, int vipLevel, int userLevel, String frameUrl) {
         appendChatLine(name, text, vipLevel, userLevel, frameUrl, null, null, null, 0L, 0L);
+    }
+
+    /**
+     * Game / luck / return-gift celebrations: single-body strip with optional game cover.
+     * Not a personal chat bubble (no avatar, no white name over the line).
+     */
+    private void appendGameCelebrationLine(String text, @Nullable String gameIconUrl) {
+        appendChatLine(CHAT_NAME_GAME_CEL, text, 0, 0, null, null, null, gameIconUrl, 0L, 0L);
     }
 
     private void appendChatLine(
@@ -1432,7 +1484,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long wealthScore,
             long charmScore) {
         boolean system = "النظام".equals(name) || getString(R.string.official_news).equals(name);
-        if (!system && vipLevel <= 0) {
+        boolean gameCel = CHAT_NAME_GAME_CEL.equals(name);
+        if (!system && !gameCel && vipLevel <= 0) {
             var session = ContainerProvider.from(this).getSessionManager();
             // Only enrich cosmetics for the local user by id — never by display name.
             boolean self = userId != null && myUserId != null && sameUser(userId, myUserId);
@@ -1461,6 +1514,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
         }
+        // Self wear: always apply equipped VIP/host frame when payload omitted it (staff included).
+        if (!system && !gameCel && userId != null && myUserId != null && sameUser(userId, myUserId)) {
+            var session = ContainerProvider.from(this).getSessionManager();
+            AuthDtos.UserDto selfUser = session.getUser();
+            if (selfUser != null) {
+                if (avatarUrl == null || avatarUrl.isEmpty()) avatarUrl = selfUser.avatarUrl;
+                if (frameUrl == null || frameUrl.isEmpty()) {
+                    if (isAgencyRoom && selfUser.hostBadgeUrl != null && !selfUser.hostBadgeUrl.isEmpty()) {
+                        frameUrl = selfUser.hostBadgeUrl;
+                    } else if (selfUser.vipBadgeUrl != null && !selfUser.vipBadgeUrl.isEmpty()) {
+                        frameUrl = selfUser.vipBadgeUrl;
+                    } else if (isAgencyRoom) {
+                        frameUrl = session.getHostBadgeUrl();
+                    }
+                }
+            }
+        }
         View row = getLayoutInflater().inflate(R.layout.item_room_chat_line, binding.chatLog, false);
         View bubble = row.findViewById(R.id.chatBubbleRoot);
         ImageView avatar = row.findViewById(R.id.imgChatAvatar);
@@ -1475,47 +1545,87 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView meta = row.findViewById(R.id.tvChatMeta);
         TextView line = row.findViewById(R.id.tvChatLine);
         View userMore = row.findViewById(R.id.btnChatUserMore);
+        View avatarWrap = row.findViewById(R.id.chatAvatarWrap);
 
         VipStyle.applyBubble(bubble, Math.max(0, vipLevel));
-        nameView.setText(name != null && !name.isEmpty() ? name : "—");
-        nameView.setTextColor(VipStyle.nameColor(vipLevel));
         line.setTextColor(VipStyle.messageColor(Math.max(0, vipLevel)));
-
-        if (avatar != null) {
+        if (gameCel) {
+            if (nameView != null) nameView.setVisibility(View.GONE);
+            if (hostChip != null) hostChip.setVisibility(View.GONE);
+            if (vipChip != null) vipChip.setVisibility(View.GONE);
+            if (levelChip != null) levelChip.setVisibility(View.GONE);
+            if (charmChip != null) charmChip.setVisibility(View.GONE);
+            if (wealthChip != null) wealthChip.setVisibility(View.GONE);
             HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
-            if (system) {
-                avatar.setVisibility(View.VISIBLE);
-                AvatarImageLoader.applyCircularClip(avatar);
-                // App logo for system / official lines (not a blank white tile).
-                avatar.setImageResource(R.drawable.jeho_logo);
-                avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                avatar.setPadding(dp(4), dp(4), dp(4), dp(4));
-                resetChatWear(avatar, frameView, hostSignal);
-            } else {
-                AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
+            if (hostSignal != null) {
+                hostSignal.clearSignal();
+                hostSignal.setVisibility(View.GONE);
             }
-        }
-        boolean creator = !system && userId != null && roomHostId != null && userId.equals(roomHostId);
-        if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
-
-        if (vipLevel > 0) {
-            vipChip.setVisibility(View.VISIBLE);
-            vipChip.setText("VIP" + vipLevel);
-            VipStyle.applyChip(vipChip, vipLevel);
-            vipChip.setTextColor(VipStyle.chipTextColor(vipLevel));
+            // Left: game cover only (not profile). Fallback: hide avatar slot.
+            if (giftIconUrl != null && !giftIconUrl.isEmpty() && avatar != null) {
+                if (avatarWrap != null) avatarWrap.setVisibility(View.VISIBLE);
+                avatar.setVisibility(View.VISIBLE);
+                avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                avatar.setPadding(0, 0, 0, 0);
+                if (frameView != null) {
+                    frameView.setVisibility(View.GONE);
+                    frameView.setImageDrawable(null);
+                }
+                try {
+                    Glide.with(avatar)
+                            .load(AssetCatalog.absoluteUrl(giftIconUrl))
+                            .centerCrop()
+                            .placeholder(R.drawable.ic_screen_chat_lottery)
+                            .error(R.drawable.ic_screen_chat_lottery)
+                            .into(avatar);
+                } catch (Exception ignored) {
+                    avatar.setImageResource(R.drawable.ic_screen_chat_lottery);
+                }
+                giftIconUrl = null; // already used as left cover
+            } else if (avatarWrap != null) {
+                avatarWrap.setVisibility(View.GONE);
+            } else if (avatar != null) {
+                avatar.setVisibility(View.GONE);
+            }
         } else {
-            vipChip.setVisibility(View.GONE);
-        }
+            nameView.setText(name != null && !name.isEmpty() ? name : "—");
+            nameView.setTextColor(VipStyle.nameColor(vipLevel));
+            if (avatar != null) {
+                HostSignalView hostSignal = row.findViewById(R.id.webChatHostSignal);
+                if (system) {
+                    avatar.setVisibility(View.VISIBLE);
+                    AvatarImageLoader.applyCircularClip(avatar);
+                    // App logo for system / official lines (not a blank white tile).
+                    avatar.setImageResource(R.drawable.jeho_logo);
+                    avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    avatar.setPadding(dp(4), dp(4), dp(4), dp(4));
+                    resetChatWear(avatar, frameView, hostSignal);
+                } else {
+                    AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
+                }
+            }
+            boolean creator = !system && userId != null && roomHostId != null && userId.equals(roomHostId);
+            if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
 
-        if (system) {
-            levelChip.setVisibility(View.GONE);
-            charmChip.setVisibility(View.GONE);
-            wealthChip.setVisibility(View.GONE);
-        } else {
-            AvatarCosmetics.styleBadges(levelChip, charmChip, wealthChip, vipLevel, userLevel,
-                    Math.max(0L, charmScore), Math.max(0L, wealthScore));
-            if (!roomCharmEnabled() && charmChip != null) {
+            if (vipLevel > 0) {
+                vipChip.setVisibility(View.VISIBLE);
+                vipChip.setText("VIP" + vipLevel);
+                VipStyle.applyChip(vipChip, vipLevel);
+                vipChip.setTextColor(VipStyle.chipTextColor(vipLevel));
+            } else {
+                vipChip.setVisibility(View.GONE);
+            }
+
+            if (system) {
+                levelChip.setVisibility(View.GONE);
                 charmChip.setVisibility(View.GONE);
+                wealthChip.setVisibility(View.GONE);
+            } else {
+                AvatarCosmetics.styleBadges(levelChip, charmChip, wealthChip, vipLevel, userLevel,
+                        Math.max(0L, charmScore), Math.max(0L, wealthScore));
+                if (!roomCharmEnabled() && charmChip != null) {
+                    charmChip.setVisibility(View.GONE);
+                }
             }
         }
         if (meta != null) meta.setVisibility(View.GONE);
@@ -1528,7 +1638,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         .placeholder(R.drawable.ic_screen_chat_lottery)
                         .error(R.drawable.ic_screen_chat_lottery)
                         .into(giftIcon);
-            } else if (text != null && text.contains("هدية")) {
+            } else if (!gameCel && text != null && text.contains("هدية")) {
                 giftIcon.setVisibility(View.VISIBLE);
                 giftIcon.setImageResource(R.drawable.ic_screen_chat_lottery);
             } else {
@@ -1537,26 +1647,29 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
 
-        final String tapName = name;
-        final String tapUserId = userId;
-        final String tapAvatar = avatarUrl;
-        final String tapFrame = frameUrl;
+        final String tapName = gameCel ? null : name;
+        final String tapUserId = gameCel ? null : userId;
+        final String tapAvatar = gameCel ? null : avatarUrl;
+        final String tapFrame = gameCel ? null : frameUrl;
         final int tapVip = vipLevel;
         final int tapLv = userLevel;
         final String tapText = text;
         final View rowRef = row;
+        final boolean noUserMenu = system || gameCel;
         View.OnClickListener openUserMenu = v -> {
-            if (system) return;
+            if (noUserMenu) return;
             showChatUserActions(v, tapUserId, tapName, tapAvatar, tapFrame, tapVip, tapLv, tapText, rowRef);
         };
         View.OnLongClickListener openUserMenuLong = v -> {
-            if (system) return false;
+            if (noUserMenu) return false;
             showChatUserActions(v, tapUserId, tapName, tapAvatar, tapFrame, tapVip, tapLv, tapText, rowRef);
             return true;
         };
         // Tap / long-press name or avatar → moderation menu (no ⋮).
-        nameView.setOnClickListener(openUserMenu);
-        nameView.setOnLongClickListener(openUserMenuLong);
+        if (nameView != null) {
+            nameView.setOnClickListener(openUserMenu);
+            nameView.setOnLongClickListener(openUserMenuLong);
+        }
         if (avatar != null) {
             avatar.setOnClickListener(openUserMenu);
             avatar.setOnLongClickListener(openUserMenuLong);
@@ -1987,10 +2100,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomSpeakerMuted = false;
             speakerMutedBeforeBackground = false;
             RoomSoundFx.setMuted(false);
-            ZegoEngineManager.getInstance().setSpeakerMuted(false);
+            RoomRtcEngine.getInstance().setSpeakerMuted(false);
             // Mute own mic while minimized (notification / mini player can unmute).
             micOn = false;
-            ZegoEngineManager.getInstance().setMicEnabled(false);
+            RoomRtcEngine.getInstance().setMicEnabled(false);
             if (roomId != null && !roomId.isEmpty()) {
                 final String rid = roomId;
                 ContainerProvider.from(this).getIoExecutor().execute(() ->
@@ -2014,7 +2127,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         long musicPosition = 0L;
         if (isLocalMusicUrl(currentMusicUrl) || isYoutubeMusicUrl(currentMusicUrl)) {
             musicPosition = isLocalMusicUrl(currentMusicUrl)
-                    ? ZegoEngineManager.getInstance().getLocalMusicPositionMs()
+                    ? RoomRtcEngine.getInstance().getLocalMusicPositionMs()
                     : (roomMusicPlayer != null ? roomMusicPlayer.getCurrentPosition() : 0L);
         } else if (roomMusicPlayer != null) {
             musicPosition = roomMusicPlayer.getCurrentPosition();
@@ -2091,6 +2204,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override public boolean canControlMusic() {
                 return canManageMusic || isHost || isOwner || isRoomStaff();
             }
+            @Override public boolean canAdjustSeatCount() {
+                return canManageRoom || isHost || isOwner;
+            }
+            @Override public boolean canReviewSeatRequests() {
+                return canInviteMic && !isFreeMicEnabled();
+            }
             @Override public String roomId() { return roomId; }
             @Override public String roomTitle() {
                 return binding != null && binding.tvRoomTitle.getText() != null
@@ -2106,6 +2225,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         switch (action) {
             case "settings":
                 showHostTools();
+                break;
+            case "seat_count":
+                if (canManageRoom || isHost || isOwner) showSeatCountSheet();
+                else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+                break;
+            case "seat_requests":
+                if (canInviteMic && !isFreeMicEnabled()) showSeatRequestsDialog();
+                else Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
                 break;
             case "lock":
                 if (isAgencyRoom) {
@@ -2569,7 +2696,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                                 "Referer", "https://www.youtube.com/",
                                                 "Origin", "https://www.youtube.com"))))
                 .build();
-        ZegoEngineManager.getInstance().setLocalMusicEndListener(() -> {
+        RoomRtcEngine.getInstance().setLocalMusicEndListener(() -> {
             if (isFinishing()) return;
             runOnUiThread(() -> {
                 if (!canManageMusic
@@ -2672,10 +2799,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
                 if (!canManageMusic || roomId == null) return;
                 if (isLocalMusicUrl(currentMusicUrl)) {
-                    long duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
+                    long duration = RoomRtcEngine.getInstance().getLocalMusicDurationMs();
                     if (duration > 0) {
                         long position = duration * seekBar.getProgress() / 1000L;
-                        ZegoEngineManager.getInstance().seekLocalMusic(position);
+                        RoomRtcEngine.getInstance().seekLocalMusic(position);
                         viewModel.updateMusic(roomId, "seek", null, null, null, position);
                     }
                     return;
@@ -2691,13 +2818,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 if (isYoutubeMusicUrl(currentMusicUrl)) {
-                    long duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
+                    long duration = RoomRtcEngine.getInstance().getLocalMusicDurationMs();
                     if (duration <= 0 && roomMusicPlayer != null) {
                         duration = roomMusicPlayer.getDuration();
                     }
                     if (duration <= 0) return;
                     long position = duration * seekBar.getProgress() / 1000L;
-                    ZegoEngineManager.getInstance().seekLocalMusic(position);
+                    RoomRtcEngine.getInstance().seekLocalMusic(position);
                     if (roomMusicPlayer != null) roomMusicPlayer.seekTo(position);
                     viewModel.updateMusic(roomId, "seek", null, null, null, position);
                     return;
@@ -2813,9 +2940,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         try {
             if (isLocalMusicUrl(currentMusicUrl)
                     || (isYoutubeMusicUrl(currentMusicUrl)
-                    && ZegoEngineManager.getInstance().getLocalMusicDurationMs() > 0)) {
-                duration = ZegoEngineManager.getInstance().getLocalMusicDurationMs();
-                position = ZegoEngineManager.getInstance().getLocalMusicPositionMs();
+                    && RoomRtcEngine.getInstance().getLocalMusicDurationMs() > 0)) {
+                duration = RoomRtcEngine.getInstance().getLocalMusicDurationMs();
+                position = RoomRtcEngine.getInstance().getLocalMusicPositionMs();
             }
         } catch (Exception ignored) {
         }
@@ -2928,9 +3055,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && incomingMusicUrl != null
                 && incomingMusicUrl.equals(preparedMusicUrl)
                 && (isLocalMusicUrl(incomingMusicUrl)
-                ? ZegoEngineManager.getInstance().isLocalMusicPlaying()
+                ? RoomRtcEngine.getInstance().isLocalMusicPlaying()
                 : (roomMusicPlayer != null && roomMusicPlayer.isPlaying())
-                        || ZegoEngineManager.getInstance().isLocalMusicPlaying())) {
+                        || RoomRtcEngine.getInstance().isLocalMusicPlaying())) {
             if (title != null && !title.isEmpty() && binding != null && binding.tvMusicTitle != null) {
                 binding.tvMusicTitle.setText(title);
             }
@@ -2947,7 +3074,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             pendingYtResolveKey = null;
             clearMusicVideoUi();
             if (roomMusicPlayer != null) roomMusicPlayer.stop();
-            if (canManageMusic) ZegoEngineManager.getInstance().stopLocalMusic();
+            if (canManageMusic) RoomRtcEngine.getInstance().stopLocalMusic();
             // No music → never float a player chip in the user's face (fresh install / idle).
             showMusicReopenChip(false);
             return;
@@ -3000,22 +3127,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (track != null && track.localPath != null && !track.localPath.isEmpty()) {
                     if (playing && !incomingMusicUrl.equals(preparedMusicUrl)) {
                         ensurePublishingForMusic();
-                        ZegoEngineManager.getInstance().playLocalMusic(track.localPath, positionMs);
+                        RoomRtcEngine.getInstance().playLocalMusic(track.localPath, positionMs);
                         preparedMusicUrl = incomingMusicUrl;
                     } else if (playing) {
                         ensurePublishingForMusic();
-                        ZegoEngineManager.getInstance().boostMusicMixVolume();
-                        if (!ZegoEngineManager.getInstance().isLocalMusicPlaying()) {
-                            if (!ZegoEngineManager.getInstance().hasLocalMusicPlayer()) {
-                                ZegoEngineManager.getInstance().playLocalMusic(
+                        RoomRtcEngine.getInstance().boostMusicMixVolume();
+                        if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
+                            if (!RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
+                                RoomRtcEngine.getInstance().playLocalMusic(
                                         track.localPath, positionMs);
                                 preparedMusicUrl = incomingMusicUrl;
                             } else {
-                                ZegoEngineManager.getInstance().resumeLocalMusic();
+                                RoomRtcEngine.getInstance().resumeLocalMusic();
                             }
                         }
                     } else if (paused) {
-                        ZegoEngineManager.getInstance().pauseLocalMusic();
+                        RoomRtcEngine.getInstance().pauseLocalMusic();
                     }
                 }
             }
@@ -3031,7 +3158,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         // Switching to remote/server uploaded audio — stop host local mix.
-        if (canManageMusic) ZegoEngineManager.getInstance().stopLocalMusic();
+        if (canManageMusic) RoomRtcEngine.getInstance().stopLocalMusic();
 
         String absoluteUrl = AssetCatalog.absoluteUrl(url);
         if (roomMusicPlayer != null && absoluteUrl != null) {
@@ -3122,16 +3249,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (canManageMusic) {
                 ensurePublishingForMusic();
                 if (playing) {
-                    ZegoEngineManager.getInstance().boostMusicMixVolume();
-                    if (!ZegoEngineManager.getInstance().isLocalMusicPlaying()) {
-                        ZegoEngineManager.getInstance().resumeLocalMusic();
+                    RoomRtcEngine.getInstance().boostMusicMixVolume();
+                    if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
+                        RoomRtcEngine.getInstance().resumeLocalMusic();
                     }
-                    if (Math.abs(ZegoEngineManager.getInstance().getLocalMusicPositionMs()
+                    if (Math.abs(RoomRtcEngine.getInstance().getLocalMusicPositionMs()
                             - seekTarget) > 1500L) {
-                        ZegoEngineManager.getInstance().seekLocalMusic(seekTarget);
+                        RoomRtcEngine.getInstance().seekLocalMusic(seekTarget);
                     }
                 } else {
-                    ZegoEngineManager.getInstance().pauseLocalMusic();
+                    RoomRtcEngine.getInstance().pauseLocalMusic();
                 }
             }
             bindMusicVideoSurfaces();
@@ -3140,7 +3267,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (ytUrl.equals(preparedMusicUrl) && youtubeUsingEmbed) {
             if (!playing) {
                 stopYoutubeEmbed();
-                if (canManageMusic) ZegoEngineManager.getInstance().pauseLocalMusic();
+                if (canManageMusic) RoomRtcEngine.getInstance().pauseLocalMusic();
             } else {
                 playYoutubeEmbedInDisc(videoId, true, seekTarget);
             }
@@ -3151,7 +3278,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             else {
                 roomMusicPlayer.setPlayWhenReady(false);
             }
-            if (canManageMusic) ZegoEngineManager.getInstance().pauseLocalMusic();
+            if (canManageMusic) RoomRtcEngine.getInstance().pauseLocalMusic();
             return;
         }
         if (!playing) return;
@@ -3191,7 +3318,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (canManageMusic) {
                     ensurePublishingForMusic();
                     String zegoUrl = mixUrl != null && !mixUrl.isEmpty() ? mixUrl : streamUrl;
-                    ZegoEngineManager.getInstance().playLocalMusic(zegoUrl, seekTarget, true);
+                    RoomRtcEngine.getInstance().playLocalMusic(zegoUrl, seekTarget, true);
                 }
 
                 // Host hears ExoPlayer; guests keep it silent and hear Zego.
@@ -3383,7 +3510,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         SavedMusicTrack track = findLocalTrackByUrl(musicUrl);
         if (track != null && track.localPath != null && new File(track.localPath).exists()) {
             ensurePublishingForMusic();
-            ZegoEngineManager.getInstance().playLocalMusic(track.localPath);
+            RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
             preparedMusicUrl = musicUrl;
         }
     }
@@ -3399,21 +3526,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         boolean currentlyPlaying = "playing".equalsIgnoreCase(currentMusicStatus);
         long pos;
         if (isLocalMusicUrl(currentMusicUrl)) {
-            pos = ZegoEngineManager.getInstance().getLocalMusicPositionMs();
+            pos = RoomRtcEngine.getInstance().getLocalMusicPositionMs();
             if (currentlyPlaying) {
-                ZegoEngineManager.getInstance().pauseLocalMusic();
+                RoomRtcEngine.getInstance().pauseLocalMusic();
             } else {
                 ensurePublishingForMusic();
-                if (!ZegoEngineManager.getInstance().hasLocalMusicPlayer()
+                if (!RoomRtcEngine.getInstance().hasLocalMusicPlayer()
                         || !currentMusicUrl.equals(preparedMusicUrl)) {
                     startHostMixedTrack(currentMusicUrl, null, null);
                 } else {
-                    ZegoEngineManager.getInstance().resumeLocalMusic();
+                    RoomRtcEngine.getInstance().resumeLocalMusic();
                 }
             }
         } else if (isYoutubeMusicUrl(currentMusicUrl)) {
             pos = youtubeUsingEmbed ? 0L
-                    : ZegoEngineManager.getInstance().getLocalMusicPositionMs();
+                    : RoomRtcEngine.getInstance().getLocalMusicPositionMs();
             if (pos <= 0L && roomMusicPlayer != null) {
                 pos = roomMusicPlayer.getCurrentPosition();
             }
@@ -3424,7 +3551,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     applyMusicPoster(currentMusicThumbUrl);
                 }
                 if (roomMusicPlayer != null) roomMusicPlayer.setPlayWhenReady(false);
-                ZegoEngineManager.getInstance().pauseLocalMusic();
+                RoomRtcEngine.getInstance().pauseLocalMusic();
             } else {
                 ensurePublishingForMusic();
                 if (youtubeUsingEmbed) {
@@ -3434,12 +3561,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         && roomMusicPlayer.getMediaItemCount() > 0) {
                     applyHostOrGuestMusicVolume();
                     roomMusicPlayer.setPlayWhenReady(true);
-                    if (!ZegoEngineManager.getInstance().isLocalMusicPlaying()) {
-                        if (!ZegoEngineManager.getInstance().hasLocalMusicPlayer()) {
+                    if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
+                        if (!RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
                             streamYoutubeInDisc(currentMusicUrl, true, false, pos, null, null, null);
                         } else {
-                            ZegoEngineManager.getInstance().boostMusicMixVolume();
-                            ZegoEngineManager.getInstance().resumeLocalMusic();
+                            RoomRtcEngine.getInstance().boostMusicMixVolume();
+                            RoomRtcEngine.getInstance().resumeLocalMusic();
                         }
                     }
                 } else {
@@ -3464,8 +3591,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void ensurePublishingForMusic() {
         if (myUserId == null || myUserId.isEmpty()) return;
-        ZegoEngineManager.getInstance().startPublishingAudio(
-                ZegoEngineManager.audioStreamId(myUserId));
+        RoomRtcEngine.getInstance().startPublishingAudio(
+                RoomRtcEngine.audioStreamId(myUserId));
     }
 
     private void dismissMusicCard() {
@@ -3612,23 +3739,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void addLocalMusicAndPlay(Uri uri) {
+        addLocalMusicAndPlay(uri, null, null, null);
+    }
+
+    private void addLocalMusicAndPlay(
+            Uri uri,
+            @Nullable String forcedTitle,
+            @Nullable String forcedArtist,
+            @Nullable Uri albumArtUri) {
         Toast.makeText(this, "جاري تجهيز الأغنية محلياً…", Toast.LENGTH_SHORT).show();
         AppContainer container = ContainerProvider.from(this);
         container.getIoExecutor().execute(() -> {
-            String metadataTitle = null;
-            String metadataArtist = null;
-            android.media.MediaMetadataRetriever metadata =
-                    new android.media.MediaMetadataRetriever();
-            try {
-                metadata.setDataSource(this, uri);
-                metadataTitle = metadata.extractMetadata(
-                        android.media.MediaMetadataRetriever.METADATA_KEY_TITLE);
-                metadataArtist = metadata.extractMetadata(
-                        android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST);
-            } catch (Exception ignored) {
-            } finally {
-                try { metadata.release(); } catch (Exception ignored) {}
-            }
+            DeviceMusicScanner.Meta meta = DeviceMusicScanner.readMeta(this, uri);
+            String metadataTitle = forcedTitle != null && !forcedTitle.trim().isEmpty()
+                    ? forcedTitle.trim() : meta.title;
+            String metadataArtist = forcedArtist != null && !forcedArtist.trim().isEmpty()
+                    ? forcedArtist.trim() : meta.artist;
             try {
                 try {
                     getContentResolver().takePersistableUriPermission(uri,
@@ -3640,6 +3766,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String normalizedMime = mime.toLowerCase(java.util.Locale.US);
                 String extension = normalizedMime.contains("wav")
                         ? ".wav"
+                        : normalizedMime.contains("flac")
+                        ? ".flac"
+                        : normalizedMime.contains("ogg") || normalizedMime.contains("opus")
+                        ? ".ogg"
                         : normalizedMime.contains("aac")
                         ? ".aac"
                         : (normalizedMime.contains("mp4") || normalizedMime.contains("m4a"))
@@ -3665,16 +3795,56 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         fos.write(buffer, 0, count);
                     }
                 }
+
+                // Real cover: album art URI, else embedded picture.
+                String coverPath = null;
+                File coversDir = new File(dir, "covers");
+                if (!coversDir.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    coversDir.mkdirs();
+                }
+                File coverFile = new File(coversDir, id + ".jpg");
+                try {
+                    boolean wrote = false;
+                    if (albumArtUri != null) {
+                        try (InputStream in = getContentResolver().openInputStream(albumArtUri);
+                             java.io.FileOutputStream fos = new java.io.FileOutputStream(coverFile)) {
+                            if (in != null) {
+                                byte[] buf = new byte[8192];
+                                int n;
+                                while ((n = in.read(buf)) != -1) fos.write(buf, 0, n);
+                                wrote = coverFile.length() > 64;
+                            }
+                        } catch (Exception ignored) {
+                        }
+                    }
+                    if (!wrote) {
+                        byte[] pic = DeviceMusicScanner.embeddedCover(this, uri);
+                        if (pic != null && pic.length > 64) {
+                            try (java.io.FileOutputStream fos =
+                                         new java.io.FileOutputStream(coverFile)) {
+                                fos.write(pic);
+                                wrote = true;
+                            }
+                        }
+                    }
+                    if (wrote) coverPath = coverFile.getAbsolutePath();
+                    else if (coverFile.exists()) {
+                        //noinspection ResultOfMethodCallIgnored
+                        coverFile.delete();
+                    }
+                } catch (Exception ignored) {
+                }
+
                 String title = metadataTitle;
-                if (title == null || title.trim().isEmpty()) title = uri.getLastPathSegment();
-                if (title == null || title.isEmpty()) title = "أغنية محلية";
+                if (title == null || title.trim().isEmpty()) title = "أغنية";
                 String artist = metadataArtist;
-                if (artist == null || artist.trim().isEmpty()) artist = "من هاتفي";
+                if (artist == null || artist.trim().isEmpty()) artist = "فنان غير معروف";
                 final String finalTitle = title.trim();
                 final String finalArtist = artist.trim();
                 final String localUrl = "local://" + id;
                 SavedMusicTrack track = new SavedMusicTrack(
-                        id, localUrl, out.getAbsolutePath(), finalTitle, finalArtist);
+                        id, localUrl, out.getAbsolutePath(), finalTitle, finalArtist, coverPath);
                 saveLocalTrack(track);
                 runOnUiThread(() -> playLocalTrack(track));
             } catch (Exception error) {
@@ -3725,20 +3895,68 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         clearDismissedMusic();
         ensurePublishingForMusic();
-        ZegoEngineManager.getInstance().playLocalMusic(track.localPath);
+        RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
         preparedMusicUrl = track.url;
         currentMusicUrl = track.url;
         currentMusicStatus = "playing";
         binding.tvMusicTitle.setText(track.title != null ? track.title : "أغنية");
-        binding.tvMusicArtist.setText(track.artist != null ? track.artist : "من هاتفي");
+        binding.tvMusicArtist.setText(track.artist != null && !track.artist.isEmpty()
+                ? track.artist : "فنان غير معروف");
+        bindLocalMusicCover(track.thumbnailUrl);
         binding.btnMusicPlayPause.setImageResource(android.R.drawable.ic_media_pause);
         startMusicDiscAnimation();
         viewModel.updateMusic(roomId, "load", track.url, track.title,
-                track.artist != null ? track.artist : "من هاتفي", 0L);
+                track.artist != null && !track.artist.isEmpty()
+                        ? track.artist : "فنان غير معروف", 0L);
         musicPanelExpanded = true;
         binding.musicCard.setVisibility(View.VISIBLE);
         binding.musicCard.bringToFront();
         showMusicReopenChip(false);
+    }
+
+    private void bindLocalMusicCover(@Nullable String thumbnailUrl) {
+        if (binding == null) return;
+        Object model = null;
+        if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
+            if (thumbnailUrl.startsWith("http") || thumbnailUrl.startsWith("content:")) {
+                model = thumbnailUrl;
+            } else {
+                File f = new File(thumbnailUrl);
+                if (f.isFile()) model = f;
+            }
+        }
+        if (binding.imgMusicDisc != null) {
+            if (model != null) {
+                try {
+                    Glide.with(binding.imgMusicDisc)
+                            .load(model)
+                            .centerCrop()
+                            .placeholder(R.drawable.icon_room_music_voice)
+                            .error(R.drawable.icon_room_music_voice)
+                            .into(binding.imgMusicDisc);
+                } catch (Exception e) {
+                    binding.imgMusicDisc.setImageResource(R.drawable.icon_room_music_voice);
+                }
+            } else {
+                binding.imgMusicDisc.setImageResource(R.drawable.icon_room_music_voice);
+            }
+        }
+        if (binding.imgMusicFloatDisc != null) {
+            if (model != null) {
+                try {
+                    Glide.with(binding.imgMusicFloatDisc)
+                            .load(model)
+                            .centerCrop()
+                            .placeholder(R.drawable.icon_room_music_voice)
+                            .error(R.drawable.icon_room_music_voice)
+                            .into(binding.imgMusicFloatDisc);
+                } catch (Exception e) {
+                    binding.imgMusicFloatDisc.setImageResource(R.drawable.icon_room_music_voice);
+                }
+            } else {
+                binding.imgMusicFloatDisc.setImageResource(R.drawable.icon_room_music_voice);
+            }
+        }
     }
 
     /** Add internet search hit into My Music (انا) — does not start playback. */
@@ -3779,7 +3997,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         clearDismissedMusic();
-        if (canManageMusic) ZegoEngineManager.getInstance().stopLocalMusic();
+        if (canManageMusic) RoomRtcEngine.getInstance().stopLocalMusic();
         preparedMusicUrl = null;
         currentMusicUrl = musicUrl;
         currentMusicStatus = "playing";
@@ -4088,7 +4306,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             } else {
                                 singer.setText(track != null && track.artist != null
                                         && !track.artist.isEmpty()
-                                        ? track.artist : "من الجهاز");
+                                        ? track.artist : "فنان غير معروف");
                             }
                         }
                         if (cover != null) {
@@ -4098,6 +4316,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 Glide.with(cover).load(track.thumbnailUrl)
                                         .centerCrop()
                                         .placeholder(R.drawable.bg_music_cover_rounded)
+                                        .into(cover);
+                            } else if (track != null && track.thumbnailUrl != null
+                                    && !track.thumbnailUrl.isEmpty()) {
+                                Object model = track.thumbnailUrl.startsWith("content:")
+                                        || track.thumbnailUrl.startsWith("http")
+                                        ? track.thumbnailUrl
+                                        : new File(track.thumbnailUrl);
+                                Glide.with(cover).load(model)
+                                        .centerCrop()
+                                        .placeholder(R.drawable.bg_music_disc)
+                                        .error(R.drawable.bg_music_disc)
                                         .into(cover);
                             } else {
                                 cover.setImageResource(R.drawable.bg_music_disc);
@@ -4145,15 +4374,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             markTab.accept(tabMine);
             bindMineList.run();
         };
-        final List<RoomDtos.MusicTrackDto> visibleHot = new ArrayList<>();
+        final List<DeviceMusicScanner.Track> visibleHot = new ArrayList<>();
         final Runnable[] refreshHotRef = new Runnable[1];
         Runnable bindHotList = () -> {
-            List<RoomDtos.MusicTrackDto> items = cachedServerMusicTracks != null
-                    ? cachedServerMusicTracks : new ArrayList<>();
+            List<DeviceMusicScanner.Track> items = cachedDeviceMusicTracks != null
+                    ? cachedDeviceMusicTracks : Collections.emptyList();
             String q = searchHot != null && searchHot.getText() != null
                     ? searchHot.getText().toString().trim() : "";
             visibleHot.clear();
-            for (RoomDtos.MusicTrackDto t : items) {
+            for (DeviceMusicScanner.Track t : items) {
                 if (t == null) continue;
                 if (musicTrackMatchesQuery(t.title, t.artist, q)) visibleHot.add(t);
             }
@@ -4171,44 +4400,71 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         public RecyclerView.ViewHolder onCreateViewHolder(
                                 @NonNull ViewGroup parent, int viewType) {
                             View row = getLayoutInflater().inflate(
-                                    R.layout.item_room_music_track, parent, false);
+                                    R.layout.list_item_local_music, parent, false);
                             return new RecyclerView.ViewHolder(row) {};
                         }
 
                         @Override
                         public void onBindViewHolder(
                                 @NonNull RecyclerView.ViewHolder holder, int position) {
-                            RoomDtos.MusicTrackDto track = visibleHot.get(position);
-                            TextView title = holder.itemView.findViewById(R.id.tvTrackTitle);
-                            TextView artist = holder.itemView.findViewById(R.id.tvTrackArtist);
-                            TextView now = holder.itemView.findViewById(R.id.tvTrackNow);
-                            ImageButton more = holder.itemView.findViewById(R.id.btnTrackMore);
-                            boolean current = track != null && track.url != null
-                                    && track.url.equals(currentMusicUrl);
-                            if (title != null) {
-                                title.setText(track != null && track.title != null
-                                        ? track.title : "أغنية");
+                            DeviceMusicScanner.Track track = visibleHot.get(position);
+                            TextView name = holder.itemView.findViewById(R.id.tv_musicName);
+                            TextView singer = holder.itemView.findViewById(R.id.tv_singerName);
+                            ImageView cover = holder.itemView.findViewById(R.id.iv_musicAlbumCover);
+                            ImageView more = holder.itemView.findViewById(R.id.iv_musicAdd);
+                            ImageView added = holder.itemView.findViewById(R.id.iv_musicAdded);
+                            TextView time = holder.itemView.findViewById(R.id.tv_musicTotalTime);
+                            if (name != null) {
+                                name.setText(track != null ? track.title : "أغنية");
                             }
-                            if (artist != null) {
-                                String who = track != null && track.artist != null
-                                        && !track.artist.isEmpty() ? track.artist
-                                        : (track != null && track.uploadedBy != null
-                                        ? track.uploadedBy : "المكتبة");
-                                artist.setText(who);
+                            if (singer != null) {
+                                singer.setText(track != null && track.artist != null
+                                        && !track.artist.isEmpty()
+                                        ? track.artist : "من الجهاز");
                             }
-                            if (now != null) {
-                                now.setVisibility(current ? View.VISIBLE : View.GONE);
+                            if (added != null) added.setVisibility(View.GONE);
+                            if (more != null) {
+                                more.setVisibility(View.VISIBLE);
+                                more.setImageResource(R.drawable.ic_music_add);
+                                more.clearColorFilter();
+                                more.setOnClickListener(v -> {
+                                    if (track == null) return;
+                                    dialog.dismiss();
+                                    addLocalMusicAndPlay(
+                                            track.contentUri, track.title, track.artist,
+                                            track.albumArtUri);
+                                });
+                            }
+                            if (time != null && track != null && track.durationMs > 0) {
+                                long sec = track.durationMs / 1000L;
+                                time.setVisibility(View.VISIBLE);
+                                time.setText(String.format(Locale.US, "%d:%02d",
+                                        sec / 60L, sec % 60L));
+                            } else if (time != null) {
+                                time.setVisibility(View.GONE);
+                            }
+                            if (cover != null) {
+                                clipRounded(cover, dp(10));
+                                Object model = track != null && track.albumArtUri != null
+                                        ? track.albumArtUri : R.drawable.bg_music_disc;
+                                try {
+                                    Glide.with(cover)
+                                            .load(model)
+                                            .centerCrop()
+                                            .placeholder(R.drawable.bg_music_disc)
+                                            .error(R.drawable.bg_music_disc)
+                                            .into(cover);
+                                } catch (Exception e) {
+                                    cover.setImageResource(R.drawable.bg_music_disc);
+                                }
                             }
                             holder.itemView.setOnClickListener(v -> {
+                                if (track == null) return;
                                 dialog.dismiss();
-                                if (track != null) {
-                                    playRemoteMusicUrl(track.url, track.title, track.artist);
-                                }
+                                addLocalMusicAndPlay(
+                                        track.contentUri, track.title, track.artist,
+                                        track.albumArtUri);
                             });
-                            if (more != null) {
-                                more.setOnClickListener(v -> showServerTrackActions(
-                                        v, track, () -> dialog.dismiss()));
-                            }
                         }
 
                         @Override
@@ -4222,31 +4478,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         };
         refreshHotRef[0] = bindHotList;
+        Runnable loadDeviceHot = () -> {
+            if (emptyHot != null) emptyHot.setVisibility(View.VISIBLE);
+            if (rvHot != null) rvHot.setVisibility(View.GONE);
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                List<DeviceMusicScanner.Track> deviceTracks = DeviceMusicScanner.scan(this);
+                runOnUiThread(() -> {
+                    if (!dialog.isShowing()) return;
+                    cachedDeviceMusicTracks = deviceTracks != null
+                            ? new ArrayList<>(deviceTracks) : new ArrayList<>();
+                    bindHotList.run();
+                });
+            });
+        };
         Runnable showHot = () -> {
             if (pageMine != null) pageMine.setVisibility(View.GONE);
             if (pageHot != null) pageHot.setVisibility(View.VISIBLE);
             if (pageInternet != null) pageInternet.setVisibility(View.GONE);
             markTab.accept(tabHot);
-            if (emptyHot != null) emptyHot.setVisibility(View.VISIBLE);
-            if (rvHot != null) rvHot.setVisibility(View.GONE);
-            AppContainer c = ContainerProvider.from(this);
-            c.getIoExecutor().execute(() -> {
-                Result<RoomDtos.MusicLibraryDto> r = c.getRoomRepository().musicLibrary();
-                runOnUiThread(() -> {
-                    if (!dialog.isShowing()) return;
-                    if (r.success && r.data != null && r.data.items != null) {
-                        cachedServerMusicTracks = new ArrayList<>(r.data.items);
-                    } else {
-                        cachedServerMusicTracks = new ArrayList<>();
-                        if (!r.success) {
-                            Toast.makeText(this,
-                                    r.error != null ? r.error : "تعذر تحميل المكتبة",
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                    bindHotList.run();
-                });
-            });
+            // "موسيقى شعبية" = device library (MediaStore) — not YouTube, not a new screen.
+            if (!PermissionHelper.hasDeviceMusicPermission(this)) {
+                if (emptyHot != null) emptyHot.setVisibility(View.VISIBLE);
+                if (rvHot != null) rvHot.setVisibility(View.GONE);
+                pendingDeviceMusicPermissionAction = () -> {
+                    if (dialog.isShowing()) loadDeviceHot.run();
+                };
+                deviceMusicPermissionLauncher.launch(PermissionHelper.deviceMusicPermissions());
+                return;
+            }
+            if (cachedDeviceMusicTracks != null && !cachedDeviceMusicTracks.isEmpty()) {
+                bindHotList.run();
+            } else {
+                loadDeviceHot.run();
+            }
         };
         Runnable bindInternetList = () -> {
             boolean empty = internetHits.isEmpty();
@@ -4375,9 +4640,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             bindInternetList.run();
             if (etInternet != null) etInternet.requestFocus();
         };
+        View tabMineWrap = root.findViewById(R.id.tabMineWrap);
+        View tabHotWrap = root.findViewById(R.id.tabHotWrap);
+        View tabInternetWrap = root.findViewById(R.id.tabInternetWrap);
         if (tabMine != null) tabMine.setOnClickListener(v -> showMine.run());
         if (tabHot != null) tabHot.setOnClickListener(v -> showHot.run());
         if (tabInternet != null) tabInternet.setOnClickListener(v -> showInternet.run());
+        if (tabMineWrap != null) tabMineWrap.setOnClickListener(v -> showMine.run());
+        if (tabHotWrap != null) tabHotWrap.setOnClickListener(v -> showHot.run());
+        if (tabInternetWrap != null) tabInternetWrap.setOnClickListener(v -> showInternet.run());
         if (btnInternetGo != null) btnInternetGo.setOnClickListener(v -> runInternetSearch.run());
         if (etInternet != null) {
             etInternet.setOnEditorActionListener((v, actionId, event) -> {
@@ -4392,17 +4663,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         showMine.run();
 
-        if (flMenu != null && llMenu != null) {
-            flMenu.setOnClickListener(v ->
-                    llMenu.setVisibility(llMenu.getVisibility() == View.VISIBLE
-                            ? View.GONE : View.VISIBLE));
-        }
-        if (llLocal != null) {
-            llLocal.setOnClickListener(v -> {
-                dialog.dismiss();
-                musicPicker.launch(new String[]{"audio/*"});
-            });
-        }
+        // No separate "محلي" menu / new screen — device songs are the "موسيقى شعبية" tab.
+        if (flMenu != null) flMenu.setVisibility(View.GONE);
+        if (llMenu != null) llMenu.setVisibility(View.GONE);
+        if (llLocal != null) llLocal.setOnClickListener(null);
         if (back != null) back.setOnClickListener(v -> dialog.dismiss());
 
         bindMineList.run();
@@ -4417,7 +4681,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             });
         }
         if (searchHot != null) {
-            searchHot.setHint(R.string.music_search_hint);
+            searchHot.setHint("ابحث في أغاني الجهاز…");
             searchHot.addTextChangedListener(new android.text.TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
                 @Override public void onTextChanged(CharSequence s, int st, int b, int c) {}
@@ -4500,7 +4764,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 tracks.remove(index);
                 cacheMusicTracks(tracks);
                 if (track.url != null && track.url.equals(currentMusicUrl) && roomId != null) {
-                    ZegoEngineManager.getInstance().stopLocalMusic();
+                    RoomRtcEngine.getInstance().stopLocalMusic();
                     viewModel.updateMusic(roomId, "stop", null, null, null, 0L);
                 }
                 Toast.makeText(this, "تم الحذف", Toast.LENGTH_SHORT).show();
@@ -5862,10 +6126,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Platform manager: mute/kick/ban people in any room. */
     private boolean isPlatformManager() {
         try {
-            AuthDtos.UserDto u = ContainerProvider.from(this).getSessionManager().getUser();
-            if (u == null) return false;
-            String role = u.staffRole != null ? u.staffRole.trim().toLowerCase() : "";
-            return "manager".equals(role) || "moderator".equals(role) || "mod".equals(role);
+            return com.Dramizo.Series.util.StaffRoleHelper.isManager(
+                    ContainerProvider.from(this).getSessionManager().getUser());
         } catch (Exception ignored) {
             return false;
         }
@@ -5874,13 +6136,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Platform super admin (or legacy isAdmin): full room + host-level powers. */
     private boolean isPlatformSuper() {
         try {
-            AuthDtos.UserDto u = ContainerProvider.from(this).getSessionManager().getUser();
-            if (u == null) return false;
-            String role = u.staffRole != null ? u.staffRole.trim().toLowerCase() : "";
-            if ("super".equals(role) || "super_admin".equals(role) || "superadmin".equals(role)) {
-                return true;
-            }
-            return u.isAdmin;
+            return com.Dramizo.Series.util.StaffRoleHelper.isSuper(
+                    ContainerProvider.from(this).getSessionManager().getUser());
         } catch (Exception ignored) {
             return false;
         }
@@ -5902,45 +6159,45 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void updateAdminControls() {
         if (binding == null) return;
-        // Seat-count control is host/room-manager only — never show to guests.
+        // Seat settings + mic-request bell stay out of the header (tools / room tab only).
         if (binding.btnHeaderHome != null) {
-            boolean seatAdmin = canManageRoom || isHost;
-            binding.btnHeaderHome.setVisibility(seatAdmin ? View.VISIBLE : View.GONE);
+            binding.btnHeaderHome.setVisibility(View.GONE);
         }
-        // Free-mic mode: no raise-hand queue — hide the mic-requests bell entirely.
-        boolean showRequestsBell = canInviteMic && !isFreeMicEnabled();
         if (binding.btnPlusWrap != null) {
-            binding.btnPlusWrap.setVisibility(showRequestsBell ? View.VISIBLE : View.GONE);
+            binding.btnPlusWrap.setVisibility(View.GONE);
         }
         if (binding.btnPlus != null) {
-            binding.btnPlus.setVisibility(View.VISIBLE);
+            binding.btnPlus.setVisibility(View.GONE);
+        }
+        if (binding.tvSeatRequestBadge != null) {
+            binding.tvSeatRequestBadge.setVisibility(View.GONE);
         }
         if (binding.llMusicLibraryChip != null) {
             binding.llMusicLibraryChip.setVisibility(View.GONE);
         }
-        if (showRequestsBell && roomId != null) {
+        // Keep request list warm so tools / host dialogs stay current.
+        if (canInviteMic && !isFreeMicEnabled() && roomId != null) {
             viewModel.loadSeatRequests(roomId);
         } else {
             updateSeatRequestBadge(null);
         }
+        if (binding.tvRoomViewerCount != null) {
+            binding.tvRoomViewerCount.setVisibility(View.VISIBLE);
+            binding.tvRoomViewerCount.bringToFront();
+        }
     }
 
     private void updateSeatRequestBadge(List<RoomDtos.SeatRequestDto> list) {
-        if (binding == null || binding.tvSeatRequestBadge == null) return;
-        boolean showRequestsBell = canInviteMic && !isFreeMicEnabled();
-        int count = list != null ? list.size() : 0;
-        if (!showRequestsBell) {
+        // Header badge removed — mic requests open from أدوات → طلبات المايك.
+        if (binding == null) return;
+        if (binding.btnPlusWrap != null) binding.btnPlusWrap.setVisibility(View.GONE);
+        if (binding.tvSeatRequestBadge != null) {
             binding.tvSeatRequestBadge.setVisibility(View.GONE);
-            if (binding.btnPlusWrap != null) binding.btnPlusWrap.setVisibility(View.GONE);
-            return;
+            int count = list != null ? list.size() : 0;
+            if (count > 0) {
+                binding.tvSeatRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
+            }
         }
-        if (binding.btnPlusWrap != null) binding.btnPlusWrap.setVisibility(View.VISIBLE);
-        if (count <= 0) {
-            binding.tvSeatRequestBadge.setVisibility(View.GONE);
-            return;
-        }
-        binding.tvSeatRequestBadge.setVisibility(View.VISIBLE);
-        binding.tvSeatRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
     }
 
     private void syncMicUi() {
@@ -5980,7 +6237,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
-        ZegoEngineManager.getInstance().setSpeakerMuted(muted);
+        RoomRtcEngine.getInstance().setSpeakerMuted(muted);
         if (roomMusicPlayer != null) {
             if (isYoutubeMusicUrl(currentMusicUrl)) {
                 applyHostOrGuestMusicVolume();
@@ -6332,7 +6589,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception ignored) {
         }
         try {
-            ZegoEngineManager.getInstance().stopLocalMusic();
+            RoomRtcEngine.getInstance().stopLocalMusic();
         } catch (Exception ignored) {
         }
         if (stopForeground) {
@@ -6344,10 +6601,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String leavingRoomId = roomId;
         try {
             micOn = false;
-            ZegoEngineManager.getInstance().setMicEnabled(false);
+            RoomRtcEngine.getInstance().setMicEnabled(false);
             // Hard leave: stop play/publish + logout. Do NOT setSpeakerMuted(true) first —
             // that would stash streams and unmute after hop could revive the previous room.
-            ZegoEngineManager.getInstance().hardLeaveRoom();
+            RoomRtcEngine.getInstance().hardLeaveRoom();
         } catch (Exception ignored) {
         }
         if (leavingRoomId != null) {
@@ -7698,6 +7955,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String chatGift = "أرسل هدية حظ " + (giftName != null ? giftName : "");
         if (comboCount > 1) chatGift += " ×" + comboCount;
         appendChatLine(me, chatGift, vip, level, frame, chatUserId, senderAvatarUrl, iconUrl);
+        showGiftSendToast(me, giftName, senderAvatarUrl, iconUrl, Math.max(1, comboCount), 0,
+                "أرسل هدية حظ");
     }
 
     /** Chat-only lucky win line (toast shown separately via ComingMsgView). */
@@ -7722,11 +7981,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable String message
     ) {
         if (areCelebrationPopupsMuted()) return;
-        if (binding == null || binding.comingMsgView == null) return;
+        // Lucky gift result uses game-style crawl bubble — not ComingMsg (personal join strip).
+        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         String msg = message != null && !message.isEmpty() ? message : "حظ سعيد";
-        binding.comingMsgView.setupView(displayName, avatarUrl, userLevel, vipLevel, msg);
-        binding.comingMsgView.bringToFront();
-        binding.comingMsgView.play(3600L);
+        RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
+        if (bubbleFx != null) {
+            bubbleFx.showSlotWinBubble(who, null, Math.max(1L, extractCoinsFromBody(msg)), "حظ", null);
+            if (binding != null && binding.giftChatEffects != null) {
+                binding.giftChatEffects.setVisibility(View.VISIBLE);
+                binding.giftChatEffects.bringToFront();
+            }
+        } else if (binding != null && binding.comingMsgView != null) {
+            binding.comingMsgView.setupView(displayName, avatarUrl, userLevel, vipLevel, msg);
+            binding.comingMsgView.bringToFront();
+            binding.comingMsgView.play(3600L);
+        }
+        if (roomBannerEnabled()) {
+            appendGameCelebrationLine(msg, null);
+        }
     }
 
     /** World celebration while inside a room — Migo bubble (name/avatar/game/win) + chat. */
@@ -7809,18 +8081,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? gameTitle
                     : extractGameTitleFromBody(line);
             if (bubbleFx != null) {
-                bubbleFx.showSlotWinBubble(who, avatarUrl, Math.max(1L, coins), game, badgeUrl);
+                // No personal avatar on game win crawl.
+                bubbleFx.showSlotWinBubble(who, null, Math.max(1L, coins), game, badgeUrl);
             }
             if (binding != null && binding.giftChatEffects != null) {
                 binding.giftChatEffects.setVisibility(View.VISIBLE);
                 binding.giftChatEffects.bringToFront();
                 binding.giftChatEffects.setElevation(42f);
             }
-            // In-room: stacked dark bubbles only — no ComingMsg / Android Toast.
             String chat = "مبروك " + who + " حصل على " + Math.max(1L, coins)
-                    + (game != null && !game.isEmpty() ? (" مبروك " + game) : "");
+                    + (game != null && !game.isEmpty() ? (" · " + game) : "");
             if (roomBannerEnabled()) {
-                appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
+                appendGameCelebrationLine(chat, badgeUrl);
             }
             return;
         }
@@ -7833,19 +8105,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     ? ("أرسل هدايا حظ وفاز بـ " + coins)
                     : "أرسل هدايا حظ وفاز";
             chat = coins > 0
-                    ? (who + " أرسل هدايا حظ للفوز بـ " + coins + " عملة")
-                    : (who + " أرسل هدايا حظ وفاز");
+                    ? ("مبروك " + who + " فاز بـ " + coins + " عملة · حظ")
+                    : ("مبروك " + who + " · حظ");
             if (bubbleFx != null && coins > 0) {
-                bubbleFx.showSlotWinBubble(who, avatarUrl, coins, "حظ", badgeUrl);
+                bubbleFx.showSlotWinBubble(who, null, coins, "حظ", badgeUrl);
                 if (binding != null && binding.giftChatEffects != null) {
                     binding.giftChatEffects.setVisibility(View.VISIBLE);
                     binding.giftChatEffects.bringToFront();
                 }
             } else if (bubbleFx != null) {
-                bubbleFx.showRoomEventBubble(who, avatarUrl, toastMsg, badgeUrl);
+                bubbleFx.showRoomEventBubble(null, null, who + " · " + toastMsg, badgeUrl);
             }
             if (roomBannerEnabled()) {
-                appendChatLine(who, chat, 0, 1, null, null, avatarUrl, badgeUrl);
+                appendGameCelebrationLine(chat, badgeUrl);
             }
             return;
         } else {
@@ -7958,8 +8230,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return targets;
     }
 
+    private void startRoomGmtClock() {
+        updateRoomGmtClock();
+        handler.removeCallbacks(roomGmtClockTick);
+        handler.postDelayed(roomGmtClockTick, 30_000L);
+    }
+
+    private void updateRoomGmtClock() {
+        if (binding == null || binding.tvRoomGmtClock == null) return;
+        try {
+            java.util.TimeZone tz = java.util.TimeZone.getDefault();
+            long now = System.currentTimeMillis();
+            int totalMin = tz.getOffset(now) / 60_000;
+            int absMin = Math.abs(totalMin);
+            String sign = totalMin >= 0 ? "+" : "-";
+            int hours = absMin / 60;
+            int mins = absMin % 60;
+            String gmt = mins == 0
+                    ? String.format(java.util.Locale.US, "GMT%s%d", sign, hours)
+                    : String.format(java.util.Locale.US, "GMT%s%d:%02d", sign, hours, mins);
+            java.text.SimpleDateFormat dateFmt =
+                    new java.text.SimpleDateFormat("MM/dd HH:mm", java.util.Locale.US);
+            dateFmt.setTimeZone(tz);
+            binding.tvRoomGmtClock.setText(gmt + "\n" + dateFmt.format(new java.util.Date(now)));
+            binding.tvRoomGmtClock.setVisibility(View.VISIBLE);
+        } catch (Exception ignored) {
+            binding.tvRoomGmtClock.setVisibility(View.GONE);
+        }
+    }
+
     /**
-     * Lucky send FX: disabled big stage. No-op (win path shows small ComingMsg toast).
+     * Mikoo lucky / multi-mic FX:
+     * gift holds center → clones to occupied seats → gold rain optional.
      */
     public void playLuckyGiftStage(
             @Nullable String giftIconUrl,
@@ -7969,10 +8271,100 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int personCount,
             @Nullable Runnable onScatterStart
     ) {
-        if (onScatterStart != null) {
-            try { onScatterStart.run(); } catch (Exception ignored) {}
+        if (binding == null || binding.giftOverlay == null) {
+            if (onScatterStart != null) {
+                try { onScatterStart.run(); } catch (Exception ignored) {}
+            }
+            return;
         }
-        // Intentionally no center stage and no all-mic rain.
+        List<String> ids = targetIds;
+        if (ids == null || ids.isEmpty()) {
+            ids = collectOccupiedMicUserIds();
+        }
+        final List<String> rainIds = ids != null ? new ArrayList<>(ids) : new ArrayList<>();
+        List<android.graphics.PointF> seats = resolveMicCenters(rainIds);
+        if (seats.isEmpty()) {
+            // Fallback: every currently visible occupied seat.
+            List<String> all = collectOccupiedMicUserIds();
+            seats = resolveMicCenters(all);
+            rainIds.clear();
+            if (all != null) rainIds.addAll(all);
+        }
+
+        binding.giftOverlay.setVisibility(View.VISIBLE);
+        binding.giftOverlay.bringToFront();
+        binding.giftOverlay.setElevation(36f);
+        markLuckyOverlayActive(5200L);
+
+        int w = Math.max(binding.giftOverlay.getWidth(), 1);
+        int h = Math.max(binding.giftOverlay.getHeight(), 1);
+        android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
+        long hold = Math.min(1400L, 520L + Math.max(1, quantity) * 80L);
+
+        final List<android.graphics.PointF> seatPts = seats;
+        GiftFlyAnimator.holdAndScatter(
+                binding.giftOverlay,
+                giftIconUrl,
+                center,
+                seatPts,
+                hold,
+                () -> {
+                    if (onScatterStart != null) {
+                        try { onScatterStart.run(); } catch (Exception ignored) {}
+                    }
+                    // Pulse each target seat when clones land.
+                    for (String uid : rainIds) {
+                        View seat = findSeatViewForUser(uid);
+                        if (seat != null) GiftFlyAnimator.pulseTarget(seat);
+                    }
+                },
+                () -> {
+                    // Soft gold trail after scatter (readable, not heavy).
+                    if (coinsSpent >= 50 && !rainIds.isEmpty()) {
+                        playCoinRainToUsers(rainIds, Math.min(90,
+                                24 + Math.max(1, quantity) * Math.max(1, personCount)));
+                    }
+                });
+    }
+
+    /** Center → clone → mics for regular all-mic gift sends. */
+    public void scatterGiftToMics(
+            @Nullable String giftIconUrl,
+            @Nullable List<String> targetIds,
+            int comboCount
+    ) {
+        if (binding == null || binding.giftOverlay == null) return;
+        List<String> ids = targetIds != null && !targetIds.isEmpty()
+                ? targetIds : collectOccupiedMicUserIds();
+        List<android.graphics.PointF> seats = resolveMicCenters(ids);
+        if (seats.isEmpty()) return;
+        binding.giftOverlay.setVisibility(View.VISIBLE);
+        binding.giftOverlay.bringToFront();
+        markLuckyOverlayActive(4000L);
+        int w = Math.max(binding.giftOverlay.getWidth(), 1);
+        int h = Math.max(binding.giftOverlay.getHeight(), 1);
+        android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
+        GiftFlyAnimator.holdAndScatter(
+                binding.giftOverlay,
+                giftIconUrl,
+                center,
+                seats,
+                700L,
+                () -> {
+                    for (String uid : ids) {
+                        View seat = findSeatViewForUser(uid);
+                        if (seat != null) GiftFlyAnimator.pulseTarget(seat);
+                    }
+                    if (comboCount >= 2) {
+                        float d = getResources().getDisplayMetrics().density;
+                        GiftFlyAnimator.showComboBurst(
+                                binding.giftOverlay,
+                                comboCount,
+                                new android.graphics.PointF(48f * d, h * 0.58f),
+                                null);
+                    }
+                },
+                null);
     }
 
     /** @deprecated Big center ×N card removed. */
@@ -8107,7 +8499,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return collectOccupiedMicUserIds();
     }
 
-    /** Lucky «كل المايك»: one stage animation, credit every mic seat. */
+    /** All-mic send: center hold → clone to every target seat + one media stage. */
     public void playLuckyGiftToAllMics(String giftName, String iconUrl, String animationUrl,
                                        String senderName, int comboCount,
                                        String senderUserId, int senderVipLevel,
@@ -8123,8 +8515,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         if (playTo == null) return;
+        scatterGiftToMics(iconUrl, targetIds, comboCount);
+        // First target: seat credit + effect queue / media (clones already flying).
         playGiftToRecipient(giftName, iconUrl, animationUrl, senderName, comboCount,
-                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue);
+                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue, true);
     }
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
@@ -8235,7 +8629,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         playGiftAnimationRemote(giftName, iconUrl, animationUrl, senderName, comboCount,
                 senderUserId, senderVipLevel, senderAvatarUrl, senderUserLevel, senderFrameUrl);
-        // No fly-to-mic / coin candy — gift media plays fixed in the chat area.
+        // Icon fly to the receiver seat (Mikoo mid → mic), independent of video stage.
+        if (receiverId != null && !receiverId.isEmpty()) {
+            flyGiftIconToUser(receiverId, iconUrl, null);
+        }
         if (updateSeatCoins && coinValue > 0) {
             applyGiftToSeat(receiverId, coinValue, 0L);
         }
@@ -8308,22 +8705,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 senderUserId, senderVipLevel, senderAvatarUrl, 1, null);
     }
 
-    /** Gift send toast — crawl above chat (not center screen). */
+    /** Gift send toast — profile + gift icon + combo xN (Mikoo crawl strip). */
     public void showGiftSendToast(@Nullable String senderName,
                                   @Nullable String giftName,
                                   @Nullable String senderAvatarUrl,
                                   @Nullable String giftIconUrl,
                                   int comboCount,
                                   int totalCoins) {
+        showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                comboCount, totalCoins, null);
+    }
+
+    public void showGiftSendToast(@Nullable String senderName,
+                                  @Nullable String giftName,
+                                  @Nullable String senderAvatarUrl,
+                                  @Nullable String giftIconUrl,
+                                  int comboCount,
+                                  int totalCoins,
+                                  @Nullable String receiverLabel) {
         if (binding == null || binding.comboGiftView == null) return;
-        String recv = giftName != null && !giftName.isEmpty()
+        String recv = receiverLabel != null && !receiverLabel.isEmpty()
+                ? receiverLabel
+                : (giftName != null && !giftName.isEmpty()
                 ? ("أرسل " + giftName)
-                : getString(R.string.send);
+                : getString(R.string.send));
         String icon = giftIconUrl;
         if (icon == null || icon.trim().isEmpty()) {
             String mapped = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                     giftName, null, null);
-            // Prefer static image sibling when only video URL is known.
             if (mapped != null && mapped.toLowerCase(java.util.Locale.US).endsWith(".mp4")) {
                 icon = mapped.replaceAll("(?i)\\.mp4(\\?.*)?$", ".png$1");
             } else if (mapped != null
@@ -8341,6 +8750,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 icon,
                 Math.max(1, comboCount),
                 Math.max(0, totalCoins));
+        // Giant left "37x" floating multiplier like screenshots.
+        if (comboCount >= 2 && binding.giftOverlay != null) {
+            binding.giftOverlay.setVisibility(View.VISIBLE);
+            float d = getResources().getDisplayMetrics().density;
+            int h = Math.max(binding.giftOverlay.getHeight(),
+                    getResources().getDisplayMetrics().heightPixels);
+            GiftFlyAnimator.showComboBurst(
+                    binding.giftOverlay,
+                    comboCount,
+                    new android.graphics.PointF(56f * d, h * 0.60f),
+                    null);
+            markLuckyOverlayActive(2800L);
+        }
     }
 
     public void playGiftAnimationRemote(String giftName, String iconUrl, String animationUrl, String senderName,
@@ -8598,8 +9020,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         unmuteAudioAfterBackground();
         try {
             // Prefer live Zego mic state (may have been toggled from notification / mini).
-            micOn = ZegoEngineManager.getInstance().isMicEnabled();
-            ZegoEngineManager.getInstance().setMicEnabled(micOn);
+            micOn = RoomRtcEngine.getInstance().isMicEnabled();
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
             syncMicUi();
         } catch (Exception ignored) {
         }
@@ -8631,21 +9053,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (mutedForBackground || exiting) return;
         try {
             speakerMutedBeforeBackground = roomSpeakerMuted
-                    || ZegoEngineManager.getInstance().isSpeakerMuted();
+                    || RoomRtcEngine.getInstance().isSpeakerMuted();
             mutedForBackground = true;
             roomSpeakerMuted = true;
             RoomSoundFx.setMuted(true);
-            ZegoEngineManager.getInstance().setSpeakerMuted(true);
+            RoomRtcEngine.getInstance().setSpeakerMuted(true);
             // Re-assert music mix after speaker mute (mute stops remote pulls only).
             if (canManageMusic
                     && currentMusicUrl != null
                     && !currentMusicUrl.isEmpty()
                     && "playing".equalsIgnoreCase(currentMusicStatus)) {
                 ensurePublishingForMusic();
-                ZegoEngineManager.getInstance().boostMusicMixVolume();
-                if (ZegoEngineManager.getInstance().hasLocalMusicPlayer()
-                        && !ZegoEngineManager.getInstance().isLocalMusicPlaying()) {
-                    ZegoEngineManager.getInstance().resumeLocalMusic();
+                RoomRtcEngine.getInstance().boostMusicMixVolume();
+                if (RoomRtcEngine.getInstance().hasLocalMusicPlayer()
+                        && !RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
+                    RoomRtcEngine.getInstance().resumeLocalMusic();
                 }
             }
         } catch (Exception ignored) {
@@ -8659,7 +9081,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean keepMuted = speakerMutedBeforeBackground;
             roomSpeakerMuted = keepMuted;
             RoomSoundFx.setMuted(keepMuted);
-            ZegoEngineManager.getInstance().setSpeakerMuted(keepMuted);
+            RoomRtcEngine.getInstance().setSpeakerMuted(keepMuted);
         } catch (Exception ignored) {
         }
     }
@@ -8802,6 +9224,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (sAliveRoom != null && sAliveRoom.get() == this) {
             sAliveRoom.clear();
         }
+        handler.removeCallbacks(roomGmtClockTick);
         closeGameOverlay();
         stopMusicDiscAnimation();
         stopTaskFloatPulse();
@@ -8813,7 +9236,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             RoomSoundFx.setMuted(true);
             GiftAudioFx.resetRoomGiftSounds();
             try {
-                ZegoEngineManager.getInstance().setSpeakerMuted(true);
+                RoomRtcEngine.getInstance().setSpeakerMuted(true);
             } catch (Exception ignored) {
             }
         } else {
@@ -8822,7 +9245,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             RoomSoundFx.setMuted(false);
             GiftAudioFx.resetRoomGiftSounds();
             try {
-                ZegoEngineManager.getInstance().setSpeakerMuted(false);
+                RoomRtcEngine.getInstance().setSpeakerMuted(false);
             } catch (Exception ignored) {
             }
         }
@@ -8862,11 +9285,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (!minimizing) {
             clearMusicVideoUi();
-            ZegoEngineManager.getInstance().setLocalMusicEndListener(null);
+            RoomRtcEngine.getInstance().setLocalMusicEndListener(null);
             // Don't stop host music here on accidental destroy if session still active via FGS —
             // intentional leave already called logoutRoom → stopLocalMusic.
             if (exiting || roomTeardownDone) {
-                ZegoEngineManager.getInstance().stopLocalMusic();
+                RoomRtcEngine.getInstance().stopLocalMusic();
             }
         } else {
             try {
@@ -8875,10 +9298,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         && !currentMusicUrl.isEmpty()
                         && "playing".equalsIgnoreCase(currentMusicStatus)) {
                     ensurePublishingForMusic();
-                    ZegoEngineManager.getInstance().boostMusicMixVolume();
-                    if (!ZegoEngineManager.getInstance().isLocalMusicPlaying()
-                            && ZegoEngineManager.getInstance().hasLocalMusicPlayer()) {
-                        ZegoEngineManager.getInstance().resumeLocalMusic();
+                    RoomRtcEngine.getInstance().boostMusicMixVolume();
+                    if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()
+                            && RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
+                        RoomRtcEngine.getInstance().resumeLocalMusic();
                     }
                 }
             } catch (Exception ignored) {
@@ -8896,7 +9319,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             moderationUserListener = null;
         }
         if (zegoRoomListener != null) {
-            ZegoEngineManager.getInstance().removeRoomListener(zegoRoomListener);
+            RoomRtcEngine.getInstance().removeRoomListener(zegoRoomListener);
             zegoRoomListener = null;
         }
         if (minimizing) {
@@ -9546,7 +9969,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         name, icon, sender, combo, senderId, senderVipChat,
                         memberStr(payload, "senderAvatarUrl"), senderLevelChat, senderFrameChat);
             } else if (allMic && !allReceivers.isEmpty()) {
-                // Normal all-mic: no coin rain (lucky/مردود only).
+                // Mikoo: center gift → clones to every target mic.
+                scatterGiftToMics(icon, allReceivers, combo);
             }
             long receiverRoomGiftTotal =
                     Math.max(0L, memberLong(payload, "receiverRoomGiftTotal", 0L));
@@ -9669,11 +10093,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean muted = memberBool(payload, "muted", false);
             boolean moderatorMuted = memberBool(payload, "moderatorMuted", false)
                     || memberBool(payload, "isModeratorMuted", false);
-            if (myUserId != null && myUserId.equals(targetUserId)) {
+            if (myUserId != null && sameUser(myUserId, targetUserId)) {
                 if (moderatorMuted || muted) {
                     RoomSoundFx.playMute(this);
                     micOn = false;
-                    ZegoEngineManager.getInstance().setMicEnabled(false);
+                    RoomRtcEngine.getInstance().setMicEnabled(false);
                     syncMicUi();
                     if (moderatorMuted) {
                         Toast.makeText(this, "قام مشرف الغرفة بكتم المايك", Toast.LENGTH_SHORT).show();
@@ -9682,7 +10106,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     // Server unmuted us — restore publish so others can hear again.
                     userChoseMute = false;
                     micOn = true;
-                    ZegoEngineManager.getInstance().setMicEnabled(true);
+                    RoomRtcEngine.getInstance().setMicEnabled(true);
                     syncMicUi();
                     activateSeatAudio(currentSeats);
                 }
@@ -9726,14 +10150,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long win = Math.max(0L, memberLong(payload, "winCoins", 0L));
             boolean won = memberBool(payload, "won", false) || win > 0;
             if (bet <= 0 && !won) return;
-            String line = won
-                    ? who + " ربح " + win + " في " + gameTitle
-                    : who + " لعب " + gameTitle + (bet > 0 ? " · رهان " + bet : "");
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
-            String avatar = memberStr(payload, "avatarUrl");
-            String uid = memberStr(payload, "userId");
-            appendChatLine(who, line, 0, 1, null, uid, avatar, gameIcon);
+            if (won) {
+                String line = "مبروك " + who + " حصل على " + win
+                        + (gameTitle != null ? (" · " + gameTitle) : "");
+                appendGameCelebrationLine(line, gameIcon);
+            } else {
+                String avatar = memberStr(payload, "avatarUrl");
+                String uid = memberStr(payload, "userId");
+                appendChatLine(who, who + " لعب " + gameTitle + (bet > 0 ? " · رهان " + bet : ""),
+                        0, 1, null, uid, avatar, gameIcon);
+            }
         } else if ("room:slot_win".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));
@@ -9741,24 +10169,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "gameId"), "لعبة");
             long win = Math.max(0L, memberLong(payload, "winCoins", 0L));
             if (win <= 0) return;
-            String avatar = memberStr(payload, "avatarUrl");
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
-            String uid = memberStr(payload, "userId");
             String chat = "مبروك " + who + " حصل على " + win
-                    + (gameTitle != null ? (" مبروك " + gameTitle) : "");
-            appendChatLine(who, chat, 0, 1, null, uid, avatar, gameIcon);
+                    + (gameTitle != null ? (" · " + gameTitle) : "");
+            appendGameCelebrationLine(chat, gameIcon);
             if (!areCelebrationPopupsMuted()) {
                 RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
                 if (bubbleFx != null) {
-                    bubbleFx.showSlotWinBubble(who, avatar, win, gameTitle, gameIcon);
+                    bubbleFx.showSlotWinBubble(who, null, win, gameTitle, gameIcon);
                 }
                 if (binding != null && binding.giftChatEffects != null) {
                     binding.giftChatEffects.setVisibility(View.VISIBLE);
                     binding.giftChatEffects.bringToFront();
                 }
             }
-            // Stacked in-room bubble only — no ComingMsg strip for game wins.
+            // Stacked in-room bubble only — no ComingMsg strip / no personal portrait.
         } else if ("room:slot_lose".equals(event)) {
             String who = firstNonEmpty(memberStr(payload, "displayName"),
                     shortUserId(memberStr(payload, "userId")));
@@ -9766,14 +10192,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "gameId"), "لعبة");
             long bet = Math.max(0L, memberLong(payload, "betCoins", 0L));
             if (bet <= 0) return;
-            String avatar = memberStr(payload, "avatarUrl");
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
-            String uid = memberStr(payload, "userId");
-            appendChatLine(who, "خسر " + bet + " · " + gameTitle, 0, 1, null, uid, avatar, gameIcon);
+            appendGameCelebrationLine(who + " خسر " + bet + " · " + gameTitle, gameIcon);
             RoomVisualEffects bubbleFx = giftVisualEffects != null ? giftVisualEffects : visualEffects;
             if (bubbleFx != null) {
-                bubbleFx.showSlotLoseBubble(who, avatar, bet, gameTitle, gameIcon);
+                bubbleFx.showSlotLoseBubble(who, null, bet, gameTitle, gameIcon);
             }
             if (binding != null && binding.giftChatEffects != null) {
                 binding.giftChatEffects.setVisibility(View.VISIBLE);
@@ -9786,34 +10210,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberStr(payload, "gameId"), "لعبة");
             String gameIcon = firstNonEmpty(memberStr(payload, "gameCoverUrl"),
                     memberStr(payload, "gameIconUrl"));
-            String avatar = memberStr(payload, "avatarUrl");
-            String uid = memberStr(payload, "userId");
-            appendChatLine(who, "أنهى اللعب · " + gameTitle, 0, 1, null, uid, avatar, gameIcon);
+            appendGameCelebrationLine(who + " أنهى اللعب · " + gameTitle, gameIcon);
         } else if ("room:kicked".equals(event)) {
             String kickedUserId = memberStr(payload, "userId");
-            if (myUserId != null && myUserId.equals(kickedUserId)) {
+            if (myUserId != null && sameUser(myUserId, kickedUserId)) {
                 forceExitRoom("تم طردك من الغرفة");
             } else {
                 appendChatLine("النظام", "تم طرد مستخدم من الغرفة", 0, 1);
                 if (kickedUserId != null) {
-                    ZegoEngineManager.getInstance().stopPlaying(ZegoEngineManager.audioStreamId(kickedUserId));
+                    RoomRtcEngine.getInstance().stopPlaying(
+                            RoomRtcEngine.audioStreamId(kickedUserId));
                 }
-                requestRoomRefresh(false);
+                requestRoomRefresh(true);
             }
         } else if ("room:banned".equals(event)) {
             String bannedUserId = memberStr(payload, "userId");
-            if (myUserId != null && myUserId.equals(bannedUserId)) {
+            if (myUserId != null && sameUser(myUserId, bannedUserId)) {
                 forceExitRoom("تم حظرك من الغرفة");
             } else {
                 appendChatLine("النظام", "تم حظر مستخدم من الغرفة", 0, 1);
                 if (bannedUserId != null) {
-                    ZegoEngineManager.getInstance().stopPlaying(ZegoEngineManager.audioStreamId(bannedUserId));
+                    RoomRtcEngine.getInstance().stopPlaying(
+                            RoomRtcEngine.audioStreamId(bannedUserId));
                 }
-                requestRoomRefresh(false);
+                requestRoomRefresh(true);
             }
         } else if ("room:chat_muted".equals(event)) {
             String mutedId = memberStr(payload, "userId");
-            if (myUserId != null && myUserId.equals(mutedId)) {
+            if (myUserId != null && sameUser(myUserId, mutedId)) {
                 applyChatMuteFromServer(
                         memberStr(payload, "until"),
                         memberStr(payload, "reason"));
@@ -9821,7 +10245,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             requestRoomRefresh(false);
         } else if ("room:unbanned".equals(event)) {
             String uid = memberStr(payload, "userId");
-            if (myUserId != null && myUserId.equals(uid)) {
+            if (myUserId != null && sameUser(myUserId, uid)) {
                 chatMutedUntilMs = 0L;
                 Toast.makeText(this, "تم رفع العقوبة عنك", Toast.LENGTH_SHORT).show();
             }
@@ -9829,7 +10253,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             forceExitRoom("تم تعليق الوكالة وإيقاف الغرفة");
         } else if ("room:seat_requests_cleared".equals(event)) {
             clearSeatRequestsUi();
-        } else if ("room:closed".equals(event)) {
+        } else if ("room:closed".equals(event) || "room:auto_closed".equals(event)) {
             clearSeatRequestsUi();
             clearTopSupportersUi();
             clearRoomChatSession();
@@ -9853,19 +10277,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else if ("room:hand_lowered".equals(event)) {
             if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
             requestRoomRefresh(false);
-        } else if ("room:seat_approved".equals(event)) {
+        } else if ("room:seat_approved".equals(event) || "room:seat_taken".equals(event)) {
             String approvedId = memberStr(payload, "userId");
             String approvedName = memberStr(payload, "displayName");
             if (approvedName == null) approvedName = "مستخدم";
-            appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
-            if (myUserId != null && myUserId.equals(approvedId)) {
-                Toast.makeText(this, R.string.mic_request_approved, Toast.LENGTH_SHORT).show();
+            // Free-mic sit uses room:seat_taken — still show climb line for others.
+            if (!sameUser(myUserId, approvedId) || "room:seat_approved".equals(event)) {
+                appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
+            }
+            if (myUserId != null && sameUser(myUserId, approvedId)) {
+                if ("room:seat_approved".equals(event)) {
+                    Toast.makeText(this, R.string.mic_request_approved, Toast.LENGTH_SHORT).show();
+                }
                 if (!PermissionHelper.hasAudioPermission(this)) {
                     PermissionHelper.ensureMediaPermissions(this, false);
                 }
                 userChoseMute = false;
                 micOn = true;
-                ZegoEngineManager.getInstance().setMicEnabled(true);
+                RoomRtcEngine.getInstance().setMicEnabled(true);
                 if (roomId != null) viewModel.setMic(roomId, false);
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
@@ -9873,7 +10302,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             requestRoomRefresh(true);
         } else if ("room:seat_rejected".equals(event)) {
             String rejectedId = memberStr(payload, "userId");
-            if (myUserId != null && myUserId.equals(rejectedId)) {
+            if (myUserId != null && sameUser(myUserId, rejectedId)) {
                 Toast.makeText(this, R.string.mic_request_rejected, Toast.LENGTH_SHORT).show();
             }
             if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
@@ -9882,23 +10311,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean forced = payload.has("forced")
                     && !payload.get("forced").isJsonNull()
                     && payload.get("forced").getAsBoolean();
-            if (myUserId != null && myUserId.equals(leftId)) {
+            if (myUserId != null && sameUser(myUserId, leftId)) {
                 micOn = false;
                 userChoseMute = false;
-                ZegoEngineManager.getInstance().setMicEnabled(false);
-                ZegoEngineManager.getInstance().stopPublishing();
+                RoomRtcEngine.getInstance().setMicEnabled(false);
+                RoomRtcEngine.getInstance().stopPublishing();
                 if (forced) {
                     Toast.makeText(this, "تم إنزالك من المقعد بسبب مخالفة", Toast.LENGTH_LONG).show();
                 }
             } else if (leftId != null) {
-                ZegoEngineManager.getInstance().stopPlaying(ZegoEngineManager.audioStreamId(leftId));
+                RoomRtcEngine.getInstance().stopPlaying(RoomRtcEngine.audioStreamId(leftId));
             }
             appendChatLine("النظام",
                     forced ? "تم إنزال مستخدم من المقعد (رقابة)" : "مستخدم نزل من المايك",
                     0, 1);
             requestRoomRefresh(true);
+        } else if ("room:staff_updated".equals(event)
+                || "room:seat_locked".equals(event)
+                || "room:seats_resized".equals(event)
+                || "room:lock_changed".equals(event)) {
+            // Permissions / layout / password — pull full snapshot immediately.
+            requestRoomRefresh(true);
         } else if ("room:user_left".equals(event)) {
+            int vc = memberInt(payload, "viewerCount", -1);
+            if (vc >= 0) {
+                setRoomViewerCount(vc);
+            } else {
+                String leftId = memberStr(payload, "userId");
+                if (leftId != null && !sameUser(leftId, myUserId)) {
+                    bumpRoomViewers(-1);
+                }
+            }
             requestRoomRefresh(false);
+        } else if ("room:supporters_cleared".equals(event)) {
+            clearTopSupportersUi();
         }
     }
 
@@ -9981,7 +10427,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             @Override
             public void onStreamRemoved(String streamId) {
-                handler.post(() -> ZegoEngineManager.getInstance().stopPlaying(streamId));
+                handler.post(() -> RoomRtcEngine.getInstance().stopPlaying(streamId));
             }
 
             @Override
@@ -9999,7 +10445,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 handler.post(() -> applyZegoRoomChat(fromUserId, fromUserName, jsonOrText));
             }
         };
-        ZegoEngineManager.getInstance().addRoomListener(zegoRoomListener);
+        RoomRtcEngine.getInstance().addRoomListener(zegoRoomListener);
     }
 
     private void applyZegoRoomChat(
@@ -10078,9 +10524,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             float level = entry.getValue() != null ? entry.getValue() : 0f;
             boolean wasSpeaking = speakingUsers.contains(key);
             // Captured mic levels are often softer — keep host responsive.
-            boolean speaking = level >= (wasSpeaking ? 2.5f : 5f);
-            if (speaking) speakingUsers.add(key);
-            else speakingUsers.remove(key);
+            // Hangover keeps waves smooth between monitor ticks (both Zego + LiveKit).
+            boolean speaking = level >= (wasSpeaking ? 2.0f : 4.0f);
+            if (speaking) {
+                speakingUsers.add(key);
+            } else if (wasSpeaking && level >= 1.0f) {
+                speaking = true; // brief hangover on soft trails
+            } else {
+                speakingUsers.remove(key);
+            }
             if (seatAdapter != null) {
                 seatAdapter.setSpeaking(userId, speaking);
             }
@@ -10189,21 +10641,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void playRemoteAudio(String streamId) {
         if (streamId == null) return;
-        String mine = ZegoEngineManager.audioStreamId(myUserId);
-        if (streamId.equals(mine) || streamId.equals(ZegoEngineManager.getInstance().getPublishingStreamId())) return;
+        String mine = RoomRtcEngine.audioStreamId(myUserId);
+        if (streamId.equals(mine) || streamId.equals(RoomRtcEngine.getInstance().getPublishingStreamId())) return;
         if (streamId.endsWith("_host")) return;
-        ZegoEngineManager.getInstance().startPlayingAudio(streamId);
+        RoomRtcEngine.getInstance().startPlayingAudio(streamId);
     }
 
     private void applyVoiceRoomInsets() {
         final float density = getResources().getDisplayMetrics().density;
-        final int headerBase = Math.round(8 * density);
+        final int headerBase = Math.round(6 * density);
+        final int edgeBase = Math.round(8 * density);
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
 
+            // Status bar / notch: lift header without shifting the whole room.
             setTopMargin(binding.headerRoom, headerBase + bars.top);
+
+            // Symmetric edge inset so the room card and close control hug the screen
+            // edges equally (cutout when present; otherwise a tight 8dp pad).
+            if (binding.headerRoom != null) {
+                int padStart = Math.max(edgeBase, bars.left);
+                int padEnd = Math.max(edgeBase, bars.right);
+                binding.headerRoom.setPaddingRelative(padStart, 0, padEnd, 0);
+            }
 
             int bottomInset = Math.max(bars.bottom, ime.bottom);
             setBottomMargin(binding.bottomBar, bottomInset);
@@ -10281,17 +10745,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     rtcReconnectInFlight = false;
                     return;
                 }
-                String zegoRoom = result.data.zegoRoomId != null
-                        ? result.data.zegoRoomId : roomId;
                 rtcCanPublish = result.data.canPublish;
                 rtcPublishTokenExpiresAtMs = result.data.expireAt > 0
                         ? result.data.expireAt * 1000L : 0L;
-                ZegoEngineManager.getInstance().logoutRoom();
-                ZegoEngineManager.getInstance().loginRoom(
-                        zegoRoom,
-                        result.data.userId != null ? result.data.userId : myUserId,
-                        result.data.token);
-                ZegoEngineManager.getInstance().setMicEnabled(micOn);
+                RoomRtcEngine.getInstance().applyJoinSession(
+                        VoiceRoomActivity.this, result.data, roomId, myUserId);
+                RoomRtcEngine.getInstance().setMicEnabled(micOn);
                 zegoLoggedIn = true;
                 handler.postDelayed(() -> {
                     rtcReconnectInFlight = false;
@@ -10309,8 +10768,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             return;
         }
-        if (!ZegoEngineManager.getInstance().isReady()) return;
-        String streamId = ZegoEngineManager.audioStreamId(myUserId);
+        // LiveKit connect is async — retry until ready instead of dropping publish.
+        if (!RoomRtcEngine.getInstance().isReady()) {
+            if (isOnSeat(seats) && RoomRtcEngine.getInstance().isLiveKit()) {
+                handler.postDelayed(() -> {
+                    if (!exiting) syncVoiceAudio(currentSeats);
+                }, 400L);
+            }
+            return;
+        }
+        String streamId = RoomRtcEngine.audioStreamId(myUserId);
         if (streamId == null) return;
         boolean onSeat = isOnSeat(seats);
         boolean moderatorMuted = false;
@@ -10323,23 +10790,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         if (onSeat) {
-            ZegoEngineManager.getInstance().setMicEnabled(micOn);
+            RoomRtcEngine.getInstance().setMicEnabled(micOn);
             if (moderatorMuted) {
                 rtcCanPublish = false;
                 handler.removeCallbacks(rtcTokenRefreshRunnable);
-                ZegoEngineManager.getInstance().stopPublishing();
+                RoomRtcEngine.getInstance().stopPublishing();
                 return;
             }
             if (rtcCanPublish
                     && System.currentTimeMillis() < rtcPublishTokenExpiresAtMs - 20_000L) {
-                ZegoEngineManager.getInstance().startPublishingAudio(streamId);
+                RoomRtcEngine.getInstance().startPublishingAudio(streamId);
             } else {
                 refreshRtcPublishToken(streamId);
             }
         } else {
             rtcPublishTokenExpiresAtMs = 0L;
             handler.removeCallbacks(rtcTokenRefreshRunnable);
-            ZegoEngineManager.getInstance().stopPublishing();
+            RoomRtcEngine.getInstance().stopPublishing();
         }
     }
 
@@ -10359,13 +10826,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String zegoRoom = result.data.zegoRoomId != null
                         ? result.data.zegoRoomId
                         : (pendingSession != null ? pendingSession.zegoRoomId : roomId);
-                ZegoEngineManager.getInstance().renewRoomToken(zegoRoom, result.data.token);
+                RoomRtcEngine.getInstance().renewRoomToken(zegoRoom, result.data.token);
                 rtcPublishTokenExpiresAtMs = result.data.expireAt > 0
                         ? result.data.expireAt * 1000L
                         : System.currentTimeMillis() + 60_000L;
                 rtcCanPublish = result.data.canPublish;
                 if (isOnSeat(currentSeats) && rtcCanPublish) {
-                    ZegoEngineManager.getInstance().startPublishingAudio(streamId);
+                    RoomRtcEngine.getInstance().startPublishingAudio(streamId);
                     handler.removeCallbacks(rtcTokenRefreshRunnable);
                     long refreshDelay = Math.max(
                             15_000L,
@@ -10373,7 +10840,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     handler.postDelayed(rtcTokenRefreshRunnable, refreshDelay);
                 } else {
                     handler.removeCallbacks(rtcTokenRefreshRunnable);
-                    ZegoEngineManager.getInstance().stopPublishing();
+                    RoomRtcEngine.getInstance().stopPublishing();
                 }
             });
         });
@@ -10784,7 +11251,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!wasSeatedBefore && !userChoseMute) {
             micOn = true;
             try {
-                ZegoEngineManager.getInstance().setMicEnabled(true);
+                RoomRtcEngine.getInstance().setMicEnabled(true);
             } catch (Exception ignored) {
             }
             if (roomId != null) viewModel.setMic(roomId, false);
@@ -11012,7 +11479,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Ensure we play audio for every seated remote user — and stop streams from the previous room. */
     private void ensurePlayingSeatedAudio(List<RoomDtos.SeatDto> seats) {
-        if (!ZegoEngineManager.getInstance().isReady()) return;
+        if (!RoomRtcEngine.getInstance().isReady()) return;
         try {
             java.util.HashSet<String> want = new java.util.HashSet<>();
             if (seats != null) {
@@ -11020,15 +11487,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String uid = seatUserId(seat);
                     if (uid == null || uid.isEmpty()) continue;
                     if (myUserId != null && sameUser(myUserId, uid)) continue;
-                    String streamId = ZegoEngineManager.audioStreamId(uid);
+                    String streamId = RoomRtcEngine.audioStreamId(uid);
                     if (streamId != null) want.add(streamId);
                 }
             }
             // Prune leftovers from the previous room / seats that left.
             for (String playing : new java.util.HashSet<>(
-                    ZegoEngineManager.getInstance().getPlayingStreamIds())) {
+                    RoomRtcEngine.getInstance().getPlayingStreamIds())) {
                 if (!want.contains(playing)) {
-                    ZegoEngineManager.getInstance().stopPlaying(playing);
+                    RoomRtcEngine.getInstance().stopPlaying(playing);
                 }
             }
             for (String streamId : want) {

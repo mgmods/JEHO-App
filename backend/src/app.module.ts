@@ -14,6 +14,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { ZegoModule } from './modules/zego/zego.module';
+import { LiveKitModule } from './modules/livekit/livekit.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { GiftsModule } from './modules/gifts/gifts.module';
 import { WalletModule } from './modules/wallet/wallet.module';
@@ -86,6 +87,7 @@ const entityList = Object.values(entities).filter(
     UsersModule,
     RoomsModule,
     ZegoModule,
+    LiveKitModule,
     ChatModule,
     GiftsModule,
     WalletModule,

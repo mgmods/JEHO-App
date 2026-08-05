@@ -18,6 +18,13 @@ export class GiftsController {
     return this.giftsService.catalog();
   }
 
+  @Public()
+  @Get('categories')
+  @ApiOperation({ summary: 'Gift sheet tabs / categories' })
+  categories() {
+    return this.giftsService.listCategories();
+  }
+
   @Post('send')
   @ApiOperation({ summary: 'Send gift with combo/lucky support' })
   send(@CurrentUser('sub') userId: string, @Body() dto: SendGiftDto) {

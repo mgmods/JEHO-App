@@ -88,6 +88,10 @@ public final class RoomDtos {
         @SerializedName("token") public String token;
         @SerializedName("appId") public long appId;
         @SerializedName("zegoRoomId") public String zegoRoomId;
+        /** {@code zego} (default) or {@code livekit} free self-hosted. */
+        @SerializedName("voiceProvider") public String voiceProvider;
+        @SerializedName("livekitUrl") public String livekitUrl;
+        @SerializedName("livekitRoomName") public String livekitRoomName;
         @SerializedName("userId") public String userId;
         @SerializedName("expireAt") public long expireAt;
         @SerializedName("canPublish") public boolean canPublish;

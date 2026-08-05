@@ -2,6 +2,12 @@
   <div>
     <PageHeader :title="t('gifts.title')" :subtitle="t('gifts.subtitle')">
       <template #actions>
+        <button class="btn btn-ghost btn-sm me-2" type="button" :disabled="importing" @click="importJehoPack">
+          <i class="bi bi-stars me-1"></i> {{ importing ? '…' : 'استيراد أعلام + فيديو JEHO' }}
+        </button>
+        <button class="btn btn-ghost btn-sm me-2" type="button" @click="openCategoryCreate">
+          <i class="bi bi-folder-plus me-1"></i> {{ t('gifts.newCategory') }}
+        </button>
         <button class="btn btn-aurora btn-sm" type="button" @click="openCreate">
           <i class="bi bi-plus-lg me-1"></i> {{ t('gifts.newGift') }}
         </button>
@@ -10,6 +16,37 @@
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
+
+    <div class="glass p-3 mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+          <strong>{{ t('gifts.categories') }}</strong>
+          <div class="small text-muted">{{ t('gifts.categoriesHint') }}</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <span
+          v-for="c in categories"
+          :key="c.id || c.key"
+          class="badge rounded-pill text-bg-dark d-inline-flex align-items-center gap-2 px-3 py-2"
+          :class="{ 'opacity-50': c.isActive === false }"
+        >
+          <span>{{ c.labelAr || c.labelEn || c.key }} <small class="text-muted">({{ c.key }})</small></span>
+          <button class="btn btn-sm btn-link text-info p-0" type="button" @click="openCategoryEdit(c)">
+            <i class="bi bi-pencil" />
+          </button>
+          <button
+            v-if="!isCoreCategory(c.key)"
+            class="btn btn-sm btn-link text-danger p-0"
+            type="button"
+            @click="askRemoveCategory(c)"
+          >
+            <i class="bi bi-trash" />
+          </button>
+        </span>
+        <span v-if="!categories.length" class="text-muted small">{{ t('app.none') }}</span>
+      </div>
+    </div>
 
     <LoadingSpinner v-if="loading" />
     <template v-else>
@@ -56,6 +93,7 @@
           </div>
           <div class="widget-card-meta mb-2">
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
+            <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
             <span v-if="isVideo(g.animationUrl)"> · فيديو</span>
             <span v-else-if="isGif(g.animationUrl)"> · GIF</span>
           </div>
@@ -101,6 +139,14 @@
                     <option value="lucky">{{ t('gifts.lucky') }}</option>
                     <option value="combo">{{ t('gifts.combo') }}</option>
                     <option value="premium">{{ t('gifts.premium') }}</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ t('gifts.category') }}</label>
+                  <select v-model="form.category" class="form-select">
+                    <option v-for="c in activeCategories" :key="c.key" :value="c.key">
+                      {{ c.labelAr || c.labelEn || c.key }}
+                    </option>
                   </select>
                 </div>
                 <template v-if="form.type === 'lucky'">
@@ -179,6 +225,57 @@
       </div>
     </div>
 
+    <div v-if="showCategoryModal" class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.45)">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+          <div class="modal-header">
+            <h5 class="modal-title">{{ catEditingId ? t('gifts.editCategory') : t('gifts.newCategory') }}</h5>
+            <button type="button" class="btn-close" @click="showCategoryModal = false"></button>
+          </div>
+          <form @submit.prevent="saveCategory">
+            <div class="modal-body">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">{{ t('gifts.categoryKey') }}</label>
+                  <input
+                    v-model="catForm.key"
+                    class="form-control"
+                    required
+                    :disabled="!!catEditingId && isCoreCategory(catForm.key)"
+                    pattern="[a-zA-Z0-9_\\-]{1,32}"
+                  />
+                  <div class="form-text">{{ t('gifts.categoryKeyHint') }}</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('gifts.labelAr') }}</label>
+                  <input v-model="catForm.labelAr" class="form-control" required />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('gifts.labelEn') }}</label>
+                  <input v-model="catForm.labelEn" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('gifts.sortOrder') }}</label>
+                  <input v-model.number="catForm.sortOrder" type="number" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('app.status') }}</label>
+                  <select v-model="catForm.status" class="form-select">
+                    <option value="active">{{ t('app.active') }}</option>
+                    <option value="inactive">{{ t('app.inactive') }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-ghost" @click="showCategoryModal = false">{{ t('app.cancel') }}</button>
+              <button type="submit" class="btn btn-aurora" :disabled="saving">{{ saving ? t('app.saving') : t('app.save') }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <ConfirmDialog
       v-model="confirmOpen"
       :title="confirmTitle"
@@ -189,7 +286,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { giftsApi, uploadsApi } from '@/api'
 import { extractList, formatNumber } from '@/composables/useUtils'
@@ -208,13 +305,46 @@ const { t } = useI18n()
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
 
 const gifts = ref([])
+const categories = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const showModal = ref(false)
+const showCategoryModal = ref(false)
 const editingId = ref(null)
+const catEditingId = ref(null)
 const bulkBusy = ref(false)
+const pendingCategory = ref(null)
+
+const CORE_KEYS = new Set(['normal', 'lucky', 'combo', 'premium', 'country'])
+function isCoreCategory(key) {
+  return CORE_KEYS.has(String(key || '').toLowerCase())
+}
+
+const importing = ref(false)
+
+async function importJehoPack() {
+  importing.value = true
+  error.value = ''
+  try {
+    const data = await giftsApi.importJehoPack()
+    const flags = data?.flags ?? 0
+    const premium = data?.premium ?? 0
+    success.value = `تم مزامنة الهدايا: أعلام ${flags} · فيديو ${premium}`
+    toast.success(success.value)
+    await load()
+  } catch (e) {
+    error.value = e?.message || 'فشل استيراد الهدايا'
+    toast.error(error.value)
+  } finally {
+    importing.value = false
+  }
+}
+
+const activeCategories = computed(() =>
+  (categories.value || []).filter((c) => c && c.isActive !== false),
+)
 
 const {
   selectedIds,
@@ -260,6 +390,7 @@ const form = reactive({
   coinPrice: 10,
   diamondValue: 8,
   type: 'normal',
+  category: 'normal',
   iconUrl: '',
   animationUrl: '',
   sortOrder: 0,
@@ -271,6 +402,24 @@ const form = reactive({
   },
 })
 
+const catForm = reactive({
+  key: '',
+  labelAr: '',
+  labelEn: '',
+  sortOrder: 0,
+  status: 'active',
+})
+
+watch(
+  () => form.type,
+  (type) => {
+    // Keep category aligned with type when admin switches gift type and category was still the old type key.
+    if (['normal', 'lucky', 'combo', 'premium'].includes(type) && CORE_KEYS.has(form.category)) {
+      form.category = type
+    }
+  },
+)
+
 function absUrl(u) {
   if (!u) return ''
   if (/^https?:\/\//i.test(u)) return u
@@ -280,14 +429,26 @@ function absUrl(u) {
 async function load() {
   loading.value = true
   error.value = ''
-  const { data, error: err } = await giftsApi.list({ limit: 200 })
+  const [gRes, cRes] = await Promise.all([
+    giftsApi.list({ limit: 200 }),
+    giftsApi.categories(),
+  ])
   loading.value = false
-  if (err) {
-    error.value = err.message
+  if (gRes.error) {
+    error.value = gRes.error.message
     gifts.value = []
-    return
+  } else {
+    gifts.value = extractList(gRes.data)
   }
-  gifts.value = extractList(data)
+  if (!cRes.error) {
+    categories.value = extractList(cRes.data)
+  }
+}
+
+function categoryLabel(key) {
+  const k = String(key || '').toLowerCase()
+  const hit = (categories.value || []).find((c) => String(c.key || '').toLowerCase() === k)
+  return hit?.labelAr || hit?.labelEn || key || ''
 }
 
 function openCreate() {
@@ -297,6 +458,7 @@ function openCreate() {
     coinPrice: 10,
     diamondValue: 8,
     type: 'normal',
+    category: activeCategories.value[0]?.key || 'normal',
     iconUrl: '',
     animationUrl: '',
     sortOrder: 0,
@@ -317,6 +479,7 @@ function openEdit(g) {
     coinPrice: g.coinPrice ?? 10,
     diamondValue: g.diamondValue ?? Math.max(1, Math.floor((g.coinPrice || 1) * 0.8)),
     type: g.type || 'normal',
+    category: g.category || g.type || 'normal',
     iconUrl: g.iconUrl || '',
     animationUrl: g.animationUrl || '',
     sortOrder: g.sortOrder || 0,
@@ -328,6 +491,30 @@ function openEdit(g) {
     },
   })
   showModal.value = true
+}
+
+function openCategoryCreate() {
+  catEditingId.value = null
+  Object.assign(catForm, {
+    key: '',
+    labelAr: '',
+    labelEn: '',
+    sortOrder: (categories.value?.length || 0) + 1,
+    status: 'active',
+  })
+  showCategoryModal.value = true
+}
+
+function openCategoryEdit(c) {
+  catEditingId.value = c.id
+  Object.assign(catForm, {
+    key: c.key || '',
+    labelAr: c.labelAr || '',
+    labelEn: c.labelEn || '',
+    sortOrder: c.sortOrder || 0,
+    status: c.isActive === false ? 'inactive' : 'active',
+  })
+  showCategoryModal.value = true
 }
 
 async function upload(file) {
@@ -378,6 +565,7 @@ async function save() {
     coinPrice: Number(form.coinPrice) || 1,
     diamondValue: Number(form.diamondValue) || 1,
     type: form.type || 'normal',
+    category: form.category || form.type || 'normal',
     sortOrder: Number(form.sortOrder) || 0,
     isActive: form.status === 'active',
     luckyConfig:
@@ -404,6 +592,31 @@ async function save() {
   await load()
 }
 
+async function saveCategory() {
+  saving.value = true
+  error.value = ''
+  const payload = {
+    key: String(catForm.key || '').trim().toLowerCase(),
+    labelAr: catForm.labelAr,
+    labelEn: catForm.labelEn || null,
+    sortOrder: Number(catForm.sortOrder) || 0,
+    isActive: catForm.status === 'active',
+  }
+  const result = catEditingId.value
+    ? await giftsApi.updateCategory(catEditingId.value, payload)
+    : await giftsApi.createCategory(payload)
+  saving.value = false
+  if (result.error) {
+    error.value = result.error.message
+    toast().danger(result.error.message)
+    return
+  }
+  showCategoryModal.value = false
+  success.value = t('app.success')
+  toast().success(t('app.success'))
+  await load()
+}
+
 const confirmOpen = ref(false)
 const confirmTitle = ref('')
 const confirmMsg = ref('')
@@ -422,9 +635,19 @@ function isImageAnim(url) {
 
 function askRemove(g) {
   pendingDelete.value = g
+  pendingCategory.value = null
   pendingAction.value = null
   confirmTitle.value = t('common.delete')
   confirmMsg.value = `${t('app.delete')} «${g.name}»؟`
+  confirmOpen.value = true
+}
+
+function askRemoveCategory(c) {
+  pendingCategory.value = c
+  pendingDelete.value = null
+  pendingAction.value = null
+  confirmTitle.value = t('common.delete')
+  confirmMsg.value = `${t('app.delete')} «${c.labelAr || c.key}»؟`
   confirmOpen.value = true
 }
 
@@ -435,6 +658,10 @@ async function runConfirm() {
     await action()
     return
   }
+  if (pendingCategory.value) {
+    await doRemoveCategory()
+    return
+  }
   await doRemove()
 }
 
@@ -443,6 +670,21 @@ async function doRemove() {
   pendingDelete.value = null
   if (!g?.id) return
   const { error: err } = await giftsApi.delete(g.id)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    success.value = t('app.success')
+    toast().success(t('app.success'))
+    await load()
+  }
+}
+
+async function doRemoveCategory() {
+  const c = pendingCategory.value
+  pendingCategory.value = null
+  if (!c?.id) return
+  const { error: err } = await giftsApi.deleteCategory(c.id)
   if (err) {
     error.value = err.message
     toast().danger(err.message)

@@ -53,6 +53,10 @@ final class RoomMoreOperatorSheet {
         boolean micInteractOn();
         boolean roomSpeakerMuted();
         boolean canControlMusic();
+        /** Host/manager: adjust number of guest mics (was header home button). */
+        boolean canAdjustSeatCount();
+        /** Host who can approve raise-hand queue (not free-mic mode). */
+        boolean canReviewSeatRequests();
         @Nullable String roomId();
         @Nullable String roomTitle();
         void onMoreAction(@NonNull String action);
@@ -154,6 +158,13 @@ final class RoomMoreOperatorSheet {
     private static List<Item> buildRoomItems(Host host) {
         List<Item> list = new ArrayList<>();
         list.add(item(R.drawable.more_btn_set, R.string.setting, "settings"));
+        // Seat admin chrome moved here from the voice-room header.
+        if (host.canAdjustSeatCount()) {
+            list.add(item(R.drawable.icon_room_up_micro, R.string.room_more_seat_count, "seat_count"));
+        }
+        if (host.canReviewSeatRequests()) {
+            list.add(item(R.drawable.ic_asset_notice, R.string.room_more_seat_requests, "seat_requests"));
+        }
         boolean locked = host.roomLocked();
         list.add(item(
                 locked ? R.drawable.more_btn_lock_kai : R.drawable.more_btn_lock,

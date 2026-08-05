@@ -18,6 +18,19 @@ public final class GiftDtos {
         @SerializedName("sortOrder") public int sortOrder;
     }
 
+    /** Gift sheet tab from GET /gifts/categories. */
+    public static class GiftCategoryDto {
+        @SerializedName("id") public String id;
+        @SerializedName("key") public String key;
+        @SerializedName("labelAr") public String labelAr;
+        @SerializedName("labelEn") public String labelEn;
+        @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("isActive") public boolean isActive = true;
+        @SerializedName("iconUrl") public String iconUrl;
+    }
+
+    public static class GiftCategoryList extends java.util.ArrayList<GiftCategoryDto> {}
+
     public static class SendGiftRequest {
         @SerializedName("giftId") public String giftId;
         @SerializedName("receiverId") public String receiverId;

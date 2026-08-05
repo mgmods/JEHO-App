@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 4-col room games cell: icon + title on white sheet -->
+<!-- 4-col room games cell: circular logo + title -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -9,14 +10,16 @@
     android:paddingTop="17dp"
     android:paddingBottom="5dp">
 
-    <ImageView
+    <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/imgIcon"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
-        android:background="@drawable/bg_room_game_icon_white"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
         android:contentDescription="@null"
-        android:padding="2dp"
+        android:padding="1dp"
         android:scaleType="centerCrop"
+        app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+        app:strokeColor="#22000000"
+        app:strokeWidth="1dp"
         tools:src="@drawable/ic_game_entrance_ono" />
 
     <TextView

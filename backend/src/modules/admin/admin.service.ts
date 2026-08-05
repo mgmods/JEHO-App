@@ -46,6 +46,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
+import { GiftsService } from '../gifts/gifts.service';
 import { AgenciesService } from '../agencies/agencies.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
@@ -71,6 +72,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { salaryLadderToHostTargetStages } from '../../common/host-salary-ladder';
 import {
   normalizeStaffRole,
+  isDashboardSuper,
   staffRank,
   type PlatformStaffRole,
 } from '../../common/staff-role';
@@ -235,6 +237,7 @@ export class AdminService {
     private readonly usersService: UsersService,
     private readonly agenciesService: AgenciesService,
     private readonly cosmeticsService: CosmeticsService,
+    private readonly giftsService: GiftsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -1063,6 +1066,28 @@ export class AdminService {
     return this.giftsRepo.find({ order: { sortOrder: 'ASC' } });
   }
 
+  listGiftCategories() {
+    return this.giftsService.listCategoriesAdmin();
+  }
+
+  upsertGiftCategory(
+    id: string | null,
+    dto: {
+      key?: string;
+      labelAr?: string;
+      labelEn?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+      iconUrl?: string | null;
+    },
+  ) {
+    return this.giftsService.upsertCategory(id, dto);
+  }
+
+  deleteGiftCategory(id: string) {
+    return this.giftsService.deleteCategory(id);
+  }
+
   async activateAllGifts() {
     const result = await this.giftsRepo
       .createQueryBuilder()
@@ -1078,6 +1103,11 @@ export class AdminService {
       total,
       active,
     };
+  }
+
+  /** Sync JEHO flag-frame + premium video gifts from on-disk catalog.json. */
+  importJehoDesignedGifts() {
+    return this.giftsService.importJehoDesignedGifts();
   }
 
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
@@ -1655,7 +1685,7 @@ export class AdminService {
       ],
       notes: {
         intro:
-          'دليل سياسة JEHO CHAT للمضيفات ومن يريد فتح وكالة والداعمين — لفهم الاقتصاد والغرف والهدايا والسحب بدون تفاصيل إدارية داخلية.',
+          'دليل سياسة JEHO CHAT المحدّث: اقتصاد العملات والألماس، تقسيم الهدايا، برنامج الوكالات (تحقق، ID، عمولة، إطارات حصرية، دعوات)، تارجت ورواتب، مهام يومية وإعلانات AdMob، هدايا الدول والفيديو، الشحن والسحب — بلا أسرار إدارية.',
       },
     };
   }
@@ -1669,6 +1699,27 @@ export class AdminService {
         nextValue = JSON.stringify(sanitizeGamesCatalog(parsed));
       } catch {
         // keep original value if JSON is invalid
+      }
+    }
+    if (key === 'app_nav_icons') {
+      try {
+        const { sanitizeNavIconsConfig } = await import('../config/nav-icons.util');
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const clean = sanitizeNavIconsConfig(parsed);
+        const prev = await this.settingsRepo.findOne({ where: { key } });
+        let prevVer = 0;
+        if (prev?.value) {
+          try {
+            prevVer = Math.max(0, Number(JSON.parse(prev.value)?.version) || 0);
+          } catch {
+            prevVer = 0;
+          }
+        }
+        clean.version = prevVer + 1;
+        clean.updatedAt = new Date().toISOString();
+        nextValue = JSON.stringify(clean);
+      } catch {
+        // keep original
       }
     }
     let setting = await this.settingsRepo.findOne({ where: { key } });
@@ -1687,16 +1738,36 @@ export class AdminService {
       .addSelect('u.passwordHash')
       .where('LOWER(u.email) = :email', { email: email.toLowerCase() })
       .getOne();
-    if (!user || !user.isAdmin || !user.passwordHash) {
+    if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid admin credentials');
+    }
+    // Browser dashboard is Super-only. Managers (in-app staff) cannot log in.
+    if (!isDashboardSuper(user)) {
+      throw new UnauthorizedException(
+        'Super admin only — dashboard is not available for managers or regular accounts',
+      );
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid admin credentials');
+
+    // Keep isAdmin + staffRole in sync for Super accounts.
+    let dirty = false;
+    if (!user.isAdmin) {
+      user.isAdmin = true;
+      dirty = true;
+    }
+    if (normalizeStaffRole(user) === 'super' && String(user.staffRole || '').toLowerCase() !== 'super') {
+      user.staffRole = 'super';
+      dirty = true;
+    }
+    if (dirty) await this.usersRepo.save(user);
 
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       username: user.username,
       isAdmin: true,
+      isSuperAdmin: true,
+      staffRole: 'super',
       role: 'admin',
     });
     return {
@@ -1710,13 +1781,18 @@ export class AdminService {
         displayName: user.displayName,
         name: user.displayName,
         isAdmin: true,
+        isSuperAdmin: true,
+        staffRole: 'super',
+        role: 'admin',
       },
     };
   }
 
   async adminMe(userId: string) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user || !user.isAdmin) throw new UnauthorizedException('Not an admin');
+    if (!user || !isDashboardSuper(user)) {
+      throw new UnauthorizedException('Super admin access required');
+    }
     return {
       id: user.id,
       email: user.email,
@@ -1724,6 +1800,9 @@ export class AdminService {
       displayName: user.displayName,
       name: user.displayName,
       isAdmin: true,
+      isSuperAdmin: true,
+      staffRole: 'super',
+      role: 'admin',
     };
   }
 

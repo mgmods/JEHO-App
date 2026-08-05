@@ -62,6 +62,7 @@
     "agencies": "Agencies",
     "gifts": "Gifts",
     "banners": "Banners",
+    "navIcons": "Tab icons",
     "coins": "Coin Bags",
     "offers": "Offers",
     "promos": "Offers & promos",
@@ -97,6 +98,7 @@
     "streams": "Live Streams",
     "gifts": "Gifts",
     "banners": "Banners",
+    "navIcons": "Tab icons",
     "coins": "Coin Bags",
     "offers": "Store Offers",
     "promos": "Offers & promos",
@@ -309,7 +311,17 @@
     "maxMultiplier": "Max multiplier",
     "sortOrder": "Sort order",
     "uploadIcon": "Upload icon",
-    "uploadAnimation": "Upload animation"
+    "uploadAnimation": "Upload animation",
+    "category": "Sheet tab category",
+    "categories": "Gift categories (tabs)",
+    "categoriesHint": "Shown as tabs in the app gift sheet. Add a category, then pick it when creating a gift.",
+    "newCategory": "New category",
+    "editCategory": "Edit category",
+    "categoryKey": "Key (english)",
+    "categoryKeyHint": "e.g. normal, bag, friends — no spaces",
+    "labelAr": "Arabic label",
+    "labelEn": "English label",
+    "iconRequired": "Icon is required"
   },
   "rooms": {
     "title": "Rooms",
@@ -501,6 +513,20 @@
     "probedUrl": "Successful URL",
     "testSuccess": "URL tested — review the result below",
     "importSuccess": "Zego settings imported and saved"
+  },
+  "voiceRtc": {
+    "title": "Voice engine (ZEGO ↔ LiveKit switch)",
+    "hint": "LiveKit is free open-source media on your VPS. ZEGO remains the paid cloud path. Use Show keys to copy URL / API Key / Secret for other apps.",
+    "free": "free",
+    "saveKeys": "Save LiveKit keys",
+    "showKeys": "Show keys",
+    "hideKeys": "Hide keys",
+    "keysSection": "LiveKit keys (URL · Key · Secret)",
+    "active": "Active now",
+    "ready": "Ready",
+    "notReady": "Not fully configured",
+    "switchedLiveKit": "Switched to LiveKit (free)",
+    "switchedZego": "Switched to ZEGO"
   },
   "commonStatus": {
     "open": "Open",
@@ -969,6 +995,25 @@
     "custom": "Custom link…",
     "save": "Save banners",
     "saved": "Banners saved"
+  },
+  "navIcons": {
+    "title": "Tab icons",
+    "subtitle": "Bottom nav icons for Games / Drama / Chat / Me",
+    "hint": "Upload PNG, JPG, or SVG (webp allowed). Leave empty to keep the built-in APK icon. App stores config in encrypted cache.",
+    "normal": "Normal",
+    "selected": "Selected",
+    "remove": "Clear",
+    "clear": "Clear all",
+    "save": "Save icons",
+    "saved": "Tab icons saved",
+    "badFormat": "Allowed formats: PNG, JPG, or SVG",
+    "tabs": {
+      "party": "Party / Home",
+      "drama": "Drama",
+      "games": "Games",
+      "chat": "Chat",
+      "me": "Me"
+    }
   },
   "offers": {
     "title": "Store Offers",

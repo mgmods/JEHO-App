@@ -1,0 +1,27 @@
+
+ReadyGo.png
+size: 864,458
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+GO
+  rotate: false
+  xy: 533, 182
+  size: 322, 274
+  orig: 334, 286
+  offset: 6, 6
+  index: -1
+ready
+  rotate: false
+  xy: 533, 17
+  size: 329, 163
+  orig: 345, 178
+  offset: 8, 8
+  index: -1
+放射发散光线光效
+  rotate: false
+  xy: 2, 2
+  size: 529, 454
+  orig: 544, 463
+  offset: 8, 5
+  index: -1

@@ -31,6 +31,7 @@ import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AuraNotificationHelper;
 import com.Dramizo.Series.util.NotificationRouter;
 import com.Dramizo.Series.util.RoomSoundFx;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.gson.JsonElement;
@@ -174,7 +175,7 @@ public class AuraLiveApp extends Application {
         try {
             container.getIoExecutor().execute(() -> {
                 try {
-                    ZegoEngineManager.getInstance().init(AuraLiveApp.this);
+                    RoomRtcEngine.getInstance().init(AuraLiveApp.this);
                 } catch (Throwable t) {
                     android.util.Log.w("AuraLiveApp", "ZEGO init deferred: " + t.getMessage());
                 }

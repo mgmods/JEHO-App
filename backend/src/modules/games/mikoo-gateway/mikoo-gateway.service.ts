@@ -35,6 +35,13 @@ import {
   encodeGreedyResultBroadcast,
   encodeGreedyStartBetBroadcast,
   encodeGreedyTableInfoRes,
+  encodeBountyFootballBetRes,
+  encodeBountyFootballGetRankDataRes,
+  encodeBountyFootballOtherPlayerBetBroadcast,
+  encodeBountyFootballResultBroadcast,
+  encodeBountyFootballStartBetBroadcast,
+  encodeBountyFootballTableInfoRes,
+  BOUNTY_FOOTBALL_RATIOS,
   encodeHeartBeatRsp,
   encodeLineSlotsGameCfgRsp,
   encodeLineSlotsGetRankDataRes,
@@ -88,6 +95,7 @@ import { findMikooGame, MikooGameDef } from '../mikoo-games.catalog';
 import { BaishunWsHandler } from './baishun-ws.handler';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { biasedCrashAt, multiAreaMultipliers, spinPayout } from './mikoo-house-edge.util';
+import { GREEDY_BOX_RATIOS, LUCK_CAR_RATIOS } from './mikoo-game-economy';
 
 type GameKind = 'crash' | 'multi' | 'spin';
 
@@ -121,12 +129,16 @@ type RoomState = {
   timers: NodeJS.Timeout[];
   /** Recent winning areas for 7updown history strip (1=down,2=seven,3=up). */
   history: number[];
+  /** BountyFootball wheel stop (1..16). Never 0 — client throws and spin dies. */
+  lastTurnPos?: number;
 };
 
 function gameKind(game: MikooGameDef): GameKind {
   if (game.id === 'crash') return 'crash';
   // multi-area / dice-style hash games (fortune-slot is a spin slot, not multi)
-  if (['7updown', 'greedy-box', 'luck-car', 'lucky77'].includes(game.id)) return 'multi';
+  if (['7updown', 'greedy-box', 'luck-car', 'lucky77', 'bounty-football'].includes(game.id)) {
+    return 'multi';
+  }
   return 'spin';
 }
 
@@ -178,6 +190,54 @@ export class MikooGatewayService implements OnModuleDestroy {
   }
 
   /** Aggregate Lucky77 area totals (icon 0/1/2). Optional filter by playerId. */
+  /** Aggregate BountyFootball icon bets for TableInfo / BetRes. */
+  private bountyFootballBets(room: RoomState, playerId?: number) {
+    const areaMap = new Map<number, number>();
+    const myMap = new Map<number, number>();
+    let totalBet = 0;
+    let myTotalBet = 0;
+    for (const b of room.bets.values()) {
+      const icon = Math.max(1, Math.min(10, b.areaId || 1));
+      areaMap.set(icon, (areaMap.get(icon) || 0) + b.amount);
+      totalBet += b.amount;
+      if (playerId != null && b.playerId === playerId) {
+        myMap.set(icon, (myMap.get(icon) || 0) + b.amount);
+        myTotalBet += b.amount;
+      }
+    }
+    const allAreaBets = [...areaMap.entries()].map(([iconId, money]) => ({ iconId, money }));
+    const myBets = [...myMap.entries()].map(([iconId, money]) => ({ iconId, money }));
+    return { allAreaBets, myBets, totalBet, myTotalBet };
+  }
+
+  /**
+   * Wheel has 16 lights (ALLUNITNUM); bet areas are 1–10.
+   * Positions 1–10 map to areas 1–10; 11–16 repeat low areas 1–6 (lower odds).
+   * Client getTurnTimes requires both start/stop in [1,16] or the spin crashes.
+   */
+  private pickBountyTurnPos(winArea: number, lastPos?: number): number {
+    const area = Math.max(1, Math.min(10, winArea | 0));
+    const candidates =
+      area <= 6 ? [area, area + 10] : [area];
+    let best = candidates[0];
+    let bestDist = -1;
+    const from = Math.max(1, Math.min(16, lastPos || 1));
+    for (const pos of candidates) {
+      let d = 0;
+      let cur = from;
+      while (cur !== pos) {
+        d++;
+        cur = cur >= 16 ? 1 : cur + 1;
+      }
+      // Prefer a full wrap that plays longer: + 5*16 is forced by getTurnTimes
+      if (d > bestDist) {
+        bestDist = d;
+        best = pos;
+      }
+    }
+    return best;
+  }
+
   private lucky77AreaBets(
     room: RoomState,
     onlyPlayerId?: number,
@@ -265,7 +325,8 @@ export class MikooGatewayService implements OnModuleDestroy {
           gameId === '7updown' ||
           gameId === 'crash' ||
           gameId === 'greedy-box' ||
-          gameId === 'luck-car'
+          gameId === 'luck-car' ||
+          gameId === 'bounty-football'
             ? 18000
             : 10000),
         overEnds: 0,
@@ -298,6 +359,12 @@ export class MikooGatewayService implements OnModuleDestroy {
     const secs = Math.ceil(delay / 1000);
     if (gameId === 'greedy-box') {
       this.broadcast(room, '.game.StartBetBroadcast', encodeGreedyStartBetBroadcast(1, secs, room.round));
+    } else if (gameId === 'bounty-football') {
+      this.broadcast(
+        room,
+        '.game.StartBetBroadcast',
+        encodeBountyFootballStartBetBroadcast(1, secs, room.round),
+      );
     } else if (gameId === 'luck-car') {
       this.broadcast(
         room,
@@ -386,8 +453,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     const lucky77AreaType = LUCKY77_ROUNDNO[lucky77WinPos - 1] || 1;
     const lucky77WinIcon = lucky77AreaType - 1; // client bets 0,1,2
     const winArea =
-      gameId === 'greedy-box' || gameId === 'luck-car'
-        ? 1 + Math.floor(Math.random() * 8)
+      gameId === 'greedy-box' || gameId === 'luck-car' || gameId === 'bounty-football'
+        ? 1 + Math.floor(Math.random() * (gameId === 'bounty-football' ? 10 : 8))
         : gameId === 'lucky77'
           ? lucky77WinIcon
           : total < 7
@@ -399,14 +466,23 @@ export class MikooGatewayService implements OnModuleDestroy {
       room.history = [...room.history, winArea].slice(-12);
     } else if (gameId === 'lucky77') {
       room.history = [...room.history, lucky77WinPos].slice(-12);
+    } else if (gameId === 'bounty-football') {
+      room.history = [...room.history, winArea].slice(-12);
     }
     const multipliers = multiAreaMultipliers();
-    const greedyRatio: Record<number, number> = {
-      1: 2, 2: 3, 3: 5, 4: 8, 5: 10, 6: 15, 7: 20, 8: 50,
-    };
-    const luckCarRatio: Record<number, number> = {
-      1: 2, 2: 3, 3: 4, 4: 5, 5: 8, 6: 10, 7: 15, 8: 25,
-    };
+    const greedyRatio: Record<number, number> = {};
+    GREEDY_BOX_RATIOS.forEach((r, i) => {
+      greedyRatio[i + 1] = r;
+    });
+    const luckCarRatio: Record<number, number> = {};
+    // Real multipliers (not milli) for settle — must match TableInfo car odds.
+    LUCK_CAR_RATIOS.forEach((r, i) => {
+      luckCarRatio[i + 1] = r;
+    });
+    const bountyRatio: Record<number, number> = {};
+    BOUNTY_FOOTBALL_RATIOS.forEach((r, i) => {
+      bountyRatio[i + 1] = r;
+    });
 
     // Aggregate 7updown / lucky77 wins per player (one settle msg).
     const sevenByUser = new Map<
@@ -433,6 +509,10 @@ export class MikooGatewayService implements OnModuleDestroy {
             ? bet.areaId === winArea
               ? luckCarRatio[winArea] || 2
               : 0
+            : gameId === 'bounty-football'
+              ? bet.areaId === winArea
+                ? bountyRatio[winArea] || 2
+                : 0
             : gameId === 'lucky77'
               ? bet.areaId === winArea
                 ? LUCKY77_RATIOS[winArea] || 2
@@ -442,7 +522,7 @@ export class MikooGatewayService implements OnModuleDestroy {
                 : 0;
       const win = Math.floor(bet.amount * mult);
 
-      if (gameId === '7updown' || gameId === 'lucky77') {
+      if (gameId === '7updown' || gameId === 'lucky77' || gameId === 'bounty-football') {
         const key = bet.userId;
         const row = sevenByUser.get(key) || {
           userId: bet.userId,
@@ -704,6 +784,99 @@ export class MikooGatewayService implements OnModuleDestroy {
           }),
         );
       }
+    } else if (gameId === 'bounty-football') {
+      // Must land on icon 1–16. Client getTurnTimes throws if 0 → no spin.
+      const turnPos = this.pickBountyTurnPos(winArea, room.lastTurnPos);
+      room.lastTurnPos = turnPos;
+      const notifiedWs = new Set<WebSocket>();
+      const betRank = [...sevenByUser.values()]
+        .filter((r) => r.win > 0 || r.betTotal > 0)
+        .sort((a, b) => b.win - a.win || b.betTotal - a.betTotal)
+        .slice(0, 3)
+        .map((r) => ({
+          name: r.displayName || 'Player',
+          head: r.avatarUrl || '',
+          totalBet: r.betTotal,
+          totalGain: r.win,
+        }));
+      for (const row of sevenByUser.values()) {
+        let bal = 0;
+        try {
+          if (row.win > 0) {
+            const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+          } else {
+            const w = await this.wallets.findOne({ where: { userId: row.userId } });
+            bal = Number(w?.coins || 0);
+          }
+        } catch {
+          bal = 0;
+        }
+        if (row.ws && row.ws.readyState === WebSocket.OPEN) {
+          this.send(
+            row.ws,
+            '.game.ResultBroadcast',
+            encodeBountyFootballResultBroadcast({
+              state: 0,
+              // Client schedules: stopBet 1.2 + ready 2 + spin 7 + boom 0.5 + flicker 1.5 ≈ 12s
+              betTime: 12,
+              betRank,
+              myReward: {
+                name: row.displayName || 'Player',
+                head: row.avatarUrl || '',
+                totalBet: row.betTotal,
+                totalGain: row.win,
+              },
+              curTurnRewardIcon: winArea,
+              turnPos,
+              curTurn: room.round,
+              userMoney: bal,
+              todayWin: row.win,
+              rewardHistory: room.history.length ? room.history : [winArea],
+            }),
+          );
+          notifiedWs.add(row.ws);
+          room.balances.set(row.ws, bal);
+        }
+        if (row.win > 0 && row.sessionId) {
+          void this.economy.onBetWin({
+            sessionId: row.sessionId,
+            userId: row.userId,
+            gameId,
+            betCoins: 0,
+            winCoins: row.win,
+            balanceAfter: bal,
+          });
+        } else if (row.win === 0 && row.sessionId && row.betTotal > 0) {
+          void this.economy.onBetWin({
+            sessionId: row.sessionId,
+            userId: row.userId,
+            gameId,
+            betCoins: 0,
+            winCoins: 0,
+            lostCoins: row.betTotal,
+            balanceAfter: bal,
+          });
+        }
+      }
+      for (const ws of room.clients) {
+        if (notifiedWs.has(ws) || ws.readyState !== WebSocket.OPEN) continue;
+        this.send(
+          ws,
+          '.game.ResultBroadcast',
+          encodeBountyFootballResultBroadcast({
+            state: 0,
+            betTime: 12,
+            betRank,
+            curTurnRewardIcon: winArea,
+            turnPos,
+            curTurn: room.round,
+            userMoney: room.balances.get(ws) ?? 0,
+            todayWin: 0,
+            rewardHistory: room.history.length ? room.history : [winArea],
+          }),
+        );
+      }
     } else if (gameId === 'greedy-box' && room.bets.size === 0) {
       this.broadcast(
         room,
@@ -742,11 +915,15 @@ export class MikooGatewayService implements OnModuleDestroy {
     room.timers.push(
       setTimeout(
         () => this.resetRound(gameId),
-        gameId === 'lucky77' || gameId === '7updown'
-          ? 8500
-          : gameId === 'luck-car'
-            ? 9000
-            : 4000,
+        // Bounty spin timeline is ~12s before result dlg + dlg hold; StartBet
+        // calls client reset() and would kill mid-spin if we reopen too early.
+        gameId === 'bounty-football'
+          ? 18000
+          : gameId === 'lucky77' || gameId === '7updown'
+            ? 8500
+            : gameId === 'luck-car'
+              ? 9000
+              : 4000,
       ),
     );
   }
@@ -766,7 +943,8 @@ export class MikooGatewayService implements OnModuleDestroy {
       gameId === '7updown' ||
       gameId === 'crash' ||
       gameId === 'greedy-box' ||
-      gameId === 'luck-car'
+      gameId === 'luck-car' ||
+      gameId === 'bounty-football'
         ? 18000
         : 10000);
     room.bets.clear();
@@ -797,7 +975,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         gameSlug === '7updown' ||
         gameSlug === 'crash' ||
         gameSlug === 'greedy-box' ||
-        gameSlug === 'luck-car'
+        gameSlug === 'luck-car' ||
+        gameSlug === 'bounty-football'
           ? 18000
           : 10000);
       this.scheduleRound(gameSlug);
@@ -874,6 +1053,43 @@ export class MikooGatewayService implements OnModuleDestroy {
       this.send(ws, '.game.TableInfo', body);
       if (room.phase === 'betting' && timeLeft > 0) {
         this.send(ws, '.game.StartBetBroadcast', encodeGreedyStartBetBroadcast(1, timeLeft, room.round));
+      }
+      return;
+    }
+    if (gameSlug === 'bounty-football') {
+      const { allAreaBets, myBets, totalBet, myTotalBet } = this.bountyFootballBets(
+        room,
+        player?.publicId,
+      );
+      // Client GAMESTATUS: BETTING=1, SETTLEMENT=0.
+      // Never show SETTLEMENT table state during active play — that would open
+      // gameResult dlg immediately without the wheel spin (see _onSetTableStatu).
+      const bountyState = room.phase === 'betting' ? 1 : 0;
+      // turnPos must be 1..16; turnPos=0 makes getTurnTimes throw and kills spin.
+      const turnPos = Math.max(1, Math.min(16, room.lastTurnPos || 1));
+      const body = encodeBountyFootballTableInfoRes({
+        state: bountyState,
+        timeLeft: bountyState === 1 ? timeLeft : 8,
+        curTurn: room.round,
+        history: room.history,
+        allAreaBets,
+        myBets,
+        totalBet,
+        myTotalBet,
+        turnPos,
+        curTurnRewardIcon:
+          bountyState === 0 && room.history.length
+            ? room.history[room.history.length - 1]
+            : 0,
+      });
+      this.send(ws, '.game.TableInfoRes', body);
+      this.send(ws, '.game.TableInfo', body);
+      if (room.phase === 'betting' && timeLeft > 0) {
+        this.send(
+          ws,
+          '.game.StartBetBroadcast',
+          encodeBountyFootballStartBetBroadcast(1, timeLeft, room.round),
+        );
       }
       return;
     }
@@ -1072,7 +1288,8 @@ export class MikooGatewayService implements OnModuleDestroy {
           gameSlug === 'crash' ||
           gameSlug === 'greedy-box' ||
           gameSlug === 'line-slots' ||
-          gameSlug === 'luck-car'
+          gameSlug === 'luck-car' ||
+          gameSlug === 'bounty-football'
         ) {
           const ud = encodeGetUserDataFor(gameSlug, {
             code: 0,
@@ -1162,6 +1379,8 @@ export class MikooGatewayService implements OnModuleDestroy {
             this.send(ws, '.game.GetRankDataRes', encode7UpGetRankDataRes(mapped));
           } else if (gameSlug === 'greedy-box') {
             this.send(ws, '.game.GetRankDataRes', encodeGreedyGetRankDataRes(mapped));
+          } else if (gameSlug === 'bounty-football') {
+            this.send(ws, '.game.GetRankDataRes', encodeBountyFootballGetRankDataRes(mapped));
           } else if (gameSlug === 'line-slots') {
             this.send(ws, '.game.GetRankDataRes', encodeLineSlotsGetRankDataRes(mapped));
           } else {
@@ -1178,6 +1397,8 @@ export class MikooGatewayService implements OnModuleDestroy {
                 ? encode7UpGetRankDataRes([])
                 : gameSlug === 'greedy-box'
                   ? encodeGreedyGetRankDataRes([])
+                  : gameSlug === 'bounty-football'
+                    ? encodeBountyFootballGetRankDataRes([])
                   : gameSlug === 'line-slots'
                     ? encodeLineSlotsGetRankDataRes([])
                     : encodeLuckCarGetRankDataRes([]),
@@ -1320,7 +1541,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       player.balance = bal;
       if (style === 'fortune') {
         this.send(ws, '.game.DoFortuneGemsRes', encodeFortuneGemsRes({
-          code: 0, desc: 'OK', cost: amount, userMoney: bal, winMoney: win, tipType: 0,
+          code: 0, desc: 'OK', cost: amount, userMoney: bal, winMoney: win, tipType: 0, mult,
         }));
       } else {
         this.send(ws, '.game.DoSlotsRsp', encodeDoSlotsRsp({
@@ -1395,7 +1616,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       player.balance = bal;
       if (style === 'sugar') {
         this.send(ws, '.game.s_c_bet', encodeSugarBetRes({
-          code: 0, desc: 'OK', money: bal, tipType: 0, winMoney: win,
+          code: 0, desc: 'OK', money: bal, tipType: 0, winMoney: win, mult,
         }));
       } else if (style === 'megaways') {
         this.send(ws, '.game.s_c_bet', encodeMegawaysBetRes({
@@ -1411,7 +1632,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         }));
       } else {
         this.send(ws, '.game.BetRes', encodeOlympiansBetRes({
-          code: 0, desc: 'OK', selfMoney: bal, winMoney: win, tipType: 0,
+          code: 0, desc: 'OK', selfMoney: bal, winMoney: win, tipType: 0, mult,
         }));
         this.send(ws, '.game.BetRsp', encodeBetRsp({
           code: 0, desc: 'OK', selfMoney: bal, betMoney: amount, tipType: 0,
@@ -1445,11 +1666,16 @@ export class MikooGatewayService implements OnModuleDestroy {
     this.logger.log(
       `GAME_PROBE BET_DECODE game=${gameSlug} phase=${room.phase} amount=${amount} area=${req.areaId} user=${player.userId} bal=${player.balance}`,
     );
-    const MAX_BET = 10_000;
+    const MAX_BET = gameSlug === 'bounty-football' ? 1_000_000 : 10_000;
     if (amount > MAX_BET) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1, iconId: req.areaId,
+        }));
+      } else if (gameSlug === 'bounty-football') {
+        this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
+          code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1,
+          curBet: { iconId: req.areaId || 0, money: amount },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
@@ -1475,6 +1701,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1, iconId: req.areaId,
+        }));
+      } else if (gameSlug === 'bounty-football') {
+        this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
+          code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1,
+          curBet: { iconId: req.areaId || 0, money: 0 },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
@@ -1505,6 +1736,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Not betting phase', userMoney: player.balance, tipType: 1, iconId: req.areaId,
+        }));
+      } else if (gameSlug === 'bounty-football') {
+        this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
+          code: 1, desc: 'Not betting phase', userMoney: player.balance, tipType: 1,
+          curBet: { iconId: req.areaId || 0, money: amount },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
@@ -1572,6 +1808,26 @@ export class MikooGatewayService implements OnModuleDestroy {
             uid: player.publicId,
           }),
           ws,
+        );
+      } else if (gameSlug === 'bounty-football') {
+        const { allAreaBets, myBets } = this.bountyFootballBets(room, player.publicId);
+        this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
+          code: 0,
+          desc: 'OK',
+          userMoney: bal,
+          tipType: 0,
+          allAreaBets,
+          myBets,
+          curBet: { iconId: req.areaId || 0, money: amount },
+        }));
+        this.broadcast(
+          room,
+          '.game.OtherPlayerBetBroadcast',
+          encodeBountyFootballOtherPlayerBetBroadcast({
+            allAreaBets,
+            playerId: player.publicId,
+            bet: { iconId: req.areaId || 0, money: amount },
+          }),
         );
       } else if (gameSlug === 'lucky77') {
         const betTotal = this.lucky77AreaBets(room, player.publicId);
@@ -1679,6 +1935,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Insufficient balance', userMoney: player.balance, tipType: 2, iconId: req.areaId,
+        }));
+      } else if (gameSlug === 'bounty-football') {
+        this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
+          code: 1, desc: 'Insufficient balance', userMoney: player.balance, tipType: 2,
+          curBet: { iconId: req.areaId || 0, money: amount },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {

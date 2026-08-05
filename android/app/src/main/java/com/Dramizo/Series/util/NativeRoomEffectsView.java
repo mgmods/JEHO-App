@@ -267,6 +267,8 @@ public final class NativeRoomEffectsView extends FrameLayout {
     private void showResultBubble(@Nullable String displayName, @Nullable String avatarUrl,
                                   long coins, @Nullable String gameTitle,
                                   @Nullable String gameIconUrl, boolean won) {
+        // Game/luck bubbles are NOT user join toasts — no personal avatar/name chrome.
+        // One line of text (winner name lives inside the sentence) + optional game cover only.
         setVisibility(VISIBLE);
         bringToFront();
 
@@ -292,65 +294,37 @@ public final class NativeRoomEffectsView extends FrameLayout {
         card.setBackground(bg);
         card.setElevation(dp(6));
 
-        ImageView img = new ImageView(getContext());
-        int avatarSize = dp(30);
-        LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
-        imgLp.setMarginEnd(dp(8));
-        img.setLayoutParams(imgLp);
-        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(0xFF243038);
-        circle.setStroke(dp(1), won ? 0xFFFFD76A : 0x88FFFFFF);
-        img.setBackground(circle);
-        img.setClipToOutline(true);
-        img.setOutlineProvider(new android.view.ViewOutlineProvider() {
-            @Override public void getOutline(View view, android.graphics.Outline outline) {
-                outline.setOval(0, 0, view.getWidth(), view.getHeight());
-            }
-        });
-        String primaryUrl = avatarUrl;
-        if ((primaryUrl == null || primaryUrl.isEmpty())
-                && gameIconUrl != null && !gameIconUrl.isEmpty()) {
-            primaryUrl = gameIconUrl;
-        }
-        if (primaryUrl != null && !primaryUrl.isEmpty()) {
+        // Prefer game cover; never show the player's profile photo on this strip.
+        String iconUrl = gameIconUrl != null && !gameIconUrl.isEmpty() ? gameIconUrl : null;
+        if (iconUrl != null) {
+            ImageView img = new ImageView(getContext());
+            int iconSize = dp(28);
+            LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(iconSize, iconSize);
+            imgLp.setMarginEnd(dp(8));
+            img.setLayoutParams(imgLp);
+            img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable rounded = new GradientDrawable();
+            rounded.setShape(GradientDrawable.RECTANGLE);
+            rounded.setCornerRadius(dp(7));
+            rounded.setColor(0xFF243038);
+            rounded.setStroke(dp(1), won ? 0xFFFFD76A : 0x88FFFFFF);
+            img.setBackground(rounded);
+            img.setClipToOutline(true);
+            img.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override public void getOutline(View view, android.graphics.Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(7));
+                }
+            });
             try {
-                Glide.with(getContext()).load(AssetCatalog.absoluteUrl(primaryUrl))
-                        .circleCrop().into(img);
+                Glide.with(getContext()).load(AssetCatalog.absoluteUrl(iconUrl))
+                        .centerCrop().into(img);
             } catch (Exception ignored) {
+                img.setImageResource(R.drawable.ic_screen_chat_lottery);
             }
-        } else {
-            img.setImageResource(R.drawable.jeho_logo);
-        }
-        card.addView(img);
-
-        if (gameIconUrl != null && !gameIconUrl.isEmpty()
-                && avatarUrl != null && !avatarUrl.isEmpty()) {
-            ImageView gameImg = new ImageView(getContext());
-            int gSize = dp(24);
-            LinearLayout.LayoutParams gLp = new LinearLayout.LayoutParams(gSize, gSize);
-            gLp.setMarginEnd(dp(6));
-            gameImg.setLayoutParams(gLp);
-            gameImg.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            GradientDrawable gBg = new GradientDrawable();
-            gBg.setCornerRadius(dp(6));
-            gBg.setColor(0xFF2a1a44);
-            gameImg.setBackground(gBg);
-            gameImg.setClipToOutline(true);
-            try {
-                Glide.with(getContext()).load(AssetCatalog.absoluteUrl(gameIconUrl))
-                        .centerCrop().into(gameImg);
-            } catch (Exception ignored) {
-            }
-            card.addView(gameImg);
+            card.addView(img);
         }
 
-        LinearLayout col = new LinearLayout(getContext());
-        col.setOrientation(LinearLayout.VERTICAL);
-        col.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
-        int maxText = Math.max(dp(140), Math.round(getResources().getDisplayMetrics().widthPixels * 0.42f));
-
+        int maxText = Math.max(dp(160), Math.round(getResources().getDisplayMetrics().widthPixels * 0.48f));
         String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
         TextView tvLine = new TextView(getContext());
         tvLine.setTextColor(won ? 0xFFFFF3C4 : 0xFFFFFFFF);
@@ -362,7 +336,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
         if (won) {
             line = "مبروك " + who + " حصل على " + coins;
             if (gameTitle != null && !gameTitle.isEmpty()) {
-                line += " مبروك " + gameTitle;
+                line += " · " + gameTitle;
             }
         } else {
             line = who + " خسر " + coins;
@@ -371,9 +345,8 @@ public final class NativeRoomEffectsView extends FrameLayout {
             }
         }
         tvLine.setText(line);
-        col.addView(tvLine, new LinearLayout.LayoutParams(
+        card.addView(tvLine, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        card.addView(col);
         card.setTag("slot_result_bubble");
 
         // Mid-screen horizontal crawl lane (slightly below true center).
@@ -484,9 +457,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
             @Nullable String badgeUrl
     ) {
         if (getContext() == null) return;
-        String who = displayName != null && !displayName.isEmpty() ? displayName : "لاعب";
+        String who = displayName != null && !displayName.isEmpty() ? displayName : "";
         String body = message != null && !message.isEmpty() ? message : "حدث في الغرفة";
-        // Reuse win bubble path with coins=0 wording overridden via gameTitle = full body.
+        // Event bubbles without a personal displayName prefer body-only (no white “name · body”).
         post(() -> showEventBubbleCard(who, avatarUrl, body, badgeUrl));
     }
 
@@ -519,27 +492,37 @@ public final class NativeRoomEffectsView extends FrameLayout {
         card.setBackground(bg);
         card.setElevation(dp(6));
 
-        ImageView img = new ImageView(getContext());
-        int avatarSize = dp(28);
-        LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
-        imgLp.setMarginEnd(dp(8));
-        img.setLayoutParams(imgLp);
-        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(0xFF243038);
-        img.setBackground(circle);
-        img.setClipToOutline(true);
-        String url = avatarUrl != null && !avatarUrl.isEmpty() ? avatarUrl : badgeUrl;
-        if (url != null && !url.isEmpty()) {
+        // Prefer game/gift badge over face; hide left icon when neither is set.
+        String url = badgeUrl != null && !badgeUrl.isEmpty() ? badgeUrl
+                : (avatarUrl != null && !avatarUrl.isEmpty() ? avatarUrl : null);
+        if (url != null) {
+            ImageView img = new ImageView(getContext());
+            int avatarSize = dp(28);
+            LinearLayout.LayoutParams imgLp = new LinearLayout.LayoutParams(avatarSize, avatarSize);
+            imgLp.setMarginEnd(dp(8));
+            img.setLayoutParams(imgLp);
+            img.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            GradientDrawable circle = new GradientDrawable();
+            boolean face = avatarUrl != null && avatarUrl.equals(url);
+            if (face) {
+                circle.setShape(GradientDrawable.OVAL);
+            } else {
+                circle.setShape(GradientDrawable.RECTANGLE);
+                circle.setCornerRadius(dp(7));
+            }
+            circle.setColor(0xFF243038);
+            img.setBackground(circle);
+            img.setClipToOutline(true);
             try {
-                Glide.with(getContext()).load(AssetCatalog.absoluteUrl(url)).circleCrop().into(img);
+                if (face) {
+                    Glide.with(getContext()).load(AssetCatalog.absoluteUrl(url)).circleCrop().into(img);
+                } else {
+                    Glide.with(getContext()).load(AssetCatalog.absoluteUrl(url)).centerCrop().into(img);
+                }
             } catch (Exception ignored) {
             }
-        } else {
-            img.setImageResource(R.drawable.jeho_logo);
+            card.addView(img);
         }
-        card.addView(img);
 
         TextView tv = new TextView(getContext());
         tv.setTextColor(0xFFFFF3C4);
@@ -550,7 +533,16 @@ public final class NativeRoomEffectsView extends FrameLayout {
         tv.setMaxWidth(maxText);
         String who = displayName != null ? displayName : "";
         String body = message != null ? message : "";
-        tv.setText(who.isEmpty() ? body : (who + " · " + body));
+        // Avoid "name · name body" double labels when body already contains the winner.
+        if (who.isEmpty()) {
+            tv.setText(body);
+        } else if (body.isEmpty()) {
+            tv.setText(who);
+        } else if (body.contains(who)) {
+            tv.setText(body);
+        } else {
+            tv.setText(who + " · " + body);
+        }
         card.addView(tv);
         card.setTag("slot_result_bubble");
 

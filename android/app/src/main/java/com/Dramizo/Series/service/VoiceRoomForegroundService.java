@@ -36,6 +36,7 @@ import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.google.gson.JsonObject;
 
@@ -73,16 +74,16 @@ public class VoiceRoomForegroundService extends Service {
             new ZegoEngineManager.RoomListener() {
                 @Override public void onRoomStateChanged(String id, int state) {}
                 @Override public void onStreamAdded(String streamId) {
-                    String mine = ZegoEngineManager.audioStreamId(
-                            ZegoEngineManager.getInstance().getCurrentUserId());
+                    String mine = RoomRtcEngine.audioStreamId(
+                            RoomRtcEngine.getInstance().getCurrentUserId());
                     // Play every remote stream including host (_host) — needed while minimized.
                     if (streamId != null && !streamId.equals(mine)) {
-                        ZegoEngineManager.getInstance().setSpeakerMuted(false);
-                        ZegoEngineManager.getInstance().startPlayingAudio(streamId);
+                        RoomRtcEngine.getInstance().setSpeakerMuted(false);
+                        RoomRtcEngine.getInstance().startPlayingAudio(streamId);
                     }
                 }
                 @Override public void onStreamRemoved(String streamId) {
-                    ZegoEngineManager.getInstance().stopPlaying(streamId);
+                    RoomRtcEngine.getInstance().stopPlaying(streamId);
                 }
             };
 
@@ -120,7 +121,8 @@ public class VoiceRoomForegroundService extends Service {
                                 .from(VoiceRoomForegroundService.this)
                                 .getSessionManager()
                                 .getUserId();
-                        if (me != null && me.equals(target)) {
+                        if (me != null && target != null
+                                && me.trim().equalsIgnoreCase(target.trim())) {
                             final String toast =
                                     "room:banned".equals(event)
                                             ? "تم حظرك من الغرفة"
@@ -251,8 +253,8 @@ public class VoiceRoomForegroundService extends Service {
                 if (result.success && result.data != null && result.data.token != null) {
                     String rtcRoom = result.data.zegoRoomId != null
                             ? result.data.zegoRoomId
-                            : ZegoEngineManager.getInstance().getCurrentRoomId();
-                    ZegoEngineManager.getInstance().renewRoomToken(rtcRoom, result.data.token);
+                            : RoomRtcEngine.getInstance().getCurrentRoomId();
+                    RoomRtcEngine.getInstance().renewRoomToken(rtcRoom, result.data.token);
                 }
             });
             main.postDelayed(this, 35_000L);
@@ -393,13 +395,13 @@ public class VoiceRoomForegroundService extends Service {
                 .apply();
         // Keep hearing the room while minimized (never leave speaker muted from Activity onStop).
         try {
-            ZegoEngineManager.getInstance().setSpeakerMuted(false);
+            RoomRtcEngine.getInstance().setSpeakerMuted(false);
         } catch (Exception ignored) {
         }
         enterForegroundSafe(resolveForegroundTypes());
         loadCoverAsync();
         postRoomBubble();
-        ZegoEngineManager.getInstance().addRoomListener(rtcListener);
+        RoomRtcEngine.getInstance().addRoomListener(rtcListener);
         RealtimeClient.getInstance().addRoomListener(realtimeListener);
         main.removeCallbacks(renewToken);
         main.post(renewToken);
@@ -421,7 +423,7 @@ public class VoiceRoomForegroundService extends Service {
         boolean micOk = ContextCompat.checkSelfPermission(
                 this, android.Manifest.permission.RECORD_AUDIO)
                 == PackageManager.PERMISSION_GRANTED;
-        if (micOk && ZegoEngineManager.getInstance().isPublishing()) {
+        if (micOk && RoomRtcEngine.getInstance().isPublishing()) {
             types |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
         }
         return types;
@@ -452,8 +454,8 @@ public class VoiceRoomForegroundService extends Service {
 
     private void toggleMicFromNotification() {
         // Must use isMicEnabled — isPublishing stays true while mic is soft-muted.
-        boolean nextOn = !ZegoEngineManager.getInstance().isMicEnabled();
-        ZegoEngineManager.getInstance().setMicEnabled(nextOn);
+        boolean nextOn = !RoomRtcEngine.getInstance().isMicEnabled();
+        RoomRtcEngine.getInstance().setMicEnabled(nextOn);
         final String rid = roomId;
         if (rid != null && !rid.isEmpty()) {
             try {
@@ -468,8 +470,8 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void toggleSpeakerFromNotification() {
-        boolean nextMuted = !ZegoEngineManager.getInstance().isSpeakerMuted();
-        ZegoEngineManager.getInstance().setSpeakerMuted(nextMuted);
+        boolean nextMuted = !RoomRtcEngine.getInstance().isSpeakerMuted();
+        RoomRtcEngine.getInstance().setSpeakerMuted(nextMuted);
         refreshNotificationUi();
     }
 
@@ -543,8 +545,8 @@ public class VoiceRoomForegroundService extends Service {
         PendingIntent micIntent = serviceAction(ACTION_TOGGLE_MIC, 7305);
         PendingIntent speakerIntent = serviceAction(ACTION_TOGGLE_SPEAKER, 7306);
 
-        boolean micOn = ZegoEngineManager.getInstance().isMicEnabled();
-        boolean speakerOn = !ZegoEngineManager.getInstance().isSpeakerMuted();
+        boolean micOn = RoomRtcEngine.getInstance().isMicEnabled();
+        boolean speakerOn = !RoomRtcEngine.getInstance().isSpeakerMuted();
         String title = roomTitle != null && !roomTitle.isEmpty()
                 ? roomTitle : getString(R.string.voice_room);
 
@@ -714,7 +716,7 @@ public class VoiceRoomForegroundService extends Service {
             container.getIoExecutor().execute(() ->
                     container.getRoomRepository().leave(leavingRoom));
         }
-        ZegoEngineManager.getInstance().logoutRoom();
+        RoomRtcEngine.getInstance().logoutRoom();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
         detachBackgroundOwner();
         NotificationManagerCompat.from(this).cancel(BUBBLE_NOTIFICATION_ID);
@@ -743,7 +745,7 @@ public class VoiceRoomForegroundService extends Service {
     private void detachBackgroundOwner() {
         main.removeCallbacks(renewToken);
         RealtimeClient.getInstance().removeRoomListener(realtimeListener);
-        ZegoEngineManager.getInstance().removeRoomListener(rtcListener);
+        RoomRtcEngine.getInstance().removeRoomListener(rtcListener);
         if (musicPlayer != null) {
             try {
                 musicPlayer.stop();

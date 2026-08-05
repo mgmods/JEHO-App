@@ -131,6 +131,17 @@ public class AgencyActivity extends ThemedActivity {
             }
             vm.joinByCode(code);
         });
+        if (binding.btnSearchAgency != null) {
+            binding.btnSearchAgency.setOnClickListener(v -> {
+                String q = binding.etAgencySearch != null && binding.etAgencySearch.getText() != null
+                        ? binding.etAgencySearch.getText().toString().trim() : "";
+                if (q.length() < 3) {
+                    Toast.makeText(this, R.string.agency_search_code_min, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                vm.searchAgencies(q);
+            });
+        }
         binding.btnCopyCode.setOnClickListener(v -> {
             CharSequence code = binding.tvActivationCode.getText();
             if (code == null || code.length() == 0) return;
@@ -172,6 +183,7 @@ public class AgencyActivity extends ThemedActivity {
             applyPeriodChips();
         }
         vm.getAgencies().observe(this, list -> rebindAgencyDirectory());
+        vm.getSearchAttempted().observe(this, attempted -> rebindAgencyDirectory());
         vm.getMine().observe(this, m -> {
             if (awaitingFirstMine) {
                 awaitingFirstMine = false;
@@ -1350,15 +1362,24 @@ public class AgencyActivity extends ThemedActivity {
 
     private void rebindAgencyDirectory() {
         if (adapter == null || binding == null) return;
-        java.util.List<MiscDtos.AgencyDto> rows = vm.getAgencies().getValue();
+        // Members already in an agency don't need the public lookup results.
+        boolean hideLookup = myAgencyId != null && !isPendingMembership(myAgency);
+        java.util.List<MiscDtos.AgencyDto> rows = hideLookup
+                ? Collections.emptyList()
+                : vm.getAgencies().getValue();
         if (rows == null) rows = Collections.emptyList();
         adapter.submit(rows, myAgencyId, canLeave, canManage);
-        boolean empty = rows.isEmpty();
+        boolean hasResults = !rows.isEmpty();
+        boolean tried = Boolean.TRUE.equals(vm.getSearchAttempted().getValue());
+        boolean showEmpty = !hideLookup && !hasResults && tried;
+        if (binding.tvActiveAgenciesTitle != null) {
+            binding.tvActiveAgenciesTitle.setVisibility(hasResults ? View.VISIBLE : View.GONE);
+        }
         if (binding.tvEmpty != null) {
-            binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            binding.tvEmpty.setVisibility(showEmpty ? View.VISIBLE : View.GONE);
         }
         if (binding.recycler != null) {
-            binding.recycler.setVisibility(empty ? View.GONE : View.VISIBLE);
+            binding.recycler.setVisibility(hasResults ? View.VISIBLE : View.GONE);
         }
     }
 

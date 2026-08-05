@@ -49,6 +49,8 @@ import { PaymentsService } from '../payments/payments.service';
 import { PatchBinancePaySettingsDto } from '../payments/dto/patch-binance-pay-settings.dto';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { PatchZegoSettingsDto } from '../zego/dto/patch-zego-settings.dto';
+import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
+import { PatchLiveKitSettingsDto } from '../livekit/dto/patch-livekit-settings.dto';
 import { ImportZegoFromUrlDto } from '../zego/dto/import-zego-from-url.dto';
 import { DramaService } from '../drama/drama.service';
 import { GameAdsService } from '../games/game-ads.service';
@@ -92,6 +94,7 @@ export class AdminController {
     private readonly paymentSettingsService: PaymentSettingsService,
     private readonly paymentsService: PaymentsService,
     private readonly zegoSettingsService: ZegoSettingsService,
+    private readonly liveKitSettingsService: LiveKitSettingsService,
     private readonly dramaService: DramaService,
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
@@ -396,6 +399,16 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('gifts/import-jeho-pack')
+  @ApiOperation({
+    summary: 'Import JEHO designed flag frames + premium video gifts from disk',
+  })
+  importJehoGiftPack() {
+    return this.adminService.importJehoDesignedGifts();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('gifts')
   createGift(@Body() dto: UpsertGiftDto) {
     return this.adminService.upsertGift(null, dto);
@@ -420,6 +433,38 @@ export class AdminController {
   @Delete('gifts/:id')
   deleteGift(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.deleteGift(id);
+  }
+
+  // ─── Gift categories (sheet tabs) ──────────────────────────
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('gift-categories')
+  listGiftCategories() {
+    return this.adminService.listGiftCategories();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('gift-categories')
+  createGiftCategory(@Body() dto: Record<string, unknown>) {
+    return this.adminService.upsertGiftCategory(null, dto as any);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('gift-categories/:id')
+  updateGiftCategory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: Record<string, unknown>,
+  ) {
+    return this.adminService.upsertGiftCategory(id, dto as any);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('gift-categories/:id')
+  deleteGiftCategory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.deleteGiftCategory(id);
   }
 
   // ─── Wallet ────────────────────────────────────────────────
@@ -1162,6 +1207,37 @@ export class AdminController {
   })
   importZegoFromUrl(@Body() body: ImportZegoFromUrlDto) {
     return this.zegoSettingsService.importFromRemoteUrl(body);
+  }
+
+  // ─── LiveKit (free self-hosted voice) + RTC provider switch ───
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('voice-rtc-settings')
+  @ApiOperation({
+    summary: 'Masked LiveKit credentials + active voice provider (zego | livekit)',
+  })
+  getVoiceRtcSettings() {
+    return this.liveKitSettingsService.getMaskedSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('voice-rtc-settings/reveal')
+  @ApiOperation({
+    summary: 'Reveal LiveKit URL / API key / secret to an authenticated admin',
+  })
+  revealVoiceRtcCredentials() {
+    return this.liveKitSettingsService.revealCredentials();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('voice-rtc-settings')
+  @ApiOperation({
+    summary: 'Update LiveKit URL/keys and optionally switch RTC provider',
+  })
+  patchVoiceRtcSettings(@Body() body: PatchLiveKitSettingsDto) {
+    return this.liveKitSettingsService.updateLiveKitSettings(body);
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

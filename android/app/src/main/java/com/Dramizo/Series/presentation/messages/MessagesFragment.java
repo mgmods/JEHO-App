@@ -103,7 +103,7 @@ public class MessagesFragment extends Fragment {
         binding.swipe.setOnChildScrollUpCallback((parent, child) ->
                 binding.recycler != null && binding.recycler.canScrollVertically(-1));
         binding.swipe.setOnRefreshListener(() -> {
-            viewModel.load();
+            viewModel.load(true);
             loadOfficialNewsPreview();
         });
         binding.btnFriends.setOnClickListener(v -> openFriendsTab(0));
@@ -191,8 +191,8 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        if (viewModel != null) viewModel.load();
-        loadOfficialNewsPreview();
+        // Soft refresh only — full reload was causing the whole chat list to blink.
+        if (viewModel != null) viewModel.load(false);
         loadPendingRequestBadge();
         registerOfficialNewsReceiver();
     }

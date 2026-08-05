@@ -23,12 +23,14 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Medium" />
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+            app:strokeColor="#33FFFFFF"
+            app:strokeWidth="2dp" />
 
         <View
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:background="#66000000"
+            android:background="@drawable/bg_game_logo_circle_scrim"
             app:layout_constraintBottom_toBottomOf="@id/imgCover"
             app:layout_constraintEnd_toEndOf="@id/imgCover"
             app:layout_constraintStart_toStartOf="@id/imgCover"

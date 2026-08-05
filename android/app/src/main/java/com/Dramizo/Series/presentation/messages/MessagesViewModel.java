@@ -19,6 +19,8 @@ public class MessagesViewModel extends ViewModel {
     private final MutableLiveData<List<ChatDtos.ConversationDto>> conversations =
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
+    private long lastLoadAtMs = 0L;
+    private static final long MIN_RELOAD_MS = 25_000L;
     private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
         @Override
         public void onPresenceOnline(String userId, String username) {
@@ -42,7 +44,7 @@ public class MessagesViewModel extends ViewModel {
             if (conversationId == null) return;
             List<ChatDtos.ConversationDto> current = conversations.getValue();
             if (current == null || current.isEmpty()) {
-                load();
+                load(true);
                 return;
             }
             List<ChatDtos.ConversationDto> next = new ArrayList<>(current);
@@ -56,7 +58,7 @@ public class MessagesViewModel extends ViewModel {
                 }
             }
             if (match == null) {
-                load();
+                load(true);
                 return;
             }
             match.lastMessage = lastMessage;
@@ -88,7 +90,7 @@ public class MessagesViewModel extends ViewModel {
         @Override
         public void onMessageUnsent(String conversationId, String messageId) {
             // The server selects the previous visible message as the new preview.
-            load();
+            load(true);
         }
 
         @Override
@@ -125,11 +127,25 @@ public class MessagesViewModel extends ViewModel {
     public LiveData<String> getError() { return error; }
 
     public void load() {
+        load(false);
+    }
+
+    /** @param force true from pull-to-refresh / deleted / missing conversation */
+    public void load(boolean force) {
+        long now = System.currentTimeMillis();
+        List<ChatDtos.ConversationDto> cached = conversations.getValue();
+        if (!force && cached != null && !cached.isEmpty() && now - lastLoadAtMs < MIN_RELOAD_MS) {
+            return;
+        }
+        lastLoadAtMs = now;
         c.getIoExecutor().execute(() -> {
             Result<ChatDtos.ConversationList> r = c.getConversationsUseCase.execute();
-            if (r.success && r.data != null && r.data.items != null) conversations.postValue(r.data.items);
-            else error.postValue(r.error != null ? r.error
-                    : c.getAppContext().getString(R.string.load_conversations_failed));
+            if (r.success && r.data != null && r.data.items != null) {
+                conversations.postValue(r.data.items);
+            } else {
+                error.postValue(r.error != null ? r.error
+                        : c.getAppContext().getString(R.string.load_conversations_failed));
+            }
         });
     }
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel;
 
 import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.data.remote.dto.WalletDtos;
+import com.Dramizo.Series.data.repository.GiftRepositoryImpl;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 
@@ -15,7 +16,10 @@ import java.util.List;
 
 public class GiftViewModel extends ViewModel {
     private final AppContainer c;
-    private final MutableLiveData<List<GiftDtos.GiftDto>> gifts = new MutableLiveData<>(Collections.emptyList());
+    private final MutableLiveData<List<GiftDtos.GiftDto>> gifts =
+            new MutableLiveData<>(Collections.emptyList());
+    private final MutableLiveData<List<GiftDtos.GiftCategoryDto>> categories =
+            new MutableLiveData<>(GiftRepositoryImpl.defaultCategories());
     private final MutableLiveData<GiftDtos.SendGiftResult> sent = new MutableLiveData<>();
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private final MutableLiveData<Long> coinsBalance = new MutableLiveData<>(null);
@@ -23,44 +27,102 @@ public class GiftViewModel extends ViewModel {
     private String lastReceiverId;
     private int combo = 1;
     private long lastSendAt;
+    private boolean loadInFlight;
 
-    public GiftViewModel(AppContainer c) { this.c = c; }
+    public GiftViewModel(AppContainer c) {
+        this.c = c;
+        // Instant fill for sheet open (no loading spinner needed when warm).
+        GiftDtos.GiftList local = c.getGiftRepository().peekLocalOrNull();
+        if (local != null && !local.isEmpty()) {
+            gifts.setValue(new ArrayList<>(local));
+        }
+        List<GiftDtos.GiftCategoryDto> cats = c.getGiftRepository().peekCategoriesOrNull();
+        if (cats != null && !cats.isEmpty()) {
+            categories.setValue(new ArrayList<>(cats));
+        }
+    }
 
-    public LiveData<List<GiftDtos.GiftDto>> getGifts() { return gifts; }
-    public LiveData<GiftDtos.SendGiftResult> getSent() { return sent; }
-    public LiveData<String> getError() { return error; }
-    public LiveData<Long> getCoinsBalance() { return coinsBalance; }
-    public int getCombo() { return combo; }
+    public LiveData<List<GiftDtos.GiftDto>> getGifts() {
+        return gifts;
+    }
+
+    public LiveData<List<GiftDtos.GiftCategoryDto>> getCategories() {
+        return categories;
+    }
+
+    public LiveData<GiftDtos.SendGiftResult> getSent() {
+        return sent;
+    }
+
+    public LiveData<String> getError() {
+        return error;
+    }
+
+    public LiveData<Long> getCoinsBalance() {
+        return coinsBalance;
+    }
+
+    public int getCombo() {
+        return combo;
+    }
+
+    public boolean hasGiftsNow() {
+        List<GiftDtos.GiftDto> v = gifts.getValue();
+        return v != null && !v.isEmpty();
+    }
 
     public void setCoinsBalance(long coins) {
         coinsBalance.postValue(coins);
     }
 
     public void load() {
+        // Instant SWR: paint local first on the same call site.
+        GiftDtos.GiftList local = c.getGiftRepository().peekLocalOrNull();
+        if (local != null && !local.isEmpty()) {
+            gifts.postValue(new ArrayList<>(local));
+        }
+        if (loadInFlight) return;
+        loadInFlight = true;
         c.getIoExecutor().execute(() -> {
-            Result<GiftDtos.GiftList> r = c.getGiftsUseCase.execute();
-            if (r.success && r.data != null && !r.data.isEmpty()) {
-                gifts.postValue(r.data);
-                java.util.ArrayList<String> urls = new java.util.ArrayList<>();
-                for (GiftDtos.GiftDto g : r.data) {
-                    if (g == null) continue;
-                    if (g.animationUrl != null && !g.animationUrl.isEmpty()) urls.add(g.animationUrl);
-                    if (g.iconUrl != null && !g.iconUrl.isEmpty()) urls.add(g.iconUrl);
+            try {
+                Result<List<GiftDtos.GiftCategoryDto>> cats =
+                        c.getGiftRepository().refreshCategories();
+                if (cats.success && cats.data != null && !cats.data.isEmpty()) {
+                    categories.postValue(new ArrayList<>(cats.data));
                 }
-                try {
-                    com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
-                            c.getAppContext(), urls);
-                } catch (Exception ignored) {
+
+                Result<GiftDtos.GiftList> r = c.getGiftRepository().refreshGifts();
+                if (r.success && r.data != null && !r.data.isEmpty()) {
+                    gifts.postValue(new ArrayList<>(r.data));
+                    ArrayList<String> urls = new ArrayList<>();
+                    for (GiftDtos.GiftDto g : r.data) {
+                        if (g == null) continue;
+                        if (g.animationUrl != null && !g.animationUrl.isEmpty()) {
+                            urls.add(g.animationUrl);
+                        }
+                        if (g.iconUrl != null && !g.iconUrl.isEmpty()) {
+                            urls.add(g.iconUrl);
+                        }
+                    }
+                    try {
+                        com.Dramizo.Series.util.NativeRoomEffectsView.preloadGiftUrls(
+                                c.getAppContext(), urls);
+                    } catch (Exception ignored) {
+                    }
+                } else if (r.success && r.data != null) {
+                    gifts.postValue(r.data);
+                    if (r.data.isEmpty()) {
+                        error.postValue("لا توجد هدايا حالياً");
+                    }
+                } else {
+                    List<GiftDtos.GiftDto> current = gifts.getValue();
+                    if (current == null || current.isEmpty()) {
+                        gifts.postValue(Collections.emptyList());
+                        error.postValue(r.error != null ? r.error : "لا توجد هدايا");
+                    }
                 }
-            } else if (r.success && r.data != null) {
-                gifts.postValue(r.data);
-                error.postValue("لا توجد هدايا حالياً");
-            } else {
-                List<GiftDtos.GiftDto> current = gifts.getValue();
-                if (current == null || current.isEmpty()) {
-                    gifts.postValue(Collections.emptyList());
-                    error.postValue(r.error != null ? r.error : "لا توجد هدايا");
-                }
+            } finally {
+                loadInFlight = false;
             }
         });
     }
@@ -92,7 +154,6 @@ public class GiftViewModel extends ViewModel {
             error.postValue("اختر مستلماً");
             return;
         }
-        // Lucky Mikoo chips: 1 / 7 / 17 / 77 / 177
         int qty = Math.max(1, Math.min(177, quantity));
         long now = System.currentTimeMillis();
         String first = targets.get(0);

@@ -48,13 +48,9 @@ public final class RoomCardBinder {
         if (b.tvWelcome != null) b.tvWelcome.setVisibility(View.GONE);
         if (b.tvLiveBadge != null) b.tvLiveBadge.setVisibility(View.GONE);
         if (b.rowRoomLevel != null) b.rowRoomLevel.setVisibility(View.GONE);
-        // Agency rooms: show «وكالة» chip (Mikoo agency/official mark). Personal: no type chip.
+        // Always show type chip so users separate personal vs agency rooms at a glance.
         if (b.tvRoomTypeBadge != null) {
-            if (RoomUiHelper.isAgencyRoom(room)) {
-                RoomUiHelper.bindTypeBadge(b.tvRoomTypeBadge, room);
-            } else {
-                b.tvRoomTypeBadge.setVisibility(View.GONE);
-            }
+            RoomUiHelper.bindTypeBadge(b.tvRoomTypeBadge, room);
         }
 
         String title = displayTitle(room);
@@ -109,23 +105,11 @@ public final class RoomCardBinder {
     }
 
     /**
-     * Mikoo HotTop 1/2/3 — only for top explore ranks from server list order.
+     * Hot rank chips (1/2/3) — disabled; ranking numbers are not shown on feed cards.
      */
     private static void bindHotTop(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
         if (b.imgHotTop != null) b.imgHotTop.setVisibility(View.GONE);
-        if (b.tvHotTop == null) return;
-        int rank = room.exploreRank;
-        if (rank < 1 || rank > 3) {
-            b.tvHotTop.setVisibility(View.GONE);
-            return;
-        }
-        b.tvHotTop.setText(String.valueOf(rank));
-        int bg = rank == 1 ? R.drawable.bg_hot_rank_1
-                : rank == 2 ? R.drawable.bg_hot_rank_2
-                : R.drawable.bg_hot_rank_3;
-        b.tvHotTop.setBackgroundResource(bg);
-        b.tvHotTop.setVisibility(View.VISIBLE);
-        b.tvHotTop.setContentDescription("Top " + rank);
+        if (b.tvHotTop != null) b.tvHotTop.setVisibility(View.GONE);
     }
 
     private static void bindCountryFlag(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {

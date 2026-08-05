@@ -363,12 +363,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 break;
             }
         }
-        if (speaking && seatPos < 0) {
-            speakingUsers.remove(key);
+        if (seatPos < 0) {
+            if (speaking) speakingUsers.remove(key);
             return;
         }
         boolean changed = speaking ? speakingUsers.add(key) : speakingUsers.remove(key);
-        if (!changed || seatPos < 0) {
+        if (!changed) {
             return;
         }
         notifyItemChanged(seatPos, "speaking");
@@ -484,9 +484,9 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             String userId = seatUserId(seat);
             for (Object p : payloads) {
                 if ("speaking".equals(p)) {
-                    // Guard against recycled holders: only animate if this row still binds that user.
+                    // Re-sync bound id: payload-only binds can otherwise drop waves forever.
+                    if (userId != null) holder.boundUserId = userId;
                     boolean match = userId != null
-                            && userId.equals(holder.boundUserId)
                             && speakingUsers.contains(userId)
                             && !activeReactions.containsKey(userId);
                     bindSpeaking(holder, match);

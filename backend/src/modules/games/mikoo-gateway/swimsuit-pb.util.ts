@@ -10,6 +10,7 @@ import {
   pbString,
   pbUInt64,
 } from './mikoo-proto.util';
+import { chipsList } from './mikoo-game-economy';
 
 function writeVarint(n: number): Buffer {
   const out: number[] = [];
@@ -62,11 +63,11 @@ export const SwimsuitRoute = {
   PLAYER_PIGGY_BANK_RECEIVED: 109,
 } as const;
 
-/** Swimsuit Party / packer games — larger chips. */
-export const CHIP_LIST = [100, 500, 1000, 2000, 5000, 10000];
+/** Swimsuit Party / packer games — expanded stakes. */
+export const CHIP_LIST = chipsList();
 
-/** Cleopatra / Slot777 / JSON slots — matches common client defaults (10…). */
-export const SLOT_CHIP_LIST = [10, 50, 100, 500, 1000, 5000, 10000];
+/** Cleopatra / Slot777 / JSON slots — same tray for all games. */
+export const SLOT_CHIP_LIST = chipsList();
 
 export function decodeEnterGameReq(buf: Buffer) {
   const f = decodeFields(buf);

@@ -71,6 +71,11 @@ export const giftsApi = {
   create: (data) => safeRequest(() => api.post('/admin/gifts', data)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/gifts/${id}`, data)),
   delete: (id) => safeRequest(() => api.delete(`/admin/gifts/${id}`)),
+  categories: () => safeRequest(() => api.get('/admin/gift-categories')),
+  createCategory: (data) => safeRequest(() => api.post('/admin/gift-categories', data)),
+  updateCategory: (id, data) => safeRequest(() => api.patch(`/admin/gift-categories/${id}`, data)),
+  deleteCategory: (id) => safeRequest(() => api.delete(`/admin/gift-categories/${id}`)),
+  importJehoPack: () => safeRequest(() => api.post('/admin/gifts/import-jeho-pack')),
 }
 
 export const walletApi = {
@@ -229,6 +234,13 @@ export const zegoSettingsApi = {
   update: (data) => safeRequest(() => api.patch('/admin/zego-settings', data)),
   importFromUrl: (data) =>
     safeRequest(() => api.post('/admin/zego-settings/import-from-url', data)),
+}
+
+/** LiveKit self-hosted (free OSS) + active voice provider switch. */
+export const voiceRtcSettingsApi = {
+  get: () => safeRequest(() => api.get('/admin/voice-rtc-settings')),
+  reveal: () => safeRequest(() => api.post('/admin/voice-rtc-settings/reveal')),
+  update: (data) => safeRequest(() => api.patch('/admin/voice-rtc-settings', data)),
 }
 
 export const contestsApi = {

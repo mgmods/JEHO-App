@@ -7,6 +7,93 @@
     <div v-else class="row g-3">
       <div class="col-12">
         <div class="settings-card">
+          <h3 class="settings-card-title">{{ t('voiceRtc.title') }}</h3>
+          <p class="text-secondary small mb-3">{{ t('voiceRtc.hint') }}</p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button
+              type="button"
+              class="btn"
+              :class="voice.provider === 'zego' ? 'btn-aurora' : 'btn-outline-secondary'"
+              :disabled="voiceSaving"
+              @click="setProvider('zego')"
+            >
+              ZEGO
+            </button>
+            <button
+              type="button"
+              class="btn"
+              :class="voice.provider === 'livekit' ? 'btn-aurora' : 'btn-outline-secondary'"
+              :disabled="voiceSaving"
+              @click="setProvider('livekit')"
+            >
+              LiveKit ({{ t('voiceRtc.free') }})
+            </button>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="small text-secondary mb-0">{{ t('voiceRtc.keysSection') }}</span>
+            <button
+              class="btn btn-sm btn-ghost"
+              type="button"
+              :disabled="voiceRevealing"
+              @click="revealVoiceKeys"
+            >
+              <span v-if="voiceRevealing" class="spinner-border spinner-border-sm me-1" />
+              {{ showingVoiceKeys ? t('voiceRtc.hideKeys') : t('voiceRtc.showKeys') }}
+            </button>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">LiveKit URL</label>
+              <input
+                v-model="voiceForm.url"
+                class="form-control"
+                dir="ltr"
+                placeholder="ws://79.x.x.x:7880 or wss://voice.example.com"
+                autocomplete="off"
+              />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">API Key</label>
+              <input
+                v-model="voiceForm.apiKey"
+                class="form-control"
+                dir="ltr"
+                autocomplete="off"
+                :type="showingVoiceKeys ? 'text' : 'password'"
+                :placeholder="voice.apiKeyConfigured && !showingVoiceKeys ? '••••••••' : 'APIxxxxxxxx'"
+              />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">API Secret</label>
+              <input
+                v-model="voiceForm.apiSecret"
+                class="form-control"
+                :type="showingVoiceKeys ? 'text' : 'password'"
+                dir="ltr"
+                autocomplete="off"
+                :placeholder="voice.apiSecretConfigured && !showingVoiceKeys ? '••••••••' : ''"
+              />
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-outline-secondary" type="button" :disabled="voiceSaving" @click="saveVoiceKeys">
+                <span v-if="voiceSaving" class="spinner-border spinner-border-sm me-2" />
+                {{ t('voiceRtc.saveKeys') }}
+              </button>
+              <span class="small text-secondary">
+                {{ t('voiceRtc.active') }}:
+                <strong>{{ voice.provider === 'livekit' ? 'LiveKit' : 'ZEGO' }}</strong>
+                · {{ voice.ready ? t('voiceRtc.ready') : t('voiceRtc.notReady') }}
+                <span v-if="voice.configSource && voice.configSource !== 'none'" class="ms-1">
+                  · {{ t('zegoSettings.source') }}: {{ voice.configSource }}
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <div class="settings-card">
           <h3 class="settings-card-title">{{ t('zegoSettings.status') }}</h3>
           <div class="row g-2 small">
             <div class="col-md-4">
@@ -171,7 +258,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { zegoSettingsApi } from '@/api'
+import { zegoSettingsApi, voiceRtcSettingsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -179,13 +266,31 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
+const voiceSaving = ref(false)
+const voiceRevealing = ref(false)
 const revealing = ref(false)
 const importing = ref(false)
 const importApply = ref(false)
 const showingKeys = ref(false)
+const showingVoiceKeys = ref(false)
 const error = ref('')
 const success = ref('')
 const importResult = ref(null)
+const voice = reactive({
+  provider: 'zego',
+  url: '',
+  urlConfigured: false,
+  apiKey: '',
+  apiKeyConfigured: false,
+  apiSecretConfigured: false,
+  ready: false,
+  configSource: 'none',
+})
+const voiceForm = reactive({
+  url: '',
+  apiKey: '',
+  apiSecret: '',
+})
 const masked = reactive({
   appId: '',
   appIdConfigured: false,
@@ -221,17 +326,105 @@ function applyMasked(data) {
   }
 }
 
-async function load() {
-  loading.value = true
+function applyVoice(data) {
+  Object.assign(voice, data || {})
+  voiceForm.url = data?.url || voiceForm.url || ''
+  if (!showingVoiceKeys.value) {
+    // Masked GET never returns full key/secret — keep fields empty until Reveal.
+    if (!data?.apiKeyConfigured) voiceForm.apiKey = ''
+    voiceForm.apiSecret = ''
+  }
+}
+
+async function revealVoiceKeys() {
+  if (showingVoiceKeys.value) {
+    showingVoiceKeys.value = false
+    voiceForm.apiKey = ''
+    voiceForm.apiSecret = ''
+    return
+  }
+  voiceRevealing.value = true
   error.value = ''
-  const { data, error: err } = await zegoSettingsApi.get()
-  loading.value = false
+  const { data, error: err } = await voiceRtcSettingsApi.reveal()
+  voiceRevealing.value = false
   if (err) {
     error.value = err.message
     toast().danger(err.message)
     return
   }
-  applyMasked(data?.data || data)
+  const revealed = data?.data || data || {}
+  voiceForm.url = revealed.url || voiceForm.url
+  voiceForm.apiKey = revealed.apiKey || ''
+  voiceForm.apiSecret = revealed.apiSecret || ''
+  if (revealed.provider) voice.provider = revealed.provider
+  showingVoiceKeys.value = true
+}
+
+async function loadVoice() {
+  const { data, error: err } = await voiceRtcSettingsApi.get()
+  if (err) {
+    // Older servers without LiveKit endpoint — ignore.
+    return
+  }
+  applyVoice(data?.data || data)
+}
+
+async function saveVoiceKeys() {
+  voiceSaving.value = true
+  error.value = ''
+  const payload = {
+    url: voiceForm.url.trim(),
+  }
+  if (voiceForm.apiKey.trim()) payload.apiKey = voiceForm.apiKey.trim()
+  if (voiceForm.apiSecret.trim()) payload.apiSecret = voiceForm.apiSecret.trim()
+  const { data, error: err } = await voiceRtcSettingsApi.update(payload)
+  voiceSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyVoice(data?.data || data)
+  showingVoiceKeys.value = false
+  voiceForm.apiKey = ''
+  voiceForm.apiSecret = ''
+  success.value = t('common.saved')
+  toast().success(success.value)
+}
+
+async function setProvider(provider) {
+  voiceSaving.value = true
+  error.value = ''
+  const payload = { provider }
+  if (provider === 'livekit') {
+    if (voiceForm.url.trim()) payload.url = voiceForm.url.trim()
+    if (voiceForm.apiKey.trim()) payload.apiKey = voiceForm.apiKey.trim()
+    if (voiceForm.apiSecret.trim()) payload.apiSecret = voiceForm.apiSecret.trim()
+  }
+  const { data, error: err } = await voiceRtcSettingsApi.update(payload)
+  voiceSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyVoice(data?.data || data)
+  success.value =
+    provider === 'livekit' ? t('voiceRtc.switchedLiveKit') : t('voiceRtc.switchedZego')
+  toast().success(success.value)
+}
+
+async function load() {
+  loading.value = true
+  error.value = ''
+  const [zegoRes] = await Promise.all([zegoSettingsApi.get(), loadVoice()])
+  loading.value = false
+  if (zegoRes.error) {
+    error.value = zegoRes.error.message
+    toast().danger(zegoRes.error.message)
+    return
+  }
+  applyMasked(zegoRes.data?.data || zegoRes.data)
 }
 
 async function reveal() {

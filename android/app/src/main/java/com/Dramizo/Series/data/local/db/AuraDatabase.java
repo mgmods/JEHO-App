@@ -18,7 +18,7 @@ import com.Dramizo.Series.data.local.entity.WalletEntity;
                 WalletEntity.class,
                 GiftEntity.class
         },
-        version = 3,
+        version = 4,
         exportSchema = false
 )
 public abstract class AuraDatabase extends RoomDatabase {

@@ -216,6 +216,11 @@
         <item name="cornerSize">50%</item>
     </style>
 
+    <style name="ShapeAppearance.AuraLive.Rounded12" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
     <style name="TextAppearance.AuraLive.LargeTitle" parent="TextAppearance.Material3.HeadlineMedium">
         <item name="android:textColor">@color/text_primary</item>
         <item name="android:fontFamily">sans-serif-medium</item>

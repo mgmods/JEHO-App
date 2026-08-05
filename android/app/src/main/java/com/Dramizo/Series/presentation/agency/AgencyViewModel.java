@@ -15,6 +15,7 @@ public class AgencyViewModel extends ViewModel {
     private final AppContainer c;
     private final MutableLiveData<List<MiscDtos.AgencyDto>> agencies =
             new MutableLiveData<>(Collections.emptyList());
+    private final MutableLiveData<Boolean> searchAttempted = new MutableLiveData<>(false);
     private final MutableLiveData<MiscDtos.AgencyEarningsDto> earnings = new MutableLiveData<>();
     private final MutableLiveData<MiscDtos.AgencyMineDto> mine = new MutableLiveData<>();
     private final MutableLiveData<MiscDtos.AgencyPricingDto> pricing = new MutableLiveData<>();
@@ -24,6 +25,7 @@ public class AgencyViewModel extends ViewModel {
 
     public AgencyViewModel(AppContainer c) { this.c = c; }
     public LiveData<List<MiscDtos.AgencyDto>> getAgencies() { return agencies; }
+    public LiveData<Boolean> getSearchAttempted() { return searchAttempted; }
     public LiveData<MiscDtos.AgencyEarningsDto> getEarnings() { return earnings; }
     public LiveData<MiscDtos.AgencyMineDto> getMine() { return mine; }
     public LiveData<MiscDtos.AgencyPricingDto> getPricing() { return pricing; }
@@ -67,13 +69,33 @@ public class AgencyViewModel extends ViewModel {
                 if (!m.success && m.error != null) error.postValue(m.error);
             }
 
-            // Public active-agency directory (professional cards).
+            // Directory is private: never auto-list active agencies.
+            agencies.postValue(Collections.emptyList());
+            searchAttempted.postValue(false);
+        });
+    }
+
+    /** Lookup by agency public ID / code only (no open browse list). */
+    public void searchAgencies(String code) {
+        String q = code != null ? code.trim() : "";
+        if (q.length() < 3) {
+            agencies.postValue(Collections.emptyList());
+            searchAttempted.postValue(false);
+            error.postValue("أدخل معرف/كود الوكالة (3 أحرف على الأقل)");
+            return;
+        }
+        c.getIoExecutor().execute(() -> {
             Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list =
-                    c.getAgencyRepository().list(1);
+                    c.getAgencyRepository().list(1, q);
+            searchAttempted.postValue(true);
             if (list.success && list.data != null && list.data.items != null) {
                 agencies.postValue(list.data.items);
-            } else if (agencies.getValue() == null) {
+                if (list.data.items.isEmpty()) {
+                    error.postValue("لم يتم العثور على وكالة بهذا الكود");
+                }
+            } else {
                 agencies.postValue(Collections.emptyList());
+                error.postValue(list.error != null ? list.error : "تعذر البحث عن الوكالة");
             }
         });
     }

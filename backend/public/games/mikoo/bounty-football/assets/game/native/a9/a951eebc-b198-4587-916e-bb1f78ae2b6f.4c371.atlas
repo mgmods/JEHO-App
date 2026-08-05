@@ -1,0 +1,27 @@
+
+Alarmclock.png
+size: 125,92
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+编组 2
+  rotate: false
+  xy: 98, 11
+  size: 24, 38
+  orig: 28, 42
+  offset: 0, 1
+  index: -1
+编组 2 2
+  rotate: false
+  xy: 98, 51
+  size: 25, 39
+  orig: 28, 42
+  offset: 2, 2
+  index: -1
+闹钟
+  rotate: true
+  xy: 2, 2
+  size: 88, 94
+  orig: 88, 94
+  offset: 0, 0
+  index: -1

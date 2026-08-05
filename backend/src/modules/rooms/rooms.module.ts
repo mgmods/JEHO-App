@@ -18,6 +18,7 @@ import { WalletTransaction } from '../../database/entities/wallet-transaction.en
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { ZegoModule } from '../zego/zego.module';
+import { LiveKitModule } from '../livekit/livekit.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -51,6 +52,7 @@ import { RoomMusicTrack } from '../../database/entities/room-music-track.entity'
       RoomMusicTrack,
     ]),
     ZegoModule,
+    LiveKitModule,
     RealtimeModule,
     TasksModule,
     NotificationsModule,

@@ -4,6 +4,7 @@ import { GiftsController } from './gifts.controller';
 import { GiftsService } from './gifts.service';
 import { Gift } from '../../database/entities/gift.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
+import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { User } from '../../database/entities/user.entity';
@@ -23,6 +24,7 @@ import { HostTargetModule } from '../host-target/host-target.module';
   imports: [
     TypeOrmModule.forFeature([
       Gift,
+      GiftCategory,
       GiftSend,
       Wallet,
       WalletTransaction,

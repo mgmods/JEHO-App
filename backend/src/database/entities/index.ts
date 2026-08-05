@@ -22,6 +22,7 @@ export * from './contest-entry.entity';
 export * from './plaza-event.entity';
 export * from './plaza-event-subscription.entity';
 export * from './gift.entity';
+export * from './gift-category.entity';
 export * from './gift-send.entity';
 export * from './wallet.entity';
 export * from './wallet-transaction.entity';

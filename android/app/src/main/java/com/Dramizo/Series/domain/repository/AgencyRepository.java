@@ -6,6 +6,7 @@ import com.Dramizo.Series.domain.model.Result;
 
 public interface AgencyRepository {
     Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page);
+    Result<MiscDtos.ListResult<MiscDtos.AgencyDto>> list(int page, String query);
     Result<MiscDtos.AgencyMineDto> mine();
     Result<MiscDtos.AgencyPricingDto> pricing();
     Result<Object> joinByCode(String code);

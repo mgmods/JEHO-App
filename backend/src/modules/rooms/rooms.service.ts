@@ -49,6 +49,8 @@ import {
 } from './dto/rooms.dto';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { ZegoTokenService } from '../zego/zego-token.service';
+import { LiveKitTokenService } from '../livekit/livekit-token.service';
+import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -118,6 +120,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     private readonly musicTracksRepo: Repository<RoomMusicTrack>,
     private readonly dataSource: DataSource,
     private readonly zegoTokenService: ZegoTokenService,
+    private readonly liveKitTokenService: LiveKitTokenService,
+    private readonly liveKitSettings: LiveKitSettingsService,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly tasksService: TasksService,
     private readonly mediaCleanup: MediaCleanupService,
@@ -310,6 +314,52 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       payload: { roomId },
       at: new Date().toISOString(),
     });
+  }
+
+  private emitRoomEvent(
+    roomId: string,
+    event: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event,
+      payload: { roomId, ...payload },
+      at: new Date().toISOString(),
+    });
+  }
+
+  /** Notify a single user (even if not fully joined channel yet) + room fans. */
+  private emitRoomEventToUser(
+    roomId: string,
+    userId: string,
+    event: string,
+    payload: Record<string, unknown> = {},
+  ) {
+    const body = {
+      roomId,
+      event,
+      payload: { roomId, ...payload },
+      at: new Date().toISOString(),
+    };
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', body);
+    this.realtimeGateway.emitToUser(userId, 'room:event', body);
+  }
+
+  private async notifyStaffUpdated(roomId: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) {
+      this.notifyRoomUpdated(roomId);
+      return;
+    }
+    const mods = await this.modsRepo.find({ where: { roomId } });
+    this.emitRoomEvent(roomId, 'room:staff_updated', {
+      cohostId: room.cohostId || null,
+      hostId: room.hostId,
+      activeHostId: room.activeHostId || null,
+      moderatorIds: mods.map((m) => m.userId),
+    });
+    this.notifyRoomUpdated(roomId);
   }
 
   private notifyRoomClosed(roomId: string) {
@@ -841,20 +891,59 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
 
   private async buildHostJoinPayload(hostId: string, roomId: string) {
     const full = await this.getRoom(roomId);
+    return this.buildRtcJoinPayload(hostId, full, true);
+  }
+
+  /**
+   * Unified Zego / LiveKit join payload. Clients switch engines via voiceProvider.
+   * LiveKit = free self-hosted open source; Zego = existing cloud path.
+   */
+  private async buildRtcJoinPayload(
+    userId: string,
+    full: Awaited<ReturnType<RoomsService['getRoom']>>,
+    canPublish: boolean,
+  ) {
+    const roomKey = full.zegoRoomId || full.id;
+    const provider = await this.liveKitSettings.getProvider();
+
+    if (provider === 'livekit') {
+      const lk = await this.liveKitTokenService.generateToken(
+        userId,
+        roomKey,
+        canPublish ? 3600 : 3600,
+        canPublish,
+      );
+      return {
+        room: full,
+        voiceProvider: 'livekit' as const,
+        token: lk.token,
+        appId: 0,
+        zegoRoomId: full.zegoRoomId,
+        livekitUrl: lk.url,
+        livekitRoomName: lk.roomName,
+        userId,
+        expireAt: lk.expireAt,
+        canPublish,
+      };
+    }
+
     const zego = await this.zegoTokenService.generateToken(
-      hostId,
+      userId,
       full.zegoRoomId || undefined,
-      60,
-      true,
+      canPublish ? 60 : undefined,
+      canPublish,
     );
     return {
       room: full,
+      voiceProvider: 'zego' as const,
       token: zego.token,
       appId: zego.appId,
       zegoRoomId: full.zegoRoomId,
-      userId: hostId,
+      livekitUrl: '',
+      livekitRoomName: '',
+      userId,
       expireAt: zego.expireAt,
-      canPublish: true,
+      canPublish,
     };
   }
 
@@ -1572,12 +1661,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         (seat: RoomSeat) =>
           seat.userId === userId && !seat.isModeratorMuted,
       );
-    const zego = await this.zegoTokenService.generateToken(
-      userId,
-      full.zegoRoomId || undefined,
-      canPublish ? 60 : undefined,
-      canPublish,
-    );
     // Real daily task: entered a voice room
     void this.tasksService
       .recordProgress(userId, 'rooms', 1, {
@@ -1613,15 +1696,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }, (120 + 2) * 1000);
     }
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
-    return {
-      room: full,
-      token: zego.token,
-      appId: zego.appId,
-      zegoRoomId: full.zegoRoomId,
-      userId,
-      expireAt: zego.expireAt,
-      canPublish,
-    };
+    return this.buildRtcJoinPayload(userId, full, canPublish);
   }
 
   async issueZegoToken(roomId: string, userId: string) {
@@ -1651,13 +1726,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.activeHostId === userId ||
       room.cohostId === userId ||
       (!!seat && !seat.isModeratorMuted);
-    const token = await this.zegoTokenService.generateToken(
-      userId,
-      room.zegoRoomId || room.id,
-      canPublish ? 60 : undefined,
-      canPublish,
-    );
-    return { ...token, canPublish };
+    const full = await this.getRoom(roomId);
+    return this.buildRtcJoinPayload(userId, full, canPublish);
   }
 
   async setGiftSounds(roomId: string, actorId: string, enabled: boolean) {
@@ -1756,6 +1826,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.passwordHash = null;
     }
     await this.roomsRepo.save(room);
+    this.emitRoomEvent(roomId, 'room:lock_changed', {
+      locked: !!locked,
+      hasPassword: !!room.hasPassword,
+      status: room.status,
+    });
+    this.notifyRoomUpdated(roomId);
     return this.getRoom(roomId);
   }
 
@@ -1781,6 +1857,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       seat.status = SeatStatus.EMPTY;
     }
     await this.seatsRepo.save(seat);
+    this.emitRoomEvent(roomId, 'room:seat_locked', {
+      seatIndex,
+      locked,
+      status: seat.status,
+      userId: seat.userId,
+    });
     this.notifyRoomUpdated(roomId);
     return this.getRoom(roomId);
   }
@@ -1825,6 +1907,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     room.seatCount = target;
     await this.roomsRepo.save(room);
+    this.emitRoomEvent(roomId, 'room:seats_resized', {
+      seatCount: target,
+    });
     this.notifyRoomUpdated(roomId);
     return this.getRoom(roomId);
   }
@@ -2274,12 +2359,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         at: new Date().toISOString(),
       });
     }
+    // Top-level + nested leave so Android viewer strip updates without waiting for poll.
+    this.realtimeGateway.emitToRoom(roomId, 'room:user_left', {
+      roomId,
+      userId,
+    });
     this.realtimeGateway.emitToRoom(roomId, 'room:event', {
       roomId,
       event: 'room:user_left',
       payload: { roomId, userId },
       at: new Date().toISOString(),
     });
+    void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true };
   }
@@ -2372,6 +2463,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }
     }
     await this.seatSignalsRepo.delete({ roomId, userId });
+    const member = await this.memberIdentity(userId);
+    // Instant seat map for everyone (free-mic sit without host queue).
+    this.emitRoomEvent(roomId, 'room:seat_taken', {
+      ...member,
+      seatIndex: dto.seatIndex,
+    });
     this.notifyRoomUpdated(roomId);
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     // Mic time task: each seat take counts toward mic_N
@@ -2582,7 +2679,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     room.cohostId = dto.userId || null;
     await this.roomsRepo.save(room);
-    this.notifyRoomUpdated(roomId);
+    await this.notifyStaffUpdated(roomId);
     return this.getRoom(roomId);
   }
 
@@ -2596,14 +2693,13 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.assertCanTargetUser(roomId, actorId, dto.userId);
     await this.leave(roomId, dto.userId);
     const member = await this.memberIdentity(dto.userId);
-    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-      roomId,
-      event: 'room:kicked',
-      payload: { roomId, ...member, reason: dto.reason || null },
-      at: new Date().toISOString(),
+    this.emitRoomEventToUser(roomId, dto.userId, 'room:kicked', {
+      ...member,
+      reason: dto.reason || null,
     });
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Kicked from voice room');
+    void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
     return { kicked: true, userId: dto.userId };
   }
 
@@ -2671,16 +2767,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     await this.leave(roomId, userId);
     const member = await this.memberIdentity(userId);
-    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-      roomId,
-      event: banMinutes > 0 ? 'room:banned' : 'room:kicked',
-      payload: {
-        roomId,
-        ...member,
-        reason: reason || 'auto_moderation',
-        auto: true,
-      },
-      at: new Date().toISOString(),
+    const eventName = banMinutes > 0 ? 'room:banned' : 'room:kicked';
+    this.emitRoomEventToUser(roomId, userId, eventName, {
+      ...member,
+      reason: reason || 'auto_moderation',
+      auto: true,
     });
     this.realtimeGateway.emitToUser(userId, 'moderation:action', {
       roomId,
@@ -2689,6 +2780,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     });
     await this.realtimeGateway.ejectUserFromRoom(roomId, userId);
     void this.ejectRtcUser(roomId, userId, reason || 'Auto-moderation kick');
+    void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
     return { kicked: true, userId, banMinutes };
   }
 
@@ -2727,19 +2819,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     await this.leave(roomId, dto.userId);
     const member = await this.memberIdentity(dto.userId);
-    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-      roomId,
-      event: 'room:banned',
-      payload: {
-        roomId,
-        ...member,
-        reason: saved.reason || null,
-        expiresAt: saved.expiresAt,
-      },
-      at: new Date().toISOString(),
+    this.emitRoomEventToUser(roomId, dto.userId, 'room:banned', {
+      ...member,
+      reason: saved.reason || null,
+      expiresAt: saved.expiresAt,
     });
     await this.realtimeGateway.ejectUserFromRoom(roomId, dto.userId);
     void this.ejectRtcUser(roomId, dto.userId, 'Banned from voice room');
+    void this.realtimeGateway.broadcastRoomPresence(roomId).catch(() => undefined);
     return saved;
   }
 
@@ -2871,7 +2958,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     }
     const existing = await this.modsRepo.findOne({ where: { roomId, userId } });
     if (existing) {
-      this.notifyRoomUpdated(roomId);
+      await this.notifyStaffUpdated(roomId);
       return existing;
     }
     const saved = await this.modsRepo.save(
@@ -2893,7 +2980,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         canManageRoom: true,
       }),
     );
-    this.notifyRoomUpdated(roomId);
+    await this.notifyStaffUpdated(roomId);
     return saved;
   }
 
@@ -2907,7 +2994,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       room.cohostId = null;
       await this.roomsRepo.save(room);
     }
-    this.notifyRoomUpdated(roomId);
+    await this.notifyStaffUpdated(roomId);
     return { removed: true, userId };
   }
 
@@ -2930,7 +3017,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (dto.canInvite !== undefined) moderator.canInvite = dto.canInvite;
     if (dto.canManageRoom !== undefined) moderator.canManageRoom = dto.canManageRoom;
     const saved = await this.modsRepo.save(moderator);
-    this.notifyRoomUpdated(roomId);
+    await this.notifyStaffUpdated(roomId);
     return saved;
   }
 

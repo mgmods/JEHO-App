@@ -151,13 +151,19 @@ public class ChatConversationActivity extends ThemedActivity {
         String title = firstExtra(getIntent(), EXTRA_TITLE, "senderName", "peerName", "name");
         String avatar = firstExtra(getIntent(), EXTRA_AVATAR, "avatarUrl", "senderAvatarUrl");
         String hostBadge = getIntent().getStringExtra(EXTRA_HOST_BADGE);
+        String vipFrame = firstExtra(getIntent(), "vipBadgeUrl", "frameUrl", "peerFrameUrl");
+        if (vipFrame == null || vipFrame.isEmpty()) {
+            // Legacy EXTRA_HOST_BADGE was often filled with the VIP head frame URL.
+            vipFrame = hostBadge;
+            hostBadge = null;
+        }
 
         bindPeerName(title, null);
         binding.tvPeerStatus.setText(R.string.loading);
         AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
         AvatarCosmetics.applyHostWear(
                 binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
-                hostBadge, null, null, null);
+                vipFrame, null, null, null);
         View.OnClickListener openPeerProfile = v -> openPeerProfile();
         binding.imgPeerAvatar.setOnClickListener(openPeerProfile);
         if (binding.imgPeerFrame != null) binding.imgPeerFrame.setOnClickListener(openPeerProfile);

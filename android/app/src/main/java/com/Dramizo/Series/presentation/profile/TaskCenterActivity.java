@@ -62,9 +62,17 @@ public class TaskCenterActivity extends ThemedActivity {
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
         binding.btnBack.setOnClickListener(v -> navigateUp());
 
-        adapter = new TaskAdapter(this::claim, this::checkIn);
+        adapter = new TaskAdapter(this::claim, this::checkIn, this::watchRewardedAd);
         binding.recyclerTasks.setLayoutManager(new LinearLayoutManager(this));
         binding.recyclerTasks.setAdapter(adapter);
+        // Warm AdMob rewarded unit for ad_* tasks.
+        try {
+            com.Dramizo.Series.presentation.games.GameAdsHelper ads =
+                    com.Dramizo.Series.presentation.games.GameAdsHelper.get(this);
+            ads.refreshConfig(this);
+            ads.preload(this);
+        } catch (Exception ignored) {
+        }
         if (binding.chipFilterAll != null) {
             binding.chipFilterAll.setOnClickListener(v -> setTaskFilter(FILTER_ALL));
         }
@@ -143,6 +151,45 @@ public class TaskCenterActivity extends ThemedActivity {
                     Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic), Toast.LENGTH_LONG).show();
                 }
             });
+        });
+    }
+
+    /** Show AdMob rewarded video, then POST progress for ad_1 / ad_3 / ad_5. */
+    private void watchRewardedAd() {
+        com.Dramizo.Series.presentation.games.GameAdsHelper ads =
+                com.Dramizo.Series.presentation.games.GameAdsHelper.get(this);
+        ads.refreshConfig(this);
+        ads.showRewardedForTask(this, new com.Dramizo.Series.presentation.games.GameAdsHelper.TaskWatchCallback() {
+            @Override
+            public void onPreparing() {
+                Toast.makeText(TaskCenterActivity.this, "جارٍ تحميل الإعلان…", Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onFinished(boolean earned, @androidx.annotation.Nullable String message) {
+                if (!earned) {
+                    Toast.makeText(
+                            TaskCenterActivity.this,
+                            message != null ? message : "أكمل مشاهدة الإعلان",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                c.getIoExecutor().execute(() -> {
+                    Result<Map<String, Object>> r = ApiCall.execute(c.getTasksApi().watchRewardedAd());
+                    runOnUiThread(() -> {
+                        if (r.success) {
+                            Toast.makeText(TaskCenterActivity.this, "تم تسجيل المشاهدة ✓", Toast.LENGTH_SHORT).show();
+                            load();
+                            loadHeader();
+                        } else {
+                            Toast.makeText(
+                                    TaskCenterActivity.this,
+                                    r.error != null ? r.error : getString(R.string.error_generic),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                });
+            }
         });
     }
 
@@ -256,9 +303,11 @@ public class TaskCenterActivity extends ThemedActivity {
         private final List<Row> rows = new ArrayList<>();
         private final ClaimListener claimListener;
         private final Runnable checkInListener;
-        TaskAdapter(ClaimListener claimListener, Runnable checkInListener) {
+        private final Runnable watchAdListener;
+        TaskAdapter(ClaimListener claimListener, Runnable checkInListener, Runnable watchAdListener) {
             this.claimListener = claimListener;
             this.checkInListener = checkInListener;
+            this.watchAdListener = watchAdListener;
         }
         void submit(List<MiscDtos.TaskDto> data) {
             rows.clear();
@@ -321,9 +370,16 @@ public class TaskCenterActivity extends ThemedActivity {
 
             String type = t.type != null ? t.type.toLowerCase() : "";
             boolean isCheckin = type.startsWith("checkin") || type.startsWith("host_checkin");
+            boolean isAdTask = type.startsWith("ad_")
+                    || type.startsWith("admob")
+                    || type.startsWith("watch_ad")
+                    || type.startsWith("rewarded_ad")
+                    || "ad".equals(type)
+                    || "admob".equals(type);
             if (h.b.imgTaskIcon != null) {
                 int icon = R.drawable.ic_asset_tasks;
                 if (isCheckin) icon = R.drawable.ic_asset_chest_gold;
+                else if (isAdTask) icon = R.drawable.ic_asset_coin_gold;
                 else if (t.claimed) icon = R.drawable.ic_asset_gift;
                 else if (t.isHostTask()) icon = R.drawable.ic_asset_diamond;
                 else if (t.claimable) icon = R.drawable.ic_asset_coin_gold;
@@ -354,6 +410,16 @@ public class TaskCenterActivity extends ThemedActivity {
                                 h.itemView.getContext().getColor(R.color.aurora_teal)));
                 h.b.btnClaim.setTextColor(0xFFFFFFFF);
                 h.b.btnClaim.setOnClickListener(v -> checkInListener.run());
+            } else if (isAdTask) {
+                h.b.btnClaim.setText("مشاهدة إعلان");
+                h.b.btnClaim.setEnabled(true);
+                h.b.btnClaim.setBackgroundTintList(
+                        android.content.res.ColorStateList.valueOf(
+                                h.itemView.getContext().getColor(R.color.aurora_teal)));
+                h.b.btnClaim.setTextColor(0xFFFFFFFF);
+                h.b.btnClaim.setOnClickListener(v -> {
+                    if (watchAdListener != null) watchAdListener.run();
+                });
             } else {
                 h.b.btnClaim.setText("أكمل أولاً");
                 h.b.btnClaim.setEnabled(false);

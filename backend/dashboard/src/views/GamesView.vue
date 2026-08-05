@@ -133,8 +133,8 @@
             v-if="editDraft.coverUrl"
             :src="editDraft.coverUrl"
             alt=""
-            class="mt-2 rounded"
-            style="max-height: 96px; object-fit: cover"
+            class="mt-2 rounded-circle"
+            style="width: 96px; height: 96px; object-fit: cover"
           />
         </div>
         <div class="form-check form-switch mb-4">
@@ -503,11 +503,12 @@ onMounted(() => {
 .catalog-card {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  border-radius: 18px;
+  align-items: center;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  overflow: hidden;
+  overflow: visible;
+  padding: 14px 10px 12px;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
@@ -523,10 +524,14 @@ onMounted(() => {
 
 .catalog-card__art {
   position: relative;
+  width: min(100%, 128px);
   aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  overflow: hidden;
   background:
     radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.12), transparent 55%),
     rgba(0, 0, 0, 0.28);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12), 0 8px 20px rgba(0, 0, 0, 0.28);
 }
 
 .catalog-card__art img {
@@ -534,12 +539,14 @@ onMounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 50%;
 }
 
 .catalog-card__fallback {
   width: 100%;
   height: 100%;
   min-height: 96px;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   font-size: 2rem;
@@ -549,6 +556,7 @@ onMounted(() => {
 .catalog-card__veil {
   position: absolute;
   inset: 0;
+  border-radius: 50%;
   display: grid;
   place-items: center;
   background: rgba(8, 10, 18, 0.55);
@@ -560,7 +568,7 @@ onMounted(() => {
 
 .catalog-card__toolbar {
   position: absolute;
-  inset-inline: 8px;
+  inset-inline: 6px;
   bottom: 8px;
   display: flex;
   justify-content: center;
@@ -651,10 +659,11 @@ onMounted(() => {
 .edit-panel__preview {
   width: 64px;
   height: 64px;
-  border-radius: 16px;
+  border-radius: 50%;
   overflow: hidden;
   flex: 0 0 64px;
   background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
 }
 
 .edit-panel__preview img,

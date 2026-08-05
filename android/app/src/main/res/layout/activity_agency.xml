@@ -780,6 +780,57 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:text="@string/agency_search_by_code_title"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/agency_search_by_code_hint"
+                        android:textAlignment="viewStart"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilAgencySearch"
+                        style="@style/Widget.AuraLive.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="@string/agency_search_code_hint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etAgencySearch"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textCapCharacters"
+                            android:maxLength="24"
+                            android:textColor="@color/text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSearchAgency"
+                        style="@style/Widget.AuraLive.Button"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/agency_search_action"
+                        android:textAllCaps="false" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="16dp"
+                        android:background="@color/divider_color" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
                         android:text="@string/agency_join_by_code_title"
                         android:textAlignment="viewStart"
                         android:textColor="@color/text_primary"
@@ -814,7 +865,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnJoinByCode"
-                        style="@style/Widget.AuraLive.Button"
+                        style="@style/Widget.AuraLive.Button.Outlined"
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
                         android:layout_marginTop="10dp"
@@ -827,11 +878,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
-                    android:text="@string/agency_active_section_title"
+                    android:text="@string/agency_search_result_title"
                     android:textAlignment="viewStart"
                     android:textColor="@color/text_primary"
                     android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:visibility="gone" />
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recycler"
@@ -846,8 +898,8 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:padding="28dp"
-                    android:text="@string/agency_empty_active"
+                    android:padding="20dp"
+                    android:text="@string/agency_search_empty"
                     android:textColor="@color/text_hint"
                     android:textSize="14sp"
                     android:visibility="gone" />

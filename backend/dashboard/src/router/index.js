@@ -57,6 +57,12 @@ const routes = [
         meta: { titleKey: 'routes.banners' },
       },
       {
+        path: 'nav-icons',
+        name: 'nav-icons',
+        component: () => import('@/views/NavIconsView.vue'),
+        meta: { titleKey: 'nav.navIcons' },
+      },
+      {
         path: 'coins',
         name: 'coins',
         component: () => import('@/views/CoinPackagesView.vue'),

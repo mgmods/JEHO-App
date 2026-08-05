@@ -41,6 +41,7 @@ import com.google.android.material.tabs.TabLayoutMediator;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -77,9 +78,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
     @Nullable private Long lastCoinsBalance;
-    private static final String[] TAB_LABELS = {
+    private static final String[] FALLBACK_TAB_LABELS = {
             "عادي", "حظ", "كومبو", "مميز"
     };
+    private static final String[] FALLBACK_TAB_KEYS = {
+            "normal", "lucky", "combo", "premium"
+    };
+    private final List<GiftDtos.GiftCategoryDto> tabCategories = new ArrayList<>();
+    private String[] tabLabels = FALLBACK_TAB_LABELS;
+    private String[] tabKeys = FALLBACK_TAB_KEYS;
 
     // From included layouts (not exposed on DialogRoomGiftBinding without include ids).
     @Nullable private com.Dramizo.Series.widget.XProgressBar wealthProgress;
@@ -209,7 +216,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                              @Nullable Bundle savedState) {
         binding = DialogRoomGiftBinding.inflate(inflater, container, false);
 
-        vm = new ViewModelProvider(this,
+        vm = new ViewModelProvider(requireActivity(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(GiftViewModel.class);
 
@@ -269,6 +276,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             }
         });
 
+        vm.getCategories().observe(getViewLifecycleOwner(), this::applyCategories);
+
         vm.getCoinsBalance().observe(getViewLifecycleOwner(), this::bindCoins);
 
         vm.getSent().observe(getViewLifecycleOwner(),
@@ -290,8 +299,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             }
         });
 
-        setLoading(true);
+        // Spinner only when we truly have nothing to show yet.
+        setLoading(!vm.hasGiftsNow());
         updateDockText();
+        // Already-warm catalog: paint instantly without waiting for network.
+        if (vm.hasGiftsNow()) {
+            List<GiftDtos.GiftDto> warm = vm.getGifts().getValue();
+            if (warm != null) {
+                allGifts.clear();
+                allGifts.addAll(warm);
+                applyFilter();
+            }
+            List<GiftDtos.GiftCategoryDto> warmCats = vm.getCategories().getValue();
+            if (warmCats != null) applyCategories(warmCats);
+        }
         vm.load();
         vm.loadWallet();
 
@@ -352,7 +373,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.vpGiftListContainer.setOffscreenPageLimit(1);
         // Seed empty pages so TabLayoutMediator can attach.
         List<List<GiftDtos.GiftDto>> empty = new ArrayList<>();
-        for (int i = 0; i < TAB_LABELS.length; i++) empty.add(new ArrayList<>());
+        for (int i = 0; i < tabLabels.length; i++) empty.add(new ArrayList<>());
         giftPageAdapter.submit(empty, null);
 
         TabLayout tabs = binding.miGiftCategory;
@@ -364,7 +385,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         tabMediator = new TabLayoutMediator(tabs, binding.vpGiftListContainer,
                 (tab, position) -> {
                     android.widget.TextView tv = new android.widget.TextView(requireContext());
-                    tv.setText(TAB_LABELS[position]);
+                    String label = position >= 0 && position < tabLabels.length
+                            ? tabLabels[position] : "";
+                    tv.setText(label);
                     tv.setSingleLine(true);
                     tv.setMaxLines(1);
                     tv.setIncludeFontPadding(false);
@@ -376,7 +399,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 });
         tabMediator.attach();
 
-        // Default tab: عادي
+        // Default tab: first
         binding.vpGiftListContainer.setCurrentItem(0, false);
         giftTypeFilter = typeForTab(0);
         styleGiftTab(tabs.getTabAt(0), true);
@@ -421,15 +444,84 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 : android.graphics.Typeface.NORMAL);
     }
 
-    @Nullable
-    private static String typeForTab(int pos) {
-        switch (pos) {
-            case 0: return "normal";
-            case 1: return "lucky";
-            case 2: return "combo";
-            case 3: return "premium";
-            default: return "normal";
+    private void applyCategories(@Nullable List<GiftDtos.GiftCategoryDto> cats) {
+        if (cats == null || cats.isEmpty()) return;
+        List<GiftDtos.GiftCategoryDto> active = new ArrayList<>();
+        for (GiftDtos.GiftCategoryDto c : cats) {
+            if (c == null) continue;
+            String key = c.key != null ? c.key.trim().toLowerCase(Locale.US) : "";
+            if (key.isEmpty()) continue;
+            // Client/categories endpoint only returns active tabs.
+            active.add(c);
         }
+        if (active.isEmpty()) return;
+        String[] keys = new String[active.size()];
+        String[] labels = new String[active.size()];
+        for (int i = 0; i < active.size(); i++) {
+            GiftDtos.GiftCategoryDto c = active.get(i);
+            keys[i] = c.key.trim().toLowerCase(Locale.US);
+            String label = c.labelAr;
+            if (label == null || label.trim().isEmpty()) label = c.labelEn;
+            if (label == null || label.trim().isEmpty()) label = keys[i];
+            labels[i] = label.trim();
+        }
+        boolean same = keys.length == tabKeys.length;
+        if (same) {
+            for (int i = 0; i < keys.length; i++) {
+                if (!keys[i].equals(tabKeys[i]) || !labels[i].equals(tabLabels[i])) {
+                    same = false;
+                    break;
+                }
+            }
+        }
+        tabCategories.clear();
+        tabCategories.addAll(active);
+        tabKeys = keys;
+        tabLabels = labels;
+        if (!same && binding != null) {
+            rebuildGiftTabs();
+        }
+        applyFilter();
+    }
+
+    private void rebuildGiftTabs() {
+        if (binding == null || giftPageAdapter == null) return;
+        int keep = binding.vpGiftListContainer.getCurrentItem();
+        if (tabMediator != null) {
+            try { tabMediator.detach(); } catch (Exception ignored) {}
+            tabMediator = null;
+        }
+        TabLayout tabs = binding.miGiftCategory;
+        tabs.removeAllTabs();
+        List<List<GiftDtos.GiftDto>> empty = new ArrayList<>();
+        for (int i = 0; i < tabLabels.length; i++) empty.add(new ArrayList<>());
+        giftPageAdapter.submit(empty, selected != null ? selected.id : null);
+        tabMediator = new TabLayoutMediator(tabs, binding.vpGiftListContainer,
+                (tab, position) -> {
+                    android.widget.TextView tv = new android.widget.TextView(requireContext());
+                    String label = position >= 0 && position < tabLabels.length
+                            ? tabLabels[position] : "";
+                    tv.setText(label);
+                    tv.setSingleLine(true);
+                    tv.setMaxLines(1);
+                    tv.setIncludeFontPadding(false);
+                    tv.setTextSize(13f);
+                    tv.setGravity(android.view.Gravity.CENTER);
+                    tv.setPadding(dp(8), 0, dp(8), 0);
+                    tv.setTextColor(0x99FFFFFF);
+                    tab.setCustomView(tv);
+                });
+        tabMediator.attach();
+        if (keep < 0 || keep >= tabLabels.length) keep = 0;
+        binding.vpGiftListContainer.setCurrentItem(keep, false);
+        giftTypeFilter = typeForTab(keep);
+        styleGiftTab(tabs.getTabAt(keep), true);
+    }
+
+    @Nullable
+    private String typeForTab(int pos) {
+        if (pos >= 0 && pos < tabKeys.length) return tabKeys[pos];
+        return "normal";
     }
 
     // ─── Filter: build one gift list per tab (no sub-page dots) ────────────────
@@ -437,7 +529,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private void applyFilter() {
         if (binding == null || giftPageAdapter == null) return;
         List<List<GiftDtos.GiftDto>> byTab = new ArrayList<>();
-        for (int i = 0; i < TAB_LABELS.length; i++) {
+        for (int i = 0; i < tabKeys.length; i++) {
             byTab.add(filterForTab(typeForTab(i)));
         }
         String selId = selected != null ? selected.id : null;
@@ -446,7 +538,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         int cur = binding.vpGiftListContainer.getCurrentItem();
         if (cur < 0 || cur >= byTab.size()) cur = 0;
-        List<GiftDtos.GiftDto> current = byTab.get(cur);
+        List<GiftDtos.GiftDto> current = byTab.isEmpty()
+                ? Collections.emptyList()
+                : byTab.get(Math.min(cur, byTab.size() - 1));
         if (current.isEmpty() && !allGifts.isEmpty()) {
             // Soft empty — no toast spam on every swipe.
         }
@@ -455,7 +549,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
     @NonNull
     private List<GiftDtos.GiftDto> filterForTab(@Nullable String filter) {
-        String want = filter != null && !filter.isEmpty() ? filter : "normal";
+        String want = filter != null && !filter.isEmpty()
+                ? filter.trim().toLowerCase(Locale.US)
+                : "normal";
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
@@ -464,17 +560,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         return out;
     }
 
-    /** Map gift type/category into the 4 app tabs: normal / lucky / combo / premium. */
+    /**
+     * Prefer explicit gift.category (dashboard tabs); fall back to type-based bucket
+     * for legacy rows that only set type.
+     */
     @NonNull
     private static String giftBucket(@NonNull GiftDtos.GiftDto g) {
-        String t = g.type != null ? g.type.trim().toLowerCase(Locale.US) : "";
         String c = g.category != null ? g.category.trim().toLowerCase(Locale.US) : "";
-        if ("lucky".equals(t) || "lucky".equals(c)) return "lucky";
-        if ("combo".equals(t) || "combo".equals(c)) return "combo";
-        if ("premium".equals(t) || "premium".equals(c)
-                || "vip".equals(c) || "celebrity".equals(c)) {
-            return "premium";
-        }
+        if (!c.isEmpty()) return c;
+        String t = g.type != null ? g.type.trim().toLowerCase(Locale.US) : "";
+        if ("lucky".equals(t)) return "lucky";
+        if ("combo".equals(t)) return "combo";
+        if ("premium".equals(t)) return "premium";
         return "normal";
     }
 
@@ -942,7 +1039,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             boolean allMic = sendToAllMic && tgts.size() > 1;
             if (luckyGift) {
                 GiftAudioFx.playLuckyCoins(requireContext(), 2);
-                // No big stage / no all-mic rain on send — seats + chat only.
+                List<String> rainIds = !tgts.isEmpty()
+                        ? tgts
+                        : room.collectOccupiedMicUserIdsPublic();
+                room.playLuckyGiftStage(
+                        icon,
+                        rainIds,
+                        Math.max(1L, spentTotal),
+                        Math.max(1, qty),
+                        Math.max(1, rainIds.size()),
+                        null);
                 for (String tid : tgts) {
                     if (tid != null && !tid.isEmpty() && coinValue > 0) {
                         room.creditGiftCoinsOnSeat(tid, coinValue);

@@ -506,7 +506,18 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       members,
       viewerCount: members.length,
     });
+    this.server.to(`room:${roomId}`).emit('room:event', {
+      roomId,
+      event: 'room:viewer_count',
+      payload: { viewerCount: members.length, roomId },
+      at: new Date().toISOString(),
+    });
     return { roomId, members, viewerCount: members.length };
+  }
+
+  /** Public rebroadcast of live members / viewer count (HTTP leave, kick, ban). */
+  async broadcastRoomPresence(roomId: string) {
+    return this.emitRoomMembers(roomId);
   }
 
   /**

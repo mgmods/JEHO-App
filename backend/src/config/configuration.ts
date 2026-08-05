@@ -62,6 +62,14 @@ export default registerAs('app', () => {
     wsUrl: process.env.ZEGO_WS_URL || '',
     wsUrlBak: process.env.ZEGO_WS_URL_BAK || '',
   },
+  /** Self-hosted LiveKit (open source). No Cloud fees when you run Docker on your VPS. */
+  livekit: {
+    provider: (process.env.VOICE_RTC_PROVIDER || 'zego').toLowerCase(),
+    url: process.env.LIVEKIT_URL || '',
+    apiKey: process.env.LIVEKIT_API_KEY || '',
+    apiSecret: process.env.LIVEKIT_API_SECRET || '',
+    tokenTtl: parseInt(process.env.LIVEKIT_TOKEN_TTL || '3600', 10),
+  },
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',

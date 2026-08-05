@@ -1,0 +1,20 @@
+
+star.png
+size: 318,277
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+光
+  rotate: true
+  xy: 2, 2
+  size: 273, 276
+  orig: 276, 280
+  offset: 1, 2
+  index: -1
+星形
+  rotate: true
+  xy: 280, 237
+  size: 38, 36
+  orig: 38, 36
+  offset: 0, 0
+  index: -1

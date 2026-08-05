@@ -326,6 +326,10 @@ export class ContentModerationService implements OnModuleInit {
     if (!(await this.isAutoModerationOn())) return;
     if (!(await this.boolSetting('live_nsfw_enabled', true))) return;
     const ext = extname(storedPath || '').toLowerCase();
+    // Vector icons for bottom-nav etc. — never run bitmap NSFW heuristics on them.
+    if (ext === '.svg' || (mimeType || '').toLowerCase().includes('svg')) {
+      return;
+    }
     const imageExt = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
     if (!imageExt.includes(ext) && !(mimeType || '').startsWith('image/')) {
       return;

@@ -60,7 +60,7 @@ export class UploadsController {
       }),
       limits: { fileSize: 40 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        const allowed = /\.(jpg|jpeg|png|gif|webp|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
+        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new Error('File type not allowed') as any, false);
         }

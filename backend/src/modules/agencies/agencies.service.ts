@@ -787,30 +787,32 @@ export class AgenciesService implements OnModuleInit {
   }
 
   async list(query: PaginationDto) {
-    const q = String(query.search || query.q || '').trim();
+    const raw = String(query.search || query.q || '').trim();
+    // No public directory dump — clients must look up by agency public ID / code only.
+    if (raw.length < 3) {
+      return paginate([], 0, query.page || 1, query.limit || 20);
+    }
+    const qUpper = raw.toUpperCase();
     const qb = this.agenciesRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.owner', 'owner')
-      .where('a.status = :st', { st: AgencyStatus.ACTIVE });
-    if (q) {
-      qb.andWhere(
-        '(a.publicId ILIKE :q OR a.name ILIKE :like OR CAST(a.id AS text) = :exact)',
-        { q: q.toUpperCase(), like: `%${q}%`, exact: q },
-      );
-    }
-    qb.orderBy('a.totalDiamonds', 'DESC')
+      .where('a.status = :st', { st: AgencyStatus.ACTIVE })
+      .andWhere(
+        // Public lookup is by agency publicId only (not broad name listing).
+        '(UPPER(TRIM(a.publicId)) = :exact OR a.publicId ILIKE :prefix OR CAST(a.id AS text) = :idExact)',
+        {
+          exact: qUpper,
+          prefix: `${qUpper.replace(/[%_]/g, '')}%`,
+          idExact: raw,
+        },
+      )
+      .orderBy('a.totalDiamonds', 'DESC')
       .skip(query.skip)
-      .take(query.limit || 20);
+      .take(Math.min(query.limit || 10, 10));
     const [items, total] = await qb.getManyAndCount();
     const liveByAgency = await this.loadLiveAgencyRooms(items.map((a) => a.id));
     const safe = items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id)));
-    // Live agencies first for a professional open-list feel.
-    safe.sort((x, y) => {
-      const liveDelta = Number(!!y.isLive) - Number(!!x.isLive);
-      if (liveDelta !== 0) return liveDelta;
-      return Number(y.liveViewerCount || 0) - Number(x.liveViewerCount || 0);
-    });
-    return paginate(safe, total, query.page || 1, query.limit || 20);
+    return paginate(safe, total, query.page || 1, query.limit || 10);
   }
 
   /** Best live room per agency (open + active host). */

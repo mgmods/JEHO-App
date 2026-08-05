@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
+import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
@@ -59,6 +60,8 @@ export class GiftsService implements OnModuleInit {
 
   constructor(
     @InjectRepository(Gift) private readonly giftsRepo: Repository<Gift>,
+    @InjectRepository(GiftCategory)
+    private readonly categoriesRepo: Repository<GiftCategory>,
     @InjectRepository(GiftSend) private readonly sendsRepo: Repository<GiftSend>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(WalletTransaction)
@@ -83,6 +86,8 @@ export class GiftsService implements OnModuleInit {
   async onModuleInit() {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
+    await this.ensureGiftCategoriesTable();
+    await this.ensureDefaultGiftCategories();
     if (!bootCatalogSeedEnabled()) {
       this.log.log('Gifts catalog: DB authoritative (no boot seed)');
       return;
@@ -101,6 +106,65 @@ export class GiftsService implements OnModuleInit {
       this.log.warn(
         `ensureGiftCategoryColumn: ${err instanceof Error ? err.message : String(err)}`,
       );
+    }
+  }
+
+  private async ensureGiftCategoriesTable() {
+    try {
+      await this.dataSource.query(`
+        CREATE TABLE IF NOT EXISTS gift_categories (
+          id uuid PRIMARY KEY,
+          key varchar(32) NOT NULL UNIQUE,
+          "labelAr" varchar(64) NOT NULL,
+          "labelEn" varchar(64) NULL,
+          "sortOrder" int NOT NULL DEFAULT 0,
+          "isActive" boolean NOT NULL DEFAULT true,
+          "iconUrl" varchar(512) NULL,
+          "createdAt" timestamptz NOT NULL DEFAULT now(),
+          "updatedAt" timestamptz NOT NULL DEFAULT now()
+        )
+      `);
+    } catch (err) {
+      this.log.warn(
+        `ensureGiftCategoriesTable: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Default tabs for the gift sheet (admins can add more from dashboard). */
+  private async ensureDefaultGiftCategories() {
+    const defaults: Array<{
+      key: string;
+      labelAr: string;
+      labelEn: string;
+      sortOrder: number;
+    }> = [
+      { key: 'normal', labelAr: 'عادي', labelEn: 'Normal', sortOrder: 0 },
+      { key: 'lucky', labelAr: 'حظ', labelEn: 'Lucky', sortOrder: 1 },
+      { key: 'combo', labelAr: 'كومبو', labelEn: 'Combo', sortOrder: 2 },
+      { key: 'premium', labelAr: 'مميز', labelEn: 'Premium', sortOrder: 3 },
+      { key: 'country', labelAr: 'دول', labelEn: 'Country', sortOrder: 4 },
+    ];
+    for (const d of defaults) {
+      try {
+        const existing = await this.categoriesRepo.findOne({ where: { key: d.key } });
+        if (existing) continue;
+        await this.categoriesRepo.save(
+          this.categoriesRepo.create({
+            key: d.key,
+            labelAr: d.labelAr,
+            labelEn: d.labelEn,
+            sortOrder: d.sortOrder,
+            isActive: true,
+          }),
+        );
+      } catch (err) {
+        this.log.warn(
+          `ensureDefaultGiftCategories ${d.key}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
     }
   }
 
@@ -414,11 +478,148 @@ export class GiftsService implements OnModuleInit {
       // Country-flag gifts + any Mikoo catalog.json rows (partial until listV3 ticket).
       await this.importMikooCountryGiftsFile();
       await this.importMikooGiftCatalogFile();
+      // JEHO designed flag frames + entry-style video gifts (self-hosted assets).
+      await this.importJehoDesignedGifts();
     } catch (err) {
       this.log.warn(
         `ensureMikooGiftTabs skipped: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * Self-hosted flag-frame gifts + premium entry-style video gifts
+   * (backend/public/assets/gifts/jeho/catalog.json).
+   * Safe to call from admin even when DB is authoritative (inserts missing only;
+   * updates icon/animation for matching names without touching coinPrice).
+   */
+  async importJehoDesignedGifts(): Promise<{ flags: number; premium: number }> {
+    const catalogPath = join(
+      process.cwd(),
+      'public',
+      'assets',
+      'gifts',
+      'jeho',
+      'catalog.json',
+    );
+    if (!existsSync(catalogPath)) {
+      this.log.warn('JEHO gift catalog missing — run tools/generate_jeho_gift_assets.py');
+      return { flags: 0, premium: 0 };
+    }
+    let raw: any;
+    try {
+      raw = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    } catch (err) {
+      this.log.warn(
+        `importJehoDesignedGifts parse: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return { flags: 0, premium: 0 };
+    }
+    const flags = Array.isArray(raw?.flags) ? raw.flags : [];
+    const premium = Array.isArray(raw?.premium) ? raw.premium : [];
+    let flagsN = 0;
+    let premiumN = 0;
+
+    for (const [i, c] of flags.entries()) {
+      const name = String(c?.nameAr || c?.nameEn || '').trim().slice(0, 64);
+      const iconUrl = String(c?.iconUrl || '').trim();
+      const animationUrl = String(c?.animationUrl || '').trim();
+      if (!name || !iconUrl) continue;
+      const coinPrice = Math.max(1, Number(c?.coinPrice) || 99);
+      let existing = await this.giftsRepo.findOne({ where: { name } });
+      if (!existing) {
+        await this.giftsRepo.save(
+          this.giftsRepo.create({
+            name,
+            description: `هدية علم متحركة · ${c?.nameEn || ''}`.trim().slice(0, 255),
+            iconUrl,
+            animationUrl: animationUrl || iconUrl,
+            coinPrice,
+            diamondValue: Math.floor(coinPrice * GIFT_DIAMOND_RATIO),
+            type: GiftType.NORMAL,
+            category: 'country',
+            isActive: true,
+            sortOrder: Number(c?.sortOrder) || 400 + i,
+          } as any),
+        );
+        flagsN += 1;
+        continue;
+      }
+      let dirty = false;
+      if (existing.iconUrl !== iconUrl) {
+        existing.iconUrl = iconUrl;
+        dirty = true;
+      }
+      if (animationUrl && existing.animationUrl !== animationUrl) {
+        existing.animationUrl = animationUrl;
+        dirty = true;
+      }
+      if ((existing as any).category !== 'country') {
+        (existing as any).category = 'country';
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      if (dirty) await this.giftsRepo.save(existing);
+      flagsN += 1;
+    }
+
+    for (const [i, g] of premium.entries()) {
+      const name = String(g?.nameAr || g?.nameEn || '').trim().slice(0, 64);
+      const iconUrl = String(g?.iconUrl || '').trim();
+      const animationUrl = String(g?.animationUrl || g?.previewUrl || '').trim();
+      if (!name || !iconUrl) continue;
+      const coinPrice = Math.max(1, Number(g?.coinPrice) || 999);
+      let existing = await this.giftsRepo.findOne({ where: { name } });
+      if (!existing) {
+        await this.giftsRepo.save(
+          this.giftsRepo.create({
+            name,
+            description: `هدية فيديو فاخرة · ${g?.nameEn || ''}`.trim().slice(0, 255),
+            iconUrl,
+            animationUrl: animationUrl || iconUrl,
+            coinPrice,
+            diamondValue: Math.floor(coinPrice * GIFT_DIAMOND_RATIO),
+            type: GiftType.PREMIUM,
+            category: 'premium',
+            isActive: true,
+            sortOrder: Number(g?.sortOrder) || 50 + i,
+          } as any),
+        );
+        premiumN += 1;
+        continue;
+      }
+      let dirty = false;
+      if (existing.iconUrl !== iconUrl) {
+        existing.iconUrl = iconUrl;
+        dirty = true;
+      }
+      if (animationUrl && existing.animationUrl !== animationUrl) {
+        existing.animationUrl = animationUrl;
+        dirty = true;
+      }
+      if ((existing as any).category !== 'premium') {
+        (existing as any).category = 'premium';
+        dirty = true;
+      }
+      if (existing.type !== GiftType.PREMIUM) {
+        existing.type = GiftType.PREMIUM;
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      if (dirty) await this.giftsRepo.save(existing);
+      premiumN += 1;
+    }
+
+    this.log.log(
+      `JEHO designed gifts synced (flags=${flagsN}, premium=${premiumN})`,
+    );
+    return { flags: flagsN, premium: premiumN };
   }
 
   /** Public Mikoo country flags → gift tab "دولة" (does not need listV3 ticket). */
@@ -627,6 +828,85 @@ export class GiftsService implements OnModuleInit {
       order: { sortOrder: 'ASC', coinPrice: 'ASC' },
     });
     return gifts.filter((g) => !this.isLuckyBoxCatalogGift(g));
+  }
+
+  /** Active gift sheet tabs for the client (keys match gift.category). */
+  async listCategories() {
+    await this.ensureDefaultGiftCategories();
+    const rows = await this.categoriesRepo.find({
+      where: { isActive: true },
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
+    });
+    if (rows.length > 0) return rows;
+    // Hard fallback if DB table empty / migrations lag.
+    return [
+      { key: 'normal', labelAr: 'عادي', labelEn: 'Normal', sortOrder: 0, isActive: true },
+      { key: 'lucky', labelAr: 'حظ', labelEn: 'Lucky', sortOrder: 1, isActive: true },
+      { key: 'combo', labelAr: 'كومبو', labelEn: 'Combo', sortOrder: 2, isActive: true },
+      { key: 'premium', labelAr: 'مميز', labelEn: 'Premium', sortOrder: 3, isActive: true },
+    ];
+  }
+
+  async listCategoriesAdmin() {
+    await this.ensureDefaultGiftCategories();
+    return this.categoriesRepo.find({
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
+    });
+  }
+
+  async upsertCategory(
+    id: string | null,
+    dto: {
+      key?: string;
+      labelAr?: string;
+      labelEn?: string | null;
+      sortOrder?: number;
+      isActive?: boolean;
+      iconUrl?: string | null;
+    },
+  ) {
+    let row = id ? await this.categoriesRepo.findOne({ where: { id } }) : null;
+    if (id && !row) throw new NotFoundException('Gift category not found');
+    const keyRaw = (dto.key ?? row?.key ?? '').trim().toLowerCase();
+    const key = keyRaw.replace(/[^a-z0-9_\-]/g, '').slice(0, 32);
+    if (!key) throw new BadRequestException('category key required');
+    if (!row) {
+      const clash = await this.categoriesRepo.findOne({ where: { key } });
+      if (clash) throw new BadRequestException('category key already exists');
+      row = this.categoriesRepo.create({
+        key,
+        labelAr: (dto.labelAr || key).trim(),
+        labelEn: dto.labelEn?.trim() || null,
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+        iconUrl: dto.iconUrl ?? null,
+      });
+    } else {
+      if (dto.key && key !== row.key) {
+        const clash = await this.categoriesRepo.findOne({ where: { key } });
+        if (clash && clash.id !== row.id) {
+          throw new BadRequestException('category key already exists');
+        }
+        row.key = key;
+      }
+      if (dto.labelAr != null) row.labelAr = dto.labelAr.trim() || row.labelAr;
+      if (dto.labelEn !== undefined) row.labelEn = dto.labelEn?.trim() || null;
+      if (dto.sortOrder != null) row.sortOrder = Number(dto.sortOrder) || 0;
+      if (dto.isActive != null) row.isActive = !!dto.isActive;
+      if (dto.iconUrl !== undefined) row.iconUrl = dto.iconUrl || null;
+    }
+    return this.categoriesRepo.save(row);
+  }
+
+  async deleteCategory(id: string) {
+    const row = await this.categoriesRepo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('Gift category not found');
+    // Protect core tabs so the sheet never loses defaults.
+    if (['normal', 'lucky', 'combo', 'premium'].includes(row.key)) {
+      throw new BadRequestException('cannot delete core category');
+    }
+    await this.categoriesRepo.remove(row);
+    return { ok: true };
   }
 
   async send(senderId: string, dto: SendGiftDto) {

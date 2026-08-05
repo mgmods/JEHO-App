@@ -296,9 +296,10 @@ public class GamesFragment extends Fragment {
                 if (binding == null) return;
 
                 if (w.success && w.data != null) {
-
-                    binding.tvCoins.setText(String.format(Locale.US, "%,d", w.data.coins));
-
+                    String next = String.format(Locale.US, "%,d", w.data.coins);
+                    if (!next.contentEquals(binding.tvCoins.getText())) {
+                        binding.tvCoins.setText(next);
+                    }
                 }
 
                 AppLoadingOverlay.hide(requireActivity());
@@ -476,13 +477,27 @@ public class GamesFragment extends Fragment {
 
 
         void submit(List<MiscDtos.GameDto> data) {
-
+            if (sameCatalog(items, data)) return;
             items.clear();
-
             if (data != null) items.addAll(data);
-
             notifyDataSetChanged();
+        }
 
+        private static boolean sameCatalog(List<MiscDtos.GameDto> a, List<MiscDtos.GameDto> b) {
+            if (a == b) return true;
+            if (b == null) return a.isEmpty();
+            if (a.size() != b.size()) return false;
+            for (int i = 0; i < a.size(); i++) {
+                MiscDtos.GameDto x = a.get(i);
+                MiscDtos.GameDto y = b.get(i);
+                String xid = x != null ? x.id : null;
+                String yid = y != null ? y.id : null;
+                if (xid == null ? yid != null : !xid.equals(yid)) return false;
+                String xc = x != null ? x.coverUrl : null;
+                String yc = y != null ? y.coverUrl : null;
+                if (xc == null ? yc != null : !xc.equals(yc)) return false;
+            }
+            return true;
         }
 
 
@@ -524,16 +539,25 @@ public class GamesFragment extends Fragment {
             }
             String loadUrl = (cover != null && !cover.isEmpty()) ? cover : fallback;
 
-            com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> req =
-                    Glide.with(h.b.imgCover).load(loadUrl)
-                            .placeholder(ImagePlaceholder.game());
-            if (fallback != null && !fallback.isEmpty()) {
-                req = req.error(Glide.with(h.b.imgCover).load(fallback)
-                        .placeholder(ImagePlaceholder.game()));
-            } else {
-                req = req.error(ImagePlaceholder.game());
+            Object prev = h.b.imgCover.getTag(R.id.tag_image_url);
+            if (!(prev instanceof String && loadUrl != null && loadUrl.equals(prev)
+                    && h.b.imgCover.getDrawable() != null)) {
+                h.b.imgCover.setTag(R.id.tag_image_url, loadUrl);
+                com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> req =
+                        Glide.with(h.b.imgCover).load(loadUrl)
+                                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                                .dontAnimate();
+                if (h.b.imgCover.getDrawable() == null) {
+                    req = req.placeholder(ImagePlaceholder.game());
+                }
+                if (fallback != null && !fallback.isEmpty()) {
+                    req = req.error(Glide.with(h.b.imgCover).load(fallback)
+                            .placeholder(ImagePlaceholder.game()));
+                } else {
+                    req = req.error(ImagePlaceholder.game());
+                }
+                req.into(h.b.imgCover);
             }
-            req.into(h.b.imgCover);
 
             h.itemView.setOnClickListener(v -> listener.onPlay(g));
 

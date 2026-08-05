@@ -26,7 +26,7 @@ public final class MikooGamesCatalog {
         g.sortOrder = sortOrder;
         g.enabled = Boolean.TRUE;
         g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html?v=20260802g";
-        g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260804g";
+        g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260805bf";
         return g;
     }
 
@@ -84,24 +84,25 @@ public final class MikooGamesCatalog {
     public static List<MiscDtos.GameDto> defaultSlots() {
         List<MiscDtos.GameDto> out = new ArrayList<>();
         out.add(slot("7updown", "٧ فوق تحت", "7 Up Down", 10));
-        out.add(slot("cleopatra-slot", "كليوباترا", "Cleopatra Slot", 11));
-        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Spins", 12));
-        out.add(slot("crash", "كراش", "Crash", 13));
-        out.add(slot("fishing", "صيد السمك", "Fishing", 14));
-        out.add(slot("football-plinko", "بلينكو كرة القدم", "Football Plinko", 15));
-        out.add(slot("fortune-slot", "جواهر الحظ", "Fortune Gems", 16));
-        out.add(slot("greedy-box", "صندوق الطمع", "Greedy Box", 17));
-        out.add(slot("hilo", "هاي لو", "Hilo", 18));
-        out.add(slot("line-slots", "فتحات الخط", "Line Slots", 19));
-        out.add(slot("luck-car", "سيارة الحظ", "Lucky Car", 20));
-        out.add(slot("lucky77", "لاكي ٧٧", "Lucky 77", 21));
-        out.add(slot("megaways-slots", "ميجاوايز", "Megaways Slots", 22));
-        out.add(slot("olympians", "الأوليمبيون", "Olympians", 23));
-        out.add(slot("pirate-king", "ملك القراصنة", "Pirate King", 24));
-        out.add(slot("royal-battle", "المعركة الملكية", "Royal Battle", 25));
-        out.add(slot("slot777", "سلوت ٧٧٧", "Slot 777", 26));
-        out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 27));
-        out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 28));
+        out.add(slot("bounty-football", "كرة القدم الجوائز", "Bounty Football", 14));
+        out.add(slot("cleopatra-slot", "كليوباترا", "Cleopatra Slot", 15));
+        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Spins", 16));
+        out.add(slot("crash", "كراش", "Crash", 17));
+        out.add(slot("fishing", "صيد السمك", "Fishing", 18));
+        out.add(slot("football-plinko", "بلينكو كرة القدم", "Football Plinko", 19));
+        out.add(slot("fortune-slot", "جواهر الحظ", "Fortune Gems", 20));
+        out.add(slot("greedy-box", "صندوق الطمع", "Greedy Box", 21));
+        out.add(slot("hilo", "هاي لو", "Hilo", 22));
+        out.add(slot("line-slots", "فتحات الخط", "Line Slots", 23));
+        out.add(slot("luck-car", "سيارة الحظ", "Lucky Car", 24));
+        out.add(slot("lucky77", "لاكي ٧٧", "Lucky 77", 25));
+        out.add(slot("megaways-slots", "ميجاوايز", "Megaways Slots", 26));
+        out.add(slot("olympians", "الأوليمبيون", "Olympians", 27));
+        out.add(slot("pirate-king", "ملك القراصنة", "Pirate King", 28));
+        out.add(slot("royal-battle", "المعركة الملكية", "Royal Battle", 29));
+        out.add(slot("slot777", "سلوت ٧٧٧", "Slot 777", 30));
+        out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 31));
+        out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 32));
         return out;
     }
 

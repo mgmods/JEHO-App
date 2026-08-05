@@ -106,6 +106,7 @@ const sections = computed(() => [
     items: [
       { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
+      { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
       { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },

@@ -30,140 +30,160 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Voice-room header: close · more · viewers+count · room card. -->
-    <LinearLayout
+    <!--
+      Header: close · clock · share | viewers + room card (trailing).
+      Seat-count / seat-request controls live under أدوات / إعدادات الغرفة — not here.
+    -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/headerRoom"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
+        android:layout_marginTop="4dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:elevation="8dp"
-        android:gravity="center_vertical"
         android:layoutDirection="ltr"
-        android:orientation="horizontal"
-        android:paddingStart="2dp"
-        android:paddingEnd="14dp"
+        android:minHeight="52dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <FrameLayout
-            android:id="@+id/btnClose"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/close"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
+        <LinearLayout
+            android:id="@+id/headerLeadingTools"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constrainedWidth="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvRoomViewerCount"
+            app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
-            <ImageView
-                android:id="@+id/imgRoomClose"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_room_close" />
-        </FrameLayout>
+            <FrameLayout
+                android:id="@+id/btnClose"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/close"
+                android:foreground="?attr/selectableItemBackgroundBorderless">
 
-        <FrameLayout
-            android:id="@+id/btnHeaderHome"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/nav_home"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:visibility="gone">
-
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:src="@drawable/icon_room_up_micro" />
-        </FrameLayout>
-
-        <FrameLayout
-            android:id="@+id/btnHeaderMore"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/share_room_title"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:visibility="visible">
-
-            <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:src="@drawable/icon_room_share" />
-        </FrameLayout>
-
-        <!-- Seat / mic join-request bell for host & moderators -->
-        <FrameLayout
-            android:id="@+id/btnPlusWrap"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="طلبات الانضمام للمايك"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:visibility="gone">
-
-            <ImageView
-                android:id="@+id/btnPlus"
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_asset_notice"
-               />
+                <ImageView
+                    android:id="@+id/imgRoomClose"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_room_close" />
+            </FrameLayout>
 
             <TextView
-                android:id="@+id/tvSeatRequestBadge"
-                android:layout_width="15dp"
-                android:layout_height="15dp"
-                android:layout_gravity="top|end"
-                android:layout_marginTop="2dp"
+                android:id="@+id/tvRoomGmtClock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="2dp"
                 android:layout_marginEnd="2dp"
-                android:background="@drawable/bg_offers_badge"
+                android:background="@drawable/bg_room_header_clock"
                 android:gravity="center"
-                android:text="0"
-                android:textColor="@color/text_primary"
+                android:includeFontPadding="false"
+                android:maxLines="2"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="2dp"
+                android:textColor="#E6FFFFFF"
                 android:textSize="8sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
-        </FrameLayout>
+                android:visibility="visible" />
 
+            <!-- Kept for ViewBinding; never shown in header (seat count → tools). -->
+            <FrameLayout
+                android:id="@+id/btnHeaderHome"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:contentDescription="ضبط المقاعد" />
+
+            <FrameLayout
+                android:id="@+id/btnHeaderMore"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/share_room_title"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:visibility="visible">
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/icon_room_share" />
+            </FrameLayout>
+
+            <!-- Seat requests: only from room settings / tools, not header chrome. -->
+            <FrameLayout
+                android:id="@+id/btnPlusWrap"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone"
+                android:contentDescription="طلبات الانضمام للمايك">
+
+                <ImageView
+                    android:id="@+id/btnPlus"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_asset_notice" />
+
+                <TextView
+                    android:id="@+id/tvSeatRequestBadge"
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:layout_gravity="top|end"
+                    android:visibility="gone"
+                    android:text="0" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <!-- Viewers always parked next to the room card (never clipped by leading tools). -->
         <TextView
             android:id="@+id/tvRoomViewerCount"
             android:layout_width="wrap_content"
             android:layout_height="28dp"
-            android:layout_marginStart="2dp"
+            android:layout_marginEnd="8dp"
             android:background="@drawable/bg_hiyoo_viewer_count_chip"
             android:clickable="true"
+            android:elevation="10dp"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless"
             android:gravity="center"
+            android:minWidth="64dp"
             android:paddingHorizontal="10dp"
             android:text="المشاهدين 1"
             android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:textStyle="bold"
-            android:visibility="visible" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="1dp"
-            android:layout_weight="1" />
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/hostCardWrap"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <FrameLayout
             android:id="@+id/hostCardWrap"
             android:layout_width="wrap_content"
             android:layout_height="56dp"
-            android:layout_marginEnd="4dp"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:maxWidth="200dp">
+            app:layout_constrainedWidth="true"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_max="210dp">
 
             <LinearLayout
                 android:id="@+id/hostCard"
@@ -173,14 +193,14 @@
                 android:gravity="center_vertical"
                 android:minWidth="128dp"
                 android:orientation="horizontal"
-                android:paddingStart="4dp"
-                android:paddingEnd="10dp">
+                android:paddingStart="5dp"
+                android:paddingEnd="12dp">
 
                 <FrameLayout
                     android:id="@+id/headerHostAvatarWrap"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_marginEnd="8dp"
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:visibility="visible">
@@ -222,7 +242,6 @@
                         android:scaleType="fitCenter"
                         android:visibility="gone" />
 
-                    <!-- Same HostSignalView path as seats — VIP/SVGA frames show immediately. -->
                     <com.Dramizo.Series.util.HostSignalView
                         android:id="@+id/headerHostSignal"
                         android:layout_width="48dp"
@@ -257,7 +276,6 @@
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxWidth="130dp"
                     android:orientation="vertical">
 
                     <TextView
@@ -306,10 +324,9 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:maxWidth="110dp"
                         android:text="@string/voice_room"
                         android:textColor="@color/white"
-                        android:textSize="12sp"
+                        android:textSize="12.5sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -319,7 +336,7 @@
                         android:layout_marginTop="1dp"
                         android:ellipsize="end"
                         android:maxLines="1"
-                        android:textColor="#B3FFFFFF"
+                        android:textColor="#CCFFFFFF"
                         android:textSize="10sp" />
 
                     <TextView
@@ -353,7 +370,9 @@
             android:id="@+id/viewerPill"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:visibility="gone">
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
 
             <TextView
                 android:id="@+id/tvViewers"
@@ -367,8 +386,10 @@
             android:id="@+id/tvLevel"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:visibility="gone" />
-    </LinearLayout>
+            android:visibility="gone"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <LinearLayout
         android:id="@+id/rowAgencyTop"

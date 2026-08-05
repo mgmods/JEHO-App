@@ -84,3 +84,10 @@ database/*_prod_*.sql
 **/__pycache__/
 **/*.cursor-upload-*
 scripts/_target_table_zoom.png
+
+# Local extract dumps
+_extract/
+
+
+docs/refs/
+

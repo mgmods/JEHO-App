@@ -33,7 +33,7 @@ export class UploadsService {
         file: Express.Multer.File,
         cb: (error: Error | null, accept: boolean) => void,
       ) => {
-        const allowed = /\.(jpg|jpeg|png|gif|webp|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
+        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new BadRequestException('File type not allowed') as any, false);
         }
