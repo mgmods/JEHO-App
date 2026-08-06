@@ -158,6 +158,18 @@ public class RoomRepositoryImpl implements RoomRepository {
     }
 
     @Override
+    public Result<Map<String, Object>> clearPublicChat(String id) {
+        return ApiCall.execute(api.clearPublicChat(id));
+    }
+
+    @Override
+    public Result<RoomDtos.RoomDto> setChatAutoClearMinutes(String id, int minutes) {
+        Map<String, Integer> body = new HashMap<>();
+        body.put("minutes", minutes);
+        return ApiCall.execute(api.setChatAutoClear(id, body));
+    }
+
+    @Override
     public Result<RoomDtos.RoomDto> lock(String id, boolean locked, String password) {
         return ApiCall.execute(api.lock(id, new RoomDtos.LockRoomRequest(locked, password)));
     }

@@ -913,6 +913,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
+            // Discard any disk cache older than the last staff/auto wipe stamp.
+            if (room.chatClearedAt != null && !room.chatClearedAt.isEmpty()) {
+                RoomChatMemory.honorServerWipe(room.id, parseIsoMillis(room.chatClearedAt));
+            }
             restoreRoomChatIfNeeded();
             roomHostId = room.hostId;
             roomCohostId = room.cohostId;
@@ -1615,11 +1619,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         closeRoomChatComposer(true);
     }
 
-    /** Mikoo MultiInputMsgView: white bar + keyboard; tip pill when idle. */
+    /** Mikoo MultiInputMsgView: white bar + keyboard only — hide tools bar. */
     private void openRoomChatComposer(boolean showKeyboard) {
         if (binding == null || binding.roomChatComposer == null) return;
         roomComposerOpen = true;
+        // Gift / games / mute / settings must NOT rise with the keyboard.
+        if (binding.bottomBar != null) {
+            binding.bottomBar.setVisibility(View.GONE);
+        }
         binding.roomChatComposer.setVisibility(View.VISIBLE);
+        binding.roomChatComposer.bringToFront();
         if (binding.tvChatInputTips != null) binding.tvChatInputTips.setVisibility(View.INVISIBLE);
         binding.etChat.requestFocus();
         ViewCompat.requestApplyInsets(binding.getRoot());
@@ -1653,9 +1662,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.roomChatComposer.setVisibility(View.GONE);
             binding.roomChatComposer.setPadding(0, 0, 0, 0);
         }
+        // Restore gift/games/settings row under the tip pill.
+        if (binding.bottomBar != null) {
+            binding.bottomBar.setVisibility(View.VISIBLE);
+        }
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
         }
+        ViewCompat.requestApplyInsets(binding.getRoot());
     }
 
     private void focusRoomChatComposer(String text, int selection) {
@@ -2009,12 +2023,45 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Wipe chat only when broadcast ends OR staff clears for everyone. */
     private void clearRoomChatSession() {
-        if (roomId != null) RoomChatMemory.clear(roomId);
+        clearRoomChatSession(0L);
+    }
+
+    private void clearRoomChatSession(long serverClearedAtMs) {
+        if (roomId != null) {
+            if (serverClearedAtMs > 0) {
+                RoomChatMemory.clear(roomId, serverClearedAtMs);
+            } else {
+                RoomChatMemory.clear(roomId);
+            }
+        }
         if (binding != null && binding.chatLog != null) {
             binding.chatLog.removeAllViews();
         }
         roomChatMemorySyncedCount = 0;
         roomChatRestored = true;
+    }
+
+    /** Parse server chatClearedAt ISO stamp; apply full local invalidation. */
+    private void honorServerChatWipe(@Nullable String iso) {
+        long ms = parseIsoMillis(iso);
+        if (ms > 0 && roomId != null) {
+            RoomChatMemory.honorServerWipe(roomId, ms);
+            if (binding != null && binding.chatLog != null) {
+                // Always empty UI so wipe is visible even if memory was already stamped.
+                binding.chatLog.removeAllViews();
+            }
+            roomChatMemorySyncedCount = 0;
+            roomChatRestored = true;
+        }
+    }
+
+    private static long parseIsoMillis(@Nullable String iso) {
+        if (iso == null || iso.isEmpty()) return 0L;
+        try {
+            return java.time.Instant.parse(iso.trim()).toEpochMilli();
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     private void resetChatWear(
@@ -2704,6 +2751,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override public boolean canReviewSeatRequests() {
                 return canInviteMic && !isFreeMicEnabled();
             }
+            @Override public int chatAutoClearMinutes() {
+                RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+                if (room == null) return 0;
+                int m = room.chatAutoClearMinutes;
+                return (m == 1 || m == 5 || m == 10) ? m : 0;
+            }
             @Override public String roomId() { return roomId; }
             @Override public String roomTitle() {
                 return binding != null && binding.tvRoomTitle.getText() != null
@@ -2770,6 +2823,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             case "clear_chat":
                 confirmClearRoomChat();
+                break;
+            case "auto_clear_chat":
+                cycleChatAutoClear();
                 break;
             case "charm": {
                 if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
@@ -3155,26 +3211,48 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 null);
     }
 
-    /** Staff action: clear public room chat for every client in the room. */
+    /** Staff: full wipe — API (DB stamp) + socket broadcast + every phone. */
     private void clearRoomChatForEveryone() {
         if (roomId == null || roomId.isEmpty()) return;
         if (!(canManageRoom || canModerateRoom() || isHost || isOwner)) {
             Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
             return;
         }
-        boolean sent = RealtimeClient.getInstance().emitRoomEvent(
-                roomId, "room:chat_cleared", new JsonObject());
-        if (!sent) {
-            Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        // Optimistic local wipe; room:chat_cleared also arrives for every client (incl. self).
+        // Local wipe immediately so the cleaner sees an empty screen.
         clearLocalRoomChat();
+        // Persist stamp on server + fan-out to all clients (phone + memory).
+        viewModel.clearPublicChat(roomId);
+        // Socket fallback for older clients / offline peers that miss HTTP fan-out.
+        RealtimeClient.getInstance().emitRoomEvent(
+                roomId, "room:chat_cleared", new JsonObject());
         Toast.makeText(this, R.string.clear_room_chat_done, Toast.LENGTH_SHORT).show();
     }
 
+    /** Cycle auto-clean: off → 1m → 5m → 10m → off (server-enforced). */
+    private void cycleChatAutoClear() {
+        if (!(canManageRoom || isHost || isOwner || isRoomStaff())) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        RoomDtos.RoomDto r = viewModel.getRoom().getValue();
+        int cur = r != null ? r.chatAutoClearMinutes : 0;
+        int next;
+        if (cur == 1) next = 5;
+        else if (cur == 5) next = 10;
+        else if (cur == 10) next = 0;
+        else next = 1;
+        if (r != null) r.chatAutoClearMinutes = next;
+        viewModel.setChatAutoClearMinutes(roomId, next);
+        String label;
+        if (next == 1) label = getString(R.string.room_auto_clear_1m);
+        else if (next == 5) label = getString(R.string.room_auto_clear_5m);
+        else if (next == 10) label = getString(R.string.room_auto_clear_10m);
+        else label = getString(R.string.room_more_str_off);
+        Toast.makeText(this, getString(R.string.room_auto_clear_set, label), Toast.LENGTH_SHORT).show();
+    }
+
     private void clearLocalRoomChat() {
-        clearRoomChatSession();
+        clearRoomChatSession(0L);
     }
 
     private void setupMusicUi() {
@@ -6164,16 +6242,135 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         showUserCard(userId, name, avatarUrl, frameUrl, null, vipLevel, userLevel);
     }
 
+    private void bindVipUserCardHead(@Nullable ImageView vipHead, int vipLevel,
+                                     @Nullable String headUrl) {
+        if (vipHead == null) return;
+        if (vipLevel <= 0) {
+            vipHead.setVisibility(View.GONE);
+            vipHead.setImageDrawable(null);
+            return;
+        }
+        String path = headUrl != null && !headUrl.isEmpty()
+                ? headUrl
+                : VipStyle.fixedHeadPath(vipLevel);
+        if (path == null || path.isEmpty()) {
+            vipHead.setVisibility(View.GONE);
+            return;
+        }
+        vipHead.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.ServerAssets.load(vipHead, path);
+    }
+
+    private void bindVipUserCardMedal(
+            @Nullable ImageView medal,
+            int vipLevel,
+            @Nullable String levelBadgeUrl) {
+        if (medal == null) return;
+        if (vipLevel <= 0) {
+            medal.setVisibility(View.GONE);
+            medal.setImageDrawable(null);
+            return;
+        }
+        String path = levelBadgeUrl;
+        if (path == null || path.isEmpty() || !path.contains("vip_medal")) {
+            int t = Math.min(7, Math.max(1, vipLevel));
+            path = "/assets/cosmetics/vip/vip_medal_mikoo_" + t + ".png";
+        }
+        medal.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.ServerAssets.load(medal, path);
+    }
+
+    private void styleMikooStatChips(@Nullable TextView charm, @Nullable TextView wealth) {
+        // Compact digit chips like Mikoo (heart / crown rows).
+        if (charm != null) {
+            charm.setTextColor(0xFFFFFFFF);
+        }
+        if (wealth != null) {
+            wealth.setTextColor(0xFFFFFFFF);
+        }
+    }
+
+    private void bindUserCardAgency(
+            @Nullable View rowAgency,
+            @Nullable ImageView logoView,
+            @Nullable TextView nameView,
+            @Nullable TextView gidView,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
+        if (rowAgency == null) return;
+        if (agency == null || agency.name == null || agency.name.trim().isEmpty()) {
+            rowAgency.setVisibility(View.GONE);
+            return;
+        }
+        rowAgency.setVisibility(View.VISIBLE);
+        if (nameView != null) nameView.setText(agency.name.trim());
+        if (gidView != null) {
+            String gid = agency.publicId != null ? agency.publicId.trim() : "";
+            if (!gid.isEmpty()) {
+                gidView.setVisibility(View.VISIBLE);
+                gidView.setText("GID:" + gid);
+            } else {
+                gidView.setVisibility(View.GONE);
+            }
+        }
+        if (logoView != null) {
+            String logo = firstNonEmpty(
+                    agency.logoUrl,
+                    agency.coverUrl,
+                    // Agency room: permanent cover is usually the agency brand.
+                    isAgencyRoom ? currentRoomCoverUrl : null);
+            logoView.setImageResource(R.drawable.icon_agency);
+            if (logo != null && !logo.isEmpty()) {
+                try {
+                    com.bumptech.glide.Glide.with(logoView.getContext())
+                            .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(logo))
+                            .circleCrop()
+                            .placeholder(R.drawable.icon_agency)
+                            .error(R.drawable.icon_agency)
+                            .into(logoView);
+                } catch (Exception ignored) {
+                    logoView.setImageResource(R.drawable.icon_agency);
+                }
+            }
+        }
+        // Open manage screen when this is the viewer's own agency.
+        rowAgency.setOnClickListener(v -> {
+            if (agency.id == null || agency.id.isEmpty()) return;
+            try {
+                android.content.Intent i = new android.content.Intent(
+                        this,
+                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.class);
+                i.putExtra(
+                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.EXTRA_AGENCY_ID,
+                        agency.id);
+                startActivity(i);
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
                               String hostBadgeUrl, int vipLevel, int userLevel) {
         BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
         View sheet = getLayoutInflater().inflate(R.layout.dialog_room_user_card, null);
         AuraDialogHelper.applyContent(sheet);
         dialog.setContentView(sheet);
+        dialog.setOnShowListener(d -> {
+            AuraDialogHelper.configureShown(dialog);
+            View bs = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
+            if (bs != null) bs.setBackgroundResource(android.R.color.transparent);
+        });
         TextView tvName = sheet.findViewById(R.id.tvUserName);
         TextView tvUserId = sheet.findViewById(R.id.tvUserId);
+        ImageView btnCopyId = sheet.findViewById(R.id.btnCopyId);
+        ImageView imgCountryFlag = sheet.findViewById(R.id.imgCountryFlag);
+        ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
+        ImageView vipHead = sheet.findViewById(R.id.imgVipHead);
+        View rowAgency = sheet.findViewById(R.id.rowAgency);
+        ImageView imgAgencyLogo = sheet.findViewById(R.id.imgAgencyLogo);
+        TextView tvAgencyName = sheet.findViewById(R.id.tvAgencyName);
+        TextView tvAgencyGid = sheet.findViewById(R.id.tvAgencyGid);
         TextView chipVip = sheet.findViewById(R.id.chipVip);
         TextView chipMember = sheet.findViewById(R.id.chipMember);
         TextView chipCharm = sheet.findViewById(R.id.chipCharm);
@@ -6181,18 +6378,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
                 chipVip, chipMember, chipCharm, chipWealth, vipLevel, userLevel, 0L, 0L);
+        if (chipMember != null) {
+            chipMember.setText(String.valueOf(Math.max(1, userLevel)));
+        }
+        styleMikooStatChips(chipCharm, chipWealth);
+        bindVipUserCardMedal(imgVipMedal, vipLevel, null);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
-        // Personal chat / profile always use VIP frame — never agency host signal.
-        final String[] chatVipFrame = { frameUrl };
-        AvatarCosmetics.bindStacked(img, frame, avatarUrl, frameUrl);
-        // Agency: host signal if set, otherwise purchased VIP/head frame.
+        // In-room profile card: always fixed VIP nobility frame (ud_vip_tou_N) when VIP.
+        // Mall/SVGA wear stays on seat mics via wearFrameUrl — not here.
+        final String[] chatVipFrame = {
+                VipStyle.profileNobilityFrameUrl(vipLevel, null)
+        };
+        bindVipUserCardHead(vipHead, vipLevel, null);
+        AvatarCosmetics.bindStacked(img, frame, avatarUrl, chatVipFrame[0]);
+        // Agency room: host signal only as overlay; VIP frame still fixed ud_vip_tou.
         if (isAgencyRoom) {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, frameUrl, hostBadgeUrl, null, null);
+            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], hostBadgeUrl, null, null);
         } else {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, frameUrl, null, null, null);
+            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], null, null, null);
+        }
+        if (rowAgency != null) rowAgency.setVisibility(View.GONE);
+        if (btnCopyId != null) {
+            btnCopyId.setOnClickListener(v -> {
+                String pid = publicIdHold[0];
+                if (pid == null || pid.isEmpty()) return;
+                android.content.ClipboardManager cm =
+                        (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cm != null) {
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("ID", pid));
+                    Toast.makeText(this, "تم نسخ المعرف", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
         if (userId != null && !userId.isEmpty()) {
             ContainerProvider.from(this).getIoExecutor().execute(() -> {
@@ -6201,17 +6421,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!r.success || r.data == null) return;
                 runOnUiThread(() -> {
                     if (!dialog.isShowing()) return;
-                    chatVipFrame[0] = r.data.vipBadgeUrl;
+                    int liveVip = Math.max(0, r.data.vipLevel);
+                    chatVipFrame[0] = VipStyle.profileNobilityFrameUrl(liveVip, r.data.vipTouUrl);
                     AvatarCosmetics.bindAvatar(img,
                             r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl);
                     AvatarCosmetics.applyHostWear(
                             frame,
                             hostBadge,
                             img,
-                            r.data.vipBadgeUrl,
+                            chatVipFrame[0],
                             isAgencyRoom ? r.data.hostBadgeUrl : null,
                             null,
                             isAgencyRoom ? r.data.hostBadgeMeta : null);
+                    bindVipUserCardHead(vipHead, liveVip,
+                            r.data.vipHeadUrl != null ? r.data.vipHeadUrl
+                                    : VipStyle.fixedHeadPath(liveVip));
+                    bindVipUserCardMedal(imgVipMedal, liveVip, r.data.levelBadgeUrl);
+                    bindUserCardAgency(rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, r.data.agency);
                     if (r.data.displayName != null && !r.data.displayName.isEmpty()) {
                         tvName.setText(r.data.displayName);
                     }
@@ -6219,20 +6445,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             tvName, null, r.data.genderVerified);
                     if (tvUserId != null) {
                         String pid = r.data.publicId != null ? r.data.publicId.trim() : "";
+                        publicIdHold[0] = pid;
                         if (!pid.isEmpty()) {
                             tvUserId.setVisibility(View.VISIBLE);
-                            tvUserId.setText("ID " + pid);
+                            tvUserId.setText("ID:" + pid);
+                            if (btnCopyId != null) btnCopyId.setVisibility(View.VISIBLE);
                         } else {
                             tvUserId.setVisibility(View.GONE);
+                            if (btnCopyId != null) btnCopyId.setVisibility(View.GONE);
                         }
+                    }
+                    if (imgCountryFlag != null) {
+                        com.Dramizo.Series.util.FlagImages.bind(imgCountryFlag, r.data.country);
                     }
                     long popularity = Math.max(
                             Math.max(0, r.data.popularityLevel),
                             Math.max(0, Math.max(r.data.charmScore, r.data.popularityScore)));
                     AvatarCosmetics.styleUserCardBadges(
                             chipVip, chipMember, chipCharm, chipWealth,
-                            Math.max(0, r.data.vipLevel), Math.max(1, r.data.level),
+                            liveVip, Math.max(1, r.data.level),
                             popularity, Math.max(0, r.data.wealthScore));
+                    if (chipMember != null) {
+                        chipMember.setText(String.valueOf(Math.max(1, r.data.level)));
+                    }
+                    if (chipCharm != null) {
+                        long popLv = r.data.popularityLevel > 0 ? r.data.popularityLevel : popularity;
+                        chipCharm.setText(String.valueOf(Math.max(0, popLv)));
+                    }
+                    if (chipWealth != null) {
+                        long wl = r.data.wealthLevel > 0 ? r.data.wealthLevel : r.data.wealthScore;
+                        chipWealth.setText(String.valueOf(Math.max(0, wl)));
+                    }
+                    styleMikooStatChips(chipCharm, chipWealth);
                     boolean showHi = r.data.showHiBadge || r.data.isFirstDay;
                     if (chipFirstDay != null) {
                         chipFirstDay.setVisibility(showHi ? View.VISIBLE : View.GONE);
@@ -6391,9 +6635,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (chat != null) chat.performClick();
             });
         }
-        TextView actFollow = sheet.findViewById(R.id.actFollow);
+        ImageView actFollow = sheet.findViewById(R.id.actFollow);
         if (actFollow != null) {
-            actFollow.setText(R.string.follow);
+            // Mikoo icon_attention — switch to check via alpha when following.
+            actFollow.setImageResource(R.drawable.icon_attention);
+            actFollow.setAlpha(1f);
             final boolean[] following = {false};
             if (userId != null && !userId.isEmpty() && !userId.equals(myUserId)) {
                 AppContainer followContainer = ContainerProvider.from(this);
@@ -6405,7 +6651,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         following[0] = true;
                         runOnUiThread(() -> {
                             if (actFollow.getWindowToken() != null) {
-                                actFollow.setText(R.string.unfollow);
+                                actFollow.setImageResource(R.drawable.icon_attentioned);
+                                actFollow.setAlpha(1f);
                             }
                         });
                     }
@@ -7646,26 +7893,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String[] codes = {
                         "room_mikoo_border_top1",
                         "room_mikoo_border_top2",
-                        "room_mikoo_border_top3"
+                        "room_mikoo_border_top3",
+                        "room_mikoo_border_top4",
+                        "room_mikoo_border_top5",
+                        "room_mikoo_border_top6",
+                        "room_mikoo_border_top7"
                 };
                 String[] files = {
                         "bg_room_border_top1.webp",
                         "bg_room_border_top2.webp",
-                        "bg_room_border_top3.webp"
+                        "bg_room_border_top3.webp",
+                        "bg_room_border_top4.webp",
+                        "bg_room_border_top5.webp",
+                        "bg_room_border_top6.webp",
+                        "bg_room_border_top7.webp"
                 };
                 String[] names = {
                         "إطار الروم · المركز 1",
                         "إطار الروم · المركز 2",
-                        "إطار الروم · المركز 3"
+                        "إطار الروم · المركز 3",
+                        "إطار الروم · المركز 4",
+                        "إطار الروم · المركز 5",
+                        "إطار الروم · المركز 6",
+                        "إطار الروم · المركز 7"
                 };
-                int[] prices = {299, 199, 149};
+                int[] prices = {299, 249, 199, 179, 159, 139, 119};
                 for (int i = 0; i < codes.length; i++) {
                     com.Dramizo.Series.data.remote.dto.CosmeticDtos.CosmeticDto dto =
                             new com.Dramizo.Series.data.remote.dto.CosmeticDtos.CosmeticDto();
                     dto.id = "local-room-border-" + (i + 1);
                     dto.code = codes[i];
                     dto.name = names[i];
-                    dto.previewUrl = "/assets/rooms/mikoo/" + files[i] + "?v=20260730r";
+                    dto.previewUrl = "/assets/rooms/mikoo/" + files[i] + "?v=20260806r7";
                     dto.animationUrl = null;
                     dto.coinPrice = prices[i];
                     dto.minVipLevel = 0;
@@ -8817,7 +9076,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /**
      * Mikoo lucky / multi-mic FX:
-     * gift holds center → clones to occupied seats → gold rain optional.
+     * large center gift · Nx · banner · simultaneous clone arcs to mics.
      */
     public void playLuckyGiftStage(
             @Nullable String giftIconUrl,
@@ -8825,6 +9084,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long coinsSpent,
             int quantity,
             int personCount,
+            @Nullable Runnable onScatterStart
+    ) {
+        playLuckyGiftStage(giftIconUrl, targetIds, coinsSpent, quantity, personCount,
+                null, onScatterStart);
+    }
+
+    public void playLuckyGiftStage(
+            @Nullable String giftIconUrl,
+            @Nullable List<String> targetIds,
+            long coinsSpent,
+            int quantity,
+            int personCount,
+            @Nullable String senderName,
             @Nullable Runnable onScatterStart
     ) {
         if (binding == null || binding.giftOverlay == null) {
@@ -8838,48 +9110,71 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             ids = collectOccupiedMicUserIds();
         }
         final List<String> rainIds = ids != null ? new ArrayList<>(ids) : new ArrayList<>();
-        List<android.graphics.PointF> seats = resolveMicCenters(rainIds);
-        if (seats.isEmpty()) {
-            // Fallback: every currently visible occupied seat.
+        if (rainIds.isEmpty()) {
             List<String> all = collectOccupiedMicUserIds();
-            seats = resolveMicCenters(all);
-            rainIds.clear();
             if (all != null) rainIds.addAll(all);
         }
 
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
         binding.giftOverlay.setElevation(36f);
-        markLuckyOverlayActive(5200L);
+        markLuckyOverlayActive(5600L);
 
-        int w = Math.max(binding.giftOverlay.getWidth(), 1);
-        int h = Math.max(binding.giftOverlay.getHeight(), 1);
-        android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-        long hold = Math.min(1400L, 520L + Math.max(1, quantity) * 80L);
+        final List<String> pulseIds = rainIds;
+        final int qtyShow = Math.max(1, quantity);
+        final int people = Math.max(1, rainIds.isEmpty() ? personCount : rainIds.size());
+        final long totalScore = Math.max(0L, coinsSpent > 0 ? coinsSpent : (long) qtyShow * people);
+        final long hold = Math.min(1600L, 620L + Math.max(1, quantity) * 70L);
+        final String who = senderName != null && !senderName.isEmpty()
+                ? senderName
+                : (myUserId != null ? displayNameForSeatUser(myUserId) : "مستخدم");
+        final String icon = giftIconUrl;
+        final Runnable scatterCb = onScatterStart;
 
-        final List<android.graphics.PointF> seatPts = seats;
-        GiftFlyAnimator.holdAndScatter(
-                binding.giftOverlay,
-                giftIconUrl,
-                center,
-                seatPts,
-                hold,
-                () -> {
-                    if (onScatterStart != null) {
-                        try { onScatterStart.run(); } catch (Exception ignored) {}
-                    }
-                    // Pulse each target seat when clones land.
-                    for (String uid : rainIds) {
-                        View seat = findSeatViewForUser(uid);
-                        if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                    }
-                },
-                () -> {
-                    // Stage rain is very light — full merdood rain only on win path.
-                    if (coinsSpent >= 200 && !rainIds.isEmpty()) {
-                        playCoinRainToUsers(rainIds, 6);
-                    }
-                });
+        Runnable startClone = () -> {
+            if (binding == null || binding.giftOverlay == null) {
+                if (scatterCb != null) {
+                    try { scatterCb.run(); } catch (Exception ignored) {}
+                }
+                return;
+            }
+            List<android.graphics.PointF> seatPts = resolveMicCenters(pulseIds);
+            if (seatPts.isEmpty()) {
+                List<String> all = collectOccupiedMicUserIds();
+                seatPts = resolveMicCenters(all);
+            }
+            int w = Math.max(binding.giftOverlay.getWidth(), 1);
+            int h = Math.max(binding.giftOverlay.getHeight(), 1);
+            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
+            GiftFlyAnimator.allMicClone(
+                    binding.giftOverlay,
+                    icon,
+                    center,
+                    seatPts,
+                    qtyShow,
+                    totalScore,
+                    who,
+                    hold,
+                    () -> {
+                        if (scatterCb != null) {
+                            try { scatterCb.run(); } catch (Exception ignored) {}
+                        }
+                        for (String uid : pulseIds) {
+                            View seat = findSeatViewForUser(uid);
+                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
+                        }
+                    },
+                    () -> {
+                        if (coinsSpent >= 200 && !pulseIds.isEmpty()) {
+                            playCoinRainToUsers(pulseIds, 6);
+                        }
+                    });
+        };
+        if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
+            binding.giftOverlay.post(startClone);
+        } else {
+            startClone.run();
+        }
     }
 
     /** Center → clone → mics for regular all-mic gift sends. */
@@ -8888,38 +9183,91 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable List<String> targetIds,
             int comboCount
     ) {
+        scatterGiftToMics(giftIconUrl, targetIds, comboCount, 1, 0, null);
+    }
+
+    public void scatterGiftToMics(
+            @Nullable String giftIconUrl,
+            @Nullable List<String> targetIds,
+            int comboCount,
+            int quantity,
+            long coinValuePerPerson,
+            @Nullable String senderName
+    ) {
         if (binding == null || binding.giftOverlay == null) return;
         List<String> ids = targetIds != null && !targetIds.isEmpty()
                 ? targetIds : collectOccupiedMicUserIds();
-        List<android.graphics.PointF> seats = resolveMicCenters(ids);
-        if (seats.isEmpty()) return;
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
-        markLuckyOverlayActive(4000L);
-        int w = Math.max(binding.giftOverlay.getWidth(), 1);
-        int h = Math.max(binding.giftOverlay.getHeight(), 1);
-        android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
-        GiftFlyAnimator.holdAndScatter(
-                binding.giftOverlay,
-                giftIconUrl,
-                center,
-                seats,
-                700L,
-                () -> {
-                    for (String uid : ids) {
-                        View seat = findSeatViewForUser(uid);
-                        if (seat != null) GiftFlyAnimator.pulseTarget(seat);
-                    }
-                    if (comboCount >= 2) {
-                        float d = getResources().getDisplayMetrics().density;
-                        GiftFlyAnimator.showComboBurst(
-                                binding.giftOverlay,
-                                comboCount,
-                                new android.graphics.PointF(48f * d, h * 0.58f),
-                                null);
-                    }
-                },
-                null);
+        markLuckyOverlayActive(4800L);
+        final List<String> finalIds = ids;
+        final int qtyShow = Math.max(1, quantity > 1 ? quantity : Math.max(1, comboCount));
+        final long total = coinValuePerPerson > 0
+                ? coinValuePerPerson * Math.max(1, ids.size())
+                : (long) qtyShow * Math.max(1, ids.size());
+        final String who = senderName != null && !senderName.isEmpty()
+                ? senderName
+                : displayNameForSeatUser(myUserId);
+        final String icon = giftIconUrl;
+        Runnable startClone = () -> {
+            if (binding == null || binding.giftOverlay == null) return;
+            List<android.graphics.PointF> seats = resolveMicCenters(finalIds);
+            if (seats.isEmpty()) return;
+            int w = Math.max(binding.giftOverlay.getWidth(), 1);
+            int h = Math.max(binding.giftOverlay.getHeight(), 1);
+            android.graphics.PointF center = new android.graphics.PointF(w / 2f, h * 0.40f);
+            GiftFlyAnimator.allMicClone(
+                    binding.giftOverlay,
+                    icon,
+                    center,
+                    seats,
+                    qtyShow,
+                    total,
+                    who,
+                    780L,
+                    () -> {
+                        for (String uid : finalIds) {
+                            View seat = findSeatViewForUser(uid);
+                            if (seat != null) GiftFlyAnimator.pulseTarget(seat);
+                        }
+                    },
+                    null);
+        };
+        if (binding.giftOverlay.getWidth() <= 0 || binding.giftOverlay.getHeight() <= 0) {
+            binding.giftOverlay.post(startClone);
+        } else {
+            startClone.run();
+        }
+    }
+
+    /** All-mic send: center hold → clone to every target seat + one media stage. */
+    public void playLuckyGiftToAllMics(String giftName, String iconUrl, String animationUrl,
+                                       String senderName, int comboCount,
+                                       String senderUserId, int senderVipLevel,
+                                       String senderAvatarUrl, List<String> targetIds, long coinValue) {
+        playLuckyGiftToAllMics(giftName, iconUrl, animationUrl, senderName, comboCount,
+                1, senderUserId, senderVipLevel, senderAvatarUrl, targetIds, coinValue);
+    }
+
+    public void playLuckyGiftToAllMics(String giftName, String iconUrl, String animationUrl,
+                                       String senderName, int comboCount, int quantity,
+                                       String senderUserId, int senderVipLevel,
+                                       String senderAvatarUrl, List<String> targetIds, long coinValue) {
+        if (targetIds == null || targetIds.isEmpty()) return;
+        String playTo = null;
+        for (String tid : targetIds) {
+            if (tid == null || tid.isEmpty()) continue;
+            if (playTo == null) {
+                playTo = tid;
+            } else if (coinValue > 0) {
+                creditGiftCoinsOnSeat(tid, coinValue);
+            }
+        }
+        if (playTo == null) return;
+        scatterGiftToMics(iconUrl, targetIds, comboCount, Math.max(1, quantity), coinValue, senderName);
+        // First target: seat credit + effect queue / media (clones already flying).
+        playGiftToRecipient(giftName, iconUrl, animationUrl, senderName, comboCount,
+                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue, true);
     }
 
     /** @deprecated Big center ×N card removed. */
@@ -9052,28 +9400,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @NonNull
     public List<String> collectOccupiedMicUserIdsPublic() {
         return collectOccupiedMicUserIds();
-    }
-
-    /** All-mic send: center hold → clone to every target seat + one media stage. */
-    public void playLuckyGiftToAllMics(String giftName, String iconUrl, String animationUrl,
-                                       String senderName, int comboCount,
-                                       String senderUserId, int senderVipLevel,
-                                       String senderAvatarUrl, List<String> targetIds, long coinValue) {
-        if (targetIds == null || targetIds.isEmpty()) return;
-        String playTo = null;
-        for (String tid : targetIds) {
-            if (tid == null || tid.isEmpty()) continue;
-            if (playTo == null) {
-                playTo = tid;
-            } else if (coinValue > 0) {
-                creditGiftCoinsOnSeat(tid, coinValue);
-            }
-        }
-        if (playTo == null) return;
-        scatterGiftToMics(iconUrl, targetIds, comboCount);
-        // First target: seat credit + effect queue / media (clones already flying).
-        playGiftToRecipient(giftName, iconUrl, animationUrl, senderName, comboCount,
-                senderUserId, senderVipLevel, senderAvatarUrl, playTo, coinValue, true);
     }
 
     /** Room banner when the sender hits a lucky multiplier (or soft partial return). */
@@ -9461,7 +9787,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static String firstNonEmpty(String... values) {
         if (values == null) return null;
         for (String value : values) {
-            if (value != null && !value.isEmpty()) return value;
+            if (value != null) {
+                String t = value.trim();
+                if (!t.isEmpty()) return t;
+            }
         }
         return null;
     }
@@ -10413,15 +10742,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 startActivity(open);
             }
         } else if ("room:chat_cleared".equals(event)) {
-            // Staff wiped public chat — clear for every client, then show a short system note.
-            clearLocalRoomChat();
+            // Full wipe for every client: phone cache + UI (+ server already stamped).
+            long stamp = parseIsoMillis(memberStr(payload, "chatClearedAt"));
+            if (stamp > 0) clearRoomChatSession(stamp);
+            else clearLocalRoomChat();
             String who = firstNonEmpty(
                     memberStr(payload, "displayName"),
                     fromUsername,
                     "مشرف");
-            appendChatLine("النظام",
-                    getString(R.string.clear_room_chat_done) + " · " + who,
-                    0, 1);
+            boolean auto = memberBool(payload, "auto", false);
+            String note = auto
+                    ? getString(R.string.clear_room_chat_done) + " · " + who
+                    : getString(R.string.clear_room_chat_done) + " · " + who;
+            appendChatLine("النظام", note, 0, 1);
+        } else if ("room:chat_auto_clear".equals(event)) {
+            int mins = memberInt(payload, "chatAutoClearMinutes", 0);
+            RoomDtos.RoomDto r = viewModel.getRoom().getValue();
+            if (r != null) r.chatAutoClearMinutes = mins;
+            long stamp = parseIsoMillis(memberStr(payload, "chatClearedAt"));
+            if (stamp > 0) RoomChatMemory.honorServerWipe(roomId, stamp);
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
             if (serverTime != null) {
@@ -10561,6 +10900,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         Math.max(1L, totalCoins),
                         qtyRemote,
                         Math.max(1, rainTargets.isEmpty() ? personCount : rainTargets.size()),
+                        sender,
                         null);
                 int senderVipChat = Math.max(0, memberInt(payload, "senderVipLevel", 0));
                 int senderLevelChat = Math.max(1, memberInt(payload, "senderUserLevel", 1));
@@ -10577,8 +10917,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         name, icon, sender, 1, senderId, senderVipChat,
                         memberStr(payload, "senderAvatarUrl"), senderLevelChat, senderFrameChat);
             } else if (allMic && !allReceivers.isEmpty()) {
-                // Mikoo: center gift → clones to every target mic.
-                scatterGiftToMics(icon, allReceivers, combo);
+                // Mikoo: center gift → simultaneous clones to every target mic.
+                String sendName = sender != null && !sender.isEmpty() ? sender : "مستخدم";
+                long perPerson = personCount > 0 ? Math.max(1L, totalCoins / personCount) : totalCoins;
+                scatterGiftToMics(icon, allReceivers, combo,
+                        Math.max(1, qtyRemote), perPerson, sendName);
             }
             long receiverRoomGiftTotal =
                     Math.max(0L, memberLong(payload, "receiverRoomGiftTotal", 0L));
@@ -11297,13 +11640,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.headerRoom.setPaddingRelative(padStart, 0, padEnd, 0);
             }
 
-            int bottomInset = Math.max(bars.bottom, ime.bottom);
-            setBottomMargin(binding.bottomBar, bottomInset);
+            int navBottom = bars.bottom;
+            int imeBottom = ime.bottom;
+            // Tools row never climbs the keyboard — only the white send bar does.
+            if (binding.bottomBar != null) {
+                setBottomMargin(binding.bottomBar, navBottom);
+                if (roomComposerOpen) {
+                    binding.bottomBar.setVisibility(View.GONE);
+                }
+            }
             // Mikoo MultiInputMsgView: pad overlay so white bar sits on keyboard; dismiss on IME hide.
             if (binding.roomChatComposer != null) {
                 if (roomComposerOpen) {
-                    binding.roomChatComposer.setPadding(0, 0, 0, bottomInset);
-                    if (ime.bottom > 0) {
+                    binding.roomChatComposer.setPadding(0, 0, 0, Math.max(navBottom, imeBottom));
+                    if (imeBottom > 0) {
                         roomComposerImeWasOpen = true;
                     } else if (roomComposerImeWasOpen) {
                         roomComposerImeWasOpen = false;
@@ -11314,11 +11664,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     roomComposerImeWasOpen = false;
                 }
             }
-            // Mikoo: pad the game overlay shell (decorView), not the WebView canvas.
-            applyGameOverlaySafeInsets(bars.bottom);
-            if (ime.bottom > 0) {
+            if (imeBottom > 0) {
                 scrollChatToBottom(false);
             }
+            applyGameOverlaySafeInsets(navBottom);
             return insets;
         });
         ViewCompat.requestApplyInsets(binding.getRoot());
@@ -13445,7 +13794,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void setRoomChromeHidden(boolean hide) {
         if (binding == null) return;
         int v = hide ? View.GONE : View.VISIBLE;
-        if (binding.bottomBar != null) binding.bottomBar.setVisibility(v);
+        // Don't revive tools while the send-only composer is open.
+        if (binding.bottomBar != null) {
+            binding.bottomBar.setVisibility(
+                    (!hide && roomComposerOpen) ? View.GONE : v);
+        }
         try {
             int chatId = getResources().getIdentifier("chatPanel", "id", getPackageName());
             if (chatId != 0) {

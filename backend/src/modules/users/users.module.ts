@@ -11,6 +11,8 @@ import { UserVip } from '../../database/entities/user-vip.entity';
 import { SocialRequest } from '../../database/entities/social-request.entity';
 import { ProfileVisit } from '../../database/entities/profile-visit.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { AgencyMember } from '../../database/entities/agency-member.entity';
+import { Agency } from '../../database/entities/agency.entity';
 import { FemaleIdentityVerification } from '../../database/entities/female-identity-verification.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
@@ -37,6 +39,8 @@ import { IdentityVerificationService } from './identity-verification.service';
       SocialRequest,
       ProfileVisit,
       Cosmetic,
+      AgencyMember,
+      Agency,
       FemaleIdentityVerification,
       AppSetting,
     ]),

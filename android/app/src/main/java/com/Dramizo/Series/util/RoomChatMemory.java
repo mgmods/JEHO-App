@@ -20,14 +20,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Room chat for the active live session.
- * Survives Activity recreate and process restart while the same roomId is live.
- * Cleared only when the broadcast ends.
+ * Room public chat for the active live session.
+ * Survives Activity recreate / minimize; wiped on staff clear, auto-clear, or end of live.
+ * Disk + memory + cleared-epoch so wipe is complete on this device.
  */
 public final class RoomChatMemory {
     private static final int SOFT_CAP = 800;
     private static final String DIR = "room_chat_sessions";
     private static final Map<String, List<Line>> BY_ROOM =
+            Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<String, Long> CLEARED_AT =
             Collections.synchronizedMap(new LinkedHashMap<>());
     @Nullable private static Context appCtx;
 
@@ -100,23 +102,90 @@ public final class RoomChatMemory {
         }
     }
 
-    /** Wipe chat for a room — call only when ending the broadcast. */
+    /**
+     * Full wipe on this phone: memory + disk session file + tmp leftovers.
+     * Call when staff clears, auto-clear fires, or live ends.
+     */
     public static void clear(@Nullable String roomId) {
+        clear(roomId, System.currentTimeMillis());
+    }
+
+    public static void clear(@Nullable String roomId, long clearedAtMs) {
         if (roomId == null || roomId.isEmpty()) return;
+        long stamp = clearedAtMs > 0 ? clearedAtMs : System.currentTimeMillis();
         synchronized (BY_ROOM) {
             BY_ROOM.remove(roomId);
+            CLEARED_AT.put(roomId, stamp);
         }
-        File f = sessionFile(roomId);
-        if (f != null && f.exists()) {
+        deleteSessionArtifacts(roomId);
+        writeClearedMeta(roomId, stamp);
+    }
+
+    /**
+     * Honor server chatClearedAt so late-join / re-open does not restore pre-wipe messages.
+     */
+    public static void honorServerWipe(@Nullable String roomId, long serverClearedAtMs) {
+        if (roomId == null || roomId.isEmpty() || serverClearedAtMs <= 0) return;
+        long local = clearedEpoch(roomId);
+        if (serverClearedAtMs > local) {
+            clear(roomId, serverClearedAtMs);
+        }
+    }
+
+    public static long clearedEpoch(@Nullable String roomId) {
+        if (roomId == null || roomId.isEmpty()) return 0L;
+        Long mem = CLEARED_AT.get(roomId);
+        if (mem != null && mem > 0) return mem;
+        long disk = readClearedMeta(roomId);
+        if (disk > 0) {
+            CLEARED_AT.put(roomId, disk);
+            return disk;
+        }
+        return 0L;
+    }
+
+    private static void deleteSessionArtifacts(String roomId) {
+        File session = sessionFile(roomId);
+        if (session != null && session.exists()) {
             //noinspection ResultOfMethodCallIgnored
-            f.delete();
+            session.delete();
+        }
+        File tmp = sessionTmpFile(roomId);
+        if (tmp != null && tmp.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+        }
+        // Wipe any legacy name variants under the sessions dir matching this room.
+        Context ctx = appCtx;
+        if (ctx == null) return;
+        File dir = new File(ctx.getFilesDir(), DIR);
+        if (!dir.isDirectory()) return;
+        String base = safeName(roomId);
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f == null || !f.isFile()) continue;
+            String n = f.getName();
+            if (n.startsWith(base + ".") || n.equals(base + ".json") || n.equals(base + ".tmp")) {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+            }
         }
     }
 
     private static void ensureLoaded(String roomId) {
         synchronized (BY_ROOM) {
             if (BY_ROOM.containsKey(roomId)) return;
+            long cleared = readClearedMeta(roomId);
+            if (cleared > 0) CLEARED_AT.put(roomId, cleared);
             List<Line> loaded = readDisk(roomId);
+            // Drop disk cache if server wipe stamp is newer than file mtime.
+            File f = sessionFile(roomId);
+            if (f != null && f.exists() && cleared > 0 && f.lastModified() < cleared) {
+                //noinspection ResultOfMethodCallIgnored
+                f.delete();
+                loaded = new ArrayList<>();
+            }
             BY_ROOM.put(roomId, loaded != null ? loaded : new ArrayList<>());
         }
     }
@@ -195,6 +264,44 @@ public final class RoomChatMemory {
         Context ctx = appCtx;
         if (ctx == null || roomId == null || roomId.isEmpty()) return null;
         return new File(new File(ctx.getFilesDir(), DIR), safeName(roomId) + ".json");
+    }
+
+    @Nullable
+    private static File sessionTmpFile(String roomId) {
+        Context ctx = appCtx;
+        if (ctx == null || roomId == null || roomId.isEmpty()) return null;
+        return new File(new File(ctx.getFilesDir(), DIR), safeName(roomId) + ".tmp");
+    }
+
+    private static void writeClearedMeta(String roomId, long ms) {
+        Context ctx = appCtx;
+        if (ctx == null) return;
+        try {
+            File dir = new File(ctx.getFilesDir(), DIR);
+            if (!dir.exists() && !dir.mkdirs()) return;
+            File meta = new File(dir, safeName(roomId) + ".cleared");
+            try (FileOutputStream fos = new FileOutputStream(meta)) {
+                fos.write(String.valueOf(ms).getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static long readClearedMeta(String roomId) {
+        Context ctx = appCtx;
+        if (ctx == null) return 0L;
+        try {
+            File meta = new File(new File(ctx.getFilesDir(), DIR), safeName(roomId) + ".cleared");
+            if (!meta.exists() || meta.length() == 0) return 0L;
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(meta), StandardCharsets.UTF_8))) {
+                String s = br.readLine();
+                if (s == null) return 0L;
+                return Long.parseLong(s.trim());
+            }
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     private static String safeName(String roomId) {

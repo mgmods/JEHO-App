@@ -223,7 +223,7 @@ async function main() {
               AND "previewUrl" NOT LIKE '%entry-mikoo-%')
     `);
 
-    // Keep only Mikoo room borders active; retire kenar/pro/vip/room_frame cards.
+    // Keep only Mikoo room borders top1–7 active; retire kenar/pro/vip/room_frame cards.
     await client.query(`
       UPDATE cosmetics
          SET "isActive" = false, "updatedAt" = NOW()
@@ -231,7 +231,11 @@ async function main() {
          AND code NOT IN (
            'room_mikoo_border_top1',
            'room_mikoo_border_top2',
-           'room_mikoo_border_top3'
+           'room_mikoo_border_top3',
+           'room_mikoo_border_top4',
+           'room_mikoo_border_top5',
+           'room_mikoo_border_top6',
+           'room_mikoo_border_top7'
          )
     `);
 

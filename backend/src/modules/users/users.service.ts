@@ -36,6 +36,9 @@ import { IdentityVerificationService } from './identity-verification.service';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 import { HOST_NEW_USER_CHAT, levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { fixedVipFrameUrl, fixedVipHeadUrl, isStaticVipTouUrl } from '../../common/vip-visual';
+import { AgencyMember, AgencyMemberStatus } from '../../database/entities/agency-member.entity';
+import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
 
 const LEVEL_THRESHOLDS = [
   0, 100, 500, 1500, 4000, 10000, 25000, 60000, 150000, 400000, 1000000,
@@ -53,6 +56,7 @@ export class UsersService {
     @InjectRepository(SocialRequest) private readonly socialRepo: Repository<SocialRequest>,
     @InjectRepository(ProfileVisit) private readonly visitsRepo: Repository<ProfileVisit>,
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
+    @InjectRepository(AgencyMember) private readonly agencyMembersRepo: Repository<AgencyMember>,
     private readonly dataSource: DataSource,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
@@ -113,11 +117,71 @@ export class UsersService {
     return { ...flat, hostBadgeMeta };
   }
 
+  /**
+   * Mikoo: VIP has separate static layers (head banner + optional vip_tou badge frame).
+   * Never overwrite vipBadgeUrl — that is the equipped mall/SVGA head frame wear.
+   */
+  private applyFixedVipWear<T extends Record<string, unknown>>(
+    flat: T,
+    vipLevel: number,
+  ): T & { vipHeadUrl: string | null; vipTouUrl: string | null } {
+    return {
+      ...flat,
+      vipHeadUrl: fixedVipHeadUrl(vipLevel),
+      /** Static VIP badge frame (ud_vip_tou) — only fall back when no equipped wear. */
+      vipTouUrl: fixedVipFrameUrl(vipLevel),
+    };
+  }
+
+  private async resolveActiveAgency(userId: string) {
+    const row = await this.agencyMembersRepo.findOne({
+      where: {
+        userId,
+        isActive: true,
+        status: AgencyMemberStatus.ACTIVE,
+      },
+      relations: ['agency'],
+      order: { joinedAt: 'DESC' },
+    });
+    const agency = row?.agency;
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) return null;
+    // Prefer stored logo; fall back to any agency room cover (often the brand image).
+    let coverUrl: string | null = null;
+    try {
+      const covers = await this.dataSource.query(
+        `SELECT "coverUrl" FROM rooms
+         WHERE "agencyId" = $1
+           AND "coverUrl" IS NOT NULL
+           AND TRIM("coverUrl") <> ''
+         ORDER BY "updatedAt" DESC NULLS LAST
+         LIMIT 1`,
+        [agency.id],
+      );
+      const raw = covers?.[0]?.coverUrl;
+      if (typeof raw === 'string' && raw.trim()) coverUrl = raw.trim();
+    } catch {
+      /* ignore — agency snip still works without cover fallback */
+    }
+    const logoUrl =
+      (agency.logoUrl && String(agency.logoUrl).trim()) || coverUrl || null;
+    return {
+      id: agency.id,
+      name: agency.name,
+      publicId: agency.publicId,
+      logoUrl,
+      coverUrl: coverUrl || logoUrl,
+      isVerified: !!agency.isVerified,
+      role: row?.role || null,
+    };
+  }
+
   private flatten(user: User) {
     const p = user.profile;
     const economy = this.economyStats(p);
     const newbie = this.newUserFlags(user);
     const staffRole = normalizeStaffRole(user);
+    // Strip static VIP art if it was wrongly written into wear column.
+    const wearVip = isStaticVipTouUrl(p?.vipBadgeUrl) ? null : p?.vipBadgeUrl ?? null;
     return {
       ...user,
       staffRole,
@@ -128,7 +192,7 @@ export class UsersService {
       entryEffectUrl: p?.entryEffectUrl ?? null,
       entryAnimationUrl: p?.entryAnimationUrl ?? null,
       roomCardUrl: p?.roomCardUrl ?? null,
-      vipBadgeUrl: p?.vipBadgeUrl ?? null,
+      vipBadgeUrl: wearVip,
       levelBadgeUrl: p?.levelBadgeUrl ?? null,
       hostBadgeUrl: p?.hostBadgeUrl ?? null,
       country: p?.country ?? null,
@@ -174,13 +238,24 @@ export class UsersService {
     });
     const vipValid = vip && (!vip.expiresAt || vip.expiresAt > now) ? vip : null;
     const verification = await this.identityVerification.getStatus(userId);
-    return this.withWearMeta({
-      ...this.flatten(user),
-      activeVip: vipValid,
-      vipLevel: effectiveVipLevel(vipValid?.level ?? 0, Number(user.profile?.totalSentCoins || 0)),
-      genderVerified: verification.genderVerified,
-      genderVerificationStatus: verification.genderVerificationStatus,
-    });
+    const vipLevel = effectiveVipLevel(
+      vipValid?.level ?? 0,
+      Number(user.profile?.totalSentCoins || 0),
+    );
+    const agency = await this.resolveActiveAgency(userId);
+    return this.withWearMeta(
+      this.applyFixedVipWear(
+        {
+          ...this.flatten(user),
+          activeVip: vipValid,
+          vipLevel,
+          genderVerified: verification.genderVerified,
+          genderVerificationStatus: verification.genderVerificationStatus,
+          agency,
+        },
+        vipLevel,
+      ),
+    );
   }
 
   async getById(id: string, viewerId?: string) {
@@ -194,10 +269,14 @@ export class UsersService {
       where: { userId: id, isActive: true },
       order: { level: 'DESC' },
     });
-    const vipLevel =
+    const vipLevelRaw =
       vip && (!vip.expiresAt || vip.expiresAt > now)
         ? Number(vip.level || 0)
         : 0;
+    const vipLevel = effectiveVipLevel(
+      vipLevelRaw,
+      Number(user.profile?.totalSentCoins || 0),
+    );
     let isFollowing = false;
     if (viewerId && viewerId !== id) {
       const follow = await this.followsRepo.findOne({
@@ -205,11 +284,18 @@ export class UsersService {
       });
       isFollowing = !!follow;
     }
-    return this.withWearMeta({
-      ...this.flatten(user),
-      vipLevel: effectiveVipLevel(vipLevel, Number(user.profile?.totalSentCoins || 0)),
-      isFollowing,
-    });
+    const agency = await this.resolveActiveAgency(id);
+    return this.withWearMeta(
+      this.applyFixedVipWear(
+        {
+          ...this.flatten(user),
+          vipLevel,
+          isFollowing,
+          agency,
+        },
+        vipLevel,
+      ),
+    );
   }
 
   async getByUsername(username: string) {
@@ -411,7 +497,12 @@ export class UsersService {
       entryEffectUrl: user.profile?.entryEffectUrl ?? null,
       entryAnimationUrl: user.profile?.entryAnimationUrl ?? null,
       roomCardUrl: user.profile?.roomCardUrl ?? null,
-      vipBadgeUrl: user.profile?.vipBadgeUrl ?? null,
+      // Equipped mall / animated frame only — never force static VIP art.
+      vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
+        ? null
+        : user.profile?.vipBadgeUrl ?? null,
+      vipHeadUrl: fixedVipHeadUrl(vipLevel),
+      vipTouUrl: fixedVipFrameUrl(vipLevel),
       levelBadgeUrl: user.profile?.levelBadgeUrl ?? null,
       hostBadgeUrl: user.profile?.hostBadgeUrl ?? null,
       country: user.profile?.country ?? null,

@@ -1413,14 +1413,14 @@
         </FrameLayout>
     </LinearLayout>
 
-    <!-- Mikoo MultiInputMsgView: full-screen overlay; white bar sits above keyboard -->
+    <!-- Mikoo MultiInputMsgView: full-screen overlay; white send box only (above keyboard) -->
     <FrameLayout
         android:id="@+id/roomChatComposer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="#66000000"
         android:clickable="true"
-        android:elevation="22dp"
+        android:elevation="40dp"
         android:focusable="true"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"

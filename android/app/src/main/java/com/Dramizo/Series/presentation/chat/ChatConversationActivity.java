@@ -159,15 +159,26 @@ public class ChatConversationActivity extends ThemedActivity {
         }
 
         bindPeerName(title, null);
-        binding.tvPeerStatus.setText(R.string.loading);
-        AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
-        AvatarCosmetics.applyHostWear(
-                binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
-                vipFrame, null, null, null);
-        View.OnClickListener openPeerProfile = v -> openPeerProfile();
-        binding.imgPeerAvatar.setOnClickListener(openPeerProfile);
-        if (binding.imgPeerFrame != null) binding.imgPeerFrame.setOnClickListener(openPeerProfile);
-        if (binding.tvPeerName != null) binding.tvPeerName.setOnClickListener(openPeerProfile);
+        if (binding.tvPeerStatus != null) {
+            binding.tvPeerStatus.setText(R.string.loading);
+        }
+        if (binding.imgPeerAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
+            AvatarCosmetics.applyHostWear(
+                    binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
+                    vipFrame, null, null, null);
+            View.OnClickListener openPeerProfile = v -> openPeerProfile();
+            binding.imgPeerAvatar.setOnClickListener(openPeerProfile);
+            if (binding.imgPeerFrame != null) binding.imgPeerFrame.setOnClickListener(openPeerProfile);
+            if (binding.tvPeerName != null) binding.tvPeerName.setOnClickListener(openPeerProfile);
+            if (binding.imgStripAvatar != null) {
+                AvatarCosmetics.bindAvatar(binding.imgStripAvatar, avatar);
+                binding.imgStripAvatar.setOnClickListener(openPeerProfile);
+            }
+            if (binding.tvStripName != null && title != null && !title.isEmpty()) {
+                binding.tvStripName.setText(title);
+            }
+        }
         binding.btnBack.setOnClickListener(v -> navigateUp());
         bindGiftButton();
         if (binding.btnChatMenu != null) {
@@ -232,8 +243,7 @@ public class ChatConversationActivity extends ThemedActivity {
         });
 
         binding.btnSend.setOnClickListener(v -> sendNow());
-        // Voice recording UI hidden (btnVoice GONE) — keep playback of received audio.
-        // setupVoiceButton();
+        setupVoiceButton();
         binding.btnAttach.setOnClickListener(v -> showAttachPicker());
         if (binding.btnChatGift != null) {
             binding.btnChatGift.setOnClickListener(v -> openChatGifts());
@@ -616,9 +626,17 @@ public class ChatConversationActivity extends ThemedActivity {
                 ? displayName
                 : (username != null && !username.isEmpty() ? username : getString(R.string.chat));
         binding.tvPeerName.setText(name);
-        // Inside chat: never show ID under the name — only last seen / online / typing.
-        binding.tvPeerUsername.setText("");
-        binding.tvPeerUsername.setVisibility(View.GONE);
+        String publicId = peer != null ? peer.displayPublicId() : "";
+        if (publicId.isEmpty() && username != null && !username.isEmpty()) {
+            publicId = username;
+        }
+        if (!publicId.isEmpty() && binding.tvPeerUsername != null) {
+            binding.tvPeerUsername.setText("(ID:" + publicId + ")");
+            binding.tvPeerUsername.setVisibility(View.VISIBLE);
+        } else if (binding.tvPeerUsername != null) {
+            binding.tvPeerUsername.setVisibility(View.GONE);
+        }
+        if (binding.tvStripName != null) binding.tvStripName.setText(name);
     }
 
     private void bindPeerProfile(AuthDtos.UserDto peer) {
@@ -629,21 +647,60 @@ public class ChatConversationActivity extends ThemedActivity {
         }
         if (peerId == null) peerId = peer.id;
         bindPeerName(peer.displayName, peer.username, peer);
-        AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, peer.avatarUrl);
-        AvatarCosmetics.applyHostWear(
-                binding.imgPeerFrame,
-                binding.imgPeerHostBadge,
-                binding.imgPeerAvatar,
-                peer.vipBadgeUrl,
-                null,
-                null,
-                null);
+        if (binding.imgPeerAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, peer.avatarUrl);
+        }
+        if (binding.imgStripAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgStripAvatar, peer.avatarUrl);
+        }
+        if (binding.imgPeerFrame != null || binding.imgPeerHostBadge != null) {
+            AvatarCosmetics.applyHostWear(
+                    binding.imgPeerFrame,
+                    binding.imgPeerHostBadge,
+                    binding.imgPeerAvatar,
+                    peer.vipBadgeUrl,
+                    null,
+                    null,
+                    null);
+        }
+        if (binding.imgStripFlag != null) {
+            com.Dramizo.Series.util.FlagImages.bind(binding.imgStripFlag, peer.country);
+        }
+        if (binding.tvStripLv1 != null) {
+            binding.tvStripLv1.setText(String.valueOf(Math.max(1, peer.level)));
+        }
+        if (binding.tvStripLv2 != null) {
+            long pop = peer.popularityLevel > 0 ? peer.popularityLevel : peer.popularityScore;
+            binding.tvStripLv2.setText(String.valueOf(Math.max(0, pop)));
+        }
+        if (binding.tvStripLv3 != null) {
+            long w = peer.wealthLevel > 0 ? peer.wealthLevel : peer.wealthScore;
+            binding.tvStripLv3.setText(String.valueOf(Math.max(0, w)));
+        }
+        // Female gradient strip when known.
+        if (binding.imgPeerStripBg != null && peer.gender != null) {
+            String g = peer.gender.trim().toLowerCase(java.util.Locale.US);
+            if ("female".equals(g) || "f".equals(g) || "انثى".equals(g) || "أنثى".equals(g)) {
+                binding.imgPeerStripBg.setImageResource(R.drawable.p2p_nvbg);
+            } else {
+                binding.imgPeerStripBg.setImageResource(R.drawable.p2p_nanbg);
+            }
+        }
+        if (binding.btnUpgradeRelation != null) {
+            binding.btnUpgradeRelation.setOnClickListener(v -> {
+                try {
+                    startActivity(new Intent(this,
+                            com.Dramizo.Series.presentation.cp.CpCenterActivity.class));
+                } catch (Exception e) {
+                    Toast.makeText(this, R.string.upgrade_relation, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         if (adapter != null) {
             adapter.setPeerProfile(peer);
         }
         showOnlineAllowed = peer.showOnlineStatus == null || Boolean.TRUE.equals(peer.showOnlineStatus);
         peerLastSeenAt = peer.lastSeenAt;
-        // Heuristic until socket presence replies
         if (showOnlineAllowed) {
             java.util.Date d = DeviceTimeFormat.parse(peer.lastSeenAt);
             if (d != null && System.currentTimeMillis() - d.getTime() < 2 * 60_000L) {
@@ -663,7 +720,7 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void refreshPeerStatusUi() {
-        if (binding == null) return;
+        if (binding == null || binding.tvPeerStatus == null) return;
         // Typing only under the name — never duplicate below the chat list.
         if (binding.tvTyping != null) binding.tvTyping.setVisibility(View.GONE);
         if (peerTyping) {
@@ -932,26 +989,29 @@ public class ChatConversationActivity extends ThemedActivity {
     private void showVoiceHud(boolean recording) {
         if (binding.voiceRecordOverlay == null) return;
         binding.voiceRecordOverlay.setVisibility(View.VISIBLE);
-        if (binding.tvVoiceTimer != null) binding.tvVoiceTimer.setText("0:00");
+        if (binding.tvVoiceTimer != null) {
+            binding.tvVoiceTimer.setVisibility(View.VISIBLE);
+            binding.tvVoiceTimer.setText("0:00");
+        }
         if (binding.tvVoiceHint != null) {
-            binding.tvVoiceHint.setText(R.string.voice_tap_send);
-            binding.tvVoiceHint.setTextColor(getColor(R.color.text_secondary));
+            binding.tvVoiceHint.setText(R.string.press_to_record);
+            binding.tvVoiceHint.setTextColor(0xFF333333);
         }
         if (binding.imgChatVoice != null) {
             binding.imgChatVoice.setColorFilter(0xFFE53935);
         }
-        if (binding.voiceRecDot != null) {
-            binding.voiceRecDot.setAlpha(1f);
-            binding.voiceRecDot.animate()
-                    .alpha(0.25f)
-                    .setDuration(500)
+        if (binding.voiceMicCircle != null) {
+            binding.voiceMicCircle.setAlpha(1f);
+            binding.voiceMicCircle.animate()
+                    .scaleX(1.06f).scaleY(1.06f)
+                    .setDuration(450)
                     .withEndAction(new Runnable() {
                         @Override public void run() {
-                            if (binding == null || binding.voiceRecDot == null) return;
-                            if (!voiceRecordingActive) return;
-                            binding.voiceRecDot.animate()
-                                    .alpha(1f)
-                                    .setDuration(500)
+                            if (binding == null || !voiceRecordingActive
+                                    || binding.voiceMicCircle == null) return;
+                            binding.voiceMicCircle.animate()
+                                    .scaleX(1f).scaleY(1f)
+                                    .setDuration(450)
                                     .withEndAction(this)
                                     .start();
                         }
@@ -967,6 +1027,11 @@ public class ChatConversationActivity extends ThemedActivity {
         voiceRecordingActive = false;
         if (binding == null) return;
         if (binding.imgChatVoice != null) binding.imgChatVoice.clearColorFilter();
+        if (binding.voiceMicCircle != null) {
+            binding.voiceMicCircle.animate().cancel();
+            binding.voiceMicCircle.setScaleX(1f);
+            binding.voiceMicCircle.setScaleY(1f);
+        }
         if (binding.voiceRecDot != null) {
             binding.voiceRecDot.animate().cancel();
             binding.voiceRecDot.setAlpha(1f);

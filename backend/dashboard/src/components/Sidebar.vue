@@ -14,17 +14,26 @@
     </div>
 
     <nav class="sidebar-nav" aria-label="Main">
-      <RouterLink
-        v-for="item in flatItems"
-        :key="item.name + String(item.query?.tab || '')"
-        class="sidebar-link"
-        :class="{ active: isItemActive(item) }"
-        :to="itemTo(item)"
-        @click="close"
+      <div
+        v-for="section in visibleSections"
+        :key="section.id"
+        class="nav-section"
       >
-        <i :class="['bi', item.icon]" aria-hidden="true"></i>
-        <span>{{ item.label }}</span>
-      </RouterLink>
+        <div class="nav-section-label">{{ section.label }}</div>
+        <div class="nav-section-body">
+          <RouterLink
+            v-for="item in section.items"
+            :key="item.name + String(item.query?.tab || '')"
+            class="sidebar-link"
+            :class="{ active: isItemActive(item) }"
+            :to="itemTo(item)"
+            @click="close"
+          >
+            <i :class="['bi', item.icon]" aria-hidden="true"></i>
+            <span>{{ item.label }}</span>
+          </RouterLink>
+        </div>
+      </div>
     </nav>
 
     <div class="sidebar-footer">
@@ -57,6 +66,10 @@ const { t } = useI18n()
 const logoUrl = brandLogo
 const femaleVerifyEnabled = ref(false)
 
+/**
+ * One page = one job. No flattened mess, no duplicate settings links
+ * mixed into unrelated groups.
+ */
 const sections = computed(() => [
   {
     id: 'overview',
@@ -81,41 +94,64 @@ const sections = computed(() => [
     id: 'live',
     label: t('nav.liveRooms'),
     items: [
-      { name: 'rooms', icon: 'bi-door-open', label: t('nav.rooms') },
-      { name: 'settings', query: { tab: 'zego' }, icon: 'bi-broadcast-pin', label: t('nav.zegoSettings') },
+      { name: 'rooms', icon: 'bi-mic', label: t('nav.rooms') },
+      {
+        name: 'settings',
+        query: { tab: 'zego' },
+        icon: 'bi-broadcast-pin',
+        label: t('nav.zegoSettings'),
+      },
     ],
   },
   {
     id: 'money',
-    label: t('nav.monetization'),
+    label: t('nav.money'),
     items: [
       { name: 'gifts', icon: 'bi-gift', label: t('nav.gifts') },
       { name: 'coins', icon: 'bi-coin', label: t('nav.coins') },
-      { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
-      { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
       { name: 'wallet', icon: 'bi-wallet2', label: t('nav.wallet') },
-      { name: 'settings', query: { tab: 'payment' }, icon: 'bi-credit-card', label: t('nav.paymentSettings') },
+      { name: 'withdrawals', icon: 'bi-cash-stack', label: t('nav.withdrawals') },
+      {
+        name: 'settings',
+        query: { tab: 'payment' },
+        icon: 'bi-credit-card-2-front',
+        label: t('nav.paymentSettings'),
+      },
       { name: 'recharge-agents', icon: 'bi-person-badge', label: t('nav.rechargeAgents') },
+    ],
+  },
+  {
+    id: 'memberships',
+    label: t('nav.memberships'),
+    items: [
       { name: 'vip', icon: 'bi-diamond', label: t('nav.vip') },
       { name: 'vanity-ids', icon: 'bi-hash', label: t('nav.vanityIds') },
+      { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
+      { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
+      { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
     ],
   },
   {
     id: 'engage',
     label: t('nav.engagement'),
     items: [
-      { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
-      { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
-      { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
       { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
       { name: 'contests', icon: 'bi-trophy', label: t('nav.contests') },
       { name: 'ranking', icon: 'bi-bar-chart', label: t('nav.ranking') },
       { name: 'room-cup', icon: 'bi-trophy-fill', label: t('nav.roomCup') },
+    ],
+  },
+  {
+    id: 'media',
+    label: t('nav.mediaGames'),
+    items: [
       { name: 'games', icon: 'bi-controller', label: t('nav.games') },
       { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
       { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
+      { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
+      { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
     ],
   },
   {
@@ -134,18 +170,19 @@ const visibleSections = computed(() =>
   sections.value.filter((s) => s.items && s.items.length > 0),
 )
 
-const flatItems = computed(() =>
-  visibleSections.value.flatMap((s) => s.items),
-)
-
 function itemTo(item) {
   if (item.query) return { name: item.name, query: item.query }
+  // Root settings must not keep stale ?tab= from other links
+  if (item.settingsRoot) return { name: item.name, query: {} }
   return { name: item.name }
 }
 
 function isItemActive(item) {
   if (item.settingsRoot) {
-    return route.name === 'settings' && !route.query.tab
+    // Active only on general-ish settings (no payment/zego deep-link tabs).
+    if (route.name !== 'settings') return false
+    const tab = String(route.query.tab || '')
+    return !tab || tab === 'general' || tab === 'economy' || tab === 'account' || tab === 'features'
   }
   if (item.query?.tab) {
     return route.name === 'settings' && String(route.query.tab || '') === item.query.tab
@@ -185,7 +222,6 @@ async function loadFeatureFlags() {
 
 onMounted(() => {
   loadFeatureFlags()
-  // Clear broken collapse state from older builds
   try {
     localStorage.removeItem('jeho_admin_nav_collapse')
   } catch {

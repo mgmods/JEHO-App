@@ -105,10 +105,26 @@ public class MessagesFragment extends Fragment {
         binding.swipe.setOnRefreshListener(() -> {
             viewModel.load(true);
             loadOfficialNewsPreview();
+            bindMyRoomCard();
         });
-        binding.btnFriends.setOnClickListener(v -> openFriendsTab(0));
-        binding.btnRequests.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), RequestsActivity.class)));
+        if (binding.btnMsgMenu != null) {
+            binding.btnMsgMenu.setOnClickListener(v -> {
+                // Mikoo broom menu: friends + requests (+ mark clear path for later).
+                openFriendsTab(0);
+            });
+        }
+        if (binding.btnFriends != null) {
+            binding.btnFriends.setOnClickListener(v -> openFriendsTab(0));
+        }
+        if (binding.btnRequests != null) {
+            binding.btnRequests.setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(), RequestsActivity.class)));
+        }
+        if (binding.cardMyRoom != null) {
+            binding.cardMyRoom.setOnClickListener(v ->
+                    com.Dramizo.Series.util.RoomOpenChooser.open(requireActivity()));
+        }
+        bindMyRoomCard();
         loadPendingRequestBadge();
 
         if (binding.officialNewsCardMsg != null) {
@@ -196,7 +212,35 @@ public class MessagesFragment extends Fragment {
         if (viewModel != null) viewModel.load(true);
         loadPendingRequestBadge();
         loadOfficialNewsPreview();
+        bindMyRoomCard();
         registerOfficialNewsReceiver();
+    }
+
+    private void bindMyRoomCard() {
+        if (binding == null || !isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto me =
+                    c.getSessionManager().getUser();
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                if (me != null) {
+                    String name = me.displayName != null && !me.displayName.isEmpty()
+                            ? me.displayName
+                            : (me.username != null ? me.username : getString(R.string.app_name));
+                    if (binding.tvMyRoomName != null) binding.tvMyRoomName.setText(name);
+                    if (binding.imgMyRoomAvatar != null && me.avatarUrl != null) {
+                        com.Dramizo.Series.util.ServerAssets.load(binding.imgMyRoomAvatar, me.avatarUrl);
+                    }
+                    if (binding.imgMyRoomPlus != null) {
+                        binding.imgMyRoomPlus.setVisibility(
+                                me.avatarUrl == null || me.avatarUrl.isEmpty()
+                                        ? View.VISIBLE : View.GONE);
+                    }
+                }
+            });
+        });
     }
 
     @Override

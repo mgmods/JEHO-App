@@ -193,6 +193,20 @@ export class Room {
   @Column({ type: 'boolean', default: true })
   lowGiftEffectsEnabled: boolean;
 
+  /**
+   * Last time public room chat was wiped (manual or auto).
+   * Clients discard any local cache older than this stamp.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  chatClearedAt: Date | null;
+
+  /**
+   * Auto wipe public chat every N minutes (0 = off). Allowed: 0, 1, 5, 10.
+   * Server enforces for every device connected to the room.
+   */
+  @Column({ type: 'int', default: 0 })
+  chatAutoClearMinutes: number;
+
   /** Season key when this room holds a Room Cup winner badge. */
   @Column({ type: 'varchar', length: 32, nullable: true })
   cupBadgeSeason: string | null;

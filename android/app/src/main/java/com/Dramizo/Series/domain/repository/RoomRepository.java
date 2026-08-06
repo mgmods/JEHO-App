@@ -29,6 +29,8 @@ public interface RoomRepository {
     Result<RoomDtos.RoomDto> lock(String id, boolean locked, String password);
     Result<RoomDtos.RoomDto> setGiftSounds(String id, boolean enabled);
     Result<RoomDtos.RoomDto> setDisplaySettings(String id, java.util.Map<String, Boolean> patch);
+    Result<java.util.Map<String, Object>> clearPublicChat(String id);
+    Result<RoomDtos.RoomDto> setChatAutoClearMinutes(String id, int minutes);
     Result<Object> setMic(String id, boolean muted);
     Result<Object> setMic(String id, boolean muted, String targetUserId);
     Result<RoomDtos.RoomDto> takeSeat(String id, int seatIndex);

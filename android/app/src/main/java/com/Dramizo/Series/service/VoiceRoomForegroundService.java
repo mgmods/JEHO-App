@@ -97,6 +97,24 @@ public class VoiceRoomForegroundService extends Service {
                         bufferChatWhileMinimized(payload, fromUserId, fromUsername);
                         return;
                     }
+                    if ("room:chat_cleared".equals(event)) {
+                        // Even while UI is closed: wipe on-device cache so reopen is empty.
+                        long stamp = 0L;
+                        if (payload != null && payload.has("chatClearedAt")
+                                && !payload.get("chatClearedAt").isJsonNull()) {
+                            try {
+                                stamp = java.time.Instant.parse(
+                                        payload.get("chatClearedAt").getAsString()).toEpochMilli();
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        if (stamp > 0) {
+                            com.Dramizo.Series.util.RoomChatMemory.clear(roomId, stamp);
+                        } else {
+                            com.Dramizo.Series.util.RoomChatMemory.clear(roomId);
+                        }
+                        return;
+                    }
                     if ("room:music".equals(event)) {
                         String url = string(payload, "url");
                         String status = string(payload, "status");

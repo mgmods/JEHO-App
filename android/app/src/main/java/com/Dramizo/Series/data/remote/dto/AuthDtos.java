@@ -109,6 +109,10 @@ public final class AuthDtos {
         @SerializedName("coverUrl") public String coverUrl;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
+        /** Fixed VIP nobility frame (ud_vip_tou_{n}) for profile/card — not mall wear. */
+        @SerializedName("vipTouUrl") public String vipTouUrl;
+        /** VIP card head ornament (ic_head_vip_{n}) — only when vipLevel &gt; 0. */
+        @SerializedName("vipHeadUrl") public String vipHeadUrl;
         @SerializedName("hostBadgeUrl") public String hostBadgeUrl;
         /** Cosmetic meta JSON for worn host badge: offsetX/offsetY/scale/avatarScale */
         @SerializedName("hostBadgeMeta") public java.util.Map<String, Object> hostBadgeMeta;
@@ -158,6 +162,19 @@ public final class AuthDtos {
         @SerializedName("isNewMale") public boolean isNewMale;
         /** True when the authenticated viewer follows this user. */
         @SerializedName("isFollowing") public Boolean isFollowing;
+        /** Active agency membership (if any) for room user-card. */
+        @SerializedName("agency") public AgencySnip agency;
+
+        public static class AgencySnip {
+            @SerializedName("id") public String id;
+            @SerializedName("name") public String name;
+            @SerializedName("publicId") public String publicId;
+            @SerializedName("logoUrl") public String logoUrl;
+            /** Live/permanent room cover fallback when logo is empty. */
+            @SerializedName("coverUrl") public String coverUrl;
+            @SerializedName("isVerified") public boolean isVerified;
+            @SerializedName("role") public String role;
+        }
 
         /** App-facing ID: numeric publicId, never the login/store username. */
         public String displayPublicId() {

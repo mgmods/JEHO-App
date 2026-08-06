@@ -6,13 +6,96 @@ import android.util.TypedValue;
 import android.view.View;
 
 import androidx.annotation.ColorInt;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 
 import com.Dramizo.Series.R;
 
-/** Mikoo-like VIP bubble / chip colors by VIP tier 1–7. */
+/**
+ * Mikoo-like VIP bubble / chip colors by VIP tier 1–7.
+ * Chat bubble skins: local 9-patch drawables (also served at
+ * /assets/chat/vip_bubbles/vip_chat_bubble_{1-7}.webp).
+ */
 public final class VipStyle {
     private VipStyle() {}
+
+    /** Server-relative path for VIP chat bubble skin (1–7). */
+    @NonNull
+    public static String bubbleAssetPath(int vipLevel) {
+        int tier = Math.min(7, Math.max(1, vipLevel));
+        return "/assets/chat/vip_bubbles/vip_chat_bubble_" + tier + ".webp";
+    }
+
+    /** Fixed Mikoo VIP avatar frame (ud_vip_tou) — never mall frames. */
+    @androidx.annotation.Nullable
+    public static String fixedFramePath(int vipLevel) {
+        if (vipLevel <= 0) return null;
+        int tier = Math.min(7, Math.max(1, vipLevel));
+        return "/assets/cosmetics/vip/ud_vip_tou_" + tier + ".webp";
+    }
+
+    /** VIP profile-card head banner (ic_head_vip). */
+    @androidx.annotation.Nullable
+    public static String fixedHeadPath(int vipLevel) {
+        if (vipLevel <= 0) return null;
+        int tier = Math.min(7, Math.max(1, vipLevel));
+        return "/assets/cosmetics/vip/ic_head_vip_" + tier + ".webp";
+    }
+
+    /**
+     * Prefer equipped mall/SVGA frame for mic/avatar wear.
+     * Static VIP (ud_vip_tou) is NOT wear — only card badge fallback.
+     */
+    @androidx.annotation.Nullable
+    public static String resolveVipFrameUrl(int vipLevel, @androidx.annotation.Nullable String vipBadgeUrl) {
+        if (vipBadgeUrl != null && !vipBadgeUrl.isEmpty() && !isStaticVipTou(vipBadgeUrl)) {
+            return vipBadgeUrl;
+        }
+        // No equipped wear: optional static VIP fallback for card/empty profiles.
+        return fixedFramePath(vipLevel);
+    }
+
+    public static boolean isStaticVipTou(@androidx.annotation.Nullable String url) {
+        if (url == null || url.isEmpty()) return false;
+        return url.contains("ud_vip_tou_")
+                || url.contains("vip_tou_fixed_")
+                || url.contains("/assets/cosmetics/vip/ud_vip_tou");
+    }
+
+    /** Room/mic wear only — never force static VIP over real equipped frames. */
+    @androidx.annotation.Nullable
+    public static String wearFrameUrl(@androidx.annotation.Nullable String vipBadgeUrl) {
+        if (vipBadgeUrl == null || vipBadgeUrl.isEmpty()) return null;
+        if (isStaticVipTou(vipBadgeUrl)) return null;
+        return vipBadgeUrl;
+    }
+
+    /**
+     * Profile page + in-room user card: fixed VIP nobility frame (ud_vip_tou_N).
+     * Does not replace mic/list wear (SVGA) — only status surfaces.
+     */
+    @androidx.annotation.Nullable
+    public static String profileNobilityFrameUrl(
+            int vipLevel,
+            @androidx.annotation.Nullable String vipTouUrl) {
+        if (vipLevel <= 0) return null;
+        if (vipTouUrl != null && !vipTouUrl.trim().isEmpty()) {
+            return vipTouUrl.trim();
+        }
+        return fixedFramePath(vipLevel);
+    }
+
+    @DrawableRes
+    private static final int[] BUBBLE_DRAWABLES = {
+            0,
+            R.drawable.vip_chat_bubble_1,
+            R.drawable.vip_chat_bubble_2,
+            R.drawable.vip_chat_bubble_3,
+            R.drawable.vip_chat_bubble_4,
+            R.drawable.vip_chat_bubble_5,
+            R.drawable.vip_chat_bubble_6,
+            R.drawable.vip_chat_bubble_7,
+    };
 
     public static final class Palette {
         @ColorInt public final int start;
@@ -54,13 +137,20 @@ public final class VipStyle {
     }
 
     public static void applyBubble(@NonNull View view, int vipLevel) {
-        float density = view.getResources().getDisplayMetrics().density;
-        if (vipLevel <= 0) {
+        int tier = Math.min(7, Math.max(0, vipLevel));
+        if (tier <= 0) {
             // Mikoo public screen: translucent black 8dp bubble.
             view.setBackgroundResource(R.drawable.bg_room_chat_bubble);
             return;
         }
-        Palette p = forLevel(vipLevel);
+        @DrawableRes int res = BUBBLE_DRAWABLES[tier];
+        if (res != 0) {
+            view.setBackgroundResource(res);
+            return;
+        }
+        // Fallback gradient if a drawable is missing
+        float density = view.getResources().getDisplayMetrics().density;
+        Palette p = forLevel(tier);
         GradientDrawable g = new GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 new int[]{p.start, p.end});

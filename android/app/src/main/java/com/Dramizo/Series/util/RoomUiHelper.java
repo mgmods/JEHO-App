@@ -14,7 +14,9 @@ public final class RoomUiHelper {
     private RoomUiHelper() {}
 
     public static boolean isSupportRoom(@Nullable RoomDtos.RoomDto room) {
-        if (room == null || room.roomKind == null) return false;
+        if (room == null) return false;
+        if (room.isSupport) return true;
+        if (room.roomKind == null) return false;
         return "support".equalsIgnoreCase(room.roomKind.trim());
     }
 

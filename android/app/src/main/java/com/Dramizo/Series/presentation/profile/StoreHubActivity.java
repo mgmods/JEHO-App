@@ -19,6 +19,7 @@ import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.HostSignalView;
+import com.Dramizo.Series.util.VipStyle;
 
 /**
  * Profile store hub: mall, badges, VIP, level, special ID.
@@ -79,13 +80,16 @@ public class StoreHubActivity extends ThemedActivity {
         GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
         String pid = user.displayPublicId();
         binding.tvUserId.setText(pid.isEmpty() ? "ID: —" : ("ID: " + pid));
-        HostSignalView.prefetchWear(this, user.vipBadgeUrl);
+        String nobilityFrame = VipStyle.profileNobilityFrameUrl(
+                Math.max(0, user.vipLevel), user.vipTouUrl);
+        String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+        HostSignalView.prefetchWear(this, profileFrame);
         AvatarCosmetics.bindProfileWear(
                 binding.webHostSignal,
                 binding.imgAvatar,
                 binding.imgFrame,
                 user.avatarUrl,
-                user.vipBadgeUrl,
+                profileFrame,
                 user.hostBadgeUrl,
                 user.hostBadgeMeta,
                 1);

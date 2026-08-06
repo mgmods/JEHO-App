@@ -1,14 +1,24 @@
 ﻿<template>
   <div>
-    <PageHeader :title="t('wallet.title')" :subtitle="t('wallet.subtitle')">
+    <PageHeader
+      :title="pageTitle"
+      :subtitle="pageSubtitle"
+    >
       <template #actions>
-        <button v-if="tab === 'packages'" class="btn btn-ghost btn-sm" type="button" @click="addPackage">
-          <i class="bi bi-plus-lg me-1"></i> {{ t('wallet.newPackage') }}
-        </button>
-        <button v-if="tab === 'withdrawPackages'" class="btn btn-ghost btn-sm" type="button" @click="addWithdrawPackage">
+        <button
+          v-if="isWithdrawals && tab === 'withdrawPackages'"
+          class="btn btn-ghost btn-sm"
+          type="button"
+          @click="addWithdrawPackage"
+        >
           <i class="bi bi-plus-lg me-1"></i> {{ t('wallet.newWithdrawPackage') }}
         </button>
-        <button class="btn btn-aurora btn-sm" type="button" @click="showAdjust = true">
+        <button
+          v-if="!isWithdrawals"
+          class="btn btn-aurora btn-sm"
+          type="button"
+          @click="showAdjust = true"
+        >
           <i class="bi bi-plus-slash-minus me-1"></i> {{ t('wallet.adjustBalance') }}
         </button>
       </template>
@@ -17,7 +27,8 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
-    <div class="glass p-3 mb-3">
+    <!-- Economy rates only on Wallet page (not mixed into withdrawals list) -->
+    <div v-if="!isWithdrawals" class="glass p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div>
           <h6 class="mb-1">{{ t('wallet.diamondEconomy') }}</h6>
@@ -69,6 +80,10 @@
       <div class="alert alert-info mt-3 mb-0 small">
         <div><strong>{{ t('wallet.livePreview') }}</strong></div>
         <div>{{ economyPreviewLine }}</div>
+      </div>
+      <div class="alert alert-secondary mt-2 mb-0 small">
+        {{ t('wallet.packagesMovedHint') }}
+        <RouterLink class="ms-1" :to="{ name: 'coins' }">{{ t('nav.coins') }}</RouterLink>
       </div>
     </div>
 
@@ -404,8 +419,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { settingsApi, walletApi, uploadsApi } from '@/api'
 import { extractList, formatNumber, formatMoney, formatDate } from '@/composables/useUtils'
 import { resolveAsset } from '@/utils/assets'
@@ -421,20 +437,47 @@ import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 
-const tabs = computed(() => [
-  { id: 'packages', label: t('wallet.packages') },
-  { id: 'withdrawPackages', label: t('wallet.withdrawPackages') },
-  { id: 'transactions', label: t('wallet.transactions') },
-  { id: 'withdraws', label: t('wallet.withdrawals') },
-  { id: 'recharges', label: t('wallet.orders') },
-])
+/** Wallet = balances/tx/recharges. Withdrawals = pull-requests page alone. */
+const isWithdrawals = computed(
+  () => route.name === 'withdrawals' || route.meta?.walletMode === 'withdrawals',
+)
 
-const tab = ref('packages')
+const pageTitle = computed(() =>
+  isWithdrawals.value ? t('wallet.titleWithdrawals') : t('wallet.title'),
+)
+const pageSubtitle = computed(() =>
+  isWithdrawals.value ? t('wallet.subtitleWithdrawals') : t('wallet.subtitle'),
+)
+
+const tabs = computed(() => {
+  if (isWithdrawals.value) {
+    return [
+      { id: 'withdraws', label: t('wallet.withdrawals') },
+      { id: 'withdrawPackages', label: t('wallet.withdrawPackages') },
+    ]
+  }
+  return [
+    { id: 'transactions', label: t('wallet.transactions') },
+    { id: 'recharges', label: t('wallet.orders') },
+  ]
+})
+
+const tab = ref('transactions')
 const rows = ref([])
 const withdrawStreamFilter = ref('all')
 const packages = ref([])
 const withdrawPackages = ref([])
+
+watch(
+  isWithdrawals,
+  (wd) => {
+    tab.value = wd ? 'withdraws' : 'transactions'
+    load()
+  },
+  { immediate: false },
+)
 
 const filteredWithdrawRows = computed(() => {
   if (tab.value !== 'withdraws') return rows.value
@@ -881,8 +924,9 @@ async function adjust() {
 }
 
 onMounted(() => {
-  load()
+  tab.value = isWithdrawals.value ? 'withdraws' : 'transactions'
   loadEconomy()
+  load()
 })
 </script>
 

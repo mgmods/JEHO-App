@@ -51,12 +51,13 @@
             <i class="bi bi-fire"></i>
             {{ accessLabel }}
           </span>
-          <span v-if="room.roomKind === 'support' || room.isSupport" class="badge bg-success ms-1">
+          <span v-if="isSupport" class="badge bg-success ms-1">
             خدمة عملاء
           </span>
-          <span v-else-if="room.isPersistent || room.roomKind === 'agency'" class="badge bg-info ms-1">
+          <span v-else-if="isAgency" class="badge bg-info ms-1">
             {{ t('rooms.agency') }}
           </span>
+          <span v-else class="badge bg-secondary ms-1">شخصي</span>
           <span v-if="entryFee > 0" class="text-warning ms-1">{{ formatNumber(entryFee) }} {{ t('common.coins') }}</span>
         </div>
         <div v-if="roomPublicId" class="small text-warning mt-1">ID: {{ roomPublicId }}</div>
@@ -129,11 +130,15 @@ const avatarError = ref(false)
 const isSupport = computed(
   () => props.room.roomKind === 'support' || props.room.isSupport === true,
 )
-const isAgency = computed(
-  () =>
-    !isSupport.value &&
-    (props.room.isPersistent || props.room.roomKind === 'agency' || !!props.room.agencyId),
-)
+/** True agency rooms only — do NOT use isPersistent (support rooms are persistent too). */
+const isAgency = computed(() => {
+  if (isSupport.value) return false
+  const kind = String(props.room.roomKind || '').toLowerCase()
+  if (kind === 'agency') return true
+  if (kind === 'standard' || kind === 'support' || kind === 'personal') return false
+  // Fallback only when roomKind is missing (legacy rows).
+  return !!(props.room.agencyId)
+})
 
 const hostName = computed(() =>
   props.room.ownerName

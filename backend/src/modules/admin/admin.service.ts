@@ -759,7 +759,14 @@ export class AdminService {
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.host', 'host')
       .leftJoinAndSelect('host.profile', 'hostProfile')
-      .orderBy('r.createdAt', 'DESC')
+      // CS rooms first — addSelect alias (TypeORM breaks on raw CASE in orderBy).
+      .addSelect(
+        `CASE WHEN r."roomKind" = :adminSupportPin THEN 1 ELSE 0 END`,
+        'admin_support_pin',
+      )
+      .setParameter('adminSupportPin', RoomKind.SUPPORT)
+      .orderBy('admin_support_pin', 'DESC')
+      .addOrderBy('r.createdAt', 'DESC')
       .skip(query.skip)
       .take(query.limit || 20);
 
@@ -1072,7 +1079,9 @@ export class AdminService {
       (kindHint === RoomKind.STANDARD && room.roomKind === RoomKind.SUPPORT);
 
     if (enableSupport) {
-      if (room.agencyId || room.roomKind === RoomKind.AGENCY) {
+      // Only real agency rooms are blocked — personal rooms of hosts in an
+      // agency still may keep a null agencyId; rely on roomKind.
+      if (room.roomKind === RoomKind.AGENCY || !!room.agencyId) {
         throw new BadRequestException(
           'لا يمكن ترقية روم وكالة إلى خدمة عملاء — اختر روماً شخصياً',
         );
@@ -1085,6 +1094,8 @@ export class AdminService {
       room.passwordHash = null;
       room.accessMode = RoomAccessMode.FREE;
       room.entryFeeCoins = 0;
+      // Keep visible at top of home even if the host is briefly offline.
+      room.emptySince = null;
     } else if (disableSupport) {
       room.roomKind = RoomKind.STANDARD;
       room.isPersistent = false;

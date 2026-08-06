@@ -69,6 +69,7 @@ import {
 } from '../../database/entities/report.entity';
 import { RoomMusicTrack } from '../../database/entities/room-music-track.entity';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { fixedVipFrameUrl, fixedVipHeadUrl, isStaticVipTouUrl } from '../../common/vip-visual';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 import {
   normalizeStaffRole,
@@ -84,6 +85,7 @@ const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
 export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
   private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
+  private chatAutoClearTimer: ReturnType<typeof setInterval> | null = null;
   /** Default list/cover art when a room has no custom cover (backgrounds pack on disk). */
   private readonly roomCoverCards = [
     'backgrounds/bg_aurora_night',
@@ -156,6 +158,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "lowGiftEffectsEnabled" boolean NOT NULL DEFAULT true`,
       );
       await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatClearedAt" TIMESTAMPTZ`,
+      );
+      await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "chatAutoClearMinutes" integer NOT NULL DEFAULT 0`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
       );
     } catch (err) {
@@ -173,12 +181,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ),
       );
     }, 60_000);
+    // Auto-clear public chat for rooms with chatAutoClearMinutes > 0.
+    this.chatAutoClearTimer = setInterval(() => {
+      void this.sweepAutoChatClear().catch((err) =>
+        this.log.warn(
+          `chat auto-clear: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, 20_000);
   }
 
   onModuleDestroy() {
     if (this.personalEmptySweepTimer) {
       clearInterval(this.personalEmptySweepTimer);
       this.personalEmptySweepTimer = null;
+    }
+    if (this.chatAutoClearTimer) {
+      clearInterval(this.chatAutoClearTimer);
+      this.chatAutoClearTimer = null;
     }
   }
 
@@ -1147,7 +1167,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       this.activeOwnedWearUrl(user.id, rawLevel),
     ]);
     const hostBadgeUrl = verifiedHost ?? rawHost;
-    const vipBadgeUrl = verifiedVip ?? rawVip;
+    const level = Number(vipLevel || user.vipLevel || 0);
+    // Equipped wear first (mall / SVGA). Static VIP art is vipTouUrl/vipHeadUrl only.
+    let vipBadgeUrl = verifiedVip ?? rawVip;
+    if (isStaticVipTouUrl(vipBadgeUrl)) {
+      vipBadgeUrl = await this.findEquippedMallHeadFrame(user.id);
+    }
+    const vipHeadUrl = fixedVipHeadUrl(level);
+    const vipTouUrl = fixedVipFrameUrl(level);
     const levelBadgeUrl = verifiedLevel ?? rawLevel;
     const hostBadgeMeta = await this.wearMetaForUrl(hostBadgeUrl);
     return {
@@ -1156,11 +1183,38 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       hostBadgeUrl,
       hostBadgeMeta,
       vipBadgeUrl,
+      vipHeadUrl,
+      vipTouUrl,
       levelBadgeUrl,
       roomCardUrl: profile.roomCardUrl ?? user.roomCardUrl ?? null,
-      vipLevel: vipLevel || user.vipLevel || 0,
+      vipLevel: level,
       profile: undefined,
     };
+  }
+
+  /** Equipped non-static VIP/head frame (SVGA/web mall art). */
+  private async findEquippedMallHeadFrame(userId: string): Promise<string | null> {
+    if (!userId) return null;
+    const rows = await this.dataSource.query(
+      `SELECT cosmetic."previewUrl" AS url, cosmetic."animationUrl" AS anim
+         FROM user_cosmetics owned
+         JOIN cosmetics cosmetic ON cosmetic.id = owned."cosmeticId"
+        WHERE owned."userId" = $1
+          AND owned.equipped = true
+          AND cosmetic."isActive" = true
+          AND cosmetic.type = 'vip_badge'
+          AND (owned."expiresAt" IS NULL OR owned."expiresAt" > NOW())
+          AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
+          AND COALESCE(cosmetic."previewUrl", '') NOT LIKE '%vip_tou_fixed_%'
+          AND COALESCE(cosmetic.meta->>'fixedVipFrame', '') <> 'true'
+        ORDER BY owned."updatedAt" DESC NULLS LAST
+        LIMIT 1`,
+      [userId],
+    );
+    if (!rows?.length) return null;
+    const anim = rows[0].anim != null ? String(rows[0].anim) : '';
+    const url = rows[0].url != null ? String(rows[0].url) : '';
+    return anim || url || null;
   }
 
   private async activeOwnedWearUrl(
@@ -1405,16 +1459,20 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     query: PaginationDto,
   ) {
     qb.leftJoin('room.agency', 'agency')
-      .where('room.isPublic = true AND room.activeHostId IS NOT NULL')
+      .where('room.isPublic = true')
+      // Live rooms, OR official customer-service rooms (always listable when open).
       .andWhere(
-        '(room.status = :open OR (room.status = :locked AND room.hasPassword = true))',
-        { open: RoomStatus.OPEN, locked: RoomStatus.LOCKED },
+        `(room.activeHostId IS NOT NULL OR room.roomKind = :supportKind)`,
+        { supportKind: RoomKind.SUPPORT },
+      )
+      .andWhere(
+        '(room.status = :open OR (room.status = :locked AND room.hasPassword = true) OR room.roomKind = :supportKind)',
+        { open: RoomStatus.OPEN, locked: RoomStatus.LOCKED, supportKind: RoomKind.SUPPORT },
       )
       .andWhere('(room.agencyId IS NULL OR agency.status = :agencyActive)', {
         agencyActive: AgencyStatus.ACTIVE,
       });
-    // Live presence is already gated by activeHostId IS NOT NULL above
-    // (viewerCount lags until socket join — do not filter personal rooms on it).
+    // Live presence is already gated by activeHostId (except support rooms pinned by admin).
     const q = (query.search || '').trim();
     if (q) {
       // displayRoomId shown in-app is the host publicId — include it in search.
@@ -1440,12 +1498,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       .leftJoinAndSelect('seats.user', 'seatUser')
       .leftJoinAndSelect('seatUser.profile', 'seatProfile');
     this.applyPublicRoomListFilters(qb, query);
-    // Hot / Explore: live presence first, seated mics, recent gifts, then lifetime gifts.
-    // Personal + agency rooms both compete (filter already requires public + live host).
-    qb.addSelect(
-      `CASE WHEN room.roomKind = 'support' THEN 1 ELSE 0 END`,
-      'support_pin',
-    )
+    // Hot / Explore: official CS rooms always first (pin), then heat.
+    // TypeORM mis-parses raw CASE in orderBy() as an alias ("CASE WHEN r… not found").
+    // Select as named columns, then orderBy those aliases.
     qb.addSelect(
       `(COALESCE(room."viewerCount", 0) * 500
         + COALESCE((
@@ -1463,6 +1518,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           ), 0) / 80.0)`,
       'explore_heat',
     )
+      .addSelect(
+        `CASE WHEN room."roomKind" = :supportPinKind THEN 1 ELSE 0 END`,
+        'support_pin',
+      )
+      .setParameter('supportPinKind', RoomKind.SUPPORT)
       .orderBy('support_pin', 'DESC')
       .addOrderBy('explore_heat', 'DESC')
       .addOrderBy('room.viewerCount', 'DESC')
@@ -1841,6 +1901,146 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     this.realtimeGateway.emitToRoom(roomId, 'room:display_settings', payload);
     this.notifyRoomUpdated(roomId);
     return this.getRoom(roomId);
+  }
+
+  private normalizeChatAutoClearMinutes(raw: unknown): number {
+    const n = Math.floor(Number(raw));
+    if (n === 1 || n === 5 || n === 10) return n;
+    return 0;
+  }
+
+  /**
+   * Staff wipe of the public chat screen for every device in the room.
+   * Stamps DB chatClearedAt so late-joiners discard stale local caches.
+   */
+  async clearPublicChat(
+    roomId: string,
+    actorId: string,
+    opts?: { auto?: boolean; displayName?: string | null },
+  ) {
+    if (!opts?.auto) {
+      await this.assertModeratorPermission(
+        roomId,
+        actorId,
+        'canManageRoom',
+        'Room management permission is required',
+      );
+    }
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    const now = new Date();
+    room.chatClearedAt = now;
+    await this.roomsRepo.save(room);
+
+    let displayName = opts?.displayName || null;
+    if (!displayName && actorId) {
+      const actor = await this.usersRepo.findOne({ where: { id: actorId } });
+      displayName =
+        actor?.displayName || actor?.username || (opts?.auto ? 'النظام' : 'مشرف');
+    }
+    const payload = {
+      userId: actorId || null,
+      displayName: displayName || (opts?.auto ? 'النظام' : 'مشرف'),
+      chatClearedAt: now.toISOString(),
+      auto: !!opts?.auto,
+      full: true,
+    };
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:chat_cleared',
+      payload,
+      from: { userId: actorId || null, username: displayName || 'مشرف' },
+      at: now.toISOString(),
+    });
+    this.notifyRoomUpdated(roomId);
+    return {
+      ok: true,
+      roomId,
+      chatClearedAt: now.toISOString(),
+      chatAutoClearMinutes: room.chatAutoClearMinutes || 0,
+    };
+  }
+
+  /** Cycle/set auto public-chat wipe interval (0 / 1 / 5 / 10 minutes). */
+  async setChatAutoClearMinutes(
+    roomId: string,
+    actorId: string,
+    minutes: number,
+  ) {
+    await this.assertModeratorPermission(
+      roomId,
+      actorId,
+      'canManageRoom',
+      'Room management permission is required',
+    );
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    room.chatAutoClearMinutes = this.normalizeChatAutoClearMinutes(minutes);
+    // Reset timer baseline so first auto wipe is after a full interval.
+    if (room.chatAutoClearMinutes > 0) {
+      room.chatClearedAt = new Date();
+    }
+    await this.roomsRepo.save(room);
+    const payload = {
+      roomId,
+      chatAutoClearMinutes: room.chatAutoClearMinutes,
+      chatClearedAt: room.chatClearedAt
+        ? room.chatClearedAt.toISOString()
+        : null,
+    };
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:chat_auto_clear',
+      payload,
+      at: new Date().toISOString(),
+    });
+    this.notifyRoomUpdated(roomId);
+    return this.getRoom(roomId);
+  }
+
+  /** Server-driven periodic wipe for rooms with chatAutoClearMinutes > 0. */
+  private async sweepAutoChatClear() {
+    const rooms = await this.roomsRepo
+      .createQueryBuilder('room')
+      .select([
+        'room.id',
+        'room.chatAutoClearMinutes',
+        'room.chatClearedAt',
+        'room.activeHostId',
+        'room.liveSessionStartedAt',
+        'room.status',
+      ])
+      .where('room."chatAutoClearMinutes" > 0')
+      .andWhere('room.status = :open', { open: RoomStatus.OPEN })
+      .andWhere('room.activeHostId IS NOT NULL')
+      .getMany();
+    if (!rooms.length) return;
+    const now = Date.now();
+    for (const room of rooms) {
+      const minutes = this.normalizeChatAutoClearMinutes(room.chatAutoClearMinutes);
+      if (minutes <= 0) continue;
+      const base = room.chatClearedAt
+        ? room.chatClearedAt.getTime()
+        : room.liveSessionStartedAt
+          ? room.liveSessionStartedAt.getTime()
+          : 0;
+      if (base <= 0) {
+        // First enable without baseline: stamp now so next tick waits full interval.
+        await this.roomsRepo.update(room.id, { chatClearedAt: new Date(now) });
+        continue;
+      }
+      if (now - base < minutes * 60_000) continue;
+      try {
+        await this.clearPublicChat(room.id, room.activeHostId || '', {
+          auto: true,
+          displayName: 'تنظيف تلقائي',
+        });
+      } catch (err) {
+        this.log.warn(
+          `auto clear ${room.id}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   }
 
   async setPassword(roomId: string, actorId: string, locked: boolean, password?: string) {

@@ -19,6 +19,7 @@ public final class RoomDtos {
         @SerializedName("cohostId") public String cohostId;
         @SerializedName("agencyId") public String agencyId;
         @SerializedName("roomKind") public String roomKind;
+        @SerializedName("isSupport") public boolean isSupport;
         @SerializedName("isPersistent") public boolean isPersistent;
         @SerializedName("activeHostId") public String activeHostId;
         @SerializedName("moderatorIds") public List<String> moderatorIds;
@@ -51,6 +52,10 @@ public final class RoomDtos {
         @SerializedName("micInteractEnabled") public boolean micInteractEnabled = true;
         @SerializedName("entryEffectsEnabled") public boolean entryEffectsEnabled = true;
         @SerializedName("lowGiftEffectsEnabled") public boolean lowGiftEffectsEnabled = true;
+        /** Server stamp of last full public-chat wipe (ISO-8601). */
+        @SerializedName("chatClearedAt") public String chatClearedAt;
+        /** 0=off, 1/5/10 = auto wipe every N minutes. */
+        @SerializedName("chatAutoClearMinutes") public int chatAutoClearMinutes;
         /** Numeric room id shown in UI (host publicId). */
         @SerializedName("displayRoomId") public String displayRoomId;
     }

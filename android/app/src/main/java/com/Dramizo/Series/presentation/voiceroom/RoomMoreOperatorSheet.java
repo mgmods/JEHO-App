@@ -7,9 +7,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
-import android.net.Uri;
+import android.os.Build;
 import android.view.Gravity;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -22,6 +23,10 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.PagerAdapter;
@@ -57,6 +62,8 @@ final class RoomMoreOperatorSheet {
         boolean canAdjustSeatCount();
         /** Host who can approve raise-hand queue (not free-mic mode). */
         boolean canReviewSeatRequests();
+        /** 0 = off, else 1/5/10 minute auto wipe. */
+        int chatAutoClearMinutes();
         @Nullable String roomId();
         @Nullable String roomTitle();
         void onMoreAction(@NonNull String action);
@@ -65,12 +72,12 @@ final class RoomMoreOperatorSheet {
     static void show(@NonNull Host host) {
         Context ctx = host.context();
         // Mikoo RoomMoreOperatorDialog = bottom DialogFragment (not Material BottomSheet).
-        // Material sheets clip height + show a top handle line — use full 398dp panel.
         Dialog dialog = new Dialog(ctx, R.style.MikooBottomPanelDialog);
         View sheet = LayoutInflater.from(ctx).inflate(R.layout.dialog_room_more_operator, null);
         dialog.setContentView(sheet);
         dialog.setCanceledOnTouchOutside(true);
 
+        View panel = sheet.findViewById(R.id.panelRoomMore);
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
@@ -85,6 +92,29 @@ final class RoomMoreOperatorSheet {
             lp.dimAmount = 0.45f;
             window.setAttributes(lp);
             window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            // Draw above nav bar insets so last tool rows stay tappable.
+            WindowCompat.setDecorFitsSystemWindows(window, false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                window.setNavigationBarColor(0xFF121616);
+            }
+        }
+
+        // Lift content above gesture/nav bars — icons were buried under the system bar.
+        if (panel != null) {
+            final int basePadBottom = panel.getPaddingBottom();
+            ViewCompat.setOnApplyWindowInsetsListener(panel, (v, windowInsets) -> {
+                Insets nav = windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars());
+                Insets cut = windowInsets.getInsets(WindowInsetsCompat.Type.displayCutout());
+                int bottom = Math.max(nav.bottom, cut.bottom);
+                v.setPadding(
+                        v.getPaddingLeft(),
+                        v.getPaddingTop(),
+                        v.getPaddingRight(),
+                        basePadBottom + bottom);
+                return windowInsets;
+            });
+            ViewCompat.requestApplyInsets(panel);
         }
 
         TextView tvRoom = sheet.findViewById(R.id.tv_room);
@@ -146,6 +176,9 @@ final class RoomMoreOperatorSheet {
         }
 
         dialog.show();
+        if (panel != null) {
+            ViewCompat.requestApplyInsets(panel);
+        }
     }
 
     private static void selectTab(TextView tv, ImageView ind, boolean on) {
@@ -158,7 +191,6 @@ final class RoomMoreOperatorSheet {
     private static List<Item> buildRoomItems(Host host) {
         List<Item> list = new ArrayList<>();
         list.add(item(R.drawable.more_btn_set, R.string.setting, "settings"));
-        // Seat admin chrome moved here from the voice-room header.
         if (host.canAdjustSeatCount()) {
             list.add(item(R.drawable.icon_room_up_micro, R.string.room_more_seat_count, "seat_count"));
         }
@@ -178,11 +210,15 @@ final class RoomMoreOperatorSheet {
                         : R.drawable.icon_room_opera_public_screen_close,
                 withState(host, R.string.room_more_chat_zone, host.chatZoneOn()),
                 "chat_zone"));
-        // Admin: wipe public chat for everyone in the room (socket room:chat_cleared).
         list.add(item(
                 R.drawable.icon_room_opera_public_screen_close,
                 R.string.clear_room_chat,
                 "clear_chat"));
+        int autoMin = host.chatAutoClearMinutes();
+        list.add(item(
+                R.drawable.icon_room_auto_clean,
+                autoClearLabel(host, autoMin),
+                "auto_clear_chat"));
         list.add(item(
                 host.charmOn() ? R.drawable.icon_room_charm_open : R.drawable.icon_room_charm_close,
                 withState(host, R.string.room_more_charm, host.charmOn()),
@@ -214,7 +250,6 @@ final class RoomMoreOperatorSheet {
                 muted ? R.drawable.mute_close : R.drawable.mute_open,
                 muted ? R.string.room_more_mute_off : R.string.room_more_mute_on,
                 "mute"));
-        // Single music entry: tools tab — use 162dp mikoo more-btn asset (has circle bg).
         if (host.canControlMusic()) {
             list.add(item(R.drawable.icon_room_send_music, R.string.music_play, "music"));
         }
@@ -249,6 +284,24 @@ final class RoomMoreOperatorSheet {
     private static CharSequence withStateNl(Host host, @StringRes int label, boolean on) {
         return host.context().getString(label) + "\n"
                 + host.context().getString(on ? R.string.room_more_str_on : R.string.room_more_str_off);
+    }
+
+    private static CharSequence autoClearLabel(Host host, int minutes) {
+        Context ctx = host.context();
+        if (minutes == 1) {
+            return ctx.getString(R.string.room_auto_clear_chat) + "\n"
+                    + ctx.getString(R.string.room_auto_clear_1m);
+        }
+        if (minutes == 5) {
+            return ctx.getString(R.string.room_auto_clear_chat) + "\n"
+                    + ctx.getString(R.string.room_auto_clear_5m);
+        }
+        if (minutes == 10) {
+            return ctx.getString(R.string.room_auto_clear_chat) + "\n"
+                    + ctx.getString(R.string.room_auto_clear_10m);
+        }
+        return ctx.getString(R.string.room_auto_clear_chat) + "\n"
+                + ctx.getString(R.string.room_more_str_off);
     }
 
     private static Item item(@DrawableRes int icon, @StringRes int title, String action) {
@@ -328,6 +381,22 @@ final class RoomMoreOperatorSheet {
             RecyclerView rv = page.findViewById(R.id.recyclerView);
             rv.setLayoutManager(new GridLayoutManager(container.getContext(), 4));
             rv.setAdapter(new GridAdapter(pages.get(position), click));
+            rv.setNestedScrollingEnabled(true);
+            // Vertical scroll must not be stolen by the horizontal ViewPager / sheet.
+            rv.addOnItemTouchListener(new RecyclerView.SimpleOnItemTouchListener() {
+                @Override
+                public boolean onInterceptTouchEvent(@NonNull RecyclerView r,
+                                                     @NonNull MotionEvent e) {
+                    int action = e.getActionMasked();
+                    if (action == MotionEvent.ACTION_DOWN
+                            || action == MotionEvent.ACTION_MOVE) {
+                        if (r.getParent() != null) {
+                            r.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                    }
+                    return false;
+                }
+            });
             container.addView(page);
             return page;
         }

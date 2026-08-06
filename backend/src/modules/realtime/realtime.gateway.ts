@@ -624,9 +624,21 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         message: 'صاحب الغرفة يستدعيك — ارجع للغرفة',
       };
     } else if (data.event === 'room:chat_cleared') {
+      const now = new Date();
+      try {
+        await this.roomsRepo.update(
+          { id: data.roomId },
+          { chatClearedAt: now },
+        );
+      } catch {
+        /* ignore stamp failures — still broadcast */
+      }
       payload = {
         userId: client.userId,
         displayName: profile.displayName || client.username || 'مشرف',
+        chatClearedAt: now.toISOString(),
+        auto: false,
+        full: true,
       };
     }
     if (data.event === 'chat:message') {

@@ -1,31 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Mikoo dialog_user_info inspired room user card (ids mapped to JEHO handlers). -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/clUserCardRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@drawable/bg_user_card_sheet"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    android:paddingHorizontal="16dp"
-    android:paddingTop="12dp"
-    android:paddingBottom="22dp">
+    android:clipChildren="false"
+    android:clipToPadding="false">
 
+    <!-- Dark sheet body -->
     <View
-        android:layout_width="40dp"
-        android:layout_height="4dp"
-        android:background="@drawable/bg_sheet_handle" />
+        android:id="@+id/userCardBg"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="52dp"
+        android:background="@drawable/bg_user_card_sheet"
+        app:layout_constraintBottom_toBottomOf="@id/bottom_layout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/imgVipHead" />
 
+    <!-- VIP head banner (ic_head_vip / iv_bg_vip) -->
+    <ImageView
+        android:id="@+id/imgVipHead"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="28dp"
+        android:contentDescription="@null"
+        android:scaleType="fitXY"
+        android:visibility="gone"
+        app:layout_constraintDimensionRatio="1125:330"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:visibility="visible" />
+
+    <!-- Avatar + VIP frame (iv_vip_tou) -->
     <FrameLayout
-        android:layout_width="112dp"
-        android:layout_height="112dp"
-        android:layout_marginTop="12dp"
+        android:id="@+id/avatar_layout"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="8dp"
         android:clipChildren="false"
-        android:clipToPadding="false">
+        android:clipToPadding="false"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
 
         <ImageView
             android:id="@+id/imgUserAvatar"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="86dp"
+            android:layout_height="86dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
@@ -50,150 +76,282 @@
             android:visibility="gone" />
     </FrameLayout>
 
-    <TextView
-        android:id="@+id/tvUserName"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/ll_level_name"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:textColor="#111827"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        tools:text="AuraStar" />
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/avatar_layout">
 
-    <TextView
-        android:id="@+id/tvUserId"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="2dp"
-        android:textColor="#6B7280"
-        android:textSize="12sp"
-        android:visibility="gone"
-        tools:text="ID 1234567"
-        tools:visibility="visible" />
-
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginTop="10dp"
-        android:scrollbars="none">
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/tvUserName"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:layout_gravity="center"
+            android:ellipsize="end"
+            android:maxWidth="220dp"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            tools:text="عمار" />
+    </LinearLayout>
+
+    <!-- ID / flag / copy / level -->
+    <LinearLayout
+        android:id="@+id/id_layout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_level_name">
+
+        <TextView
+            android:id="@+id/tvUserId"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#99FFFFFF"
+            android:textSize="14sp"
+            android:visibility="gone"
+            tools:text="ID:5764421"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/btnCopyId"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="نسخ"
+            android:src="@drawable/icon_copy"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <ImageView
+            android:id="@+id/imgCountryFlag"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="10dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/chipMember"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_user_card_id_chip"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
+            android:textColor="#E0F7FA"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:text="30" />
+    </LinearLayout>
+
+    <!-- VIP medal + stats -->
+    <LinearLayout
+        android:id="@+id/ll_model"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/id_layout">
+
+        <ImageView
+            android:id="@+id/imgVipMedal"
+            android:layout_width="43dp"
+            android:layout_height="25dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/chipVip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_vip"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:text="VIP3"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/chipCharm"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_charm"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:text="15" />
+
+        <TextView
+            android:id="@+id/chipWealth"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_wealth"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            tools:text="24" />
+
+        <TextView
+            android:id="@+id/chipFirstDay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_reward"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:text="اليوم الأول"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/btnHi"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_chip_dark"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="4dp"
+            android:text="Hi"
+            android:textColor="@color/white"
+            android:textSize="13sp"
+            android:textStyle="bold|italic"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Agency / guild strip -->
+    <FrameLayout
+        android:id="@+id/rowAgency"
+        android:layout_width="0dp"
+        android:layout_height="58dp"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="14dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/ll_model"
+        tools:visibility="visible">
+
+        <ImageView
+            android:id="@+id/imgAgencyBannerBg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:src="@drawable/icon_info_guild_bg_base_lv1" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="4dp">
+            android:paddingHorizontal="14dp">
 
-            <TextView
-                android:id="@+id/chipVip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_chip_vip"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:visibility="gone"
-                tools:text="VIP12"
-                tools:visibility="visible" />
+            <FrameLayout
+                android:layout_width="44dp"
+                android:layout_height="44dp">
 
-            <TextView
-                android:id="@+id/chipMember"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_chip_level"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="Lv.12" />
+                <ImageView
+                    android:id="@+id/imgAgencyLogo"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_voice_seat_circle"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/icon_agency" />
 
-            <TextView
-                android:id="@+id/chipCharm"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_chip_charm"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="شعبية 2.1K" />
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ur_gh_tou" />
+            </FrameLayout>
 
-            <TextView
-                android:id="@+id/chipWealth"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_chip_wealth"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                tools:text="ثروة 8.4K" />
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/chipFirstDay"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_chip_reward"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="4dp"
-                android:text="اليوم الأول"
-                android:textColor="@color/white"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:visibility="gone" />
+                <TextView
+                    android:id="@+id/tvAgencyName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    tools:text="الوكالة" />
 
-            <TextView
-                android:id="@+id/btnHi"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:background="@drawable/bg_chip_dark"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="4dp"
-                android:text="Hi"
-                android:textColor="@color/white"
-                android:textSize="13sp"
-                android:textStyle="bold|italic"
-                android:visibility="gone" />
+                <TextView
+                    android:id="@+id/tvAgencyGid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="#99FFFFFF"
+                    android:textSize="13sp"
+                    tools:text="GID:1895" />
+            </LinearLayout>
         </LinearLayout>
-    </HorizontalScrollView>
+    </FrameLayout>
 
     <HorizontalScrollView
         android:id="@+id/rowHostTasks"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
+        android:paddingHorizontal="12dp"
         android:scrollbars="none"
-        android:visibility="gone">
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowAgency">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingVertical="4dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="المهام"
-                android:textColor="#6B7280"
-                android:textSize="12sp"
-                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/chipTaskChat5"
@@ -204,7 +362,7 @@
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
                 android:text="5 رسائل"
-                android:textColor="#B45309"
+                android:textColor="#FBBF24"
                 android:textSize="11sp" />
 
             <TextView
@@ -216,7 +374,7 @@
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
                 android:text="10 رسائل"
-                android:textColor="#B45309"
+                android:textColor="#FBBF24"
                 android:textSize="11sp" />
 
             <TextView
@@ -227,212 +385,242 @@
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
                 android:text="دعوة +40◆"
-                android:textColor="#B45309"
+                android:textColor="#FBBF24"
                 android:textSize="11sp" />
         </LinearLayout>
     </HorizontalScrollView>
 
-    <TextView
-        android:id="@+id/tvUserActionsTitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:gravity="start"
-        android:text="خيارات المستخدم والتفاعل"
-        android:textColor="#374151"
-        android:textSize="13sp"
-        android:textStyle="bold" />
-
+    <!-- Mikoo bottom_layout: gift / chat / attention / @  as real icons -->
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/actProfile"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:text="الملف" />
-
-        <TextView
-            android:id="@+id/actGift"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="هدية"
-            android:textColor="#BE123C" />
-
-        <TextView
-            android:id="@+id/actChat"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="رسالة"
-            android:textColor="#1D4ED8" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/actFollow"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:text="متابعة" />
-
-        <TextView
-            android:id="@+id/actFriend"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="صداقة" />
-
-        <TextView
-            android:id="@+id/actAt"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="@mention" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/actXo"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:text="@string/xo_challenge"
-            android:textColor="#0F766E"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/actInviteGuest"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="دعوة للمايك"
-            android:textColor="#0F766E"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/actTaskInvite"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="مهمة +40◆"
-            android:textColor="#B45309"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/actMute"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="كتم"
-            android:textColor="#B45309"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/rowMicControls"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/actOpenMic"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:text="فتح مايك"
-            android:textColor="#0F766E" />
-
-        <TextView
-            android:id="@+id/actCloseMic"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="إغلاق مايك"
-            android:textColor="#BE123C" />
-
-        <TextView
-            android:id="@+id/actUnmute"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="فك الكتم"
-            android:textColor="#047857" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="horizontal">
-
-        <TextView
-            android:id="@+id/actModerator"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:text="مشرف"
-            android:textColor="#0F766E"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/actKick"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="طرد"
-            android:textColor="#B45309"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/actBan"
-            style="@style/Widget.AuraLive.UserCardAction"
-            android:layout_width="0dp"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:text="@string/ban_user"
-            android:textColor="#BE123C"
-            android:visibility="gone" />
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/actReport"
-        style="@style/Widget.AuraLive.UserCardAction"
-        android:layout_width="match_parent"
-        android:layout_marginTop="8dp"
-        android:text="إبلاغ"
-        android:textColor="#BE123C" />
-
-    <GridLayout
-        android:id="@+id/userActionsGrid"
+        android:id="@+id/bottom_layout"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone" />
-</LinearLayout>
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingBottom="16dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowHostTasks">
+
+        <ImageView
+            android:id="@+id/actGift"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="هدية"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_gift" />
+
+        <ImageView
+            android:id="@+id/actChat"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="رسالة"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_chat" />
+
+        <ImageView
+            android:id="@+id/actFollow"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="متابعة"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_attention" />
+
+        <ImageView
+            android:id="@+id/actAt"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@mention"
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/icon_focus" />
+    </LinearLayout>
+
+    <!-- Secondary admin actions keep TextView style under primary icons -->
+    <LinearLayout
+        android:id="@+id/moreActionsBlock"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:background="@drawable/bg_user_card_sheet"
+        android:paddingBottom="12dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/bottom_layout">
+
+        <TextView
+            android:id="@+id/tvUserActionsTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="المزيد"
+            android:textColor="#99FFFFFF"
+            android:textSize="12sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/actProfile"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="الملف" />
+
+            <TextView
+                android:id="@+id/actFriend"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="صداقة" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/actXo"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="@string/xo_challenge"
+                android:textColor="#5EEAD4"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actInviteGuest"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="دعوة للمايك"
+                android:textColor="#5EEAD4"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actTaskInvite"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="مهمة +40◆"
+                android:textColor="#FBBF24"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actMute"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="كتم"
+                android:textColor="#FBBF24"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/rowMicControls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/actOpenMic"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="فتح مايك"
+                android:textColor="#5EEAD4" />
+
+            <TextView
+                android:id="@+id/actCloseMic"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="إغلاق مايك"
+                android:textColor="#FCA5A5" />
+
+            <TextView
+                android:id="@+id/actUnmute"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="فك الكتم"
+                android:textColor="#6EE7B7" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/actModerator"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:text="مشرف"
+                android:textColor="#5EEAD4"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actKick"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="طرد"
+                android:textColor="#FBBF24"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actBan"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/ban_user"
+                android:textColor="#FCA5A5"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/actReport"
+            style="@style/Widget.AuraLive.UserCardAction"
+            android:layout_width="match_parent"
+            android:layout_marginTop="8dp"
+            android:text="إبلاغ"
+            android:textColor="#FCA5A5" />
+
+        <GridLayout
+            android:id="@+id/userActionsGrid"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

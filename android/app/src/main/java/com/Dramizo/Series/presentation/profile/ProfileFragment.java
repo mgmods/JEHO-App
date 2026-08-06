@@ -36,6 +36,7 @@ import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.RoomOpenChooser;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.VipStyle;
 
 import java.util.Calendar;
 import java.text.NumberFormat;
@@ -172,13 +173,17 @@ public class ProfileFragment extends Fragment {
             binding.tvFollowers.setText(String.valueOf(Math.max(0, user.friendsCount)));
             binding.tvFollowing.setText(String.valueOf(Math.max(0, user.followingCount)));
             binding.tvFans.setText(String.valueOf(Math.max(0, user.followersCount)));
-            HostSignalView.prefetchWear(requireContext(), user.vipBadgeUrl);
+            // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
+            String nobilityFrame = VipStyle.profileNobilityFrameUrl(
+                    Math.max(0, user.vipLevel), user.vipTouUrl);
+            String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+            HostSignalView.prefetchWear(requireContext(), profileFrame);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
                     binding.imgFrame,
                     user.avatarUrl,
-                    user.vipBadgeUrl,
+                    profileFrame,
                     user.hostBadgeUrl,
                     user.hostBadgeMeta,
                     1);

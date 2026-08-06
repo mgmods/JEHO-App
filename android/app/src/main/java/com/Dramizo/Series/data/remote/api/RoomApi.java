@@ -128,6 +128,14 @@ public interface RoomApi {
             @Path("id") String id,
             @Body Map<String, Boolean> body);
 
+    @POST("rooms/{id}/chat/clear")
+    Call<ApiResponse<Map<String, Object>>> clearPublicChat(@Path("id") String id);
+
+    @POST("rooms/{id}/chat/auto-clear")
+    Call<ApiResponse<RoomDtos.RoomDto>> setChatAutoClear(
+            @Path("id") String id,
+            @Body Map<String, Integer> body);
+
     @POST("rooms/{id}/lock")
     Call<ApiResponse<RoomDtos.RoomDto>> lock(@Path("id") String id, @Body RoomDtos.LockRoomRequest body);
 

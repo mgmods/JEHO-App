@@ -241,16 +241,20 @@ public class ProfileActivity extends ThemedActivity {
             binding.tvWealthChip.setVisibility(View.VISIBLE);
             binding.tvWealthChip.setBackgroundResource(R.drawable.bg_chip_wealth);
             binding.tvWealthChip.setTextColor(0xFFFFFFFF);
+            // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
+            String nobilityFrame = com.Dramizo.Series.util.VipStyle.profileNobilityFrameUrl(
+                    Math.max(0, user.vipLevel), user.vipTouUrl);
+            String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
                     binding.imgFrame,
                     user.avatarUrl,
-                    user.vipBadgeUrl,
+                    profileFrame,
                     user.hostBadgeUrl,
                     user.hostBadgeMeta,
                     1);
-            com.Dramizo.Series.util.HostSignalView.prefetchWear(this, user.vipBadgeUrl);
+            com.Dramizo.Series.util.HostSignalView.prefetchWear(this, profileFrame);
             // Wear on avatar only — never chips under the name.
             if (binding.imgHostBadge != null) {
                 binding.imgHostBadge.setVisibility(View.GONE);

@@ -28,6 +28,7 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.databinding.ItemMessageBinding;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.VipStyle;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
@@ -220,8 +221,13 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.rowBadges.setVisibility(View.GONE);
         holder.b.tvMeta.setVisibility(View.GONE);
 
-        holder.b.bubbleRoot.setBackgroundResource(
-                mine ? R.drawable.bg_chat_bubble_me : R.drawable.bg_chat_bubble_peer);
+        int vipLevel = resolveVipLevel(holder, msg, mine);
+        if (vipLevel > 0) {
+            VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
+        } else {
+            holder.b.bubbleRoot.setBackgroundResource(
+                    mine ? R.drawable.bg_chat_bubble_me : R.drawable.bg_chat_bubble_peer);
+        }
 
         bindReplyQuote(holder, msg);
         bindBody(holder, msg);
@@ -326,16 +332,22 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
 
-        // Better contrast on mine / peer bubbles
-        int bodyColor = mine ? 0xFFFFFFFF : holder.itemView.getContext().getColor(R.color.text_primary);
-        int metaColor = mine ? 0xCCFFFFFF : holder.itemView.getContext().getColor(R.color.text_hint);
+        // VIP ornate skins are dark — use white text on both sides when VIP.
+        int vipForText = resolveVipLevel(holder, msg, mine);
+        boolean lightOnBubble = mine || vipForText > 0;
+        int bodyColor = lightOnBubble ? 0xFFFFFFFF
+                : holder.itemView.getContext().getColor(R.color.text_primary);
+        int metaColor = lightOnBubble ? 0xCCFFFFFF
+                : holder.itemView.getContext().getColor(R.color.text_hint);
         holder.b.tvContent.setTextColor(bodyColor);
         holder.b.tvTime.setTextColor(metaColor);
         if (holder.b.tvTranslated != null) {
-            holder.b.tvTranslated.setTextColor(mine ? 0xE6FFFFFF : holder.itemView.getContext().getColor(R.color.text_secondary));
+            holder.b.tvTranslated.setTextColor(lightOnBubble ? 0xE6FFFFFF
+                    : holder.itemView.getContext().getColor(R.color.text_secondary));
         }
         if (holder.b.tvTranslateAction != null) {
-            holder.b.tvTranslateAction.setTextColor(mine ? 0xCCFFFFFF : holder.itemView.getContext().getColor(R.color.text_secondary));
+            holder.b.tvTranslateAction.setTextColor(lightOnBubble ? 0xCCFFFFFF
+                    : holder.itemView.getContext().getColor(R.color.text_secondary));
         }
         if (holder.b.tvAudioDur != null) {
             holder.b.tvAudioDur.setTextColor(metaColor);
@@ -365,6 +377,28 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             if (v != null && !v.trim().isEmpty()) return v.trim();
         }
         return "";
+    }
+
+    private int resolveVipLevel(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg, boolean mine) {
+        try {
+            if (mine) {
+                AuthDtos.UserDto liveMe = me;
+                try {
+                    AuthDtos.UserDto sessionMe = com.Dramizo.Series.presentation.common.ContainerProvider
+                            .from(holder.itemView.getContext())
+                            .getSessionManager()
+                            .getUser();
+                    if (sessionMe != null) liveMe = sessionMe;
+                } catch (Exception ignored) {
+                }
+                return liveMe != null ? Math.max(0, liveMe.vipLevel) : 0;
+            }
+            if (msg.sender != null) {
+                return Math.max(0, msg.sender.vipLevel);
+            }
+        } catch (Exception ignored) {
+        }
+        return 0;
     }
 
     private void bindStatusTick(@NonNull VH holder, ChatDtos.MessageDto msg, boolean mine) {
@@ -410,6 +444,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.imgMedia.setVisibility(View.GONE);
         holder.b.imgMedia.setOnClickListener(null);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
+        if (holder.b.agencyInviteRow != null) holder.b.agencyInviteRow.setVisibility(View.GONE);
         if (holder.b.giftRow != null) holder.b.giftRow.setVisibility(View.GONE);
         if (holder.b.roomShareRow != null) {
             holder.b.roomShareRow.setVisibility(View.GONE);
@@ -474,11 +509,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             if (holder.b.waveAudio != null) {
                 holder.b.waveAudio.setProgress(0f);
                 holder.b.waveAudio.setAnimating(false);
-                if (mine) {
-                    holder.b.waveAudio.setWaveColors(0xFFFFFFFF, 0x66FFFFFF);
-                } else {
-                    holder.b.waveAudio.setWaveColors(0xFFE8F4F8, 0x55A8C5D4);
-                }
+                holder.b.waveAudio.setWaveColors(0xFF4A90E2, 0x664A90E2);
             }
             holder.b.imgAudioPlay.setImageResource(R.drawable.ic_audio_play);
             View.OnClickListener play = v -> playAudio(
@@ -492,6 +523,36 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                     dur);
             holder.b.audioRow.setOnClickListener(play);
             holder.b.imgAudioPlay.setOnClickListener(play);
+            return;
+        }
+
+        if (isAgencyInviteType(type, msg.content) && holder.b.agencyInviteRow != null) {
+            holder.b.agencyInviteRow.setVisibility(View.VISIBLE);
+            String agencyName = firstNonEmpty(msg.content,
+                    holder.itemView.getContext().getString(R.string.agency_invite_title));
+            if (holder.b.tvAgencyInviteName != null) {
+                holder.b.tvAgencyInviteName.setText(agencyName);
+            }
+            if (holder.b.tvAgencyInviteBody != null) {
+                holder.b.tvAgencyInviteBody.setText(R.string.agency_invite_body);
+            }
+            if (holder.b.imgAgencyInviteLogo != null && mediaUrl != null && !mediaUrl.isEmpty()) {
+                Glide.with(holder.b.imgAgencyInviteLogo)
+                        .load(AssetCatalog.absoluteUrl(mediaUrl))
+                        .placeholder(R.drawable.icon_agency)
+                        .error(R.drawable.icon_agency)
+                        .into(holder.b.imgAgencyInviteLogo);
+            }
+            if (holder.b.btnAgencyInviteYes != null) {
+                holder.b.btnAgencyInviteYes.setOnClickListener(v ->
+                        Toast.makeText(holder.itemView.getContext(),
+                                R.string.agency_invite_agree, Toast.LENGTH_SHORT).show());
+            }
+            if (holder.b.btnAgencyInviteNo != null) {
+                holder.b.btnAgencyInviteNo.setOnClickListener(v ->
+                        Toast.makeText(holder.itemView.getContext(),
+                                R.string.agency_invite_disagree, Toast.LENGTH_SHORT).show());
+            }
             return;
         }
 
@@ -673,9 +734,30 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     }
 
     private static String formatDuration(int sec) {
+        // Mikoo voice bubbles show 3" / 8" for short clips.
+        if (sec < 60) {
+            return sec + "\"";
+        }
         int m = sec / 60;
         int s = sec % 60;
         return String.format(Locale.US, "%d:%02d", m, s);
+    }
+
+    private static boolean isAgencyInviteType(@Nullable String type, @Nullable String content) {
+        if (type != null) {
+            String t = type.toLowerCase(Locale.US);
+            if (t.contains("agency") || t.contains("guild") || t.contains("family_invite")) {
+                return true;
+            }
+        }
+        if (content != null) {
+            String c = content;
+            return c.contains("الانضمام إلى العائلة")
+                    || c.contains("join the family")
+                    || c.contains("join agency")
+                    || c.contains("وكالة");
+        }
+        return false;
     }
 
     private boolean isMine(ChatDtos.MessageDto msg) {

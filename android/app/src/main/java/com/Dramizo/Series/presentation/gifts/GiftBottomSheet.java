@@ -1122,21 +1122,19 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : java.util.Collections.emptyList());
             boolean allMic = sendToAllMic && tgts.size() > 1;
             if (luckyGift) {
-                // Lightweight send feedback only — heavy rain is for مردود win path (once).
+                // Center hero + simultaneous clones to selected/all mic seats.
                 try {
                     GiftAudioFx.playLuckyCoins(requireContext(), 1);
                     List<String> rainIds = !tgts.isEmpty()
                             ? tgts
                             : room.collectOccupiedMicUserIdsPublic();
-                    if (rainIds.size() > 6) {
-                        rainIds = new ArrayList<>(rainIds.subList(0, 6));
-                    }
                     room.playLuckyGiftStage(
                             icon,
                             rainIds,
                             Math.max(1L, spentTotal),
-                            Math.max(1, Math.min(qty, 5)),
+                            Math.max(1, Math.min(qty, 99)),
                             Math.max(1, rainIds.size()),
+                            session.getDisplayName(),
                             null);
                     for (String tid : tgts) {
                         if (tid != null && !tid.isEmpty() && coinValue > 0) {
@@ -1160,7 +1158,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 }
             } else if (allMic) {
                 room.playLuckyGiftToAllMics(name, icon, anim,
-                        session.getDisplayName(), combo,
+                        session.getDisplayName(), combo, Math.max(1, qty),
                         session.getUserId(), Math.max(0, session.getVipLevel()),
                         session.getAvatarUrl(), tgts, coinValue);
             } else {

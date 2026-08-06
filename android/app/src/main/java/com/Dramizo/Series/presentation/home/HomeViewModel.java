@@ -181,6 +181,8 @@ public class HomeViewModel extends ViewModel {
         // Identity must track server (personal vs agency), not stick to first poll.
         c.agencyId = neu.agencyId != null ? neu.agencyId : old.agencyId;
         c.roomKind = neu.roomKind != null ? neu.roomKind : old.roomKind;
+        c.isSupport = neu.isSupport || "support".equalsIgnoreCase(
+                neu.roomKind != null ? neu.roomKind : "");
         c.isPersistent = neu.isPersistent;
         c.activeHostId = neu.activeHostId != null ? neu.activeHostId : old.activeHostId;
         c.moderatorIds = old.moderatorIds;
@@ -221,7 +223,20 @@ public class HomeViewModel extends ViewModel {
             if (room == null || room.id == null) continue;
             map.putIfAbsent(room.id, room);
         }
-        return new ArrayList<>(map.values());
+        // Fail-safe pin: official CS rooms always first (server also orders this way).
+        List<RoomDtos.RoomDto> support = new ArrayList<>();
+        List<RoomDtos.RoomDto> rest = new ArrayList<>();
+        for (RoomDtos.RoomDto room : map.values()) {
+            if (com.Dramizo.Series.util.RoomUiHelper.isSupportRoom(room)) {
+                support.add(room);
+            } else {
+                rest.add(room);
+            }
+        }
+        List<RoomDtos.RoomDto> out = new ArrayList<>(support.size() + rest.size());
+        out.addAll(support);
+        out.addAll(rest);
+        return out;
     }
 
     private void loadRooms(boolean quiet, boolean reset) {

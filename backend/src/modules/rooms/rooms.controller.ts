@@ -411,6 +411,33 @@ export class RoomsController {
     return this.roomsService.setDisplaySettings(id, userId, body || {});
   }
 
+  @Post(':id/chat/clear')
+  @ApiOperation({
+    summary: 'Wipe public room chat on every client + stamp DB chatClearedAt',
+  })
+  clearPublicChat(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.roomsService.clearPublicChat(id, userId);
+  }
+
+  @Post(':id/chat/auto-clear')
+  @ApiOperation({
+    summary: 'Set auto wipe interval for public room chat (0/1/5/10 minutes)',
+  })
+  setChatAutoClear(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() body: { minutes?: number },
+  ) {
+    return this.roomsService.setChatAutoClearMinutes(
+      id,
+      userId,
+      body?.minutes ?? 0,
+    );
+  }
+
   @Post(':id/lock')
   @ApiOperation({ summary: 'Lock or unlock room with password' })
   lock(

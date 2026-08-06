@@ -31,6 +31,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { MALL_COSMETIC_PRICES, PRICING_VERSION } from '../../common/pricing-catalog';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
+import { isStaticVipTouUrl } from '../../common/vip-visual';
 
 type MikooCatalogItem = {
   type: CosmeticType | string;
@@ -67,9 +68,11 @@ export class CosmeticsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Always re-bind VIP frames gates (minVip / clear minUserLevel) — does not reseed art/prices.
+    // Always install fixed VIP head frames + re-bind VIP gates (safe on production).
     try {
+      await this.ensureFixedVipTouFrames();
       await this.rebindVipFrameGates();
+      await this.healStaticVipTouWear();
     } catch (err) {
       this.logger.warn(`VIP frame gate rebind: ${(err as Error).message}`);
     }
@@ -618,11 +621,18 @@ export class CosmeticsService implements OnModuleInit {
           !lower.includes('runtime.html') &&
           !lower.endsWith('.html') &&
           !lower.endsWith('.json');
-        // VIP badge doubles as avatar frame wear URL in the Android client.
-        // Prefer SVGA / GIF / MP4 animation when provided (Mikoo headwear).
-        profile.vipBadgeUrl = playable
-          ? anim
-          : owned.cosmetic.previewUrl || null;
+        const preview = owned.cosmetic.previewUrl || null;
+        const next = playable ? anim : preview;
+        // Mikoo: static vip_tou is not avatar wear — do not overwrite mall/SVGA frames.
+        if (
+          (owned.cosmetic.meta as any)?.fixedVipFrame === true ||
+          isStaticVipTouUrl(preview) ||
+          isStaticVipTouUrl(anim)
+        ) {
+          // Grant inventory only; keep existing profile.vipBadgeUrl wear.
+        } else {
+          profile.vipBadgeUrl = next;
+        }
       }
       if (type === CosmeticType.LEVEL_BADGE) {
         profile.levelBadgeUrl = owned.cosmetic.previewUrl;
@@ -694,14 +704,15 @@ export class CosmeticsService implements OnModuleInit {
     const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 30)));
     await this.ensureAristocracyCatalog();
 
+    // Only auto-equip medals. Fixed VIP head frames (ud_vip_tou) are display-only
+    // (Mikoo: vip_tou is separate from mall/SVGA wear) — never overwrite wear.
     const types: CosmeticType[] = [
-      CosmeticType.VIP_BADGE,
       CosmeticType.LEVEL_BADGE,
+      CosmeticType.VIP_BADGE, // owned in inventory, not force-equipped
       CosmeticType.HOST_BADGE,
     ];
 
     const granted: Array<{ type: CosmeticType; code: string; expiresAt?: Date | null }> = [];
-    let hostId: string | null = null;
 
     for (const type of types) {
       const item = await this.pickAristocracyItem(type, level);
@@ -711,21 +722,13 @@ export class CosmeticsService implements OnModuleInit {
         forceTimed: true,
       });
       granted.push({ type, code: item.code, expiresAt: temp?.expiresAt ?? null });
-      if (type === CosmeticType.HOST_BADGE) hostId = item.id;
-      else {
+      // Equip medals only (level_badge). Never auto-equip fixed VIP frames over SVGA wear.
+      if (type === CosmeticType.LEVEL_BADGE) {
         try {
           await this.equip(userId, item.id, { skipRequirements: true });
         } catch {
           // ignore rare races
         }
-      }
-    }
-
-    if (hostId) {
-      try {
-        await this.equip(userId, hostId, { skipRequirements: true });
-      } catch {
-        /* ignore */
       }
     }
 
@@ -741,6 +744,21 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   private async pickAristocracyItem(type: CosmeticType, level: number): Promise<Cosmetic | null> {
+    // Fixed VIP head frames (ud_vip_tou) — never pick paid mall "frames" for VIP grant.
+    if (type === CosmeticType.VIP_BADGE) {
+      const fixed = await this.cosmeticsRepo.findOne({
+        where: { code: `vip_tou_fixed_${level}`, isActive: true },
+      });
+      if (fixed) return fixed;
+      const anyFixed = await this.cosmeticsRepo.find({
+        where: { type: CosmeticType.VIP_BADGE, minVipLevel: level, isActive: true },
+        order: { sortOrder: 'ASC' },
+      });
+      const match = anyFixed.find((c) => (c.meta as any)?.fixedVipFrame);
+      if (match) return match;
+      return null;
+    }
+
     const exact = await this.cosmeticsRepo.findOne({
       where: { type, minVipLevel: level, isActive: true },
       order: { sortOrder: 'ASC' },
@@ -752,6 +770,7 @@ export class CosmeticsService implements OnModuleInit {
       `host_vip_${level}`,
       `host_lv${level}`,
       `vip${level}`,
+      `level_vip_${level}`,
       `level_${level}`,
       `frame_vip_${level}`,
       `toast_vip_${level}`,
@@ -1018,6 +1037,85 @@ export class CosmeticsService implements OnModuleInit {
     if (created > 0) this.logger.log(`Seeded ${created} room backgrounds`);
   }
 
+  /**
+   * Undo accidental auto-wear of static VIP frames (ud_vip_tou) over mall/SVGA frames.
+   * Safe to run every boot.
+   */
+  private async healStaticVipTouWear() {
+    // 1) Clear profiles that point wear at static VIP art.
+    const cleared = await this.dataSource.query(
+      `UPDATE user_profiles
+          SET "vipBadgeUrl" = NULL
+        WHERE "vipBadgeUrl" LIKE '%ud_vip_tou_%'
+           OR "vipBadgeUrl" LIKE '%vip_tou_fixed_%'`,
+    );
+    // 2) Unequip fixed-VIP inventory rows so they stop refreshing wear URLs.
+    await this.dataSource.query(
+      `UPDATE user_cosmetics uc
+          SET equipped = false
+         FROM cosmetics c
+        WHERE c.id = uc."cosmeticId"
+          AND uc.equipped = true
+          AND (
+            c.code LIKE 'vip_tou_fixed_%'
+            OR COALESCE(c."previewUrl", '') LIKE '%ud_vip_tou_%'
+            OR COALESCE(c.meta->>'fixedVipFrame', '') = 'true'
+          )`,
+    );
+    // 3) Re-attach wear from any other equipped vip_badge (mall/SVGA).
+    await this.dataSource.query(
+      `UPDATE user_profiles p
+          SET "vipBadgeUrl" = sub.wear
+         FROM (
+           SELECT DISTINCT ON (uc."userId")
+                  uc."userId" AS uid,
+                  COALESCE(NULLIF(c."animationUrl", ''), c."previewUrl") AS wear
+             FROM user_cosmetics uc
+             JOIN cosmetics c ON c.id = uc."cosmeticId"
+            WHERE uc.equipped = true
+              AND c.type = 'vip_badge'
+              AND c."isActive" = true
+              AND (uc."expiresAt" IS NULL OR uc."expiresAt" > NOW())
+              AND COALESCE(c."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
+              AND COALESCE(c.meta->>'fixedVipFrame', '') <> 'true'
+              AND c.code NOT LIKE 'vip_tou_fixed_%'
+            ORDER BY uc."userId", uc."updatedAt" DESC NULLS LAST
+         ) sub
+        WHERE p."userId" = sub.uid
+          AND (p."vipBadgeUrl" IS NULL OR p."vipBadgeUrl" = '')`,
+    );
+    const n = Array.isArray(cleared) ? cleared.length : (cleared as any)?.rowCount;
+    if (n) this.logger.log(`Healed static VIP wear on profiles (cleared ~${n})`);
+  }
+
+  /**
+   * Fixed Mikoo VIP headframes (ud_vip_tou_1..7) + head plaques.
+   * Always safe on production — unique codes, coinPrice=0, not mall mix.
+   */
+  async ensureFixedVipTouFrames() {
+    for (let lvl = 1; lvl <= 7; lvl++) {
+      const framePath = `/assets/cosmetics/vip/ud_vip_tou_${lvl}.webp?v=20260806vipfix1`;
+      const headPath = `/assets/cosmetics/vip/ic_head_vip_${lvl}.webp?v=20260806vipfix1`;
+      await this.upsertAristocracyRow({
+        type: CosmeticType.VIP_BADGE,
+        code: `vip_tou_fixed_${lvl}`,
+        name: `إطار VIP${lvl}`,
+        previewUrl: framePath,
+        animationUrl: null,
+        minVipLevel: lvl,
+        minUserLevel: 0,
+        sortOrder: 200 + lvl,
+        meta: {
+          aristocracy: true,
+          vipLevel: lvl,
+          fixedVipFrame: true,
+          source: 'ud_vip_tou',
+          headUrl: headPath,
+        },
+      });
+    }
+  }
+
   async ensureAristocracyCatalog() {
     if (this.aristocracyEnsured) return;
 
@@ -1033,7 +1131,7 @@ export class CosmeticsService implements OnModuleInit {
 
     // Mikoo only ships VIP1–7 medals — keep badges sequential and force URLs.
     for (let lvl = 1; lvl <= 7; lvl++) {
-      const medalPath = `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`;
+      const medalPath = `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260806vipfix1`;
       await this.upsertAristocracyRow({
         type: CosmeticType.LEVEL_BADGE,
         code: `level_vip_${lvl}`,
@@ -1058,6 +1156,8 @@ export class CosmeticsService implements OnModuleInit {
         meta: { aristocracy: true, vipLevel: lvl, source: 'mikoo_xunzhang' },
       });
     }
+
+    await this.ensureFixedVipTouFrames();
 
     // Bind every active head frame (vip_badge) to VIP only — never account level.
     await this.rebindVipFrameGates();
@@ -1135,21 +1235,20 @@ export class CosmeticsService implements OnModuleInit {
   }
 
   /**
-   * Room list cards: keep ONLY original Mikoo rank borders top1–top3.
-   * Do not invent tinted clones of the same art for top4–top10.
+   * Room list cards: Mikoo rank borders top1–top7.
    */
   async ensureRoomCardCatalog() {
-    const v = '20260801r2';
-    const keepCodes = new Set([
-      'room_mikoo_border_top1',
-      'room_mikoo_border_top2',
-      'room_mikoo_border_top3',
-    ]);
+    const v = '20260806r7';
     const mikooBorders = [
       { code: 'room_mikoo_border_top1', name: 'إطار الروم · المركز 1', file: 'bg_room_border_top1.webp', price: 299, sortOrder: 50 },
-      { code: 'room_mikoo_border_top2', name: 'إطار الروم · المركز 2', file: 'bg_room_border_top2.webp', price: 199, sortOrder: 51 },
-      { code: 'room_mikoo_border_top3', name: 'إطار الروم · المركز 3', file: 'bg_room_border_top3.webp', price: 149, sortOrder: 52 },
+      { code: 'room_mikoo_border_top2', name: 'إطار الروم · المركز 2', file: 'bg_room_border_top2.webp', price: 249, sortOrder: 51 },
+      { code: 'room_mikoo_border_top3', name: 'إطار الروم · المركز 3', file: 'bg_room_border_top3.webp', price: 199, sortOrder: 52 },
+      { code: 'room_mikoo_border_top4', name: 'إطار الروم · المركز 4', file: 'bg_room_border_top4.webp', price: 179, sortOrder: 53 },
+      { code: 'room_mikoo_border_top5', name: 'إطار الروم · المركز 5', file: 'bg_room_border_top5.webp', price: 159, sortOrder: 54 },
+      { code: 'room_mikoo_border_top6', name: 'إطار الروم · المركز 6', file: 'bg_room_border_top6.webp', price: 139, sortOrder: 55 },
+      { code: 'room_mikoo_border_top7', name: 'إطار الروم · المركز 7', file: 'bg_room_border_top7.webp', price: 119, sortOrder: 56 },
     ];
+    const keepCodes = new Set(mikooBorders.map((b) => b.code));
 
     let created = 0;
     for (const b of mikooBorders) {
@@ -1172,7 +1271,7 @@ export class CosmeticsService implements OnModuleInit {
             minUserLevel: 0,
             isActive: true,
             sortOrder: b.sortOrder,
-            meta: { source: 'mikoo_border', kind: 'room_card' },
+            meta: { source: 'mikoo_border', kind: 'room_card', rank: Number(b.code.slice(-1)) },
           } as any),
         );
         created += 1;
@@ -1196,15 +1295,19 @@ export class CosmeticsService implements OnModuleInit {
         existing.description = nextDesc;
         dirty = true;
       }
-      // coinPrice stays from DB (dashboard).
+      // coinPrice stays from DB (dashboard) unless zero/null new row.
       if (!existing.isActive) {
         existing.isActive = true;
+        dirty = true;
+      }
+      if ((existing as any).sortOrder !== b.sortOrder) {
+        (existing as any).sortOrder = b.sortOrder;
         dirty = true;
       }
       if (dirty) await this.cosmeticsRepo.save(existing);
     }
 
-    // Deactivate every other room_card (including tinted top4–10 clones / kenar / host-signals).
+    // Deactivate every other room_card (kenar / legacy clones).
     const allCards = await this.cosmeticsRepo.find({ where: { type: CosmeticType.ROOM_CARD } });
     let retired = 0;
     for (const row of allCards) {
@@ -1216,7 +1319,7 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     if (created > 0 || retired > 0) {
-      this.logger.log(`Room cards: seeded=${created}, retired=${retired} (kept Mikoo borders only)`);
+      this.logger.log(`Room cards: seeded=${created}, retired=${retired} (kept Mikoo borders top1–7)`);
     }
   }
 

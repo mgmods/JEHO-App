@@ -84,7 +84,13 @@ const routes = [
         path: 'wallet',
         name: 'wallet',
         component: () => import('@/views/WalletView.vue'),
-        meta: { titleKey: 'routes.wallet' },
+        meta: { titleKey: 'routes.wallet', walletMode: 'wallet' },
+      },
+      {
+        path: 'withdrawals',
+        name: 'withdrawals',
+        component: () => import('@/views/WalletView.vue'),
+        meta: { titleKey: 'routes.withdrawals', walletMode: 'withdrawals' },
       },
       {
         path: 'host-target',

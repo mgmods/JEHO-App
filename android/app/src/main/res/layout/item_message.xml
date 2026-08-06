@@ -152,49 +152,132 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
-                android:minWidth="132dp"
+                android:minWidth="100dp"
+                android:minHeight="36dp"
                 android:orientation="horizontal"
-                android:paddingVertical="0dp"
+                android:paddingHorizontal="4dp"
                 android:visibility="gone">
 
-                <FrameLayout
-                    android:id="@+id/audioPlayWrap"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:background="@drawable/bg_chat_audio_play">
-
-                    <ImageView
-                        android:id="@+id/imgAudioPlay"
-                        android:layout_width="14dp"
-                        android:layout_height="14dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/voice_message"
-                        android:src="@drawable/ic_audio_play"
-                        app:tint="@color/text_primary" />
-                </FrameLayout>
+                <TextView
+                    android:id="@+id/tvAudioDur"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="22dp"
+                    android:textColor="#FF333333"
+                    android:textSize="13sp"
+                    tools:text="3&quot;" />
 
                 <com.Dramizo.Series.presentation.chat.AudioWaveformView
                     android:id="@+id/waveAudio"
-                    android:layout_width="88dp"
-                    android:layout_height="22dp"
+                    android:layout_width="72dp"
+                    android:layout_height="20dp"
                     android:layout_marginStart="8dp" />
+
+                <FrameLayout
+                    android:id="@+id/audioPlayWrap"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginStart="6dp"
+                    android:background="@android:color/transparent">
+
+                    <ImageView
+                        android:id="@+id/imgAudioPlay"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@string/voice_message"
+                        android:src="@drawable/ic_audio_play"
+                        app:tint="#FF4A90E2" />
+                </FrameLayout>
 
                 <SeekBar
                     android:id="@+id/seekAudio"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:visibility="gone" />
+            </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvAudioDur"
-                    android:layout_width="wrap_content"
+            <!-- Agency family invite (Mikoo-style card) -->
+            <LinearLayout
+                android:id="@+id/agencyInviteRow"
+                android:layout_width="240dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:minWidth="28dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp"
-                    android:textStyle="bold"
-                    tools:text="0:12" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/imgAgencyInviteLogo"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/icon_agency" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvAgencyInviteName"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FF2B2C40"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            tools:text="وكالة التاج" />
+
+                        <TextView
+                            android:id="@+id/tvAgencyInviteBody"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/agency_invite_body"
+                            android:textColor="#FF666666"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnAgencyInviteNo"
+                        android:layout_width="0dp"
+                        android:layout_height="30dp"
+                        android:layout_marginEnd="10dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_agency_invite_no"
+                        android:gravity="center"
+                        android:text="@string/agency_invite_disagree"
+                        android:textColor="#FF43D3A2"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/btnAgencyInviteYes"
+                        android:layout_width="0dp"
+                        android:layout_height="30dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_agency_invite_yes"
+                        android:gravity="center"
+                        android:text="@string/agency_invite_agree"
+                        android:textColor="@color/white"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
 
             <LinearLayout

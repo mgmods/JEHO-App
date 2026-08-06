@@ -206,7 +206,9 @@ function toggleSupport(r) {
 }
 
 function removeRoom(r) {
-  const isAgency = r.isPersistent || r.roomKind === 'agency' || r.agencyId
+  const kind = String(r.roomKind || '').toLowerCase()
+  const isAgency =
+    kind === 'agency' || (!kind && !!(r.agencyId || r.isPersistent))
   const msg = isAgency
     ? t('rooms.confirmDeleteAgencyRoom', { name: r.name || r.title || r.id })
     : t('rooms.confirmDelete', { name: r.name || r.title || r.id })

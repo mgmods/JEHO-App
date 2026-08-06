@@ -114,8 +114,12 @@ async function seed() {
   let sort = 1;
   const mikooBorders = [
     { code: 'room_mikoo_border_top1', name: 'إطار الروم · المركز 1', file: 'bg_room_border_top1.webp', price: 299 },
-    { code: 'room_mikoo_border_top2', name: 'إطار الروم · المركز 2', file: 'bg_room_border_top2.webp', price: 199 },
-    { code: 'room_mikoo_border_top3', name: 'إطار الروم · المركز 3', file: 'bg_room_border_top3.webp', price: 149 },
+    { code: 'room_mikoo_border_top2', name: 'إطار الروم · المركز 2', file: 'bg_room_border_top2.webp', price: 249 },
+    { code: 'room_mikoo_border_top3', name: 'إطار الروم · المركز 3', file: 'bg_room_border_top3.webp', price: 199 },
+    { code: 'room_mikoo_border_top4', name: 'إطار الروم · المركز 4', file: 'bg_room_border_top4.webp', price: 179 },
+    { code: 'room_mikoo_border_top5', name: 'إطار الروم · المركز 5', file: 'bg_room_border_top5.webp', price: 159 },
+    { code: 'room_mikoo_border_top6', name: 'إطار الروم · المركز 6', file: 'bg_room_border_top6.webp', price: 139 },
+    { code: 'room_mikoo_border_top7', name: 'إطار الروم · المركز 7', file: 'bg_room_border_top7.webp', price: 119 },
   ];
   for (const b of mikooBorders) {
     const existing = await cosmeticRepo.findOne({ where: { code: b.code } });

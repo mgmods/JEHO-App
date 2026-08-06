@@ -185,6 +185,23 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
+    public void clearPublicChat(String roomId) {
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> r =
+                    c.getRoomRepository().clearPublicChat(roomId);
+            if (!r.success) error.postValue(r.error);
+        });
+    }
+
+    public void setChatAutoClearMinutes(String roomId, int minutes) {
+        c.getIoExecutor().execute(() -> {
+            Result<RoomDtos.RoomDto> r =
+                    c.getRoomRepository().setChatAutoClearMinutes(roomId, minutes);
+            if (r.success) room.postValue(r.data);
+            else error.postValue(r.error);
+        });
+    }
+
     public void lockRoom(String roomId, boolean locked) {
         lockRoom(roomId, locked, null);
     }
