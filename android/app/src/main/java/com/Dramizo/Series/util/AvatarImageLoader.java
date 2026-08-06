@@ -2,6 +2,7 @@ package com.Dramizo.Series.util;
 
 import android.content.ContentResolver;
 import android.graphics.Outline;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.view.View;
 import android.view.ViewOutlineProvider;
@@ -10,6 +11,10 @@ import android.widget.ImageView;
 import androidx.annotation.Nullable;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 
 import com.Dramizo.Series.R;
 
@@ -62,16 +67,20 @@ public final class AvatarImageLoader {
         applyCircularClip(view);
         if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
             view.setTag(R.id.tag_image_url, null);
+            view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
             view.setImageResource(ImagePlaceholder.avatar());
             return;
         }
         String abs = AssetCatalog.absoluteUrl(avatarUrl);
         Object prev = view.getTag(R.id.tag_image_url);
-        if (prev instanceof String && abs != null && abs.equals(prev) && view.getDrawable() != null) {
-            // Same URL already painted — avoid Glide placeholder flash on tab re-enter.
+        boolean loadedOk = Boolean.TRUE.equals(view.getTag(R.id.tag_image_loaded));
+        // Only skip when the same URL already decoded — never lock on placeholder/error drawable.
+        if (prev instanceof String && abs != null && abs.equals(prev)
+                && loadedOk && view.getDrawable() != null) {
             return;
         }
         view.setTag(R.id.tag_image_url, abs);
+        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
         String lower = abs != null ? abs.toLowerCase(Locale.US) : "";
         boolean animated = lower.contains(".gif") || lower.contains(".webp");
         int size = Math.max(96, Math.min(
@@ -82,7 +91,29 @@ public final class AvatarImageLoader {
                 .override(size, size)
                 .centerCrop()
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
-                .error(ImagePlaceholder.avatar());
+                .error(ImagePlaceholder.avatar())
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(
+                            @Nullable GlideException e,
+                            Object model,
+                            Target<Drawable> target,
+                            boolean isFirstResource) {
+                        view.setTag(R.id.tag_image_loaded, Boolean.FALSE);
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(
+                            Drawable resource,
+                            Object model,
+                            Target<Drawable> target,
+                            DataSource dataSource,
+                            boolean isFirstResource) {
+                        view.setTag(R.id.tag_image_loaded, Boolean.TRUE);
+                        return false;
+                    }
+                });
         // Placeholder only on cold first paint (no current drawable).
         if (view.getDrawable() == null) {
             req = req.placeholder(ImagePlaceholder.avatar());

@@ -17,20 +17,24 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.friends.RequestsActivity;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
+import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarImageLoader;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
-/** Mikoo-style CP hub with real relation bind via social requests. */
+/** Full CP hub: request / accept path / intimacy / end bond / invite code. */
 public class CpCenterActivity extends ThemedActivity {
     private ActivityCpCenterBinding binding;
     private AppContainer c;
     @Nullable private AuthDtos.UserDto partner;
+    private long bondScore;
+    private int bondLevel;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -42,17 +46,27 @@ public class CpCenterActivity extends ThemedActivity {
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.btnBecomeCp.setOnClickListener(v -> {
             if (partner != null) {
-                Intent i = new Intent(this, RequestsActivity.class);
-                i.putExtra(RequestsActivity.EXTRA_TAB, 2);
-                startActivity(i);
+                confirmEndCp();
             } else {
                 showSendCpDialog();
             }
         });
         binding.btnOpenInvite.setOnClickListener(v ->
                 startActivity(new Intent(this, InvitationActivity.class)));
+        binding.btnOpenInvite.setOnLongClickListener(v -> {
+            Intent i = new Intent(this, RequestsActivity.class);
+            i.putExtra(RequestsActivity.EXTRA_TAB, 2);
+            startActivity(i);
+            return true;
+        });
         binding.btnCpWealth.setOnClickListener(v -> openRanking("rich"));
         binding.btnCpCharm.setOnClickListener(v -> openRanking("popular"));
+        binding.cardCpPartner.setOnClickListener(v -> {
+            if (partner == null || partner.id == null) return;
+            Intent i = new Intent(this, ProfileActivity.class);
+            i.putExtra(ProfileActivity.EXTRA_USER_ID, partner.id);
+            startActivity(i);
+        });
         loadPartner();
     }
 
@@ -64,25 +78,45 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void loadPartner() {
         c.getIoExecutor().execute(() -> {
-            Result<List<MiscDtos.SocialRequestDto>> r =
-                    ApiCall.execute(c.getUserApi().relations("relation"));
-            runOnUiThread(() -> {
-                if (isFinishing() || binding == null) return;
-                partner = null;
+            Result<MiscDtos.CpStatusDto> status = ApiCall.execute(c.getUserApi().myCp());
+            Result<List<MiscDtos.SocialRequestDto>> pending =
+                    ApiCall.execute(c.getUserApi().requests("relation"));
+            final int pendingCount = (pending.success && pending.data != null)
+                    ? pending.data.size() : 0;
+            AuthDtos.UserDto found = null;
+            long score = 0;
+            int level = 0;
+            if (status.success && status.data != null && status.data.hasCp
+                    && status.data.partner != null) {
+                found = status.data.partner;
+                score = Math.max(0, status.data.bondScore);
+                level = Math.max(0, status.data.level);
+            } else if (!status.success) {
+                Result<List<MiscDtos.SocialRequestDto>> r =
+                        ApiCall.execute(c.getUserApi().relations("relation"));
                 if (r.success && r.data != null) {
                     for (MiscDtos.SocialRequestDto row : r.data) {
                         if (row != null && row.user != null) {
-                            partner = row.user;
+                            found = row.user;
                             break;
                         }
                     }
                 }
-                bindPartnerUi();
+            }
+            final AuthDtos.UserDto partnerRes = found;
+            final long scoreRes = score;
+            final int levelRes = level;
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                partner = partnerRes;
+                bondScore = scoreRes;
+                bondLevel = levelRes;
+                bindPartnerUi(pendingCount);
             });
         });
     }
 
-    private void bindPartnerUi() {
+    private void bindPartnerUi(int pendingIncoming) {
         if (partner != null) {
             binding.cardCpPartner.setVisibility(View.VISIBLE);
             String name = partner.displayName != null && !partner.displayName.isEmpty()
@@ -91,15 +125,50 @@ public class CpCenterActivity extends ThemedActivity {
             binding.tvCpPartnerName.setText(name);
             AvatarImageLoader.load(binding.imgCpPartner, partner.avatarUrl);
             binding.tvCpHeroTitle.setText("مساحة CP");
-            binding.tvCpHint.setText("أنتم الآن CP. يمكنكم إدارة الطلبات والعلاقات من صفحة العلاقات.");
-            binding.btnBecomeCp.setText("إدارة العلاقات");
+            binding.tvCpHint.setText(String.format(Locale.US,
+                    "مرتبطان كـ CP · المستوى LV.%d\nنقاط الألفة: %,d (من هدايا CP بينكما)\n"
+                            + "أرسل هدايا تبويب CP في الغرفة لرفع المستوى.\n"
+                            + "اضغط البطاقة لملف الشريك.",
+                    bondLevel, bondScore));
+            binding.btnBecomeCp.setText("إنهاء CP");
         } else {
             binding.cardCpPartner.setVisibility(View.GONE);
             binding.tvCpHeroTitle.setText("كيف تصبح CP؟");
+            String pendingHint = pendingIncoming > 0
+                    ? ("\nلديك " + pendingIncoming + " طلب CP معلّق — افتح الطلبات للقبول.")
+                    : "";
             binding.tvCpHint.setText(
-                    "CP هو رابط خاص بينك وبين صديق/صديقة.\nأدخل معرّف الصديق لإرسال طلب CP، وبعد القبول تظهر مساحتكما هنا.");
-            binding.btnBecomeCp.setText("أصبح CP · دعوة صديق");
+                    "CP = زوج خاص (طلب → قبول).\n"
+                            + "1) أدخل معرّف الصديق (public ID)\n"
+                            + "2) يقبلك من «الطلبات → CP»\n"
+                            + "3) تبادلوا هدايا تبويب CP في الغرفة\n"
+                            + "يمكنكم رابطاً واحداً فقط في نفس الوقت."
+                            + pendingHint
+                            + "\n\nاضغط مطوّلاً على «رمز دعوتي» لفتح طلبات CP.");
+            binding.btnBecomeCp.setText("أرسل طلب CP");
         }
+    }
+
+    private void confirmEndCp() {
+        if (partner == null || partner.id == null) return;
+        String name = partner.displayName != null ? partner.displayName : "الشريك";
+        AuraDialogHelper.confirm(this,
+                "إنهاء CP",
+                "هل تريد إنهاء ارتباط CP مع " + name + "؟",
+                "إنهاء",
+                () -> c.getIoExecutor().execute(() -> {
+                    Result<Object> r = ApiCall.execute(
+                            c.getUserApi().endBond(partner.id, "relation"));
+                    runOnUiThread(() -> {
+                        Toast.makeText(this,
+                                r.success ? "تم إنهاء CP"
+                                        : (r.error != null ? r.error : "فشل"),
+                                Toast.LENGTH_SHORT).show();
+                        if (r.success) loadPartner();
+                    });
+                }),
+                getString(android.R.string.cancel),
+                null);
     }
 
     private void showSendCpDialog() {
@@ -108,7 +177,7 @@ public class CpCenterActivity extends ThemedActivity {
         input.setPadding(48, 32, 48, 32);
         new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("إرسال طلب CP")
-                .setMessage("أدخل public ID أو اسم المستخدم للصديق")
+                .setMessage("أدخل public ID أو اسم المستخدم. الطرف يقبل من الطلبات.")
                 .setView(input)
                 .setPositiveButton("إرسال", (d, w) -> {
                     String q = input.getText() != null ? input.getText().toString().trim() : "";
@@ -119,6 +188,11 @@ public class CpCenterActivity extends ThemedActivity {
                     sendCpRequest(q);
                 })
                 .setNegativeButton("إلغاء", null)
+                .setNeutralButton("طلباتي", (d, w) -> {
+                    Intent i = new Intent(this, RequestsActivity.class);
+                    i.putExtra(RequestsActivity.EXTRA_TAB, 2);
+                    startActivity(i);
+                })
                 .show();
     }
 
@@ -163,7 +237,9 @@ public class CpCenterActivity extends ThemedActivity {
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                Toast.makeText(this, "تم إرسال طلب CP إلى " + name, Toast.LENGTH_LONG).show();
+                Toast.makeText(this,
+                        "تم إرسال طلب CP إلى " + name + " — ينتظر القبول",
+                        Toast.LENGTH_LONG).show();
             });
         });
     }

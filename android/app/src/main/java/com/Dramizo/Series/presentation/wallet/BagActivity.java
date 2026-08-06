@@ -190,9 +190,12 @@ public class BagActivity extends ThemedActivity {
                             com.Dramizo.Series.presentation.games.GameStoreActivity.class)));
         }
         if (binding.btnOpenDebrisTasks != null) {
-            binding.btnOpenDebrisTasks.setOnClickListener(v ->
-                    startActivity(new Intent(this,
-                            com.Dramizo.Series.presentation.profile.TaskCenterActivity.class)));
+            com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnOpenDebrisTasks, this);
+            binding.btnOpenDebrisTasks.setOnClickListener(v -> {
+                if (!com.Dramizo.Series.util.TasksFeature.isEnabled(this)) return;
+                startActivity(new Intent(this,
+                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
+            });
         }
         if (binding.btnFocusConvert != null) {
             binding.btnFocusConvert.setOnClickListener(openDiamondScreen);
@@ -416,6 +419,41 @@ public class BagActivity extends ThemedActivity {
                 applyPromoProgress(promo.success ? promo.data : null);
             });
         });
+        // If user paid on Play then app killed before verify — reclaim the token.
+        recoverGooglePlayPurchaseIfPending();
+    }
+
+    /** Completes server credit for owned-but-unconsumed Play INAPP purchases. */
+    private void recoverGooglePlayPurchaseIfPending() {
+        try {
+            c.getBillingHelper().recoverPendingIfAny(
+                    new com.Dramizo.Series.billing.BillingHelper.PurchaseCallback() {
+                        @Override
+                        public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
+                            if (sku == null || sku.isEmpty() || purchaseToken == null) return;
+                            c.getIoExecutor().execute(() -> {
+                                Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
+                                        sku, purchaseToken, orderId, 0, 0);
+                                runOnUiThread(() -> {
+                                    if (isFinishing()) return;
+                                    if (r.success) {
+                                        c.getBillingHelper().consumePendingPurchase();
+                                        applyWallet(r.data);
+                                        Toast.makeText(BagActivity.this,
+                                                "تم تأكيد شحن Google Play",
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                            });
+                        }
+
+                        @Override
+                        public void onPurchaseError(String message) {
+                            /* silent recover */
+                        }
+                    });
+        } catch (Exception ignored) {
+        }
     }
 
     private void applyPromoProgress(@Nullable PromoDtos.MyProgress progress) {
@@ -1095,6 +1133,7 @@ public class BagActivity extends ThemedActivity {
         if (w == null || binding == null) return;
         currentWallet = w;
         String coinsTxt = String.format(Locale.US, "%,d", w.coins);
+        // Personal pool only on the big number (withdraw path uses personal diamonds).
         String diamondsTxt = String.format(Locale.US, "%,d", w.diamonds);
         binding.tvGoldBalance.setText(coinsTxt);
         binding.tvDiamondBalance.setText(diamondsTxt);
@@ -1102,11 +1141,15 @@ public class BagActivity extends ThemedActivity {
             binding.tvDebrisBalance.setText(coinsTxt);
         }
         binding.tvDiamondUsdValue.setText(String.format(Locale.US,
-                "$%,.2f USD", w.diamonds * diamondUsdRate));
+                "شخصي ≈ $%,.2f USD", w.diamonds * diamondUsdRate));
         if (binding.tvTraderDiamonds != null) {
-            long trader = w.traderDiamonds;
-            binding.tvTraderDiamonds.setText(String.format(Locale.US,
-                    "تاجر: %,d", trader));
+            // Agency-room gift share lands in agencyDiamonds — was invisible before → “no diamonds”.
+            long agency = Math.max(0L, w.agencyDiamonds);
+            long trader = Math.max(0L, w.traderDiamonds);
+            String extra = String.format(Locale.US,
+                    "وكالة: %,d (≈ $%,.2f) · تاجر: %,d",
+                    agency, agency * diamondUsdRate, trader);
+            binding.tvTraderDiamonds.setText(extra);
             binding.tvTraderDiamonds.setVisibility(View.VISIBLE);
         }
         if (binding.sectionHostTrade != null) {
@@ -1115,9 +1158,10 @@ public class BagActivity extends ThemedActivity {
             binding.sectionHostTrade.setVisibility(showForm ? View.VISIBLE : View.GONE);
         }
         if (binding.tvWithdrawHint != null) {
+            long agency = Math.max(0L, w.agencyDiamonds);
             binding.tvWithdrawHint.setText(String.format(Locale.US,
-                    "التارجت: %,d ألماس · رصيدك القابل للسحب: %,d (≈ $%,.2f)",
-                    minWithdrawDiamonds, w.diamonds, w.diamonds * diamondUsdRate));
+                    "شخصي: %,d · وكالة: %,d · حد السحب الشخصي: %,d",
+                    w.diamonds, agency, minWithdrawDiamonds));
             binding.tvWithdrawHint.setContentDescription(String.format(Locale.US,
                     "1 diamond equals $%.6f; exchange rate %.2f coins",
                     diamondUsdRate, diamondCoinRate));

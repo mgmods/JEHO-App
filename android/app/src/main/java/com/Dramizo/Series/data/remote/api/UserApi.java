@@ -76,6 +76,9 @@ public interface UserApi {
     @GET("users/me/relations")
     Call<ApiResponse<List<MiscDtos.SocialRequestDto>>> relations(@Query("type") String type);
 
+    @GET("users/me/cp")
+    Call<ApiResponse<MiscDtos.CpStatusDto>> myCp();
+
     @POST("users/me/requests/{id}/accept")
     Call<ApiResponse<Object>> acceptRequest(@Path("id") String id);
 

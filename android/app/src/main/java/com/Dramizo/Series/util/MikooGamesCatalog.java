@@ -1,6 +1,7 @@
 package com.Dramizo.Series.util;
 
 import android.content.Context;
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
@@ -104,6 +105,117 @@ public final class MikooGamesCatalog {
         out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 31));
         out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 32));
         return out;
+    }
+
+    /**
+     * Cocos design size from each packaged game (Canvas / scene assets).
+     * The room dock letterboxes the stage to this aspect so the full UI is visible.
+     */
+    public static final class ViewportSpec {
+        public final int designW;
+        public final int designH;
+        /** True when designW >= designH (e.g. fishing table). */
+        public final boolean landscape;
+
+        public ViewportSpec(int designW, int designH) {
+            this.designW = Math.max(1, designW);
+            this.designH = Math.max(1, designH);
+            this.landscape = this.designW >= this.designH;
+        }
+
+        public float aspect() {
+            return designW / (float) designH;
+        }
+    }
+
+    private static final Map<String, ViewportSpec> VIEWPORTS = new LinkedHashMap<>();
+    static {
+        // Every default catalog game — sizes from package scene Canvas / splash assets.
+        putVp("7updown", 750, 750);
+        putVp("bounty-football", 750, 1334);
+        putVp("cleopatra-slot", 750, 1334);
+        putVp("cleopatra-slots", 750, 1334);
+        putVp("crash", 750, 1334);
+        putVp("fishing", 1334, 750);           // landscape
+        putVp("football-plinko", 750, 1334);
+        putVp("fortune-slot", 750, 1200);
+        putVp("greedy-box", 750, 1334);
+        putVp("hilo", 750, 1334);
+        putVp("line-slots", 750, 944);
+        putVp("luck-car", 750, 1334);
+        putVp("lucky77", 750, 1248);
+        putVp("megaways-slots", 750, 1334);
+        putVp("olympians", 750, 1334);
+        putVp("pirate-king", 750, 898);
+        putVp("royal-battle", 750, 1334);
+        putVp("slot777", 750, 1334);
+        putVp("sugar-rush", 750, 1334);
+        putVp("swimsuit-party", 750, 1624);    // taller portrait
+    }
+
+    private static void putVp(String id, int w, int h) {
+        VIEWPORTS.put(id.toLowerCase(Locale.US), new ViewportSpec(w, h));
+    }
+
+    /** Resolve from game id or play URL path (`/games/mikoo/<id>/`). */
+    @NonNull
+    public static ViewportSpec viewportFor(@Nullable String gameId) {
+        return viewportFor(gameId, null);
+    }
+
+    @NonNull
+    public static ViewportSpec viewportFor(@Nullable String gameId, @Nullable String playUrl) {
+        String key = null;
+        if (gameId != null && !gameId.trim().isEmpty()) {
+            key = gameId.trim().toLowerCase(Locale.US);
+        }
+        if ((key == null || key.isEmpty()) && playUrl != null) {
+            try {
+                String path = playUrl.toLowerCase(Locale.US);
+                int i = path.indexOf("/games/mikoo/");
+                if (i >= 0) {
+                    String rest = path.substring(i + "/games/mikoo/".length());
+                    int slash = rest.indexOf('/');
+                    key = slash > 0 ? rest.substring(0, slash) : rest;
+                    int q = key.indexOf('?');
+                    if (q > 0) key = key.substring(0, q);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (key != null) {
+            ViewportSpec s = VIEWPORTS.get(key);
+            if (s != null) return s;
+            if (key.contains("fish")) return new ViewportSpec(1334, 750);
+            if (key.contains("cleopatra")) return new ViewportSpec(750, 1334);
+            if (key.contains("swim")) return new ViewportSpec(750, 1624);
+            if (key.contains("lucky77") || key.contains("lucky-77")) {
+                return new ViewportSpec(750, 1248);
+            }
+            if (key.contains("plinko") || key.contains("football")) {
+                return new ViewportSpec(750, 1334);
+            }
+            if (key.contains("pirate")) return new ViewportSpec(750, 898);
+            if (key.contains("line")) return new ViewportSpec(750, 944);
+            if (key.contains("fortune") || key.contains("gem")) {
+                return new ViewportSpec(750, 1200);
+            }
+            if (key.contains("7up") || key.contains("updown")) {
+                return new ViewportSpec(750, 750);
+            }
+        }
+        return new ViewportSpec(750, 1334);
+    }
+
+    /** All known mikoo game ids (for completeness checks). */
+    @NonNull
+    public static Set<String> knownGameIds() {
+        Set<String> ids = new LinkedHashSet<>();
+        for (MiscDtos.GameDto g : defaultSlots()) {
+            if (g != null && g.id != null) ids.add(g.id.toLowerCase(Locale.US));
+        }
+        ids.addAll(VIEWPORTS.keySet());
+        return ids;
     }
 
     public static boolean isBlocked(MiscDtos.GameDto g) {

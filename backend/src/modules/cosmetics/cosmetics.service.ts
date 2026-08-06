@@ -67,6 +67,12 @@ export class CosmeticsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Always re-bind VIP frames gates (minVip / clear minUserLevel) — does not reseed art/prices.
+    try {
+      await this.rebindVipFrameGates();
+    } catch (err) {
+      this.logger.warn(`VIP frame gate rebind: ${(err as Error).message}`);
+    }
     // Live DB is the catalog. Boot mutators only when BOOT_SEED_CATALOGS=1.
     if (!bootCatalogSeedEnabled()) {
       this.logger.log('Cosmetics catalog: DB authoritative (no boot seed)');
@@ -118,7 +124,11 @@ export class CosmeticsService implements OnModuleInit {
       animationUrl: dto.animationUrl || null,
       coinPrice: Number(dto.coinPrice || 0),
       minVipLevel: Number(dto.minVipLevel || 0),
-      minUserLevel: Number(dto.minUserLevel || 0),
+      // Head frames / host wear: VIP only — never account level.
+      minUserLevel:
+        dto.type === CosmeticType.VIP_BADGE || dto.type === CosmeticType.HOST_BADGE
+          ? 0
+          : Number(dto.minUserLevel || 0),
       isActive: dto.isActive !== false,
       sortOrder: Number(dto.sortOrder || 0),
       meta: dto.meta || null,
@@ -160,6 +170,10 @@ export class CosmeticsService implements OnModuleInit {
     if (dto.coinPrice != null) row.coinPrice = Number(dto.coinPrice);
     if (dto.minVipLevel != null) row.minVipLevel = Number(dto.minVipLevel);
     if (dto.minUserLevel != null) row.minUserLevel = Number(dto.minUserLevel);
+    // Frames / headwear are VIP-bound only (dashboard accident: "level 20" was account level).
+    if (row.type === CosmeticType.VIP_BADGE || row.type === CosmeticType.HOST_BADGE) {
+      row.minUserLevel = 0;
+    }
     if (dto.isActive != null) row.isActive = !!dto.isActive;
     if (dto.sortOrder != null) row.sortOrder = Number(dto.sortOrder);
     if (dto.meta !== undefined) row.meta = dto.meta;
@@ -399,19 +413,38 @@ export class CosmeticsService implements OnModuleInit {
     return Number(vip?.level || 0);
   }
 
+  /**
+   * VIP plan (1–100) → visual frame/medal tier (1–7).
+   * Used for grants; equip still checks cosmetic.minVipLevel (usually 1–7).
+   */
+  private vipVisualTier(vipLevel: number): number {
+    return Math.min(7, Math.max(1, Math.floor(Number(vipLevel) || 1)));
+  }
+
   private async assertCosmeticRequirements(userId: string, cosmetic: Cosmetic) {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
+    // Headwear/VIP frames are VIP-gated only — ignore accidental minUserLevel in DB.
+    const isVipWear =
+      cosmetic.type === CosmeticType.VIP_BADGE ||
+      cosmetic.type === CosmeticType.HOST_BADGE ||
+      (cosmetic.meta as any)?.aristocracy === true;
+
     const userLevel = Math.max(1, Number(user.level || 1));
-    if (cosmetic.minUserLevel > 0 && userLevel < cosmetic.minUserLevel) {
-      throw new BadRequestException(`Requires user level ${cosmetic.minUserLevel}`);
+    if (!isVipWear && cosmetic.minUserLevel > 0 && userLevel < cosmetic.minUserLevel) {
+      throw new BadRequestException(
+        `يتطلب مستوى الحساب ${cosmetic.minUserLevel}`,
+      );
     }
 
     if (cosmetic.minVipLevel > 0) {
       const vipLevel = await this.activeVipLevel(userId);
+      // Plan can be 1–100; compare against catalog min (visual tiers usually 1–7).
       if (vipLevel < cosmetic.minVipLevel) {
-        throw new BadRequestException(`Requires VIP level ${cosmetic.minVipLevel}`);
+        throw new BadRequestException(
+          `يتطلب VIP ${cosmetic.minVipLevel} (مستواك VIP ${vipLevel || 0})`,
+        );
       }
     }
   }
@@ -697,11 +730,6 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     return { vipLevel: vip, visualTier: level, days: daysSafe, granted };
-  }
-
-  private vipVisualTier(vipLevel: number): number {
-    // VIP1→frame1 … VIP7→frame7; VIP8+ keep the top VIP7 frame.
-    return Math.min(7, Math.max(1, Math.floor(Number(vipLevel) || 1)));
   }
 
   private async ensureOwned(userId: string, cosmeticId: string) {
@@ -1031,28 +1059,8 @@ export class CosmeticsService implements OnModuleInit {
       });
     }
 
-    // Fix VIP frame sort order to VIP number (not Mikoo catalog index).
-    const frames = await this.cosmeticsRepo.find({
-      where: { type: CosmeticType.VIP_BADGE, isActive: true },
-    });
-    for (const frame of frames) {
-      const code = String(frame.code || '');
-      const name = String(frame.name || '');
-      const m =
-        code.match(/(?:^|_)vip(\d+)$/i) ||
-        code.match(/vip[_-]?(\d+)/i) ||
-        name.match(/VIP\s*(\d+)/i);
-      if (!m) continue;
-      const vip = Math.min(7, Math.max(1, Number(m[1]) || 0));
-      if (vip < 1) continue;
-      const nextSort = 200 + vip;
-      if (frame.sortOrder !== nextSort || frame.minVipLevel !== vip) {
-        frame.sortOrder = nextSort;
-        frame.minVipLevel = vip;
-        frame.meta = { ...(frame.meta || {}), vipLevel: vip, aristocracy: true };
-        await this.cosmeticsRepo.save(frame);
-      }
-    }
+    // Bind every active head frame (vip_badge) to VIP only — never account level.
+    await this.rebindVipFrameGates();
 
     // Deactivate bogus level_vip_8..10 that pointed at missing/non-Mikoo art.
     for (let lvl = 8; lvl <= 10; lvl++) {
@@ -1064,6 +1072,66 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     this.aristocracyEnsured = true;
+  }
+
+  /**
+   * Frames (vip_badge): always VIP-gated, never account-level-gated.
+   * Safe on production (BOOT_SEED off) — only updates gate columns + meta.vipLevel.
+   */
+  private async rebindVipFrameGates() {
+    const frames = await this.cosmeticsRepo.find({
+      where: { type: CosmeticType.VIP_BADGE, isActive: true },
+    });
+    let updated = 0;
+    for (const frame of frames) {
+      const code = String(frame.code || '');
+      const name = String(frame.name || '');
+      const metaVip = Number((frame.meta as any)?.vipLevel || 0);
+      const m =
+        code.match(/(?:^|_)vip(\d+)$/i) ||
+        code.match(/vip[_-]?(\d+)/i) ||
+        name.match(/VIP\s*(\d+)/i) ||
+        name.match(/في\s*اي\s*بي\s*(\d+)/i);
+      let vip = 0;
+      if (m) vip = Math.max(0, Number(m[1]) || 0);
+      else if (metaVip > 0) vip = metaVip;
+      else if (Number(frame.minVipLevel || 0) > 0) vip = Number(frame.minVipLevel);
+      // Wear art is VIP1–7; plans 8–100 still wear tier 7.
+      if (vip > 0) vip = Math.min(7, Math.max(1, vip));
+
+      let dirty = false;
+      if (Number(frame.minUserLevel || 0) !== 0) {
+        frame.minUserLevel = 0;
+        dirty = true;
+      }
+      if (vip > 0) {
+        const nextSort = Math.max(Number(frame.sortOrder) || 0, 200 + vip);
+        if (Number(frame.minVipLevel || 0) !== vip) {
+          frame.minVipLevel = vip;
+          dirty = true;
+        }
+        if ((frame.meta as any)?.vipLevel !== vip || !(frame.meta as any)?.aristocracy) {
+          frame.meta = {
+            ...(frame.meta || {}),
+            vipLevel: vip,
+            aristocracy: true,
+          };
+          dirty = true;
+        }
+        // Keep VIP frames ordered but avoid thrashing custom sortOrder unless zeroish.
+        if ((Number(frame.sortOrder) || 0) < 200 && frame.sortOrder !== nextSort) {
+          frame.sortOrder = nextSort;
+          dirty = true;
+        }
+      }
+      if (dirty) {
+        await this.cosmeticsRepo.save(frame);
+        updated += 1;
+      }
+    }
+    if (updated > 0) {
+      this.logger.log(`Re-bound ${updated} VIP frames (minVipLevel, cleared minUserLevel)`);
+    }
   }
 
   /**

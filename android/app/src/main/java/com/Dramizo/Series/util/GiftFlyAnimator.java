@@ -116,35 +116,45 @@ public final class GiftFlyAnimator {
             public void onAnimationEnd(Animator animation) {
                 long hold = Math.max(350L, holdMs);
                 hero.postDelayed(() -> {
-                    if (onScatterStart != null) {
-                        try {
-                            onScatterStart.run();
-                        } catch (Exception ignored) {
+                    try {
+                        if (onScatterStart != null) {
+                            try {
+                                onScatterStart.run();
+                            } catch (Exception ignored) {
+                            }
+                        }
+                        if (targets.isEmpty()) {
+                            hero.animate()
+                                    .alpha(0f).scaleX(1.4f).scaleY(1.4f)
+                                    .setDuration(420)
+                                    .withEndAction(() -> {
+                                        remove(hero);
+                                        if (onEnd != null) onEnd.run();
+                                    })
+                                    .start();
+                            return;
+                        }
+                        scatterClones(overlay, iconUrl, mid, targets, density, onEnd);
+                        hero.animate()
+                                .alpha(0f).scaleX(0.4f).scaleY(0.4f)
+                                .setDuration(380)
+                                .withEndAction(() -> remove(hero))
+                                .start();
+                    } catch (OutOfMemoryError | Exception e) {
+                        remove(hero);
+                        if (onEnd != null) {
+                            try { onEnd.run(); } catch (Exception ignored) {}
                         }
                     }
-                    if (targets.isEmpty()) {
-                        // Pulse fade only.
-                        hero.animate()
-                                .alpha(0f).scaleX(1.4f).scaleY(1.4f)
-                                .setDuration(420)
-                                .withEndAction(() -> {
-                                    remove(hero);
-                                    if (onEnd != null) onEnd.run();
-                                })
-                                .start();
-                        return;
-                    }
-                    scatterClones(overlay, iconUrl, mid, targets, density, onEnd);
-                    // Hero dissolves while clones fly.
-                    hero.animate()
-                            .alpha(0f).scaleX(0.4f).scaleY(0.4f)
-                            .setDuration(380)
-                            .withEndAction(() -> remove(hero))
-                            .start();
                 }, hold);
             }
         });
-        pop.start();
+        try {
+            pop.start();
+        } catch (OutOfMemoryError | Exception e) {
+            remove(hero);
+            if (onEnd != null) onEnd.run();
+        }
     }
 
     private static void scatterClones(
@@ -155,13 +165,15 @@ public final class GiftFlyAnimator {
             float density,
             @Nullable Runnable onEnd
     ) {
-        int size = Math.round(42f * density);
-        final int[] left = {seats.size()};
+        // Cap clone count on mid-range devices (luck/gift scatter used to OOM-kill process).
+        int maxSeats = Math.min(seats != null ? seats.size() : 0, 8);
+        final int[] left = {maxSeats};
         if (left[0] <= 0) {
             if (onEnd != null) onEnd.run();
             return;
         }
-        for (int i = 0; i < seats.size(); i++) {
+        int size = Math.round(42f * density);
+        for (int i = 0; i < maxSeats; i++) {
             PointF to = seats.get(i);
             if (to == null) {
                 left[0]--;
@@ -298,11 +310,13 @@ public final class GiftFlyAnimator {
         icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         if (iconUrl != null && !iconUrl.isEmpty()) {
             try {
-                Glide.with(icon).load(AssetCatalog.absoluteUrl(iconUrl))
+                // Application context — never crash if Activity is finishing during gift FX.
+                Glide.with(overlay.getContext().getApplicationContext())
+                        .load(AssetCatalog.absoluteUrl(iconUrl))
                         .placeholder(ImagePlaceholder.gift())
                         .error(ImagePlaceholder.gift())
                         .into(icon);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 icon.setImageResource(ImagePlaceholder.gift());
             }
         } else {

@@ -5,15 +5,16 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="#FFECEFF3">
 
     <ImageView
         android:id="@+id/imgThemeBg"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#FFECEFF3"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white" />
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentColumn"

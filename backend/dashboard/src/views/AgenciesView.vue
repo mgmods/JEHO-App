@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div>
     <PageHeader :title="t('agencies.title')" :subtitle="t('agencies.subtitle')">
       <template #actions>
@@ -14,8 +14,32 @@
     <div class="glass p-3 mb-3">
       <div class="row g-2 align-items-end">
         <div class="col-md-2">
+          <label class="form-label d-block">{{ t('agencies.createFree') }}</label>
+          <div class="form-check form-switch mt-2">
+            <input
+              id="agencyCreateFree"
+              v-model="pricing.createFree"
+              class="form-check-input"
+              type="checkbox"
+              @change="onCreateFreeToggle"
+            />
+            <label class="form-check-label small" for="agencyCreateFree">
+              {{ pricing.createFree ? t('agencies.createFreeOn') : t('agencies.createFreeOff') }}
+            </label>
+          </div>
+        </div>
+        <div class="col-md-2">
           <label class="form-label">{{ t('agencies.createPrice') }}</label>
-          <input v-model.number="pricing.createPriceCoins" type="number" min="0" class="form-control" />
+          <input
+            v-model.number="pricing.createPriceCoins"
+            type="number"
+            :min="pricing.createFree ? 0 : 1000"
+            class="form-control"
+            :disabled="pricing.createFree"
+          />
+          <div v-if="pricing.createFree" class="form-text small">
+            {{ t('agencies.createFreePriceHint') }}
+          </div>
         </div>
         <div class="col-md-2">
           <label class="form-label">{{ t('agencies.defaultCommission') }}</label>
@@ -465,6 +489,7 @@ const form = reactive({
 const grantingExclusives = ref(false)
 const pricing = reactive({
   createPriceCoins: 50000,
+  createFree: false,
   defaultCommissionPercent: 15,
   platformCutPercent: 30,
   hostSharePercent: 55,
@@ -605,6 +630,16 @@ async function loadPricing() {
     }
   }
   pricing.createPriceCoins = Number(map.agency_create_price_coins ?? pricing.createPriceCoins)
+  const freeRaw = String(map.agency_create_free ?? 'false').toLowerCase()
+  // Legacy: price 0 was used to mean free — migrate into the free toggle.
+  pricing.createFree =
+    freeRaw === 'true' || freeRaw === '1' || freeRaw === 'yes'
+    || Number(pricing.createPriceCoins) === 0
+  if (pricing.createFree) {
+    pricing.createPriceCoins = 0
+  } else if (!Number.isFinite(pricing.createPriceCoins) || pricing.createPriceCoins < 1000) {
+    pricing.createPriceCoins = 1000
+  }
   pricing.defaultCommissionPercent = Number(map.agency_default_commission_percent ?? pricing.defaultCommissionPercent)
   pricing.platformCutPercent = Number(map.agency_platform_cut_percent ?? pricing.platformCutPercent)
   pricing.platformRevenueDiamonds = Number(map.platform_gift_revenue_diamonds ?? pricing.platformRevenueDiamonds)
@@ -615,6 +650,14 @@ async function loadPricing() {
     ? Number(hostRaw)
     : Math.max(0, 100 - Number(pricing.defaultCommissionPercent || 0) - Number(pricing.platformCutPercent || 0))
   clampPricingFields()
+}
+
+function onCreateFreeToggle() {
+  if (pricing.createFree) {
+    pricing.createPriceCoins = 0
+  } else if (!Number.isFinite(pricing.createPriceCoins) || pricing.createPriceCoins < 1000) {
+    pricing.createPriceCoins = 50000
+  }
 }
 
 async function loadApplications() {
@@ -903,8 +946,17 @@ async function savePricing() {
     toast().danger(error.value)
     return
   }
+  const createFree = !!pricing.createFree
+  let coins = Math.floor(Number(pricing.createPriceCoins) || 0)
+  if (createFree) {
+    coins = 0
+  } else {
+    coins = Math.max(1000, coins > 0 ? coins : 1000)
+    pricing.createPriceCoins = coins
+  }
   const { error: err } = await settingsApi.update({
-    agency_create_price_coins: String(Math.max(0, Math.floor(Number(pricing.createPriceCoins) || 0))),
+    agency_create_free: createFree ? 'true' : 'false',
+    agency_create_price_coins: String(coins),
     agency_default_commission_percent: String(pricing.defaultCommissionPercent),
     agency_platform_cut_percent: String(pricing.platformCutPercent),
     agency_host_share_percent: String(pricing.hostSharePercent),

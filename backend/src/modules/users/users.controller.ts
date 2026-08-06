@@ -89,6 +89,12 @@ export class UsersController {
     return this.usersService.listAcceptedRelations(userId, type);
   }
 
+  @Get('me/cp')
+  @ApiOperation({ summary: 'My CP partner, intimacy score and level' })
+  myCp(@CurrentUser('sub') userId: string) {
+    return this.usersService.myCpStatus(userId);
+  }
+
   @Get('me/requests')
   myRequests(
     @CurrentUser('sub') userId: string,

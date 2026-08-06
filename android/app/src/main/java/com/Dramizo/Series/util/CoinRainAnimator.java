@@ -70,15 +70,16 @@ public final class CoinRainAnimator {
         }
 
         float density = overlay.getResources().getDisplayMetrics().density;
-        int size = Math.round(26 * density);
-        int n = Math.max(40, Math.min(160, coinCount));
+        int size = Math.round(22 * density);
+        // Hard cap — budget devices (Hot 30 etc.) OOM when 100+ ImageViews+animators spawn.
+        int n = Math.max(6, Math.min(18, coinCount));
         Random rnd = new Random();
         PointF center = new PointF(w / 2f, h * 0.48f);
         overlay.setVisibility(View.VISIBLE);
         overlay.bringToFront();
 
         // Center pulse cluster — gold heartbeats before scatter.
-        int pulseN = Math.min(18, Math.max(8, targets.size() * 2));
+        int pulseN = Math.min(6, Math.max(3, targets.size()));
         final int[] remaining = {n + pulseN};
         Runnable doneOne = () -> {
             remaining[0]--;
@@ -196,7 +197,7 @@ public final class CoinRainAnimator {
         int h = Math.max(overlay.getHeight(), 1);
         float density = overlay.getResources().getDisplayMetrics().density;
         int size = Math.round(22 * density);
-        int n = Math.max(24, Math.min(90, coinCount));
+        int n = Math.max(8, Math.min(16, coinCount));
         Random rnd = new Random();
         final int[] remaining = {n};
         for (int i = 0; i < n; i++) {
@@ -254,7 +255,7 @@ public final class CoinRainAnimator {
         }
         float density = overlay.getResources().getDisplayMetrics().density;
         int size = Math.round(22 * density);
-        int n = Math.max(28, Math.min(100, coinCount));
+        int n = Math.max(8, Math.min(16, coinCount));
         Random rnd = new Random();
         final int[] remaining = {n};
         for (int i = 0; i < n; i++) {

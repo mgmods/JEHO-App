@@ -61,11 +61,14 @@ public class MessagesViewModel extends ViewModel {
                 load(true);
                 return;
             }
-            match.lastMessage = lastMessage;
-            match.unreadCount = unreadCount;
-            if (lastMessage != null && lastMessage.createdAt != null) {
-                match.updatedAt = lastMessage.createdAt;
+            // Keep last preview when server only clears unread (lastMessage == null).
+            if (lastMessage != null) {
+                match.lastMessage = lastMessage;
+                if (lastMessage.createdAt != null) {
+                    match.updatedAt = lastMessage.createdAt;
+                }
             }
+            match.unreadCount = Math.max(0, unreadCount);
             next.remove(idx);
             next.add(0, match);
             conversations.postValue(next);

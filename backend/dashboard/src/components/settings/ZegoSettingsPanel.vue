@@ -9,7 +9,7 @@
         <div class="settings-card">
           <h3 class="settings-card-title">{{ t('voiceRtc.title') }}</h3>
           <p class="text-secondary small mb-3">{{ t('voiceRtc.hint') }}</p>
-          <div class="d-flex flex-wrap gap-2 mb-3">
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
             <button
               type="button"
               class="btn"
@@ -21,13 +21,37 @@
             </button>
             <button
               type="button"
-              class="btn"
+              class="btn voice-provider-livekit d-inline-flex align-items-center gap-2"
               :class="voice.provider === 'livekit' ? 'btn-aurora' : 'btn-outline-secondary'"
               :disabled="voiceSaving"
               @click="setProvider('livekit')"
             >
+              <span
+                class="voice-wave"
+                :class="{
+                  'voice-wave--on': voice.provider === 'livekit',
+                  'voice-wave--ready': voice.provider === 'livekit' && voice.ready,
+                }"
+                aria-hidden="true"
+                title="LiveKit مجاني"
+              >
+                <i /><i /><i /><i /><i />
+              </span>
               LiveKit ({{ t('voiceRtc.free') }})
             </button>
+            <span
+              v-if="voice.provider === 'livekit'"
+              class="small text-secondary d-inline-flex align-items-center gap-1"
+            >
+              <span
+                class="voice-wave voice-wave--sm"
+                :class="{ 'voice-wave--on': true, 'voice-wave--ready': voice.ready }"
+                aria-hidden="true"
+              >
+                <i /><i /><i /><i /><i />
+              </span>
+              {{ voice.ready ? 'إشارة مجانية نشطة' : 'LiveKit محدّد — راجع المفاتيح' }}
+            </span>
           </div>
           <div class="d-flex justify-content-between align-items-center mb-2">
             <span class="small text-secondary mb-0">{{ t('voiceRtc.keysSection') }}</span>
@@ -512,3 +536,52 @@ async function save() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.voice-wave {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 14px;
+  min-width: 16px;
+  opacity: 0.45;
+}
+.voice-wave--sm {
+  height: 12px;
+}
+.voice-wave i {
+  display: block;
+  width: 2.5px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: bottom center;
+}
+.voice-wave--on {
+  opacity: 0.95;
+}
+.voice-wave--on i {
+  animation: voice-bar 0.85s ease-in-out infinite;
+}
+.voice-wave--on i:nth-child(1) { animation-delay: 0s; height: 5px; }
+.voice-wave--on i:nth-child(2) { animation-delay: 0.12s; height: 10px; }
+.voice-wave--on i:nth-child(3) { animation-delay: 0.24s; height: 14px; }
+.voice-wave--on i:nth-child(4) { animation-delay: 0.36s; height: 9px; }
+.voice-wave--on i:nth-child(5) { animation-delay: 0.48s; height: 6px; }
+.voice-wave--ready i {
+  animation-duration: 0.55s;
+}
+.voice-provider-livekit.btn-outline-secondary .voice-wave {
+  opacity: 0.35;
+}
+.voice-provider-livekit.btn-outline-secondary .voice-wave i {
+  animation: none;
+  height: 5px;
+}
+
+@keyframes voice-bar {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.65; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+</style>

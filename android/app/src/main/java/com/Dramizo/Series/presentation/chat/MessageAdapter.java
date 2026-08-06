@@ -29,6 +29,7 @@ import com.Dramizo.Series.data.remote.dto.ChatDtos;
 import com.Dramizo.Series.databinding.ItemMessageBinding;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RoomShareCodec;
@@ -322,8 +323,23 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.imgFrame.bringToFront();
         }
 
-        holder.b.tvSender.setVisibility(View.VISIBLE);
+        holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
+
+        // Better contrast on mine / peer bubbles
+        int bodyColor = mine ? 0xFFFFFFFF : holder.itemView.getContext().getColor(R.color.text_primary);
+        int metaColor = mine ? 0xCCFFFFFF : holder.itemView.getContext().getColor(R.color.text_hint);
+        holder.b.tvContent.setTextColor(bodyColor);
+        holder.b.tvTime.setTextColor(metaColor);
+        if (holder.b.tvTranslated != null) {
+            holder.b.tvTranslated.setTextColor(mine ? 0xE6FFFFFF : holder.itemView.getContext().getColor(R.color.text_secondary));
+        }
+        if (holder.b.tvTranslateAction != null) {
+            holder.b.tvTranslateAction.setTextColor(mine ? 0xCCFFFFFF : holder.itemView.getContext().getColor(R.color.text_secondary));
+        }
+        if (holder.b.tvAudioDur != null) {
+            holder.b.tvAudioDur.setTextColor(metaColor);
+        }
 
         if (!mine && listener != null) {
             String clickUserId = firstNonEmpty(
@@ -483,13 +499,27 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.giftRow.setVisibility(View.VISIBLE);
             String label = msg.content != null && !msg.content.isEmpty() ? msg.content : "هدية";
             holder.b.tvGiftLabel.setText(label);
-            if (mediaUrl != null && !mediaUrl.isEmpty()) {
+            String giftIcon = mediaUrl;
+            if (giftIcon != null) {
+                CosmeticMedia.Kind k = CosmeticMedia.kind(giftIcon);
+                if (k == CosmeticMedia.Kind.VIDEO || k == CosmeticMedia.Kind.SVGA) {
+                    giftIcon = null;
+                }
+            }
+            if (giftIcon != null && !giftIcon.isEmpty()) {
                 holder.b.imgGift.setVisibility(View.VISIBLE);
-                Glide.with(holder.b.imgGift)
-                        .load(AssetCatalog.absoluteUrl(mediaUrl))
-                        .placeholder(ImagePlaceholder.gift())
-                        .error(ImagePlaceholder.gift())
-                        .into(holder.b.imgGift);
+                try {
+                    Glide.with(holder.b.imgGift.getContext().getApplicationContext())
+                            .load(AssetCatalog.absoluteUrl(giftIcon))
+                            .placeholder(ImagePlaceholder.gift())
+                            .error(ImagePlaceholder.gift())
+                            .override(160, 160)
+                            .centerInside()
+                            .dontAnimate()
+                            .into(holder.b.imgGift);
+                } catch (Exception e) {
+                    holder.b.imgGift.setImageResource(ImagePlaceholder.gift());
+                }
             } else {
                 holder.b.imgGift.setVisibility(View.VISIBLE);
                 holder.b.imgGift.setImageResource(ImagePlaceholder.gift());

@@ -6,10 +6,12 @@ import {
   GREEDY_BOX_RATIOS,
   LUCK_CAR_RATIOS_MILLI,
   LUCKY77_AREA_RATIOS,
+  LUCKY77_BET_CHIPS,
   MIKOO_BET_CHIPS,
   MIKOO_CRASH_CHIPS,
   MIKOO_WIN_MULTS,
   chipsList,
+  lucky77ChipsList,
   randomWinMult,
 } from './mikoo-game-economy';
 
@@ -1825,7 +1827,10 @@ export function encodeLucky77TableInfoRes(data: {
   myAreaBet?: Array<{ icon: number; money: number }>;
   betTotal?: Array<{ icon: number; money: number }>;
 }): Buffer {
-  const chips = data.chips ?? chipsList();
+  // Must be exactly 4 values — UI has CHIPCOUNTS=4 fixed nodes.
+  const raw = data.chips ?? lucky77ChipsList();
+  const chips = raw.slice(0, 4);
+  while (chips.length < 4) chips.push(LUCKY77_BET_CHIPS[chips.length] ?? 100);
   const ratios = data.ratios ?? [...LUCKY77_RATIOS];
   const history = data.history ?? [1, 2, 3, 4, 5, 9, 1, 2];
   const parts: Buffer[] = [
@@ -1943,6 +1948,52 @@ export function encodeLucky77GetRankDataRes(
     pbInt32(4, weekNo),
     pbInt32(5, 0), // tipType
   ]);
+}
+
+/**
+ * Lucky77 GetUserRecordRes (My Cost panel):
+ * code@1, desc@2, recordData@3[] of recordStruct
+ * recordStruct: time@1 int64, betTotal@2 detailBetStruct[], icon@3 int32[], curTurn@4
+ * detailBetStruct: icon@1, cost@2 (stake), money@3 (return)
+ */
+export function encodeLucky77GetUserRecordRes(
+  records: Array<{
+    time?: number;
+    curTurn?: number;
+    icons?: number[];
+    betTotal?: Array<{ icon: number; cost: number; money: number }>;
+  }> = [],
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const rec of records) {
+    const rowParts: Buffer[] = [
+      pbUInt64(1, Math.max(0, Math.floor(rec.time ?? Date.now() / 1000))),
+    ];
+    for (const b of rec.betTotal ?? []) {
+      const detail = encodeMessage([
+        pbInt32(1, b.icon | 0),
+        pbInt32(2, Math.max(0, Math.floor(b.cost || 0))),
+        pbInt32(3, Math.max(0, Math.floor(b.money || 0))),
+      ]);
+      rowParts.push(Buffer.concat([tag(2, 2), writeVarint(detail.length), detail]));
+    }
+    for (const icon of rec.icons ?? []) {
+      rowParts.push(pbInt32(3, Math.max(0, Math.floor(icon))));
+    }
+    rowParts.push(pbInt32(4, Math.max(0, Math.floor(rec.curTurn ?? 0))));
+    const row = encodeMessage(rowParts);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  return encodeMessage(parts);
+}
+
+/** Lucky77 Game History (prize strip) — code/desc + recordData int32[] of wheel positions 1..9. */
+export function encodeLucky77GetPrizeDrawRecordRes(positions: number[] = []): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const p of positions) {
+    parts.push(pbInt32(3, Math.max(0, Math.floor(p))));
+  }
+  return encodeMessage(parts);
 }
 
 /** Lucky77 ResultBroadcast — myGoodLuck required. */

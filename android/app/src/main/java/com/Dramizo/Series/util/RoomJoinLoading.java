@@ -47,7 +47,15 @@ public final class RoomJoinLoading {
             }
         }
         SVGAImageView svga = root.findViewById(R.id.svRoomLoading);
-        MikooLoadingAnim.bind(svga);
+        // Soft-bind SVGA async — hard load on main freezes low-end devices during room join.
+        if (svga != null) {
+            svga.post(() -> {
+                try {
+                    MikooLoadingAnim.bind(svga);
+                } catch (Exception ignored) {
+                }
+            });
+        }
         d.setCancelable(false);
         d.setCanceledOnTouchOutside(false);
         try {

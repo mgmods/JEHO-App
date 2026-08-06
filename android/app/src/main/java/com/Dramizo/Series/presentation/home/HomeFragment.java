@@ -214,8 +214,11 @@ public class HomeFragment extends Fragment {
         binding.tileRich.setOnClickListener(v -> openRanking("rich"));
         setupHomeActBanners();
         // Explore strip removed — Mikoo Hot is a single recycled grid (item_home_live_list).
-        binding.tileActivity.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.TaskCenterActivity.class)));
+        binding.tileActivity.setOnClickListener(v -> {
+            if (!isTasksEnabled()) return;
+            startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
+        });
+        applyTasksFeatureVisibility();
 
         if (binding.myRoomCardHome != null) {
             binding.myRoomCardHome.getRoot().setVisibility(View.GONE);
@@ -391,9 +394,39 @@ public class HomeFragment extends Fragment {
         act.cpBannerCard.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(),
                         com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
-        act.activityBannerCard.setOnClickListener(v ->
+        applyTasksFeatureVisibility();
+    }
+
+    private boolean isTasksEnabled() {
+        return com.Dramizo.Series.util.TasksFeature.isEnabled(requireContext());
+    }
+
+    private void applyTasksFeatureVisibility() {
+        if (binding == null) return;
+        boolean on = isTasksEnabled();
+        // Tile on the explore grid still hides when tasks are off.
+        com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.tileActivity, on);
+        if (binding.homeActBanners == null) return;
+        var act = binding.homeActBanners;
+        // Keep the third banner filled — tasks when enabled, store otherwise (no empty gap).
+        act.activityBannerCard.setVisibility(View.VISIBLE);
+        if (act.tvActivityBannerTitle != null) {
+            act.tvActivityBannerTitle.setText(on ? R.string.task_center : R.string.store_title);
+        }
+        if (act.tvActivityBannerHint != null) {
+            act.tvActivityBannerHint.setText(on
+                    ? "مهام يومية · مكافآت"
+                    : "إطارات · دخوليات · خلفيات");
+        }
+        act.activityBannerCard.setOnClickListener(v -> {
+            if (on) {
                 startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class)));
+                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
+            } else {
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.profile.StoreHubActivity.class));
+            }
+        });
     }
 
     private void bindRankFlipPage(int pageIndex, List<MiscDtos.RankingEntryDto> list) {
@@ -724,7 +757,8 @@ public class HomeFragment extends Fragment {
     private void launchVoiceRoom(
             com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto room,
             @Nullable String pwd) {
-        // Loading lives inside VoiceRoomActivity (Mikoo), not over the home list.
+        // Start HTTP join BEFORE inflating VoiceRoomActivity (biggest open lag).
+        com.Dramizo.Series.util.RoomJoinPrefetch.begin(requireContext(), room.id, pwd);
         Intent i = new Intent(requireContext(), VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
         if (pwd != null && !pwd.isEmpty()) {
@@ -983,6 +1017,7 @@ public class HomeFragment extends Fragment {
             return;
         }
         if ("tasks".equals(link) || link.contains("task")) {
+            if (!isTasksEnabled()) return;
             startActivity(new Intent(requireContext(),
                     com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
             return;
@@ -1015,11 +1050,11 @@ public class HomeFragment extends Fragment {
         super.onResume();
         refreshLocationTabChrome();
         AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
+            c.getIoExecutor().execute(() -> {
             AppFeatures.refresh(c);
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
-                // Feature flags refreshed (e.g. female-only voice hosts).
+                applyTasksFeatureVisibility();
             });
         });
         if (binding != null

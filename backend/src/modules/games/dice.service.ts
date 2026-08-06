@@ -16,20 +16,21 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiceRollDto } from './dto/dice.dto';
 import { RoomGameAccessService } from './room-game-access.service';
+import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
 
-/** Display multipliers — capped so wins stay reasonable. */
+/** Display multipliers ≈ fair × 0.75 house (true 2-dice outcomes). Peaks soft-clamped by guard. */
 export const DICE_ODDS: Record<number, number> = {
-  2: 8,
-  3: 6,
-  4: 5,
-  5: 4,
-  6: 3,
-  7: 2,
-  8: 3,
-  9: 4,
-  10: 5,
-  11: 6,
-  12: 8,
+  2: 18,
+  3: 12,
+  4: 8,
+  5: 6,
+  6: 5,
+  7: 4,
+  8: 5,
+  9: 6,
+  10: 8,
+  11: 12,
+  12: 18,
 };
 
 @Injectable()
@@ -61,7 +62,7 @@ export class DiceService {
     return {
       enabled: (map.get('games.dice.enabled') ?? 'true') !== 'false',
       minBet: Math.max(1, num('games.dice.min_bet', 100)),
-      maxBet: Math.max(100, num('games.dice.max_bet', 20_000)),
+      maxBet: Math.min(Math.max(100, num('games.dice.max_bet', 10_000)), GAME_PAYOUT.maxBet),
       /** Very low hit rate (~8%). */
       winWeight: Math.max(0, num('games.dice.win_weight', 8)),
       loseWeight: Math.max(1, num('games.dice.lose_weight', 92)),
@@ -81,7 +82,7 @@ export class DiceService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 1000, 10000, 50000].filter((c) => c <= cfg.maxBet),
+        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
         odds: DICE_ODDS,
       },
     };
@@ -129,12 +130,16 @@ export class DiceService {
         }),
       );
 
-      const hit = this.shouldWin(cfg);
-      const [d1, d2] = hit ? this.comboFor(pick) : this.comboNot(pick);
+      // True 2-dice roll + house mult table (~75% RTP at fair p × mult).
+      const d1 = 1 + Math.floor(Math.random() * 6);
+      const d2 = 1 + Math.floor(Math.random() * 6);
       const total = d1 + d2;
       const multiplier = DICE_ODDS[pick] || 2;
       const won = total === pick;
-      const payout = won ? amount * multiplier : 0;
+      // One extra house soft-void on max peak hits (~5%) for platform safety.
+      const softVoid = won && multiplier >= 14 && Math.random() < 0.08;
+      const rawPayout = won && !softVoid ? amount * multiplier : 0;
+      const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
 
       if (payout > 0) {
         wallet.coins = Number(wallet.coins || 0) + payout;
@@ -152,6 +157,7 @@ export class DiceService {
             metadata: {
               amount,
               payout,
+              rawPayout,
               multiplier,
               pick,
               d1,

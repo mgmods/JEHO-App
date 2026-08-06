@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User, Gender } from '../../database/entities/user.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Follow } from '../../database/entities/follow.entity';
@@ -53,6 +53,7 @@ export class UsersService {
     @InjectRepository(SocialRequest) private readonly socialRepo: Repository<SocialRequest>,
     @InjectRepository(ProfileVisit) private readonly visitsRepo: Repository<ProfileVisit>,
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
+    private readonly dataSource: DataSource,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
     private readonly identityVerification: IdentityVerificationService,
@@ -641,27 +642,99 @@ export class UsersService {
     );
   }
 
+  /** Accepted CP pair between two users? */
+  async isCpPair(userA: string, userB: string): Promise<boolean> {
+    if (!userA || !userB || userA === userB) return false;
+    const row = await this.socialRepo.findOne({
+      where: [
+        {
+          fromUserId: userA,
+          toUserId: userB,
+          type: SocialRequestType.RELATION,
+          status: SocialRequestStatus.ACCEPTED,
+        },
+        {
+          fromUserId: userB,
+          toUserId: userA,
+          type: SocialRequestType.RELATION,
+          status: SocialRequestStatus.ACCEPTED,
+        },
+      ],
+    });
+    return !!row;
+  }
+
+  private async hasAcceptedCp(userId: string): Promise<boolean> {
+    const row = await this.socialRepo.findOne({
+      where: [
+        {
+          fromUserId: userId,
+          type: SocialRequestType.RELATION,
+          status: SocialRequestStatus.ACCEPTED,
+        },
+        {
+          toUserId: userId,
+          type: SocialRequestType.RELATION,
+          status: SocialRequestStatus.ACCEPTED,
+        },
+      ],
+    });
+    return !!row;
+  }
+
+  /** Lifetime gift coins exchanged between a CP pair → intimacy level. */
+  private async cpBondScore(userA: string, userB: string): Promise<number> {
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT COALESCE(SUM(gs."totalCoins"), 0)::text AS s
+           FROM gift_sends gs
+          WHERE (gs."senderId" = $1 AND gs."receiverId" = $2)
+             OR (gs."senderId" = $2 AND gs."receiverId" = $1)`,
+        [userA, userB],
+      );
+      return Math.max(0, Math.floor(Number(rows?.[0]?.s || 0)));
+    } catch {
+      return 0;
+    }
+  }
+
+  /** CP hub status for me (partner + intimacy). */
+  async myCpStatus(userId: string) {
+    const items = await this.listAcceptedRelations(userId, SocialRequestType.RELATION);
+    const bond = items[0] || null;
+    if (!bond?.user?.id) {
+      return {
+        hasCp: false,
+        partner: null,
+        bondScore: 0,
+        level: 0,
+        nextLevelAt: 500,
+      };
+    }
+    const bondScore = await this.cpBondScore(userId, bond.user.id);
+    // 500 coins exchanged between pair = 1 level (soft Mikoo-style ladder).
+    const level = Math.min(99, 1 + Math.floor(bondScore / 500));
+    const nextLevelAt = level * 500;
+    return {
+      hasCp: true,
+      partner: bond.user,
+      bondScore,
+      level,
+      nextLevelAt,
+      relationId: bond.id,
+    };
+  }
+
   async createSocialRequest(fromUserId: string, toUserId: string, type: SocialRequestType) {
     if (fromUserId === toUserId) throw new BadRequestException('Cannot request yourself');
     const target = await this.usersRepo.findOne({ where: { id: toUserId } });
     if (!target) throw new NotFoundException('User not found');
     if (type === SocialRequestType.RELATION) {
-      const existingCp = await this.socialRepo.findOne({
-        where: [
-          {
-            fromUserId,
-            type: SocialRequestType.RELATION,
-            status: SocialRequestStatus.ACCEPTED,
-          },
-          {
-            toUserId: fromUserId,
-            type: SocialRequestType.RELATION,
-            status: SocialRequestStatus.ACCEPTED,
-          },
-        ],
-      });
-      if (existingCp) {
-        throw new BadRequestException('لديك CP بالفعل');
+      if (await this.hasAcceptedCp(fromUserId)) {
+        throw new BadRequestException('لديك CP بالفعل — أنهِ الارتباط الحالي أولاً');
+      }
+      if (await this.hasAcceptedCp(toUserId)) {
+        throw new BadRequestException('لدى هذا المستخدم CP بالفعل');
       }
     }
     let row = await this.socialRepo.findOne({ where: { fromUserId, toUserId, type } });
@@ -795,6 +868,12 @@ export class UsersService {
           /* already following */
         }
       } else if (row.type === SocialRequestType.RELATION) {
+        if (await this.hasAcceptedCp(userId)) {
+          // Accepting when I somehow already have another CP (race) — supersede below.
+        }
+        if (await this.hasAcceptedCp(row.fromUserId)) {
+          // Sender already paired — only keep this one; supersede others.
+        }
         // One CP pair only: supersede other accepted relation links for both users.
         const others = await this.socialRepo.find({
           where: [

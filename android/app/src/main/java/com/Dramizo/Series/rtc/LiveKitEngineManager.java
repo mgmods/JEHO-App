@@ -2,7 +2,6 @@ package com.Dramizo.Series.rtc;
 
 import android.app.Application;
 import android.content.Context;
-import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -158,8 +157,16 @@ public final class LiveKitEngineManager {
                         pendingPublishStreamId = null;
                     }
                 }
+                // Slight delay so WebRTC media plane is ready before first mic open.
+                try {
+                    Thread.sleep(180L);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
                 if (publishing || micEnabled) {
                     applyMicOnEngine(micEnabled);
+                } else {
+                    trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 }
                 seedRemoteAudioTracks(newRoom);
                 startPolling();
@@ -267,10 +274,57 @@ public final class LiveKitEngineManager {
         }
     }
 
-    /**
-     * Poll LiveKit Participant.isSpeaking / audioLevel — no Flow collect from Java.
-     * Maps to Zego-style 0–100 for VoiceRoomActivity thresholds.
-     */
+    /** LiveKit audioLevel is 0–1; isSpeaking is preferred. Fallback for silent-but-open mic. */
+    private static float participantLevel0to100(
+            @Nullable Participant participant, boolean treatLocalPublishingMicAsActive) {
+        if (participant == null) return 0f;
+        boolean speaking = isParticipantSpeaking(participant);
+        float al = participantAudioLevel(participant);
+        if (speaking) {
+            // Keep ripples lively for the whole speak window.
+            float base = al > 0.01f ? al * 100f : 42f;
+            return Math.max(36f, Math.min(100f, base + 12f));
+        }
+        if (al > 0.015f) {
+            return Math.min(100f, Math.max(18f, al * 100f));
+        }
+        // Local host: if mic track is publishing but VAD hasn't fired yet, keep a soft pulse
+        // so the seat ring proves LiveKit is live (never zeros the UI immediately).
+        if (treatLocalPublishingMicAsActive) {
+            return 22f;
+        }
+        return 0f;
+    }
+
+    private static boolean isParticipantSpeaking(@Nullable Participant participant) {
+        if (participant == null) return false;
+        // Direct SDK interop first (LiveKit Android Kotlin properties → isSpeaking / getIsSpeaking).
+        try {
+            Method m = participant.getClass().getMethod("isSpeaking");
+            Object v = m.invoke(participant);
+            if (v instanceof Boolean) return (Boolean) v;
+        } catch (Throwable ignored) {
+        }
+        try {
+            Method m = participant.getClass().getMethod("getIsSpeaking");
+            Object v = m.invoke(participant);
+            if (v instanceof Boolean) return (Boolean) v;
+        } catch (Throwable ignored) {
+        }
+        return readBooleanProp(participant, "isSpeaking", "getIsSpeaking", "speaking");
+    }
+
+    private static float participantAudioLevel(@Nullable Participant participant) {
+        if (participant == null) return 0f;
+        try {
+            Method m = participant.getClass().getMethod("getAudioLevel");
+            Object v = m.invoke(participant);
+            if (v instanceof Number) return ((Number) v).floatValue();
+        } catch (Throwable ignored) {
+        }
+        return readFloatProp(participant, "getAudioLevel", "audioLevel");
+    }
+
     private void pollSpeakLevels() {
         if (!connected.get()) return;
         Room r = room;
@@ -278,36 +332,28 @@ public final class LiveKitEngineManager {
             try {
                 LocalParticipant local = r.getLocalParticipant();
                 if (local != null && currentUserId != null) {
-                    float level = participantLevel0to100(local);
-                    // When mic is open we still report 0 on silence (correct waves off).
+                    boolean localActiveMic = micEnabled && (publishing || pendingPublishStreamId != null);
+                    float level = participantLevel0to100(local, localActiveMic);
+                    // Only inject soft pulse when truly open mic; silence still can dip lower.
+                    if (localActiveMic && level < 12f && isParticipantSpeaking(local)) {
+                        level = 36f;
+                    }
                     notifySoundLevel(currentUserId, level);
                 }
                 for (Participant p : r.getRemoteParticipants().values()) {
                     if (p == null) continue;
                     String identity = participantIdentity(p);
                     if (identity == null || identity.isEmpty()) continue;
-                    notifySoundLevel(identity, participantLevel0to100(p));
+                    notifySoundLevel(identity, participantLevel0to100(p, false));
                 }
             } catch (Throwable t) {
                 Log.w(TAG, "pollSpeak: " + t.getMessage());
             }
         }
         if (connected.get()) {
-            mainHandler.postDelayed(speakLevelPollRunnable, 220L);
+            // Faster than 220ms so waves feel responsive on LiveKit free engine.
+            mainHandler.postDelayed(speakLevelPollRunnable, 140L);
         }
-    }
-
-    /** LiveKit audioLevel is 0–1; isSpeaking is more reliable while talking. */
-    private static float participantLevel0to100(@Nullable Participant participant) {
-        if (participant == null) return 0f;
-        if (readBooleanProp(participant, "isSpeaking", "getIsSpeaking", "isSpeaking")) {
-            float al = readFloatProp(participant, "getAudioLevel", "audioLevel");
-            // Keep waves lively while SDK marks speaking.
-            return Math.max(28f, Math.min(100f, (al > 0f ? al * 100f : 35f) + 10f));
-        }
-        float al = readFloatProp(participant, "getAudioLevel", "audioLevel");
-        if (al <= 0.02f) return 0f;
-        return Math.min(100f, al * 100f);
     }
 
     private static boolean readBooleanProp(Object target, String... names) {
@@ -478,13 +524,23 @@ public final class LiveKitEngineManager {
     }
 
     public void hardLeaveRoom() {
+        // Never block the UI thread — r.disconnect() can freeze enter/exit transitions.
         micEnabled = false;
         speakerMuted = false; // don't leave speaker sticky-muted for next join
         publishing = false;
         publishingStreamId = null;
         pendingPublishStreamId = null;
-        disconnectBlocking(true);
         currentRoomId = null;
+        lastToken = null;
+        connected.set(false);
+        cancelEvents();
+        io.execute(() -> {
+            try {
+                disconnectBlocking(true);
+            } catch (Throwable t) {
+                Log.w(TAG, "hardLeaveRoom bg failed: " + t.getMessage());
+            }
+        });
     }
 
     public void logoutRoom() {
@@ -508,22 +564,67 @@ public final class LiveKitEngineManager {
             Log.w(TAG, "applyMic deferred — not connected yet mic=" + enabled);
             return;
         }
+        // Retry — WebRTC capture can fail once right after connect on mid-range devices.
+        Throwable last = null;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                LocalParticipant local = r.getLocalParticipant();
+                if (local == null) {
+                    last = new IllegalStateException("local participant null");
+                    Thread.sleep(120L * attempt);
+                    continue;
+                }
+                Object result = BuildersKt.runBlocking(
+                        EmptyCoroutineContext.INSTANCE,
+                        (s, cont) -> {
+                            try {
+                                return local.setMicrophoneEnabled(enabled, cont);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        });
+                applyAudioRoute();
+                // Keep remote levels audible when SPEAKER is the route (common room mode).
+                trySetRemotePlaybackGain(r, speakerMuted ? 0f : 1f);
+                Log.i(TAG, "setMicrophoneEnabled=" + enabled
+                        + " attempt=" + attempt
+                        + " result="
+                        + (result != null ? result.getClass().getSimpleName() : "null"));
+                return;
+            } catch (Throwable t) {
+                last = t;
+                Log.w(TAG, "setMicEnabled attempt " + attempt + " failed: " + t.getMessage());
+                try {
+                    Thread.sleep(150L * attempt);
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        if (last != null) {
+            Log.e(TAG, "setMicEnabled failed after retries: " + last.getMessage(), last);
+        }
+    }
+
+    /** Best-effort remote volume so some devices do not mix at near-zero after soft mute. */
+    private static void trySetRemotePlaybackGain(@Nullable Room r, float gain) {
+        if (r == null) return;
         try {
-            LocalParticipant local = r.getLocalParticipant();
-            Object result = BuildersKt.runBlocking(
-                    EmptyCoroutineContext.INSTANCE,
-                    (s, cont) -> {
-                        try {
-                            return local.setMicrophoneEnabled(enabled, cont);
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
-            Log.i(TAG, "setMicrophoneEnabled=" + enabled + " result="
-                    + (result != null ? result.getClass().getSimpleName() : "null"));
-            applyAudioRoute();
-        } catch (Throwable t) {
-            Log.e(TAG, "setMicEnabled failed: " + t.getMessage(), t);
+            for (Participant p : r.getRemoteParticipants().values()) {
+                if (p == null) continue;
+                try {
+                    Method m = p.getClass().getMethod("setVolume", double.class);
+                    m.invoke(p, (double) Math.max(0f, Math.min(1f, gain)));
+                } catch (Throwable ignored) {
+                    try {
+                        Method m = p.getClass().getMethod("setVolume", float.class);
+                        m.invoke(p, Math.max(0f, Math.min(1f, gain)));
+                    } catch (Throwable ignored2) {
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
         }
     }
 
@@ -541,16 +642,8 @@ public final class LiveKitEngineManager {
     }
 
     private void applyAudioRoute() {
-        Context ctx = application;
-        if (ctx == null) return;
-        try {
-            AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
-            if (am == null) return;
-            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
-            am.setSpeakerphoneOn(!speakerMuted);
-        } catch (Throwable t) {
-            Log.w(TAG, "audio route: " + t.getMessage());
-        }
+        // wantOpenSpeaker = !speakerMuted (room “speaker” button on).
+        RoomAudioRoute.applyCommunicationRoute(application, !speakerMuted);
     }
 
     public void startPublishingAudio(String streamId) {
@@ -625,6 +718,11 @@ public final class LiveKitEngineManager {
 
     public String getCurrentUserId() {
         return currentUserId;
+    }
+
+    @Nullable
+    public String getLastToken() {
+        return lastToken;
     }
 
     public boolean isConnectInFlight() {

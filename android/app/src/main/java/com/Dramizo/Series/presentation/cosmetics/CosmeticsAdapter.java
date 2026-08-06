@@ -15,6 +15,7 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.CosmeticDtos;
 import com.Dramizo.Series.databinding.ItemCosmeticBinding;
 import com.Dramizo.Series.util.AssetCatalog;
+import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
@@ -24,8 +25,9 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Mall grid adapter — PNG-only cell previews.
- * Selection drives the activity hero ({@link HostSignalView} SVGA) — never decode SVGA here.
+ * Mall grid adapter — static cell previews only (PNG/WebP/GIF).
+ * Selection drives the activity hero ({@link com.Dramizo.Series.util.HostSignalView}) —
+ * never decode SVGA/MP4 in the grid.
  */
 public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> {
     public interface Listener {
@@ -37,6 +39,10 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         boolean isEquipped(String cosmeticId);
         @Nullable Integer daysLeft(String cosmeticId);
         @Nullable String selectedId();
+        /** Active paid VIP plan (1–100). */
+        int myVipLevel();
+        /** Account level (not VIP). Used only for non-frame gates. */
+        int myUserLevel();
     }
 
     private final List<CosmeticDtos.CosmeticDto> items = new ArrayList<>();
@@ -63,21 +69,53 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         boolean owned = listener.isOwned(item.id);
         boolean equipped = listener.isEquipped(item.id);
         Integer days = listener.daysLeft(item.id);
+        int myVip = Math.max(0, listener.myVipLevel());
+        int needVip = Math.max(0, item.minVipLevel);
+        boolean vipLocked = !owned && needVip > 0 && myVip < needVip;
+        // Frames/host wear: VIP-only; ignore minUserLevel (account level) for display locks.
+        boolean isFrame = isHeadwear(item.type);
+        int needLvl = isFrame ? 0 : Math.max(0, item.minUserLevel);
+        int myLvl = Math.max(1, listener.myUserLevel());
+        boolean levelLocked = !owned && !vipLocked && needLvl > 0 && myLvl < needLvl;
+        boolean locked = vipLocked || levelLocked;
+
         if (owned && days != null && days > 0) {
             holder.b.tvPrice.setText(holder.itemView.getContext()
                     .getString(R.string.mall_days_left, days));
         } else if (owned && days == null) {
             holder.b.tvPrice.setText(R.string.mall_permanent);
+        } else if (vipLocked) {
+            holder.b.tvPrice.setText(holder.itemView.getContext()
+                    .getString(R.string.mall_requires_vip, needVip));
+        } else if (levelLocked) {
+            holder.b.tvPrice.setText(holder.itemView.getContext()
+                    .getString(R.string.mall_requires_level, needLvl));
+        } else if (needVip > 0 && item.coinPrice <= 0) {
+            holder.b.tvPrice.setText(holder.itemView.getContext()
+                    .getString(R.string.mall_vip_unlock, needVip));
         } else {
             holder.b.tvPrice.setText(item.coinPrice > 0
                     ? holder.itemView.getContext().getString(
                             R.string.mall_price_days, item.coinPrice, CosmeticsViewModel.LEASE_DAYS)
                     : holder.itemView.getContext().getString(R.string.mall_free_days, CosmeticsViewModel.LEASE_DAYS));
         }
+
+        if (holder.b.tvVipLock != null) {
+            if (needVip > 0) {
+                holder.b.tvVipLock.setVisibility(View.VISIBLE);
+                holder.b.tvVipLock.setText(holder.itemView.getContext()
+                        .getString(R.string.mall_vip_badge, needVip));
+                holder.b.tvVipLock.setAlpha(vipLocked ? 1f : 0.85f);
+            } else {
+                holder.b.tvVipLock.setVisibility(View.GONE);
+            }
+        }
+
         String sel = listener.selectedId();
         boolean selected = sel != null && sel.equals(item.id);
         holder.b.getRoot().setStrokeWidth(selected ? 3 : 1);
         holder.b.getRoot().setStrokeColor(selected ? 0xFFE8A317 : 0x1A000000);
+        holder.b.getRoot().setAlpha(locked ? 0.72f : 1f);
 
         holder.b.btnPurchase.setVisibility(owned ? View.GONE : View.VISIBLE);
         holder.b.btnEquip.setVisibility(owned ? View.VISIBLE : View.GONE);
@@ -89,31 +127,47 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                 ? R.drawable.bg_cosmetic_btn_equipped
                 : R.drawable.bg_cosmetic_btn_equip);
         holder.b.btnEquip.setTextColor(equipped ? 0xFF1A1200 : 0xFF0F766E);
-        holder.b.btnPurchase.setOnClickListener(v -> listener.onPurchase(item.id));
+
+        if (!owned) {
+            if (locked) {
+                holder.b.btnPurchase.setText(vipLocked
+                        ? holder.itemView.getContext().getString(R.string.mall_requires_vip, needVip)
+                        : holder.itemView.getContext().getString(R.string.mall_requires_level, needLvl));
+                holder.b.btnPurchase.setAlpha(0.85f);
+            } else {
+                holder.b.btnPurchase.setText(R.string.purchase);
+                holder.b.btnPurchase.setAlpha(1f);
+            }
+        }
+
+        holder.b.btnPurchase.setOnClickListener(v -> {
+            if (locked) {
+                listener.onPurchase(item.id); // ViewModel shows VIP/level message
+                return;
+            }
+            listener.onPurchase(item.id);
+        });
         holder.b.btnEquip.setOnClickListener(v -> {
             if (equipped) listener.onUnequip(item.id);
             else listener.onEquip(item.id);
         });
         holder.itemView.setOnClickListener(v -> listener.onSelect(item));
 
-        boolean headwear = "vip_badge".equalsIgnoreCase(item.type)
-                || "host_badge".equalsIgnoreCase(item.type)
-                || "frames".equalsIgnoreCase(item.type);
-
-        String still = stillPngUrl(item.previewUrl, item.animationUrl);
+        boolean headwear = isFrame;
+        String still = stillPreviewUrl(item.previewUrl, item.animationUrl);
         String abs = AssetCatalog.absoluteUrl(still);
 
         holder.b.imgPreview.setVisibility(View.VISIBLE);
         holder.b.imgPreview.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-        holder.b.imgPreview.setPadding(dp(holder, headwear ? 4 : 8), dp(holder, headwear ? 4 : 8),
-                dp(holder, headwear ? 4 : 8), dp(holder, headwear ? 4 : 8));
+        holder.b.imgPreview.setPadding(dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4),
+                dp(holder, headwear ? 4 : 4), dp(holder, headwear ? 4 : 4));
 
         if (abs == null || abs.isEmpty()) {
             holder.b.imgPreview.setImageResource(ImagePlaceholder.cover());
         } else {
-            Glide.with(holder.b.imgPreview)
+            Glide.with(holder.b.imgPreview.getContext().getApplicationContext())
                     .load(abs)
-                    .override(256, 256)
+                    .override(320, 320)
                     .fitCenter()
                     .dontAnimate()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -134,7 +188,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
             if (avatarUrl == null || avatarUrl.isEmpty()) {
                 holder.b.imgFace.setImageResource(ImagePlaceholder.avatar());
             } else {
-                Glide.with(holder.b.imgFace)
+                Glide.with(holder.b.imgFace.getContext().getApplicationContext())
                         .load(AssetCatalog.absoluteUrl(avatarUrl))
                         .override(128, 128)
                         .centerCrop()
@@ -145,20 +199,30 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                         .into(holder.b.imgFace);
             }
         } else {
-            Glide.with(holder.b.imgFace).clear(holder.b.imgFace);
+            Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
             holder.b.imgFace.setVisibility(View.GONE);
         }
     }
 
     @Override
     public void onViewRecycled(@NonNull VH holder) {
-        Glide.with(holder.b.imgPreview).clear(holder.b.imgPreview);
-        Glide.with(holder.b.imgFace).clear(holder.b.imgFace);
+        try {
+            Glide.with(holder.b.imgPreview.getContext().getApplicationContext()).clear(holder.b.imgPreview);
+            Glide.with(holder.b.imgFace.getContext().getApplicationContext()).clear(holder.b.imgFace);
+        } catch (Exception ignored) {
+        }
         super.onViewRecycled(holder);
     }
 
     @Override
     public int getItemCount() { return items.size(); }
+
+    private static boolean isHeadwear(@Nullable String type) {
+        if (type == null) return false;
+        return "vip_badge".equalsIgnoreCase(type)
+                || "host_badge".equalsIgnoreCase(type)
+                || "frames".equalsIgnoreCase(type);
+    }
 
     private static void ensureCircle(View view) {
         view.setClipToOutline(true);
@@ -180,21 +244,42 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         return null;
     }
 
-    /** Always prefer a still PNG — never SVGA/GIF/WebP/MP4 in the mall grid. */
-    private static String stillPngUrl(String preview, String anim) {
+    /**
+     * Grid preview URL: prefer static still; allow WebP/GIF (Glide handles);
+     * convert SVGA/video to sibling .png when possible — never invent broken ".pngwebp".
+     */
+    @Nullable
+    static String stillPreviewUrl(@Nullable String preview, @Nullable String anim) {
+        String preferPreview = firstNonEmpty(preview, null);
+        if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
+
         String base = firstNonEmpty(preview, anim);
         if (base == null) return null;
-        String lower = base.toLowerCase(Locale.US);
-        if (lower.contains(".svga") || lower.contains(".gif")
-                || lower.contains(".webp") || lower.contains(".mp4")
-                || lower.contains(".webm") || lower.endsWith(".json")
-                || lower.contains(".html")) {
-            String png = base.replaceAll("(?i)\\.(svga|gif|webp|mp4|webm|json|html)(\\?.*)?$", ".png$1");
-            if (!png.equals(base)) return png;
-            if (preview != null && preview.toLowerCase(Locale.US).contains(".png")) return preview;
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(base);
+        if (kind == CosmeticMedia.Kind.IMAGE || kind == CosmeticMedia.Kind.GIF) {
+            return base;
+        }
+        if (kind == CosmeticMedia.Kind.VIDEO || kind == CosmeticMedia.Kind.SVGA) {
+            String png = base.replaceAll(
+                    "(?i)\\.(svga|mp4|webm|mov|html)(\\?.*)?$", ".png$2");
+            if (!png.equals(base) && isStaticStill(png)) return png;
+            if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
             return null;
         }
+        // Unknown CDN path without extension — try as image.
         return base;
+    }
+
+    private static boolean isStaticStill(@Nullable String url) {
+        if (url == null || url.isEmpty()) return false;
+        String lower = url.toLowerCase(Locale.US);
+        if (lower.contains(".svga") || lower.contains(".mp4") || lower.contains(".webm")
+                || lower.contains(".mov") || lower.contains(".html") || lower.endsWith(".json")) {
+            return false;
+        }
+        CosmeticMedia.Kind k = CosmeticMedia.kind(url);
+        return k == CosmeticMedia.Kind.IMAGE || k == CosmeticMedia.Kind.GIF
+                || k == CosmeticMedia.Kind.NONE;
     }
 
     static class VH extends RecyclerView.ViewHolder {

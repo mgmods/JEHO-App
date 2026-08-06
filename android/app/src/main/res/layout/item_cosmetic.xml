@@ -42,6 +42,22 @@
                 android:contentDescription="@null"
                 android:padding="6dp"
                 android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/tvVipLock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_margin="6dp"
+                android:background="@drawable/bg_cosmetic_price_chip"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="2dp"
+                android:textColor="#FF8A4B08"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="gone"
+                tools:text="VIP 7"
+                tools:visibility="visible" />
         </FrameLayout>
 
         <TextView

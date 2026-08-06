@@ -215,6 +215,16 @@ public class CosmeticsViewModel extends ViewModel {
 
     public void purchase(String cosmeticId) {
         final String type = filterType;
+        // Client-side VIP gate before API (clearer UX for frames).
+        CosmeticDtos.CosmeticDto target = findInCurrentPage(cosmeticId);
+        if (target != null && !isOwned(cosmeticId) && target.minVipLevel > 0) {
+            int myVip = Math.max(0, container.getSessionManager().getVipLevel());
+            if (myVip < target.minVipLevel) {
+                error.postValue("يتطلب VIP " + target.minVipLevel
+                        + " (مستواك VIP " + myVip + ")");
+                return;
+            }
+        }
         container.getIoExecutor().execute(() -> {
             Result<CosmeticDtos.UserCosmeticDto> r =
                     container.getCosmeticsRepository().purchase(cosmeticId);
@@ -244,6 +254,17 @@ public class CosmeticsViewModel extends ViewModel {
             message.postValue("تم الشراء والارتداء");
             loadForType(type);
         });
+    }
+
+    @Nullable
+    private CosmeticDtos.CosmeticDto findInCurrentPage(@Nullable String id) {
+        if (id == null) return null;
+        CatalogPage page = catalogPage.getValue();
+        if (page == null || page.items == null) return null;
+        for (CosmeticDtos.CosmeticDto row : page.items) {
+            if (row != null && id.equals(row.id)) return row;
+        }
+        return null;
     }
 
     /** Buy again / half-price extend — same API as purchase when already owned. */

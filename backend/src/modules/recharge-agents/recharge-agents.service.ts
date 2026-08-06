@@ -100,13 +100,15 @@ export interface RechargeAgentPricingConfig {
 
 export const RECHARGE_AGENT_CONFIG_KEY = 'recharge_agent_config';
 export const DEFAULT_RECHARGE_AGENT_CONFIG: RechargeAgentPricingConfig = {
-  membershipFeeUsdt: 20,
-  /** ~$0.90 / 10k — agents can undercut Play slightly and still profit. */
-  wholesalePer100CoinsUsdt: 0.009,
-  /** ~$1.20 / 10k suggested retail — tempting vs Play for local users. */
-  suggestedRetailPer100CoinsUsdt: 0.012,
+  membershipFeeUsdt: 25,
+  /**
+   * Wholesale: $1.20 / 10k coins — still better than retail ~$5/50k
+   * but not free leverage for users to farm gifts.
+   */
+  wholesalePer100CoinsUsdt: 0.012,
+  suggestedRetailPer100CoinsUsdt: 0.016,
   minInitialCoins: 10_000,
-  maxInitialCoins: 10_000_000,
+  maxInitialCoins: 20_000_000,
 };
 
 @Injectable()
@@ -146,6 +148,32 @@ export class RechargeAgentsService implements OnModuleInit {
       );
     } catch {
       /* column may already exist */
+    }
+    try {
+      // Soft-upgrade legacy default agent wholesale ($0.009 / fee $20) → v3 defaults.
+      const row = await this.settingsRepo.findOne({
+        where: { key: RECHARGE_AGENT_CONFIG_KEY },
+      });
+      if (row?.value) {
+        let parsed: Partial<RechargeAgentPricingConfig> = {};
+        try {
+          parsed = JSON.parse(row.value);
+        } catch {
+          parsed = {};
+        }
+        const whole = Number(parsed.wholesalePer100CoinsUsdt);
+        const fee = Number(parsed.membershipFeeUsdt);
+        const isLegacy =
+          (whole === 0.009 || whole === 0.0090 || whole === 0.01 || whole === 0.010) &&
+          (fee === 20 || fee === 25 || !Number.isFinite(fee));
+        if (isLegacy) {
+          row.value = JSON.stringify(DEFAULT_RECHARGE_AGENT_CONFIG);
+          row.description = 'Recharge agent membership and USDT pricing (economy-v5)';
+          await this.settingsRepo.save(row);
+        }
+      }
+    } catch {
+      /* ignore seed race */
     }
   }
 

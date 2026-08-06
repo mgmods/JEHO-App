@@ -1,5 +1,6 @@
 package com.Dramizo.Series.util;
 
+import android.graphics.drawable.Drawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -13,6 +14,10 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.databinding.ItemPartyRoomBinding;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -128,10 +133,18 @@ public final class RoomCardBinder {
         String cover = resolveCover(room);
         String abs = AssetCatalog.absoluteUrl(cover);
         Object tag = b.imgCover.getTag(R.id.tag_room_cover_url);
-        if (abs != null && abs.equals(tag) && b.imgCover.getDrawable() != null) {
+        boolean loadedOk = Boolean.TRUE.equals(b.imgCover.getTag(R.id.tag_room_cover_loaded));
+        // Skip only after a successful decode — placeholder/error drawables must not lock the tag.
+        if (abs != null && abs.equals(tag) && loadedOk && b.imgCover.getDrawable() != null) {
             return;
         }
         b.imgCover.setTag(R.id.tag_room_cover_url, abs);
+        b.imgCover.setTag(R.id.tag_room_cover_loaded, Boolean.FALSE);
+        if (abs == null || abs.isEmpty()) {
+            Glide.with(b.imgCover).clear(b.imgCover);
+            b.imgCover.setImageResource(ImagePlaceholder.cover());
+            return;
+        }
         int w = b.imgCover.getWidth();
         int h = b.imgCover.getHeight();
         if (w <= 0 || h <= 0) {
@@ -147,7 +160,36 @@ public final class RoomCardBinder {
                 .centerCrop()
                 .override(w, h)
                 .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL)
+                .listener(new RequestListener<Drawable>() {
+                    @Override
+                    public boolean onLoadFailed(
+                            @Nullable GlideException e,
+                            Object model,
+                            Target<Drawable> target,
+                            boolean isFirstResource) {
+                        b.imgCover.setTag(R.id.tag_room_cover_loaded, Boolean.FALSE);
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(
+                            Drawable resource,
+                            Object model,
+                            Target<Drawable> target,
+                            DataSource dataSource,
+                            boolean isFirstResource) {
+                        b.imgCover.setTag(R.id.tag_room_cover_loaded, Boolean.TRUE);
+                        return false;
+                    }
+                })
                 .into(b.imgCover);
+    }
+
+    /** Clear cover load state when a list card is recycled. */
+    public static void clearCoverState(@Nullable ItemPartyRoomBinding b) {
+        if (b == null || b.imgCover == null) return;
+        b.imgCover.setTag(R.id.tag_room_cover_url, null);
+        b.imgCover.setTag(R.id.tag_room_cover_loaded, Boolean.FALSE);
     }
 
     public static void bindViewerOnly(ItemPartyRoomBinding b, @Nullable RoomDtos.RoomDto room) {
@@ -272,22 +314,24 @@ public final class RoomCardBinder {
     }
 
     private static String resolveCover(RoomDtos.RoomDto room) {
-        // Room face = permanent room cover (not host profile avatar).
+        // Prefer a real cover; fall back to host avatar when the list has no custom art.
         String cover = room.coverUrl != null ? room.coverUrl.trim() : "";
         if (!cover.isEmpty() && !isGenericServerCover(cover)) {
             return cover;
         }
-        if (!cover.isEmpty()) return cover;
         if (room.host != null && room.host.avatarUrl != null && !room.host.avatarUrl.isEmpty()) {
             return room.host.avatarUrl;
         }
+        if (!cover.isEmpty()) return cover;
         return null;
     }
 
     public static boolean isGenericServerCoverForList(String url) {
         if (url == null || url.isEmpty()) return false;
         String lower = url.toLowerCase(Locale.ROOT);
-        return lower.contains("/assets/rooms/") && lower.contains("card_");
+        // Placeholder list cards + the default background pack rarely look good on feed tiles.
+        return (lower.contains("/assets/rooms/") && lower.contains("card_"))
+                || lower.contains("room_default");
     }
 
     private static boolean isGenericServerCover(String url) {

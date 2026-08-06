@@ -285,14 +285,8 @@ public class CosmeticsActivity extends ThemedActivity {
     }
 
     private static String stillPngUrl(String preview, String anim) {
-        String base = firstNonEmpty(preview, anim);
-        if (base == null) return null;
-        String lower = base.toLowerCase(Locale.US);
-        if (lower.contains(".svga") || lower.contains(".mp4") || lower.contains(".webm")
-                || lower.contains(".html")) {
-            return base.replaceAll("(?i)\\.(svga|mp4|webm|html)(\\?.*)?$", ".png$1");
-        }
-        return base;
+        // Same rules as grid — so hero & cells both load room backgrounds/WebP.
+        return CosmeticsAdapter.stillPreviewUrl(preview, anim);
     }
 
     private static final class Pager extends FragmentStateAdapter {

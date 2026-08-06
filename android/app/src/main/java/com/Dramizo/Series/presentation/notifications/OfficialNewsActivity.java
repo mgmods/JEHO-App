@@ -57,6 +57,10 @@ public class OfficialNewsActivity extends ThemedActivity {
                 if (!items.isEmpty()) {
                     binding.recycler.scrollToPosition(items.size() - 1);
                 }
+                // Clear parent Messages list badge
+                sendBroadcast(new android.content.Intent(
+                        com.Dramizo.Series.presentation.messages.MessagesFragment.ACTION_OFFICIAL_NEWS_UPDATED)
+                        .setPackage(getPackageName()));
             });
         });
     }

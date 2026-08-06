@@ -126,14 +126,15 @@ public final class LocalEngagementScheduler {
         }
         if (!NotificationManagerCompat.from(ctx).areNotificationsEnabled()) return;
 
-        // Prefer real unfinished daily tasks from the server.
-        TaskDigest digest = loadTaskDigest(container);
+        boolean tasksOn = container.getSessionManager().isTasksEnabledFromServer();
+        // Prefer real unfinished daily tasks from the server (only when product enabled).
+        TaskDigest digest = tasksOn ? loadTaskDigest(container) : null;
         if (digest != null && digest.pendingCount > 0) {
             postTasksFromServer(ctx, digest);
             bumpIndex(ctx);
             return;
         }
-        postRotated(ctx);
+        postRotated(ctx, tasksOn);
     }
 
     private static void bumpIndex(@NonNull Context context) {
@@ -143,10 +144,15 @@ public final class LocalEngagementScheduler {
                 .putInt(KEY_INDEX, index + 1).apply();
     }
 
-    private static void postRotated(@NonNull Context context) {
+    private static void postRotated(@NonNull Context context, boolean tasksOn) {
         int index = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .getInt(KEY_INDEX, 0);
-        Kind kind = Kind.values()[Math.floorMod(index, Kind.values().length)];
+        Kind[] kinds = Kind.values();
+        Kind kind = kinds[Math.floorMod(index, kinds.length)];
+        if (!tasksOn && kind == Kind.TASKS) {
+            kind = kinds[Math.floorMod(index + 1, kinds.length)];
+            if (kind == Kind.TASKS) kind = Kind.ROOMS;
+        }
         bumpIndex(context);
         showFallback(context, kind);
     }

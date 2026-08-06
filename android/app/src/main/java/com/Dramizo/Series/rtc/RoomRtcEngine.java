@@ -59,6 +59,7 @@ public final class RoomRtcEngine {
             provider = PROVIDER_LIVEKIT;
             try {
                 ZegoEngineManager.getInstance().setVoiceSessionActive(false);
+                // Never block UI on engine teardown while painting the room.
                 ZegoEngineManager.getInstance().hardLeaveRoom();
             } catch (Throwable ignored) {
             }
@@ -81,7 +82,8 @@ public final class RoomRtcEngine {
         }
         provider = PROVIDER_ZEGO;
         try {
-            LiveKitEngineManager.getInstance().disconnect();
+            // Async disconnect — never run LiveKit disconnectBlocking on UI thread.
+            LiveKitEngineManager.getInstance().hardLeaveRoom();
         } catch (Throwable ignored) {
         }
         try {
@@ -120,8 +122,14 @@ public final class RoomRtcEngine {
 
     public void renewRoomToken(String roomId, String token) {
         if (isLiveKit()) {
-            // LiveKit cannot publish with canPublish=false JWT after taking a seat.
-            // Re-connect with the fresh seat-aware token from /zego-token.
+            // LiveKit JWT is immutable — reconnect when publish rights change (audience → seat).
+            // Skip only if already publishing with identical token payload (no-op renew).
+            LiveKitEngineManager lk = LiveKitEngineManager.getInstance();
+            if (lk.isReady() && lk.isPublishing()
+                    && token != null && token.equals(lk.getLastToken())) {
+                Log.i(TAG, "livekit skip reconnect — same token already live");
+                return;
+            }
             LiveKitEngineManager.getInstance().reconnectWithToken(
                     null, livekitUrl, token, roomId != null ? roomId : livekitRoomName, null);
             Log.i(TAG, "livekit reconnect with seat-aware token");
@@ -218,17 +226,27 @@ public final class RoomRtcEngine {
                 : ZegoEngineManager.getInstance().getCurrentUserId();
     }
 
+    /**
+     * Cut ALL voice providers (LiveKit + Zego). LiveKit disconnect is async so UI never freezes.
+     */
     public void hardLeaveRoom() {
-        if (isLiveKit()) LiveKitEngineManager.getInstance().hardLeaveRoom();
-        else ZegoEngineManager.getInstance().hardLeaveRoom();
+        try {
+            LiveKitEngineManager.getInstance().hardLeaveRoom();
+        } catch (Throwable ignored) {
+        }
+        try {
+            ZegoEngineManager.getInstance().hardLeaveRoom();
+        } catch (Throwable ignored) {
+        }
     }
 
     public void logoutRoom() {
-        if (isLiveKit()) LiveKitEngineManager.getInstance().logoutRoom();
-        else ZegoEngineManager.getInstance().logoutRoom();
+        // hardLeave already clears LiveKit + Zego sessions.
+        hardLeaveRoom();
     }
 
     public void addRoomListener(ZegoEngineManager.RoomListener listener) {
+        // Register on both; each engine only fires while it is the active session.
         ZegoEngineManager.getInstance().addRoomListener(listener);
         LiveKitEngineManager.getInstance().addRoomListener(listener);
     }
@@ -236,6 +254,18 @@ public final class RoomRtcEngine {
     public void removeRoomListener(ZegoEngineManager.RoomListener listener) {
         ZegoEngineManager.getInstance().removeRoomListener(listener);
         LiveKitEngineManager.getInstance().removeRoomListener(listener);
+    }
+
+    /** Drop listeners on the inactive engine so stray callbacks cannot zero seat waves. */
+    public void preferActiveProviderListenersOnly(ZegoEngineManager.RoomListener listener) {
+        if (listener == null) return;
+        if (isLiveKit()) {
+            ZegoEngineManager.getInstance().removeRoomListener(listener);
+            LiveKitEngineManager.getInstance().addRoomListener(listener);
+        } else {
+            LiveKitEngineManager.getInstance().removeRoomListener(listener);
+            ZegoEngineManager.getInstance().addRoomListener(listener);
+        }
     }
 
     public boolean sendRoomChatMessage(
@@ -321,5 +351,16 @@ public final class RoomRtcEngine {
 
     public void fetchAndApplyRemote(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
         ZegoEngineManager.getInstance().fetchAndApplyRemote(context, api);
+    }
+
+    /** Re-run headset/speaker routing (plug/unplug events). */
+    public void reapplyAudioRoute() {
+        if (isLiveKit()) {
+            LiveKitEngineManager.getInstance().setSpeakerMuted(
+                    LiveKitEngineManager.getInstance().isSpeakerMuted());
+        } else {
+            ZegoEngineManager.getInstance().setSpeakerMuted(
+                    ZegoEngineManager.getInstance().isSpeakerMuted());
+        }
     }
 }

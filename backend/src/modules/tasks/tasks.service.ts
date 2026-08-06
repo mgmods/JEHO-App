@@ -354,6 +354,8 @@ export const DEFAULT_HOST_TASKS: DailyTask[] = [
 ];
 
 const TASKS_KEY = 'daily_tasks';
+/** Master kill-switch for the whole tasks product (UI + progress + rewards). Default ON. */
+const TASKS_ENABLED_KEY = 'tasks.enabled';
 const LEVEL_THRESHOLDS = [
   0, 100, 300, 600, 1000, 1500, 2200, 3000, 4000, 5500, 7500, 10000, 13000, 17000, 22000, 28000,
   35000, 45000, 60000, 80000, 100000,
@@ -361,6 +363,8 @@ const LEVEL_THRESHOLDS = [
 
 @Injectable()
 export class TasksService {
+  private enabledCache: { value: boolean; at: number } | null = null;
+
   constructor(
     @InjectRepository(Wallet) private readonly wallets: Repository<Wallet>,
     @InjectRepository(AppSetting) private readonly settings: Repository<AppSetting>,
@@ -371,6 +375,48 @@ export class TasksService {
     @Optional() private readonly cosmetics?: CosmeticsService,
     @Optional() private readonly vip?: VipService,
   ) {}
+
+  /**
+   * When false, clients hide all tasks UI and the API rejects claim/progress.
+   * Missing setting = enabled (backward compatible).
+   */
+  async isEnabled(): Promise<boolean> {
+    const now = Date.now();
+    if (this.enabledCache && now - this.enabledCache.at < 5_000) {
+      return this.enabledCache.value;
+    }
+    const row = await this.settings.findOne({ where: { key: TASKS_ENABLED_KEY } });
+    const raw = row?.value?.trim().toLowerCase();
+    let enabled = true;
+    if (raw !== undefined && raw !== null && raw !== '') {
+      enabled = raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+    }
+    this.enabledCache = { value: enabled, at: now };
+    return enabled;
+  }
+
+  async setEnabled(enabled: boolean): Promise<boolean> {
+    const value = enabled ? 'true' : 'false';
+    let row = await this.settings.findOne({ where: { key: TASKS_ENABLED_KEY } });
+    if (!row) {
+      row = this.settings.create({
+        key: TASKS_ENABLED_KEY,
+        value,
+        description: 'Master switch: app tasks feature on/off',
+      });
+    } else {
+      row.value = value;
+    }
+    await this.settings.save(row);
+    this.enabledCache = { value: enabled, at: Date.now() };
+    return enabled;
+  }
+
+  private async assertEnabled() {
+    if (!(await this.isEnabled())) {
+      throw new BadRequestException('المهام متوقفة حالياً من الإدارة');
+    }
+  }
 
   /** Active agency OWNER/MANAGER/HOST only — agency itself must be ACTIVE. */
   async isActiveAgencyHost(userId: string): Promise<boolean> {
@@ -577,6 +623,7 @@ export class TasksService {
     context: TaskProgressContext = {},
   ) {
     if (!userId || !event || amount <= 0) return;
+    if (!(await this.isEnabled())) return;
     const family = this.familyOf(event);
     const tasks = await this.loadTasks();
     const matching = tasks.filter(
@@ -644,6 +691,7 @@ export class TasksService {
   }
 
   async listForUser(userId: string, context: TaskProgressContext = {}) {
+    if (!(await this.isEnabled())) return [];
     const user = await this.users.findOne({ where: { id: userId } });
     const isFemale = String(user?.gender || '').toLowerCase() === 'female';
     const isMale = String(user?.gender || '').toLowerCase() === 'male';
@@ -696,6 +744,7 @@ export class TasksService {
 
   /** Explicit daily check-in (must tap — not auto on open). */
   async checkIn(userId: string) {
+    await this.assertEnabled();
     await this.recordProgress(userId, 'checkin', 1);
     await this.recordProgress(userId, 'host_checkin', 1);
     return { ok: true, tasks: await this.listForUser(userId) };
@@ -707,11 +756,13 @@ export class TasksService {
    */
   async watchRewardedAd(userId: string) {
     if (!userId) throw new BadRequestException('مستخدم غير صالح');
+    await this.assertEnabled();
     await this.recordProgress(userId, 'ad', 1);
     return { ok: true, tasks: await this.listForUser(userId) };
   }
 
   async claim(userId: string, taskId: string) {
+    await this.assertEnabled();
     const tasks = await this.loadTasks();
     const task = tasks.find((t) => t.id === taskId);
     if (!task) throw new BadRequestException('المهمة غير موجودة');
@@ -1031,6 +1082,7 @@ export class TasksService {
   }) {
     const { conversationId, senderId, peerId } = params;
     if (!conversationId || !senderId || !peerId || senderId === peerId) return;
+    if (!(await this.isEnabled())) return;
 
     const sg = String(params.senderGender || '').toLowerCase();
     const pg = String(params.peerGender || '').toLowerCase();
@@ -1191,6 +1243,7 @@ export class TasksService {
     guestId: string;
     guestAlreadyInRoom?: boolean;
   }) {
+    await this.assertEnabled();
     const { roomId, hostId, guestId } = params;
     if (!roomId || !hostId || !guestId || hostId === guestId) {
       throw new BadRequestException('دعوة غير صالحة');
@@ -1283,6 +1336,7 @@ export class TasksService {
     hostId: string;
     guestId: string;
   }) {
+    if (!(await this.isEnabled())) return null;
     const { roomId, hostId, guestId } = params;
     if (!roomId || !hostId || !guestId || hostId === guestId) return null;
     const inviteKey = this.roomInviteKey(hostId, guestId);
@@ -1329,6 +1383,7 @@ export class TasksService {
     guestId: string;
     forceCheck?: boolean;
   }) {
+    if (!(await this.isEnabled())) return { rewarded: false };
     const { roomId, hostId, guestId } = params;
     if (!roomId || !hostId || !guestId) return { rewarded: false };
     const dwellKey = this.roomDwellKey(roomId, hostId, guestId);
@@ -1494,6 +1549,7 @@ export class TasksService {
     roomHostId?: string | null;
     activeHostId?: string | null;
   }) {
+    if (!(await this.isEnabled())) return;
     const hostId = params.activeHostId || params.roomHostId;
     if (!hostId || hostId === params.guestId) return;
     await this.onGuestJoinedForInviteReward({
@@ -1509,6 +1565,7 @@ export class TasksService {
     roomHostId?: string | null;
     activeHostId?: string | null;
   }) {
+    if (!(await this.isEnabled())) return;
     const hostIds = Array.from(
       new Set([params.activeHostId, params.roomHostId].filter(Boolean) as string[]),
     );

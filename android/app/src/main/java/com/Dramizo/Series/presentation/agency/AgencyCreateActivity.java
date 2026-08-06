@@ -29,6 +29,7 @@ public class AgencyCreateActivity extends ThemedActivity {
     private ActivityCreateAgencyBinding binding;
     private DialogCreateAgencyBinding form;
     private int priceCoins;
+    private boolean createFree;
     private long walletCoins = -1;
 
     @Override
@@ -57,7 +58,7 @@ public class AgencyCreateActivity extends ThemedActivity {
         vm.getPricing().observe(this, this::bindPricing);
         vm.getSubmitting().observe(this, busy -> {
             boolean loading = Boolean.TRUE.equals(busy);
-            form.btnSubmitAgency.setEnabled(!loading && priceCoins > 0);
+            form.btnSubmitAgency.setEnabled(!loading && pricingReady());
             if (loading) {
                 form.btnSubmitAgency.setText(R.string.loading);
             } else {
@@ -82,20 +83,29 @@ public class AgencyCreateActivity extends ThemedActivity {
         loadWalletBalance();
     }
 
+    private boolean pricingReady() {
+        return createFree || priceCoins > 0;
+    }
+
     private void bindPricing(MiscDtos.AgencyPricingDto p) {
         if (p == null) return;
-        priceCoins = Math.max(0, p.createPriceCoins);
-        if (priceCoins > 0) {
+        createFree = p.createFree || (!p.isPaid && p.createPriceCoins <= 0);
+        priceCoins = createFree ? 0 : Math.max(0, p.createPriceCoins);
+        if (createFree) {
+            binding.tvPriceCoins.setText(R.string.agency_application_free_hint);
+        } else if (priceCoins > 0) {
             binding.tvPriceCoins.setText(getString(R.string.agency_create_price_format, priceCoins));
         } else {
             binding.tvPriceCoins.setText(R.string.agency_application_loading_price);
         }
         refreshSubmitLabel();
-        form.btnSubmitAgency.setEnabled(priceCoins > 0);
+        form.btnSubmitAgency.setEnabled(pricingReady());
     }
 
     private void refreshSubmitLabel() {
-        if (priceCoins > 0) {
+        if (createFree) {
+            form.btnSubmitAgency.setText(R.string.agency_submit_free);
+        } else if (priceCoins > 0) {
             form.btnSubmitAgency.setText(getString(R.string.agency_pay_and_submit_format, priceCoins));
         } else {
             form.btnSubmitAgency.setText(R.string.agency_application_loading_price);
@@ -120,12 +130,12 @@ public class AgencyCreateActivity extends ThemedActivity {
     }
 
     private void submit() {
-        if (priceCoins <= 0) {
+        if (!pricingReady()) {
             Toast.makeText(this, R.string.agency_application_loading_price, Toast.LENGTH_SHORT).show();
             vm.loadPricing();
             return;
         }
-        if (walletCoins >= 0 && walletCoins < priceCoins) {
+        if (!createFree && walletCoins >= 0 && walletCoins < priceCoins) {
             com.Dramizo.Series.util.BalanceRedirect.handleForced(this,
                     getString(R.string.agency_insufficient_coins_format, priceCoins));
             return;
@@ -138,6 +148,16 @@ public class AgencyCreateActivity extends ThemedActivity {
         }
         if (!request.termsAccepted) {
             Toast.makeText(this, R.string.agency_accept_terms, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (createFree) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(R.string.open_agency)
+                    .setMessage(R.string.agency_confirm_free_message)
+                    .setPositiveButton(R.string.agency_submit_free,
+                            (d, w) -> vm.submitApplication(applicationFrom()))
+                    .setNegativeButton(R.string.cancel, null)
+                    .show();
             return;
         }
         new androidx.appcompat.app.AlertDialog.Builder(this)

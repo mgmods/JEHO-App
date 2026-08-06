@@ -229,7 +229,9 @@ public class ComboGiftView extends FrameLayout {
 
     @DrawableRes
     private static int comboBgForCombo(int combo, int coins) {
-        int score = Math.max(combo, coins / 500);
+        // Styling follows gift COMBO streak only — never total coins (that confused users
+        // into thinking price/mardood was combo).
+        int score = Math.max(1, combo);
         if (score >= 50) return R.drawable.icon_combo_bg_level5;
         if (score >= 20) return R.drawable.icon_combo_bg_level4;
         if (score >= 10) return R.drawable.icon_combo_bg_level3;

@@ -15,6 +15,7 @@ import androidx.annotation.Nullable;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivityAgencyManageBinding;
 import com.Dramizo.Series.databinding.DialogAgencyConfirmBinding;
@@ -34,6 +35,7 @@ import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.RoomOpenChooser;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -49,6 +51,7 @@ public class AgencyManageActivity extends ThemedActivity {
     private AgencyViewModel vm;
     private String agencyId;
     private boolean isOwner;
+    private boolean isPlatformSuper;
     private MiscDtos.AgencyMineDto myAgency;
     private String activationCode = "";
     private int knownTotalMembers = 0;
@@ -90,6 +93,12 @@ public class AgencyManageActivity extends ThemedActivity {
         binding.menuLive.setOnClickListener(v -> {
             if (myAgency != null && myAgency.isEligibleHost()) {
                 RoomOpenChooser.showChooser(this, myAgency);
+            } else if (isPlatformSuper || isOwner) {
+                String name = myAgency != null && myAgency.agency != null
+                        ? myAgency.agency.name
+                        : (binding.tvAgencyHeroName != null
+                        ? binding.tvAgencyHeroName.getText().toString() : null);
+                AgencyRoomLauncher.open(this, agencyId, name);
             } else {
                 String name = myAgency != null && myAgency.agency != null ? myAgency.agency.name : null;
                 AgencyRoomLauncher.open(this, agencyId, name);
@@ -156,29 +165,63 @@ public class AgencyManageActivity extends ThemedActivity {
                     isOwner = "owner".equals(role)
                             && mineResult.data.agency != null
                             && agencyId.equals(mineResult.data.agency.id);
-                    if (mineResult.data.agency != null) {
-                        MiscDtos.AgencyDto ag = mineResult.data.agency;
-                        binding.tvAgencyHeroName.setText(
-                                ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
-                        binding.tvAgencyHeroMeta.setText(getString(
-                                R.string.agency_manage_meta_format,
-                                Math.max(0, knownTotalMembers > 0
-                                        ? knownTotalMembers : ag.memberCount),
-                                roleAr(role)));
-                        if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
-                            Glide.with(this)
-                                    .load(AssetCatalog.absoluteUrl(ag.logoUrl))
-                                    .circleCrop()
-                                    .placeholder(R.drawable.icon_agency)
-                                    .into(binding.imgAgencyLogo);
-                        }
-                        activationCode = ag.activationCode != null ? ag.activationCode : "";
-                        if (ag.notificationStyle != null) notificationStyle = ag.notificationStyle;
-                        binding.tvCommission.setVisibility(View.VISIBLE);
-                        binding.tvCommission.setText(String.format(Locale.US,
-                                getString(R.string.agency_commission_value_format),
-                                ag.commissionPercent));
+                }
+                try {
+                    AuthDtos.UserDto me = ContainerProvider.from(this)
+                            .getSessionManager().getUser();
+                    isPlatformSuper = StaffRoleHelper.isSuper(me);
+                } catch (Exception ignored) {
+                    isPlatformSuper = false;
+                }
+                if (isPlatformSuper) isOwner = true;
+
+                if (mineResult.success && mineResult.data != null && mineResult.data.agency != null
+                        && agencyId.equals(mineResult.data.agency.id)) {
+                    MiscDtos.AgencyDto ag = mineResult.data.agency;
+                    binding.tvAgencyHeroName.setText(
+                            ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                    String role = mineResult.data.role != null
+                            ? mineResult.data.role.toLowerCase(Locale.US) : "";
+                    binding.tvAgencyHeroMeta.setText(getString(
+                            R.string.agency_manage_meta_format,
+                            Math.max(0, knownTotalMembers > 0
+                                    ? knownTotalMembers : ag.memberCount),
+                            isPlatformSuper ? "سوبر أدمن" : roleAr(role)));
+                    if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
+                        Glide.with(this)
+                                .load(AssetCatalog.absoluteUrl(ag.logoUrl))
+                                .circleCrop()
+                                .placeholder(R.drawable.icon_agency)
+                                .into(binding.imgAgencyLogo);
                     }
+                    activationCode = ag.activationCode != null ? ag.activationCode : "";
+                    if (ag.notificationStyle != null) notificationStyle = ag.notificationStyle;
+                    binding.tvCommission.setVisibility(View.VISIBLE);
+                    binding.tvCommission.setText(String.format(Locale.US,
+                            getString(R.string.agency_commission_value_format),
+                            ag.commissionPercent));
+                } else if (r.success && r.data != null) {
+                    // Platform super managing an agency they do not own/belong to
+                    MiscDtos.AgencyDto ag = r.data;
+                    binding.tvAgencyHeroName.setText(
+                            ag.name != null && !ag.name.isEmpty() ? ag.name : "وكالة");
+                    binding.tvAgencyHeroMeta.setText(getString(
+                            R.string.agency_manage_meta_format,
+                            Math.max(0, knownTotalMembers > 0
+                                    ? knownTotalMembers : ag.memberCount),
+                            isPlatformSuper ? "سوبر أدمن" : "—"));
+                    if (ag.logoUrl != null && !ag.logoUrl.isEmpty()) {
+                        Glide.with(this)
+                                .load(AssetCatalog.absoluteUrl(ag.logoUrl))
+                                .circleCrop()
+                                .placeholder(R.drawable.icon_agency)
+                                .into(binding.imgAgencyLogo);
+                    }
+                    activationCode = ag.activationCode != null ? ag.activationCode : "";
+                    binding.tvCommission.setVisibility(View.VISIBLE);
+                    binding.tvCommission.setText(String.format(Locale.US,
+                            getString(R.string.agency_commission_value_format),
+                            ag.commissionPercent));
                 }
 
                 pendingMembers.clear();
@@ -199,8 +242,9 @@ public class AgencyManageActivity extends ThemedActivity {
                     binding.menuBranding.getRoot().setVisibility(isOwner ? View.VISIBLE : View.GONE);
                 }
                 binding.menuDelete.setVisibility(isOwner ? View.VISIBLE : View.GONE);
-                boolean canOpen = myAgency != null && myAgency.isEligibleHost()
-                        && myAgency.agency != null && agencyId.equals(myAgency.agency.id);
+                boolean canOpen = isPlatformSuper
+                        || (myAgency != null && myAgency.isEligibleHost()
+                        && myAgency.agency != null && agencyId.equals(myAgency.agency.id));
                 binding.menuLive.setVisibility(canOpen ? View.VISIBLE : View.GONE);
             });
         });

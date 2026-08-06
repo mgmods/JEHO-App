@@ -3,7 +3,9 @@
     <item name="tag_image_url" type="id" />
     <item name="tag_frame_url" type="id" />
     <item name="tag_wear_key" type="id" />
+    <item name="tag_image_loaded" type="id" />
     <item name="tag_room_cover_url" type="id" />
+    <item name="tag_room_cover_loaded" type="id" />
     <item name="tag_room_kenar_url" type="id" />
     <item name="tag_edge_padded" type="id" />
 </resources>

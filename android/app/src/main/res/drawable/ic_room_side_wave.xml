@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Green activity bars (viewer count) for discover rows. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="14dp"
+    android:height="14dp"
+    android:viewportWidth="14"
+    android:viewportHeight="14">
+    <path
+        android:fillColor="#FF4CAF50"
+        android:pathData="M1,9h2v4H1z" />
+    <path
+        android:fillColor="#FF4CAF50"
+        android:pathData="M5,5h2v8H5z" />
+    <path
+        android:fillColor="#FF4CAF50"
+        android:pathData="M9,2h2v11H9z" />
+    <path
+        android:fillColor="#FF4CAF50"
+        android:pathData="M11.5,6.5h2v6.5h-2z" />
+</vector>

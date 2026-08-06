@@ -54,7 +54,7 @@ public class InvitationActivity extends ThemedActivity {
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.btnInviteHelp.setOnClickListener(v ->
                 Toast.makeText(this,
-                        "ادعُ أصدقاءك برمزك. عند إدخال الرمز يحصل الطرفان على مكافأة كوينز مرة واحدة.",
+                        "ادعُ أصدقاءك برمزك (public ID). عند إدخال الرمز مرة واحدة: أنت +100 والصديق +50 كوينز (قابل للتغيير من الإعدادات).",
                         Toast.LENGTH_LONG).show());
         binding.btnShareInvite.setOnClickListener(v -> {
             Intent send = new Intent(Intent.ACTION_SEND);
@@ -109,7 +109,7 @@ public class InvitationActivity extends ThemedActivity {
     private void bindMe(InviteDtos.InviteMeDto data) {
         shareCode = data.code != null && !data.code.isEmpty() ? data.code : "----";
         binding.tvInviteCode.setText(shareCode);
-        binding.tvInvitePeople.setText(String.valueOf(Math.max(0, data.invitedCount)));
+            binding.tvInvitePeople.setText(String.valueOf(Math.max(0, data.invitedCount)));
         binding.tvInviteCoins.setText(String.format(Locale.US, "%,d كوينز",
                 Math.max(0L, data.totalCoins)));
         binding.btnEnterInvite.setEnabled(data.canBind);

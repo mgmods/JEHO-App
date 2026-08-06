@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.FragmentProfileBinding;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.agency.AgencyActivity;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
@@ -70,8 +71,11 @@ public class ProfileFragment extends Fragment {
 
         bindRow(binding.btnAppearance, v ->
                 startActivity(new Intent(requireContext(), StoreHubActivity.class)));
-        bindRow(binding.btnTaskCenter, v ->
-                startActivity(new Intent(requireContext(), TaskCenterActivity.class)));
+        bindRow(binding.btnTaskCenter, v -> {
+            if (!com.Dramizo.Series.util.TasksFeature.isEnabled(requireContext())) return;
+            startActivity(new Intent(requireContext(), TaskCenterActivity.class));
+        });
+        applyTasksFeatureVisibility();
         bindRow(binding.btnContests, v ->
                 startActivity(new Intent(requireContext(), MedalActivity.class)));
         bindRow(binding.btnMyRoom, v -> RoomOpenChooser.open(requireActivity()));
@@ -312,10 +316,27 @@ public class ProfileFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        // Re-fetch feature flags so master tasks switch takes effect without reinstall.
+        try {
+            AppContainer c = ContainerProvider.from(requireActivity());
+            c.getIoExecutor().execute(() -> {
+                com.Dramizo.Series.util.AppFeatures.refresh(c);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(this::applyTasksFeatureVisibility);
+            });
+        } catch (Exception ignored) {
+            applyTasksFeatureVisibility();
+        }
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
         refreshWalletBalances(false);
+    }
+
+    private void applyTasksFeatureVisibility() {
+        if (binding == null) return;
+        // Entire row GONE — no "مهام" label left on profile.
+        com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnTaskCenter, requireContext());
     }
 
     private void bindStaffUi(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {

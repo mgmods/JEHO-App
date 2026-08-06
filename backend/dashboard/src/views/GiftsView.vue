@@ -2,9 +2,6 @@
   <div>
     <PageHeader :title="t('gifts.title')" :subtitle="t('gifts.subtitle')">
       <template #actions>
-        <button class="btn btn-ghost btn-sm me-2" type="button" :disabled="importing" @click="importJehoPack">
-          <i class="bi bi-stars me-1"></i> {{ importing ? '…' : 'استيراد أعلام + فيديو JEHO' }}
-        </button>
         <button class="btn btn-ghost btn-sm me-2" type="button" @click="openCategoryCreate">
           <i class="bi bi-folder-plus me-1"></i> {{ t('gifts.newCategory') }}
         </button>
@@ -32,13 +29,14 @@
           :class="{ 'opacity-50': c.isActive === false }"
         >
           <span>{{ c.labelAr || c.labelEn || c.key }} <small class="text-muted">({{ c.key }})</small></span>
-          <button class="btn btn-sm btn-link text-info p-0" type="button" @click="openCategoryEdit(c)">
+          <button class="btn btn-sm btn-link text-info p-0" type="button" @click="openCategoryEdit(c)" title="تعديل">
             <i class="bi bi-pencil" />
           </button>
           <button
-            v-if="!isCoreCategory(c.key)"
             class="btn btn-sm btn-link text-danger p-0"
             type="button"
+            :disabled="!c.id"
+            title="حذف"
             @click="askRemoveCategory(c)"
           >
             <i class="bi bi-trash" />
@@ -74,6 +72,17 @@
             autoplay
             playsinline
           />
+          <!-- Animated motion (gif/webp) takes over static icon so type is visible -->
+          <img
+            v-else-if="isAnimatedImage(g.animationUrl)"
+            :src="absUrl(g.animationUrl)"
+            alt=""
+          />
+          <img
+            v-else-if="isAnimatedImage(g.iconUrl)"
+            :src="absUrl(g.iconUrl)"
+            alt=""
+          />
           <img
             v-else-if="g.iconUrl"
             :src="absUrl(g.iconUrl)"
@@ -94,8 +103,7 @@
           <div class="widget-card-meta mb-2">
             {{ formatNumber(g.coinPrice ?? 0) }} · {{ giftTypeLabel(g.type) }}
             <span v-if="g.category"> · {{ categoryLabel(g.category) }}</span>
-            <span v-if="isVideo(g.animationUrl)"> · فيديو</span>
-            <span v-else-if="isGif(g.animationUrl)"> · GIF</span>
+            <span v-if="giftMediaKindLabel(g)"> · {{ giftMediaKindLabel(g) }}</span>
           </div>
           <div class="action-btns">
             <button class="btn btn-sm btn-ghost" type="button" @click="openEdit(g)">
@@ -183,14 +191,14 @@
                   <div class="form-text">اختر ملف الأيقونة (صورة)</div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">{{ t('gifts.animation') }} GIF / فيديو</label>
+                  <label class="form-label">{{ t('gifts.animation') }}</label>
                   <input
                     type="file"
-                    accept="image/gif,image/webp,video/mp4,video/webm,video/quicktime,.gif,.webp,.mp4,.webm,.mov"
+                    accept="image/*,video/*,.gif,.webp,.png,.jpg,.jpeg,.mp4,.webm,.mov"
                     class="form-control"
                     @change="onAnimFile"
                   />
-                  <div class="form-text">ارفع GIF أو فيديو — بدون رابط</div>
+                  <div class="form-text">صورة · متحركة (GIF/WebP) · فيديو — التطبيق يعرض حسب نوع الملف</div>
                 </div>
                 <div class="col-6" v-if="form.iconUrl">
                   <div class="small text-muted mb-1">أيقونة</div>
@@ -241,7 +249,6 @@
                     v-model="catForm.key"
                     class="form-control"
                     required
-                    :disabled="!!catEditingId && isCoreCategory(catForm.key)"
                     pattern="[a-zA-Z0-9_\\-]{1,32}"
                   />
                   <div class="form-text">{{ t('gifts.categoryKeyHint') }}</div>
@@ -320,26 +327,6 @@ const pendingCategory = ref(null)
 const CORE_KEYS = new Set(['normal', 'lucky', 'combo', 'premium', 'country'])
 function isCoreCategory(key) {
   return CORE_KEYS.has(String(key || '').toLowerCase())
-}
-
-const importing = ref(false)
-
-async function importJehoPack() {
-  importing.value = true
-  error.value = ''
-  try {
-    const data = await giftsApi.importJehoPack()
-    const flags = data?.flags ?? 0
-    const premium = data?.premium ?? 0
-    success.value = `تم مزامنة الهدايا: أعلام ${flags} · فيديو ${premium}`
-    toast.success(success.value)
-    await load()
-  } catch (e) {
-    error.value = e?.message || 'فشل استيراد الهدايا'
-    toast.error(error.value)
-  } finally {
-    importing.value = false
-  }
 }
 
 const activeCategories = computed(() =>
@@ -506,6 +493,11 @@ function openCategoryCreate() {
 }
 
 function openCategoryEdit(c) {
+  if (!c?.id) {
+    error.value = 'لا يمكن تعديل هذه الفئة — حدّث الصفحة وحاول مجدداً'
+    toast().danger(error.value)
+    return
+  }
   catEditingId.value = c.id
   Object.assign(catForm, {
     key: c.key || '',
@@ -602,6 +594,24 @@ async function saveCategory() {
     sortOrder: Number(catForm.sortOrder) || 0,
     isActive: catForm.status === 'active',
   }
+  if (!payload.key) {
+    saving.value = false
+    error.value = 'المعرّف (key) مطلوب'
+    toast().danger(error.value)
+    return
+  }
+  if (!payload.labelAr) {
+    saving.value = false
+    error.value = 'الاسم بالعربي مطلوب'
+    toast().danger(error.value)
+    return
+  }
+  if (catEditingId.value && !String(catEditingId.value).trim()) {
+    saving.value = false
+    error.value = 'معرّف الفئة غير صالح'
+    toast().danger(error.value)
+    return
+  }
   const result = catEditingId.value
     ? await giftsApi.updateCategory(catEditingId.value, payload)
     : await giftsApi.createCategory(payload)
@@ -629,8 +639,19 @@ function isVideo(url) {
 function isGif(url) {
   return /\.gif(\?|$)/i.test(String(url || ''))
 }
+function isAnimatedImage(url) {
+  return /\.(gif|webp)(\?|$)/i.test(String(url || ''))
+}
 function isImageAnim(url) {
   return /\.(gif|webp|png|jpe?g)(\?|$)/i.test(String(url || ''))
+}
+/** Label how the app will play this gift for users. */
+function giftMediaKindLabel(g) {
+  if (!g) return ''
+  if (isVideo(g.animationUrl)) return 'فيديو'
+  if (isAnimatedImage(g.animationUrl) || isAnimatedImage(g.iconUrl)) return 'متحركة'
+  if (g.iconUrl || isImageAnim(g.animationUrl)) return 'صورة'
+  return ''
 }
 
 function askRemove(g) {
@@ -643,11 +664,16 @@ function askRemove(g) {
 }
 
 function askRemoveCategory(c) {
+  if (!c?.id) {
+    error.value = 'لا يمكن حذف هذه الفئة — حدّث الصفحة وحاول مجدداً'
+    toast().danger(error.value)
+    return
+  }
   pendingCategory.value = c
   pendingDelete.value = null
   pendingAction.value = null
   confirmTitle.value = t('common.delete')
-  confirmMsg.value = `${t('app.delete')} «${c.labelAr || c.key}»؟`
+  confirmMsg.value = `${t('app.delete')} «${c.labelAr || c.key}»؟\nالهدايا فيها تُنقل إلى فئة أخرى.`
   confirmOpen.value = true
 }
 

@@ -49,6 +49,62 @@
           <ZegoSettingsPanel />
         </template>
 
+        <template v-else-if="settingsTab === 'account'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">{{ t('settings.accountTitle') }}</h3>
+            <p class="form-text mb-3">{{ t('settings.accountHint') }}</p>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">{{ t('settings.accountEmail') }}</label>
+                <input v-model="accountForm.email" type="email" class="form-control" dir="ltr" autocomplete="username" />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ t('settings.accountCurrentPassword') }}</label>
+                <input
+                  v-model="accountForm.currentPassword"
+                  type="password"
+                  class="form-control"
+                  dir="ltr"
+                  autocomplete="current-password"
+                />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ t('settings.accountNewPassword') }}</label>
+                <input
+                  v-model="accountForm.newPassword"
+                  type="password"
+                  class="form-control"
+                  dir="ltr"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ t('settings.accountConfirmPassword') }}</label>
+                <input
+                  v-model="accountForm.confirmPassword"
+                  type="password"
+                  class="form-control"
+                  dir="ltr"
+                  autocomplete="new-password"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+            <div class="mt-3">
+              <button
+                class="btn btn-aurora"
+                type="button"
+                :disabled="accountSaving"
+                @click="saveAccount"
+              >
+                <span v-if="accountSaving" class="spinner-border spinner-border-sm me-1" />
+                {{ t('settings.accountSave') }}
+              </button>
+            </div>
+          </section>
+        </template>
+
         <form v-else class="settings-form" @submit.prevent="save">
           <!-- GENERAL -->
           <template v-if="settingsTab === 'general'">
@@ -348,7 +404,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi } from '@/api'
+import { settingsApi, authApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -359,10 +415,12 @@ import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue
 import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const dashboardLocale = ref(readDashboardLocale())
 const settingsTab = ref('general')
 const CORE_TABS = new Set(['general', 'economy', 'features', 'moderation', 'other'])
@@ -375,14 +433,78 @@ const settingTabs = computed(() => [
   { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
   { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
   { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
+  { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock' },
   { id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' },
 ])
 
 const loading = ref(false)
 const saving = ref(false)
+const accountSaving = ref(false)
 const error = ref('')
 const success = ref('')
 
+const accountForm = reactive({
+  email: '',
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+
+function fillAccountFromAuth() {
+  accountForm.email = String(auth.user?.email || '').trim()
+  accountForm.currentPassword = ''
+  accountForm.newPassword = ''
+  accountForm.confirmPassword = ''
+}
+
+async function saveAccount() {
+  error.value = ''
+  success.value = ''
+  const email = String(accountForm.email || '').trim().toLowerCase()
+  const currentPassword = String(accountForm.currentPassword || '')
+  const newPassword = String(accountForm.newPassword || '')
+  const confirmPassword = String(accountForm.confirmPassword || '')
+  if (!currentPassword) {
+    error.value = t('settings.accountCurrentPassword')
+    toast().danger(error.value)
+    return
+  }
+  const currentEmail = String(auth.user?.email || '').trim().toLowerCase()
+  const emailChanged = email && email !== currentEmail
+  if (!emailChanged && !newPassword) {
+    error.value = t('settings.accountNeedChange')
+    toast().danger(error.value)
+    return
+  }
+  if (newPassword && newPassword.length < 8) {
+    error.value = t('settings.accountPasswordShort')
+    toast().danger(error.value)
+    return
+  }
+  if (newPassword && newPassword !== confirmPassword) {
+    error.value = t('settings.accountPasswordMismatch')
+    toast().danger(error.value)
+    return
+  }
+  accountSaving.value = true
+  const payload = { currentPassword }
+  if (emailChanged) payload.newEmail = email
+  if (newPassword) payload.newPassword = newPassword
+  const { data, error: err } = await authApi.updateCredentials(payload)
+  accountSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const nextEmail = data?.email || email || currentEmail
+  if (auth.user) {
+    auth.setSession(auth.token, { ...auth.user, email: nextEmail })
+  }
+  fillAccountFromAuth()
+  success.value = t('settings.accountUpdated')
+  toast().success(success.value)
+}
 const form = reactive({
   appName: 'JEHO CHAT',
   supportEmail: 'support@adnova.bbs.tr',
@@ -443,12 +565,14 @@ function normalizeAppName(raw) {
 function selectTab(id) {
   settingsTab.value = id
   router.replace({ name: 'settings', query: { tab: id } })
+  if (id === 'account') fillAccountFromAuth()
 }
 
 function syncTabFromRoute() {
   const raw = String(route.query.tab || 'general')
   const allowed = new Set(settingTabs.value.map((x) => x.id))
   settingsTab.value = allowed.has(raw) ? raw : 'general'
+  if (settingsTab.value === 'account') fillAccountFromAuth()
 }
 
 watch(() => route.query.tab, syncTabFromRoute)
@@ -612,8 +736,12 @@ async function save() {
   toast().success(success.value)
 }
 
-onMounted(() => {
+onMounted(async () => {
   syncTabFromRoute()
+  if (!auth.user?.email) {
+    await auth.fetchMe()
+  }
+  fillAccountFromAuth()
   load()
 })
 </script>

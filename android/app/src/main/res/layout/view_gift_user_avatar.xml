@@ -1,7 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<merge android:gravity="start|center" android:layout_width="fill_parent" android:layout_height="fill_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto">
-    <View android:background="@color/color_4E4E4E" android:visibility="invisible" android:layout_width="@dimen/dp_1" android:layout_height="@dimen/dp_15" android:layout_marginLeft="@dimen/dp_9" android:layout_marginRight="@dimen/dp_9" android:layout_marginHorizontal="@dimen/dp_9" />
-    <androidx.recyclerview.widget.RecyclerView android:id="@+id/rv_gift_mic_list" android:layout_width="0.0dip" android:layout_height="fill_parent" android:layout_weight="1.0" />
-    <TextView android:textSize="14.0sp" android:textColor="@color/white" android:gravity="center" android:id="@+id/blt_gift_all_mic" android:layout_width="42.0dip" android:layout_height="24.0dip" android:text="@string/all" android:layout_marginStart="9.0dip" android:layout_marginEnd="@dimen/dp_15" />
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="start|center_vertical">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_gift_mic_list"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:paddingStart="6dp"
+        android:paddingEnd="4dp" />
+
+    <TextView
+        android:id="@+id/blt_gift_all_mic"
+        android:layout_width="44dp"
+        android:layout_height="28dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/bg_room_gift_all_mic"
+        android:gravity="center"
+        android:text="@string/all"
+        android:textColor="@android:color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        tools:text="الكل" />
 </merge>

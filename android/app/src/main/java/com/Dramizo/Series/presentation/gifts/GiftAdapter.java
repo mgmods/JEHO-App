@@ -20,6 +20,7 @@ import com.bumptech.glide.Glide;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -113,13 +114,54 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
         holder.b.tvGiftName.setHorizontallyScrolling(false);
         holder.b.giftGold.setText(String.valueOf(gift.coinPrice));
         applySelection(holder, gift);
-        Glide.with(holder.b.giftImage)
-                .load(AssetCatalog.absoluteUrl(gift.iconUrl))
-                .placeholder(ImagePlaceholder.gift())
-                .error(ImagePlaceholder.gift())
-                .dontAnimate()
-                .centerInside()
-                .into(holder.b.giftImage);
+
+        // Prefer icon; if icon missing use animation; animate gif/webp when that is the file type.
+        String thumb = gift.iconUrl;
+        if (thumb == null || thumb.isEmpty()) thumb = gift.animationUrl;
+        String abs = AssetCatalog.absoluteUrl(thumb);
+        com.Dramizo.Series.util.CosmeticMedia.Kind kind =
+                com.Dramizo.Series.util.CosmeticMedia.kind(abs);
+        if (abs == null || abs.isEmpty()) {
+            holder.b.giftImage.setImageResource(ImagePlaceholder.gift());
+        } else if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.GIF
+                || (abs.toLowerCase(Locale.US).contains(".gif"))
+                || (abs.toLowerCase(Locale.US).contains(".webp"))) {
+            try {
+                Glide.with(holder.b.giftImage)
+                        .asGif()
+                        .load(abs)
+                        .placeholder(ImagePlaceholder.gift())
+                        .error(ImagePlaceholder.gift())
+                        .centerInside()
+                        .into(holder.b.giftImage);
+            } catch (Exception e) {
+                Glide.with(holder.b.giftImage)
+                        .load(abs)
+                        .placeholder(ImagePlaceholder.gift())
+                        .error(ImagePlaceholder.gift())
+                        .centerInside()
+                        .into(holder.b.giftImage);
+            }
+        } else if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+            // Video gifts: show icon still if separate; else a frame via Glide first-frame if possible.
+            String still = gift.iconUrl != null && !gift.iconUrl.isEmpty()
+                    ? AssetCatalog.absoluteUrl(gift.iconUrl) : abs;
+            Glide.with(holder.b.giftImage)
+                    .load(still)
+                    .placeholder(ImagePlaceholder.gift())
+                    .error(ImagePlaceholder.gift())
+                    .dontAnimate()
+                    .centerInside()
+                    .into(holder.b.giftImage);
+        } else {
+            Glide.with(holder.b.giftImage)
+                    .load(abs)
+                    .placeholder(ImagePlaceholder.gift())
+                    .error(ImagePlaceholder.gift())
+                    .dontAnimate()
+                    .centerInside()
+                    .into(holder.b.giftImage);
+        }
         if (holder.b.ivGiftEffect != null) holder.b.ivGiftEffect.setVisibility(android.view.View.GONE);
         if (holder.b.ivGiftLuck != null) holder.b.ivGiftLuck.setVisibility(android.view.View.GONE);
         if (holder.b.ivGiftLimitTime != null) {

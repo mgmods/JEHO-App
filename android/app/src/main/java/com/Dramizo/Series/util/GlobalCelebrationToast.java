@@ -162,12 +162,22 @@ public final class GlobalCelebrationToast {
                 ? firstNonEmpty(badgeUrl, null)
                 : avatarUrl;
         String absLeft = AssetCatalog.absoluteUrl(leftUrl);
+        if (absLeft != null) {
+            com.Dramizo.Series.util.CosmeticMedia.Kind badgeKind =
+                    com.Dramizo.Series.util.CosmeticMedia.kind(absLeft);
+            if (badgeKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO
+                    || badgeKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA) {
+                absLeft = null;
+            }
+        }
         if (avatar != null) {
             if (absLeft != null && !absLeft.isEmpty()) {
                 try {
                     Glide.with(activity.getApplicationContext())
                             .load(absLeft)
+                            .override(128, 128)
                             .centerCrop()
+                            .dontAnimate()
                             .into(avatar);
                 } catch (Exception ignored) {
                     avatar.setImageResource(R.drawable.ic_screen_chat_lottery);

@@ -12,6 +12,8 @@ import com.Dramizo.Series.data.remote.api.ConfigApi;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 
+import com.Dramizo.Series.rtc.RoomAudioRoute;
+
 import im.zego.zegoexpress.ZegoExpressEngine;
 import im.zego.zegoexpress.callback.IZegoEventHandler;
 import im.zego.zegoexpress.constants.ZegoRoomMode;
@@ -348,13 +350,21 @@ public class ZegoEngineManager {
         if (initialized) {
             activeAppId = appId;
             engine.startSoundLevelMonitor();
-            try {
-                engine.muteSpeaker(speakerMuted);
-                if (!speakerMuted) engine.setAudioRouteToSpeaker(true);
-            } catch (Exception ignored) {
-            }
+            applyZegoAudioRoute();
         }
         Log.i(TAG, "ZEGO Express engine initialized=" + initialized + " appId=" + appId + " tokenAuth=true");
+    }
+
+    /** Loudspeaker only when unmuted and no wired/BT headset is plugged. */
+    private void applyZegoAudioRoute() {
+        if (engine == null) return;
+        try {
+            engine.muteSpeaker(speakerMuted);
+            engine.setAudioRouteToSpeaker(
+                    RoomAudioRoute.zegoRouteToSpeaker(application, speakerMuted));
+        } catch (Exception ignored) {
+        }
+        RoomAudioRoute.applyCommunicationRoute(application, !speakerMuted);
     }
 
     private static SharedPreferences prefs(Context context) {
@@ -443,8 +453,7 @@ public class ZegoEngineManager {
         // Keep the Activity's intended mic state — do not force-unmute on every login
         // (that caused hear-me / mute flicker after reconnect).
         try {
-            engine.muteSpeaker(speakerMuted);
-            if (!speakerMuted) engine.setAudioRouteToSpeaker(true);
+            applyZegoAudioRoute();
             engine.muteMicrophone(!micEnabled);
             engine.startSoundLevelMonitor();
         } catch (Exception e) {
@@ -527,8 +536,7 @@ public class ZegoEngineManager {
         stopPublishing();
         engine.muteMicrophone(!micEnabled);
         try {
-            engine.muteSpeaker(speakerMuted);
-            if (!speakerMuted) engine.setAudioRouteToSpeaker(true);
+            applyZegoAudioRoute();
         } catch (Exception ignored) {
         }
         engine.startPublishingStream(streamId);
@@ -564,8 +572,7 @@ public class ZegoEngineManager {
             return;
         }
         try {
-            engine.muteSpeaker(false);
-            engine.setAudioRouteToSpeaker(true);
+            applyZegoAudioRoute();
         } catch (Exception ignored) {
         }
         engine.startPlayingStream(streamId);
@@ -679,8 +686,7 @@ public class ZegoEngineManager {
             return;
         }
         try {
-            engine.muteSpeaker(false);
-            engine.setAudioRouteToSpeaker(true);
+            applyZegoAudioRoute();
         } catch (Exception ignored) {
         }
         try {

@@ -86,6 +86,7 @@ public final class MiscDtos {
 
     public static class AgencyPricingDto {
         @SerializedName("createPriceCoins") public int createPriceCoins;
+        @SerializedName("createFree") public boolean createFree;
         @SerializedName("defaultCommissionPercent") public double defaultCommissionPercent;
         @SerializedName("platformCutPercent") public double platformCutPercent;
         @SerializedName("hostSharePercent") public double hostSharePercent;
@@ -286,6 +287,8 @@ public final class MiscDtos {
         @SerializedName("roomRulesText") public String roomRulesText;
         /** When false, gift effect audio is fully muted across the app. */
         @SerializedName("giftSoundsEnabled") public boolean giftSoundsEnabled = true;
+        /** When false, hide all tasks UI and stop client-side task flows. */
+        @SerializedName("tasksEnabled") public boolean tasksEnabled = true;
         @SerializedName("autoModeration") public boolean autoModeration = true;
         @SerializedName("chatPromoFilterEnabled") public boolean chatPromoFilterEnabled = true;
         @SerializedName("chatPromoKickEnabled") public boolean chatPromoKickEnabled = true;
@@ -579,6 +582,15 @@ public final class MiscDtos {
         @SerializedName("status") public String status;
         @SerializedName("createdAt") public String createdAt;
         @SerializedName("user") public AuthDtos.UserDto user;
+    }
+
+    public static class CpStatusDto {
+        @SerializedName("hasCp") public boolean hasCp;
+        @SerializedName("partner") public AuthDtos.UserDto partner;
+        @SerializedName("bondScore") public long bondScore;
+        @SerializedName("level") public int level;
+        @SerializedName("nextLevelAt") public long nextLevelAt;
+        @SerializedName("relationId") public String relationId;
     }
 
     public static class BondDto {

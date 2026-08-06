@@ -243,6 +243,7 @@ public class SearchActivity extends ThemedActivity {
                     InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD,
                     getString(R.string.enter_room),
                     pwd -> {
+                        com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, room.id, pwd);
                         Intent i = new Intent(this, VoiceRoomActivity.class);
                         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
                         if (pwd != null && !pwd.isEmpty()) {
@@ -252,6 +253,7 @@ public class SearchActivity extends ThemedActivity {
                     });
             return;
         }
+        com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, room.id, null);
         Intent i = new Intent(this, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
         startActivity(i);

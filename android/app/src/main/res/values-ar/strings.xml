@@ -179,9 +179,11 @@
 <string name="agency_application_paid_hint">فتح الوكالة مدفوع من رصيد الكوينز (جوجل بلاي / بينانس USDT / وكيل شحن). السعر يحدده الأدمن من الداشبورد.</string>
 <string name="agency_application_loading_price">جاري تحميل السعر…</string>
 <string name="agency_pay_and_submit_format">ادفع %,d كوينز وأرسل الطلب</string>
+<string name="agency_submit_free">إرسال طلب مجاني</string>
 <string name="agency_wallet_balance_format">رصيدك: %,d كوينز</string>
 <string name="agency_insufficient_coins_format">رصيدك غير كافٍ. المطلوب %,d كوينز — افتح المحفظة للشحن.</string>
 <string name="agency_confirm_pay_message">سيتم خصم %,d كوينز من رصيدك عند الإرسال. هل تريد المتابعة؟</string>
+<string name="agency_confirm_free_message">فتح الوكالة مجاني (فعّل الأدمن الوضع المجاني). هل تريد إرسال الطلب للمراجعة؟</string>
 <string name="agency_create_price_format">السعر: %,d كوينز (تُخصم عند الإرسال)</string>
 <string name="agency_need_coins_recharge">تحتاج %,d كوينز. اشحن أولاً من المحفظة (بلاي / USDT / وكيل).</string>
 <string name="agency_proposed_name">اسم الوكالة المقترح *</string>
@@ -553,8 +555,12 @@
 <string name="mall_days_left">متبقي %1$d يوم</string>
 <string name="mall_permanent">دائم</string>
 <string name="mall_price_days">%1$d عملة · %2$d يوم</string>
-<string name="mall_free_days">مجاني · %1$d يوم</string>
-<string name="mall_tab_frames">قطاع الراس</string>
+    <string name="mall_free_days">مجاني · %1$d يوم</string>
+    <string name="mall_requires_vip">يتطلب VIP %1$d</string>
+    <string name="mall_requires_level">يتطلب مستوى %1$d</string>
+    <string name="mall_vip_unlock">مفتوح لـ VIP %1$d</string>
+    <string name="mall_vip_badge">VIP %1$d</string>
+    <string name="mall_tab_frames">قطاع الراس</string>
 <string name="mall_tab_entry">الدخولية</string>
 <string name="mall_tab_level">شارات المستوى</string>
 <string name="mall_tab_room_card">كروت الروم</string>

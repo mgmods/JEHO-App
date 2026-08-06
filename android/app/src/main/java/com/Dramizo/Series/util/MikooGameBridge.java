@@ -165,11 +165,10 @@ public final class MikooGameBridge {
         root.addProperty("avatar", nullToEmpty(session.avatarUrl));
         root.addProperty("headImg", nullToEmpty(session.avatarUrl));
         JsonObject gameConfig = new JsonObject();
-        // sceneMode 0 = half-screen in-room; full screen outside Games tab.
-        boolean inRoom = session.roomId != null
-                && !session.roomId.isEmpty()
-                && !"0".equals(session.roomId);
-        gameConfig.addProperty("sceneMode", inRoom ? 0 : 1);
+        // Exact Mikoo BSGameWebDialog NativeBridge.getConfig:
+        // sceneMode=0 → engine draws half-scene (room stays visible); host gives full WebView.
+        gameConfig.addProperty("sceneMode", 0);
+        gameConfig.addProperty("halfScreen", true);
         gameConfig.addProperty("currencyIcon", nullToEmpty(session.currencyIcon));
         gameConfig.addProperty("balance", session.balance);
         gameConfig.addProperty("coin", session.balance);
@@ -409,10 +408,7 @@ public final class MikooGameBridge {
         if (!nick.isEmpty()) {
             builder.appendQueryParameter("nickname", nick);
         }
-        // Half-screen splash sizing for voice-room sessions (BaiShun gameMode=2).
-        if (session.roomId != null && !session.roomId.isEmpty() && !"0".equals(session.roomId)) {
-            builder.appendQueryParameter("adaption", "1");
-        }
+        // Mikoo room sessions do not force adaption=0; sceneMode=0 handles half-UI.
         if (session.gameType > 0) {
             builder.appendQueryParameter("gameType", String.valueOf(session.gameType));
         }

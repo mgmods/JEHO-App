@@ -498,7 +498,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     const members = Array.from(unique.values());
     await this.roomsRepo.update(
       { id: roomId },
-      { viewerCount: members.length },
+      { viewerCount: members.length, updatedAt: new Date() },
     );
     void this.syncPersonalEmptySince(roomId, members.length);
     this.server.to(`room:${roomId}`).emit('room:members', {

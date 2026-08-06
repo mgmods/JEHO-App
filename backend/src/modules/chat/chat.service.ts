@@ -538,6 +538,12 @@ export class ChatService {
       at: lastReadAt.toISOString(),
     };
     const peers = await this.partRepo.find({ where: { conversationId } });
+    // Reader's list badge must clear immediately (no full refetch needed).
+    this.realtime?.emitToUser(readerId, 'chat:conversation:updated', {
+      conversationId,
+      unreadCount: 0,
+      at: lastReadAt.toISOString(),
+    });
     for (const peer of peers) {
       if (peer.userId === readerId) continue;
       this.realtime?.emitToUser(peer.userId, 'chat:read', payload);

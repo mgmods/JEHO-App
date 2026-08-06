@@ -118,26 +118,47 @@ export class WalletService implements OnModuleInit {
     }
   }
 
-  /** DB packages win. Code defaults only for empty installs when BOOT_SEED_CATALOGS=1. */
+  /** Force-safe packages if missing, outdated version, or fat density (owner-risk). */
   async ensureCanonicalPackages() {
     const pkgRow = await this.settingsRepo.findOne({
       where: { key: 'recharge_packages' },
     });
-    if (pkgRow?.value) {
-      // Live dashboard / production packages — never force-reset from code.
-      return;
-    }
-    if (!bootCatalogSeedEnabled()) {
-      this.logger.log('Recharge packages: DB authoritative (empty, seed disabled)');
-      return;
-    }
-
     const verKey = 'pricing.version';
     const verRow = await this.settingsRepo.findOne({ where: { key: verKey } });
+    const versionOk = String(verRow?.value || '') === PRICING_VERSION;
 
+    let packagesFat = false;
+    if (pkgRow?.value) {
+      try {
+        const list = JSON.parse(pkgRow.value) as Array<{
+          coins?: number;
+          bonusCoins?: number;
+          priceUsd?: number;
+        }>;
+        for (const p of list || []) {
+          const total = Math.max(0, Number(p.coins || 0) + Number(p.bonusCoins || 0));
+          const usd = Math.max(0.01, Number(p.priceUsd || 0));
+          // >14k coins/$ exceeds owner-safe band after gift cashout math.
+          if (total / usd > 14_000) {
+            packagesFat = true;
+            break;
+          }
+        }
+      } catch {
+        packagesFat = true;
+      }
+    }
+
+    const shouldWrite = !pkgRow?.value || !versionOk || packagesFat;
+    if (!shouldWrite) {
+      return;
+    }
+
+    this.logger.warn(
+      `Applying canonical packages ${PRICING_VERSION} (empty=${!pkgRow?.value} staleVer=${!versionOk} fat=${packagesFat})`,
+    );
     await this.savePackages([...STANDARD_RECHARGE_PACKAGES] as any);
 
-    // Keep store_offers aligned so Play billing never falls back to fat bonuses.
     const offersRow = await this.settingsRepo.findOne({ where: { key: 'store_offers' } });
     const offersValue = JSON.stringify(
       STANDARD_RECHARGE_PACKAGES.map((pkg) => ({
@@ -173,7 +194,6 @@ export class WalletService implements OnModuleInit {
       verRow.value = PRICING_VERSION;
       await this.settingsRepo.save(verRow);
     }
-    this.logger.log(`Seeded empty recharge packages to ${PRICING_VERSION}`);
   }
 
   async getWallet(userId: string) {

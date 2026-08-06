@@ -65,11 +65,13 @@ import {
   isValidAgencyPublicId,
   normalizeAgencyPublicId,
 } from './agency-perks';
+import { normalizeStaffRole } from '../../common/staff-role';
 
 const DEFAULT_CREATE_PRICE = AGENCY_CREATE.defaultCoins;
+/** Matches pricing-catalog DEFAULT_GIFT_SPLIT — owner-safe economy v3. */
 const DEFAULT_COMMISSION = 15;
-const DEFAULT_PLATFORM_CUT = 30;
-const DEFAULT_HOST_SHARE = 55;
+const DEFAULT_PLATFORM_CUT = 40;
+const DEFAULT_HOST_SHARE = 45;
 const DEFAULT_AGENCY_SEAT_COUNT = 11;
 const DEFAULT_DIAMOND_USD_RATE = 0.00005;
 
@@ -193,6 +195,11 @@ export class AgenciesService implements OnModuleInit {
           }),
         );
       }
+      await this.ensureSetting(
+        AGENCY_CREATE.freeSettingKey,
+        'false',
+        'فتح الوكالة مجاناً (true) — عند التعطيل لا يُقبل سعر 0 ويُطبَّق الحد الأدنى',
+      );
     } catch (err) {
       this.logger.warn(`ensure agency create price setting: ${(err as Error).message}`);
     }
@@ -217,16 +224,29 @@ export class AgenciesService implements OnModuleInit {
         'false',
         'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
       );
-      // Raise legacy platform cut (20/25) to safer 30% house default.
+      // Soft-migrate platform cut → 40% house default (legacy low cuts).
       const cut = await this.settingsRepo.findOne({
         where: { key: 'agency_platform_cut_percent' },
       });
       if (cut) {
         const n = Number(String(cut.value).trim());
-        if (n === 20 || n === 25) {
+        if ([20, 25, 30, 35, 38].includes(n)) {
           cut.value = String(DEFAULT_PLATFORM_CUT);
-          cut.description = 'حصة المنصة من هدايا الوكالة %';
+          cut.description = 'حصة المنصة من هدايا الوكالة % (economy-v5)';
           await this.settingsRepo.save(cut);
+        }
+      }
+      // Soft-migrate host share → 45 when still on previous defaults.
+      const hostShare = await this.settingsRepo.findOne({
+        where: { key: 'agency_host_share_percent' },
+      });
+      if (hostShare) {
+        const hn = String(hostShare.value).trim();
+        if (['55', '50', '47'].includes(hn)) {
+          hostShare.value = String(DEFAULT_HOST_SHARE);
+          hostShare.description =
+            'حصة المضيفة من هدايا الوكالة % (مستقلة — economy-v5)';
+          await this.settingsRepo.save(hostShare);
         }
       }
       // Soft-migrate default agency commission 20 → 15 when still on legacy default.
@@ -237,6 +257,35 @@ export class AgenciesService implements OnModuleInit {
         defComm.value = String(DEFAULT_COMMISSION);
         defComm.description = 'حصة صاحب الوكالة من هدايا الأعضاء %';
         await this.settingsRepo.save(defComm);
+      }
+      // Keep admin economy readout fractions aligned with live %.
+      for (const [key, value, description] of [
+        ['economy.platform_share', '0.40', 'Platform gift share fraction'],
+        ['gift_platform_share', '0.40', 'Platform gift share fraction'],
+        ['economy.agency_share', '0.15', 'Agency owner gift share fraction'],
+        ['gift_agency_share', '0.15', 'Agency owner gift share fraction'],
+        ['economy.host_share_agency', '0.45', 'Host share in agency room'],
+        ['economy.host_share_solo', '0.60', 'Host share personal room (100-platform)'],
+      ] as const) {
+        const row = await this.settingsRepo.findOne({ where: { key } });
+        if (!row) {
+          await this.settingsRepo.save(
+            this.settingsRepo.create({ key, value, description }),
+          );
+        } else if (
+          (key.includes('platform') &&
+            ['0.2', '0.20', '0.25', '0.3', '0.30', '0.35', '0.38'].includes(
+              String(row.value).trim(),
+            )) ||
+          (key.includes('host_share_agency') &&
+            ['0.55', '0.5', '0.50', '0.47'].includes(String(row.value).trim())) ||
+          (key.includes('host_share_solo') &&
+            ['0.7', '0.70', '0.65', '0.62'].includes(String(row.value).trim()))
+        ) {
+          row.value = value;
+          row.description = description;
+          await this.settingsRepo.save(row);
+        }
       }
     } catch (err) {
       this.logger.warn(`ensure agency commission settings: ${(err as Error).message}`);
@@ -303,14 +352,33 @@ export class AgenciesService implements OnModuleInit {
   }
 
   async pricing() {
+    const freeRaw = String(
+      (await this.settingsRepo.findOne({ where: { key: AGENCY_CREATE.freeSettingKey } }))
+        ?.value || 'false',
+    )
+      .trim()
+      .toLowerCase();
+    const createFree =
+      freeRaw === 'true' || freeRaw === '1' || freeRaw === 'yes';
+
     const raw = await this.getSettingNumber(
       AGENCY_CREATE.settingKey,
       DEFAULT_CREATE_PRICE,
     );
-    const createPriceCoins = Math.max(
-      AGENCY_CREATE.minCoins,
-      Math.min(AGENCY_CREATE.maxCoins, Math.floor(raw)),
-    );
+    // Free only when explicitly enabled. Price 0 without the free flag → min paid fee.
+    let createPriceCoins: number;
+    if (createFree) {
+      createPriceCoins = 0;
+    } else {
+      const paid = Number.isFinite(raw) ? Math.floor(raw) : DEFAULT_CREATE_PRICE;
+      createPriceCoins = Math.max(
+        AGENCY_CREATE.minCoins,
+        Math.min(
+          AGENCY_CREATE.maxCoins,
+          paid > 0 ? paid : AGENCY_CREATE.minCoins,
+        ),
+      );
+    }
     const defaultCommissionPercent = clampSharePct(
       await this.getSettingNumber('agency_default_commission_percent', DEFAULT_COMMISSION),
       DEFAULT_COMMISSION,
@@ -337,6 +405,7 @@ export class AgenciesService implements OnModuleInit {
       autoRaw === 'true' || autoRaw === '1' || autoRaw === 'yes';
     return {
       createPriceCoins,
+      createFree,
       currency: 'coins',
       isPaid: createPriceCoins > 0,
       defaultCommissionPercent,
@@ -479,7 +548,10 @@ export class AgenciesService implements OnModuleInit {
     }
 
     const pricing = await this.pricing();
-    const priceCoins = Math.max(0, Number(pricing.createPriceCoins) || 0);
+    // Free only when createFree is on (pricing() already zeroed the fee).
+    const priceCoins = pricing.createFree
+      ? 0
+      : Math.max(AGENCY_CREATE.minCoins, Math.floor(Number(pricing.createPriceCoins) || 0));
     const alreadyPaid =
       pending?.status === AgencyApplicationStatus.CHANGES_REQUESTED &&
       Number(pending.paidCoins || 0) > 0 &&
@@ -531,6 +603,10 @@ export class AgenciesService implements OnModuleInit {
             metadata: { proposedName: dto.proposedName, priceCoins },
           }),
         );
+      } else if (!alreadyPaid && priceCoins <= 0) {
+        // Free application — mark as settled with 0 coins (not unpaid).
+        paidCoins = 0;
+        paymentReferenceId = `agency_create_free:${applicantId}:${Date.now()}`;
       }
 
       const values: Partial<AgencyApplication> = {
@@ -2003,6 +2079,9 @@ export class AgenciesService implements OnModuleInit {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
     if (agency.ownerId === userId) return { agency, role: AgencyRole.OWNER };
+    if (await this.isPlatformSuper(userId)) {
+      return { agency, role: AgencyRole.OWNER };
+    }
     const member = await this.membersRepo.findOne({
       where: {
         agencyId,
@@ -2397,6 +2476,7 @@ export class AgenciesService implements OnModuleInit {
 
   /** Open/reopen the authenticated admin's own persistent room in this agency. */
   async openAgencyRoom(agencyId: string, userId: string, dto: CreateRoomDto) {
+    const superStaff = await this.isPlatformSuper(userId);
     const membership = await this.membersRepo.findOne({
       where: {
         agencyId,
@@ -2406,14 +2486,28 @@ export class AgenciesService implements OnModuleInit {
       },
       relations: ['agency'],
     });
+    const agency =
+      membership?.agency ||
+      (await this.agenciesRepo.findOne({ where: { id: agencyId } }));
+    if (!agency || agency.status !== AgencyStatus.ACTIVE) {
+      throw new ForbiddenException('فتح بث الوكالة لمالك الوكالة أو الأدمن فقط');
+    }
     if (
-      !membership ||
-      membership.agency?.status !== AgencyStatus.ACTIVE ||
-      ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)
+      !superStaff &&
+      (!membership ||
+        ![AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role))
     ) {
       throw new ForbiddenException('فتح بث الوكالة لمالك الوكالة أو الأدمن فقط');
     }
-    const agencyName = String(membership.agency.name || '').trim() || 'وكالة';
+    const agencyName = String(agency.name || '').trim() || 'وكالة';
+    // Super can open any agency brand room even when not a member (platform SOS / support).
+    if (superStaff) {
+      const room = await this.ensurePermanentRoom(agencyId);
+      room.title = agencyName;
+      await this.roomsRepo.save(room);
+      return this.roomsService.forceOpenAgencyRoom(room.id, userId);
+    }
+    // Agency owner/manager: open own agency host room with agency branding.
     return this.roomsService.create(userId, {
       ...dto,
       title: agencyName,
@@ -2428,7 +2522,7 @@ export class AgenciesService implements OnModuleInit {
   async deleteOwn(agencyId: string, userId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('الوكالة غير موجودة');
-    if (agency.ownerId !== userId) {
+    if (agency.ownerId !== userId && !(await this.isPlatformSuper(userId))) {
       throw new ForbiddenException('فقط صاحب الوكالة يمكنه حذفها نهائياً');
     }
 
@@ -2481,12 +2575,26 @@ export class AgenciesService implements OnModuleInit {
   private async assertOwner(agencyId: string, actorId: string) {
     const agency = await this.agenciesRepo.findOne({ where: { id: agencyId } });
     if (!agency) throw new NotFoundException('Agency not found');
-    if (agency.ownerId !== actorId) {
-      throw new ForbiddenException('فقط صاحب الوكالة يمكنه تعديل الاسم والوصف');
+    if (agency.ownerId === actorId) return;
+    if (await this.isPlatformSuper(actorId)) return;
+    throw new ForbiddenException('فقط صاحب الوكالة يمكنه تعديل الاسم والوصف');
+  }
+
+  private async isPlatformSuper(userId: string): Promise<boolean> {
+    if (!userId) return false;
+    try {
+      const user = await this.usersRepo.findOne({
+        where: { id: userId },
+        select: ['id', 'isAdmin', 'staffRole'] as any,
+      });
+      return normalizeStaffRole(user as any) === 'super';
+    } catch {
+      return false;
     }
   }
 
   private async assertManager(agencyId: string, actorId: string) {
+    if (await this.isPlatformSuper(actorId)) return;
     const member = await this.membersRepo.findOne({
       where: { agencyId, userId: actorId, isActive: true },
     });

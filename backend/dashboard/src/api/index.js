@@ -7,6 +7,8 @@ export const bulkApi = {
 export const authApi = {
   login: (payload) => safeRequest(() => api.post('/admin/auth/login', payload)),
   me: () => safeRequest(() => api.get('/admin/auth/me')),
+  updateCredentials: (payload) =>
+    safeRequest(() => api.patch('/admin/auth/credentials', payload)),
 }
 
 export const dashboardApi = {
@@ -75,7 +77,6 @@ export const giftsApi = {
   createCategory: (data) => safeRequest(() => api.post('/admin/gift-categories', data)),
   updateCategory: (id, data) => safeRequest(() => api.patch(`/admin/gift-categories/${id}`, data)),
   deleteCategory: (id) => safeRequest(() => api.delete(`/admin/gift-categories/${id}`)),
-  importJehoPack: () => safeRequest(() => api.post('/admin/gifts/import-jeho-pack')),
 }
 
 export const walletApi = {
@@ -260,7 +261,15 @@ export const gameStoreApi = {
 
 export const tasksApi = {
   list: () => safeRequest(() => api.get('/admin/tasks')),
-  save: (items) => safeRequest(() => api.put('/admin/tasks', { items })),
+  save: (items, enabled) =>
+    safeRequest(() =>
+      api.put('/admin/tasks', {
+        items,
+        ...(typeof enabled === 'boolean' ? { enabled } : {}),
+      }),
+    ),
+  setEnabled: (enabled) =>
+    safeRequest(() => api.put('/admin/tasks/enabled', { enabled: !!enabled })),
 }
 
 export const rankingApi = {

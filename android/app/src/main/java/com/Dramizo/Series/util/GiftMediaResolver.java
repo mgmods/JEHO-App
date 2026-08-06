@@ -5,9 +5,16 @@ import androidx.annotation.Nullable;
 import java.util.Locale;
 
 /**
- * Maps gift names / icon paths to real playable MP4/SVGA when the catalog still
- * points at {@code /visual-system/runtime.html} (non-playable on Android).
- * Prefers Mikoo entry videos already shipped on the CDN.
+ * Resolves what media to play for a gift in the room.
+ * <p>
+ * Admin uploads win by type:
+ * <ul>
+ *   <li>static image (png/jpg/webp still) → show image</li>
+ *   <li>animated gif / animated webp → play as gif</li>
+ *   <li>video (mp4/webm/mov) / SVGA → play video</li>
+ * </ul>
+ * Mikoo entry remaps exist only as last-resort fallback when catalog still has
+ * {@code runtime.html} and no uploaded media.
  */
 public final class GiftMediaResolver {
     private GiftMediaResolver() {}
@@ -21,27 +28,37 @@ public final class GiftMediaResolver {
             @Nullable String iconUrl,
             @Nullable String animationUrl
     ) {
-        String mapped = mapByName(giftName);
-        if (mapped == null) mapped = mapByIcon(iconUrl);
+        // 1) Explicit animation from dashboard / API — never overwrite real uploads.
+        String anim = firstRealMedia(animationUrl);
+        if (anim != null) return anim;
 
-        String existing = CosmeticMedia.playableUrl(animationUrl);
-        if (existing != null) {
-            CosmeticMedia.Kind k = CosmeticMedia.kind(existing);
-            if (k == CosmeticMedia.Kind.VIDEO || k == CosmeticMedia.Kind.SVGA) {
-                // Catalog often stores sibling .mp4 next to gift PNGs that 404 on CDN.
-                // Prefer known Mikoo entry videos when the catalog URL looks fragile.
-                if (mapped != null && looksFragileGiftUrl(existing)) {
-                    return mapped;
-                }
-                return existing;
+        // 2) Icon itself can be the show media (gif / webp / video uploaded as icon).
+        String icon = firstRealMedia(iconUrl);
+        if (icon != null) {
+            CosmeticMedia.Kind ik = CosmeticMedia.kind(icon);
+            if (ik == CosmeticMedia.Kind.VIDEO
+                    || ik == CosmeticMedia.Kind.SVGA
+                    || ik == CosmeticMedia.Kind.GIF
+                    || isTrustedUpload(icon)) {
+                return icon;
             }
+            // Static catalog PNG icon with no animation: keep still (no forced Mikoo MP4).
+            if (ik == CosmeticMedia.Kind.IMAGE) return icon;
         }
 
-        if (mapped != null) return mapped;
+        // 3) Legacy HTML placeholder only → optional Mikoo name/icon entry remap.
+        if (isHtmlPlaceholder(animationUrl)) {
+            String mapped = mapByName(giftName);
+            if (mapped == null) mapped = mapByIcon(iconUrl);
+            if (mapped != null) return mapped;
+        }
+
+        // 4) Sibling .mp4 next to icon only when not a fragile guess.
         if (iconUrl != null && !iconUrl.isEmpty()) {
             String sibling = iconUrl.replaceAll("(?i)\\.(png|jpe?g|webp)(\\?.*)?$", ".mp4$2");
-            if (!sibling.equals(iconUrl) && CosmeticMedia.kind(sibling) == CosmeticMedia.Kind.VIDEO
-                    && !looksFragileGiftUrl(sibling)) {
+            if (!sibling.equals(iconUrl)
+                    && CosmeticMedia.kind(sibling) == CosmeticMedia.Kind.VIDEO
+                    && isTrustedUpload(sibling)) {
                 return sibling;
             }
         }
@@ -50,31 +67,57 @@ public final class GiftMediaResolver {
 
     /**
      * CDN entry remap for a gift (name/icon) — used when the primary animation URL 404s.
+     * Never use this to replace a successful admin upload.
      */
     @Nullable
     public static String resolveMappedFallback(
             @Nullable String giftName,
             @Nullable String iconUrl
     ) {
+        // Only for true legacy blanks — if icon/anim already real media, no silent swap.
+        if (firstRealMedia(iconUrl) != null) return null;
         String mapped = mapByName(giftName);
         if (mapped == null) mapped = mapByIcon(iconUrl);
         return mapped;
     }
 
-    /** Gift-sprite / visual-system paths that frequently 404 when used as MP4. */
-    private static boolean looksFragileGiftUrl(@Nullable String url) {
+    /** True uploaded /cdn media worth playing as-is (not HTML engine stubs). */
+    @Nullable
+    public static String firstRealMedia(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return null;
+        if (isHtmlPlaceholder(url)) return null;
+        String playable = CosmeticMedia.playableUrl(url.trim());
+        if (playable == null) return null;
+        CosmeticMedia.Kind k = CosmeticMedia.kind(playable);
+        if (k == CosmeticMedia.Kind.NONE) return null;
+        return playable;
+    }
+
+    public static boolean isHtmlPlaceholder(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return true;
+        String u = url.toLowerCase(Locale.US);
+        return u.contains("runtime.html") || u.endsWith(".html") || u.endsWith(".htm");
+    }
+
+    /** Admin uploads and packaged JEHO gift assets. */
+    public static boolean isTrustedUpload(@Nullable String url) {
         if (url == null || url.isEmpty()) return false;
         String u = url.toLowerCase(Locale.US);
-        return u.contains("/gifts/")
-                || u.contains("gift-")
-                || u.contains("gift_")
-                || u.contains("visual-system")
-                || (u.contains("/anims/") && !u.contains("/cosmetics/entries/"));
+        return u.contains("/uploads/")
+                || u.contains("/assets/gifts/")
+                || u.contains("/assets/pack/")
+                || u.startsWith("http://")
+                || u.startsWith("https://");
     }
 
     @Nullable
     private static String mapByIcon(@Nullable String iconUrl) {
         if (iconUrl == null || iconUrl.isEmpty()) return null;
+        // Never remap admin uploads by path keywords.
+        if (isTrustedUpload(iconUrl) && firstRealMedia(iconUrl) != null
+                && !isHtmlPlaceholder(iconUrl)) {
+            return null;
+        }
         String u = iconUrl.toLowerCase(Locale.US);
         if (u.contains("lion") || u.contains("اسد") || u.contains("أسد")) {
             return entry("entry_mikoo_247_golden_lion_roar.mp4");
@@ -92,7 +135,7 @@ public final class GiftMediaResolver {
             return entry("entry_mikoo_268_royal_family.mp4");
         }
         if (u.contains("dragon") || u.contains("تنين")) {
-            return entry("entry_mikoo_264_majestic_lion_king.mp4"); // closest cinematic until dedicated dragon gift mp4
+            return entry("entry_mikoo_264_majestic_lion_king.mp4");
         }
         if (u.contains("yacht") || u.contains("يخت") || u.contains("train") || u.contains("قطار")) {
             return entry("entry_mikoo_265_luxury_car_team.mp4");
@@ -107,9 +150,6 @@ public final class GiftMediaResolver {
         if (u.contains("planet") || u.contains("saturn") || u.contains("earth") || u.contains("كوكب")) {
             return entry("entry_mikoo_267_winning_the_championship.mp4");
         }
-        if (u.contains("mikoo_gift_cache") || u.contains("/anims/")) {
-            return null; // already special-cased via animationUrl
-        }
         return null;
     }
 
@@ -117,7 +157,6 @@ public final class GiftMediaResolver {
     private static String mapByName(@Nullable String giftName) {
         if (giftName == null || giftName.isEmpty()) return null;
         String n = giftName.trim().toLowerCase(Locale.US);
-        // Arabic + English aliases
         if (containsAny(n, "lion", "أسد", "اسد", "ليث")) {
             return entry("entry_mikoo_247_golden_lion_roar.mp4");
         }
@@ -145,7 +184,7 @@ public final class GiftMediaResolver {
         if (containsAny(n, "yacht", "يخت", "train", "قطار", "bike", "دراجة")) {
             return entry("entry_mikoo_265_luxury_car_team.mp4");
         }
-        if (containsAny(n, "rocket", "صاروخ", "meteor", "نيزك", "plane")) {
+        if (containsAny(n, "rocket", "صاروخ", "meteor", "نيزك")) {
             return entry("entry_mikoo_177_glory_kick.mp4");
         }
         if (containsAny(n, "fireworks", "ألعاب نارية", "galaxy", "مجرة", "champagne", "شامبانيا",
@@ -170,7 +209,6 @@ public final class GiftMediaResolver {
         if (containsAny(n, "unicorn", "يونيكورن", "elephant", "فيل", "eagle", "نسر", "falcon", "صقر")) {
             return entry("entry_mikoo_264_majestic_lion_king.mp4");
         }
-        // No dedicated video yet — keep sprite/icon path for donkey/cow/ass.
         if (containsAny(n, "donkey", "حمار", "جحش", "cow", "بقرة", "بقره", "ass")) {
             return null;
         }

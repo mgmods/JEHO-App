@@ -951,18 +951,15 @@
                 android:scaleType="centerCrop"
                 android:src="@drawable/icon_room_music_voice" />
 
-            <androidx.media3.ui.PlayerView
+            <FrameLayout
                 android:id="@+id/musicVideoSurface"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:visibility="gone"
-                app:resize_mode="zoom"
-                app:surface_type="texture_view"
-                app:use_controller="false"
-                app:shutter_background_color="@android:color/transparent" />
+                android:visibility="gone" />
 
-            <WebView
-                android:id="@+id/musicYoutubeWeb"
+            <!-- Lazy WebView host: created only when YouTube embed is needed. -->
+            <FrameLayout
+                android:id="@+id/musicYoutubeWebHost"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:visibility="gone" />
@@ -1122,15 +1119,11 @@
             android:scaleType="centerCrop"
             android:src="@drawable/icon_room_music_voice" />
 
-        <androidx.media3.ui.PlayerView
+        <FrameLayout
             android:id="@+id/musicFloatVideo"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:visibility="gone"
-            app:resize_mode="zoom"
-            app:surface_type="texture_view"
-            app:use_controller="false"
-            app:shutter_background_color="@android:color/transparent" />
+            android:visibility="gone" />
     </FrameLayout>
 
     <TextView
@@ -1262,7 +1255,7 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
-        android:elevation="12dp"
+        android:elevation="28dp"
         android:gravity="center_vertical"
         android:layoutDirection="ltr"
         android:minHeight="56dp"
@@ -1586,42 +1579,51 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/recyclerSeats" />
 
+    <!-- Room games (Mikoo BSGameWebDialog): full-bleed WebView above bottomBar.
+         Engine sceneMode=0 draws the half-scene UI; LTR avoids RTL mirror. -->
     <FrameLayout
         android:id="@+id/gameOverlay"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@android:color/transparent"
-        android:clickable="true"
-        android:elevation="24dp"
-        android:focusable="true"
+        android:clickable="false"
+        android:elevation="18dp"
+        android:focusable="false"
+        android:layoutDirection="ltr"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <!-- Mikoo BSGameWebDialog: full-screen transparent WebView; H5 sceneMode=0 = half panel -->
+        <!-- Full-size stage+WebView like dialog_bai_shun_webview. -->
         <FrameLayout
             android:id="@+id/gamePanel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_gravity="bottom"
             android:background="@android:color/transparent"
+            android:clickable="true"
             android:clipChildren="false"
-            android:elevation="0dp">
+            android:elevation="0dp"
+            android:focusable="true"
+            android:layoutDirection="ltr">
 
             <FrameLayout
                 android:id="@+id/gameStage"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:background="@android:color/transparent">
+                android:layout_gravity="bottom"
+                android:background="@android:color/transparent"
+                android:layoutDirection="ltr">
 
-                <WebView
-                    android:id="@+id/webGame"
+                <!-- Lazy WebView host: created only when a game is opened (huge cold-start win). -->
+                <FrameLayout
+                    android:id="@+id/webGameHost"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@android:color/transparent" />
+                    android:background="@android:color/transparent"
+                    android:layoutDirection="ltr" />
             </FrameLayout>
 
             <!-- Loading / close kept gone — Mikoo uses in-game back only -->

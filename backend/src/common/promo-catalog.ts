@@ -2,7 +2,7 @@
  * JEHO promo economy — monthly recharge gifts, agent float bonuses,
  * supporter packs (frame + special ID), VIP time packs (never permanent).
  */
-export const PROMO_CATALOG_VERSION = '20260802-promos-v1';
+export const PROMO_CATALOG_VERSION = '20260806-promos-v2';
 
 /** VIP is always rented — never permanent. Colorful duration packs. */
 export const VIP_DURATION_PACKS = [
@@ -62,10 +62,11 @@ export const MONTHLY_RECHARGE_OFFERS = [
  * Recharge-agent float purchase bonus (on balance / float coins).
  * Applied when float is topped up by the matching USDT amount.
  */
+  /** Agent float bonuses kept modest — free bonus coins are pure house liability. */
 export const AGENT_FLOAT_BONUS_TIERS = [
-  { id: 'agent_l1', thresholdUsd: 200, bonusPercent: 12, titleAr: 'المستوى الأول' },
-  { id: 'agent_l2', thresholdUsd: 500, bonusPercent: 15, titleAr: 'المستوى الثاني' },
-  { id: 'agent_l3', thresholdUsd: 1000, bonusPercent: 20, titleAr: 'المستوى الثالث' },
+  { id: 'agent_l1', thresholdUsd: 200, bonusPercent: 5, titleAr: 'المستوى الأول' },
+  { id: 'agent_l2', thresholdUsd: 500, bonusPercent: 8, titleAr: 'المستوى الثاني' },
+  { id: 'agent_l3', thresholdUsd: 1000, bonusPercent: 10, titleAr: 'المستوى الثالث' },
 ] as const;
 
 /** Supporter recharge packs: custom frame + special ID for N days. */

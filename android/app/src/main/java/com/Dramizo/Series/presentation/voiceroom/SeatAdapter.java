@@ -24,6 +24,7 @@ import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.databinding.ItemSeatBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.SeatReactionEmojis;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
@@ -58,6 +59,8 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     @Nullable private String selfAvatarUrl;
     private boolean agencyRoom;
     private final Set<String> speakingUsers = new HashSet<>();
+    private final Map<String, Float> speakingLevels = new HashMap<>();
+    private final Map<String, Float> lastPaintedSpeakLevel = new HashMap<>();
     private final Map<String, Integer> activeReactions = new HashMap<>();
     private final Map<String, String> activeReactionKeys = new HashMap<>();
     private final Map<String, Runnable> hideReactionRunnables = new HashMap<>();
@@ -267,6 +270,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (uid != null && !uid.isEmpty()) seated.add(uid);
         }
         speakingUsers.retainAll(seated);
+        speakingLevels.keySet().retainAll(seated);
     }
 
     private static boolean sameSeat(RoomDtos.SeatDto a, RoomDtos.SeatDto b) {
@@ -351,6 +355,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     public void setSpeaking(String userId, boolean speaking) {
+        setSpeaking(userId, speaking, speaking ? 48f : 0f);
+    }
+
+    public void setSpeaking(String userId, boolean speaking, float level0to100) {
         String key = normalizeUserId(userId);
         if (key.isEmpty()) {
             return;
@@ -364,13 +372,30 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
         }
         if (seatPos < 0) {
-            if (speaking) speakingUsers.remove(key);
+            speakingUsers.remove(key);
+            speakingLevels.remove(key);
+            lastPaintedSpeakLevel.remove(key);
             return;
         }
         boolean changed = speaking ? speakingUsers.add(key) : speakingUsers.remove(key);
+        if (speaking) {
+            speakingLevels.put(key, Math.max(0f, level0to100));
+        } else {
+            speakingLevels.remove(key);
+        }
         if (!changed) {
+            // Already speaking: refresh intensity sparingly (avoid RecyclerView churn).
+            if (speaking) {
+                Float prev = lastPaintedSpeakLevel.get(key);
+                if (prev == null || Math.abs(prev - level0to100) >= 6f) {
+                    lastPaintedSpeakLevel.put(key, level0to100);
+                    notifyItemChanged(seatPos, "speak_level");
+                }
+            }
             return;
         }
+        if (speaking) lastPaintedSpeakLevel.put(key, level0to100);
+        else lastPaintedSpeakLevel.remove(key);
         notifyItemChanged(seatPos, "speaking");
     }
 
@@ -490,6 +515,22 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                             && speakingUsers.contains(userId)
                             && !activeReactions.containsKey(userId);
                     bindSpeaking(holder, match);
+                    if (match) {
+                        float lv = speakingLevels.containsKey(userId)
+                                ? speakingLevels.get(userId) : 48f;
+                        if (holder.b.seatSpeakAura != null) {
+                            holder.b.seatSpeakAura.setIntensity(lv);
+                        }
+                    }
+                } else if ("speak_level".equals(p)) {
+                    if (userId != null && speakingUsers.contains(userId)
+                            && holder.b.seatSpeakAura != null) {
+                        float lv = speakingLevels.containsKey(userId)
+                                ? speakingLevels.get(userId) : 48f;
+                        holder.b.seatSpeakAura.setSpeaking(true);
+                        holder.b.seatSpeakAura.setIntensity(lv);
+                        holder.speaking = true;
+                    }
                 } else if ("scale".equals(p)) {
                     applySeatScale(holder);
                 } else if ("reaction".equals(p)) {
@@ -589,6 +630,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (holder.b.imgSeatHostMark != null) {
                 holder.b.imgSeatHostMark.setVisibility(View.GONE);
             }
+            bindStaffSeatBadge(holder, null);
             if (holder.b.imgMuted != null) {
                 holder.b.imgMuted.setVisibility(View.GONE);
             }
@@ -659,6 +701,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             if (holder.b.imgSeatHostMark != null) {
                 holder.b.imgSeatHostMark.setVisibility(isCreator ? View.VISIBLE : View.GONE);
             }
+            bindStaffSeatBadge(holder, seat.user);
             if (holder.b.tvStatus != null) {
                 holder.b.tvStatus.setVisibility(View.GONE);
             }
@@ -683,6 +726,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (holder.b.imgSeatHostMark != null) {
             holder.b.imgSeatHostMark.setVisibility(View.GONE);
         }
+        bindStaffSeatBadge(holder, null);
         if (holder.b.tvGiftCount != null) {
             holder.b.tvGiftCount.setVisibility(View.GONE);
         }
@@ -764,11 +808,12 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 holder.b.getRoot().getPaddingRight(), pb);
 
         android.view.View frameView = (android.view.View) holder.b.imgAvatar.getParent();
+        // Keep normal seat footprint so grid spacing stays tight (FX may draw slightly outside via clipChildren=false).
         setSeatSize(frameView, frame, ctx);
         setSeatSize(holder.b.seatRing, ring, ctx);
-        setSeatSize(holder.b.seatRippleOuter, frame, ctx);
-        setSeatSize(holder.b.seatRippleMid, Math.round(frame * 0.89f), ctx);
-        setSeatSize(holder.b.seatRippleInner, Math.round(frame * 0.79f), ctx);
+        if (holder.b.seatSpeakAura != null) {
+            setSeatSize(holder.b.seatSpeakAura, frame, ctx);
+        }
         setSeatSize(holder.b.imgSeatShell, avatar, ctx);
         setSeatSize(holder.b.imgAvatar, avatar, ctx);
         setSeatSize(holder.b.imgFrame, frame, ctx);
@@ -1031,33 +1076,57 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                 null, null, null, null);
     }
 
+    private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (holder.b.tvStaffSeatBadge == null) return;
+        if (user == null || !StaffRoleHelper.isStaff(user)) {
+            holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
+            holder.b.tvStaffSeatBadge.setText("");
+            return;
+        }
+        String role = StaffRoleHelper.normalize(user);
+        // Compact seat label
+        String label = StaffRoleHelper.SUPER.equals(role) ? "سوبر" : "مانجر";
+        holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
+        holder.b.tvStaffSeatBadge.setText(label);
+        holder.b.tvStaffSeatBadge.setBackgroundResource(
+                StaffRoleHelper.SUPER.equals(role)
+                        ? R.drawable.bg_chip_staff_super
+                        : R.drawable.bg_chip_staff_manager);
+    }
+
     private void bindSpeaking(VH holder, boolean speaking) {
         if (!speaking) {
-            // Always force-hide: recycled holders can keep VISIBLE ripples while speaking=false.
             stopSpeakingRipples(holder);
             return;
         }
-        if (holder.speaking
-                && holder.b.seatRippleOuter.getVisibility() == View.VISIBLE
-                && holder.b.seatRippleOuter.getAnimation() != null) {
+        // Only while this bind is actually speaking (sound-level driven).
+        holder.speaking = true;
+        if (holder.b.seatSpeakAura != null) {
+            holder.b.seatSpeakAura.setSpeaking(true);
+            String uid = holder.boundUserId;
+            float lv = uid != null && speakingLevels.containsKey(uid)
+                    ? speakingLevels.get(uid) : 48f;
+            holder.b.seatSpeakAura.setIntensity(lv);
             return;
         }
-        holder.speaking = true;
+        // Fallback (old layouts)
         holder.b.seatRippleOuter.setVisibility(View.VISIBLE);
-        holder.b.seatRippleOuter.setAlpha(1f);
+        startRipple(holder.b.seatRippleOuter, 0);
         if (holder.b.seatRippleMid != null) {
             holder.b.seatRippleMid.setVisibility(View.VISIBLE);
-            holder.b.seatRippleMid.setAlpha(1f);
+            startRipple(holder.b.seatRippleMid, 180);
         }
-        holder.b.seatRippleInner.setVisibility(View.VISIBLE);
-        holder.b.seatRippleInner.setAlpha(1f);
-        startRipple(holder.b.seatRippleOuter, 0);
-        if (holder.b.seatRippleMid != null) startRipple(holder.b.seatRippleMid, 280);
-        startRipple(holder.b.seatRippleInner, 520);
+        if (holder.b.seatRippleInner != null) {
+            holder.b.seatRippleInner.setVisibility(View.VISIBLE);
+            startRipple(holder.b.seatRippleInner, 360);
+        }
     }
 
     private void stopSpeakingRipples(VH holder) {
         holder.speaking = false;
+        if (holder.b.seatSpeakAura != null) {
+            holder.b.seatSpeakAura.setSpeaking(false);
+        }
         stopRipple(holder.b.seatRippleOuter);
         stopRipple(holder.b.seatRippleMid);
         stopRipple(holder.b.seatRippleInner);
@@ -1073,20 +1142,20 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     private void startRipple(View view, long offset) {
-        if (view == null) return;
+        if (view == null || view.getVisibility() == View.GONE) return;
         view.clearAnimation();
         view.setScaleX(1f);
         view.setScaleY(1f);
         view.setAlpha(1f);
         AnimationSet set = new AnimationSet(true);
         ScaleAnimation scale = new ScaleAnimation(
-                0.94f, 1.14f, 0.94f, 1.14f,
+                0.9f, 1.35f, 0.9f, 1.35f,
                 Animation.RELATIVE_TO_SELF, 0.5f,
                 Animation.RELATIVE_TO_SELF, 0.5f);
-        AlphaAnimation alpha = new AlphaAnimation(0.85f, 0.08f);
+        AlphaAnimation alpha = new AlphaAnimation(0.95f, 0.05f);
         set.addAnimation(scale);
         set.addAnimation(alpha);
-        set.setDuration(900);
+        set.setDuration(720);
         set.setStartOffset(offset);
         set.setRepeatCount(Animation.INFINITE);
         set.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
@@ -1099,6 +1168,10 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (holder.b.seatHostSignal != null
                 && holder.b.seatHostSignal.getVisibility() == View.VISIBLE) {
             holder.b.seatHostSignal.resumeMotion();
+        }
+        if (holder.speaking && holder.b.seatSpeakAura != null
+                && !holder.b.seatSpeakAura.isSpeakingActive()) {
+            holder.b.seatSpeakAura.setSpeaking(true);
         }
     }
 

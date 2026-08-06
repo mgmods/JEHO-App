@@ -81,7 +81,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:gravity="center"
-                android:text="شارك الرمز مع أصدقائك واحصل على مكافآت عند تسجيلهم."
+                android:text="شارك رمزك (رقم المعرف). عند الربط مرة واحدة: أنت +100 والصديق +50 كوينز."
                 android:textColor="#7C7C7C"
                 android:textSize="12sp" />
 

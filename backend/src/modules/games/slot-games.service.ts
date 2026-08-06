@@ -273,6 +273,9 @@ export class SlotGamesService {
 
     identity?: { userId: number | string; nickname: string; avatarUrl: string },
 
+    /** In voice room → half-scene UI (matches Android bottom dock). */
+    halfScene = true,
+
   ) {
 
     return JSON.stringify({
@@ -304,6 +307,11 @@ export class SlotGamesService {
       avatar: identity?.avatarUrl || '',
 
       headImg: identity?.avatarUrl || '',
+
+      // 0 = half-screen (room); 1 = full-screen Games tab
+      sceneMode: halfScene ? 0 : 1,
+
+      gameMode: halfScene ? '2' : '3',
 
     });
 
@@ -352,11 +360,19 @@ export class SlotGamesService {
     const balance = Number(wallet.coins || 0);
     const displayName = this.sanitizeDisplayName(user);
 
-    const hashGameConfig = this.buildHashGameConfig(game, containerUrl, currencyIcon, balance, {
-      userId: publicId,
-      nickname: displayName,
-      avatarUrl: user.avatarUrl || '',
-    });
+    const hashGameConfig = this.buildHashGameConfig(
+      game,
+      containerUrl,
+      currencyIcon,
+      balance,
+      {
+        userId: publicId,
+        nickname: displayName,
+        avatarUrl: user.avatarUrl || '',
+      },
+      // Voice-room sessions always open bottom half so seats stay visible.
+      !!voiceRoomId,
+    );
 
 
 
@@ -421,7 +437,13 @@ export class SlotGamesService {
 
       language,
 
-      gameMode: game.id === 'fishing' ? '3' : '2',
+      gameMode:
+        game.id === 'fishing'
+          ? // 2 = half-screen (in-room); 3 = full immersive splash outside room.
+            voiceRoomId
+            ? '2'
+            : '3'
+          : '2',
 
       currencyIcon,
 

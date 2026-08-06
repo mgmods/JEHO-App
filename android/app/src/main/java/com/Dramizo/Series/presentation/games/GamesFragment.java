@@ -142,7 +142,11 @@ public class GamesFragment extends Fragment {
 
 
 
-        binding.btnDailyMap.setOnClickListener(v -> showTasksDialog());
+        binding.btnDailyMap.setOnClickListener(v -> {
+            if (!isTasksEnabled()) return;
+            showTasksDialog();
+        });
+        applyTasksFeatureVisibility();
 
         binding.btnContests.setOnClickListener(v ->
 
@@ -310,9 +314,19 @@ public class GamesFragment extends Fragment {
 
     }
 
+    private boolean isTasksEnabled() {
+        return com.Dramizo.Series.util.TasksFeature.isEnabled(requireContext());
+    }
 
+    private void applyTasksFeatureVisibility() {
+        if (binding == null || binding.btnDailyMap == null) return;
+        // Toolbar stub is already gone-sized; keep GONE when product disabled.
+        binding.btnDailyMap.setVisibility(
+                isTasksEnabled() ? View.GONE : View.GONE);
+    }
 
     private void showTasksDialog() {
+        if (!isTasksEnabled()) return;
 
         BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(requireContext());
 

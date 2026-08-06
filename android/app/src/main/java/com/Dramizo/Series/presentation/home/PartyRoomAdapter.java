@@ -171,7 +171,7 @@ public class PartyRoomAdapter extends RecyclerView.Adapter<RecyclerView.ViewHold
         if (holder instanceof LoadingVH) {
             MikooLoadingAnim.stop(((LoadingVH) holder).svga);
         } else if (holder instanceof VH) {
-            // Stop kenar animator only — keep Glide bitmaps/tags so rebind can skip reloads (scroll jank).
+            // Stop kenar animator only — successful cover tags stay so rebind can skip reloads.
             RoomCardAnimator.stop(((VH) holder).b.imgCardFrame);
         }
         super.onViewRecycled(holder);

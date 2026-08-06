@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent">
+    android:background="#FFF7F8FA">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -12,7 +12,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white" />
+        android:src="@color/white"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"

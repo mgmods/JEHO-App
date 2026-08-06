@@ -71,6 +71,23 @@ public class CosmeticsCategoryFragment extends Fragment {
             @Override public boolean isEquipped(String cosmeticId) { return vm.isEquipped(cosmeticId); }
             @Override public Integer daysLeft(String cosmeticId) { return vm.daysLeft(cosmeticId); }
             @Override public String selectedId() { return vm.getSelectedId().getValue(); }
+            @Override public int myVipLevel() {
+                try {
+                    return Math.max(0, ContainerProvider.from(requireActivity())
+                            .getSessionManager().getVipLevel());
+                } catch (Exception e) {
+                    return 0;
+                }
+            }
+            @Override public int myUserLevel() {
+                try {
+                    com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto u =
+                            ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+                    if (u != null && u.level > 0) return u.level;
+                } catch (Exception ignored) {
+                }
+                return 1;
+            }
         });
         binding.recycler.setLayoutManager(new GridLayoutManager(requireContext(), 2));
         binding.recycler.setHasFixedSize(true);

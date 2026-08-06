@@ -3,7 +3,11 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.media.AudioManager;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.graphics.Color;
@@ -14,6 +18,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.DisplayMetrics;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
@@ -74,11 +80,13 @@ import com.Dramizo.Series.realtime.RealtimeClient;
 import com.Dramizo.Series.service.VoiceRoomForegroundService;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.util.ActiveRoomSession;
+import com.Dramizo.Series.util.RoomJoinPrefetch;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.AvatarImageLoader;
+import com.Dramizo.Series.util.BalanceRedirect;
 import com.Dramizo.Series.util.GiftAudioFx;
 import com.Dramizo.Series.util.GlobalCelebrationToast;
 import com.Dramizo.Series.util.HostSignalView;
@@ -195,6 +203,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Speaker was muted by us because the app went to background (WhatsApp / Home). */
     private boolean mutedForBackground;
     private boolean speakerMutedBeforeBackground;
+    /** Re-apply loudspeaker vs headset when user plugs/unplugs headphones mid-room. */
+    @Nullable private BroadcastReceiver audioRouteReceiver;
     private boolean hoppingRoom;
     private boolean realtimeJoined;
     private boolean realtimeJoinInFlight;
@@ -250,6 +260,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     };
     private final Map<String, Float> pendingSoundLevels = new HashMap<>();
     private final Set<String> speakingUsers = new HashSet<>();
+    /** Last wall-clock ms we got a real sound tick (level>0 or active speak) per user. */
+    private final Map<String, Long> lastSoundTickMs = new HashMap<>();
     private boolean soundLevelDrainPending;
     private boolean hostStageSpeaking;
     private String hostStageUserId;
@@ -295,6 +307,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean luckyOverlayActive;
     private Runnable luckyOverlayRelease;
     private ExoPlayer roomMusicPlayer;
+    /** Lazy: create only when a Mikoo game opens (WebView cold-create freezes S23 if done in onCreate). */
+    @Nullable private WebView roomGameWebView;
+    /** Lazy: YouTube embed disc WebView. */
+    @Nullable private WebView musicYoutubeWebView;
+    /** Lazy media3 PlayerViews (PlayerView in XML freezes inflate). */
+    @Nullable private androidx.media3.ui.PlayerView musicVideoPlayerView;
+    @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
+    /** HTTP join kicked off at start of onCreate (parallel with UI setup). */
+    private boolean earlyJoinStarted;
+    private boolean musicUiReady;
+    /** Prefetch completed before observers existed — publish after wires. */
+    @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
@@ -373,6 +397,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
+        viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
+                .get(VoiceRoomViewModel.class);
+        roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
+        pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
+        isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
+        myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        // Critical path: HTTP join overlaps layout inflate.
+        // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
+        boolean canResume = roomId != null && !roomId.isEmpty()
+                && ActiveRoomSession.get().canResumeUi(roomId);
+        if (roomId != null && !roomId.isEmpty() && !"demo-room-1".equals(roomId) && !canResume) {
+            earlyJoinStarted = true;
+            RoomDtos.JoinRoomResult prefetched = RoomJoinPrefetch.takeReady(roomId);
+            if (prefetched != null) {
+                // Will publish to LiveData after observers are registered (end of onCreate).
+                pendingPrefetchSession = prefetched;
+            } else if (RoomJoinPrefetch.isInFlight(roomId)) {
+                RoomJoinPrefetch.await(roomId, (session, err) -> {
+                    if (isFinishing() || exiting) return;
+                    if (session != null) {
+                        viewModel.restoreLocalSession(session, session.room);
+                    } else if (err != null && !err.isEmpty()) {
+                        // Fall through to normal join if prefetch failed soft.
+                        viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
+                    } else {
+                        viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
+                    }
+                });
+            } else {
+                String pass0 = getIntent().getStringExtra(EXTRA_PASSWORD);
+                // No home prefetch (deep link / rare path) — start join here once.
+                viewModel.join(roomId, pass0);
+            }
+        }
+        registerAudioRouteReceiver();
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -381,34 +441,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     closeGameOverlay();
                     return;
                 }
-                // Mikoo: back = minimize (session stays). Leave only from exit sheet.
-                if (pendingSession != null && roomId != null && !roomId.isEmpty() && !exiting) {
-                    keepRoomInBackground();
+                // Always open Mikoo side drawer (Minimize / Exit / Settings / More).
+                // Never auto-minimize or finish the room on back — user chooses on the panel.
+                if (roomSidePanelDialog != null && roomSidePanelDialog.isShowing()) {
+                    roomSidePanelDialog.dismiss();
                     return;
                 }
-                confirmExit();
+                showRoomSidePanel();
             }
         });
         com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(this, "voiceRoom");
         getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         applyVoiceRoomInsets();
         applyResponsiveRoomLayout();
-        viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
-                .get(VoiceRoomViewModel.class);
-        roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
-        pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         if (VoiceRoomForegroundService.hasActiveRoom(this, roomId)) {
             VoiceRoomForegroundService.attachUi(this);
         }
-        isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
-        myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
         roomTouchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
-        setupMusicUi();
+        // Defer ExoPlayer + any WebView config until first frame (huge win on mid devices).
+        binding.getRoot().post(this::ensureMusicUiReady);
+        // Effects wrappers are cheap (views already GONE); still defer gift preloads.
         visualEffects = new RoomVisualEffects(binding.webVisualEffects);
         if (binding.giftChatEffects != null) {
             giftVisualEffects = new RoomVisualEffects(binding.giftChatEffects);
         }
-        preloadRoomGiftMedia();
+        binding.getRoot().postDelayed(this::preloadRoomGiftMedia, 1_200L);
         effectQueue = new RoomEffectQueue(effect -> {
             if (effect.isEntry()) {
                 if (!roomEntryEffectsEnabled()) {
@@ -494,7 +551,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         return true;
                     }
                 });
-        PermissionHelper.ensureMediaPermissions(this, false);
+        // Mic/camera permission: never block cold open — ask when user hits mic/seat later.
+        handler.postDelayed(() -> {
+            if (!isFinishing() && !exiting) {
+                try {
+                    PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
+                } catch (Exception ignored) {
+                }
+            }
+        }, 900L);
         applyRoomToolbarIcons();
         startRoomGmtClock();
         setupRealtime();
@@ -1111,46 +1176,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             });
             if (zegoLoggedIn) return;
-            zegoLoggedIn = true;
-            RoomRtcEngine.getInstance().applyJoinSession(
-                    this, session, roomId, myUserId);
-            if (session.room != null && myUserId != null && myUserId.equals(session.room.hostId)) {
-                isHost = true;
-            }
-            // Host/agency open: already seated on seat 0 — open mic unless user muted themselves.
-            if (session.room != null && session.room.seats != null
-                    && (currentSeats == null || currentSeats.isEmpty())) {
-                currentSeats = session.room.seats;
-            }
-            if (isOnSeat(currentSeats)) {
-                if (!userChoseMute) {
-                    RoomDtos.SeatDto mySeat = findMySeat(currentSeats);
-                    if (mySeat == null || !mySeat.isModeratorMuted) {
-                        micOn = true;
-                    }
-                }
-            }
-            RoomRtcEngine.getInstance().setMicEnabled(micOn);
-            // Unmute speakers for this session (leave path leaves them muted).
-            // Clear any stash first so unmute cannot revive streams from the previous room hop.
-            roomSpeakerMuted = false;
-            try {
-                RoomRtcEngine.getInstance().clearPausedPlayStreams();
-                RoomRtcEngine.getInstance().setSpeakerMuted(false);
-                RoomSoundFx.setMuted(false);
-            } catch (Exception ignored) {
-            }
-            // Force publish after login (debounce used to skip and guests never heard host).
-            final int audioEpoch = roomAudioEpoch;
-            activateSeatAudio(currentSeats, true);
-            handler.postDelayed(() -> {
-                if (audioEpoch != roomAudioEpoch || exiting) return;
-                activateSeatAudio(currentSeats, true);
-            }, 180);
-            handler.postDelayed(() -> {
-                if (audioEpoch != roomAudioEpoch || exiting) return;
-                activateSeatAudio(currentSeats, true);
-            }, 700);
+            // Paint seats/chat first; RTC attach next frame (avoids freeze concurrent with bind).
+            final RoomDtos.JoinRoomResult sess = session;
+            handler.post(() -> attachRtcForSession(sess));
         });
 
         handler.postDelayed(refreshRunnable, 60_000L);
@@ -1163,9 +1191,69 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (tryRestoreActiveRoomSession()) {
             return;
         }
-        String pass = getIntent().getStringExtra(EXTRA_PASSWORD);
-        showRoomJoinLoading();
-        viewModel.join(roomId, pass);
+        // Join already started at top of onCreate / home prefetch. Only show loading UI.
+        final String joinRoomId = roomId;
+        binding.getRoot().post(() -> {
+            if (isFinishing() || isDestroyed() || exiting) return;
+            if (joinRoomId == null || !joinRoomId.equals(roomId)) return;
+            showRoomJoinLoading();
+            // Prefetch finished before observers were attached — apply now.
+            if (pendingPrefetchSession != null) {
+                RoomDtos.JoinRoomResult pre = pendingPrefetchSession;
+                pendingPrefetchSession = null;
+                viewModel.restoreLocalSession(pre, pre.room);
+                return;
+            }
+            if (!earlyJoinStarted) {
+                String pass = getIntent().getStringExtra(EXTRA_PASSWORD);
+                viewModel.join(joinRoomId, pass);
+                earlyJoinStarted = true;
+            }
+        });
+    }
+
+    /** RTC side of session observer — deferred one frame after LiveData so UI can paint. */
+    private void attachRtcForSession(@Nullable RoomDtos.JoinRoomResult session) {
+        if (session == null || exiting || isFinishing() || zegoLoggedIn) return;
+        zegoLoggedIn = true;
+        RoomRtcEngine.getInstance().applyJoinSession(
+                this, session, roomId, myUserId);
+        if (zegoRoomListener != null) {
+            RoomRtcEngine.getInstance().preferActiveProviderListenersOnly(zegoRoomListener);
+        }
+        if (session.room != null && myUserId != null && myUserId.equals(session.room.hostId)) {
+            isHost = true;
+        }
+        if (session.room != null && session.room.seats != null
+                && (currentSeats == null || currentSeats.isEmpty())) {
+            currentSeats = session.room.seats;
+        }
+        if (isOnSeat(currentSeats)) {
+            if (!userChoseMute) {
+                RoomDtos.SeatDto mySeat = findMySeat(currentSeats);
+                if (mySeat == null || !mySeat.isModeratorMuted) {
+                    micOn = true;
+                }
+            }
+        }
+        RoomRtcEngine.getInstance().setMicEnabled(micOn);
+        roomSpeakerMuted = false;
+        try {
+            RoomRtcEngine.getInstance().clearPausedPlayStreams();
+            RoomRtcEngine.getInstance().setSpeakerMuted(false);
+            RoomSoundFx.setMuted(false);
+        } catch (Exception ignored) {
+        }
+        final int audioEpoch = roomAudioEpoch;
+        activateSeatAudio(currentSeats, true);
+        handler.postDelayed(() -> {
+            if (audioEpoch != roomAudioEpoch || exiting) return;
+            activateSeatAudio(currentSeats, true);
+        }, 180);
+        handler.postDelayed(() -> {
+            if (audioEpoch != roomAudioEpoch || exiting) return;
+            activateSeatAudio(currentSeats, true);
+        }, 700);
     }
 
     /**
@@ -1226,6 +1314,155 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
         // Longer on weak networks — user should see loading, not a sudden eject.
         handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
+    }
+
+    private void ensureMusicUiReady() {
+        if (musicUiReady || isFinishing() || isDestroyed() || binding == null) return;
+        try {
+            setupMusicUi();
+            musicUiReady = true;
+        } catch (Exception e) {
+            android.util.Log.e("VoiceRoom", "music UI init failed", e);
+        }
+    }
+
+    /** Lazy room game WebView — never inflate at Activity open (main ANR on WebView ctor). */
+    @NonNull
+    private WebView ensureRoomGameWebView() {
+        if (roomGameWebView != null) return roomGameWebView;
+        FrameLayout host = binding != null ? binding.webGameHost : null;
+        roomGameWebView = new WebView(this);
+        roomGameWebView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        roomGameWebView.setBackgroundColor(Color.TRANSPARENT);
+        forceRoomGameLtr(roomGameWebView);
+        if (host != null) {
+            host.removeAllViews();
+            host.addView(roomGameWebView);
+        }
+        return roomGameWebView;
+    }
+
+    @Nullable
+    private WebView ensureMusicYoutubeWebView() {
+        if (musicYoutubeWebView != null) return musicYoutubeWebView;
+        if (binding == null || binding.musicYoutubeWebHost == null) return null;
+        musicYoutubeWebView = new WebView(this);
+        musicYoutubeWebView.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        WebSettings ws = musicYoutubeWebView.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setMediaPlaybackRequiresUserGesture(false);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        musicYoutubeWebView.setBackgroundColor(Color.BLACK);
+        musicYoutubeWebView.setWebChromeClient(new WebChromeClient());
+        musicYoutubeWebView.setWebViewClient(new WebViewClient());
+        binding.musicYoutubeWebHost.removeAllViews();
+        binding.musicYoutubeWebHost.addView(musicYoutubeWebView);
+        return musicYoutubeWebView;
+    }
+
+    @SuppressLint("UnsafeOptInUsageError")
+    @Nullable
+    private androidx.media3.ui.PlayerView ensureMusicVideoPlayerView() {
+        if (musicVideoPlayerView != null) return musicVideoPlayerView;
+        if (binding == null || binding.musicVideoSurface == null) return null;
+        androidx.media3.ui.PlayerView pv = new androidx.media3.ui.PlayerView(this);
+        pv.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        pv.setUseController(false);
+        try {
+            pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
+        } catch (Exception ignored) {
+        }
+        binding.musicVideoSurface.removeAllViews();
+        binding.musicVideoSurface.addView(pv);
+        musicVideoPlayerView = pv;
+        return musicVideoPlayerView;
+    }
+
+    @SuppressLint("UnsafeOptInUsageError")
+    @Nullable
+    private androidx.media3.ui.PlayerView ensureMusicFloatPlayerView() {
+        if (musicFloatPlayerView != null) return musicFloatPlayerView;
+        if (binding == null || binding.musicFloatVideo == null) return null;
+        androidx.media3.ui.PlayerView pv = new androidx.media3.ui.PlayerView(this);
+        pv.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+        pv.setUseController(false);
+        try {
+            pv.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
+        } catch (Exception ignored) {
+        }
+        binding.musicFloatVideo.removeAllViews();
+        binding.musicFloatVideo.addView(pv);
+        musicFloatPlayerView = pv;
+        return musicFloatPlayerView;
+    }
+
+    private void musicVideoSetPlayer(@Nullable ExoPlayer player) {
+        try {
+            if (player == null) {
+                if (musicVideoPlayerView != null) musicVideoPlayerView.setPlayer(null);
+                return;
+            }
+            androidx.media3.ui.PlayerView pv = ensureMusicVideoPlayerView();
+            if (pv != null) pv.setPlayer(player);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void musicFloatSetPlayer(@Nullable ExoPlayer player) {
+        try {
+            if (player == null) {
+                if (musicFloatPlayerView != null) musicFloatPlayerView.setPlayer(null);
+                return;
+            }
+            androidx.media3.ui.PlayerView pv = ensureMusicFloatPlayerView();
+            if (pv != null) pv.setPlayer(player);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void destroyLazyWebViews() {
+        if (roomGameWebView != null) {
+            try {
+                roomGameWebView.stopLoading();
+                roomGameWebView.loadUrl("about:blank");
+                roomGameWebView.removeAllViews();
+                roomGameWebView.destroy();
+            } catch (Exception ignored) {
+            }
+            roomGameWebView = null;
+            try {
+                if (binding != null && binding.webGameHost != null) {
+                    binding.webGameHost.removeAllViews();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (musicYoutubeWebView != null) {
+            try {
+                musicYoutubeWebView.stopLoading();
+                musicYoutubeWebView.loadUrl("about:blank");
+                musicYoutubeWebView.destroy();
+            } catch (Exception ignored) {
+            }
+            musicYoutubeWebView = null;
+            try {
+                if (binding != null && binding.musicYoutubeWebHost != null) {
+                    binding.musicYoutubeWebHost.removeAllViews();
+                    binding.musicYoutubeWebHost.setVisibility(View.GONE);
+                }
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     private void dismissRoomJoinLoading() {
@@ -1971,91 +2208,316 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         appendChatLine(getString(R.string.official_news), line, 0, 0, null);
     }
 
+    /** Open room side-drawer (null when closed). */
+    @Nullable private Dialog roomSidePanelDialog;
+
+    /**
+     * Mikoo end-live side panel: More / Settings / Minimize / Exit
+     * + tabs يكتشف / تاريخ + live rooms.
+     */
     private void confirmExit() {
-        android.app.Dialog dialog = new android.app.Dialog(this);
+        showRoomSidePanel();
+    }
+
+    private void showRoomSidePanel() {
+        if (isFinishing() || isDestroyed()) return;
+        // Second back / re-tap closes if already open.
+        if (roomSidePanelDialog != null && roomSidePanelDialog.isShowing()) {
+            roomSidePanelDialog.dismiss();
+            return;
+        }
+        final Dialog dialog = new Dialog(this, android.R.style.Theme_Translucent_NoTitleBar);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        View sheet = getLayoutInflater().inflate(R.layout.dialog_room_exit, null);
+        View sheet = getLayoutInflater().inflate(R.layout.dialog_room_side_panel, null);
         dialog.setContentView(sheet);
         dialog.setCancelable(true);
         dialog.setCanceledOnTouchOutside(true);
-
-        TextView hint = sheet.findViewById(R.id.tvExitHint);
-        View btnLeave = sheet.findViewById(R.id.btnLeave);
-        View btnEnd = sheet.findViewById(R.id.btnEndBroadcast);
-        View rowEnd = sheet.findViewById(R.id.rowEndBroadcast);
-        View btnSummon = sheet.findViewById(R.id.btnSummon);
-        View rowSummon = sheet.findViewById(R.id.rowSummon);
-        View actionsPanel = sheet.findViewById(R.id.exitActionsPanel);
-        View cancelScrim = sheet.findViewById(R.id.btnCancelExit);
-
-        // Host of this live session (owner or current active host).
-        boolean canEnd = isHost || isOwner || canManageRoom
-                || (myUserId != null && (sameUser(myUserId, roomHostId)
-                || sameUser(myUserId, hostStageUserId)));
-        boolean canSummon = canEnd;
-
-        if (hint != null) {
-            if (isPersistentRoom) {
-                hint.setText(canEnd
-                        ? "غرفة الوكالة دائمة\nاحتفظ · خروج (يكتم زيجو دون إنهاء البث) · إنهاء البث"
-                        : "غرفة الوكالة دائمة وستبقى متاحة بعد مغادرتك\nاختر: احتفظ أو خروج");
-            } else if (canEnd) {
-                hint.setText("خروج = مغادرة ويكتم الصوت دون إنهاء البث\nإنهاء البث يغلق اللايف للجميع");
-            } else {
-                hint.setText("اختر إبقاء الغرفة أو الخروج");
-            }
-        }
-
-        if (rowEnd != null) rowEnd.setVisibility(canEnd ? View.VISIBLE : View.GONE);
-        if (btnEnd != null) btnEnd.setVisibility(canEnd ? View.VISIBLE : View.GONE);
-        if (rowSummon != null) rowSummon.setVisibility(canSummon ? View.VISIBLE : View.GONE);
-        if (btnSummon != null) btnSummon.setVisibility(canSummon ? View.VISIBLE : View.GONE);
-
-        if (cancelScrim != null) {
-            cancelScrim.setOnClickListener(v -> dialog.cancel());
-        }
-        // Don't let taps on the actions panel dismiss the sheet.
-        if (actionsPanel != null) {
-            actionsPanel.setOnClickListener(v -> { /* consume */ });
-        }
-
-        sheet.findViewById(R.id.btnMinimize).setOnClickListener(v -> {
-            dialog.dismiss();
-            keepRoomInBackground();
+        roomSidePanelDialog = dialog;
+        dialog.setOnDismissListener(d -> {
+            if (roomSidePanelDialog == d) roomSidePanelDialog = null;
         });
-        if (btnSummon != null) {
-            btnSummon.setOnClickListener(v -> {
+        // System / gesture back closes this sheet first (don't open another).
+        dialog.setOnKeyListener((d, keyCode, event) -> {
+            if (keyCode == android.view.KeyEvent.KEYCODE_BACK
+                    && event.getAction() == android.view.KeyEvent.ACTION_UP) {
+                d.dismiss();
+                return true;
+            }
+            return false;
+        });
+
+        View scrim = sheet.findViewById(R.id.sidePanelScrim);
+        final View body = sheet.findViewById(R.id.sidePanelBody);
+        if (scrim != null) scrim.setOnClickListener(v -> dialog.dismiss());
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int panelW = Math.round(dm.widthPixels * 0.78f);
+        panelW = Math.max(Math.round(260f * dm.density),
+                Math.min(panelW, Math.round(360f * dm.density)));
+        if (body != null) {
+            ViewGroup.LayoutParams lp = body.getLayoutParams();
+            if (lp != null) {
+                lp.width = panelW;
+                body.setLayoutParams(lp);
+            }
+            // Stay under status bar — don't eat the system clock/battery.
+            ViewCompat.setOnApplyWindowInsetsListener(body, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+                v.setPadding(v.getPaddingLeft(), bars.top, v.getPaddingRight(), v.getPaddingBottom());
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(body);
+            body.setOnClickListener(v -> { /* consume */ });
+            body.setTranslationX(panelW);
+            body.post(() -> body.animate()
+                    .translationX(0f)
+                    .setDuration(240)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start());
+        }
+
+        View btnMore = sheet.findViewById(R.id.btnSideMore);
+        View btnSettings = sheet.findViewById(R.id.btnSideSettings);
+        View btnMin = sheet.findViewById(R.id.btnSideMinimize);
+        View btnExit = sheet.findViewById(R.id.btnSideExit);
+        View tabDiscover = sheet.findViewById(R.id.tabDiscover);
+        View tabHistory = sheet.findViewById(R.id.tabHistory);
+        TextView tvDiscover = sheet.findViewById(R.id.tvTabDiscover);
+        TextView tvHistory = sheet.findViewById(R.id.tvTabHistory);
+        View lineDiscover = sheet.findViewById(R.id.lineTabDiscover);
+        View lineHistory = sheet.findViewById(R.id.lineTabHistory);
+        RecyclerView rv = sheet.findViewById(R.id.rvDiscoverRooms);
+
+        if (btnMore != null) {
+            btnMore.setOnClickListener(v -> {
                 dialog.dismiss();
-                summonRoomMembers();
+                showOtherTools();
             });
         }
-        if (btnLeave != null) {
-            btnLeave.setOnClickListener(v -> {
+        if (btnSettings != null) {
+            btnSettings.setOnClickListener(v -> {
+                dialog.dismiss();
+                if (canModerateRoom() || isHost || isOwner || canManageRoom) {
+                    showHostTools();
+                } else {
+                    showOtherTools();
+                }
+            });
+        }
+        if (btnMin != null) {
+            btnMin.setOnClickListener(v -> {
+                dialog.dismiss();
+                keepRoomInBackground();
+            });
+        }
+        if (btnExit != null) {
+            btnExit.setOnClickListener(v -> {
                 dialog.dismiss();
                 exitRoom(true);
             });
         }
-        if (btnEnd != null) {
-            btnEnd.setOnClickListener(v -> {
+
+        final DiscoverRoomAdapter adapter = new DiscoverRoomAdapter(targetId -> {
+            if (targetId == null || targetId.isEmpty()) return;
+            if (roomId != null && roomId.equals(targetId)) {
                 dialog.dismiss();
-                endBroadcastAndExit();
-            });
+                return;
+            }
+            dialog.dismiss();
+            switchRoomInPlace(targetId, null);
+        });
+        if (rv != null) {
+            rv.setLayoutManager(new LinearLayoutManager(this));
+            rv.setAdapter(adapter);
         }
-        dialog.show();
+
+        final Runnable showDiscover = () -> {
+            if (tvDiscover != null) tvDiscover.setTextColor(0xFFFFFFFF);
+            if (tvHistory != null) tvHistory.setTextColor(0x99FFFFFF);
+            if (lineDiscover != null) lineDiscover.setVisibility(View.VISIBLE);
+            if (lineHistory != null) lineHistory.setVisibility(View.INVISIBLE);
+            loadDiscoverRoomsForSidePanel(adapter, false);
+        };
+        final Runnable showHistory = () -> {
+            if (tvDiscover != null) tvDiscover.setTextColor(0x99FFFFFF);
+            if (tvHistory != null) tvHistory.setTextColor(0xFFFFFFFF);
+            if (lineDiscover != null) lineDiscover.setVisibility(View.INVISIBLE);
+            if (lineHistory != null) lineHistory.setVisibility(View.VISIBLE);
+            loadDiscoverRoomsForSidePanel(adapter, true);
+        };
+        if (tabDiscover != null) tabDiscover.setOnClickListener(v -> showDiscover.run());
+        if (tabHistory != null) tabHistory.setOnClickListener(v -> showHistory.run());
+        showDiscover.run();
+
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setDimAmount(0.55f);
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setDimAmount(0.28f);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            // Draw under system bars so only panel body applies status padding (room stays full-bleed).
             window.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setGravity(Gravity.END);
+            try {
+                WindowManager.LayoutParams wlp = window.getAttributes();
+                wlp.width = WindowManager.LayoutParams.MATCH_PARENT;
+                wlp.height = WindowManager.LayoutParams.MATCH_PARENT;
+                window.setAttributes(wlp);
+            } catch (Exception ignored) {
+            }
+        }
+        dialog.show();
+    }
+
+    private void loadDiscoverRoomsForSidePanel(
+            @NonNull DiscoverRoomAdapter adapter, boolean historyTab) {
+        if (historyTab) {
+            List<RoomDtos.RoomDto> recent =
+                    com.Dramizo.Series.util.RecentRoomsStore.list(this);
+            List<RoomDtos.RoomDto> rooms = new ArrayList<>();
+            for (RoomDtos.RoomDto room : recent) {
+                if (room == null || room.id == null || room.id.isEmpty()) continue;
+                if (roomId != null && roomId.equals(room.id)) continue;
+                rooms.add(room);
+            }
+            adapter.submit(rooms);
+            return;
+        }
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.MiscDtos.ListResult<RoomDtos.RoomDto>> r =
+                    ContainerProvider.from(this).getRoomRepository().list(1, 30);
+            List<RoomDtos.RoomDto> rooms = new ArrayList<>();
+            if (r != null && r.success && r.data != null && r.data.items != null) {
+                for (RoomDtos.RoomDto room : r.data.items) {
+                    if (room == null || room.id == null || room.id.isEmpty()) continue;
+                    if (roomId != null && roomId.equals(room.id)) continue;
+                    rooms.add(room);
+                }
+            }
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                adapter.submit(rooms);
+            });
+        });
+    }
+
+    /** Lightweight discover / history rows for the room side panel. */
+    private static final class DiscoverRoomAdapter
+            extends RecyclerView.Adapter<DiscoverRoomAdapter.VH> {
+        interface Listener {
+            void onOpen(@Nullable String roomId);
+        }
+
+        private final List<RoomDtos.RoomDto> items = new ArrayList<>();
+        private final Listener listener;
+
+        DiscoverRoomAdapter(Listener listener) {
+            this.listener = listener;
+        }
+
+        void submit(@Nullable List<RoomDtos.RoomDto> data) {
+            items.clear();
+            if (data != null) items.addAll(data);
+            notifyDataSetChanged();
+        }
+
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View v = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_room_discover_row, parent, false);
+            return new VH(v);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH h, int position) {
+            RoomDtos.RoomDto room = items.get(position);
+            String title = room.title != null && !room.title.isEmpty()
+                    ? room.title : "غرفة";
+            h.tvTitle.setText(title);
+            String sub = room.description != null && !room.description.trim().isEmpty()
+                    ? room.description.trim()
+                    : "مرحباً بك في ميكو";
+            if (h.tvSub != null) {
+                h.tvSub.setText(sub);
+                h.tvSub.setVisibility(View.VISIBLE);
+            }
+            if (h.tvViewers != null) {
+                h.tvViewers.setText(String.valueOf(Math.max(0, room.viewerCount)));
+            }
+            String cover = room.coverUrl != null && !room.coverUrl.isEmpty()
+                    ? room.coverUrl
+                    : room.roomCardUrl;
+            if (h.imgCover != null) {
+                try {
+                    Glide.with(h.imgCover)
+                            .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(cover))
+                            .centerCrop()
+                            .placeholder(R.drawable.hams_background)
+                            .into(h.imgCover);
+                } catch (Exception ignored) {
+                }
+            }
+            String country = room.host != null ? room.host.country : null;
+            if (h.imgFlag != null) {
+                com.Dramizo.Series.util.FlagImages.bind(h.imgFlag, country);
+            }
+            if (h.rowAvatars != null) {
+                h.rowAvatars.removeAllViews();
+                List<String> avs = room.viewerAvatars;
+                int shown = 0;
+                if (avs != null) {
+                    for (String a : avs) {
+                        if (a == null || a.isEmpty()) continue;
+                        if (shown >= 4) break;
+                        ImageView iv = new ImageView(h.itemView.getContext());
+                        int s = Math.round(18f * h.itemView.getResources().getDisplayMetrics().density);
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(s, s);
+                        if (shown > 0) {
+                            lp.setMarginStart(Math.round(
+                                    -4f * h.itemView.getResources().getDisplayMetrics().density));
+                        }
+                        iv.setLayoutParams(lp);
+                        AvatarImageLoader.applyCircularClip(iv);
+                        AvatarImageLoader.load(iv, a);
+                        h.rowAvatars.addView(iv);
+                        shown++;
+                    }
+                }
+            }
+            h.itemView.setOnClickListener(v -> {
+                if (listener != null) listener.onOpen(room.id);
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return items.size();
+        }
+
+        static final class VH extends RecyclerView.ViewHolder {
+            final ImageView imgCover;
+            final ImageView imgFlag;
+            final TextView tvTitle;
+            final TextView tvSub;
+            final TextView tvViewers;
+            final LinearLayout rowAvatars;
+
+            VH(View itemView) {
+                super(itemView);
+                imgCover = itemView.findViewById(R.id.imgCover);
+                imgFlag = itemView.findViewById(R.id.imgFlag);
+                tvTitle = itemView.findViewById(R.id.tvTitle);
+                tvSub = itemView.findViewById(R.id.tvSub);
+                tvViewers = itemView.findViewById(R.id.tvViewers);
+                rowAvatars = itemView.findViewById(R.id.rowAvatars);
+            }
         }
     }
 
     private void endBroadcastAndExit() {
         if (exiting || roomId == null) return;
-        Toast.makeText(this, "جاري إنهاء اللايف...", Toast.LENGTH_SHORT).show();
         clearRoomChatSession();
         viewModel.closeRoom(roomId);
         exitRoom(true);
@@ -2077,7 +2539,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /**
      * Mikoo-style minimize: mark minimize → keep FGS/Zego/realtime → close UI only.
-     * Never logoutRoom / leaveRoom here (RoomDataManager.isMinimize equivalent).
+     * Music must hand off to FGS before Activity Exo dies (no cutouts).
      */
     private void keepRoomInBackground() {
         if (roomId == null || roomId.isEmpty() || minimizing || exiting || isFinishing()) return;
@@ -2085,14 +2547,46 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ActiveRoomSession.get().setMinimized(true);
         ensuringRoomKeepAlive(true);
         ensureMinimizedListeningState();
+        // Handoff: fade Exo to FGS, keep Zego local music alive, then leave UI.
+        try {
+            if (roomMusicPlayer != null
+                    && "playing".equalsIgnoreCase(currentMusicStatus)
+                    && currentMusicUrl != null
+                    && !currentMusicUrl.isEmpty()
+                    && !isLocalMusicUrl(currentMusicUrl)) {
+                // Avoid dual play: FGS will take over; dip volume briefly then finish.
+                roomMusicPlayer.setVolume(0.35f);
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            if (canManageMusic
+                    && currentMusicUrl != null
+                    && !currentMusicUrl.isEmpty()
+                    && "playing".equalsIgnoreCase(currentMusicStatus)
+                    && isLocalMusicUrl(currentMusicUrl)) {
+                ensurePublishingForMusic();
+                RoomRtcEngine.getInstance().boostMusicMixVolume();
+                if (!RoomRtcEngine.getInstance().isLocalMusicPlaying()
+                        && RoomRtcEngine.getInstance().hasLocalMusicPlayer()) {
+                    RoomRtcEngine.getInstance().resumeLocalMusic();
+                }
+            }
+        } catch (Exception ignored) {
+        }
         Toast.makeText(getApplicationContext(), R.string.room_minimized_audio_continues,
                 Toast.LENGTH_SHORT).show();
-        navigateHomeAndFinish();
+        // Small delay so FGS can start mediaPlayback before Activity releases Exo.
+        handler.postDelayed(() -> {
+            if (isFinishing() || exiting) return;
+            navigateHomeAndFinish();
+        }, 280L);
     }
 
     /**
      * While UI is gone but room session stays: hear the room, own mic off.
      * Never call setSpeakerMuted(true) here — that stops remote play streams.
+     * Never stop YouTube/room music here — FGS continues playback.
      */
     private void ensureMinimizedListeningState() {
         try {
@@ -2684,6 +3178,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void setupMusicUi() {
+        if (roomMusicPlayer != null) return;
         roomMusicPlayer = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this)
                         .setDataSourceFactory(
@@ -2750,22 +3245,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         });
         if (binding.musicVideoSurface != null) {
-            binding.musicVideoSurface.setPlayer(roomMusicPlayer);
-            binding.musicVideoSurface.setUseController(false);
+            musicVideoSetPlayer(roomMusicPlayer);
         }
         clipOval(binding.musicDiscWrap);
         clipOval(binding.musicFloatWrap);
-        if (binding.musicYoutubeWeb != null) {
-            WebSettings ws = binding.musicYoutubeWeb.getSettings();
-            ws.setJavaScriptEnabled(true);
-            ws.setDomStorageEnabled(true);
-            ws.setMediaPlaybackRequiresUserGesture(false);
-            ws.setLoadWithOverviewMode(true);
-            ws.setUseWideViewPort(true);
-            binding.musicYoutubeWeb.setBackgroundColor(android.graphics.Color.BLACK);
-            binding.musicYoutubeWeb.setWebChromeClient(new WebChromeClient());
-            binding.musicYoutubeWeb.setWebViewClient(new WebViewClient());
-        }
+        // YouTube WebView is lazy — see ensureMusicYoutubeWebView().
         binding.btnMusicPlayPause.setOnClickListener(v -> toggleRoomMusicPlayback());
         binding.btnMusicStop.setOnClickListener(v -> {
             // Mikoo music_list_more — open library to add/pick tracks from the player.
@@ -3012,6 +3496,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @SuppressLint("NewApi")
     private void applyMusicState(
             String url, String title, String artist, String status, long positionMs, String startedAt) {
+        // ExoPlayer is deferred past first frame — spin up when room actually has music.
+        if (url != null && !url.trim().isEmpty()) {
+            ensureMusicUiReady();
+        }
         String incomingMusicUrl = url != null ? url.trim() : null;
         boolean urlEmpty = incomingMusicUrl == null || incomingMusicUrl.isEmpty();
         String prevStatus = currentMusicStatus;
@@ -3386,8 +3874,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.musicFloatVideo.setVisibility(
                     showVideo && !useEmbed && floatVisible ? View.VISIBLE : View.GONE);
         }
-        if (binding.musicYoutubeWeb != null) {
-            binding.musicYoutubeWeb.setVisibility(useEmbed ? View.VISIBLE : View.GONE);
+        if (binding.musicYoutubeWebHost != null) {
+            binding.musicYoutubeWebHost.setVisibility(useEmbed ? View.VISIBLE : View.GONE);
+        }
+        if (useEmbed) {
+            WebView yt = ensureMusicYoutubeWebView();
+            if (yt != null) yt.setVisibility(View.VISIBLE);
+        } else if (musicYoutubeWebView != null) {
+            musicYoutubeWebView.setVisibility(View.GONE);
         }
         if (binding.imgMusicDisc != null) {
             binding.imgMusicDisc.setVisibility(
@@ -3407,15 +3901,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && binding.musicCard.getVisibility() == View.VISIBLE
                 && musicPanelExpanded;
         if (cardOpen && binding.musicVideoSurface != null) {
-            binding.musicVideoSurface.setPlayer(roomMusicPlayer);
-            if (binding.musicFloatVideo != null) binding.musicFloatVideo.setPlayer(null);
+            musicVideoSetPlayer(roomMusicPlayer);
+            if (binding.musicFloatVideo != null) musicFloatSetPlayer(null);
         } else if (binding.musicFloatVideo != null
                 && binding.musicFloatWrap != null
                 && binding.musicFloatWrap.getVisibility() == View.VISIBLE) {
-            binding.musicFloatVideo.setPlayer(roomMusicPlayer);
-            if (binding.musicVideoSurface != null) binding.musicVideoSurface.setPlayer(null);
+            musicFloatSetPlayer(roomMusicPlayer);
+            if (binding.musicVideoSurface != null) musicVideoSetPlayer(null);
         } else if (binding.musicVideoSurface != null) {
-            binding.musicVideoSurface.setPlayer(roomMusicPlayer);
+            musicVideoSetPlayer(roomMusicPlayer);
         }
         if (youtubePlayingVideo || youtubeUsingEmbed) {
             showMusicVideoSurface(true);
@@ -3423,7 +3917,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void playYoutubeEmbedInDisc(@NonNull String videoId, boolean playing, long positionMs) {
-        if (binding == null || binding.musicYoutubeWeb == null) return;
+        if (binding == null || ensureMusicYoutubeWebView() == null) return;
         if (roomMusicPlayer != null) {
             try {
                 roomMusicPlayer.stop();
@@ -3435,6 +3929,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         youtubePlayingVideo = true;
         preparedMusicUrl = "yt://" + videoId;
         stopMusicDiscAnimation();
+        if (binding.musicYoutubeWebHost != null) {
+            binding.musicYoutubeWebHost.setVisibility(View.VISIBLE);
+        }
         long startSec = Math.max(0L, positionMs / 1000L);
         String html = "<!DOCTYPE html><html><head><meta name='viewport' "
                 + "content='width=device-width,initial-scale=1,maximum-scale=1'/>"
@@ -3445,20 +3942,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 + "&controls=0&playsinline=1&rel=0&modestbranding=1&fs=0&start=" + startSec
                 + "' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
                 + "</body></html>";
-        binding.musicYoutubeWeb.loadDataWithBaseURL(
+        ensureMusicYoutubeWebView().loadDataWithBaseURL(
                 "https://www.youtube.com", html, "text/html", "utf-8", null);
         showMusicVideoSurface(true);
-        if (binding.musicVideoSurface != null) binding.musicVideoSurface.setPlayer(null);
+        if (binding.musicVideoSurface != null) musicVideoSetPlayer(null);
     }
 
     private void stopYoutubeEmbed() {
         youtubeUsingEmbed = false;
-        if (binding != null && binding.musicYoutubeWeb != null) {
+        if (musicYoutubeWebView != null) {
             try {
-                binding.musicYoutubeWeb.loadUrl("about:blank");
+                musicYoutubeWebView.loadUrl("about:blank");
             } catch (Exception ignored) {
             }
-            binding.musicYoutubeWeb.setVisibility(View.GONE);
+            musicYoutubeWebView.setVisibility(View.GONE);
+        }
+        if (binding != null && binding.musicYoutubeWebHost != null) {
+            binding.musicYoutubeWebHost.setVisibility(View.GONE);
         }
     }
 
@@ -3468,11 +3968,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         currentMusicThumbUrl = null;
         if (binding != null) {
             if (binding.musicVideoSurface != null) {
-                binding.musicVideoSurface.setPlayer(null);
+                musicVideoSetPlayer(null);
                 binding.musicVideoSurface.setVisibility(View.GONE);
             }
             if (binding.musicFloatVideo != null) {
-                binding.musicFloatVideo.setPlayer(null);
+                musicFloatSetPlayer(null);
                 binding.musicFloatVideo.setVisibility(View.GONE);
             }
             if (binding.imgMusicDisc != null) {
@@ -5740,16 +6240,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (btnHi != null) {
                         btnHi.setVisibility(showHi ? View.VISIBLE : View.GONE);
                     }
-                    boolean showHostTasks = isHost && r.data.isNewMale
+                    boolean showHostTasks = isHost
+                            && com.Dramizo.Series.util.TasksFeature.isEnabled(this)
+                            && r.data.isNewMale
                             && userId != null && !userId.equals(myUserId);
                     if (rowHostTasks != null) {
                         rowHostTasks.setVisibility(showHostTasks ? View.VISIBLE : View.GONE);
                     }
                     View taskInvite = sheet.findViewById(R.id.actTaskInvite);
                     if (taskInvite != null && isHost) {
-                        taskInvite.setVisibility(
-                                (r.data.isNewMale && userId != null && !userId.equals(myUserId))
-                                        ? View.VISIBLE : View.GONE);
+                        boolean inviteOn = com.Dramizo.Series.util.TasksFeature.isEnabled(this)
+                                && r.data.isNewMale
+                                && userId != null
+                                && !userId.equals(myUserId);
+                        taskInvite.setVisibility(inviteOn ? View.VISIBLE : View.GONE);
                     }
                 });
             });
@@ -6533,28 +7037,50 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /**
-     * Mikoo-style intentional leave: tear session down once, then close UI.
+     * Mikoo-style intentional leave: leave UI first (smooth), then tear RTC/session.
+     * Never wait on LiveKit/Zego disconnect before finish — that was black-screen freeze.
      * Minimize must never call this — only احتفظ / FGS keep-alive.
      */
     private void exitRoom(boolean finishNow) {
         if (exiting) return;
         exiting = true;
         minimizing = false;
+        try {
+            dismissRoomJoinLoading();
+        } catch (Exception ignored) {
+        }
         clearSeatRequestsUi();
         clearTopSupportersUi();
         handler.removeCallbacks(refreshRunnable);
-        teardownRoomSession(true);
+        handler.removeCallbacks(retryRealtimeJoinRunnable);
+        handler.removeCallbacks(retryHttpJoinRunnable);
+        // Instant silence so leave feels snappy even if RTC cleanup lags.
+        try {
+            roomSpeakerMuted = true;
+            RoomSoundFx.setMuted(true);
+            GiftAudioFx.resetRoomGiftSounds();
+            RoomRtcEngine.getInstance().setMicEnabled(false);
+            RoomRtcEngine.getInstance().setSpeakerMuted(true);
+        } catch (Exception ignored) {
+        }
+        // Leave the UI first, then clean session (RTC disconnect is non-blocking).
         if (finishNow) {
-            if (isHost || isOwner || isPersistentRoom) {
-                Toast.makeText(getApplicationContext(),
-                        "تم الخروج · الغرفة تبقى مفتوحة (لم يُنهَ البث)",
-                        Toast.LENGTH_SHORT).show();
-            }
             try {
                 navigateHomeAndFinish();
             } catch (Exception e) {
-                finish();
+                try {
+                    finish();
+                } catch (Exception ignored) {
+                }
             }
+            try {
+                overridePendingTransition(0, 0);
+            } catch (Exception ignored) {
+            }
+        }
+        try {
+            teardownRoomSession(true);
+        } catch (Exception ignored) {
         }
     }
 
@@ -6651,6 +7177,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         startActivity(home);
         finish();
+        try {
+            overridePendingTransition(0, 0);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -6785,9 +7315,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || hitView(binding.musicCard, x, y)
                 || hitView(binding.taskFloatWrap, x, y)
                 || hitView(binding.luckyFloatWrap, x, y)
-                || hitView(binding.gameOverlay, x, y)
-                || (binding.gameOverlay != null
-                && binding.gameOverlay.getVisibility() == View.VISIBLE);
+                // Only the bottom game panel captures gestures — not a full-screen mask.
+                || hitView(binding.gamePanel, x, y);
     }
 
     private boolean isTouchOnInteractiveUi(float x, float y) {
@@ -7748,7 +8277,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (stageName != null && stageName.length() > 0) name = stageName.toString();
             }
             if (name == null || name.isEmpty()) name = "المضيف";
-            out.add(new GiftRecipient(liveHostId, name, avatar, hostBadge, vipBadge, -1, true));
+            int hostSeatIdx = -1;
+            if (hostSeat != null) hostSeatIdx = hostSeat.seatIndex;
+            long hostSupport = seatAdapter != null ? seatAdapter.getGiftCoins(liveHostId) : 0L;
+            int hostLevel = 0;
+            if (hostSeat != null && hostSeat.user != null) {
+                hostLevel = Math.max(0, hostSeat.user.level);
+            } else if (room != null && room.host != null) {
+                hostLevel = Math.max(0, room.host.level);
+            }
+            out.add(new GiftRecipient(
+                    liveHostId, name, avatar, hostBadge, vipBadge,
+                    hostSeatIdx, true, hostSupport, hostLevel));
             seen.add(liveHostId);
         }
 
@@ -7770,7 +8310,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String hostBadge = seat.user != null ? seat.user.hostBadgeUrl : null;
                 String vipBadge = seat.user != null ? seat.user.vipBadgeUrl : null;
                 boolean host = liveHostId != null && liveHostId.equals(uid);
-                out.add(new GiftRecipient(uid, name, avatar, hostBadge, vipBadge, seat.seatIndex, host));
+                long support = seatAdapter != null ? seatAdapter.getGiftCoins(uid) : 0L;
+                int level = seat.user != null ? Math.max(0, seat.user.level) : 0;
+                out.add(new GiftRecipient(
+                        uid, name, avatar, hostBadge, vipBadge,
+                        seat.seatIndex, host, support, level));
             }
         }
         return out;
@@ -7953,10 +8497,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         }
         String chatGift = "أرسل هدية حظ " + (giftName != null ? giftName : "");
-        if (comboCount > 1) chatGift += " ×" + comboCount;
+        // Quantity/combo streak is independent of مـردود — do not show ×N here.
+        // (مردود appears only via announceLuckyWinChat / lucky:hit banner.)
         appendChatLine(me, chatGift, vip, level, frame, chatUserId, senderAvatarUrl, iconUrl);
-        showGiftSendToast(me, giftName, senderAvatarUrl, iconUrl, Math.max(1, comboCount), 0,
-                "أرسل هدية حظ");
+        // Always toast as 1 — gift combo strip is for normal/combo gifts only.
+        showGiftSendToast(me, giftName, senderAvatarUrl, iconUrl, 1, 0, "أرسل هدية حظ");
     }
 
     /** Chat-only lucky win line (toast shown separately via ComingMsgView). */
@@ -8199,10 +8744,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void playCoinRainToUsers(@Nullable List<String> userIds, int coinCount, boolean allowRetry) {
         if (binding == null || binding.giftOverlay == null) return;
+        // Prevent stacking rains (gift + mardood) from exploding view count on budget phones.
+        try {
+            if (binding.giftOverlay.getChildCount() > 40) {
+                return;
+            }
+        } catch (Exception ignored) {
+        }
+        int safeCount = Math.max(4, Math.min(18, coinCount));
         List<android.graphics.PointF> targets = resolveMicCenters(userIds);
         if (targets.isEmpty() && allowRetry && userIds != null && !userIds.isEmpty()) {
             final List<String> ids = new ArrayList<>(userIds);
-            final int n = coinCount;
+            final int n = safeCount;
             binding.giftOverlay.setVisibility(View.VISIBLE);
             markLuckyOverlayActive(2500L);
             binding.giftOverlay.post(() -> playCoinRainToUsers(ids, n, false));
@@ -8212,7 +8765,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.giftOverlay.bringToFront();
         binding.giftOverlay.setElevation(28f);
         markLuckyOverlayActive(4500L);
-        CoinRainAnimator.rain(binding.giftOverlay, targets.isEmpty() ? null : targets, coinCount, null);
+        try {
+            CoinRainAnimator.rain(binding.giftOverlay, targets.isEmpty() ? null : targets, safeCount, null);
+        } catch (OutOfMemoryError | Exception ignored) {
+        }
     }
 
     @NonNull
@@ -8319,10 +8875,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                 },
                 () -> {
-                    // Soft gold trail after scatter (readable, not heavy).
-                    if (coinsSpent >= 50 && !rainIds.isEmpty()) {
-                        playCoinRainToUsers(rainIds, Math.min(90,
-                                24 + Math.max(1, quantity) * Math.max(1, personCount)));
+                    // Stage rain is very light — full merdood rain only on win path.
+                    if (coinsSpent >= 200 && !rainIds.isEmpty()) {
+                        playCoinRainToUsers(rainIds, 6);
                     }
                 });
     }
@@ -8750,7 +9305,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 icon,
                 Math.max(1, comboCount),
                 Math.max(0, totalCoins));
-        // Giant left "37x" floating multiplier like screenshots.
+        // Giant left "37x" floating multiplier — gift combo only (never merdood/luck).
+        // Do not use totalCoins as fake combo.
         if (comboCount >= 2 && binding.giftOverlay != null) {
             binding.giftOverlay.setVisibility(View.VISIBLE);
             float d = getResources().getDisplayMetrics().density;
@@ -8761,7 +9317,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     comboCount,
                     new android.graphics.PointF(56f * d, h * 0.60f),
                     null);
-            markLuckyOverlayActive(2800L);
+            // Short overlay hold for gift combo only — do not mark as lucky/mardood.
+            try {
+                if (luckyOverlayRelease != null) { /* leave lucky alone */ }
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -8953,12 +9513,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             closeGameOverlay();
             return;
         }
-        // Mikoo: back = minimize when joined.
-        if (pendingSession != null && roomId != null && !roomId.isEmpty() && !exiting) {
-            keepRoomInBackground();
+        // First back: close side panel if open.
+        if (roomSidePanelDialog != null && roomSidePanelDialog.isShowing()) {
+            roomSidePanelDialog.dismiss();
             return;
         }
-        confirmExit();
+        // Next back: open Mikoo side panel (actions + يكتشف / تاريخ).
+        showRoomSidePanel();
     }
 
     @Override
@@ -9097,8 +9658,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (slotSession == null) return;
                 slotSession.balance = coins;
                 if (mikooBridge != null) mikooBridge.notifyWalletUpdate();
-                if (binding != null && binding.webGame != null) {
-                    injectRoomGameBalanceSync(binding.webGame);
+                if (binding != null && roomGameWebView != null) {
+                    injectRoomGameBalanceSync(ensureRoomGameWebView());
                 }
             });
         });
@@ -9219,13 +9780,60 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 () -> viewModel.respondSeatInvite(roomId, false));
     }
 
+    private void registerAudioRouteReceiver() {
+        if (audioRouteReceiver != null) return;
+        audioRouteReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (intent == null) return;
+                String action = intent.getAction();
+                if (AudioManager.ACTION_HEADSET_PLUG.equals(action)
+                        || AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(action)
+                        || Intent.ACTION_HEADSET_PLUG.equals(action)
+                        || AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED.equals(action)) {
+                    try {
+                        RoomRtcEngine.getInstance().reapplyAudioRoute();
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        };
+        try {
+            IntentFilter f = new IntentFilter();
+            f.addAction(Intent.ACTION_HEADSET_PLUG);
+            f.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+            f.addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED);
+            registerReceiver(audioRouteReceiver, f);
+        } catch (Exception e) {
+            audioRouteReceiver = null;
+        }
+    }
+
+    private void unregisterAudioRouteReceiver() {
+        if (audioRouteReceiver == null) return;
+        try {
+            unregisterReceiver(audioRouteReceiver);
+        } catch (Exception ignored) {
+        }
+        audioRouteReceiver = null;
+    }
+
     @Override
     protected void onDestroy() {
+        unregisterAudioRouteReceiver();
         if (sAliveRoom != null && sAliveRoom.get() == this) {
             sAliveRoom.clear();
         }
         handler.removeCallbacks(roomGmtClockTick);
-        closeGameOverlay();
+        // Never interstitials/ads on activity death — they freeze black screen on room leave.
+        try {
+            closeGameOverlayInternal();
+        } catch (Exception ignored) {
+        }
+        try {
+            destroyLazyWebViews();
+        } catch (Exception ignored) {
+        }
         stopMusicDiscAnimation();
         stopTaskFloatPulse();
         // Mikoo-style: while minimizing, UI dies — session/engine stay in process + FGS.
@@ -9273,10 +9881,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             try {
                 roomMusicPlayer.clearMediaItems();
                 if (binding != null && binding.musicVideoSurface != null) {
-                    binding.musicVideoSurface.setPlayer(null);
+                    musicVideoSetPlayer(null);
                 }
                 if (binding != null && binding.musicFloatVideo != null) {
-                    binding.musicFloatVideo.setPlayer(null);
+                    musicFloatSetPlayer(null);
                 }
                 roomMusicPlayer.release();
             } catch (Exception ignored) {
@@ -9966,7 +10574,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     senderFrameChat = senderVipFrameChat;
                 }
                 announceLuckyGiftChat(
-                        name, icon, sender, combo, senderId, senderVipChat,
+                        name, icon, sender, 1, senderId, senderVipChat,
                         memberStr(payload, "senderAvatarUrl"), senderLevelChat, senderFrameChat);
             } else if (allMic && !allReceivers.isEmpty()) {
                 // Mikoo: center gift → clones to every target mic.
@@ -10505,7 +11113,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (soundLevelDrainPending) return;
             soundLevelDrainPending = true;
         }
-        handler.postDelayed(this::drainSoundLevels, 120L);
+        handler.postDelayed(this::drainSoundLevels, 50L);
     }
 
     private void drainSoundLevels() {
@@ -10516,6 +11124,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             soundLevelDrainPending = false;
         }
         if (exiting) return;
+        long now = System.currentTimeMillis();
         boolean hostUpdated = false;
         for (Map.Entry<String, Float> entry : levels.entrySet()) {
             String userId = entry.getKey();
@@ -10523,22 +11132,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (key.isEmpty()) continue;
             float level = entry.getValue() != null ? entry.getValue() : 0f;
             boolean wasSpeaking = speakingUsers.contains(key);
-            // Captured mic levels are often softer — keep host responsive.
-            // Hangover keeps waves smooth between monitor ticks (both Zego + LiveKit).
-            boolean speaking = level >= (wasSpeaking ? 2.0f : 4.0f);
+            // Sensitive enough for quiet speech; hangover prevents flicker.
+            boolean speaking = level >= (wasSpeaking ? 1.2f : 2.0f);
             if (speaking) {
                 speakingUsers.add(key);
-            } else if (wasSpeaking && level >= 1.0f) {
-                speaking = true; // brief hangover on soft trails
+                lastSoundTickMs.put(key, now);
+            } else if (wasSpeaking && level >= 0.6f
+                    && (now - lastSoundTickMs.getOrDefault(key, 0L)) < 420L) {
+                speaking = true; // hangover so waves feel continuous
             } else {
                 speakingUsers.remove(key);
+                if (level <= 0.01f) lastSoundTickMs.remove(key);
             }
             if (seatAdapter != null) {
-                seatAdapter.setSpeaking(userId, speaking);
+                seatAdapter.setSpeaking(userId, speaking, level);
             }
             if (isHostStageUser(userId)) {
                 setHostStageSpeaking(speaking);
                 hostUpdated = true;
+            }
+        }
+        // Stop FX for anyone who stopped reporting levels (left/mic closed).
+        if (seatAdapter != null && !speakingUsers.isEmpty()) {
+            java.util.ArrayList<String> stale = new java.util.ArrayList<>();
+            for (String key : speakingUsers) {
+                if (now - lastSoundTickMs.getOrDefault(key, 0L) > 700L) {
+                    stale.add(key);
+                }
+            }
+            for (String key : stale) {
+                lastSoundTickMs.remove(key);
+                seatAdapter.setSpeaking(key, false);
+                if (isHostStageUser(key)) {
+                    setHostStageSpeaking(false);
+                    hostUpdated = true;
+                }
             }
         }
         if (!hostUpdated && hostStageUserId != null
@@ -10699,18 +11327,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Lift room-game controls above Android nav bar (Mikoo decorView padding). */
     private void applyGameOverlaySafeInsets(int navBottom) {
         if (binding == null || binding.gameOverlay == null) return;
-        int bottom = Math.max(0, navBottom);
+        // Width full-bleed; dock sits above bottomBar (no mid-screen raise).
         if (binding.gameOverlay.getVisibility() != View.VISIBLE) {
             binding.gameOverlay.setPadding(0, 0, 0, 0);
             return;
         }
-        binding.gameOverlay.setPadding(0, 0, 0, bottom);
-        if (binding.webGame != null) {
-            // Do not pad WebView itself — Cocos treats that as a broken viewport.
-            binding.webGame.setPadding(0, 0, 0, 0);
+        binding.gameOverlay.setPadding(0, 0, 0, 0);
+        if (roomGameWebView != null) {
+            ensureRoomGameWebView().setPadding(0, 0, 0, 0);
         }
         if (binding.gamePanel != null) {
             binding.gamePanel.setPadding(0, 0, 0, 0);
+        }
+        try {
+            if (binding.gameOverlay.getVisibility() == View.VISIBLE) {
+                layoutRoomGamePanel(true);
+            }
+        } catch (Exception ignored) {
         }
     }
 
@@ -10750,6 +11383,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         ? result.data.expireAt * 1000L : 0L;
                 RoomRtcEngine.getInstance().applyJoinSession(
                         VoiceRoomActivity.this, result.data, roomId, myUserId);
+                if (zegoRoomListener != null) {
+                    RoomRtcEngine.getInstance().preferActiveProviderListenersOnly(zegoRoomListener);
+                }
                 RoomRtcEngine.getInstance().setMicEnabled(micOn);
                 zegoLoggedIn = true;
                 handler.postDelayed(() -> {
@@ -11672,21 +12308,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             hubDialog.dismiss();
             showRoomGameLeaderboard();
         });
-        sheet.findViewById(R.id.hubTasks).setOnClickListener(v -> {
-            hubDialog.dismiss();
-            Intent intent = new Intent(this,
-                    com.Dramizo.Series.presentation.profile.TaskCenterActivity.class);
-            intent.putExtra(
-                    com.Dramizo.Series.presentation.profile.TaskCenterActivity.EXTRA_ROOM_ID,
-                    roomId);
-            RoomDtos.RoomDto room = viewModel.getRoom().getValue();
-            if (room != null && room.agencyId != null) {
-                intent.putExtra(
-                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.EXTRA_AGENCY_ID,
-                        room.agencyId);
+        View hubTasks = sheet.findViewById(R.id.hubTasks);
+        if (hubTasks != null) {
+            if (!com.Dramizo.Series.util.TasksFeature.isEnabled(this)) {
+                hubTasks.setVisibility(View.GONE);
+                hubTasks.setOnClickListener(null);
+            } else {
+                hubTasks.setVisibility(View.VISIBLE);
+                hubTasks.setOnClickListener(v -> {
+                    hubDialog.dismiss();
+                    Intent intent = new Intent(this,
+                            com.Dramizo.Series.presentation.profile.TaskCenterActivity.class);
+                    intent.putExtra(
+                            com.Dramizo.Series.presentation.profile.TaskCenterActivity.EXTRA_ROOM_ID,
+                            roomId);
+                    RoomDtos.RoomDto room = viewModel.getRoom().getValue();
+                    if (room != null && room.agencyId != null) {
+                        intent.putExtra(
+                                com.Dramizo.Series.presentation.profile.TaskCenterActivity.EXTRA_AGENCY_ID,
+                                room.agencyId);
+                    }
+                    startActivity(intent);
+                });
             }
-            startActivity(intent);
-        });
+        }
         sheet.findViewById(R.id.hubLuckyBox).setOnClickListener(v -> {
             hubDialog.dismiss();
             showLuckyFloatAgain();
@@ -12042,8 +12687,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         setRoomChromeHidden(false); // Mikoo: seats/chat stay visible under half-scene H5
         layoutRoomGamePanel(true);
         configureRoomGameWebView(true);
-        binding.webGame.setRotation(0f);
-        binding.webGame.setWebChromeClient(new WebChromeClient() {
+        ensureRoomGameWebView().setRotation(0f);
+        ensureRoomGameWebView().setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
                 if (consoleMessage != null) {
@@ -12055,7 +12700,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return super.onConsoleMessage(consoleMessage);
             }
         });
-        binding.webGame.setWebViewClient(createMikooRoomWebViewClient());
+        ensureRoomGameWebView().setWebViewClient(createMikooRoomWebViewClient());
         GameProbeLog.i("OPEN.mikoo", "title=" + title + " gameId=" + overlayGameId + " url=" + rawUrl);
         binding.gameOverlay.setVisibility(View.VISIBLE);
         binding.gameOverlay.bringToFront();
@@ -12091,11 +12736,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                 + " container=" + slotSession.containerUrl
                                 + " route=" + slotSession.routeUrl);
                 if (slotSession.balance <= 0) {
-                    Toast.makeText(this, "رصيدك 0 — اشحن كوينز للعب", Toast.LENGTH_LONG).show();
-                    MikooGameBridge.openWallet(VoiceRoomActivity.this);
+                    BalanceRedirect.handleForced(this, "رصيدك 0 — اشحن كوينز للعب");
                 }
-                boolean isHash = slotSession.bridge != null
-                        && "hash".equalsIgnoreCase(slotSession.bridge);
                 hashBridge = new MikooHashBridge(slotSession, new MikooHashBridge.Callbacks() {
                     @Override
                     public void onClose() {
@@ -12104,16 +12746,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
                     @Override
                     public void onRecharge() {
-                        Toast.makeText(VoiceRoomActivity.this,
-                                "رصيد غير كافٍ — افتح الشحن",
-                                Toast.LENGTH_SHORT).show();
-                        MikooGameBridge.openWallet(VoiceRoomActivity.this);
+                        BalanceRedirect.handleForced(VoiceRoomActivity.this,
+                                "رصيد غير كافٍ — اشحن كوينز");
                     }
                 });
                 // Hash games need androidJsObj; BaiShun needs NativeBridge. Attach both safely.
-                MikooHashBridge.attach(binding.webGame, hashBridge);
+                MikooHashBridge.attach(ensureRoomGameWebView(), hashBridge);
 
-                mikooBridge = new MikooGameBridge(binding.webGame, slotSession, new MikooGameBridge.Callbacks() {
+                mikooBridge = new MikooGameBridge(ensureRoomGameWebView(), slotSession, new MikooGameBridge.Callbacks() {
                     @Override
                     public void onDestroy() {
                         closeGameOverlay();
@@ -12121,36 +12761,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
                     @Override
                     public void onRecharge() {
-                        Toast.makeText(VoiceRoomActivity.this,
-                                "رصيد غير كافٍ — افتح الشحن",
-                                Toast.LENGTH_SHORT).show();
-                        MikooGameBridge.openWallet(VoiceRoomActivity.this);
+                        BalanceRedirect.handleForced(VoiceRoomActivity.this,
+                                "رصيد غير كافٍ — اشحن كوينز");
                     }
 
                     @Override
                     public void onLoaded() {
                         overlayGameReady = true;
                         showRoomGameLoading(false);
+                        if (binding != null && roomGameWebView != null) {
+                            scheduleRoomGameCanvasFit(ensureRoomGameWebView(), 0);
+                            scheduleRoomGameCanvasFit(ensureRoomGameWebView(), 300);
+                            scheduleRoomGameCanvasFit(ensureRoomGameWebView(), 900);
+                            scheduleRoomGameCanvasFit(ensureRoomGameWebView(), 1800);
+                        }
                     }
                 });
                 mikooBridge.attach();
 
-                // Hash / multiplayer: full opaque stage (half-scene is BaiShun-only).
-                final boolean halfScene = !isHash;
-                setRoomChromeHidden(!halfScene);
+                // Same dock for every mikoo game (not fishing-only).
+                final boolean halfScene = true;
+                setRoomChromeHidden(false);
                 layoutRoomGamePanel(halfScene);
 
                 String loadUrl = MikooGameBridge.appendSessionParams(overlayPendingUrl, slotSession);
                 loadUrl = appendGameAuthParams(loadUrl);
                 handler.post(heartbeatSlot);
                 final String finalUrl = loadUrl;
-                View panel = binding.gamePanel != null ? binding.gamePanel : binding.webGame;
+                View panel = binding.gamePanel != null ? binding.gamePanel : ensureRoomGameWebView();
                 panel.post(() -> {
                     if (isFinishing() || binding == null) return;
                     layoutRoomGamePanel(halfScene);
-                    binding.webGame.post(() -> {
+                    ensureRoomGameWebView().post(() -> {
                         if (isFinishing() || binding == null) return;
-                        binding.webGame.loadUrl(finalUrl);
+                        ensureRoomGameWebView().loadUrl(finalUrl);
                     });
                 });
                 handler.postDelayed(() -> {
@@ -12162,14 +12806,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** BaiShun half-scene: transparent full WebView. Hash games: letterbox 750×1334 on black. */
+    /**
+     * In-room games — Mikoo BSGameWebDialog layout for EVERY game:
+     * full-width WebView from top → above bottomBar, transparent, LTR.
+     * Half-UI comes from engine sceneMode=0 (not Android letterboxing).
+     */
     private void layoutRoomGamePanel(boolean mikooHalfScene) {
+        layoutRoomGamePanel(mikooHalfScene, false);
+    }
+
+    private void layoutRoomGamePanel(boolean mikooHalfScene, boolean ignoredFishingFlag) {
         if (binding == null || binding.gamePanel == null) return;
+        int navBottom = navigationBarInsetPx();
+        int bottomChrome = roomGameBottomChromePx(navBottom);
+
+        // Mirror Mikoo dialog_bai_shun_webview: WebView fills the host area (full height).
+        // Host keeps chat bottomBar free; seats stay visible via transparent + sceneMode 0.
+        if (binding.gameOverlay != null) {
+            ViewGroup.LayoutParams olp = binding.gameOverlay.getLayoutParams();
+            if (olp instanceof ConstraintLayout.LayoutParams clp) {
+                clp.width = 0;
+                clp.height = 0;
+                clp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+                clp.topToBottom = ConstraintLayout.LayoutParams.UNSET;
+                if (binding.bottomBar != null) {
+                    clp.bottomToBottom = ConstraintLayout.LayoutParams.UNSET;
+                    clp.bottomToTop = binding.bottomBar.getId();
+                    clp.setMargins(0, 0, 0, 0);
+                } else {
+                    clp.bottomToTop = ConstraintLayout.LayoutParams.UNSET;
+                    clp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+                    clp.setMargins(0, 0, 0, bottomChrome);
+                }
+                clp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
+                clp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+                clp.horizontalWeight = 0f;
+                clp.verticalBias = 1f;
+                binding.gameOverlay.setLayoutParams(clp);
+            } else if (olp != null) {
+                olp.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                olp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+                binding.gameOverlay.setLayoutParams(olp);
+            }
+            binding.gameOverlay.setPadding(0, 0, 0, 0);
+            binding.gameOverlay.setBackgroundColor(Color.TRANSPARENT);
+            binding.gameOverlay.setClickable(false);
+            binding.gameOverlay.setFocusable(false);
+            binding.gameOverlay.setClipChildren(false);
+            binding.gameOverlay.setClipToPadding(false);
+            if (binding.bottomBar != null) binding.bottomBar.bringToFront();
+        }
+
         ViewGroup.LayoutParams plp = binding.gamePanel.getLayoutParams();
         if (plp instanceof FrameLayout.LayoutParams flp) {
             flp.width = ViewGroup.LayoutParams.MATCH_PARENT;
             flp.height = ViewGroup.LayoutParams.MATCH_PARENT;
-            flp.gravity = android.view.Gravity.BOTTOM;
+            flp.gravity = Gravity.BOTTOM;
             flp.setMargins(0, 0, 0, 0);
             binding.gamePanel.setLayoutParams(flp);
         } else if (plp != null) {
@@ -12177,51 +12869,64 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             plp.height = ViewGroup.LayoutParams.MATCH_PARENT;
             binding.gamePanel.setLayoutParams(plp);
         }
-        binding.gamePanel.setBackgroundColor(mikooHalfScene ? Color.TRANSPARENT : Color.BLACK);
+        binding.gamePanel.setBackgroundColor(Color.TRANSPARENT);
+        binding.gamePanel.setClickable(true);
+        binding.gamePanel.setFocusable(true);
+        binding.gamePanel.setClipChildren(false);
+        binding.gamePanel.setClipToPadding(false);
+        forceRoomGameLtr(binding.gamePanel);
+        forceRoomGameLtr(binding.gameOverlay);
+
+        // No per-game letterbox — stage/WebView are fill_parent like Mikoo.
         View stage = binding.getRoot().findViewById(R.id.gameStage);
-        int navBottom = navigationBarInsetPx();
-        if (binding.gameOverlay != null) {
-            binding.gameOverlay.setPadding(0, 0, 0, navBottom);
-        }
         if (stage != null) {
-            if (mikooHalfScene) {
-                stage.setBackgroundColor(Color.TRANSPARENT);
-                stage.setLayoutParams(new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        android.view.Gravity.CENTER));
-            } else {
-                stage.setBackgroundColor(Color.BLACK);
-                int screenW = binding.gamePanel.getWidth();
-                int screenH = binding.gamePanel.getHeight();
-                if (screenW <= 0 || screenH <= 0) {
-                    screenW = getResources().getDisplayMetrics().widthPixels;
-                    screenH = Math.max(1, getResources().getDisplayMetrics().heightPixels - navBottom);
-                }
-                float designW = 750f;
-                float designH = 1334f;
-                float scale = Math.min(screenW / designW, screenH / designH);
-                int w = Math.max(1, Math.round(designW * scale));
-                int h = Math.max(1, Math.round(designH * scale));
-                stage.setLayoutParams(new FrameLayout.LayoutParams(w, h, android.view.Gravity.CENTER));
+            stage.setBackgroundColor(Color.TRANSPARENT);
+            FrameLayout.LayoutParams slp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT);
+            slp.gravity = Gravity.BOTTOM;
+            slp.setMargins(0, 0, 0, 0);
+            stage.setLayoutParams(slp);
+            if (stage instanceof ViewGroup) {
+                ((ViewGroup) stage).setClipChildren(false);
             }
+            forceRoomGameLtr(stage);
         }
-        if (binding.webGame != null) {
-            binding.webGame.setRotation(0f);
-            binding.webGame.setBackgroundColor(mikooHalfScene ? Color.TRANSPARENT : Color.BLACK);
-            binding.webGame.setPadding(0, 0, 0, 0);
-            binding.webGame.setLayoutParams(new FrameLayout.LayoutParams(
+        if (roomGameWebView != null) {
+            forceRoomGameLtr(roomGameWebView);
+            roomGameWebView.setRotation(0f);
+            roomGameWebView.setTranslationX(0f);
+            roomGameWebView.setTranslationY(0f);
+            roomGameWebView.setScaleX(1f);
+            roomGameWebView.setScaleY(1f);
+            roomGameWebView.setBackgroundColor(Color.TRANSPARENT);
+            roomGameWebView.setPadding(0, 0, 0, 0);
+            roomGameWebView.setLayoutParams(new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-        if (binding.gamePanel != null) {
-            binding.gamePanel.setPadding(0, 0, 0, 0);
         }
         if (binding.btnCloseGameOverlay != null) {
             binding.btnCloseGameOverlay.setVisibility(View.GONE);
         }
         showRoomGameLoading(false);
-        setRoomChromeHidden(!mikooHalfScene);
+        setRoomChromeHidden(false);
+    }
+
+    /** Games/engines are designed LTR; RTL rooms must not mirror the WebView canvas. */
+    private void forceRoomGameLtr(@Nullable View v) {
+        if (v == null) return;
+        try {
+            ViewCompat.setLayoutDirection(v, ViewCompat.LAYOUT_DIRECTION_LTR);
+            if (android.os.Build.VERSION.SDK_INT >= 17) {
+                v.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            }
+            if (v instanceof TextView) {
+                ((TextView) v).setTextDirection(View.TEXT_DIRECTION_LTR);
+            } else {
+                v.setTextDirection(View.TEXT_DIRECTION_LTR);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     private int navigationBarInsetPx() {
@@ -12242,6 +12947,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return 0;
     }
 
+    /**
+     * Space reserved under the game dock: bottom send/gift/emoji bar (+ nav fallback).
+     * Game bottom edge sits on top of this chrome — never floats mid-screen.
+     */
+    private int roomGameBottomChromePx(int navBottom) {
+        float density = getResources().getDisplayMetrics().density;
+        int bar = 0;
+        if (binding != null && binding.bottomBar != null
+                && binding.bottomBar.getVisibility() != View.GONE) {
+            bar = binding.bottomBar.getHeight();
+            if (bar <= 0) {
+                try {
+                    binding.bottomBar.measure(
+                            View.MeasureSpec.makeMeasureSpec(
+                                    Math.max(1, binding.getRoot().getWidth()),
+                                    View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                    bar = binding.bottomBar.getMeasuredHeight();
+                } catch (Exception ignored) {
+                }
+            }
+            if (bar <= 0) bar = Math.round(56f * density);
+            if (binding.bottomBar.getLayoutParams() instanceof ViewGroup.MarginLayoutParams mlp) {
+                bar += Math.max(0, mlp.bottomMargin);
+            }
+        }
+        // If bar already sits at parent bottom above system gesture area, nav may be 0
+        // in layout coords; keep a tiny pad when bar missing.
+        if (bar > 0) return bar;
+        return Math.max(0, navBottom);
+    }
+
     private void showRoomGameLoading(boolean show) {
         // User request: never show «جاري التحميل» over room games.
         if (binding == null || binding.gameLoadingOverlay == null) return;
@@ -12250,7 +12987,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void configureRoomGameWebView(boolean mikoo) {
         if (binding == null) return;
-        WebView web = binding.webGame;
+        WebView web = ensureRoomGameWebView();
+        forceRoomGameLtr(web);
+        if (binding.gamePanel != null) forceRoomGameLtr(binding.gamePanel);
+        if (binding.gameOverlay != null) forceRoomGameLtr(binding.gameOverlay);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -12284,8 +13024,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 GameProbeLog.net("PAGE.start", url);
+                forceRoomGameLtr(view);
                 injectRoomGameForceLocalHosts(view);
                 injectGameProbeHooks(view);
+                // Early LTR / no-rotate before Cocos can apply portrait spin.
+                scheduleRoomGameCanvasFit(view, 0);
             }
 
             @Override
@@ -12293,8 +13036,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GameProbeLog.net("PAGE.finish", url);
                 injectRoomGameForceLocalHosts(view);
                 injectGameProbeHooks(view);
-                // Mikoo does not stretch GameCanvas — sceneMode=0 handles half UI.
-                injectRoomGameCanvasFit(view);
+                // Stretch full game into mid→bottom dock (re-apply after Cocos boots).
+                scheduleRoomGameCanvasFit(view, 0);
+                scheduleRoomGameCanvasFit(view, 400);
+                scheduleRoomGameCanvasFit(view, 1200);
+                scheduleRoomGameCanvasFit(view, 2500);
                 if (slotSession != null) {
                     injectRoomGameRechargeHook(view);
                     injectRoomGameBalanceSync(view);
@@ -12465,27 +13211,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    private void scheduleRoomGameCanvasFit(@Nullable WebView view, long delayMs) {
+        if (view == null || handler == null) return;
+        handler.postDelayed(() -> {
+            if (isFinishing() || binding == null || roomGameWebView == null) return;
+            if (binding.gameOverlay == null
+                    || binding.gameOverlay.getVisibility() != View.VISIBLE) return;
+            // Same layout+fit for every room game (including fishing / cleopatra / crash…).
+            layoutRoomGamePanel(true);
+            injectRoomGameCanvasFit(ensureRoomGameWebView());
+        }, Math.max(0L, delayMs));
+    }
+
+    /**
+     * Light host hygiene only — Mikoo does NOT override Cocos design resolution.
+     * Forcing SHOW_ALL / design sizes made portrait titles (Cleopatra…) tiny.
+     */
     private void injectRoomGameCanvasFit(WebView view) {
         if (view == null) return;
         String js = "(function(){try{"
-                + "var d=document.documentElement,b=document.body;"
-                + "if(d){d.style.height='100%';d.style.width='100%';d.style.margin='0';"
-                + "d.style.overflow='hidden';d.style.transform='none';}"
-                + "if(b){b.style.height='100%';b.style.width='100%';b.style.margin='0';"
-                + "b.style.overflow='hidden';b.style.background='#000';"
-                + "b.style.transform='none';b.style.rotate='none';}"
-                + "var gc=document.getElementById('Cocos2dGameContainer');"
-                + "if(gc){gc.style.width='100%';gc.style.height='100%';"
-                + "gc.style.transform='none';gc.style.margin='0';}"
-                + "var c=document.getElementById('GameCanvas')||document.querySelector('canvas');"
-                + "if(c){c.style.width='100%';c.style.height='100%';c.style.display='block';"
-                + "c.style.transform='none';c.style.rotate='0deg';"
-                + "c.style.objectFit='contain';}"
+                + "try{document.documentElement.setAttribute('dir','ltr');"
+                + "document.documentElement.dir='ltr';"
+                + "document.documentElement.style.direction='ltr';"
+                + "document.documentElement.style.background='transparent';"
+                + "if(document.body){document.body.setAttribute('dir','ltr');"
+                + "document.body.dir='ltr';document.body.style.direction='ltr';"
+                + "document.body.style.background='transparent';"
+                + "document.body.style.margin='0';document.body.style.padding='0';}"
+                + "}catch(e0){}"
+                + "try{if(window.cc&&cc.view){"
+                + "if(cc.view.resizeWithBrowserSize)cc.view.resizeWithBrowserSize(true);"
+                + "try{if(cc.view._resizeEvent)cc.view._resizeEvent();}catch(e2){}"
+                + "try{window.dispatchEvent(new Event('resize'));}catch(e3){}"
+                + "}}catch(e){}"
                 + "}catch(e){}})();";
         try {
             view.evaluateJavascript(js, null);
         } catch (Exception ignored) {
         }
+    }
+
+    private void injectFishingRoomFit(WebView view) {
+        // No fishing-only path — every game uses the same canvas fit.
+        injectRoomGameCanvasFit(view);
     }
 
     private void injectRoomGameRechargeHook(WebView view) {
@@ -12500,7 +13268,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 + "}catch(e){}}"
                 + "function jehoNeed(t){if(!t)return false;t=String(t);"
                 + "return t.indexOf('Insufficient')>=0||t.indexOf('NeedRecharge')>=0"
-                + "||t.indexOf('need_recharge')>=0||t.indexOf('\"Code\":2')>=0||t.indexOf('\"Code\": 2')>=0;}"
+                + "||t.indexOf('need_recharge')>=0||t.indexOf('\"Code\":2')>=0||t.indexOf('\"Code\": 2')>=0"
+                + "||t.indexOf('\"tipType\":2')>=0||t.indexOf('\"tipType\": 2')>=0"
+                + "||t.indexOf('errCode\":5')>=0||t.indexOf('errCode\": 5')>=0;}"
                 + "var OW=window.WebSocket;if(OW&&!OW.__jehoEcoWrap){"
                 + "function W(u,p){var ws=p!==undefined?new OW(u,p):new OW(u);"
                 + "ws.addEventListener('message',function(ev){try{"
@@ -12570,7 +13340,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             mikooBridge = null;
         }
         if (hashBridge != null && binding != null) {
-            MikooHashBridge.detach(binding.webGame);
+            MikooHashBridge.detach(ensureRoomGameWebView());
             hashBridge = null;
         }
     }
@@ -12593,25 +13363,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnCloseGameOverlay.setVisibility(View.GONE);
         }
 
-        setRoomChromeHidden(true);
+        setRoomChromeHidden(false);
         showRoomGameLoading(false);
-        layoutRoomGamePanel(false);
+        layoutRoomGamePanel(true);
 
         try {
             configureRoomGameWebView(false);
             if (immersiveFruit) {
                 try {
-                    binding.webGame.clearCache(false);
-                    binding.webGame.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+                    ensureRoomGameWebView().clearCache(false);
+                    ensureRoomGameWebView().getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
                 } catch (Exception ignored) {
                 }
             } else {
                 try {
-                    binding.webGame.getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
+                    ensureRoomGameWebView().getSettings().setCacheMode(WebSettings.LOAD_DEFAULT);
                 } catch (Exception ignored) {
                 }
             }
-            binding.webGame.setWebChromeClient(new WebChromeClient());
+            ensureRoomGameWebView().setWebChromeClient(new WebChromeClient());
             // Keep top controls clear of status bar / notch.
             int insetTop = 0;
             try {
@@ -12626,15 +13396,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } catch (Exception ignored) {
             }
             if (immersiveFruit) {
-                binding.webGame.setPadding(0, Math.max(insetTop, (int) (24 * getResources().getDisplayMetrics().density)), 0, 0);
+                ensureRoomGameWebView().setPadding(0, Math.max(insetTop, (int) (24 * getResources().getDisplayMetrics().density)), 0, 0);
             } else {
-                binding.webGame.setPadding(0, 0, 0, 0);
+                ensureRoomGameWebView().setPadding(0, 0, 0, 0);
             }
-            binding.webGame.removeJavascriptInterface("AuraBridge");
-            binding.webGame.removeJavascriptInterface("NativeBridge");
-            binding.webGame.removeJavascriptInterface("gameBridge");
-            binding.webGame.removeJavascriptInterface("androidJsObj");
-            binding.webGame.addJavascriptInterface(new Object() {
+            ensureRoomGameWebView().removeJavascriptInterface("AuraBridge");
+            ensureRoomGameWebView().removeJavascriptInterface("NativeBridge");
+            ensureRoomGameWebView().removeJavascriptInterface("gameBridge");
+            ensureRoomGameWebView().removeJavascriptInterface("androidJsObj");
+            ensureRoomGameWebView().addJavascriptInterface(new Object() {
                 @android.webkit.JavascriptInterface
                 public String getAccessToken() {
                     String accessToken = ContainerProvider.from(VoiceRoomActivity.this)
@@ -12661,8 +13431,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     });
                 }
             }, "AuraBridge");
-            binding.webGame.setWebViewClient(new WebViewClient());
-            binding.webGame.loadUrl(url);
+            ensureRoomGameWebView().setWebViewClient(new WebViewClient());
+            ensureRoomGameWebView().loadUrl(url);
         } catch (Exception ignored) {
         }
         binding.gameOverlay.setVisibility(View.VISIBLE);
@@ -12726,13 +13496,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         endOverlaySlotSession();
         showRoomGameLoading(false);
         try {
-            binding.webGame.setPadding(0, 0, 0, 0);
-            binding.webGame.stopLoading();
-            binding.webGame.loadUrl("about:blank");
-            binding.webGame.removeJavascriptInterface("AuraBridge");
-            binding.webGame.removeJavascriptInterface("NativeBridge");
-            binding.webGame.removeJavascriptInterface("gameBridge");
-            binding.webGame.removeJavascriptInterface("androidJsObj");
+            if (roomGameWebView != null) {
+                roomGameWebView.setPadding(0, 0, 0, 0);
+                roomGameWebView.stopLoading();
+                roomGameWebView.loadUrl("about:blank");
+                roomGameWebView.removeJavascriptInterface("AuraBridge");
+                roomGameWebView.removeJavascriptInterface("NativeBridge");
+                roomGameWebView.removeJavascriptInterface("gameBridge");
+                roomGameWebView.removeJavascriptInterface("androidJsObj");
+                try {
+                    if (binding != null && binding.webGameHost != null) {
+                        binding.webGameHost.removeView(roomGameWebView);
+                    }
+                    roomGameWebView.destroy();
+                } catch (Exception ignored2) {
+                }
+                roomGameWebView = null;
+            }
         } catch (Exception ignored) {
         }
         binding.gameOverlay.setVisibility(View.GONE);

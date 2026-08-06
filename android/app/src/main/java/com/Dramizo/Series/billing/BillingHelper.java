@@ -53,12 +53,16 @@ public class BillingHelper implements PurchasesUpdatedListener {
         startConnection();
     }
 
-    private void startConnection() {
+    public void startConnection() {
         billingClient.startConnection(new BillingClientStateListener() {
             @Override
             public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
                 ready.set(billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK);
                 Log.i(TAG, "Billing setup: " + billingResult.getResponseCode());
+                if (ready.get()) {
+                    // Resubmit any unconsumed paid purchases (app killed after pay before verify).
+                    queryAndRestoreUnacked();
+                }
             }
 
             @Override
@@ -68,6 +72,58 @@ public class BillingHelper implements PurchasesUpdatedListener {
                 main.postDelayed(BillingHelper.this::startConnection, 1500);
             }
         });
+    }
+
+    /**
+     * Hold callback used by restore; Store UI sets its own when launching a buy.
+     */
+    public void setPurchaseCallback(@Nullable PurchaseCallback cb) {
+        this.callback = cb;
+    }
+
+    /** Re-deliver owned INAPP purchases that were not yet consumed (server credit pending). */
+    public void queryAndRestoreUnacked() {
+        if (!isReady()) return;
+        try {
+            billingClient.queryPurchasesAsync(
+                    com.android.billingclient.api.QueryPurchasesParams.newBuilder()
+                            .setProductType(BillingClient.ProductType.INAPP)
+                            .build(),
+                    (billingResult, purchases) -> {
+                        if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
+                                || purchases == null || purchases.isEmpty()) {
+                            return;
+                        }
+                        for (Purchase purchase : purchases) {
+                            if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                                Log.i(TAG, "restore unconsumed product="
+                                        + (purchase.getProducts().isEmpty()
+                                        ? "?" : purchase.getProducts().get(0)));
+                                // Don’t invoke store callback without an active buyer UI —
+                                // store last pending for explicit recoverPending().
+                                pendingConsume = purchase;
+                            }
+                        }
+                    });
+        } catch (Throwable t) {
+            Log.w(TAG, "queryPurchases restore failed: " + t.getMessage());
+        }
+    }
+
+    /**
+     * After wallet opens: if a paid token is still owned, call verify again.
+     */
+    public void recoverPendingIfAny(@Nullable PurchaseCallback cb) {
+        if (pendingConsume == null) {
+            queryAndRestoreUnacked();
+        }
+        Purchase p = pendingConsume;
+        if (p == null || p.getPurchaseState() != Purchase.PurchaseState.PURCHASED) return;
+        if (cb != null) callback = cb;
+        if (callback != null) {
+            String sku = p.getProducts().isEmpty() ? "" : p.getProducts().get(0);
+            callback.onPurchaseSuccess(sku, p.getPurchaseToken(), p.getOrderId());
+        }
     }
 
     public boolean isReady() {

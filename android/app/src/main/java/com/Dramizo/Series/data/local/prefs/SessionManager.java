@@ -237,6 +237,15 @@ public class SessionManager {
         return prefs.getBoolean("server_gift_sounds_enabled", true);
     }
 
+    public void setTasksEnabledFromServer(boolean enabled) {
+        prefs.edit().putBoolean("server_tasks_enabled", enabled).apply();
+    }
+
+    /** Master flag from GET /config/features — default ON until server says otherwise. */
+    public boolean isTasksEnabledFromServer() {
+        return prefs.getBoolean("server_tasks_enabled", true);
+    }
+
     public void setChatPromoFilterFromServer(boolean enabled) {
         prefs.edit().putBoolean("server_chat_promo_filter", enabled).apply();
     }

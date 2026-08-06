@@ -74,36 +74,31 @@ public final class RoomSoundFx {
         if (mutedFx || c == null) return;
         Context app = c.getApplicationContext();
         init(app);
-        int count = Math.max(1, Math.min(10, waves));
+        // Soft max — ToneGenerator multi-open native-crashes some MediaTek (Hot 30) phones.
+        int count = Math.max(1, Math.min(2, waves));
         Handler main = new Handler(Looper.getMainLooper());
         for (int i = 0; i < count; i++) {
             final int step = i;
             main.postDelayed(() -> {
                 if (mutedFx) return;
-                float rate = 0.92f + step * 0.07f;
-                if (pool != null && giftId != 0) {
-                    float vol = 0.55f + Math.min(0.4f, step * 0.06f);
-                    pool.play(giftId, vol, vol, 1, 0, Math.min(1.55f, rate));
-                    // Soft echo for sparkle.
-                    main.postDelayed(() -> {
-                        if (mutedFx || pool == null || giftId == 0) return;
-                        pool.play(giftId, vol * 0.45f, vol * 0.45f, 0, 0, Math.min(1.7f, rate + 0.12f));
-                    }, 70);
-                    return;
-                }
                 try {
-                    ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_MUSIC, 88);
-                    int[] tones = {
-                            ToneGenerator.TONE_PROP_BEEP,
-                            ToneGenerator.TONE_PROP_ACK,
-                            ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD,
-                            ToneGenerator.TONE_PROP_BEEP2
-                    };
-                    tg.startTone(tones[step % tones.length], 55 + step * 8);
-                    main.postDelayed(tg::release, 160);
-                } catch (Exception ignored) {
+                    float rate = 0.95f + step * 0.08f;
+                    if (pool != null && giftId != 0) {
+                        float vol = 0.6f + step * 0.1f;
+                        pool.play(giftId, vol, vol, 1, 0, Math.min(1.4f, rate));
+                        return;
+                    }
+                    // Fallback: one short tone only (never cascade generators).
+                    if (step == 0) {
+                        ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_MUSIC, 70);
+                        tg.startTone(ToneGenerator.TONE_PROP_ACK, 90);
+                        main.postDelayed(() -> {
+                            try { tg.release(); } catch (Exception ignored) {}
+                        }, 200);
+                    }
+                } catch (Throwable ignored) {
                 }
-            }, i * 140L);
+            }, i * 160L);
         }
     }
     public static void playJoin(Context c) { play(c, Kind.JOIN, joinId, 0.8f); }

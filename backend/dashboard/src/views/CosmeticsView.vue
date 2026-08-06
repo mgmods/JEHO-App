@@ -135,7 +135,8 @@
             <div class="small mb-2">
               <span v-if="item.coinPrice">{{ item.coinPrice }} {{ t('app.coins') }}</span>
               <span v-else class="text-muted">—</span>
-              <span v-if="item.minVipLevel"> · VIP{{ item.minVipLevel }}+</span>
+              <span v-if="item.minVipLevel" class="badge text-bg-warning ms-1">VIP{{ item.minVipLevel }}+</span>
+              <span v-if="item.minUserLevel && item.type !== 'vip_badge' && item.type !== 'host_badge'" class="badge text-bg-secondary ms-1">Lv{{ item.minUserLevel }}+</span>
               <span v-if="mediaLabel(wearSrc(item) || item.animationUrl)" class="badge text-bg-warning ms-1">{{ mediaLabel(wearSrc(item) || item.animationUrl) }}</span>
               <span v-if="item.isActive === false" class="badge text-bg-secondary ms-1">off</span>
             </div>
@@ -186,11 +187,18 @@
                 </div>
                 <div class="col-md-3">
                   <label class="form-label">{{ t('cosmetics.minVip') }}</label>
-                  <input v-model.number="form.minVipLevel" type="number" min="0" class="form-control" />
+                  <input v-model.number="form.minVipLevel" type="number" min="0" max="100" class="form-control" />
+                  <div class="form-text">خطة VIP (1–100). الإطارات البصرية 1–7؛ VIP أعلى من 7 يبقى على أقصى إطار.</div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-3" v-if="form.type !== 'vip_badge' && form.type !== 'host_badge'">
                   <label class="form-label">{{ t('cosmetics.minLevel') }}</label>
                   <input v-model.number="form.minUserLevel" type="number" min="0" class="form-control" />
+                  <div class="form-text">مستوى الحساب فقط — ليس VIP.</div>
+                </div>
+                <div class="col-md-3" v-else>
+                  <label class="form-label">{{ t('cosmetics.minLevel') }}</label>
+                  <input type="number" class="form-control" :value="0" disabled />
+                  <div class="form-text text-warning">الإطارات مربوطة بالـ VIP فقط (لا مستوى الحساب).</div>
                 </div>
                 <div class="col-md-3">
                   <label class="form-label">{{ t('cosmetics.sortOrder') }}</label>
@@ -661,7 +669,9 @@ async function save() {
       description: form.value.description || null,
       coinPrice: Number(form.value.coinPrice || 0),
       minVipLevel: Number(form.value.minVipLevel || 0),
-      minUserLevel: Number(form.value.minUserLevel || 0),
+      minUserLevel: ['vip_badge', 'host_badge'].includes(form.value.type)
+        ? 0
+        : Number(form.value.minUserLevel || 0),
       sortOrder: Number(form.value.sortOrder || 0),
       previewUrl: form.value.previewUrl,
       animationUrl: form.value.animationUrl || null,

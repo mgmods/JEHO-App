@@ -15,6 +15,7 @@ public final class AppFeatures {
         container.getSessionManager().setFemaleOnlyVoiceHostsFromServer(r.data.femaleOnlyVoiceHosts);
         container.getSessionManager().setMicWithoutHostApprovalFromServer(r.data.micWithoutHostApproval);
         container.getSessionManager().setGiftSoundsEnabledFromServer(r.data.giftSoundsEnabled);
+        container.getSessionManager().setTasksEnabledFromServer(r.data.tasksEnabled);
         container.getSessionManager().setChatPromoFilterFromServer(r.data.chatPromoFilterEnabled);
         if (r.data.extraKeywords != null && !r.data.extraKeywords.isEmpty()) {
             StringBuilder sb = new StringBuilder();

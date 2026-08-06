@@ -132,11 +132,23 @@ export class InvitesService implements OnModuleInit {
       me.inviteBoundAt = new Date();
       await manager.save(me);
 
-      if (rewards.inviteeCoins > 0) {
-        const inviteeWallet = await manager.findOne(Wallet, {
-          where: { userId },
+      const ensureWallet = async (uid: string) => {
+        let w = await manager.findOne(Wallet, {
+          where: { userId: uid },
           lock: { mode: 'pessimistic_write' },
         });
+        if (!w) {
+          w = await manager.save(manager.create(Wallet, { userId: uid }));
+          w = await manager.findOne(Wallet, {
+            where: { userId: uid },
+            lock: { mode: 'pessimistic_write' },
+          });
+        }
+        return w;
+      };
+
+      if (rewards.inviteeCoins > 0) {
+        const inviteeWallet = await ensureWallet(userId);
         if (inviteeWallet) {
           inviteeWallet.coins = Number(inviteeWallet.coins) + rewards.inviteeCoins;
           await manager.save(inviteeWallet);
@@ -156,10 +168,7 @@ export class InvitesService implements OnModuleInit {
       }
 
       if (rewards.inviterCoins > 0) {
-        const inviterWallet = await manager.findOne(Wallet, {
-          where: { userId: inviter.id },
-          lock: { mode: 'pessimistic_write' },
-        });
+        const inviterWallet = await ensureWallet(inviter.id);
         if (inviterWallet) {
           inviterWallet.coins = Number(inviterWallet.coins) + rewards.inviterCoins;
           await manager.save(inviterWallet);

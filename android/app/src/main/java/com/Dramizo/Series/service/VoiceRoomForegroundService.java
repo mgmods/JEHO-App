@@ -684,25 +684,90 @@ public class VoiceRoomForegroundService extends Service {
         if (musicPlayer == null) return;
         if (url == null || url.isEmpty() || "stopped".equalsIgnoreCase(status)
                 || url.regionMatches(true, 0, "local://", 0, 8)) {
-            // Local phone music is mixed by the host into Zego — never stream via ExoPlayer here.
-            musicPlayer.stop();
+            // Local phone music is mixed by the host into Zego — keep Zego, stop Exo.
+            try {
+                musicPlayer.stop();
+            } catch (Exception ignored) {
+            }
+            // Hosts: never pause Zego mix when minimizing.
+            try {
+                if ("playing".equalsIgnoreCase(status)
+                        && RoomRtcEngine.getInstance().hasLocalMusicPlayer()
+                        && !RoomRtcEngine.getInstance().isLocalMusicPlaying()) {
+                    RoomRtcEngine.getInstance().resumeLocalMusic();
+                }
+            } catch (Exception ignored) {
+            }
+            return;
+        }
+        final long targetBase = Math.max(0L, positionMs);
+        final String started = startedAt;
+        final String playStatus = status != null ? status : "stopped";
+        // Resolve YouTube → stream offline; direct HTTP/mp3 URLs play as-is.
+        if (isYoutubeUrl(url)) {
+            final String videoId = youtubeId(url);
+            if (videoId == null || videoId.isEmpty()) return;
+            new Thread(() -> {
+                try {
+                    com.Dramizo.Series.util.YoutubeAudioResolver.Resolved resolved =
+                            com.Dramizo.Series.util.YoutubeAudioResolver.resolve(videoId);
+                    String stream = resolved != null
+                            ? (resolved.mixUrl != null && !resolved.mixUrl.isEmpty()
+                            ? resolved.mixUrl : resolved.audioUrl)
+                            : null;
+                    if (stream == null || stream.isEmpty()) return;
+                    main.post(() -> playMusicUrl(stream, playStatus, targetBase, started));
+                } catch (Exception ignored) {
+                }
+            }, "fgs-yt-music").start();
             return;
         }
         String absolute = AssetCatalog.absoluteUrl(url);
-        if (absolute == null) return;
-        musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
-        musicPlayer.prepare();
-        long target = Math.max(0L, positionMs);
-        if ("playing".equalsIgnoreCase(status) && startedAt != null) {
-            try {
-                target += Math.max(0L,
-                        System.currentTimeMillis()
-                                - java.time.Instant.parse(startedAt).toEpochMilli());
-            } catch (Exception ignored) {
+        if (absolute == null || absolute.isEmpty()) absolute = url;
+        playMusicUrl(absolute, playStatus, targetBase, started);
+    }
+
+    private void playMusicUrl(String absolute, String status, long positionMs, String startedAt) {
+        if (musicPlayer == null || absolute == null || absolute.isEmpty()) return;
+        try {
+            musicPlayer.setMediaItem(MediaItem.fromUri(absolute));
+            musicPlayer.prepare();
+            long target = Math.max(0L, positionMs);
+            if ("playing".equalsIgnoreCase(status) && startedAt != null) {
+                try {
+                    target += Math.max(0L,
+                            System.currentTimeMillis()
+                                    - java.time.Instant.parse(startedAt).toEpochMilli());
+                } catch (Exception ignored) {
+                }
             }
+            musicPlayer.seekTo(target);
+            musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
+            musicPlayer.setVolume(1f);
+        } catch (Exception ignored) {
         }
-        musicPlayer.seekTo(target);
-        musicPlayer.setPlayWhenReady("playing".equalsIgnoreCase(status));
+    }
+
+    private static boolean isYoutubeUrl(@Nullable String url) {
+        if (url == null) return false;
+        String u = url.toLowerCase(java.util.Locale.US);
+        return u.contains("youtube.com") || u.contains("youtu.be") || u.startsWith("yt://");
+    }
+
+    @Nullable
+    private static String youtubeId(@Nullable String url) {
+        if (url == null || url.isEmpty()) return null;
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?:v=|/embed/|/shorts/|youtu\\.be/)([A-Za-z0-9_-]{6,})")
+                    .matcher(url);
+            if (m.find()) return m.group(1);
+            if (url.regionMatches(true, 0, "yt://", 0, 5)) {
+                return url.substring(5).trim();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private void leaveRoom(String requestedRoomId) {

@@ -41,13 +41,23 @@
       </div>
       <div class="col-lg-4">
         <ChartCard
-          :title="t('dashboard.userDistribution')"
+          :title="t('dashboard.revenueByChannel') || 'إيرادات حسب القناة'"
           type="doughnut"
           :labels="revenueChart.labels"
           :datasets="revenueChart.datasets"
-          :center-label="t('dashboard.totalShort')"
-          :center-value="centerTotal"
+          :center-label="t('dashboard.totalRevenueLabel') || 'إيرادات'"
+          :center-value="revenueCenter"
         />
+        <div v-if="revenueBreakdown.length" class="s-panel mt-2 p-2">
+          <div
+            v-for="row in revenueBreakdown"
+            :key="row.provider"
+            class="d-flex justify-content-between align-items-center small py-1 border-bottom border-secondary-subtle"
+          >
+            <span class="text-secondary">{{ row.label }} · {{ row.count }}</span>
+            <strong dir="ltr">{{ formatMoney(row.total) }}</strong>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -214,6 +224,17 @@ const cards = computed(() => {
 
 const centerTotal = computed(() => formatNumber(overview.value?.users ?? overview.value?.totalUsers ?? 0))
 
+const revenueBreakdown = computed(() => {
+  const fromOverview = overview.value?.revenueByProvider
+  if (Array.isArray(fromOverview) && fromOverview.length) return fromOverview
+  const fromCharts = charts.value?.revenue?.byProvider
+  return Array.isArray(fromCharts) ? fromCharts : []
+})
+
+const revenueCenter = computed(() =>
+  formatMoney(overview.value?.revenue ?? overview.value?.totalRevenue ?? overview.value?.totalRechargeFiat ?? 0),
+)
+
 const miniStats = computed(() => {
   const o = overview.value || {}
   const users = charts.value?.users || {}
@@ -222,14 +243,28 @@ const miniStats = computed(() => {
   const rSeries = rooms.data || rooms.rooms || []
   const todayUsers = uSeries.length ? Number(uSeries[uSeries.length - 1] || 0) : 0
   const todayRooms = rSeries.length ? Number(rSeries[rSeries.length - 1] || 0) : 0
-  const rev = charts.value?.revenue || {}
-  const revVals = rev.values || rev.data || []
+  const coinVol = charts.value?.revenue?.coinVolume?.values || []
   return [
     { label: t('dashboard.newUsersToday'), value: `+${formatNumber(todayUsers)}`, icon: 'bi-person-plus', tone: 't-p' },
     { label: t('dashboard.newRoomsToday'), value: `+${formatNumber(todayRooms)}`, icon: 'bi-door-open', tone: 't-b' },
-    { label: t('dashboard.txToday'), value: formatMoney(o.revenue ?? o.totalRevenue ?? 0), icon: 'bi-cash-stack', tone: 't-g' },
-    { label: t('dashboard.rechargeCoins'), value: formatNumber(revVals[0] ?? 0), icon: 'bi-gem', tone: 't-y' },
-    { label: t('dashboard.giftsSent'), value: formatNumber(revVals[1] ?? o.activeGifts ?? 0), icon: 'bi-gift-fill', tone: 't-r' },
+    {
+      label: t('dashboard.txToday') || 'إيراد اليوم',
+      value: formatMoney(o.todayRevenue ?? 0),
+      icon: 'bi-cash-stack',
+      tone: 't-g',
+    },
+    {
+      label: t('dashboard.rechargeCoins'),
+      value: formatNumber(coinVol[0] ?? 0),
+      icon: 'bi-gem',
+      tone: 't-y',
+    },
+    {
+      label: t('dashboard.giftsSent'),
+      value: formatNumber(coinVol[1] ?? o.activeGifts ?? 0),
+      icon: 'bi-gift-fill',
+      tone: 't-r',
+    },
   ]
 })
 
@@ -310,12 +345,14 @@ const combinedChart = computed(() => {
 
 const revenueChart = computed(() => {
   const c = charts.value?.revenue || {}
+  const labels = c.labels || revenueBreakdown.value.map((r) => r.label)
+  const data = c.values || c.data || revenueBreakdown.value.map((r) => r.total)
   return {
-    labels: c.labels || [t('dashboard.recharge'), t('gifts.title'), t('vip.title')],
+    labels: labels.length ? labels : ['—'],
     datasets: [
       {
-        data: c.values || c.data || [1, 1, 1],
-        backgroundColor: ['#6c5ce7', '#3b82f6', '#f5b942', '#00c566', '#ff5a7a'],
+        data: data.length ? data : [0],
+        backgroundColor: ['#6c5ce7', '#3b82f6', '#f5b942', '#00c566', '#ff5a7a', '#a78bfa', '#22d3ee'],
         borderWidth: 0,
         hoverOffset: 6,
         spacing: 3,

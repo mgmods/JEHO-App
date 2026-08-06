@@ -49,7 +49,12 @@ public final class AvatarCosmetics {
     private static void loadWearImage(@Nullable ImageView view, @Nullable String url) {
         if (view == null || url == null || url.isEmpty()) return;
         Runnable load = () -> {
-            if (view.getContext() == null) return;
+            android.content.Context ctx = view.getContext();
+            if (ctx == null) return;
+            if (ctx instanceof android.app.Activity) {
+                android.app.Activity act = (android.app.Activity) ctx;
+                if (act.isFinishing() || act.isDestroyed()) return;
+            }
             int px = Math.max(view.getWidth(), view.getHeight());
             if (px <= 0) {
                 px = Math.round(TypedValue.applyDimension(
@@ -57,13 +62,17 @@ public final class AvatarCosmetics {
             }
             // Cap decode size — frames never need 2K+ pixels on list rows.
             px = Math.min(Math.max(px, 64), 512);
-            Glide.with(view)
-                    .load(AssetCatalog.absoluteUrl(url))
-                    .override(px, px)
-                    .fitCenter()
-                    .dontAnimate()
-                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                    .into(view);
+            try {
+                Glide.with(view)
+                        .load(AssetCatalog.absoluteUrl(url))
+                        .override(px, px)
+                        .fitCenter()
+                        .dontAnimate()
+                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                        .into(view);
+            } catch (Exception ignored) {
+                // Destroyed activity / detached view — ignore.
+            }
         };
         if (view.getWidth() > 0 && view.getHeight() > 0) {
             load.run();

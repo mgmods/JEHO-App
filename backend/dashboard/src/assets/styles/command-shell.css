@@ -1242,10 +1242,16 @@ textarea.form-control,
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Ensure login page is also dark */
 .login-page {
-  background: #0f111a !important;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 20%, rgba(108, 92, 231, 0.18), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 15%, rgba(59, 130, 246, 0.1), transparent 50%),
+    #0f111a !important;
   color: #f4f6fb !important;
+}
+
+.login-page::before {
+  display: none;
 }
 
 /* image placeholders / empty media */

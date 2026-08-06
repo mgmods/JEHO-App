@@ -223,9 +223,11 @@
 <string name="agency_application_paid_hint">Opening an agency is paid from your coin wallet (Google Play / Binance USDT / agent). Price is set by admin.</string>
 <string name="agency_application_loading_price">Loading price…</string>
 <string name="agency_pay_and_submit_format">Pay %,d coins &amp; submit</string>
+<string name="agency_submit_free">Submit free application</string>
 <string name="agency_wallet_balance_format">Your balance: %,d coins</string>
 <string name="agency_insufficient_coins_format">Not enough coins. Need %,d coins — open wallet to recharge.</string>
 <string name="agency_confirm_pay_message">%,d coins will be deducted from your wallet when you submit. Continue?</string>
+<string name="agency_confirm_free_message">Opening is free (admin enabled free mode). Submit application for review?</string>
 <string name="agency_create_price_format">Price: %,d coins (deducted on submit)</string>
 <string name="agency_need_coins_recharge">You need %,d coins. Recharge first (Play / USDT / agent).</string>
 <string name="agency_proposed_name">Proposed agency name *</string>
@@ -556,8 +558,12 @@
 <string name="mall_days_left">%1$d days left</string>
 <string name="mall_permanent">Permanent</string>
 <string name="mall_price_days">%1$d coins · %2$d days</string>
-<string name="mall_free_days">Free · %1$d days</string>
-<string name="mall_tab_frames">Frames</string>
+    <string name="mall_free_days">Free · %1$d days</string>
+    <string name="mall_requires_vip">Requires VIP %1$d</string>
+    <string name="mall_requires_level">Requires level %1$d</string>
+    <string name="mall_vip_unlock">VIP %1$d unlock</string>
+    <string name="mall_vip_badge">VIP %1$d</string>
+    <string name="mall_tab_frames">Frames</string>
 <string name="mall_tab_entry">Entry</string>
 <string name="mall_tab_level">Level badges</string>
 <string name="mall_tab_room_card">Room cards</string>

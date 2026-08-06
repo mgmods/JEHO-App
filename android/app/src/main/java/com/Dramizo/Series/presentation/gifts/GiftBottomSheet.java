@@ -26,11 +26,16 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.GiftDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.DialogRoomGiftBinding;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
+import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
+import com.Dramizo.Series.util.AvatarImageLoader;
 import com.Dramizo.Series.util.GiftAudioFx;
 import com.Dramizo.Series.widget.GiftUserAvatarView;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -260,8 +265,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (gifts != null) allGifts.addAll(gifts);
             applyFilter();
             setLoading(false);
-            // Warm MP4s while the sheet is open so send is instant.
-            if (gifts != null && !gifts.isEmpty() && getContext() != null) {
+            // Room only: warm gift MP4s. DM chat must not buffer dozens of videos (OOM / process kill).
+            if (!chatMode && gifts != null && !gifts.isEmpty() && getContext() != null) {
                 java.util.ArrayList<String> warm = new java.util.ArrayList<>();
                 for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : gifts) {
                     if (g == null) continue;
@@ -280,6 +285,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         vm.getCoinsBalance().observe(getViewLifecycleOwner(), this::bindCoins);
 
+        // Clear sticky so observe does not immediately re-run last room/DM send.
+        vm.clearSent();
         vm.getSent().observe(getViewLifecycleOwner(),
                 result -> onGiftSent(result, roomId));
 
@@ -336,8 +343,83 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         binding.giftNumberRv.setVisibility(View.GONE);
         if (noCpLayout != null) noCpLayout.setVisibility(View.GONE);
         if (hascpLayout != null) hascpLayout.setVisibility(View.GONE);
-        // Collapse promotional top band so the sheet has no empty gap above recipients.
+        // Promotional top band used only for CP tab banner.
         if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
+    }
+
+    private void refreshCpBanner() {
+        if (binding == null) return;
+        boolean isCpTab = giftTypeFilter != null
+                && "cp".equalsIgnoreCase(giftTypeFilter.trim());
+        if (!isCpTab) {
+            if (noCpLayout != null) noCpLayout.setVisibility(View.GONE);
+            if (hascpLayout != null) hascpLayout.setVisibility(View.GONE);
+            if (binding.flTop != null) binding.flTop.setVisibility(View.GONE);
+            return;
+        }
+        if (binding.flTop != null) binding.flTop.setVisibility(View.VISIBLE);
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.CpStatusDto> r = ApiCall.execute(c.getUserApi().myCp());
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                boolean has = r.success && r.data != null && r.data.hasCp && r.data.partner != null;
+                if (noCpLayout != null) noCpLayout.setVisibility(has ? View.GONE : View.VISIBLE);
+                if (hascpLayout != null) hascpLayout.setVisibility(has ? View.VISIBLE : View.GONE);
+                if (!has && noCpLayout != null) {
+                    noCpLayout.setOnClickListener(v ->
+                            startActivity(new android.content.Intent(
+                                    requireContext(),
+                                    com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+                    View marquee = noCpLayout.findViewById(R.id.marquee_view);
+                    if (marquee instanceof android.widget.TextView) {
+                        ((android.widget.TextView) marquee).setText(
+                                "لا يوجد CP — اضغط هنا لإرسال طلب CP");
+                    }
+                }
+                if (has) {
+                    MiscDtos.CpStatusDto st = r.data;
+                    android.widget.TextView lv = hascpLayout != null
+                            ? hascpLayout.findViewById(R.id.has_level) : null;
+                    android.widget.TextView desc = hascpLayout != null
+                            ? hascpLayout.findViewById(R.id.has_level_desc) : null;
+                    android.widget.ProgressBar bar = hascpLayout != null
+                            ? hascpLayout.findViewById(R.id.has_cp_progress) : null;
+                    com.google.android.material.imageview.ShapeableImageView meA =
+                            hascpLayout != null ? hascpLayout.findViewById(R.id.has_cp_me) : null;
+                    com.google.android.material.imageview.ShapeableImageView peerA =
+                            hascpLayout != null ? hascpLayout.findViewById(R.id.has_cp_right) : null;
+                    if (lv != null) lv.setText("LV." + Math.max(0, st.level));
+                    if (desc != null) {
+                        long next = Math.max(st.nextLevelAt, st.level * 500L);
+                        desc.setText(String.format(java.util.Locale.US,
+                                "ألفة %,d · الهدف %,d", st.bondScore, next));
+                    }
+                    if (bar != null) {
+                        bar.setMax(100);
+                        long span = 500;
+                        long into = st.bondScore % span;
+                        bar.setProgress((int) Math.min(100, (into * 100) / span));
+                    }
+                    String myAvatar = null;
+                    try {
+                        Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
+                        if (me.success && me.data != null) myAvatar = me.data.avatarUrl;
+                    } catch (Exception ignored) {}
+                    if (meA != null) AvatarImageLoader.load(meA, myAvatar);
+                    if (peerA != null && st.partner != null) {
+                        AvatarImageLoader.load(peerA, st.partner.avatarUrl);
+                    }
+                    if (hascpLayout != null) {
+                        hascpLayout.setOnClickListener(v ->
+                                startActivity(new android.content.Intent(
+                                        requireContext(),
+                                        com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+                    }
+                }
+            });
+        });
     }
 
     private void setupLoadingBar() {
@@ -414,6 +496,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         && binding.vpGiftListContainer.getCurrentItem() != tab.getPosition()) {
                     binding.vpGiftListContainer.setCurrentItem(tab.getPosition(), true);
                 }
+                refreshCpBanner();
             }
             @Override
             public void onTabUnselected(TabLayout.Tab tab) {
@@ -432,6 +515,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                             giftPageAdapter.setSelectedId(
                                     selected != null ? selected.id : null);
                         }
+                        refreshCpBanner();
                     }
                 });
     }
@@ -964,10 +1048,15 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private void onGiftSent(@Nullable GiftDtos.SendGiftResult result,
                             @Nullable String roomId) {
         sending = false;
+        if (result == null) return;
+        // Consume sticky result first so re-observe never double-fires this payload.
+        try {
+            vm.clearSent();
+        } catch (Exception ignored) {
+        }
         if (binding == null) return;
         refreshSendBtn();
         updateDockText();
-        if (result == null) return;
 
         GiftDtos.GiftDto gift = selected;
         if (result.gift != null) {
@@ -979,6 +1068,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 : (selected != null ? selected.name : "هدية");
         String iconTmp = gift != null ? gift.iconUrl : null;
         if ((iconTmp == null || iconTmp.isEmpty()) && selected != null) iconTmp = selected.iconUrl;
+        // Bubble / toast: never feed video/SVGA into Glide (OOM kill on mid-range devices).
+        String safeIcon = stillGiftIconUrl(iconTmp);
         String animTmp = gift != null ? gift.animationUrl : null;
         if ((animTmp == null || animTmp.isEmpty()
                 || animTmp.toLowerCase(java.util.Locale.US).contains("runtime.html"))
@@ -990,7 +1081,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         // Last resort: map known names (أسد…) to CDN entry MP4s.
         String mapped = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(name, iconTmp, animTmp);
         if (mapped != null) animTmp = mapped;
-        final String icon = iconTmp;
+        final String icon = safeIcon != null ? safeIcon : iconTmp;
         final String anim = animTmp;
         int combo = result.comboCount > 0 ? result.comboCount : vm.getCombo();
         int qty = effectiveQty();
@@ -1004,23 +1095,16 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             vm.setCoinsBalance(result.senderBalance);
         }
 
-        // Normal gift feedback uses Mikoo center toast (VoiceRoomActivity).
-
         boolean luckyGift = isLuckyMode()
                 || (gift != null && gift.type != null
                 && "lucky".equalsIgnoreCase(gift.type.trim()))
                 || (gift != null && gift.category != null
                 && "lucky".equalsIgnoreCase(gift.category.trim()));
 
-        if (!luckyGift) {
-            // Gift SFX disabled product-wide.
-        }
-
+        // Private chat: post bubble only — no room rains, no full-screen celebration overlays.
         if (chatMode) {
-            Bundle out = new Bundle();
-            out.putString("name", name);
-            out.putString("icon", icon);
-            getParentFragmentManager().setFragmentResult("gift_sent_chat", out);
+            finishChatGiftSend(name, icon, luckyGift, result);
+            return;
         }
 
         long coinValue = gift != null
@@ -1029,7 +1113,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 ? result.coinsSpent
                 : (result.totalCoins > 0 ? result.totalCoins : coinValue * Math.max(1, ppl));
         android.app.Activity hostAct = getActivity();
-        if (!chatMode && hostAct instanceof VoiceRoomActivity room) {
+        if (hostAct instanceof VoiceRoomActivity room) {
             SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
             List<String> tgts = !lastTargets.isEmpty()
                     ? new ArrayList<>(lastTargets)
@@ -1038,27 +1122,42 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : java.util.Collections.emptyList());
             boolean allMic = sendToAllMic && tgts.size() > 1;
             if (luckyGift) {
-                GiftAudioFx.playLuckyCoins(requireContext(), 2);
-                List<String> rainIds = !tgts.isEmpty()
-                        ? tgts
-                        : room.collectOccupiedMicUserIdsPublic();
-                room.playLuckyGiftStage(
-                        icon,
-                        rainIds,
-                        Math.max(1L, spentTotal),
-                        Math.max(1, qty),
-                        Math.max(1, rainIds.size()),
-                        null);
-                for (String tid : tgts) {
-                    if (tid != null && !tid.isEmpty() && coinValue > 0) {
-                        room.creditGiftCoinsOnSeat(tid, coinValue);
+                // Lightweight send feedback only — heavy rain is for مردود win path (once).
+                try {
+                    GiftAudioFx.playLuckyCoins(requireContext(), 1);
+                    List<String> rainIds = !tgts.isEmpty()
+                            ? tgts
+                            : room.collectOccupiedMicUserIdsPublic();
+                    if (rainIds.size() > 6) {
+                        rainIds = new ArrayList<>(rainIds.subList(0, 6));
+                    }
+                    room.playLuckyGiftStage(
+                            icon,
+                            rainIds,
+                            Math.max(1L, spentTotal),
+                            Math.max(1, Math.min(qty, 5)),
+                            Math.max(1, rainIds.size()),
+                            null);
+                    for (String tid : tgts) {
+                        if (tid != null && !tid.isEmpty() && coinValue > 0) {
+                            room.creditGiftCoinsOnSeat(tid, coinValue);
+                        }
+                    }
+                    room.announceLuckyGiftChat(
+                            name, icon, session.getDisplayName(), 1,
+                            session.getUserId(), Math.max(0, session.getVipLevel()),
+                            session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
+                            session.getHostBadgeUrl());
+                } catch (OutOfMemoryError | Exception e) {
+                    try {
+                        room.announceLuckyGiftChat(
+                                name, icon, session.getDisplayName(), 1,
+                                session.getUserId(), Math.max(0, session.getVipLevel()),
+                                session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
+                                session.getHostBadgeUrl());
+                    } catch (Exception ignored) {
                     }
                 }
-                room.announceLuckyGiftChat(
-                        name, icon, session.getDisplayName(), combo,
-                        session.getUserId(), Math.max(0, session.getVipLevel()),
-                        session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
-                        session.getHostBadgeUrl());
             } else if (allMic) {
                 room.playLuckyGiftToAllMics(name, icon, anim,
                         session.getDisplayName(), combo,
@@ -1144,17 +1243,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     String chat = softFinal
                             ? ("ضرب حظه · مردود +" + wonCoins)
                             : ("ضرب حظه وربح ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
-                    room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
-                    String meId = session.getUserId();
-                    if (meId != null && !meId.isEmpty()) {
-                        room.showLuckyReturnOnMics(
-                                java.util.Collections.singletonList(meId), wonCoins);
-                        room.playCoinRainToUsers(
-                                java.util.Collections.singletonList(meId), 16);
-                    }
-                    if (sfxCtx != null) {
-                        GiftAudioFx.playLuckyCoins(sfxCtx,
-                                softFinal ? 2 : Math.min(4, Math.max(2, mulFinal)));
+                    try {
+                        room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
+                        String meId = session.getUserId();
+                        if (meId != null && !meId.isEmpty()) {
+                            room.showLuckyReturnOnMics(
+                                    java.util.Collections.singletonList(meId), wonCoins);
+                            // One light rain only — not a second full particle storm.
+                            room.playCoinRainToUsers(
+                                    java.util.Collections.singletonList(meId), 8);
+                        }
+                        if (sfxCtx != null) {
+                            GiftAudioFx.playLuckyCoins(sfxCtx, 1);
+                        }
+                    } catch (OutOfMemoryError | Exception ignored) {
                     }
                     hostAct.getWindow().getDecorView().postDelayed(showSmallToast, 200L);
                 }
@@ -1183,6 +1285,54 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
         // Normal gift: close sheet; Mikoo center toast is shown by VoiceRoomActivity.
         dismissAllowingStateLoss();
+    }
+
+    /**
+     * DM gift: only bubble in conversation. Room rains / celebration toast OOM some handsets
+     * (Hot 30) when misused after private send; sticky LiveData also re-fired this path.
+     */
+    private void finishChatGiftSend(
+            @Nullable String name,
+            @Nullable String icon,
+            boolean luckyGift,
+            @NonNull GiftDtos.SendGiftResult result) {
+        try {
+            Bundle out = new Bundle();
+            out.putString("name", name != null && !name.isEmpty() ? name : "هدية");
+            if (icon != null && !icon.isEmpty()) {
+                out.putString("icon", icon);
+            }
+            long won = result.luckyCoinsWon > 0
+                    ? result.luckyCoinsWon
+                    : (result.breakdown != null ? result.breakdown.luckyReturn : 0L);
+            if (luckyGift && won > 0) {
+                android.content.Context ctx = getContext();
+                if (ctx != null) {
+                    Toast.makeText(ctx, "مردود +" + won, Toast.LENGTH_SHORT).show();
+                }
+            }
+            if (isAdded()) {
+                getParentFragmentManager().setFragmentResult("gift_sent_chat", out);
+            }
+        } catch (Exception ignored) {
+        }
+        try {
+            dismissAllowingStateLoss();
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Nullable
+    private static String stillGiftIconUrl(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return null;
+        String u = url.trim();
+        com.Dramizo.Series.util.CosmeticMedia.Kind kind =
+                com.Dramizo.Series.util.CosmeticMedia.kind(u);
+        if (kind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO
+                || kind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA) {
+            return null;
+        }
+        return u;
     }
 
     // ─── Wealth / coins ───────────────────────────────────────────────────────
@@ -1225,7 +1375,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             }
             if (wealthLevelDesc != null) {
                 wealthLevelDesc.setText(String.format(Locale.US,
-                        "التقدم: %s / %s", fmt(done), fmt(span)));
+                        "التقدم · %s / %s", fmt(done), fmt(span)));
             }
             if (wealthLevelAvatar != null) {
                 String frame = null;
@@ -1243,8 +1393,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     } catch (Exception ignoredFrame) {}
                 }
                 // Fixed sizes in room_gift_level_layout — bind avatar + frame without stack resize.
-                AvatarCosmetics.bindAvatar(wealthLevelAvatar, avatar);
-                AvatarCosmetics.applyFrame(wealthLevelFrame, frame);
+                AvatarCosmetics.bindStacked(wealthLevelAvatar, wealthLevelFrame, avatar, frame);
             }
         } catch (Exception ignored) {}
     }

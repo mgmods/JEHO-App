@@ -10,7 +10,34 @@
         <ImageView android:id="@+id/gift_anim_image" android:visibility="gone" android:layout_width="71.0dip" android:layout_height="71.0dip" android:layout_marginTop="@dimen/dp_1" android:contentDescription="@null" android:layout_marginStart="@dimen/dp_9" android:layout_marginEnd="@dimen/dp_9" android:layout_alignParentStart="true" android:layout_alignParentEnd="true" />
         <ImageView android:id="@+id/gift_image" android:layout_width="71.0dip" android:layout_height="71.0dip" android:layout_marginTop="@dimen/dp_1" android:contentDescription="@null" android:layout_marginStart="@dimen/dp_9" android:layout_marginEnd="@dimen/dp_9" android:layout_alignParentStart="true" android:layout_alignParentEnd="true" />
         <com.Dramizo.Series.widget.MarqueeTextView android:textSize="10.0sp" android:textColor="@color/white" android:ellipsize="marquee" android:gravity="center" android:id="@+id/tv_gift_name" android:focusable="true" android:focusableInTouchMode="true" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginTop="-5.0dip" android:scrollHorizontally="true" android:singleLine="true" android:includeFontPadding="false" android:layout_below="@id/gift_image" android:marqueeRepeatLimit="marquee_forever" android:fontFamily="sans-serif-medium" android:layout_marginStart="@dimen/dp_4" android:layout_marginEnd="@dimen/dp_4" />
-        <TextView android:textSize="11.0sp" android:textColor="@color/white_alpha_30" android:id="@+id/gift_gold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_5" android:text="@string/gift_gold_init" android:includeFontPadding="false" android:layout_below="@id/tv_gift_name" android:layout_centerHorizontal="true" android:fontFamily="sans-serif-medium" android:textDirection="locale" android:layoutDirection="locale" />
+        <LinearLayout
+            android:id="@+id/ll_gift_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/tv_gift_name"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="@dimen/dp_4"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ImageView
+                android:id="@+id/iv_gift_coin"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_asset_coin_gold" />
+            <TextView
+                android:id="@+id/gift_gold"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:text="@string/gift_gold_init"
+                android:textColor="#FFFFD54F"
+                android:textDirection="locale"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
         <LinearLayout android:gravity="end|center" android:orientation="horizontal" android:id="@+id/llMark1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/dp_5" android:layout_marginEnd="@dimen/dp_5" android:layout_alignParentEnd="true">
             <ImageView android:id="@+id/imvGiftMusic" android:visibility="gone" android:layout_width="@dimen/dp_9" android:layout_height="@dimen/dp_9" android:src="@drawable/ic_gift_music" android:contentDescription="@null" />
             <ImageView android:id="@+id/ivGiftEffect" android:visibility="visible" android:layout_width="@dimen/dp_9" android:layout_height="@dimen/dp_9" android:src="@drawable/icon_gift_effect" android:contentDescription="@null" android:layout_marginStart="@dimen/dp_5" />

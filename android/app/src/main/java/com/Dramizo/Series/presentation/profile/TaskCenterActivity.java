@@ -58,6 +58,10 @@ public class TaskCenterActivity extends ThemedActivity {
         binding = ActivityTaskCenterBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         c = ContainerProvider.from(this);
+        if (!c.getSessionManager().isTasksEnabledFromServer()) {
+            finish();
+            return;
+        }
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
         agencyId = getIntent().getStringExtra(EXTRA_AGENCY_ID);
         binding.btnBack.setOnClickListener(v -> navigateUp());

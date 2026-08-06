@@ -28,8 +28,11 @@ public class UserLevelActivity extends ThemedActivity {
         setContentView(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());
         if (binding.btnTasks != null) {
-            binding.btnTasks.setOnClickListener(v ->
-                    startActivity(new Intent(this, TaskCenterActivity.class)));
+            com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnTasks, this);
+            binding.btnTasks.setOnClickListener(v -> {
+                if (!com.Dramizo.Series.util.TasksFeature.isEnabled(this)) return;
+                startActivity(new Intent(this, TaskCenterActivity.class));
+            });
         }
 
         binding.tabLevel.addTab(binding.tabLevel.newTab().setText(R.string.growth_tab));

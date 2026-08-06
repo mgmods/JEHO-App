@@ -47,6 +47,7 @@ import {
   GIFT_DIAMOND_RATIO,
   LUCKY_GIFT_DIAMOND_RATIO,
   LUCKY_GIFT_MAX_MULTIPLIER,
+  mintDiamondsPerUnit,
 } from '../../common/pricing-catalog';
 
 type LuckyRoll = {
@@ -88,12 +89,52 @@ export class GiftsService implements OnModuleInit {
     await this.ensureGiftCategoryColumn();
     await this.ensureGiftCategoriesTable();
     await this.ensureDefaultGiftCategories();
+    // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
+    await this.healZeroDiamondCatalog();
     if (!bootCatalogSeedEnabled()) {
       this.log.log('Gifts catalog: DB authoritative (no boot seed)');
       return;
     }
     await this.ensureDefaultLuckyGift();
     await this.ensureMikooGiftTabs();
+  }
+
+  /**
+   * Repair paid gifts that have catalog diamondValue=0 (legacy default).
+   * Does not change free bag gifts (coinPrice=0) or admin-set positive ceilings.
+   */
+  private async healZeroDiamondCatalog() {
+    try {
+      const rows: Array<{ id: string; coinPrice: number; type: string }> =
+        await this.dataSource.query(
+          `SELECT id, "coinPrice", type FROM gifts
+           WHERE COALESCE("diamondValue", 0) = 0
+             AND COALESCE("coinPrice", 0) > 0
+             AND "isActive" = true`,
+        );
+      if (!rows?.length) return;
+      let fixed = 0;
+      for (const row of rows) {
+        const isLucky = String(row.type || '') === GiftType.LUCKY;
+        const next = mintDiamondsPerUnit(
+          Number(row.coinPrice) || 0,
+          0,
+          isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO,
+        );
+        if (next <= 0) continue;
+        await this.giftsRepo.update({ id: row.id }, { diamondValue: next });
+        fixed += 1;
+      }
+      if (fixed > 0) {
+        this.log.warn(
+          `Healed ${fixed} gift(s) with diamondValue=0 → minted from coin × ratio`,
+        );
+      }
+    } catch (err) {
+      this.log.warn(
+        `healZeroDiamondCatalog: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /** Ensure optional Mikoo-style category column exists (prod may have synchronize=false). */
@@ -113,7 +154,7 @@ export class GiftsService implements OnModuleInit {
     try {
       await this.dataSource.query(`
         CREATE TABLE IF NOT EXISTS gift_categories (
-          id uuid PRIMARY KEY,
+          id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
           key varchar(32) NOT NULL UNIQUE,
           "labelAr" varchar(64) NOT NULL,
           "labelEn" varchar(64) NULL,
@@ -131,8 +172,18 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
-  /** Default tabs for the gift sheet (admins can add more from dashboard). */
+  /** Seed defaults only when the table is empty — never re-create admin deletions. */
   private async ensureDefaultGiftCategories() {
+    try {
+      const count = await this.categoriesRepo.count();
+      if (count > 0) return;
+    } catch (err) {
+      this.log.warn(
+        `ensureDefaultGiftCategories count: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
     const defaults: Array<{
       key: string;
       labelAr: string;
@@ -147,8 +198,6 @@ export class GiftsService implements OnModuleInit {
     ];
     for (const d of defaults) {
       try {
-        const existing = await this.categoriesRepo.findOne({ where: { key: d.key } });
-        if (existing) continue;
         await this.categoriesRepo.save(
           this.categoriesRepo.create({
             key: d.key,
@@ -493,6 +542,192 @@ export class GiftsService implements OnModuleInit {
    * Safe to call from admin even when DB is authoritative (inserts missing only;
    * updates icon/animation for matching names without touching coinPrice).
    */
+  /**
+   * Upsert professional still-image gifts. Never deletes video/flag/existing gifts.
+   * Media type stays as uploaded: PNG/JPEG=image, GIF/WebP=anim, MP4=video on play.
+   */
+  async rebuildStillImageCatalog(): Promise<{
+    deleted: number;
+    created: number;
+    updated: number;
+    categories: number;
+  }> {
+    const catalogPath = join(
+      process.cwd(),
+      'public',
+      'assets',
+      'gifts',
+      'jeho',
+      'still-catalog.json',
+    );
+    if (!existsSync(catalogPath)) {
+      throw new BadRequestException(
+        'still-catalog.json missing under public/assets/gifts/jeho/',
+      );
+    }
+    let raw: any;
+    try {
+      raw = JSON.parse(readFileSync(catalogPath, 'utf8'));
+    } catch {
+      throw new BadRequestException('still-catalog.json invalid JSON');
+    }
+    const gifts = Array.isArray(raw?.gifts) ? raw.gifts : [];
+    if (!gifts.length) {
+      throw new BadRequestException('still-catalog has no gifts');
+    }
+
+    // Ensure core category tabs exist (do NOT deactivate country / custom tabs).
+    const coreCats: Array<{
+      key: string;
+      labelAr: string;
+      labelEn: string;
+      sortOrder: number;
+    }> = Array.isArray(raw?.categories)
+      ? raw.categories
+      : [
+          { key: 'normal', labelAr: 'عادي', labelEn: 'Normal', sortOrder: 0 },
+          { key: 'lucky', labelAr: 'حظ', labelEn: 'Lucky', sortOrder: 1 },
+          { key: 'combo', labelAr: 'كومبو', labelEn: 'Combo', sortOrder: 2 },
+          { key: 'premium', labelAr: 'مميز', labelEn: 'Premium', sortOrder: 3 },
+        ];
+    let catN = 0;
+    for (const d of coreCats) {
+      let row = await this.categoriesRepo.findOne({ where: { key: d.key } });
+      if (!row) {
+        row = this.categoriesRepo.create({
+          key: d.key,
+          labelAr: d.labelAr,
+          labelEn: d.labelEn,
+          sortOrder: d.sortOrder,
+          isActive: true,
+        });
+      } else {
+        row.labelAr = d.labelAr;
+        row.labelEn = d.labelEn;
+        row.sortOrder = d.sortOrder;
+        row.isActive = true;
+      }
+      await this.categoriesRepo.save(row);
+      catN += 1;
+    }
+
+    const stillBase = '/assets/gifts/jeho/still';
+    const versionTag = 'v=still2';
+    let created = 0;
+    let updated = 0;
+    for (const g of gifts) {
+      const code = String(g?.code || '').trim();
+      const name = String(g?.nameAr || g?.name || '').trim().slice(0, 64);
+      const file = String(g?.file || '').trim();
+      if (!name || !file) continue;
+      const iconUrl = `${stillBase}/${file}?${versionTag}`;
+      // Image gift: icon + anim both still → app plays as IMAGE (can change anim to mp4 later).
+      const animationUrl = iconUrl;
+      const coinPrice = Math.max(1, Number(g?.coinPrice) || 10);
+      const typeRaw = String(g?.type || 'normal').toLowerCase();
+      const type =
+        typeRaw === 'lucky'
+          ? GiftType.LUCKY
+          : typeRaw === 'combo'
+            ? GiftType.COMBO
+            : typeRaw === 'premium'
+              ? GiftType.PREMIUM
+              : GiftType.NORMAL;
+      const category = String(g?.category || type || 'normal')
+        .trim()
+        .toLowerCase()
+        .slice(0, 32);
+      const lucky =
+        type === GiftType.LUCKY || g?.lucky === true
+          ? {
+              mode: 'multiplier' as const,
+              minMultiplier: 0.2,
+              maxMultiplier: 20,
+              winChance: 0.35,
+            }
+          : null;
+
+      // Match by name — never overwrite gifts that already have real video animation.
+      let existing = await this.giftsRepo.findOne({ where: { name } });
+      if (existing) {
+        const existingAnim = String(existing.animationUrl || '').toLowerCase();
+        const isVideoGift =
+          existingAnim.endsWith('.mp4') ||
+          existingAnim.endsWith('.webm') ||
+          existingAnim.endsWith('.mov') ||
+          existingAnim.includes('.mp4?') ||
+          existingAnim.includes('.webm?');
+        if (isVideoGift) {
+          // Keep video gifts untouched.
+          continue;
+        }
+        let dirty = false;
+        if (existing.iconUrl !== iconUrl) {
+          existing.iconUrl = iconUrl;
+          dirty = true;
+        }
+        if (!existing.animationUrl || !String(existing.animationUrl).includes('/still/')) {
+          // Only set anim to still if empty / html placeholder — never clobber custom media.
+          const a = String(existing.animationUrl || '').toLowerCase();
+          if (!a || a.includes('runtime.html') || a.endsWith('.html')) {
+            existing.animationUrl = animationUrl;
+            dirty = true;
+          }
+        }
+        if (!existing.isActive) {
+          existing.isActive = true;
+          dirty = true;
+        }
+        // Paid gifts with catalog diamondValue=0 awarded 0 diamonds (Math.min bug).
+        if (
+          Number(existing.diamondValue || 0) <= 0 &&
+          Number(existing.coinPrice || coinPrice || 0) > 0
+        ) {
+          const price = Math.max(1, Number(existing.coinPrice) || coinPrice);
+          existing.diamondValue = mintDiamondsPerUnit(
+            price,
+            0,
+            type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO,
+          );
+          dirty = true;
+        }
+        if (dirty) {
+          await this.giftsRepo.save(existing);
+          updated += 1;
+        }
+        continue;
+      }
+
+      await this.giftsRepo.save(
+        this.giftsRepo.create({
+          name,
+          description: `هدية صورة · ${code || name}`.slice(0, 255),
+          iconUrl,
+          animationUrl,
+          coinPrice,
+          diamondValue: Math.floor(
+            coinPrice * (type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO),
+          ),
+          type,
+          category,
+          isActive: true,
+          sortOrder: Number(g?.sortOrder) || created,
+          luckyConfig: lucky,
+        } as any),
+      );
+      created += 1;
+    }
+
+    this.log.log(
+      `Still gifts merged (no wipe): created=${created}, updated=${updated}, cats=${catN}`,
+    );
+    return { deleted: 0, created, updated, categories: catN };
+  }
+
+  /**
+   * JEHO designed packs: flag frames + premium video gifts (upsert only, no full wipe).
+   * App plays media by file type: mp4 → video, gif/webp → anim, png → image.
+   */
   async importJehoDesignedGifts(): Promise<{ flags: number; premium: number }> {
     const catalogPath = join(
       process.cwd(),
@@ -577,7 +812,7 @@ export class GiftsService implements OnModuleInit {
         await this.giftsRepo.save(
           this.giftsRepo.create({
             name,
-            description: `هدية فيديو فاخرة · ${g?.nameEn || ''}`.trim().slice(0, 255),
+            description: `هدية فيديو · ${g?.nameEn || ''}`.trim().slice(0, 255),
             iconUrl,
             animationUrl: animationUrl || iconUrl,
             coinPrice,
@@ -617,7 +852,7 @@ export class GiftsService implements OnModuleInit {
     }
 
     this.log.log(
-      `JEHO designed gifts synced (flags=${flagsN}, premium=${premiumN})`,
+      `JEHO designed gifts synced (flags=${flagsN}, premium video=${premiumN})`,
     );
     return { flags: flagsN, premium: premiumN };
   }
@@ -797,23 +1032,23 @@ export class GiftsService implements OnModuleInit {
       maxMultiplier?: number;
     } | null,
   ): LuckyRoll {
-    const hardMax = Math.max(1, Number(LUCKY_GIFT_MAX_MULTIPLIER) || 8);
-    // Prefer runtime house table; cfg only caps the big-hit ceiling.
+    const hardMax = Math.max(1, Number(LUCKY_GIFT_MAX_MULTIPLIER) || 5);
     const maxMul = Math.min(
       hardMax,
       Math.max(3, Number(cfg?.maxMultiplier) || hardMax),
     );
+    // ≈ EV 0.40–0.42 coin rebate to sender (house keeps majority + diamond cut).
     const roll = randomInt(0, 1_000_000) / 1_000_000;
     let luckyMultiplier: number | null = null;
-    if (roll < 0.4) {
+    if (roll < 0.38) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((0.3 + frac * 0.5) * 100) / 100; // 0.30–0.80
-    } else if (roll < 0.5) {
+      luckyMultiplier = Math.round((0.25 + frac * 0.45) * 100) / 100; // 0.25–0.70
+    } else if (roll < 0.47) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((1.2 + frac * 1.3) * 100) / 100; // 1.20–2.50
-    } else if (roll < 0.525) {
+      luckyMultiplier = Math.round((1.1 + frac * 0.9) * 100) / 100; // 1.10–2.00
+    } else if (roll < 0.485) {
       const frac = randomInt(0, 1_000_000) / 1_000_000;
-      luckyMultiplier = Math.round((3 + frac * (maxMul - 3)) * 100) / 100;
+      luckyMultiplier = Math.round((2.5 + frac * (maxMul - 2.5)) * 100) / 100;
     }
     const luckyCoinsWon =
       luckyMultiplier != null
@@ -887,7 +1122,19 @@ export class GiftsService implements OnModuleInit {
         if (clash && clash.id !== row.id) {
           throw new BadRequestException('category key already exists');
         }
+        const oldKey = row.key;
         row.key = key;
+        // Keep gifts pointing to the renamed tab.
+        try {
+          await this.giftsRepo
+            .createQueryBuilder()
+            .update()
+            .set({ category: key })
+            .where('category = :oldKey', { oldKey })
+            .execute();
+        } catch {
+          /* column may lag */
+        }
       }
       if (dto.labelAr != null) row.labelAr = dto.labelAr.trim() || row.labelAr;
       if (dto.labelEn !== undefined) row.labelEn = dto.labelEn?.trim() || null;
@@ -901,12 +1148,32 @@ export class GiftsService implements OnModuleInit {
   async deleteCategory(id: string) {
     const row = await this.categoriesRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('Gift category not found');
-    // Protect core tabs so the sheet never loses defaults.
-    if (['normal', 'lucky', 'combo', 'premium'].includes(row.key)) {
-      throw new BadRequestException('cannot delete core category');
+    const total = await this.categoriesRepo.count();
+    if (total <= 1) {
+      throw new BadRequestException('يجب الإبقاء على فئة واحدة على الأقل');
+    }
+    // Move gifts off this tab so the sheet stays consistent.
+    const others = await this.categoriesRepo.find({
+      order: { sortOrder: 'ASC', createdAt: 'ASC' },
+    });
+    const fallback =
+      others.find((c) => c.id !== row.id)?.key ||
+      others.find((c) => c.key !== row.key)?.key ||
+      'normal';
+    try {
+      await this.giftsRepo
+        .createQueryBuilder()
+        .update()
+        .set({ category: fallback })
+        .where('category = :key', { key: row.key })
+        .execute();
+    } catch (err) {
+      this.log.warn(
+        `deleteCategory reassign gifts: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
     await this.categoriesRepo.remove(row);
-    return { ok: true };
+    return { ok: true, reassignedTo: fallback };
   }
 
   async send(senderId: string, dto: SendGiftDto) {
@@ -921,18 +1188,37 @@ export class GiftsService implements OnModuleInit {
     if (!gift) throw new NotFoundException('Gift not found');
     await this.assertGiftTarget(dto);
 
+    const giftCategory = String((gift as any).category || '')
+      .trim()
+      .toLowerCase();
+    if (giftCategory === 'cp') {
+      const rows = await this.dataSource.query(
+        `SELECT 1 FROM social_requests
+          WHERE type = 'relation' AND status = 'accepted'
+            AND (("fromUserId" = $1 AND "toUserId" = $2)
+              OR ("fromUserId" = $2 AND "toUserId" = $1))
+          LIMIT 1`,
+        [senderId, dto.receiverId],
+      );
+      if (!rows?.length) {
+        throw new BadRequestException(
+          'هدايا CP للشريك فقط — أكملا ربط CP من مساحة CP أولاً',
+        );
+      }
+    }
+
     const isLucky = gift.type === GiftType.LUCKY;
     const qtyCap = isLucky ? 177 : 99;
     const qty = Math.max(1, Math.min(qtyCap, Math.floor(Number(dto.quantity) || 1)));
-    const comboCount = Math.max(1, Math.min(99, Math.floor(Number(dto.comboCount) || 1)));
+    // Lucky gifts never ride a client combo streak (combo ≠ مردود).
+    const comboCount = isLucky
+      ? 1
+      : Math.max(1, Math.min(99, Math.floor(Number(dto.comboCount) || 1)));
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty;
     const ratioCap = isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO;
-    const catalogDiamonds = Math.max(0, Number(gift.diamondValue) || 0);
-    const cappedPerUnit = Math.min(
-      catalogDiamonds,
-      Math.floor(coinPrice * ratioCap),
-    );
+    // Never use Math.min(catalog=0, …) — that wiped diamonds on unpaid catalog rows.
+    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
     // Receiver diamonds stay base (no multiplier). Lucky jackpot returns coins to sender.
     const diamondsAwarded = cappedPerUnit * qty;
     let luckyMultiplier: number | null = null;
@@ -1010,14 +1296,14 @@ export class GiftsService implements OnModuleInit {
         });
       }
 
-      let platformPct = 30;
+      let platformPct = 40;
       const cutRow = await manager.findOne(AppSetting, {
         where: { key: 'agency_platform_cut_percent' },
       });
       if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
         platformPct = Math.min(100, Math.max(0, Number(cutRow.value)));
       }
-      let hostSharePct = 55;
+      let hostSharePct = 45;
       const hostShareRow = await manager.findOne(AppSetting, {
         where: { key: 'agency_host_share_percent' },
       });
@@ -1540,19 +1826,14 @@ export class GiftsService implements OnModuleInit {
     const isLucky = gift.type === GiftType.LUCKY;
     const qtyCap = isLucky ? 177 : 99;
     const qty = Math.max(1, Math.min(qtyCap, Math.floor(Number(dto.quantity) || 1)));
-    const comboCount = Math.max(
-      1,
-      Math.min(99, Math.floor(Number(dto.comboCount) || 1)),
-    );
+    const comboCount = isLucky
+      ? 1
+      : Math.max(1, Math.min(99, Math.floor(Number(dto.comboCount) || 1)));
     const personCount = receiverIds.length;
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty * personCount;
     const ratioCap = isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO;
-    const catalogDiamonds = Math.max(0, Number(gift.diamondValue) || 0);
-    const cappedPerUnit = Math.min(
-      catalogDiamonds,
-      Math.floor(coinPrice * ratioCap),
-    );
+    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
     const diamondPool = cappedPerUnit * qty * personCount;
 
     let luckyMultiplier: number | null = null;
@@ -1563,7 +1844,7 @@ export class GiftsService implements OnModuleInit {
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    let platformPct = 25;
+    let platformPct = 40;
     const cutRow = await this.settingsRepo.findOne({
       where: { key: 'agency_platform_cut_percent' },
     });

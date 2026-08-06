@@ -54,6 +54,11 @@ public class GiftViewModel extends ViewModel {
         return sent;
     }
 
+    /** Consume sticky send so re-opening the gift sheet does not re-fire FX / chat posts. */
+    public void clearSent() {
+        sent.setValue(null);
+    }
+
     public LiveData<String> getError() {
         return error;
     }
@@ -157,11 +162,15 @@ public class GiftViewModel extends ViewModel {
         int qty = Math.max(1, Math.min(177, quantity));
         long now = System.currentTimeMillis();
         String first = targets.get(0);
-        boolean sameCombo = giftId.equals(lastGiftId)
+        // Gift combo streak is for rapid re-send of the same normal gift only.
+        // Lucky / مردود must never inflate combo (user confuses ×combo with merdood).
+        boolean lucky = isLuckyGift(giftId);
+        boolean sameCombo = !lucky
+                && giftId.equals(lastGiftId)
                 && first != null && first.equals(lastReceiverId)
                 && targets.size() == 1
                 && (now - lastSendAt) < 4000;
-        combo = sameCombo ? combo + 1 : 1;
+        combo = lucky ? 1 : (sameCombo ? combo + 1 : 1);
         lastGiftId = giftId;
         lastReceiverId = first;
         lastSendAt = now;
@@ -178,7 +187,12 @@ public class GiftViewModel extends ViewModel {
                 return;
             }
             GiftDtos.SendGiftResult data = r.data;
-            if (data != null && data.comboCount > 0) combo = data.comboCount;
+            // Server may echo combo — never let lucky inflate local streak.
+            if (data != null && data.comboCount > 0 && !isLuckyGift(giftId)) {
+                combo = data.comboCount;
+            } else if (isLuckyGift(giftId)) {
+                combo = 1;
+            }
             if (data != null) {
                 if (data.wallet != null) {
                     coinsBalance.postValue(data.wallet.coins);
@@ -192,5 +206,18 @@ public class GiftViewModel extends ViewModel {
             }
             sent.postValue(data);
         });
+    }
+
+    private boolean isLuckyGift(String giftId) {
+        if (giftId == null || giftId.isEmpty()) return false;
+        List<GiftDtos.GiftDto> list = gifts.getValue();
+        if (list == null) return false;
+        for (GiftDtos.GiftDto g : list) {
+            if (g == null || g.id == null || !giftId.equals(g.id)) continue;
+            if (g.type != null && "lucky".equalsIgnoreCase(g.type.trim())) return true;
+            if (g.category != null && "lucky".equalsIgnoreCase(g.category.trim())) return true;
+            return false;
+        }
+        return false;
     }
 }

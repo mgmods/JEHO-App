@@ -79,6 +79,24 @@ class AdminLoginDto {
   password!: string;
 }
 
+class UpdateAdminCredentialsDto {
+  @ApiProperty({ description: 'Current password confirmation' })
+  @IsString()
+  @MinLength(6)
+  currentPassword!: string;
+
+  @ApiProperty({ required: false, description: 'New login email' })
+  @IsOptional()
+  @IsEmail()
+  newEmail?: string;
+
+  @ApiProperty({ required: false, description: 'New password (min 8)' })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
+  newPassword?: string;
+}
+
 @ApiTags('Admin')
 @Controller('admin')
 export class AdminController {
@@ -114,6 +132,17 @@ export class AdminController {
   @Get('auth/me')
   adminMe(@CurrentUser('sub') userId: string) {
     return this.adminService.adminMe(userId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('auth/credentials')
+  @ApiOperation({ summary: 'Change super-admin email and/or password' })
+  updateCredentials(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: UpdateAdminCredentialsDto,
+  ) {
+    return this.adminService.updateAdminCredentials(userId, dto);
   }
 
   // ─── Dashboard ─────────────────────────────────────────────
@@ -399,9 +428,19 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('gifts/rebuild-still-catalog')
+  @ApiOperation({
+    summary: 'Merge still-image gifts only (never deletes video/flag gifts)',
+  })
+  rebuildStillGiftCatalog() {
+    return this.adminService.rebuildStillGiftCatalog();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('gifts/import-jeho-pack')
   @ApiOperation({
-    summary: 'Import JEHO designed flag frames + premium video gifts from disk',
+    summary: 'Upsert JEHO flag + premium video gifts (keeps existing media types)',
   })
   importJehoGiftPack() {
     return this.adminService.importJehoDesignedGifts();
@@ -1375,16 +1414,40 @@ export class AdminController {
   @ApiBearerAuth()
   @Get('tasks')
   async adminTasks() {
-    const items = await this.tasksService.loadTasks();
-    return { items, total: items.length };
+    const [items, enabled] = await Promise.all([
+      this.tasksService.loadTasks(),
+      this.tasksService.isEnabled(),
+    ]);
+    return { items, total: items.length, enabled };
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Put('tasks')
-  saveTasks(@Body() body: { items?: unknown[] } | unknown[]) {
-    const items = Array.isArray(body) ? body : (body as any)?.items;
-    return this.tasksService.saveTasks(items as any);
+  async saveTasks(@Body() body: { items?: unknown[]; enabled?: boolean } | unknown[]) {
+    if (Array.isArray(body)) {
+      return this.tasksService.saveTasks(body as any);
+    }
+    const payload = (body || {}) as { items?: unknown[]; enabled?: boolean };
+    const result: Record<string, unknown> = {};
+    if (typeof payload.enabled === 'boolean') {
+      result.enabled = await this.tasksService.setEnabled(payload.enabled);
+    }
+    if (Array.isArray(payload.items)) {
+      Object.assign(result, await this.tasksService.saveTasks(payload.items as any));
+    }
+    if (result.enabled === undefined) {
+      result.enabled = await this.tasksService.isEnabled();
+    }
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Put('tasks/enabled')
+  async setTasksEnabled(@Body() body: { enabled?: boolean }) {
+    const enabled = await this.tasksService.setEnabled(body?.enabled !== false);
+    return { enabled };
   }
 
   // ─── Cosmetics admin ───────────────────────────────────────

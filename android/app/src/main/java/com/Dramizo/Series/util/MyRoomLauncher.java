@@ -70,6 +70,7 @@ public final class MyRoomLauncher {
     }
 
     private static void enter(@NonNull Activity activity, @NonNull String roomId) {
+        RoomJoinPrefetch.begin(activity, roomId, null);
         Intent i = new Intent(activity, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
         i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, true);

@@ -16,12 +16,13 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { LuckyWheelSpinDto } from './dto/lucky-wheel.dto';
 import { RoomGameAccessService } from './room-game-access.service';
+import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
 
 export type LuckyWheelSector = 'red' | 'orange' | 'seven' | 'lose';
 
 /** Visual wheel sectors (8) — must match lucky-wheel.html slice order. */
 export const WHEEL_SECTORS: { id: LuckyWheelSector; multiplier: number }[] = [
-  { id: 'seven', multiplier: 8 },
+  { id: 'seven', multiplier: 6 },
   { id: 'orange', multiplier: 2 },
   { id: 'lose', multiplier: 0 },
   { id: 'orange', multiplier: 2 },
@@ -61,11 +62,11 @@ export class LuckyWheelService {
     return {
       enabled: (map.get('games.lucky_wheel.enabled') ?? 'true') !== 'false',
       minBet: Math.max(1, num('games.lucky_wheel.min_bet', 100)),
-      maxBet: Math.max(100, num('games.lucky_wheel.max_bet', 50_000)),
+      maxBet: Math.min(Math.max(100, num('games.lucky_wheel.max_bet', 10_000)), GAME_PAYOUT.maxBet),
       /** Very low win rate by default. */
-      loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 86)),
-      x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 12)),
-      x8Weight: Math.max(0, num('games.lucky_wheel.x8_weight', 2)),
+      loseWeight: Math.max(1, num('games.lucky_wheel.lose_weight', 72)),
+      x2Weight: Math.max(0, num('games.lucky_wheel.x2_weight', 24)),
+      x8Weight: Math.max(0, num('games.lucky_wheel.x8_weight', 4)),
     };
   }
 
@@ -83,8 +84,8 @@ export class LuckyWheelService {
       config: {
         minBet: cfg.minBet,
         maxBet: cfg.maxBet,
-        chips: [100, 1000, 10000, 50000].filter((c) => c <= cfg.maxBet),
-        multipliers: { red: 2, orange: 2, seven: 8, lose: 0 },
+        chips: [100, 500, 1000, 5000, 10_000].filter((c) => c <= cfg.maxBet),
+        multipliers: { red: 2, orange: 2, seven: 6, lose: 0 },
         sectors: WHEEL_SECTORS,
       },
     };
@@ -132,7 +133,8 @@ export class LuckyWheelService {
       const sectorIndex = this.pickSectorIndex(outcome);
       const sector = WHEEL_SECTORS[sectorIndex];
       const multiplier = sector.multiplier;
-      const payout = amount * multiplier;
+      const rawPayout = amount * multiplier;
+      const { win: payout } = clampGamePayout({ bet: amount, win: rawPayout });
 
       if (payout > 0) {
         wallet.coins = Number(wallet.coins || 0) + payout;
@@ -150,6 +152,7 @@ export class LuckyWheelService {
             metadata: {
               amount,
               payout,
+              rawPayout,
               multiplier,
               sector: sector.id,
               roomId: roomId || null,

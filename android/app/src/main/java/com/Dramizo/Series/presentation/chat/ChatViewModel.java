@@ -242,13 +242,25 @@ public class ChatViewModel extends ViewModel {
         clearReply();
         final String localId = "local:" + System.currentTimeMillis();
         ChatDtos.MessageDto pending = newOptimistic("gift", localId, conversationId, reply);
-        pending.content = giftName;
-        pending.media = new ChatDtos.MediaDto();
-        pending.media.url = iconUrl;
+        pending.content = giftName != null && !giftName.isEmpty() ? giftName : "هدية";
+        String safeIcon = iconUrl;
+        if (safeIcon != null) {
+            com.Dramizo.Series.util.CosmeticMedia.Kind k =
+                    com.Dramizo.Series.util.CosmeticMedia.kind(safeIcon);
+            if (k == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO
+                    || k == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA) {
+                safeIcon = null;
+            }
+        }
+        if (safeIcon != null && !safeIcon.isEmpty()) {
+            pending.media = new ChatDtos.MediaDto();
+            pending.media.url = safeIcon;
+        }
         appendMessage(pending);
+        final String iconFinal = safeIcon;
         c.getIoExecutor().execute(() -> {
             Result<ChatDtos.MessageDto> r =
-                    c.sendMessageUseCase.executeGift(conversationId, giftName, iconUrl, reply);
+                    c.sendMessageUseCase.executeGift(conversationId, pending.content, iconFinal, reply);
             if (r.success && r.data != null) replaceLocalWithServer(localId, r.data);
             else error.postValue(r.error != null ? r.error : "تعذر إرسال الهدية");
         });

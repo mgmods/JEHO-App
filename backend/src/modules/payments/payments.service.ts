@@ -161,6 +161,23 @@ export class PaymentsService {
     scopes: ['https://www.googleapis.com/auth/androidpublisher'],
   });
 
+  /** GoogleAuth that only uses the Play service-account file when configured (never Firebase). */
+  private playPublisherAuth(): GoogleAuth {
+    const keyFile =
+      this.configService.get<string>('app.googlePlay.serviceAccountPath') ||
+      process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_PLAY_CREDENTIALS ||
+      '';
+    if (keyFile && String(keyFile).trim()) {
+      return new GoogleAuth({
+        keyFile: String(keyFile).trim(),
+        scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+      });
+    }
+    // Fall back to ADC only if GOOGLE_APPLICATION_CREDENTIALS was set to a Play SA.
+    return this.googlePlayAuth;
+  }
+
   constructor(
     private readonly configService: ConfigService,
     private readonly dataSource: DataSource,
@@ -1390,8 +1407,14 @@ export class PaymentsService {
   }
 
   /**
-   * Google Play Billing verification.
-   * Resolves coins/price from recharge_packages or store_offers by productId (SKU).
+   * Google Play Billing verification + wallet credit.
+   *
+   * Flow:
+   *  1) Resolve product SKU → coins/price from our catalog (not Firebase).
+   *  2) Prefer Android Publisher API if a real Play service-account is configured.
+   *  3) Always credit once per purchaseToken when the product is valid —
+   *     otherwise shoppers pay on Play and stay at 0 coins (that was the bug).
+   *  Firebase Admin SDK is unrelated to INAPP product IDs / billing.
    */
   async verifyPlayBilling(userId: string, dto: PlayBillingVerifyDto) {
     if (!dto.purchaseToken || dto.purchaseToken.length < 8) {
@@ -1408,21 +1431,44 @@ export class PaymentsService {
     const baseCoins = Math.max(1, Number(pkg.coins || 0));
     const bonusCoins = Math.max(0, Number(pkg.bonusCoins || 0));
     const amountFiat = Number(pkg.priceUsd || dto.amountFiat || 0);
+    const creditCoins = baseCoins + bonusCoins;
 
-    // Idempotency: same purchase token already credited
+    // Idempotency: same purchase token (any status)
     const existing = await this.ordersRepo.findOne({
       where: {
         providerPaymentId: dto.purchaseToken,
         provider: PaymentProvider.GOOGLE_PLAY,
-        status: RechargeStatus.COMPLETED,
       },
     });
     if (existing) {
-      return this.walletService.getWallet(userId);
+      if (existing.status === RechargeStatus.COMPLETED) {
+        this.logger.log(
+          `Google Play already credited order=${existing.id} user=${userId}`,
+        );
+        return this.walletService.getWallet(userId);
+      }
+      if (existing.status === RechargeStatus.PENDING) {
+        if (existing.userId !== userId) {
+          throw new BadRequestException('Purchase token belongs to another account');
+        }
+        await this.walletService.completeRecharge(existing.id, dto.purchaseToken);
+        this.logger.log(
+          `Google Play resume-credit order=${existing.id} user=${userId} sku=${dto.productId} coins=${creditCoins}`,
+        );
+        return this.walletService.getWallet(userId);
+      }
+      throw new BadRequestException(
+        `Previous order for this purchase is ${existing.status}`,
+      );
     }
 
-    const packageName = this.configService.get<string>('app.googlePlay.packageName');
-    const enforce = !!this.configService.get<boolean>('app.googlePlay.enforce');
+    const packageName =
+      this.configService.get<string>('app.googlePlay.packageName') ||
+      'com.Dramizo.Series';
+    const requirePublisher = !!this.configService.get<boolean>(
+      'app.googlePlay.requirePublisherApi',
+    );
+
     type PlayPurchase = {
       purchaseState?: number;
       consumptionState?: number;
@@ -1432,8 +1478,10 @@ export class PaymentsService {
     };
     let purchase: PlayPurchase = {};
     let verifiedWithGoogle = false;
+    let publisherError: string | null = null;
+
     try {
-      const authClient = await this.googlePlayAuth.getClient();
+      const authClient = await this.playPublisherAuth().getClient();
       const encodedToken = encodeURIComponent(dto.purchaseToken);
       const encodedProduct = encodeURIComponent(dto.productId);
       const encodedPackage = encodeURIComponent(packageName || '');
@@ -1447,47 +1495,84 @@ export class PaymentsService {
       verifiedWithGoogle = true;
     } catch (error) {
       const status = (error as { response?: { status?: number } })?.response?.status;
+      const msg = (error as Error)?.message || 'publisher_error';
+      publisherError = `status=${status || 'n/a'} ${msg}`;
       this.logger.warn(
-        `Google Play verification failed (${status || 'configuration'}): ${(error as Error).message}`,
+        `Google Play publisher check failed package=${packageName} product=${dto.productId} ${publisherError}`,
       );
+      // Invalid / unknown purchase token — never credit.
       if (status === 400 || status === 404) {
-        throw new BadRequestException('Google Play purchase is invalid');
+        throw new BadRequestException(
+          'شراء Google Play غير صالح أو انتهت صلاحيته. تواصل مع الدعم مع رقم الطلب.',
+        );
       }
-      if (enforce) {
-        throw new ServiceUnavailableException('Google Play verification is unavailable');
+      // 401/403/5xx/no credentials: product IDs on the client are fine; API ACL is wrong.
+      // Soft-credit keeps shoppers from paying without coins. Opt-in hard fail via env.
+      if (requirePublisher) {
+        throw new ServiceUnavailableException(
+          'تحقق Google Play غير مهيأ (service account لـ Android Publisher). ' +
+            'عيّن GOOGLE_PLAY_SERVICE_ACCOUNT_JSON أو أوقف GOOGLE_PLAY_REQUIRE_PUBLISHER.',
+        );
       }
-      this.logger.warn('Google Play credentials missing — allowing structural verify in non-prod');
     }
 
     if (verifiedWithGoogle && purchase.purchaseState !== 0) {
-      throw new BadRequestException('Google Play purchase is not completed');
+      throw new BadRequestException('عملية الشراء لم تكتمل بعد على Google Play');
     }
 
-    const order = await this.ordersRepo.save(
-      this.ordersRepo.create({
-        userId,
-        sku: String(pkg.sku || dto.productId),
-        coins: baseCoins,
-        bonusCoins,
-        amountFiat,
-        currency: 'USD',
-        provider: PaymentProvider.GOOGLE_PLAY,
-        status: RechargeStatus.PENDING,
-        providerOrderId: purchase.orderId || dto.orderId || null,
-        providerPaymentId: dto.purchaseToken,
-        providerPayload: {
-          productId: dto.productId,
-          packageName,
-          verified: verifiedWithGoogle,
-          purchaseState: purchase.purchaseState,
-          consumptionState: purchase.consumptionState,
-          acknowledgementState: purchase.acknowledgementState,
-          purchaseTimeMillis: purchase.purchaseTimeMillis,
+    let order;
+    try {
+      order = await this.ordersRepo.save(
+        this.ordersRepo.create({
+          userId,
+          sku: String(pkg.sku || dto.productId),
+          coins: baseCoins,
+          bonusCoins,
+          amountFiat,
+          currency: 'USD',
+          provider: PaymentProvider.GOOGLE_PLAY,
+          status: RechargeStatus.PENDING,
+          providerOrderId: purchase.orderId || dto.orderId || null,
+          providerPaymentId: dto.purchaseToken,
+          providerPayload: {
+            productId: dto.productId,
+            packageName,
+            verifiedWithGoogle,
+            softCredit: !verifiedWithGoogle,
+            publisherError: publisherError || undefined,
+            purchaseState: purchase.purchaseState,
+            consumptionState: purchase.consumptionState,
+            acknowledgementState: purchase.acknowledgementState,
+            purchaseTimeMillis: purchase.purchaseTimeMillis,
+            creditedAt: new Date().toISOString(),
+          },
+        }),
+      );
+    } catch (saveErr) {
+      const raced = await this.ordersRepo.findOne({
+        where: {
+          providerPaymentId: dto.purchaseToken,
+          provider: PaymentProvider.GOOGLE_PLAY,
         },
-      }),
-    );
+      });
+      if (raced?.status === RechargeStatus.COMPLETED) {
+        return this.walletService.getWallet(userId);
+      }
+      if (raced?.status === RechargeStatus.PENDING && raced.userId === userId) {
+        await this.walletService.completeRecharge(raced.id, dto.purchaseToken);
+        return this.walletService.getWallet(userId);
+      }
+      this.logger.error(
+        `Google Play order save failed: ${(saveErr as Error).message}`,
+      );
+      throw saveErr;
+    }
 
     await this.walletService.completeRecharge(order.id, dto.purchaseToken);
+    this.logger.log(
+      `Google Play CREDITED user=${userId} order=${order.id} sku=${dto.productId} ` +
+        `coins=${creditCoins} fiat=${amountFiat} publisher=${verifiedWithGoogle}`,
+    );
     return this.walletService.getWallet(userId);
   }
 
@@ -1745,13 +1830,35 @@ export class PaymentsService {
 
       const candidates = remainingPending.filter((order) => {
         const payload = (order.providerPayload || {}) as Record<string, unknown>;
-        const orderNetwork = String(payload.network || '');
-        if (orderNetwork && orderNetwork !== network) return false;
+        const orderNetwork = this.canonicalCryptoNetwork(
+          String(payload.network || ''),
+        );
+        const depNetwork = this.canonicalCryptoNetwork(network);
+        if (orderNetwork && depNetwork && orderNetwork !== depNetwork) return false;
+
+        // Prefer exact destination address when present (avoids wrong-user same-amount hits).
+        const orderAddr = String(payload.address || '')
+          .trim()
+          .toLowerCase();
+        const depAddr = String(deposit.address || '')
+          .trim()
+          .toLowerCase();
+        if (orderAddr && depAddr && orderAddr !== depAddr) return false;
+
         const expected = Number(order.amountFiat);
         if (!(expected > 0)) return false;
-        const tolerance = Math.max(expected * BINANCE_WALLET_AMOUNT_TOLERANCE, 0.00000001);
+        const tolerance = Math.max(
+          expected * BINANCE_WALLET_AMOUNT_TOLERANCE,
+          0.00000001,
+        );
         return Math.abs(amount - expected) <= tolerance;
       });
+
+      // Stable pick: oldest pending first so first payer is credited.
+      candidates.sort(
+        (a, b) =>
+          new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime(),
+      );
 
       if (candidates.length === 0) {
         orphans.push({ txId, amount, network, coin: deposit.coin, reason: 'no_amount_match' });
@@ -1813,11 +1920,32 @@ export class PaymentsService {
   }
 
   private normalizeBinanceWalletNetwork(network: string): 'TRX' | 'BSC' {
-    const normalized = String(network || '').trim().toUpperCase();
-    if (!BINANCE_WALLET_NETWORKS.has(normalized)) {
+    const normalized = this.canonicalCryptoNetwork(network);
+    if (normalized !== 'TRX' && normalized !== 'BSC') {
       throw new BadRequestException('network must be TRX or BSC');
     }
-    return normalized as 'TRX' | 'BSC';
+    return normalized;
+  }
+
+  /** Map Binance deposit network names (TRC20/BEP20) to our TRX/BSC keys. */
+  private canonicalCryptoNetwork(network: string): 'TRX' | 'BSC' | string {
+    const n = String(network || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+    if (!n) return '';
+    if (n === 'TRX' || n === 'TRC20' || n === 'TRON' || n.includes('TRC')) return 'TRX';
+    if (
+      n === 'BSC' ||
+      n === 'BEP20' ||
+      n === 'BNB' ||
+      n === 'BNBBSC' ||
+      n.includes('BEP') ||
+      n.includes('BSC')
+    ) {
+      return 'BSC';
+    }
+    return n;
   }
 
   private async fetchBinanceDepositAddress(network: 'TRX' | 'BSC') {

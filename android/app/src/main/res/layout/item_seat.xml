@@ -13,10 +13,20 @@
     android:paddingHorizontal="2dp">
 
     <FrameLayout
-        android:layout_width="76dp"
-        android:layout_height="76dp"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
         android:clipChildren="false"
         android:clipToPadding="false">
+
+        <!-- Speak waves: larger than avatar so rings expand around the seat -->
+        <com.Dramizo.Series.widget.SeatSpeakLightningView
+            android:id="@+id/seatSpeakAura"
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:layout_gravity="center"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="invisible" />
 
         <View
             android:id="@+id/seatRing"
@@ -26,29 +36,24 @@
             android:background="@drawable/bg_seat_avatar_ring"
             android:visibility="gone" />
 
+        <!-- Legacy ids kept for binding; unused -->
         <View
             android:id="@+id/seatRippleOuter"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_seat_speaking_ripple"
-            android:visibility="invisible" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
 
         <View
             android:id="@+id/seatRippleMid"
-            android:layout_width="68dp"
-            android:layout_height="68dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_seat_speaking_ripple"
-            android:visibility="invisible" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
 
         <View
             android:id="@+id/seatRippleInner"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_seat_speaking_ripple"
-            android:visibility="invisible" />
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
 
         <!-- Empty / locked classic Mikoo seat -->
         <ImageView
@@ -125,8 +130,8 @@
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_gravity="bottom|end"
-            android:layout_marginEnd="10dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginEnd="18dp"
+            android:layout_marginBottom="16dp"
             android:contentDescription="@null"
             android:elevation="10dp"
             android:scaleType="fitCenter"
@@ -148,7 +153,7 @@
             android:layout_width="28dp"
             android:layout_height="3dp"
             android:layout_gravity="bottom|center_horizontal"
-            android:layout_marginBottom="4dp"
+            android:layout_marginBottom="10dp"
             android:background="@drawable/bg_gift_seat_select_underline"
             android:elevation="7dp"
             android:visibility="gone" />
@@ -182,6 +187,22 @@
             android:textColor="#80FFFFFF"
             android:textSize="11sp" />
     </LinearLayout>
+
+    <!-- Platform staff (super / manager) under seat name -->
+    <TextView
+        android:id="@+id/tvStaffSeatBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:paddingHorizontal="5dp"
+        android:paddingVertical="1dp"
+        android:textColor="@android:color/white"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <!-- Charm / gift count — Mikoo grey pill -->
     <TextView

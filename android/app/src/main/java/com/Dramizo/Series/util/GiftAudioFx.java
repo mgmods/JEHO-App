@@ -47,15 +47,9 @@ public final class GiftAudioFx {
     public static void playLuckyCoins(Context context, int bursts) {
         if (context == null || RoomSoundFx.isMuted()) return;
         Context app = context.getApplicationContext();
-        int count = Math.max(3, Math.min(10, bursts + 2));
-        // One cascading gold sparkle sequence (not tiny single beeps).
+        // Cap — Hot 30 crash reports tied to heavy gift + multi Tone/SoundPool waves.
+        int count = Math.max(1, Math.min(3, bursts));
         RoomSoundFx.playLuckyGold(app, count);
-        // Second wave mid-flight so the FX stays audible while coins travel.
-        MAIN.postDelayed(() -> {
-            if (!RoomSoundFx.isMuted()) {
-                RoomSoundFx.playLuckyGold(app, Math.max(2, count / 2));
-            }
-        }, 900L);
     }
 
     public static void stop() {

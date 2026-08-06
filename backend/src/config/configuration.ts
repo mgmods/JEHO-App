@@ -108,11 +108,22 @@ export default registerAs('app', () => {
     mode: process.env.PAYPAL_MODE || 'sandbox',
   },
   googlePlay: {
-      packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.Dramizo.Series',
-    // Production is fail-closed. Local/dev can still credit when credentials are absent.
-    enforce:
-      process.env.GOOGLE_PLAY_VERIFY_ENFORCE === 'true' ||
-      process.env.NODE_ENV === 'production',
+    // Must match android `applicationId` / Play Console package exactly.
+    packageName: process.env.GOOGLE_PLAY_PACKAGE_NAME || 'com.Dramizo.Series',
+    /**
+     * Optional dedicated service-account JSON for Android Publisher API
+     * (Play Console → Users and permissions → API access). NOT Firebase.
+     */
+    serviceAccountPath:
+      process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ||
+      process.env.GOOGLE_PLAY_CREDENTIALS ||
+      '',
+    /**
+     * If true, refuse credit when Publisher API is down/misconfigured.
+     * Default false: still credit valid product SKUs with a unique purchaseToken
+     * so users who already paid on Play are not left with zero coins.
+     */
+    requirePublisherApi: process.env.GOOGLE_PLAY_REQUIRE_PUBLISHER === 'true',
   },
   fcm: {
     serverKey: process.env.FCM_SERVER_KEY || '',

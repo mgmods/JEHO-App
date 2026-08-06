@@ -191,9 +191,11 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Soft refresh only — full reload was causing the whole chat list to blink.
-        if (viewModel != null) viewModel.load(false);
+        // Force reload after leaving a chat so unread badges clear (server marks read on open).
+        // Adapter soft-updates rows by id so avatars do not blink.
+        if (viewModel != null) viewModel.load(true);
         loadPendingRequestBadge();
+        loadOfficialNewsPreview();
         registerOfficialNewsReceiver();
     }
 

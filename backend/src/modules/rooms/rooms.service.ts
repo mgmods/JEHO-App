@@ -84,9 +84,8 @@ const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
 export class RoomsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(RoomsService.name);
   private personalEmptySweepTimer: ReturnType<typeof setInterval> | null = null;
-  /** Default list/cover art when a room has no custom cover (backgrounds pack). */
+  /** Default list/cover art when a room has no custom cover (backgrounds pack on disk). */
   private readonly roomCoverCards = [
-    'backgrounds/room_default',
     'backgrounds/bg_aurora_night',
     'backgrounds/bg_ocean_deep',
     'backgrounds/bg_mint_dream',
@@ -927,10 +926,13 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    // Publish tokens must NOT be 60s: short TTL silently kills mic mid-room when
+    // refresh races fail, so only a few seated users hear each other.
+    // Default server TTL (~3600s) + client renew keeps Zego continuous.
     const zego = await this.zegoTokenService.generateToken(
       userId,
       full.zegoRoomId || undefined,
-      canPublish ? 60 : undefined,
+      canPublish ? 3600 : 3600,
       canPublish,
     );
     return {
@@ -991,6 +993,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async assertEligibleAgencyHost(agencyId: string, userId: string) {
+    if ((await this.platformStaffRole(userId)) === 'super') return;
     const membership = await this.agencyMembersRepo.findOne({
       where: {
         agencyId,
@@ -1007,6 +1010,33 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'فتح بث الوكالة لمالك الوكالة أو الأدمن فقط',
       );
     }
+  }
+
+  /**
+   * Super staff force-opens an agency permanent room as live host (any agency).
+   */
+  async forceOpenAgencyRoom(roomId: string, actorId: string) {
+    if ((await this.platformStaffRole(actorId)) !== 'super') {
+      throw new ForbiddenException('Super privileges required');
+    }
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (!room.agencyId && room.roomKind !== RoomKind.AGENCY) {
+      throw new BadRequestException('Not an agency room');
+    }
+    room.status = RoomStatus.OPEN;
+    room.activeHostId = actorId;
+    room.emptySince = null;
+    if (!room.liveSessionStartedAt) room.liveSessionStartedAt = new Date();
+    room.isPublic = true;
+    await this.roomsRepo.save(room);
+    await this.occupyHostSeat(
+      room.id,
+      actorId,
+      Math.max(room.seatCount || 0, DEFAULT_ROOM_SEAT_COUNT),
+    );
+    this.notifyRoomUpdated(roomId);
+    return this.buildHostJoinPayload(actorId, roomId);
   }
 
   private async occupyHostSeat(roomId: string, hostId: string, seatCount: number) {
@@ -1410,20 +1440,32 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       .leftJoinAndSelect('seats.user', 'seatUser')
       .leftJoinAndSelect('seatUser.profile', 'seatProfile');
     this.applyPublicRoomListFilters(qb, query);
-    // Mikoo Hot heat: viewers + lifetime gift coins (not viewers alone).
-    // Customer-service rooms always float to the top of explore.
+    // Hot / Explore: live presence first, seated mics, recent gifts, then lifetime gifts.
+    // Personal + agency rooms both compete (filter already requires public + live host).
     qb.addSelect(
       `CASE WHEN room.roomKind = 'support' THEN 1 ELSE 0 END`,
       'support_pin',
     )
     qb.addSelect(
-      `(COALESCE(room.viewerCount, 0) * 100 + COALESCE((
-          SELECT SUM(gs."totalCoins") FROM gift_sends gs WHERE gs."roomId" = room.id
-        ), 0) / 50)`,
+      `(COALESCE(room."viewerCount", 0) * 500
+        + COALESCE((
+            SELECT COUNT(*)::int FROM room_seats rs
+             WHERE rs."roomId" = room.id AND rs."userId" IS NOT NULL
+          ), 0) * 250
+        + COALESCE((
+            SELECT SUM(gs."totalCoins") FROM gift_sends gs
+             WHERE gs."roomId" = room.id
+               AND gs."createdAt" > NOW() - INTERVAL '24 hours'
+          ), 0) / 15.0
+        + COALESCE((
+            SELECT SUM(gs."totalCoins") FROM gift_sends gs
+             WHERE gs."roomId" = room.id
+          ), 0) / 80.0)`,
       'explore_heat',
     )
       .orderBy('support_pin', 'DESC')
       .addOrderBy('explore_heat', 'DESC')
+      .addOrderBy('room.viewerCount', 'DESC')
       .addOrderBy('room.updatedAt', 'DESC')
       .addOrderBy('room.createdAt', 'DESC')
       .skip(query.skip)
@@ -3024,7 +3066,11 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     async close(roomId: string, hostId: string) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
     if (!room) throw new NotFoundException('Room not found');
-    if (room.hostId !== hostId) throw new ForbiddenException('Only host can close room');
+    const staff = await this.platformStaffRole(hostId);
+    // Super may force-end any live room. Host/owner still may close their own.
+    if (room.hostId !== hostId && staff !== 'super') {
+      throw new ForbiddenException('Only host can close room');
+    }
 
     // End the live session for everyone (agency rooms stay in DB; reopen via create/open).
     await this.seatsRepo.update(

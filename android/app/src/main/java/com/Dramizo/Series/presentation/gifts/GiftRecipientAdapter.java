@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Mikoo GiftTopAvatarAdapter cells + VIP/host frame cosmetics.
+ * Gift dial recipient strip — frame, seat chip, support coins under each avatar.
  */
 public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdapter.VH> {
 
@@ -87,10 +87,35 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
         String primary = agencyRoom ? r.hostBadgeUrl : r.vipBadgeUrl;
         String fallback = agencyRoom ? r.vipBadgeUrl : r.hostBadgeUrl;
         String frameUrl = (primary != null && !primary.isEmpty()) ? primary : fallback;
+        if ((frameUrl == null || frameUrl.isEmpty()) && r.vipBadgeUrl != null
+                && !r.vipBadgeUrl.isEmpty()) {
+            frameUrl = r.vipBadgeUrl;
+        }
+        if ((frameUrl == null || frameUrl.isEmpty()) && r.hostBadgeUrl != null
+                && !r.hostBadgeUrl.isEmpty()) {
+            frameUrl = r.hostBadgeUrl;
+        }
 
-        // Keep fixed CircleImageView size — do not use fitAvatarInsideWear (blows up tiny cells).
-        AvatarCosmetics.bindAvatar(holder.b.civUserAvatar, r.avatarUrl);
-        AvatarCosmetics.applyFrame(holder.b.ivAvatarFrame, frameUrl);
+        AvatarCosmetics.bindStacked(
+                holder.b.civUserAvatar,
+                holder.b.ivAvatarFrame,
+                r.avatarUrl,
+                frameUrl);
+
+        // Seat / host number chip
+        if (holder.b.tvSeatChip != null) {
+            String seat = r.seatLabel();
+            if (seat != null && !seat.isEmpty()) {
+                holder.b.tvSeatChip.setVisibility(View.VISIBLE);
+                holder.b.tvSeatChip.setText(seat);
+            } else {
+                holder.b.tvSeatChip.setVisibility(View.GONE);
+            }
+        }
+        // Support amount
+        if (holder.b.tvSupportCoins != null) {
+            holder.b.tvSupportCoins.setText(r.supportLabel());
+        }
 
         if (holder.b.selectLine != null) {
             holder.b.selectLine.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
@@ -99,6 +124,8 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
             holder.b.ivCheckStatus.setVisibility(selected && !selectAll ? View.VISIBLE : View.GONE);
         }
 
+        float alpha = selected ? 1f : 0.92f;
+        holder.itemView.setAlpha(alpha);
         holder.itemView.setOnClickListener(v -> {
             selectAll = false;
             selectedUserId = r.userId;

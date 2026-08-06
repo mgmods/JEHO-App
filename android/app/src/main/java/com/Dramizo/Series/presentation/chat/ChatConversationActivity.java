@@ -242,10 +242,14 @@ public class ChatConversationActivity extends ThemedActivity {
                 "gift_sent_chat",
                 this,
                 (key, bundle) -> {
-                    String name = bundle.getString("name");
-                    String icon = bundle.getString("icon");
-                    if (conversationId != null) {
+                    try {
+                        String name = bundle != null ? bundle.getString("name") : null;
+                        String icon = bundle != null ? bundle.getString("icon") : null;
+                        if (conversationId == null || conversationId.isEmpty()) return;
+                        if (name == null || name.isEmpty()) name = "هدية";
                         viewModel.sendGiftMessage(conversationId, name, icon);
+                    } catch (Exception e) {
+                        Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
                     }
                 });
         if (binding.btnChatEmoji != null) {

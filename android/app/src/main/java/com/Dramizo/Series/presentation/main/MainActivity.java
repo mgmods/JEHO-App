@@ -223,6 +223,7 @@ public class MainActivity extends ThemedActivity {
             com.Dramizo.Series.util.InviteReferralHelper.takePendingRoom(this);
         }
         if (roomId == null || roomId.isEmpty()) return;
+        com.Dramizo.Series.util.RoomJoinPrefetch.begin(this, roomId, null);
         Intent i = new Intent(this, VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
         i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
@@ -478,7 +479,8 @@ public class MainActivity extends ThemedActivity {
         super.onResume();
         AppContainer container = ContainerProvider.from(this);
         loadAgencyAction(container);
-        AppFeatures.refresh(container);
+        // Off main thread — flags (incl. tasks kill-switch) refresh without freezing UI.
+        container.getIoExecutor().execute(() -> AppFeatures.refresh(container));
         bindActiveRoomMini();
         if (playInAppUpdateHelper != null) {
             playInAppUpdateHelper.onResume();

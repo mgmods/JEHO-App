@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#FFF4F5F7">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -10,18 +12,16 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white" />
-
-<FrameLayout android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
+        android:src="@color/white"
+        android:visibility="gone" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:overScrollMode="never">
 
         <LinearLayout
             android:id="@+id/contentRoot"
@@ -30,11 +30,12 @@
             android:clipChildren="false"
             android:clipToPadding="false"
             android:orientation="vertical"
-            android:paddingBottom="28dp">
+            android:paddingBottom="32dp">
 
+            <!-- Cover -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="190dp">
+                android:layout_height="200dp">
 
                 <ImageView
                     android:id="@+id/imgCover"
@@ -47,42 +48,55 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:background="@drawable/bg_scrim_bottom" />
+                    android:background="@drawable/bg_profile_cover_scrim" />
 
                 <ImageView
                     android:id="@+id/btnBack"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:layout_gravity="start|top"
                     android:layout_marginStart="12dp"
                     android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_profile_nav_btn"
                     android:contentDescription="@string/close"
-                    android:padding="8dp"
+                    android:padding="10dp"
                     android:src="@drawable/ic_arrow_back"
-                    app:tint="@color/text_primary" />
+                    app:tint="#FFFFFFFF" />
             </FrameLayout>
 
+            <!-- Identity card (overlaps cover) -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-52dp"
+                android:layout_marginHorizontal="14dp"
+                android:layout_marginTop="-48dp"
+                android:background="@drawable/bg_profile_user_card"
                 android:clipChildren="false"
                 android:clipToPadding="false"
+                android:elevation="3dp"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingHorizontal="20dp">
+                android:paddingBottom="18dp"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="0dp">
 
-                <!-- Mikoo user info: face 80dp + frame 100dp centered. -->
                 <FrameLayout
-                    android:layout_width="100dp"
-                    android:layout_height="100dp"
+                    android:layout_width="108dp"
+                    android:layout_height="108dp"
+                    android:layout_marginTop="-40dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
+                    <View
+                        android:layout_width="92dp"
+                        android:layout_height="92dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_profile_avatar_ring" />
+
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/imgAvatar"
-                        android:layout_width="80dp"
-                        android:layout_height="80dp"
+                        android:layout_width="84dp"
+                        android:layout_height="84dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/nav_profile"
                         android:scaleType="centerCrop"
@@ -91,8 +105,8 @@
 
                     <ImageView
                         android:id="@+id/imgFrame"
-                        android:layout_width="100dp"
-                        android:layout_height="100dp"
+                        android:layout_width="108dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
@@ -100,8 +114,8 @@
 
                     <com.Dramizo.Series.util.HostSignalView
                         android:id="@+id/webProfileHostSignal"
-                        android:layout_width="100dp"
-                        android:layout_height="100dp"
+                        android:layout_width="108dp"
+                        android:layout_height="108dp"
                         android:layout_gravity="center"
                         android:visibility="gone" />
                 </FrameLayout>
@@ -110,152 +124,62 @@
                     android:id="@+id/tvDisplayName"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="8dp"
+                    android:ellipsize="end"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="#FF111827"
                     android:textSize="22sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    tools:text="أحمد" />
+
+                <!-- Staff: under name, professional pill -->
+                <TextView
+                    android:id="@+id/tvStaffBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:includeFontPadding="false"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="4dp"
+                    android:textColor="@android:color/white"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:background="@drawable/bg_chip_staff_super"
+                    tools:text="سوبر أدمن"
+                    tools:visibility="visible" />
 
                 <LinearLayout
                     android:id="@+id/rowUserId"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
+                    android:layout_marginTop="6dp"
+                    android:background="@drawable/bg_profile_id_chip"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp">
 
                     <TextView
                         android:id="@+id/tvUsername"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="#FF64748B"
+                        android:textSize="12sp"
+                        tools:text="ID: 10086" />
 
                     <ImageView
                         android:id="@+id/btnCopyId"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:layout_marginStart="6dp"
+                        android:layout_width="26dp"
+                        android:layout_height="26dp"
+                        android:layout_marginStart="4dp"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:contentDescription="@string/copy_user_id"
-                        android:padding="5dp"
+                        android:padding="4dp"
                         android:src="@drawable/ic_copy"
-                        app:tint="@color/aurora_mint" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:id="@+id/tvAgeChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="@drawable/bg_chip_age"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="—"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/imgCountryFlag"
-                        android:layout_width="16dp"
-                        android:layout_height="11dp"
-                        android:layout_marginStart="4dp"
-                        android:contentDescription="@null"
-                        android:scaleType="centerCrop"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvCountryChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="4dp"
-                        android:paddingVertical="3dp"
-                        android:text="@string/country"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/tvLevelChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/bg_chip_level"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="Lv.1"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/imgVipBadge"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:layout_marginStart="4dp"
-                        android:contentDescription="@string/vip"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvVipChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/bg_chip_vip"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="VIP 0"
-                        android:textColor="@color/white"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-
-                    <ImageView
-                        android:id="@+id/imgHostBadge"
-                        android:layout_width="22dp"
-                        android:layout_height="22dp"
-                        android:layout_marginStart="4dp"
-                        android:contentDescription="@string/my_room"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvCharmChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/bg_chip_charm"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="🌙 1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvWealthChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:background="@drawable/bg_chip_wealth"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="❤ 1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+                        app:tint="#FF64748B" />
                 </LinearLayout>
 
                 <TextView
@@ -263,28 +187,248 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="متصل الآن"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+                    android:textColor="#FF94A3B8"
+                    android:textSize="12sp"
+                    tools:text="متصل الآن" />
 
+                <!-- Stats strip -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_profile_stats_strip"
+                    android:orientation="horizontal"
+                    android:paddingVertical="12dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvStatFriends"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FF0F172A"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            tools:text="12" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/friends"
+                            android:textColor="#FF94A3B8"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center_vertical"
+                        android:background="#FFE2E8F0" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvStatFollowing"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FF0F172A"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            tools:text="48" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/following"
+                            android:textColor="#FF94A3B8"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="1dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center_vertical"
+                        android:background="#FFE2E8F0" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvStatFans"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="#FF0F172A"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            tools:text="320" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/fans"
+                            android:textColor="#FF94A3B8"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Rank chips (compact) -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvAgeChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_chip_age"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
+                            android:text="—"
+                            android:textColor="@color/white"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/imgCountryFlag"
+                            android:layout_width="16dp"
+                            android:layout_height="11dp"
+                            android:layout_marginStart="6dp"
+                            android:contentDescription="@null"
+                            android:scaleType="centerCrop"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvCountryChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="4dp"
+                            android:paddingVertical="3dp"
+                            android:text="@string/country"
+                            android:textColor="#FF64748B"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:id="@+id/tvLevelChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_chip_level"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
+                            android:text="Lv.1"
+                            android:textColor="@color/white"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/imgVipBadge"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginStart="4dp"
+                            android:contentDescription="@string/vip"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvVipChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_chip_vip"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
+                            android:text="VIP 0"
+                            android:textColor="@color/white"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/imgHostBadge"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginStart="4dp"
+                            android:contentDescription="@string/my_room"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvCharmChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_chip_charm"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
+                            android:text="🌙 1"
+                            android:textColor="@color/white"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvWealthChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_chip_wealth"
+                            android:includeFontPadding="false"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="3dp"
+                            android:text="❤ 1"
+                            android:textColor="@color/white"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <!-- Legacy single-line stats kept for binding safety (hidden) -->
                 <TextView
                     android:id="@+id/tvStats"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tvBio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_glass_card"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_profile_bio"
                     android:gravity="center"
+                    android:lineSpacingExtra="3dp"
                     android:padding="14dp"
                     android:text="@string/lazy_no_signature"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="#FF64748B"
                     android:textSize="13sp" />
 
                 <LinearLayout
@@ -298,162 +442,175 @@
                         android:id="@+id/btnFollow"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="46dp"
                         android:layout_marginEnd="6dp"
                         android:layout_weight="1"
-                        android:background="@drawable/bg_wallet_action"
+                        android:background="@drawable/bg_profile_btn_soft"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="@string/follow"
                         android:textAllCaps="false"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FF0F172A"
                         android:textSize="13sp"
+                        android:textStyle="bold"
                         app:backgroundTint="@null"
-                        app:cornerRadius="16dp" />
+                        app:cornerRadius="14dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnFriend"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="46dp"
                         android:layout_marginHorizontal="3dp"
                         android:layout_weight="1"
-                        android:background="@drawable/bg_wallet_action"
+                        android:background="@drawable/bg_profile_btn_soft"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="طلب صداقة"
                         android:textAllCaps="false"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FF0F172A"
                         android:textSize="13sp"
+                        android:textStyle="bold"
                         app:backgroundTint="@null"
-                        app:cornerRadius="16dp" />
+                        app:cornerRadius="14dp" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnMessage"
                         style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
                         android:layout_width="0dp"
-                        android:layout_height="48dp"
+                        android:layout_height="46dp"
                         android:layout_marginStart="6dp"
                         android:layout_weight="1"
-                        android:background="@drawable/bg_wallet_action"
+                        android:background="@drawable/bg_profile_btn_primary"
                         android:insetTop="0dp"
                         android:insetBottom="0dp"
                         android:text="@string/chat"
                         android:textAllCaps="false"
-                        android:textColor="@color/text_primary"
+                        android:textColor="#FFFFFFFF"
                         android:textSize="13sp"
+                        android:textStyle="bold"
                         app:backgroundTint="@null"
-                        app:cornerRadius="16dp" />
+                        app:cornerRadius="14dp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="18dp"
+                android:layout_marginTop="20dp"
+                android:text="سجل الهدايا"
+                android:textColor="#FF0F172A"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="14dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_profile_user_card"
+                android:orientation="vertical"
+                android:paddingHorizontal="14dp">
+
+                <LinearLayout
+                    android:id="@+id/rowGiftSeat"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_asset_gift" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/gift_seat"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
                 </LinearLayout>
 
                 <TextView
+                    android:id="@+id/rowGuardian"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:text="سجل الهدايا"
+                    android:layout_height="48dp"
+                    android:gravity="center_vertical"
+                    android:text="@string/guardian"
                     android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/rowBadges"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:gravity="center_vertical"
+                    android:text="@string/badges"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/rowCars"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:gravity="center_vertical"
+                    android:text="@string/cars_mall"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/rowHead"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:gravity="center_vertical"
+                    android:text="@string/head_mall"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:visibility="gone" />
 
                 <LinearLayout
+                    android:id="@+id/rowGiftHistory"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_wallet_section"
-                    android:orientation="vertical"
-                    android:paddingHorizontal="14dp">
+                    android:layout_height="50dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                    <LinearLayout
-                        android:id="@+id/rowGiftSeat"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:visibility="gone">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:contentDescription="@null"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_asset_gift" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:text="@string/gift_seat"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp" />
-                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:contentDescription="@null"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_asset_gift" />
 
                     <TextView
-                        android:id="@+id/rowGuardian"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:gravity="center_vertical"
-                        android:text="@string/guardian"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:text="@string/gift_history"
                         android:textColor="@color/text_primary"
                         android:textSize="14sp"
-                        android:visibility="gone" />
+                        android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/rowBadges"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:gravity="center_vertical"
-                        android:text="@string/badges"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/rowCars"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:gravity="center_vertical"
-                        android:text="@string/cars_mall"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/rowHead"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:gravity="center_vertical"
-                        android:text="@string/head_mall"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:visibility="gone" />
-
-                    <LinearLayout
-                        android:id="@+id/rowGiftHistory"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:contentDescription="@null"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_asset_gift" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:text="@string/gift_history"
-                            android:textColor="@color/text_primary"
-                            android:textSize="14sp" />
-                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_arrow_right_me"
+                        app:tint="#FF94A3B8" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
-</FrameLayout>
 </FrameLayout>

@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { spinPayout } from './mikoo-house-edge.util';
+import { clampBetAmount, clampGamePayout, GAME_PAYOUT } from '../game-payout-guard';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -98,6 +99,8 @@ const HILO_MSG = {
 @Injectable()
 export class BaishunWsHandler {
   private readonly logger = new Logger(BaishunWsHandler.name);
+  /** fishing fireToken → debit stake (one-shot hit). */
+  private readonly fishFireStakes = new WeakMap<WebSocket, Map<string, number>>();
 
   constructor(
     private readonly sessions: MikooSessionService,
@@ -365,7 +368,7 @@ export class BaishunWsHandler {
               const afterBet = await this.debit(player.userId, betAmount, gameSlug);
               const { win, mult } = spinPayout(betAmount);
               let balance = afterBet;
-              if (win > 0) balance = await this.credit(player.userId, win, gameSlug);
+              if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               player.balance = balance;
               const rewardMultipleIndex = Math.max(0, Math.min(10, mult > 0 ? Math.min(10, mult) : 0));
               const rewardLevel = win >= betAmount * 3 ? 2 : win > 0 ? 1 : 0;
@@ -829,7 +832,7 @@ export class BaishunWsHandler {
               if (!isFree) {
                 balance = await this.debit(player.userId, betAmount, gameSlug);
                 win = spinPayout(betAmount).win;
-                if (win > 0) balance = await this.credit(player.userId, win, gameSlug);
+                if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               }
               player.balance = balance;
               const roundId = randomUUID();
@@ -1097,12 +1100,15 @@ export class BaishunWsHandler {
                     ),
                   );
                   void (async () => {
-                    const areaOdds = [0, 1.95, 1.95, 8, 4.5, 4.5];
-                    const odds = areaOdds[winner] || 1.95;
+                    const areaOdds = [0, 1.85, 1.85, 6, 4, 4];
+                    const odds = areaOdds[winner] || 1.85;
                     const stake = royalMyBet || chip;
-                    const win = Math.floor(stake * odds * (Math.random() > 0.45 ? 1 : 0));
+                    // Pay gate ~38% → RTP on 1.85 side ≈ 70%.
+                    const win = Math.floor(
+                      stake * odds * (Math.random() > 0.62 ? 1 : 0),
+                    );
                     let nb = await this.sessions.refreshBalance(p);
-                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug);
+                    if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
                     p.balance = nb;
                     const uid = String(p.publicId || p.userId);
                     setTimeout(() => {
@@ -1239,11 +1245,13 @@ export class BaishunWsHandler {
             let showBet = hiloBet;
             let bal = p ? await this.sessions.refreshBalance(p) : 0;
             if (won && p && hiloBet > 0) {
-              const payout = Math.floor(hiloBet * 1.5);
-              bal = await this.credit(p.userId, payout, gameSlug);
+              // Single-step settlement — full credit ends the pot (no compound leak).
+              // P(win)~50% × 1.45 ≈ RTP 72.5%.
+              const payout = Math.floor(hiloBet * 1.45);
+              bal = await this.credit(p.userId, payout, gameSlug, hiloBet);
               p.balance = bal;
               showBet = payout;
-              hiloBet = payout;
+              hiloBet = 0;
               hiloRounds += 1;
               void this.economy.onBetWin({
                 sessionId: p.sessionId,
@@ -1429,16 +1437,27 @@ export class BaishunWsHandler {
       }
       const bal = await this.sessions.refreshBalance(player);
       const uid = player.publicId || player.userId;
-      // ft 1..7 maps to Fish_1..Fish_7 pools; line is swim path id.
-      const makeFish = (id: number, i: number) => ({
-        id,
-        ft: 1 + (i % 7),
-        line: 1 + (i % 12),
-        buffer: 0,
-        ageTime: 0,
-        delayed: 0,
-      });
-      const fishs = Array.from({ length: 10 }, (_, i) => makeFish(1000 + i, i));
+      // Cocos Data/Line keys are 1001–1029 (also 2001…/3001…/4001…); NOT 1..12.
+      // initFish(id, line) → getLineData(line) → "Fish line error!" if key missing → fish freeze.
+      const makeFish = (id: number, i: number) => {
+        const ft = 1 + (i % 7);
+        const line = 1001 + (i % 29);
+        return {
+          id,
+          ft,
+          line,
+          buffer: 0,
+          ageTime: 0,
+          delayed: 0,
+          // aliases some SDK builds still read
+          fishId: id,
+          fishType: ft,
+          type: ft,
+          path: line,
+          pathId: line,
+        };
+      };
+      const fishs = Array.from({ length: 14 }, (_, i) => makeFish(1000 + i, i));
       const self = {
         pos: 0,
         userId: uid,
@@ -1483,34 +1502,65 @@ export class BaishunWsHandler {
         fishs,
       });
       this.logger.log(`baishun connect ${gameSlug} user=${player.userId} bal=${bal} (fishing enter)`);
-      // Keep spawning periodically while socket open — payload must be { fishs: [...] }.
+      // Keep spawning frequently so the pond never freezes on a single static wave.
       const spawnTimer = setInterval(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           clearInterval(spawnTimer);
           return;
         }
-        const fid = 2000 + Math.floor(Math.random() * 9000);
-        this.replyFish(ws, 1004, {
-          fishs: [makeFish(fid, fid % 7)],
+        const n = 1 + Math.floor(Math.random() * 3);
+        const fishs = Array.from({ length: n }, (_, i) => {
+          const fid = 2000 + Math.floor(Math.random() * 900000) + i;
+          return makeFish(fid, fid % 7);
         });
-      }, 2200);
+        this.replyFish(ws, 1004, { fishs });
+      }, 1400);
       ws.once('close', () => clearInterval(spawnTimer));
       return;
     }
 
     if (code === 1005) {
-      // Weapon fire — small debit per shot
+      // Weapon fire — client expects data.userID + data.newCoin + data.fireToken
+      // (UI_WEAPON_FIRE → Weapon._onFire uses e.fireToken for the bullet).
+      if (!player) {
+        const auth = String(
+          data.code ?? data.token ?? query.code ?? query.token ?? '',
+        );
+        if (auth) {
+          player = await this.sessions.resolvePlayer(gameSlug, 0, auth);
+          setPlayer(player);
+        }
+      }
       const cost = Math.max(10, Math.floor(Number(data.coin ?? data.bet ?? data.mul ?? 10)));
       if (!player) {
         this.replyFish(ws, 1005, {}, 5);
         return;
       }
+      const uid = player.publicId || player.userId;
+      const fireToken = data.fireToken ?? data.fire ?? data.token ?? Date.now();
+      const angle = Number(data.angle ?? 90);
       try {
-        const bal = await this.debit(player.userId, Math.min(cost, 5000), gameSlug);
+        const charged = Math.min(cost, 5000);
+        const bal = await this.debit(player.userId, charged, gameSlug);
         player.balance = bal;
+        let stakeMap = this.fishFireStakes.get(ws);
+        if (!stakeMap) {
+          stakeMap = new Map();
+          this.fishFireStakes.set(ws, stakeMap);
+        }
+        stakeMap.set(String(fireToken), charged);
+        // Cap map size (anti-spam)
+        if (stakeMap.size > 40) {
+          const first = stakeMap.keys().next().value;
+          if (first != null) stakeMap.delete(first);
+        }
         this.replyFish(ws, 1005, {
-          userID: player.publicId || player.userId,
-          userId: player.publicId || player.userId,
+          userID: uid,
+          userId: uid,
+          user_id: uid,
+          fireToken,
+          fire: fireToken,
+          angle,
           newCoin: bal,
           coin: bal,
           curCoin: bal,
@@ -1521,7 +1571,7 @@ export class BaishunWsHandler {
           sessionId: player.sessionId,
           userId: player.userId,
           gameId: gameSlug,
-          betCoins: Math.min(cost, 5000),
+          betCoins: charged,
           winCoins: 0,
           balanceAfter: bal,
         });
@@ -1532,24 +1582,51 @@ export class BaishunWsHandler {
     }
 
     if (code === 1006) {
-      // Hit — occasional fish kill payout
+      // Hit — only settle once per fireToken using the real debit stake.
+      if (!player) {
+        const auth = String(
+          data.code ?? data.token ?? query.code ?? query.token ?? '',
+        );
+        if (auth) {
+          player = await this.sessions.resolvePlayer(gameSlug, 0, auth);
+          setPlayer(player);
+        }
+      }
       if (!player) {
         this.replyFish(ws, 1006, {}, 5);
         return;
       }
+      const uid = player.publicId || player.userId;
       const fishId = Number(data.fishId ?? data.id ?? 0);
-      const { win } = spinPayout(Math.max(50, Math.floor(Number(data.coin ?? 100))));
+      const fireToken = data.fireToken ?? data.fire ?? data.token ?? 0;
+      const stakeMap = this.fishFireStakes.get(ws);
+      const tokenKey = String(fireToken);
+      let stake = stakeMap?.get(tokenKey);
+      if (stake != null) stakeMap?.delete(tokenKey);
+      // No matching fire → no payout (blocks hit spam without debit).
+      if (stake == null || stake <= 0) {
+        this.replyFish(ws, 1006, {
+          fishId,
+          die: false,
+          kill: false,
+          coin: 0,
+        });
+        return;
+      }
+      // Slightly lower RTP than lobby slots (~10% hit on spin table).
+      const { win } = spinPayout(stake, { hitRate: 0.1 });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
-        bal = await this.credit(player.userId, win, gameSlug);
+        bal = await this.credit(player.userId, win, gameSlug, stake);
         player.balance = bal;
         this.replyFish(ws, 1003, {
           ids: [fishId],
           fishId,
           fish_id: fishId,
           id: fishId,
-          userId: player.publicId,
-          user_id: player.publicId,
+          userId: uid,
+          user_id: uid,
+          userID: uid,
           coin: win,
           bonus: win,
           die: true,
@@ -1566,13 +1643,10 @@ export class BaishunWsHandler {
         });
       }
       this.replyFish(ws, 1006, {
-        ok: true,
-        coin: bal,
-        win,
         fishId,
-        fish_id: fishId,
-        bonus: win,
-        userId: player.publicId,
+        die: win > 0,
+        kill: win > 0,
+        coin: win,
       });
       return;
     }
@@ -1683,6 +1757,8 @@ export class BaishunWsHandler {
   }
 
   private async debit(userId: string, amount: number, gameId: string) {
+    amount = clampBetAmount(amount, GAME_PAYOUT.maxBet);
+    if (amount < 1) throw new Error('INVALID_BET');
     return this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
@@ -1710,7 +1786,18 @@ export class BaishunWsHandler {
     });
   }
 
-  private async credit(userId: string, amount: number, gameId: string) {
+  private async credit(userId: string, amount: number, gameId: string, bet = 0) {
+    const clamped = clampGamePayout({ bet, win: amount });
+    if (clamped.capped) {
+      this.logger.warn(
+        `PAYOUT_CAP baishun game=${gameId} user=${userId} bet=${bet} raw=${clamped.rawWin} -> ${clamped.win}`,
+      );
+    }
+    amount = clamped.win;
+    if (amount <= 0) {
+      const w = await this.dataSource.getRepository(Wallet).findOne({ where: { userId } });
+      return Number(w?.coins || 0);
+    }
     return this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
@@ -1729,7 +1816,13 @@ export class BaishunWsHandler {
           referenceType: 'mikoo_baishun_win',
           referenceId: randomUUID(),
           description: `BaiShun ${gameId} win`,
-          metadata: { gameId, amount },
+          metadata: {
+            gameId,
+            amount,
+            bet,
+            capped: clamped.capped,
+            rawWin: clamped.rawWin,
+          },
         }),
       );
       return Number(wallet.coins);

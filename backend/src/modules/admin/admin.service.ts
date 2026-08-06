@@ -251,6 +251,8 @@ export class AdminService {
       pendingWithdraws,
       pendingReports,
       rechargeSum,
+      revenueByProviderRaw,
+      todayRechargeSum,
     ] = await Promise.all([
       this.usersRepo.count({ where: { status: Not(UserStatus.DELETED) } }),
       this.usersRepo.count({ where: { status: UserStatus.DELETED } }),
@@ -264,10 +266,41 @@ export class AdminService {
       this.rechargeRepo
         .createQueryBuilder('r')
         .select('COALESCE(SUM(r.amountFiat),0)', 'total')
-        .where('r.status = :s', { s: 'completed' })
+        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
+        .getRawOne(),
+      this.rechargeRepo
+        .createQueryBuilder('r')
+        .select('r.provider', 'provider')
+        .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
+        .addSelect('COUNT(*)', 'count')
+        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
+        .groupBy('r.provider')
+        .getRawMany(),
+      this.rechargeRepo
+        .createQueryBuilder('r')
+        .select('COALESCE(SUM(r.amountFiat),0)', 'total')
+        .where('r.status = :s', { s: RechargeStatus.COMPLETED })
+        .andWhere('r.completedAt >= :day', {
+          day: (() => {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })(),
+        })
         .getRawOne(),
     ]);
 
+    const revenueByProvider = (revenueByProviderRaw || []).map((row: any) => {
+      const provider = String(row.provider || 'other');
+      return {
+        provider,
+        label: this.providerRevenueLabel(provider),
+        total: Number(row.total || 0),
+        count: Number(row.count || 0),
+      };
+    }).sort((a, b) => b.total - a.total);
+
+    const totalRev = Number(rechargeSum?.total || 0);
     return {
       brand: 'JEHO CHAT',
       users,
@@ -281,10 +314,37 @@ export class AdminService {
       activeGifts: gifts,
       pendingWithdraws,
       pendingReports,
-      totalRechargeFiat: Number(rechargeSum?.total || 0),
-      revenue: Number(rechargeSum?.total || 0),
-      totalRevenue: Number(rechargeSum?.total || 0),
+      totalRechargeFiat: totalRev,
+      revenue: totalRev,
+      totalRevenue: totalRev,
+      todayRevenue: Number(todayRechargeSum?.total || 0),
+      revenueByProvider,
     };
+  }
+
+  private providerRevenueLabel(provider: string): string {
+    switch (String(provider || '').toLowerCase()) {
+      case 'google_play':
+        return 'جوجل بلاي';
+      case 'fourthwall':
+        return 'بطاقة';
+      case 'binance_wallet':
+      case 'binance_pay':
+      case 'crypto':
+        return 'USDT';
+      case 'sham_cash':
+        return 'شام كاش';
+      case 'stripe':
+        return 'Stripe';
+      case 'paypal':
+        return 'PayPal';
+      case 'admin':
+        return 'أدمن';
+      case 'recharge_agent':
+        return 'وكيل شحن';
+      default:
+        return provider || 'أخرى';
+    }
   }
 
   /** Currently live voice rooms for the admin overview panel. */
@@ -1105,7 +1165,12 @@ export class AdminService {
     };
   }
 
-  /** Sync JEHO flag-frame + premium video gifts from on-disk catalog.json. */
+  /** Merge still-image gifts only — never wipes video gifts. */
+  rebuildStillGiftCatalog() {
+    return this.giftsService.rebuildStillImageCatalog();
+  }
+
+  /** Upsert flag + premium video gifts. */
   importJehoDesignedGifts() {
     return this.giftsService.importJehoDesignedGifts();
   }
@@ -1542,10 +1607,10 @@ export class AdminService {
       hostInviteDiamonds: HOST_ROOM_INVITE_REWARD.diamonds,
       hostInviteDwellSeconds: HOST_ROOM_INVITE_REWARD.dwellSeconds,
       hostInviteMaxPerDay: HOST_ROOM_INVITE_REWARD.maxRewardsPerHostPerDay,
-      platformShare: Number(settings['economy.platform_share'] || settings['gift_platform_share'] || 0.3),
+      platformShare: Number(settings['economy.platform_share'] || settings['gift_platform_share'] || 0.4),
       agencyShare: Number(settings['economy.agency_share'] || settings['gift_agency_share'] || 0.15),
-      hostShareWithAgency: Number(settings['economy.host_share_agency'] || 0.55),
-      hostShareSolo: Number(settings['economy.host_share_solo'] || 0.7),
+      hostShareWithAgency: Number(settings['economy.host_share_agency'] || 0.45),
+      hostShareSolo: Number(settings['economy.host_share_solo'] || 0.6),
     };
 
     const paymentFlags = {
@@ -1806,6 +1871,86 @@ export class AdminService {
     };
   }
 
+  /**
+   * Super-admin only: update dashboard login email and/or password.
+   * Requires current password. Mirrors into admin_users when linked.
+   */
+  async updateAdminCredentials(
+    userId: string,
+    dto: {
+      currentPassword: string;
+      newEmail?: string;
+      newPassword?: string;
+    },
+  ) {
+    const user = await this.usersRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('u.id = :id', { id: userId })
+      .getOne();
+    if (!user || !isDashboardSuper(user)) {
+      throw new UnauthorizedException('Super admin access required');
+    }
+    if (!user.passwordHash) {
+      throw new BadRequestException('This account has no password set');
+    }
+    const ok = await bcrypt.compare(String(dto.currentPassword || ''), user.passwordHash);
+    if (!ok) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const nextEmailRaw = dto.newEmail != null ? String(dto.newEmail).trim().toLowerCase() : '';
+    const nextPassword = dto.newPassword != null ? String(dto.newPassword) : '';
+    if (!nextEmailRaw && !nextPassword) {
+      throw new BadRequestException('Provide a new email and/or a new password');
+    }
+
+    if (nextEmailRaw) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmailRaw)) {
+        throw new BadRequestException('Invalid email address');
+      }
+      if (nextEmailRaw !== String(user.email || '').toLowerCase()) {
+        const taken = await this.usersRepo
+          .createQueryBuilder('u')
+          .where('LOWER(u.email) = :email', { email: nextEmailRaw })
+          .andWhere('u.id != :id', { id: user.id })
+          .getOne();
+        if (taken) {
+          throw new ConflictException('Email is already in use');
+        }
+        user.email = nextEmailRaw;
+      }
+    }
+
+    let passwordHash: string | null = null;
+    if (nextPassword) {
+      if (nextPassword.length < 8) {
+        throw new BadRequestException('New password must be at least 8 characters');
+      }
+      passwordHash = await bcrypt.hash(nextPassword, 12);
+      user.passwordHash = passwordHash;
+    }
+
+    await this.usersRepo.save(user);
+
+    // Keep legacy admin_users table in sync when present.
+    const linked = await this.adminUsersRepo.find({
+      where: [{ linkedUserId: user.id }],
+    });
+    for (const row of linked) {
+      if (nextEmailRaw) row.email = nextEmailRaw;
+      if (passwordHash) row.passwordHash = passwordHash;
+      await this.adminUsersRepo.save(row);
+    }
+
+    return {
+      ok: true,
+      email: user.email,
+      username: user.username,
+      message: 'Admin credentials updated',
+    };
+  }
+
   async charts() {
     const days = 7;
     const labels: string[] = [];
@@ -1852,6 +1997,31 @@ export class AdminService {
     const giftsVal = Math.max(0, Number(giftCoins?.total || 0));
     const vipVal = Math.max(0, Number(vipCoins?.total || 0));
 
+    const providerRows = await this.rechargeRepo
+      .createQueryBuilder('r')
+      .select('r.provider', 'provider')
+      .addSelect('COALESCE(SUM(r.amountFiat),0)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .where('r.status = :s', { s: RechargeStatus.COMPLETED })
+      .groupBy('r.provider')
+      .getRawMany();
+    const byProvider = (providerRows || [])
+      .map((row: any) => ({
+        provider: String(row.provider || 'other'),
+        label: this.providerRevenueLabel(String(row.provider || 'other')),
+        total: Number(row.total || 0),
+        count: Number(row.count || 0),
+      }))
+      .filter((r) => r.total > 0 || r.count > 0)
+      .sort((a, b) => b.total - a.total);
+    // Doughnut = real fiat revenue by payment channel (Play / card / USDT / …).
+    const revLabels = byProvider.map((r) => r.label);
+    const revValues = byProvider.map((r) => r.total);
+    if (revLabels.length === 0) {
+      revLabels.push('—');
+      revValues.push(0);
+    }
+
     return {
       labels,
       users: {
@@ -1860,9 +2030,15 @@ export class AdminService {
         data: usersSeries,
       },
       revenue: {
-        labels: ['Recharge', 'Gifts', 'VIP'],
-        values: [rechargeVal, giftsVal, vipVal],
-        data: [rechargeVal, giftsVal, vipVal],
+        labels: revLabels,
+        values: revValues,
+        data: revValues,
+        byProvider,
+        // Keep coin totals for mini-stats (not revenue).
+        coinVolume: {
+          labels: ['Recharge', 'Gifts', 'VIP'],
+          values: [rechargeVal, giftsVal, vipVal],
+        },
       },
       rooms: {
         labels,
@@ -2073,7 +2249,21 @@ export class AdminService {
             ? 'شام كاش'
             : r.provider === 'fourthwall'
               ? 'بطاقة'
-              : r.provider,
+              : r.provider === 'google_play'
+                ? 'جوجل بلاي'
+                : r.provider === 'binance_wallet' || r.provider === 'binance_pay'
+                  ? 'USDT'
+                  : r.provider === 'recharge_agent'
+                    ? 'وكيل شحن'
+                    : r.provider === 'crypto'
+                      ? 'USDT'
+                      : r.provider === 'admin'
+                        ? 'أدمن'
+                        : r.provider === 'stripe'
+                          ? 'Stripe'
+                          : r.provider === 'paypal'
+                            ? 'PayPal'
+                            : r.provider,
       })),
       total,
       query.page || 1,

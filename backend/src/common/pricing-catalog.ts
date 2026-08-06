@@ -1,90 +1,117 @@
 /**
  * Canonical social-app pricing (USD Play product IDs = sku).
- * Tempting entry packs + profitable ladder; gift mint &lt; cashout liability.
+ *
+ * Owner-safe density: ≈ 10,000–11,000 coins per $1 (not 17k–25k).
+ * Break-even under pure gifts (ratio 0.35 × 60% cashable × $0.00005/d):
+ *   liability ≈ $0.0105 per 1,000 coins → $5 supports up to ~476k coins before loss.
+ * Packages stay far under that (Play fees included still profitable).
  */
-export const PRICING_VERSION = '20260802economy-v2';
+export const PRICING_VERSION = '20260806economy-v5';
 
-/** Google Play / store productId == sku. */
+/** Google Play productId == sku. Total coins = coins + bonusCoins. */
 export const STANDARD_RECHARGE_PACKAGES = [
   {
     id: '1',
     sku: 'coins_10000',
-    coins: 12000,
+    coins: 10000,
     bonusCoins: 0,
     priceUsd: 0.99,
-    label: '12,000',
+    label: '10,000',
     popular: false,
   },
   {
     id: '2',
     sku: 'coins_35000',
-    coins: 40000,
+    coins: 28000,
     bonusCoins: 2000,
     priceUsd: 2.99,
-    label: '42,000',
+    label: '30,000',
     popular: false,
   },
   {
     id: '3',
     sku: 'coins_70000',
-    coins: 85000,
-    bonusCoins: 8000,
+    coins: 45000,
+    bonusCoins: 5000,
     priceUsd: 4.99,
-    label: '93,000',
+    label: '50,000',
     popular: true,
   },
   {
     id: '4',
     sku: 'coins_141700',
-    coins: 180000,
-    bonusCoins: 20000,
+    coins: 90000,
+    bonusCoins: 10000,
     priceUsd: 9.99,
-    label: '200,000',
+    label: '100,000',
     popular: false,
   },
   {
     id: '5',
     sku: 'coins_300000',
-    coins: 380000,
-    bonusCoins: 45000,
+    coins: 180000,
+    bonusCoins: 20000,
     priceUsd: 19.99,
-    label: '425,000',
+    label: '200,000',
     popular: false,
   },
   {
     id: '6',
     sku: 'coins_750000',
-    coins: 950000,
-    bonusCoins: 120000,
+    coins: 450000,
+    bonusCoins: 50000,
     priceUsd: 49.99,
-    label: '1,070,000',
+    label: '500,000',
     popular: false,
   },
   {
     id: '7',
     sku: 'coins_2000000',
-    coins: 2200000,
-    bonusCoins: 350000,
+    coins: 900000,
+    bonusCoins: 100000,
     priceUsd: 99.99,
-    label: '2,550,000',
+    label: '1,000,000',
     popular: false,
   },
 ] as const;
 
 /**
  * Coin → diamond mint on gifts (before platform/agency/host split).
- * Slightly under 50% so platform stays profitable after Play fees + cashout.
+ * 0.35 × (host+agency 60%) × $0.00005 ≈ $0.0000105 cashout risk per coin.
  */
-export const GIFT_DIAMOND_RATIO = 0.45;
-/** Lucky gifts pay less diamonds — rebate already returns coins to sender. */
-export const LUCKY_GIFT_DIAMOND_RATIO = 0.2;
+export const GIFT_DIAMOND_RATIO = 0.35;
+/** Lucky gifts: lower mint — rebate already returns coins to sender. */
+export const LUCKY_GIFT_DIAMOND_RATIO = 0.12;
+export const LUCKY_GIFT_MAX_MULTIPLIER = 4;
+export const LUCKY_GIFT_TARGET_EV = 0.38;
+
+/** Independent gift split % (agency room). */
+export const DEFAULT_GIFT_SPLIT = {
+  platformPercent: 40,
+  hostPercent: 45,
+  agencyOwnerPercent: 15,
+} as const;
+
 /**
- * Hard ceiling on lucky gift RNG multipliers (platform safety).
- * Soft returns (mul &lt; 1) are allowed for frequent «مردود» feel while EV stays &lt; 1.
+ * Diamonds minted per single gift unit (before split).
+ * - Always floor(coinPrice × ratio) from coin burn.
+ * - If catalog diamondValue &gt; 0, cap at that (admin lower ceiling only — never inflate above house ratio).
+ * - If catalog is 0/missing (legacy bad rows), mint full ratio so hosts never receive 0 on paid gifts.
  */
-export const LUCKY_GIFT_MAX_MULTIPLIER = 8;
-/** Target EV of coin rebate vs stake (house keeps the rest + diamond cut). */
-export const LUCKY_GIFT_TARGET_EV = 0.52;
+export function mintDiamondsPerUnit(
+  coinPrice: number,
+  catalogDiamondValue: number | null | undefined,
+  ratio: number = GIFT_DIAMOND_RATIO,
+): number {
+  const price = Math.max(0, Math.floor(Number(coinPrice) || 0));
+  if (price <= 0) return 0;
+  const r = Number(ratio);
+  const safeRatio = Number.isFinite(r) && r > 0 ? Math.min(1, Math.max(0, r)) : GIFT_DIAMOND_RATIO;
+  const fromCoins = Math.floor(price * safeRatio);
+  const catalog = Math.max(0, Math.floor(Number(catalogDiamondValue) || 0));
+  if (catalog <= 0) return fromCoins;
+  return Math.min(catalog, fromCoins);
+}
 
 /** Soft currency mall ladder — sinks coins (good for platform). Nothing free in mall. */
 export const MALL_COSMETIC_PRICES: Record<string, number[]> = {
@@ -127,6 +154,8 @@ export const HOST_ROOM_INVITE_REWARD = {
 /** Agency opening fee (coins). Runtime override via app_settings.agency_create_price_coins. */
 export const AGENCY_CREATE = {
   settingKey: 'agency_create_price_coins',
+  /** Explicit free mode (true/false). Zero price alone does not grant free open unless this is true. */
+  freeSettingKey: 'agency_create_free',
   defaultCoins: 50_000,
   minCoins: 1_000,
   maxCoins: 5_000_000,

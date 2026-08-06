@@ -110,6 +110,8 @@ export class ConfigController {
       'features.female_only_voice_hosts',
       'gender_verification.auto_accept',
       'rooms.mic_without_host_approval',
+      'gifts.sound_enabled',
+      'tasks.enabled',
     ];
     const rows = await this.settingsRepo
       .createQueryBuilder('s')
@@ -134,6 +136,8 @@ export class ConfigController {
       ),
       // Default ON: gift WAV / SFX play unless admin mutes globally.
       giftSoundsEnabled: bool('gifts.sound_enabled', true),
+      // Default ON: hide full tasks product when admin turns it off.
+      tasksEnabled: bool('tasks.enabled', true),
       ...(await this.moderation.clientPolicy()),
     };
   }

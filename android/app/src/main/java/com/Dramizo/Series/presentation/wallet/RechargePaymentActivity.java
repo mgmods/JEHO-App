@@ -253,26 +253,35 @@ public class RechargePaymentActivity extends ThemedActivity {
             c.getBillingHelper().launchPurchase(this, pkg.sku,
                     new com.Dramizo.Series.billing.BillingHelper.PurchaseCallback() {
                         @Override
-                        public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
+                            public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
                             showLoading(getString(R.string.loading));
                             c.getIoExecutor().execute(() -> {
                                 Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
                                         sku, purchaseToken, orderId, totalCoins, pkg.amountForVerify());
                                 runOnUiThread(() -> {
                                     hideLoading();
-                                    if (r.success) {
+                                    if (r.success && r.data != null) {
                                         c.getBillingHelper().consumePendingPurchase();
+                                        long newCoins = r.data.coins;
                                         RewardBurstOverlay.showCoins(
                                                 RechargePaymentActivity.this,
                                                 getString(R.string.pay_recharge_success),
                                                 String.format(Locale.US, "+%,d", totalCoins));
+                                        Toast.makeText(RechargePaymentActivity.this,
+                                                String.format(Locale.US,
+                                                        "تم إضافة الرصيد · رصيدك الآن %,d",
+                                                        newCoins),
+                                                Toast.LENGTH_LONG).show();
                                         pollHandler.postDelayed(() -> {
                                             if (!isFinishing()) finish();
                                         }, 1400);
                                     } else {
+                                        // Purchase may already be paid on Play — keep token for retry;
+                                        // do NOT consume until server credits.
+                                        String err = r.error != null ? r.error
+                                                : "تم الدفع لكن لم يُضف الرصيد — أعد فتح المحفظة";
                                         Toast.makeText(RechargePaymentActivity.this,
-                                                r.error != null ? r.error : getString(R.string.error_generic),
-                                                Toast.LENGTH_LONG).show();
+                                                err, Toast.LENGTH_LONG).show();
                                     }
                                 });
                             });

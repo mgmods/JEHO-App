@@ -607,27 +607,51 @@ public final class NativeRoomEffectsView extends FrameLayout {
             anim = "";
         }
         CosmeticMedia.Kind animKind = CosmeticMedia.kind(anim);
-        // Always fill the overlay: GIF / video / SVGA / still — no fly motion.
+        // Center stage for image / gif / video / SVGA — same presentation as video gifts.
         boolean mediaFx = animKind == CosmeticMedia.Kind.SVGA
                 || animKind == CosmeticMedia.Kind.VIDEO
                 || animKind == CosmeticMedia.Kind.GIF
                 || animKind == CosmeticMedia.Kind.IMAGE
                 || (anim != null && !anim.isEmpty());
+        // Prefer icon when animation empty so still gifts still fullscreen.
+        String effectiveAnim = mediaFx ? anim : animationUrl;
+        if ((effectiveAnim == null || effectiveAnim.isEmpty())
+                && remoteIconUrl != null && !remoteIconUrl.isEmpty()) {
+            effectiveAnim = remoteIconUrl;
+            animKind = CosmeticMedia.kind(effectiveAnim);
+        }
         boolean fullscreenMedia = animKind == CosmeticMedia.Kind.VIDEO
-                || animKind == CosmeticMedia.Kind.SVGA;
+                || animKind == CosmeticMedia.Kind.SVGA
+                || animKind == CosmeticMedia.Kind.GIF
+                || animKind == CosmeticMedia.Kind.IMAGE
+                || (effectiveAnim != null && !effectiveAnim.isEmpty());
 
         View visual = createGiftVisual(spec, remoteIconUrl,
-                mediaFx ? anim : animationUrl, Math.min(width, height));
+                effectiveAnim, Math.min(width, height));
         if (visual != null) {
             if (visual instanceof ImageView) {
                 ((ImageView) visual).setScaleType(ImageView.ScaleType.FIT_CENTER);
             }
-            // Full-bleed stage for video/SVGA — never the chat recycle bounds.
+            // Full-bleed stage for video/SVGA/image — never the chat recycle bounds.
             LayoutParams lp = new LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     Gravity.CENTER);
             addView(visual, lp);
+            // Appear from center (image gifts behave like video stage).
+            try {
+                visual.setScaleX(0.28f);
+                visual.setScaleY(0.28f);
+                visual.setAlpha(0f);
+                ObjectAnimator pop = ObjectAnimator.ofPropertyValuesHolder(visual,
+                        PropertyValuesHolder.ofFloat(View.SCALE_X, 0.28f, 1f),
+                        PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.28f, 1f),
+                        PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
+                pop.setDuration(420);
+                pop.setInterpolator(new DecelerateInterpolator(1.4f));
+                pop.start();
+            } catch (Exception ignored) {
+            }
             if (fullscreenMedia) {
                 try {
                     setElevation(Math.max(getElevation(), 52f));
@@ -922,7 +946,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         playerView.setPlayer(player);
         player.setRepeatMode(Player.REPEAT_MODE_OFF);
         try {
-            player.setVolume(1f);
+            // Mute gift video audio — voice room (Zego/LiveKit) must keep the mic track.
+            // SFX for lucky/mardood is a separate short SoundPool path.
+            player.setVolume(0f);
             player.setAudioAttributes(
                     new androidx.media3.common.AudioAttributes.Builder()
                             .setUsage(androidx.media3.common.C.USAGE_MEDIA)
@@ -930,7 +956,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                             .build(),
                     /* handleAudioFocus= */ false);
         } catch (Exception ignored) {
-            try { player.setVolume(1f); } catch (Exception ignored2) {}
+            try { player.setVolume(0f); } catch (Exception ignored2) {}
         }
 
         final Runnable reveal = () -> {
@@ -1188,43 +1214,31 @@ public final class NativeRoomEffectsView extends FrameLayout {
                                   @Nullable String animationUrl, int visualSize) {
         String anim = animationUrl != null ? animationUrl.trim() : "";
         // Backend stores HTML engine URL for all gifts — native uses catalog assets/sprites.
-        if (anim.toLowerCase(Locale.US).contains("runtime.html")
-                || anim.toLowerCase(Locale.US).endsWith(".html")) {
+        if (GiftMediaResolver.isHtmlPlaceholder(anim)) {
             anim = "";
         }
-        String abs = anim.isEmpty() ? "" : AssetCatalog.absoluteUrl(anim);
-        CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
 
-        // Even when catalog has no MP4 (HTML/empty), remap known gifts to CDN entry videos.
-        if (kind != CosmeticMedia.Kind.VIDEO && kind != CosmeticMedia.Kind.SVGA) {
-            try {
-                String preferred = GiftMediaResolver.resolvePlayable(
-                        spec != null ? spec.name : null, remoteIconUrl, anim);
-                if (preferred != null && !preferred.isEmpty()) {
-                    String prefAbs = AssetCatalog.absoluteUrl(preferred);
-                    if (prefAbs != null && !prefAbs.isEmpty()) {
-                        abs = prefAbs;
-                        kind = CosmeticMedia.kind(abs);
-                    }
-                }
-            } catch (Exception ignored) {
-            }
+        // Prefer resolved media by type: admin image / gif / video wins over name remaps.
+        String resolved = null;
+        try {
+            resolved = GiftMediaResolver.resolvePlayable(
+                    spec != null ? spec.name : null, remoteIconUrl, anim.isEmpty() ? null : anim);
+        } catch (Exception ignored) {
         }
+        String pick = resolved != null && !resolved.isEmpty()
+                ? resolved
+                : (anim.isEmpty() ? firstNonEmpty(remoteIconUrl, null) : anim);
+        String abs = pick == null || pick.isEmpty() ? "" : AssetCatalog.absoluteUrl(pick);
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
 
         // Gift videos: always ExoPlayer with audio (TikTok-style). Never muted AnimView/VAP —
         // AnimView expects VAP alpha packs and was muting/failing normal MP4 gift uploads.
         if (kind == CosmeticMedia.Kind.VIDEO) {
-            String fallback = GiftMediaResolver.resolveMappedFallback(
-                    spec != null ? spec.name : null, remoteIconUrl);
-            try {
-                String preferred = GiftMediaResolver.resolvePlayable(
-                        spec != null ? spec.name : null, remoteIconUrl, abs);
-                if (preferred != null && !preferred.isEmpty()) {
-                    String prefAbs = AssetCatalog.absoluteUrl(preferred);
-                    if (prefAbs != null && !prefAbs.isEmpty()) abs = prefAbs;
-                }
-            } catch (Exception ignored) {
-            }
+            // No silent name-remap fallback when the URL is a real admin upload.
+            String fallback = GiftMediaResolver.isTrustedUpload(abs)
+                    ? null
+                    : GiftMediaResolver.resolveMappedFallback(
+                            spec != null ? spec.name : null, remoteIconUrl);
             if (fallback != null) {
                 try {
                     String fAbs = AssetCatalog.absoluteUrl(fallback);
@@ -1308,13 +1322,34 @@ public final class NativeRoomEffectsView extends FrameLayout {
             }
         }
 
+        // Static image / GIF / (animated) WebP — show exactly what was uploaded.
         ImageView image = new ImageView(getContext());
         image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        if (!abs.isEmpty() && (lower.contains(".gif") || lower.contains(".webp"))) {
+        String iconAbs = remoteIconUrl != null && !remoteIconUrl.isEmpty()
+                ? AssetCatalog.absoluteUrl(remoteIconUrl) : null;
+        String imageUrl = !abs.isEmpty() ? abs : iconAbs;
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            String il = imageUrl.toLowerCase(Locale.US);
+            boolean animated = kind == CosmeticMedia.Kind.GIF
+                    || il.contains(".gif")
+                    || (il.contains(".webp") && !il.contains("static"));
             try {
-                Glide.with(this).asGif().load(abs).into(image);
+                if (animated) {
+                    Glide.with(this).asGif().load(imageUrl)
+                            .fitCenter()
+                            .into(image);
+                } else {
+                    Glide.with(this).load(imageUrl)
+                            .fitCenter()
+                            .into(image);
+                }
             } catch (Exception e) {
-                Glide.with(this).load(abs).into(image);
+                try {
+                    Glide.with(this).load(imageUrl).fitCenter().into(image);
+                } catch (Exception ignored) {
+                    loadAssetOrRemote(image, "visual-system/gifts/assets/gift-" + spec.id + ".png",
+                            remoteIconUrl, visualSize, visualSize);
+                }
             }
         } else {
             loadAssetOrRemote(image, "visual-system/gifts/assets/gift-" + spec.id + ".png",

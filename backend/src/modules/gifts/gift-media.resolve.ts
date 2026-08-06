@@ -1,40 +1,97 @@
 /**
- * Resolve a playable gift animation when DB still has /visual-system/runtime.html.
- * Uses Mikoo entry MP4s already on CDN.
+ * Resolve gift play media by uploaded type (image / gif-webp / video).
+ * Admin uploads always win; Mikoo entry remaps only for legacy HTML placeholders.
  */
 export function resolvePlayableGiftAnimation(opts: {
   giftName?: string | null;
   iconUrl?: string | null;
   animationUrl?: string | null;
 }): string | null {
-  const anim = (opts.animationUrl || '').trim();
-  if (isVideoOrSvga(anim) && !isHtmlPlaceholder(anim)) return anim;
+  const anim = firstRealMedia(opts.animationUrl);
+  if (anim) return anim;
 
-  const byName = mapByName(opts.giftName || '');
-  if (byName) return byName;
-  const byIcon = mapByIcon(opts.iconUrl || '');
-  if (byIcon) return byIcon;
-
-  const icon = (opts.iconUrl || '').trim();
+  const icon = firstRealMedia(opts.iconUrl);
   if (icon) {
-    const sibling = icon.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, '.mp4$2');
-    if (sibling !== icon && isVideoOrSvga(sibling)) return sibling.split('?')[0];
+    const k = mediaKind(icon);
+    // Icon-as-show: gif / video / svga / trusted upload image.
+    if (
+      k === 'video' ||
+      k === 'svga' ||
+      k === 'gif' ||
+      k === 'image' ||
+      isTrustedUpload(icon)
+    ) {
+      return icon;
+    }
   }
-  return isHtmlPlaceholder(anim) ? null : anim || null;
+
+  // Legacy only: runtime.html with no real files.
+  if (isHtmlPlaceholder(opts.animationUrl || '')) {
+    const byName = mapByName(opts.giftName || '');
+    if (byName) return byName;
+    if (!isTrustedUpload(opts.iconUrl || '')) {
+      const byIcon = mapByIcon(opts.iconUrl || '');
+      if (byIcon) return byIcon;
+    }
+  }
+
+  const iconRaw = (opts.iconUrl || '').trim();
+  if (iconRaw && isTrustedUpload(iconRaw)) {
+    const sibling = iconRaw.replace(/\.(png|jpe?g|webp)(\?.*)?$/i, '.mp4$2');
+    if (sibling !== iconRaw && mediaKind(sibling) === 'video' && isTrustedUpload(sibling)) {
+      return sibling.split('?')[0];
+    }
+  }
+
+  return firstRealMedia(opts.animationUrl) || firstRealMedia(opts.iconUrl) || null;
+}
+
+export type GiftMediaKind = 'image' | 'gif' | 'video' | 'svga' | 'none';
+
+export function mediaKind(url: string): GiftMediaKind {
+  if (!url) return 'none';
+  const u = url.split('?')[0].toLowerCase();
+  if (isHtmlPlaceholder(url)) return 'none';
+  if (u.endsWith('.svga')) return 'svga';
+  if (u.endsWith('.mp4') || u.endsWith('.webm') || u.endsWith('.mov')) return 'video';
+  if (u.endsWith('.gif')) return 'gif';
+  if (
+    u.endsWith('.webp') ||
+    u.endsWith('.png') ||
+    u.endsWith('.jpg') ||
+    u.endsWith('.jpeg') ||
+    u.endsWith('.bmp') ||
+    u.endsWith('.avif')
+  ) {
+    // Animated webp is still delivered as image/gif path client-side (Glide asGif).
+    return u.endsWith('.webp') || u.endsWith('.gif') ? 'gif' : 'image';
+  }
+  if (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/')) {
+    return 'image';
+  }
+  return 'none';
+}
+
+function firstRealMedia(url?: string | null): string | null {
+  const raw = (url || '').trim();
+  if (!raw || isHtmlPlaceholder(raw)) return null;
+  const k = mediaKind(raw);
+  return k === 'none' ? null : raw;
 }
 
 function isHtmlPlaceholder(url: string): boolean {
-  const u = url.toLowerCase();
+  const u = (url || '').toLowerCase();
   return !url || u.includes('runtime.html') || u.endsWith('.html') || u.endsWith('.htm');
 }
 
-function isVideoOrSvga(url: string): boolean {
-  const u = url.split('?')[0].toLowerCase();
+function isTrustedUpload(url: string): boolean {
+  const u = (url || '').toLowerCase();
   return (
-    u.endsWith('.mp4') ||
-    u.endsWith('.webm') ||
-    u.endsWith('.mov') ||
-    u.endsWith('.svga')
+    u.includes('/uploads/') ||
+    u.includes('/assets/gifts/') ||
+    u.includes('/assets/pack/') ||
+    u.startsWith('http://') ||
+    u.startsWith('https://')
   );
 }
 
@@ -80,7 +137,7 @@ function mapByName(name: string): string | null {
 
 function mapByIcon(iconUrl: string): string | null {
   const u = iconUrl.toLowerCase();
-  if (!u) return null;
+  if (!u || isTrustedUpload(iconUrl)) return null;
   if (u.includes('lion')) return entry('entry_mikoo_247_golden_lion_roar.mp4');
   if (u.includes('car')) return entry('entry_mikoo_265_luxury_car_team.mp4');
   if (u.includes('plane') || u.includes('airplane')) return entry('entry_mikoo_179_dubai_golden_airplane.mp4');

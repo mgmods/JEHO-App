@@ -28,6 +28,7 @@ import com.Dramizo.Series.util.CountryCatalog;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.FlagImages;
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.bumptech.glide.Glide;
 
 import java.util.Calendar;
@@ -191,9 +192,18 @@ public class ProfileActivity extends ThemedActivity {
                 }
             });
             binding.tvBio.setText(user.bio != null && !user.bio.isEmpty() ? user.bio : getString(R.string.lazy_no_signature));
-            binding.tvStats.setText(getString(R.string.friends) + " " + Math.max(0, user.friendsCount)
-                    + " · " + getString(R.string.following) + " " + user.followingCount
-                    + " · " + getString(R.string.fans) + " " + user.followersCount);
+            int friends = Math.max(0, user.friendsCount);
+            int following = Math.max(0, user.followingCount);
+            int fans = Math.max(0, user.followersCount);
+            if (binding.tvStatFriends != null) binding.tvStatFriends.setText(formatScore(friends));
+            if (binding.tvStatFollowing != null) binding.tvStatFollowing.setText(formatScore(following));
+            if (binding.tvStatFans != null) binding.tvStatFans.setText(formatScore(fans));
+            if (binding.tvStats != null) {
+                binding.tvStats.setText(getString(R.string.friends) + " " + friends
+                        + " · " + getString(R.string.following) + " " + following
+                        + " · " + getString(R.string.fans) + " " + fans);
+            }
+            bindStaffBadge(user);
             binding.tvLevelChip.setText("Lv." + Math.max(1, user.level));
             com.Dramizo.Series.util.ServerAssets.loadCompoundStart(
                     binding.tvLevelChip, user.levelBadgeUrl, 24);
@@ -288,6 +298,21 @@ public class ProfileActivity extends ThemedActivity {
     private String formatScore(long value) {
         return NumberFormat.getIntegerInstance(getResources().getConfiguration().getLocales().get(0))
                 .format(Math.max(0, value));
+    }
+
+    private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        if (binding == null || binding.tvStaffBadge == null) return;
+        if (!StaffRoleHelper.isStaff(user)) {
+            binding.tvStaffBadge.setVisibility(View.GONE);
+            return;
+        }
+        String role = StaffRoleHelper.normalize(user);
+        binding.tvStaffBadge.setVisibility(View.VISIBLE);
+        binding.tvStaffBadge.setText(StaffRoleHelper.badgeAr(user));
+        binding.tvStaffBadge.setBackgroundResource(
+                StaffRoleHelper.SUPER.equals(role)
+                        ? R.drawable.bg_chip_staff_super
+                        : R.drawable.bg_chip_staff_manager);
     }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {

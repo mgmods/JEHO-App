@@ -64,9 +64,16 @@ public class ChatRepositoryImpl implements ChatRepository {
     @Override public Result<ChatDtos.MessageDto> sendGift(String conversationId, String giftName, String iconUrl, String replyToId) {
         ChatDtos.MediaDto media = null;
         if (iconUrl != null && !iconUrl.isEmpty()) {
-            media = new ChatDtos.MediaDto();
-            media.url = iconUrl;
-            media.mimeType = "image/png";
+            // Never store gift video/SVGA into DM bubbles — decode kills low-RAM phones.
+            com.Dramizo.Series.util.CosmeticMedia.Kind kind =
+                    com.Dramizo.Series.util.CosmeticMedia.kind(iconUrl);
+            if (kind != com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO
+                    && kind != com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA) {
+                media = new ChatDtos.MediaDto();
+                media.url = iconUrl;
+                media.mimeType = "image/png";
+                media.size = 0;
+            }
         }
         String content = giftName != null ? giftName : "هدية";
         return ApiCall.execute(api.send(conversationId,

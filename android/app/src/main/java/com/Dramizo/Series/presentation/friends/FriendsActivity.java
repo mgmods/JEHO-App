@@ -47,6 +47,11 @@ public class FriendsActivity extends ThemedActivity {
         RealtimeClient.getInstance().addUserListener(userListener);
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        if (binding.btnInviteCode != null) {
+            binding.btnInviteCode.setOnClickListener(v ->
+                    startActivity(new android.content.Intent(
+                            this, com.Dramizo.Series.presentation.invite.InvitationActivity.class)));
+        }
         int initial = Math.min(Math.max(getIntent().getIntExtra(EXTRA_TAB, 0), 0), 2);
 
         binding.pager.setAdapter(new PagerAdapter(this));
