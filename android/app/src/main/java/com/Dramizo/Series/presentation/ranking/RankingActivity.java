@@ -9,8 +9,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.ActivityRankingBinding;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.google.android.material.tabs.TabLayout;
 
 public class RankingActivity extends ThemedActivity {
@@ -47,9 +47,8 @@ public class RankingActivity extends ThemedActivity {
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(RankingViewModel.class);
         adapter = new RankingAdapter(userId -> {
-            Intent intent = new Intent(this, ProfileActivity.class);
-            intent.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
-            startActivity(intent);
+            if (userId == null || userId.isEmpty()) return;
+            UserProfileCardSheet.show(this, userId);
         });
         binding.recycler.setLayoutManager(new LinearLayoutManager(this));
         binding.recycler.setAdapter(adapter);

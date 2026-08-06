@@ -40,6 +40,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.gifts.GiftBottomSheet;
 import com.Dramizo.Series.realtime.RealtimeClient;
@@ -217,14 +218,8 @@ public class ChatConversationActivity extends ThemedActivity {
 
             @Override
             public void onAvatarClick(String userId) {
-                if (userId != null && !userId.isEmpty()) {
-                    Intent i = new Intent(ChatConversationActivity.this,
-                            com.Dramizo.Series.presentation.profile.ProfileActivity.class);
-                    i.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, userId);
-                    startActivity(i);
-                } else {
-                    openPeerProfile();
-                }
+                String id = (userId != null && !userId.isEmpty()) ? userId : peerId;
+                openUserCard(id);
             }
         });
         LinearLayoutManager lm = new LinearLayoutManager(this);
@@ -351,16 +346,29 @@ public class ChatConversationActivity extends ThemedActivity {
         final int voicePadT = binding.voiceRecordBar.getPaddingTop();
         final int voicePadR = binding.voiceRecordBar.getPaddingRight();
         final int voicePadB = binding.voiceRecordBar.getPaddingBottom();
+        // Fixed content height of header toolbar (without system inset).
+        final int toolbarMinH = (int) (50f * getResources().getDisplayMetrics().density + 0.5f);
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root, (v, insets) -> {
-            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            Insets bars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars()
+                            | WindowInsetsCompat.Type.displayCutout());
             Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
-            binding.headerBar.setPadding(headerPadL, headerPadT + bars.top, headerPadR, headerPadB);
+
+            // White header fills under status bar; content sits below it.
+            binding.headerBar.setPadding(
+                    headerPadL, headerPadT + bars.top, headerPadR, headerPadB);
+            binding.headerBar.setMinimumHeight(toolbarMinH + bars.top);
+
             int bottom = Math.max(bars.bottom, ime.bottom);
             binding.inputBar.setPadding(inputPadL, inputPadT, inputPadR, inputPadB + bottom);
-            // Keep "Slide to cancel" above Android nav bar / gesture bar.
+
+            // Voice overlay sits above system nav / gesture bar.
             binding.voiceRecordBar.setPadding(
                     voicePadL, voicePadT, voicePadR, voicePadB + Math.max(bars.bottom, 0));
+            if (binding.voiceRecordOverlay != null) {
+                binding.voiceRecordOverlay.setPadding(0, 0, 0, Math.max(bars.bottom, 0));
+            }
             return insets;
         });
         ViewCompat.requestApplyInsets(binding.root);
@@ -743,13 +751,18 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void openPeerProfile() {
-        if (peerId == null || peerId.isEmpty()) {
+        openUserCard(peerId);
+    }
+
+    private void openUserCard(@Nullable String userId) {
+        if (userId == null || userId.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
             return;
         }
-        Intent i = new Intent(this, com.Dramizo.Series.presentation.profile.ProfileActivity.class);
-        i.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, peerId);
-        startActivity(i);
+        String name = binding.tvPeerName != null && binding.tvPeerName.getText() != null
+                ? binding.tvPeerName.getText().toString()
+                : null;
+        UserProfileCardSheet.show(this, userId, name, null);
     }
 
     private void onMessageLongClick(ChatDtos.MessageDto msg) {

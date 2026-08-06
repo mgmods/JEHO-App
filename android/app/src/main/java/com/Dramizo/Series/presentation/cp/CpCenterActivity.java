@@ -15,9 +15,9 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.friends.RequestsActivity;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
-import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
@@ -63,9 +63,13 @@ public class CpCenterActivity extends ThemedActivity {
         binding.btnCpCharm.setOnClickListener(v -> openRanking("popular"));
         binding.cardCpPartner.setOnClickListener(v -> {
             if (partner == null || partner.id == null) return;
-            Intent i = new Intent(this, ProfileActivity.class);
-            i.putExtra(ProfileActivity.EXTRA_USER_ID, partner.id);
-            startActivity(i);
+            UserProfileCardSheet.show(
+                    this,
+                    partner.id,
+                    partner.displayName != null ? partner.displayName : partner.username,
+                    partner.avatarUrl,
+                    Math.max(0, partner.vipLevel),
+                    Math.max(1, partner.level));
         });
         loadPartner();
     }

@@ -48,7 +48,7 @@ export function mikooPlayUrl(gameId: string) {
 }
 
 export function mikooCoverUrl(gameId: string) {
-  return `${ORIGIN}/games/mikoo/covers/${gameId}.png?v=20260805bf`;
+  return `${ORIGIN}/games/mikoo/covers/${gameId}.png?v=20260806icons`;
 }
 
 export function mikooSplashUrl(gameId: string) {

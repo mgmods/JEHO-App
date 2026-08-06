@@ -28,7 +28,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
-import com.Dramizo.Series.presentation.profile.ProfileActivity;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
@@ -226,9 +226,14 @@ public class SearchActivity extends ThemedActivity {
 
     private void openRow(Row row) {
         if (row.kind == KIND_USER && row.user != null) {
-            Intent i = new Intent(this, ProfileActivity.class);
-            i.putExtra(ProfileActivity.EXTRA_USER_ID, row.user.id);
-            startActivity(i);
+            AuthDtos.UserDto u = row.user;
+            UserProfileCardSheet.show(
+                    this,
+                    u.id,
+                    u.displayName != null ? u.displayName : u.username,
+                    u.avatarUrl,
+                    Math.max(0, u.vipLevel),
+                    Math.max(1, u.level));
         } else if (row.kind == KIND_ROOM && row.room != null) {
             openRoom(row.room);
         }

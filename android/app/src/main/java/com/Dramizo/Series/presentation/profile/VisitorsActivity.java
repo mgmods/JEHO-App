@@ -20,6 +20,7 @@ import com.Dramizo.Series.databinding.ItemFriendRowBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
@@ -49,9 +50,14 @@ public class VisitorsActivity extends ThemedActivity {
                 holder.b.tvId.setText(u.displayPublicId().isEmpty() ? "" : ("ID: " + u.displayPublicId()));
                 AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, u);
                 holder.itemView.setOnClickListener(v -> {
-                    Intent i = new Intent(VisitorsActivity.this, ProfileActivity.class);
-                    i.putExtra(ProfileActivity.EXTRA_USER_ID, u.id);
-                    startActivity(i);
+                    if (u == null || u.id == null) return;
+                    UserProfileCardSheet.show(
+                            VisitorsActivity.this,
+                            u.id,
+                            u.displayName != null ? u.displayName : u.username,
+                            u.avatarUrl,
+                            Math.max(0, u.vipLevel),
+                            Math.max(1, u.level));
                 });
             }
             @Override public int getItemCount() { return items.size(); }

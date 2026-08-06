@@ -21,7 +21,7 @@ import com.Dramizo.Series.databinding.ItemFriendRowBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
-import com.Dramizo.Series.presentation.profile.ProfileActivity;
+import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.FlagImages;
@@ -65,9 +65,14 @@ public class FriendsListFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         adapter = new FriendAdapter(user -> {
-            Intent i = new Intent(requireContext(), ProfileActivity.class);
-            i.putExtra(ProfileActivity.EXTRA_USER_ID, user.id);
-            startActivity(i);
+            if (user == null || user.id == null) return;
+            UserProfileCardSheet.show(
+                    requireActivity(),
+                    user.id,
+                    user.displayName != null ? user.displayName : user.username,
+                    user.avatarUrl,
+                    Math.max(0, user.vipLevel),
+                    Math.max(1, user.level));
         });
         binding.recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recycler.setAdapter(adapter);
