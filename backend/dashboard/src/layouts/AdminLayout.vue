@@ -19,12 +19,14 @@
 </template>
 
 <script setup>
-import { onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Sidebar from '@/components/Sidebar.vue'
 import Topbar from '@/components/Topbar.vue'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 const sidebarOpen = ref(false)
 
 function closeSidebar() {
@@ -45,11 +47,14 @@ function setBodyLock(open) {
 
 watch(sidebarOpen, (open) => setBodyLock(open), { immediate: true })
 
-// Any route navigation closes drawer (mobile)
 watch(
   () => route.fullPath,
   () => closeSidebar(),
 )
+
+onMounted(() => {
+  if (auth.isAuthenticated) auth.fetchMe()
+})
 
 onUnmounted(() => setBodyLock(false))
 </script>

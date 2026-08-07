@@ -243,6 +243,11 @@ router.beforeEach((to) => {
   if (to.meta.guest && auth.isAuthenticated) {
     return { name: 'dashboard' }
   }
+  if (to.meta.requiresAuth && auth.isAuthenticated && to.name) {
+    if (!auth.canRoute(String(to.name), 'read')) {
+      return { name: 'dashboard' }
+    }
+  }
   const title = to.meta.titleKey ? `${i18n.global.t(to.meta.titleKey)} · JEHO CHAT Admin` : 'JEHO CHAT Admin'
   document.title = title
   return true

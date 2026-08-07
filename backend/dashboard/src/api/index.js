@@ -11,6 +11,13 @@ export const authApi = {
     safeRequest(() => api.patch('/admin/auth/credentials', payload)),
 }
 
+export const operatorsApi = {
+  list: () => safeRequest(() => api.get('/admin/operators')),
+  create: (data) => safeRequest(() => api.post('/admin/operators', data)),
+  update: (id, data) => safeRequest(() => api.patch(`/admin/operators/${id}`, data)),
+  remove: (id) => safeRequest(() => api.delete(`/admin/operators/${id}`)),
+}
+
 export const dashboardApi = {
   overview: () => safeRequest(() => api.get('/admin/dashboard/overview')),
   charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params })),

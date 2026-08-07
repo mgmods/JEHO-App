@@ -55,6 +55,8 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { settingsApi } from '@/api'
 import brandLogo from '@/assets/brand/logo.png'
+import { useAuthStore } from '@/stores/auth'
+import { ROUTE_MODULE } from '@/utils/dashboard-permissions'
 
 defineProps({
   open: { type: Boolean, default: false },
@@ -63,6 +65,7 @@ defineProps({
 const emit = defineEmits(['close'])
 const route = useRoute()
 const { t } = useI18n()
+const auth = useAuthStore()
 const logoUrl = brandLogo
 const femaleVerifyEnabled = ref(false)
 
@@ -100,6 +103,7 @@ const sections = computed(() => [
         query: { tab: 'zego' },
         icon: 'bi-broadcast-pin',
         label: t('nav.zegoSettings'),
+        module: 'settings',
       },
     ],
   },
@@ -116,6 +120,7 @@ const sections = computed(() => [
         query: { tab: 'payment' },
         icon: 'bi-credit-card-2-front',
         label: t('nav.paymentSettings'),
+        module: 'settings',
       },
       { name: 'recharge-agents', icon: 'bi-person-badge', label: t('nav.rechargeAgents') },
     ],
@@ -166,8 +171,20 @@ const sections = computed(() => [
   },
 ])
 
+function itemAllowed(item) {
+  if (auth.isSuperAdmin) return true
+  const mod = item.module || ROUTE_MODULE[item.name]
+  if (!mod) return true
+  return auth.can(mod, 'read')
+}
+
 const visibleSections = computed(() =>
-  sections.value.filter((s) => s.items && s.items.length > 0),
+  sections.value
+    .map((s) => ({
+      ...s,
+      items: (s.items || []).filter(itemAllowed),
+    }))
+    .filter((s) => s.items && s.items.length > 0),
 )
 
 function itemTo(item) {
