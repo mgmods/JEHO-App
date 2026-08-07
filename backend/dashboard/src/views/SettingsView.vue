@@ -6,7 +6,7 @@
           {{ t('common.reload') }}
         </button>
         <button
-          v-if="isCoreTab"
+          v-if="isCoreTab && canWriteSettings"
           class="btn btn-aurora btn-sm"
           type="button"
           :disabled="saving || loading"
@@ -101,6 +101,135 @@
                 <span v-if="accountSaving" class="spinner-border spinner-border-sm me-1" />
                 {{ t('settings.accountSave') }}
               </button>
+            </div>
+          </section>
+        </template>
+
+        <template v-else-if="settingsTab === 'admins'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">{{ t('settings.adminsTitle') }}</h3>
+            <p class="form-text mb-3">{{ t('settings.adminsHint') }}</p>
+
+            <div class="glass p-3 mb-4 border rounded-3">
+              <h5 class="mb-3">{{ t('settings.adminsCreate') }}</h5>
+              <div class="row g-2">
+                <div class="col-md-4">
+                  <label class="form-label">{{ t('settings.accountEmail') }}</label>
+                  <input v-model="opForm.email" type="email" class="form-control" dir="ltr" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ t('settings.adminsDisplayName') }}</label>
+                  <input v-model="opForm.displayName" type="text" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">{{ t('settings.adminsPassword') }}</label>
+                  <input v-model="opForm.password" type="password" class="form-control" dir="ltr" />
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="small text-secondary mb-2">{{ t('settings.adminsPerms') }}</div>
+                <div class="row g-2">
+                  <div
+                    v-for="mod in moduleKeys"
+                    :key="'new-' + mod"
+                    class="col-md-4 col-lg-3"
+                  >
+                    <label class="form-label small mb-0">{{ moduleLabel(mod) }}</label>
+                    <select v-model="opForm.permissions[mod]" class="form-select form-select-sm">
+                      <option value="none">{{ t('settings.permNone') }}</option>
+                      <option value="read">{{ t('settings.permRead') }}</option>
+                      <option value="write">{{ t('settings.permWrite') }}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <button class="btn btn-aurora" type="button" :disabled="opSaving" @click="createOperator">
+                  <span v-if="opSaving" class="spinner-border spinner-border-sm me-1" />
+                  {{ t('settings.adminsCreateBtn') }}
+                </button>
+              </div>
+            </div>
+
+            <LoadingSpinner v-if="opLoading" />
+            <div v-else class="table-responsive">
+              <table class="table table-glass table-hover align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>{{ t('settings.adminsDisplayName') }}</th>
+                    <th>{{ t('settings.accountEmail') }}</th>
+                    <th>{{ t('settings.adminsPerms') }}</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="!operators.length">
+                    <td colspan="4" class="text-secondary">{{ t('settings.adminsEmpty') }}</td>
+                  </tr>
+                  <tr v-for="op in operators" :key="op.id">
+                    <td>
+                      <div class="fw-semibold">{{ op.displayName || op.name }}</div>
+                      <div class="small text-secondary">{{ op.username }}</div>
+                    </td>
+                    <td dir="ltr">{{ op.email }}</td>
+                    <td>
+                      <div class="d-flex flex-wrap gap-1">
+                        <span
+                          v-for="p in summaryPerms(op.permissions)"
+                          :key="op.id + p"
+                          class="badge text-bg-secondary"
+                        >{{ p }}</span>
+                      </div>
+                      <button
+                        class="btn btn-link btn-sm px-0"
+                        type="button"
+                        @click="editOperator(op)"
+                      >{{ t('settings.adminsEdit') }}</button>
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-sm btn-outline-danger" type="button" @click="removeOperator(op)">
+                        {{ t('settings.adminsRemove') }}
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="editingOp" class="glass p-3 mt-4 border rounded-3">
+              <h5 class="mb-3">{{ t('settings.adminsEdit') }} — {{ editingOp.email }}</h5>
+              <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('settings.adminsDisplayName') }}</label>
+                  <input v-model="editForm.displayName" type="text" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ t('settings.adminsPasswordOptional') }}</label>
+                  <input v-model="editForm.password" type="password" class="form-control" dir="ltr" />
+                </div>
+              </div>
+              <div class="row g-2">
+                <div
+                  v-for="mod in moduleKeys"
+                  :key="'edit-' + mod"
+                  class="col-md-4 col-lg-3"
+                >
+                  <label class="form-label small mb-0">{{ moduleLabel(mod) }}</label>
+                  <select v-model="editForm.permissions[mod]" class="form-select form-select-sm">
+                    <option value="none">{{ t('settings.permNone') }}</option>
+                    <option value="read">{{ t('settings.permRead') }}</option>
+                    <option value="write">{{ t('settings.permWrite') }}</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mt-3 d-flex gap-2">
+                <button class="btn btn-aurora" type="button" :disabled="opSaving" @click="saveOperatorEdit">
+                  {{ t('settings.adminsSave') }}
+                </button>
+                <button class="btn btn-outline-secondary" type="button" @click="editingOp = null">
+                  {{ t('app.cancel') }}
+                </button>
+              </div>
             </div>
           </section>
         </template>
@@ -404,7 +533,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi, authApi } from '@/api'
+import { settingsApi, authApi, operatorsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -416,6 +545,7 @@ import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
 import { useAuthStore } from '@/stores/auth'
+import { DASHBOARD_MODULES } from '@/utils/dashboard-permissions'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -425,17 +555,136 @@ const dashboardLocale = ref(readDashboardLocale())
 const settingsTab = ref('general')
 const CORE_TABS = new Set(['general', 'economy', 'features', 'moderation', 'other'])
 const isCoreTab = computed(() => CORE_TABS.has(settingsTab.value))
+const canWriteSettings = computed(() => auth.can('settings', 'write'))
 
-const settingTabs = computed(() => [
-  { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
-  { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
-  { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
-  { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
-  { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
-  { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
-  { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock' },
-  { id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' },
-])
+const settingTabs = computed(() => {
+  const tabs = [
+    { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
+    { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
+    { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
+    { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
+    { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
+    { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
+    { id: 'account', label: t('settings.tabAccount'), icon: 'bi-person-lock' },
+  ]
+  if (auth.isSuperAdmin) {
+    tabs.push({ id: 'admins', label: t('settings.tabAdmins'), icon: 'bi-people-fill' })
+  }
+  tabs.push({ id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' })
+  return tabs
+})
+
+const moduleKeys = DASHBOARD_MODULES
+
+function emptyPerms() {
+  const o = {}
+  for (const m of moduleKeys) o[m] = 'none'
+  return o
+}
+
+const opLoading = ref(false)
+const opSaving = ref(false)
+const operators = ref([])
+const editingOp = ref(null)
+const opForm = reactive({
+  email: '',
+  displayName: '',
+  password: '',
+  permissions: emptyPerms(),
+})
+const editForm = reactive({
+  displayName: '',
+  password: '',
+  permissions: emptyPerms(),
+})
+
+function moduleLabel(mod) {
+  return t(`settings.mod.${mod}`, mod)
+}
+
+function summaryPerms(perms) {
+  if (!perms) return []
+  return Object.entries(perms)
+    .filter(([, v]) => v === 'read' || v === 'write')
+    .map(([k, v]) => `${moduleLabel(k)}:${v === 'write' ? '✎' : '👁'}`)
+}
+
+async function loadOperators() {
+  if (!auth.isSuperAdmin) return
+  opLoading.value = true
+  const { data, error: err } = await operatorsApi.list()
+  opLoading.value = false
+  if (err) {
+    error.value = err.message
+    return
+  }
+  operators.value = data?.items || data?.data?.items || []
+}
+
+async function createOperator() {
+  error.value = ''
+  success.value = ''
+  opSaving.value = true
+  const { error: err } = await operatorsApi.create({
+    email: opForm.email,
+    password: opForm.password,
+    displayName: opForm.displayName,
+    permissions: { ...opForm.permissions },
+  })
+  opSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  success.value = t('settings.adminsCreated')
+  toast().success(success.value)
+  opForm.email = ''
+  opForm.displayName = ''
+  opForm.password = ''
+  opForm.permissions = emptyPerms()
+  await loadOperators()
+}
+
+function editOperator(op) {
+  editingOp.value = op
+  editForm.displayName = op.displayName || op.name || ''
+  editForm.password = ''
+  editForm.permissions = { ...emptyPerms(), ...(op.permissions || {}) }
+}
+
+async function saveOperatorEdit() {
+  if (!editingOp.value) return
+  opSaving.value = true
+  const payload = {
+    displayName: editForm.displayName,
+    permissions: { ...editForm.permissions },
+  }
+  if (editForm.password) payload.password = editForm.password
+  const { error: err } = await operatorsApi.update(editingOp.value.id, payload)
+  opSaving.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  success.value = t('settings.adminsUpdated')
+  toast().success(success.value)
+  editingOp.value = null
+  await loadOperators()
+}
+
+async function removeOperator(op) {
+  if (!confirm(t('settings.adminsRemoveConfirm', { email: op.email }))) return
+  const { error: err } = await operatorsApi.remove(op.id)
+  if (err) {
+    toast().danger(err.message)
+    return
+  }
+  toast().success(t('settings.adminsRemoved'))
+  if (editingOp.value?.id === op.id) editingOp.value = null
+  await loadOperators()
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -566,6 +815,7 @@ function selectTab(id) {
   settingsTab.value = id
   router.replace({ name: 'settings', query: { tab: id } })
   if (id === 'account') fillAccountFromAuth()
+  if (id === 'admins') loadOperators()
 }
 
 function syncTabFromRoute() {
@@ -573,6 +823,7 @@ function syncTabFromRoute() {
   const allowed = new Set(settingTabs.value.map((x) => x.id))
   settingsTab.value = allowed.has(raw) ? raw : 'general'
   if (settingsTab.value === 'account') fillAccountFromAuth()
+  if (settingsTab.value === 'admins') loadOperators()
 }
 
 watch(() => route.query.tab, syncTabFromRoute)
@@ -681,6 +932,11 @@ function reloadActive() {
 }
 
 async function save() {
+  if (!auth.can('settings', 'write')) {
+    error.value = t('settings.readOnly')
+    toast().danger(error.value)
+    return
+  }
   saving.value = true
   error.value = ''
   success.value = ''

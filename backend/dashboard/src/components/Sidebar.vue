@@ -199,7 +199,7 @@ function isItemActive(item) {
     // Active only on general-ish settings (no payment/zego deep-link tabs).
     if (route.name !== 'settings') return false
     const tab = String(route.query.tab || '')
-    return !tab || tab === 'general' || tab === 'economy' || tab === 'account' || tab === 'features'
+    return !tab || tab === 'general' || tab === 'economy' || tab === 'account' || tab === 'features' || tab === 'admins' || tab === 'moderation' || tab === 'other'
   }
   if (item.query?.tab) {
     return route.name === 'settings' && String(route.query.tab || '') === item.query.tab
