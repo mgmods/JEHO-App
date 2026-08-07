@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
+        android:id="@+id/action_view_profile"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="@string/view_profile" />
+    <item
         android:id="@+id/action_archive_chat"
         android:icon="@android:drawable/ic_menu_save"
         android:title="@string/archive_conversation" />

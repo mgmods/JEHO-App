@@ -1,12 +1,12 @@
 <template>
   <div>
     <PageHeader
-      title="تارجيت المضيف الشهري"
-      subtitle="جدول التارجت (كوينز = ألماس ١:١) + راتب المضيف وراتب الوكيل بالدولار — يظهر في التطبيق وملف السياسة PDF"
+      title="تارجيت المضيف (أسبوعي / شهري)"
+      subtitle="الحد الأدنى لراتب المضيف $10 — عمولة الوكالة + السحب يعتمدان على المراحل. ١ كوين تارجت = ١ ألماسة. يظهر للمضيف وإدارة الوكالة فقط."
     >
       <template #actions>
         <button class="btn btn-ghost btn-sm" type="button" :disabled="saving" @click="loadOfficialLadder">
-          تحميل الجدول الرسمي (٣٤ مرحلة)
+          تحميل الجدول الرسمي (من $10 · 28 مرحلة)
         </button>
         <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
           حفظ التارجيت
@@ -32,6 +32,16 @@
             <option value="diamonds">ألماس الهدايا (جدول الرواتب: ١ كوين = ١ ألماسة)</option>
             <option value="gift_coins">عملات الهدايا</option>
           </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">فترة التارجت</label>
+          <select v-model="hostTarget.period" class="form-select">
+            <option value="monthly">شهري (تقويم UTC)</option>
+            <option value="weekly">أسبوعي (أسبوع ISO UTC)</option>
+          </select>
+          <div class="form-text">
+            التقدّم يُصفَّر تلقائياً عند بداية فترة جديدة. التارجت يظهر للمضيف + إدارة الوكالة فقط.
+          </div>
         </div>
       </div>
 
@@ -69,7 +79,7 @@
                 <input
                   v-model.number="stage.hostSalaryUsd"
                   type="number"
-                  min="0"
+                  min="10"
                   step="1"
                   class="form-control form-control-sm"
                   style="min-width:5rem"
@@ -117,7 +127,7 @@ import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
-import { OFFICIAL_SALARY_LADDER } from '@/data/hostSalaryLadder'
+import { OFFICIAL_SALARY_LADDER, HOST_TARGET_MIN_USD } from '@/data/hostSalaryLadder'
 
 const loading = ref(true)
 const saving = ref(false)
@@ -126,6 +136,7 @@ const success = ref('')
 const hostTarget = reactive({
   enabled: true,
   currency: 'diamonds',
+  period: 'monthly',
   stages: [],
 })
 
@@ -156,19 +167,23 @@ function mapStage(s, i) {
 
 function addStage() {
   const n = hostTarget.stages.length + 1
+  const last = hostTarget.stages[hostTarget.stages.length - 1]
+  const nextTh = last ? Math.max(150000, Number(last.threshold) || 0) + 50000 : 150000
+  const nextHost = Math.max(HOST_TARGET_MIN_USD, Number(last?.hostSalaryUsd) || HOST_TARGET_MIN_USD)
   hostTarget.stages.push(
     mapStage(
       {
         id: `stage_${n}`,
         title: `مرحلة ${n}`,
-        threshold: n * 15000,
-        hostSalaryUsd: 0,
-        agentSalaryUsd: 0,
+        threshold: nextTh,
+        hostSalaryUsd: nextHost,
+        agentSalaryUsd: Math.max(0, Number(last?.agentSalaryUsd) || 2),
         totalUsd: 0,
       },
       n - 1,
     ),
   )
+  recalcTotal(hostTarget.stages[hostTarget.stages.length - 1])
 }
 
 function loadOfficialLadder() {
@@ -177,7 +192,7 @@ function loadOfficialLadder() {
   hostTarget.stages = OFFICIAL_SALARY_LADDER.map((row, i) =>
     mapStage(
       {
-        id: `salary_${row.stage}`,
+        id: `salary_v2_${row.stage}`,
         title: `مرحلة ${row.stage}`,
         threshold: row.targetCoins,
         hostSalaryUsd: row.hostSalaryUsd,
@@ -190,7 +205,7 @@ function loadOfficialLadder() {
       i,
     ),
   )
-  success.value = 'تم تحميل الجدول الرسمي — اضغط حفظ لتطبيقه'
+  success.value = `تم تحميل الجدول الرسمي (أقل تارجت مضيف $${HOST_TARGET_MIN_USD}) — اضغط حفظ`
   toast().success(success.value)
 }
 
@@ -215,11 +230,16 @@ async function load() {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
     hostTarget.enabled = parsed.enabled !== false
     hostTarget.currency = parsed.currency === 'gift_coins' ? 'gift_coins' : 'diamonds'
+    hostTarget.period = parsed.period === 'weekly' ? 'weekly' : 'monthly'
     hostTarget.stages = Array.isArray(parsed.stages) ? parsed.stages.map(mapStage) : []
+    const minHost = hostTarget.stages
+      .map((s) => Number(s.hostSalaryUsd) || 0)
+      .filter((n) => n > 0)
+    const hasSubMin = minHost.length > 0 && Math.min(...minHost) < HOST_TARGET_MIN_USD
     const hasSalary = hostTarget.stages.some(
       (s) => Number(s.hostSalaryUsd) > 0 || Number(s.agentSalaryUsd) > 0,
     )
-    if (!hostTarget.stages.length || !hasSalary || hostTarget.stages.length < 20) {
+    if (!hostTarget.stages.length || !hasSalary || hasSubMin || hostTarget.stages.length < 20) {
       loadOfficialLadder()
     }
   } catch {
@@ -232,10 +252,29 @@ async function save() {
   error.value = ''
   success.value = ''
   hostTarget.stages.forEach(recalcTotal)
+  const bad = hostTarget.stages.filter((s) => {
+    const h = Number(s.hostSalaryUsd) || 0
+    return h > 0 && h < HOST_TARGET_MIN_USD
+  })
+  if (bad.length) {
+    saving.value = false
+    error.value = `رفض الحفظ: مراحل برواتب مضيف أقل من $${HOST_TARGET_MIN_USD} (مثل $1/$2). حمّل الجدول الرسمي أو ارفع القيم.`
+    toast().danger(error.value)
+    return
+  }
+  if (!hostTarget.stages.length) {
+    saving.value = false
+    error.value = 'لا توجد مراحل — حمّل الجدول الرسمي أولاً'
+    toast().danger(error.value)
+    return
+  }
   const payload = {
     enabled: !!hostTarget.enabled,
     currency: hostTarget.currency,
+    period: hostTarget.period === 'weekly' ? 'weekly' : 'monthly',
     stages: hostTarget.stages,
+    ladderVersion: '20260807-min10usd-v2',
+    minHostTargetUsd: HOST_TARGET_MIN_USD,
   }
   const result = await settingsApi.update({
     host_monthly_target: JSON.stringify(payload),
@@ -245,7 +284,7 @@ async function save() {
     error.value = result.error.message
     toast().danger(result.error.message)
   } else {
-    success.value = 'تم حفظ تارجيت المضيف وجدول الرواتب'
+    success.value = 'تم حفظ تارجيت المضيف (حد أدنى $10) — يعتمد عليه سحب المضيف وعمولة الوكالة'
     toast().success(success.value)
   }
 }

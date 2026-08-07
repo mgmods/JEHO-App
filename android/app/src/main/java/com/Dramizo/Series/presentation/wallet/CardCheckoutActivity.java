@@ -35,13 +35,14 @@ import java.util.Locale;
 
 /**
  * In-app card checkout: app chrome + loading → secure payment WebView.
- * After Fourthwall shows the post-pay "order" page we confirm crediting and
- * return to {@link BagActivity} with a clear recharge-success result.
+ * Package recharge returns to {@link BagActivity}.
  */
 public class CardCheckoutActivity extends ThemedActivity {
 
     public static final String EXTRA_RECHARGE_SUCCESS = "extra_recharge_success";
     public static final String EXTRA_RECHARGE_COINS = "extra_recharge_coins";
+    public static final String EXTRA_ORDER_ID = "extra_order_id";
+    public static final String EXTRA_PAYMENT_REF = "extra_payment_ref";
 
     private AppContainer c;
     private WalletDtos.RechargePackageDto pkg;

@@ -66,21 +66,22 @@ export class BaishunRouteController {
 
   private resolveSlug(gameId?: string) {
     if (!gameId) return 'cleopatra-slot';
-    const id = String(gameId).trim();
-    const byModule = [
-      ['1107', 'cleopatra-slot'],
-      ['1022', 'fishing'],
-      ['1184', 'football-plinko'],
-      ['1072', 'hilo'],
-      ['1174', 'royal-battle'],
-      ['1098', 'slot777'],
-      ['1183', 'swimsuit-party'],
-    ];
-    for (const [mod, slug] of byModule) {
-      if (id === mod) return slug;
-    }
+    const id = String(gameId).trim().toLowerCase();
+    // Numeric BaiShun module ids (and string form).
+    const byModule: Record<string, string> = {
+      '1107': 'cleopatra-slot',
+      '1022': 'fishing',
+      '1184': 'football-plinko',
+      '1068': 'greedy-lion',
+      '1072': 'hilo',
+      '1174': 'royal-battle',
+      '1098': 'slot777',
+      '1183': 'swimsuit-party',
+    };
+    if (byModule[id]) return byModule[id];
     const game = findMikooGame(id);
     if (game?.bridge === 'baishun') return game.id;
-    return id.toLowerCase();
+    if (game) return game.id;
+    return id;
   }
 }

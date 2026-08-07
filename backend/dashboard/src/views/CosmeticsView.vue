@@ -395,7 +395,7 @@ function displayName(item) {
   // Fix mojibake-ish leftover names by preferring Arabic rewrite for common badges
   if (/vip_medal_mikoo_(\d+)/i.test(code)) {
     const n = code.match(/vip_medal_mikoo_(\d+)/i)[1]
-    return `شارة VIP ميكو ${n}`
+    return `شارة VIP ${n}`
   }
   return raw
 }

@@ -35,7 +35,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 
-/** Home «النشاطات»: public plaza events only (manage yours from Profile). */
+/** Home Activities tab: public plaza events only (manage yours from Profile). */
 public class HomeActivitiesFragment extends Fragment {
     public static final int TAB_ACTIVITIES = 3;
 
@@ -89,8 +89,10 @@ public class HomeActivitiesFragment extends Fragment {
                     items.addAll(r.data.items);
                 }
                 adapter.notifyDataSetChanged();
-                binding.tvEmptyEvents.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                binding.tvEmptyEvents.setText(R.string.event_empty_square);
+                View emptyView = binding.tvEmptyEvents;
+                if (emptyView != null) {
+                    emptyView.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
+                }
                 if (r.error != null) ErrorToasts.show(requireContext(), r.error);
                 notifyHostSized();
             });
@@ -161,18 +163,38 @@ public class HomeActivitiesFragment extends Fragment {
         public void onBindViewHolder(@NonNull VH h, int position) {
             EventDtos.EventDto e = items.get(position);
             h.b.tvEventTitle.setText(e.title != null ? e.title : "");
-            h.b.tvEventTag.setText(tagLabel(e.tag));
+            h.b.tvEventTag.setText(tagLabel(e));
             h.b.tvEventTime.setText(formatTime(e));
             h.b.tvEventMeta.setText(metaLine(e));
 
+            // Highlight agency-opening events (Mikoo ceremony vibe).
+            boolean agencyOpen = e.isAgencyRoom
+                    || (e.tag != null && e.tag.toLowerCase(Locale.US).contains("agency"));
+            try {
+                h.b.tvEventTag.setBackgroundResource(
+                        agencyOpen ? R.drawable.bg_event_tag_agency : R.drawable.bg_event_tag_pill);
+            } catch (Exception ignored) {
+                // drawable missing on older skins
+            }
+
+            String cover = e.coverUrl;
+            if ((cover == null || cover.isEmpty()) && e.agencyLogoUrl != null) {
+                cover = e.agencyLogoUrl;
+            }
+            if ((cover == null || cover.isEmpty()) && e.roomCoverUrl != null) {
+                cover = e.roomCoverUrl;
+            }
             Glide.with(h.b.imgEventCover)
-                    .load(AssetCatalog.absoluteUrl(e.coverUrl))
+                    .load(AssetCatalog.absoluteUrl(cover))
                     .placeholder(ImagePlaceholder.cover())
                     .error(ImagePlaceholder.cover())
                     .centerCrop()
                     .into(h.b.imgEventCover);
 
             String avatar = e.host != null ? e.host.avatarUrl : null;
+            if ((avatar == null || avatar.isEmpty()) && e.agencyLogoUrl != null) {
+                avatar = e.agencyLogoUrl;
+            }
             AvatarImageLoader.load(h.b.imgHostAvatar, avatar);
 
             boolean sub = e.subscribed;
@@ -196,17 +218,29 @@ public class HomeActivitiesFragment extends Fragment {
         }
     }
 
-    private String tagLabel(String tag) {
+    private String tagLabel(EventDtos.EventDto e) {
+        if (e != null && e.isAgencyRoom) {
+            return getString(R.string.event_tag_agency_open);
+        }
+        String tag = e != null ? e.tag : null;
         if (tag == null) return getString(R.string.event_tag_party);
         switch (tag.toLowerCase(Locale.US)) {
             case "game": return getString(R.string.event_tag_game);
             case "music": return getString(R.string.event_tag_music);
+            case "agency":
+            case "agency_open":
+            case "open_agency":
+                return getString(R.string.event_tag_agency_open);
             case "party":
             default: return getString(R.string.event_tag_party);
         }
     }
 
     private String metaLine(EventDtos.EventDto e) {
+        if (e.isAgencyRoom && e.agencyName != null && !e.agencyName.isEmpty()) {
+            return e.agencyName + " · " + getString(R.string.event_subscribers_count,
+                    Math.max(0, e.subscribersCount));
+        }
         String host = "";
         if (e.host != null) {
             if (e.host.displayName != null && !e.host.displayName.isEmpty()) host = e.host.displayName;

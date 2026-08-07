@@ -138,6 +138,11 @@ export class ConfigController {
       giftSoundsEnabled: bool('gifts.sound_enabled', true),
       // Default ON: hide full tasks product when admin turns it off.
       tasksEnabled: bool('tasks.enabled', true),
+      // Bump via app settings (or redeploy MIKOO_COVERS_CACHE_TAG) when static art is replaced.
+      mediaAssetEpoch: await this.readSetting(
+        'app.media_asset_epoch',
+        (await import('../games/mikoo-games.catalog')).MIKOO_COVERS_CACHE_TAG,
+      ),
       ...(await this.moderation.clientPolicy()),
     };
   }
@@ -285,12 +290,20 @@ export class ConfigController {
       }
     }
 
-    // Persist cleaned catalog once (drop lucky-wheel / dice leftovers).
-    if (row && Array.isArray(raw) && raw.some((g) => isRemovedLegacyHtmlGame(g as Record<string, unknown>))) {
-      const cleaned = sanitizeGamesCatalog(raw);
-      row.value = JSON.stringify(cleaned);
-      await this.settingsRepo.save(row);
-      raw = cleaned;
+    // Optional: re-persist merged catalog (new games + int sortOrder) without blocking clients.
+    if (row) {
+      try {
+        const cleaned = sanitizeGamesCatalog(raw);
+        const next = JSON.stringify(cleaned);
+        if (row.value !== next) {
+          row.value = next;
+          await this.settingsRepo.save(row);
+        }
+        raw = cleaned;
+      } catch {
+        // Redis / DB write issues must not break the public catalog response.
+        raw = sanitizeGamesCatalog(raw);
+      }
     }
 
     return sanitizeGamesCatalog(raw, { forClient: true });

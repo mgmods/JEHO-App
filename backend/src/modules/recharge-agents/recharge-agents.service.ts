@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   Injectable,
   NotFoundException,
   OnModuleInit,
@@ -51,6 +52,8 @@ export interface ApplyRechargeAgentDto {
   paymentReference?: string;
   /** Completed Binance USDT deposit order id — auto-fills payment reference from tx. */
   depositOrderId?: string;
+  /** Completed Fourthwall / card membership order id. */
+  cardOrderId?: string;
 }
 
 export interface SellRechargeDto {
@@ -177,76 +180,9 @@ export class RechargeAgentsService implements OnModuleInit {
     }
   }
 
-  async apply(userId: string, dto: ApplyRechargeAgentDto) {
-    const existingAgent = await this.agentsRepo.findOne({ where: { userId } });
-    if (existingAgent?.status === RechargeAgentStatus.ACTIVE) {
-      throw new ConflictException('User is already an active recharge agent');
-    }
-    const pending = await this.applicationsRepo.findOne({
-      where: { userId, status: RechargeAgentStatus.PENDING },
-      order: { createdAt: 'DESC' },
-    });
-    if (pending) throw new ConflictException('An application is already pending');
-
-    const requestedCoins = Number(dto.requestedCoins || 0);
-    const config = await this.getPricingConfig();
-    if (
-      !Number.isSafeInteger(requestedCoins) ||
-      requestedCoins < config.minInitialCoins ||
-      requestedCoins > config.maxInitialCoins
-    ) {
-      throw new BadRequestException(
-        `requestedCoins must be between ${config.minInitialCoins} and ${config.maxInitialCoins}`,
-      );
-    }
-    const paymentReferenceRaw = dto.paymentReference?.trim();
-    let paymentReference = paymentReferenceRaw || '';
-    if (dto.depositOrderId) {
-      const depositStatus = await this.paymentsService.getBinanceWalletOrderStatus(
-        userId,
-        dto.depositOrderId,
-      );
-      const order = depositStatus.order as {
-        status?: string;
-        providerPaymentId?: string | null;
-        amountFiat?: number;
-        providerPayload?: Record<string, unknown>;
-      };
-      if (String(order?.status || '').toLowerCase() !== 'completed') {
-        throw new BadRequestException('Deposit order is not paid yet');
-      }
-      const purpose = String(order?.providerPayload?.purpose || '');
-      if (purpose && purpose !== 'recharge_agent') {
-        throw new BadRequestException('Deposit order is not an agent membership payment');
-      }
-      paymentReference = String(order.providerPaymentId || dto.depositOrderId);
-    }
-    if (!paymentReference || paymentReference.length < 8 || paymentReference.length > 160) {
-      throw new BadRequestException('A valid USDT transaction reference is required');
-    }
-    const duplicatePayment = await this.applicationsRepo.findOne({
-      where: { paymentReference },
-    });
-    if (duplicatePayment) {
-      throw new ConflictException('This payment reference has already been submitted');
-    }
-    const paymentNetwork = this.normalizeNetwork(dto.paymentNetwork);
-    const quote = this.quote(config, requestedCoins);
-
-    return this.applicationsRepo.save(
-      this.applicationsRepo.create({
-        userId,
-        contact: dto.contact?.trim() || null,
-        region: dto.region?.trim() || null,
-        reason: dto.reason?.trim() || null,
-        requestedCoins,
-        membershipFeeUsdt: quote.membershipFeeUsdt,
-        stockCostUsdt: quote.stockCostUsdt,
-        totalPaidUsdt: quote.totalUsdt,
-        paymentNetwork,
-        paymentReference,
-        status: RechargeAgentStatus.PENDING,
-      }),
+  async apply(_userId: string, _dto: ApplyRechargeAgentDto) {
+    throw new GoneException(
+      'طلب الانضمام المدفوع لوكلاء الشحن أُوقف — الوكلاء بيع داخلي يُعيَّنون من الإدارة فقط',
     );
   }
 
@@ -273,8 +209,7 @@ export class RechargeAgentsService implements OnModuleInit {
     return { ...pricing, ...deposit };
   }
 
-  /** Create a trackable USDT deposit order for agent membership (auto-detect via reconcile). */
-  async createDepositOrder(userId: string, network: string, requestedCoins: number) {
+  private async assertCanApplyAsAgent(userId: string) {
     const existingAgent = await this.agentsRepo.findOne({ where: { userId } });
     if (existingAgent?.status === RechargeAgentStatus.ACTIVE) {
       throw new ConflictException('User is already an active recharge agent');
@@ -284,43 +219,23 @@ export class RechargeAgentsService implements OnModuleInit {
       order: { createdAt: 'DESC' },
     });
     if (pending) throw new ConflictException('An application is already pending');
+  }
 
-    const config = await this.getPricingConfig();
-    if (
-      !Number.isSafeInteger(requestedCoins) ||
-      requestedCoins < config.minInitialCoins ||
-      requestedCoins > config.maxInitialCoins
-    ) {
-      throw new BadRequestException(
-        `requestedCoins must be between ${config.minInitialCoins} and ${config.maxInitialCoins}`,
-      );
-    }
-    const paymentNetwork = this.normalizeNetwork(network);
-    const quote = this.quote(config, requestedCoins);
-    const deposit = await this.paymentsService.createBinanceUsdtDepositOrder({
-      userId,
-      network: paymentNetwork,
-      expectedAmount: quote.totalUsdt,
-      sku: 'agent_apply',
-      coins: 0,
-      bonusCoins: 0,
-      purpose: 'recharge_agent',
-      uniqueAmount: true,
-      meta: {
-        requestedCoins,
-        membershipFeeUsdt: quote.membershipFeeUsdt,
-        stockCostUsdt: quote.stockCostUsdt,
-        totalUsdt: quote.totalUsdt,
-      },
-    });
-    return {
-      ...deposit,
-      requestedCoins,
-      membershipFeeUsdt: quote.membershipFeeUsdt,
-      stockCostUsdt: quote.stockCostUsdt,
-      quoteTotalUsdt: quote.totalUsdt,
-      paymentNetwork,
-    };
+  /** Create a trackable USDT deposit order for agent membership (auto-detect via reconcile). */
+  async createDepositOrder(_userId: string, _network: string, _requestedCoins: number) {
+    throw new GoneException(
+      'طلب الانضمام المدفوع لوكلاء الشحن أُوقف — البيع داخلي فقط',
+    );
+  }
+
+  /**
+   * Card (Fourthwall) checkout for agent membership fee + opening stock.
+   * Wallet coins are NOT credited — float is granted only after admin approval.
+   */
+  async createCardCheckout(_userId: string, _requestedCoins: number) {
+    throw new GoneException(
+      'طلب الانضمام المدفوع لوكلاء الشحن أُوقف — البيع داخلي فقط',
+    );
   }
 
   async getDepositOrderStatus(userId: string, orderId: string) {
@@ -351,12 +266,11 @@ export class RechargeAgentsService implements OnModuleInit {
     };
   }
 
-  /** Coin recharge agents only — never mix with voice-room agencies. */
+  /** Active recharge agents available for diamond-to-cash via agent. */
   async listAgentsForWithdraw() {
     const agents = await this.agentsRepo.find({
       where: {
         status: RechargeAgentStatus.ACTIVE,
-        listedInDirectory: true,
       },
       relations: { user: true },
       order: { createdAt: 'DESC' },
@@ -821,6 +735,7 @@ export class RechargeAgentsService implements OnModuleInit {
         });
       }
       agent.status = RechargeAgentStatus.ACTIVE;
+      agent.listedInDirectory = false;
       agent.floatCoins = dto.floatCoins ?? previousFloat;
       agent.commissionBps = dto.commissionBps ?? Number(agent.commissionBps || 0);
       agent.dailyLimitCoins =
@@ -851,6 +766,11 @@ export class RechargeAgentsService implements OnModuleInit {
   }
 
   async adminListApplications() {
+    // Paid join applications retired — internal assign only.
+    return { items: [], total: 0 };
+  }
+
+  private async _legacyAdminListApplicationsDisabled() {
     const items = await this.applicationsRepo.find({
       relations: { user: true },
       order: { createdAt: 'DESC' },
@@ -862,6 +782,19 @@ export class RechargeAgentsService implements OnModuleInit {
   }
 
   async adminReviewApplication(
+    _id: string,
+    _action: 'approve' | 'reject',
+    _adminId: string,
+    _note?: string,
+    _options?: { floatCoins?: number; commissionBps?: number },
+  ) {
+    throw new GoneException(
+      'طلبات الانضمام المدفوعة أُوقفت — عيّن وكلاء البيع الداخلي يدوياً',
+    );
+  }
+
+  /** @deprecated Paid applications retired. */
+  private async _legacyAdminReviewApplication(
     id: string,
     action: 'approve' | 'reject',
     adminId: string,
@@ -897,6 +830,7 @@ export class RechargeAgentsService implements OnModuleInit {
           });
         }
         agent.status = RechargeAgentStatus.ACTIVE;
+        agent.listedInDirectory = true;
         agent.reviewedBy = adminId;
         agent.reviewedAt = new Date();
         if (note?.trim()) agent.notes = note.trim();
@@ -1047,121 +981,32 @@ export class RechargeAgentsService implements OnModuleInit {
     if (dto.country !== undefined) agent.country = dto.country?.trim() || null;
     if (dto.whatsapp !== undefined) agent.whatsapp = dto.whatsapp?.trim() || null;
     if (dto.telegram !== undefined) agent.telegram = dto.telegram?.trim() || null;
-    if (dto.listedInDirectory !== undefined) agent.listedInDirectory = !!dto.listedInDirectory;
+    // Directory contact listing retired.
+    agent.listedInDirectory = false;
     agent.reviewedBy = adminId;
     agent.reviewedAt = new Date();
     return this.normalizeAgent(await this.agentsRepo.save(agent));
   }
 
-  async publicDirectory(country?: string) {
-    const countryFilter = country?.trim() || null;
-    const contactsQb = this.contactsRepo
-      .createQueryBuilder('c')
-      .where('c.isActive = true')
-      .orderBy('c.sortOrder', 'ASC')
-      .addOrderBy('c.createdAt', 'DESC');
-    if (countryFilter) {
-      contactsQb.andWhere('LOWER(c.country) = LOWER(:country)', { country: countryFilter });
-    }
-    const contacts = await contactsQb.getMany();
-
-    const agentsQb = this.agentsRepo
-      .createQueryBuilder('a')
-      .leftJoinAndSelect('a.user', 'user')
-      .leftJoinAndSelect('user.profile', 'profile')
-      .where('a.status = :status', { status: RechargeAgentStatus.ACTIVE })
-      .andWhere('a.listedInDirectory = true')
-      .andWhere('(a.whatsapp IS NOT NULL OR a.telegram IS NOT NULL)')
-      .orderBy('a.createdAt', 'DESC');
-    if (countryFilter) {
-      agentsQb.andWhere('LOWER(a.country) = LOWER(:country)', { country: countryFilter });
-    }
-    const agents = await agentsQb.getMany();
-
-    const items = [
-      ...contacts.map((c) => ({
-        id: c.id,
-        source: 'contact' as const,
-        displayName: c.displayName,
-        country: c.country,
-        whatsapp: c.whatsapp,
-        telegram: c.telegram,
-        notes: c.notes,
-        avatarUrl: null as string | null,
-        coverUrl: null as string | null,
-      })),
-      ...agents.map((a) => ({
-        id: a.id,
-        source: 'agent' as const,
-        displayName: a.user?.displayName || a.user?.username || 'وكيل شحن',
-        country: a.country || '',
-        whatsapp: a.whatsapp,
-        telegram: a.telegram,
-        notes: a.notes,
-        avatarUrl: a.user?.avatarUrl || null,
-        coverUrl: a.user?.profile?.coverUrl || null,
-      })),
-    ];
-
-    const countriesSet = new Set<string>();
-    for (const row of await this.contactsRepo.find({
-      where: { isActive: true },
-      select: ['country'],
-    })) {
-      if (row.country) countriesSet.add(row.country);
-    }
-    for (const row of await this.agentsRepo.find({
-      where: { status: RechargeAgentStatus.ACTIVE, listedInDirectory: true },
-      select: ['country'],
-    })) {
-      if (row.country) countriesSet.add(row.country);
-    }
-
-    return {
-      items,
-      countries: Array.from(countriesSet).sort((a, b) => a.localeCompare(b, 'ar')),
-      total: items.length,
-    };
+  async publicDirectory(_country?: string) {
+    // WhatsApp / Telegram external agent directory retired — internal sell only.
+    return { items: [], countries: [], total: 0 };
   }
 
   async adminListContacts() {
-    const items = await this.contactsRepo.find({ order: { sortOrder: 'ASC', createdAt: 'DESC' } });
-    return { items, total: items.length };
+    return { items: [], total: 0 };
   }
 
-  async adminUpsertContact(dto: AdminUpsertAgentContactDto) {
-    const displayName = dto.displayName?.trim();
-    const country = dto.country?.trim();
-    if (!displayName || !country) {
-      throw new BadRequestException('displayName and country are required');
-    }
-    const whatsapp = dto.whatsapp?.trim() || null;
-    const telegram = dto.telegram?.trim() || null;
-    if (!whatsapp && !telegram) {
-      throw new BadRequestException('At least one of whatsapp or telegram is required');
-    }
-    let contact: RechargeAgentContact | null = null;
-    if (dto.id) {
-      contact = await this.contactsRepo.findOne({ where: { id: dto.id } });
-      if (!contact) throw new NotFoundException('Contact not found');
-    } else {
-      contact = this.contactsRepo.create();
-    }
-    contact.displayName = displayName;
-    contact.country = country;
-    contact.whatsapp = whatsapp;
-    contact.telegram = telegram;
-    contact.notes = dto.notes?.trim() || null;
-    if (dto.isActive !== undefined) contact.isActive = !!dto.isActive;
-    if (dto.sortOrder !== undefined) contact.sortOrder = Number(dto.sortOrder) || 0;
-    return this.contactsRepo.save(contact);
+  async adminUpsertContact(_dto: AdminUpsertAgentContactDto) {
+    throw new GoneException(
+      'دليل التواصل (واتساب/تيليجرام) أُزيل — وكلاء البيع الداخلي فقط',
+    );
   }
 
-  async adminDeleteContact(id: string) {
-    const contact = await this.contactsRepo.findOne({ where: { id } });
-    if (!contact) throw new NotFoundException('Contact not found');
-    await this.contactsRepo.remove(contact);
-    return { deleted: true, id };
+  async adminDeleteContact(_id: string) {
+    throw new GoneException(
+      'دليل التواصل (واتساب/تيليجرام) أُزيل — وكلاء البيع الداخلي فقط',
+    );
   }
 
   async adminDeleteAgent(id: string) {

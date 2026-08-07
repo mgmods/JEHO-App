@@ -42,6 +42,15 @@ import {
   encodeBountyFootballStartBetBroadcast,
   encodeBountyFootballTableInfoRes,
   BOUNTY_FOOTBALL_RATIOS,
+  CAMEL_RACING_RATIOS,
+  encodeCamelBetRsp,
+  encodeCamelGetRankDataRes,
+  encodeCamelGetUserRecordRes,
+  encodeCamelPlayerBetBroadcast,
+  encodeCamelPlayerNumsBroadcast,
+  encodeCamelResultBroadcast,
+  encodeCamelStartBetBroadcast,
+  encodeCamelTableInfoRes,
   encodeHeartBeatRsp,
   encodeLineSlotsGameCfgRsp,
   encodeLineSlotsGetRankDataRes,
@@ -139,7 +148,7 @@ type RoomState = {
 function gameKind(game: MikooGameDef): GameKind {
   if (game.id === 'crash') return 'crash';
   // multi-area / dice-style hash games (fortune-slot is a spin slot, not multi)
-  if (['7updown', 'greedy-box', 'luck-car', 'lucky77', 'bounty-football'].includes(game.id)) {
+  if (['7updown', 'greedy-box', 'luck-car', 'lucky77', 'bounty-football', 'camel-racing'].includes(game.id)) {
     return 'multi';
   }
   return 'spin';
@@ -184,7 +193,9 @@ export class MikooGatewayService implements OnModuleDestroy {
       this.wss?.handleUpgrade(req, socket, head, (ws) => {
         const pathPart = url.split('/games/ws/')[1] || '';
         const slug = pathPart.split('?')[0]?.replace(/\/$/, '') || '';
-        this.handleConnection(ws, slug, req);
+        // Normalize PORT aliases (e.g. camelracing → camel-racing).
+        const game = findMikooGame(slug);
+        this.handleConnection(ws, game?.id || slug, req);
       });
     });
     this.logger.log('Mikoo game WebSocket gateway attached at /games/ws/:gameId');
@@ -220,6 +231,41 @@ export class MikooGatewayService implements OnModuleDestroy {
     const allAreaBets = [...areaMap.entries()].map(([iconId, money]) => ({ iconId, money }));
     const myBets = [...myMap.entries()].map(([iconId, money]) => ({ iconId, money }));
     return { allAreaBets, myBets, totalBet, myTotalBet };
+  }
+
+  private shuffleInts(from: number, to: number): number[] {
+    const a: number[] = [];
+    for (let i = from; i <= to; i++) a.push(i);
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]!;
+      a[i] = a[j]!;
+      a[j] = t;
+    }
+    return a;
+  }
+
+  private camelMyBets(room: RoomState, playerId?: number): Array<{ icon: number; money: number }> {
+    const map = new Map<number, number>();
+    for (const b of room.bets.values()) {
+      if (playerId != null && b.playerId !== playerId) continue;
+      const icon = Math.max(1, Math.min(8, b.areaId || 1));
+      map.set(icon, (map.get(icon) || 0) + b.amount);
+    }
+    return [...map.entries()].map(([icon, money]) => ({ icon, money }));
+  }
+
+  private camelPool(room: RoomState): { arena: number[]; money: number[]; totalBet: number } {
+    const map = new Map<number, number>();
+    let totalBet = 0;
+    for (const b of room.bets.values()) {
+      const icon = Math.max(1, Math.min(8, b.areaId || 1));
+      map.set(icon, (map.get(icon) || 0) + b.amount);
+      totalBet += b.amount;
+    }
+    const arena = [...map.keys()];
+    const money = arena.map((i) => map.get(i) || 0);
+    return { arena, money, totalBet };
   }
 
   /**
@@ -338,7 +384,8 @@ export class MikooGatewayService implements OnModuleDestroy {
           gameId === 'crash' ||
           gameId === 'greedy-box' ||
           gameId === 'luck-car' ||
-          gameId === 'bounty-football'
+          gameId === 'bounty-football' ||
+          gameId === 'camel-racing'
             ? 18000
             : 10000),
         overEnds: 0,
@@ -377,6 +424,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         '.game.StartBetBroadcast',
         encodeBountyFootballStartBetBroadcast(1, secs, room.round),
       );
+    } else if (gameId === 'camel-racing') {
+      this.broadcast(room, '.game.StartBetBroadcast', encodeCamelStartBetBroadcast(1, secs));
     } else if (gameId === 'luck-car') {
       this.broadcast(
         room,
@@ -477,6 +526,8 @@ export class MikooGatewayService implements OnModuleDestroy {
           ? pickWeightedAreaId(LUCK_CAR_RATIOS, 0.75)
           : gameId === 'bounty-football'
             ? pickWeightedAreaId(BOUNTY_FOOTBALL_RATIOS, 0.75)
+            : gameId === 'camel-racing'
+              ? pickWeightedAreaId(CAMEL_RACING_RATIOS, 0.75)
             : gameId === 'lucky77'
               ? lucky77WinIcon
               : // 7updown: use actual dice total (classic feel) + slightly reduced mults.
@@ -490,6 +541,8 @@ export class MikooGatewayService implements OnModuleDestroy {
     } else if (gameId === 'lucky77') {
       room.history = [...room.history, lucky77WinPos].slice(-12);
     } else if (gameId === 'bounty-football') {
+      room.history = [...room.history, winArea].slice(-12);
+    } else if (gameId === 'camel-racing') {
       room.history = [...room.history, winArea].slice(-12);
     }
     const multipliers = multiAreaMultipliers();
@@ -505,6 +558,10 @@ export class MikooGatewayService implements OnModuleDestroy {
     const bountyRatio: Record<number, number> = {};
     BOUNTY_FOOTBALL_RATIOS.forEach((r, i) => {
       bountyRatio[i + 1] = r;
+    });
+    const camelRatio: Record<number, number> = {};
+    CAMEL_RACING_RATIOS.forEach((r, i) => {
+      camelRatio[i + 1] = r;
     });
 
     // Aggregate 7updown / lucky77 wins per player (one settle msg).
@@ -536,6 +593,10 @@ export class MikooGatewayService implements OnModuleDestroy {
               ? bet.areaId === winArea
                 ? bountyRatio[winArea] || 2
                 : 0
+            : gameId === 'camel-racing'
+              ? bet.areaId === winArea
+                ? camelRatio[winArea] || 2
+                : 0
             : gameId === 'lucky77'
               ? bet.areaId === winArea
                 ? LUCKY77_RATIOS[winArea] || 2
@@ -548,7 +609,7 @@ export class MikooGatewayService implements OnModuleDestroy {
         win: Math.floor(bet.amount * mult),
       }).win;
 
-      if (gameId === '7updown' || gameId === 'lucky77' || gameId === 'bounty-football') {
+      if (gameId === '7updown' || gameId === 'lucky77' || gameId === 'bounty-football' || gameId === 'camel-racing') {
         const key = bet.userId;
         const row = sevenByUser.get(key) || {
           userId: bet.userId,
@@ -942,6 +1003,98 @@ export class MikooGatewayService implements OnModuleDestroy {
           }),
         );
       }
+    } else if (gameId === 'camel-racing') {
+      const animalRandom = this.shuffleInts(1, 8);
+      const posRandom = this.shuffleInts(1, 8);
+      const notifiedWs = new Set<WebSocket>();
+      const betRank = [...sevenByUser.values()]
+        .filter((r) => r.win > 0 || r.betTotal > 0)
+        .sort((a, b) => b.win - a.win || b.betTotal - a.betTotal)
+        .slice(0, 3)
+        .map((r) => ({
+          name: r.displayName || 'Player',
+          head: r.avatarUrl || '',
+          winMoney: r.win,
+        }));
+      for (const row of sevenByUser.values()) {
+        let bal = 0;
+        try {
+          if (row.win > 0) {
+            const ratio = row.betTotal > 0 ? row.win / row.betTotal : 0;
+            bal = await this.credit(row.userId, row.win, gameId, ratio, row.betTotal);
+          } else {
+            const w = await this.wallets.findOne({ where: { userId: row.userId } });
+            bal = Number(w?.coins || 0);
+          }
+        } catch {
+          bal = 0;
+        }
+        if (row.ws && row.ws.readyState === WebSocket.OPEN) {
+          this.send(
+            row.ws,
+            '.game.ResultBroadcast',
+            encodeCamelResultBroadcast({
+              state: 0,
+              betTime: 8,
+              totalBet: row.betTotal,
+              totalGain: row.win,
+              curBingoIcon: winArea,
+              currGroupId: 0,
+              curTurn: room.round,
+              userMoney: bal,
+              todayWin: row.win,
+              playerStatus: 0,
+              betRank,
+              animalRandom,
+              posRandom,
+            }),
+          );
+          notifiedWs.add(row.ws);
+          room.balances.set(row.ws, bal);
+        }
+        if (row.win > 0 && row.sessionId) {
+          void this.economy.onBetWin({
+            sessionId: row.sessionId,
+            userId: row.userId,
+            gameId,
+            betCoins: 0,
+            winCoins: row.win,
+            balanceAfter: bal,
+          });
+        } else if (row.win === 0 && row.sessionId && row.betTotal > 0) {
+          void this.economy.onBetWin({
+            sessionId: row.sessionId,
+            userId: row.userId,
+            gameId,
+            betCoins: 0,
+            winCoins: 0,
+            lostCoins: row.betTotal,
+            balanceAfter: bal,
+          });
+        }
+      }
+      for (const ws of room.clients) {
+        if (notifiedWs.has(ws) || ws.readyState !== WebSocket.OPEN) continue;
+        this.send(
+          ws,
+          '.game.ResultBroadcast',
+          encodeCamelResultBroadcast({
+            state: 0,
+            betTime: 8,
+            totalBet: 0,
+            totalGain: 0,
+            curBingoIcon: winArea,
+            currGroupId: 0,
+            curTurn: room.round,
+            userMoney: room.balances.get(ws) ?? 0,
+            todayWin: 0,
+            playerStatus: 0,
+            betRank,
+            animalRandom,
+            posRandom,
+          }),
+        );
+      }
     } else if (gameId === 'greedy-box' && room.bets.size === 0) {
       this.broadcast(
         room,
@@ -984,6 +1137,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         // calls client reset() and would kill mid-spin if we reopen too early.
         gameId === 'bounty-football'
           ? 18000
+          : gameId === 'camel-racing'
+            ? 10000
           : gameId === 'lucky77' || gameId === '7updown'
             ? 8500
             : gameId === 'luck-car'
@@ -1009,7 +1164,8 @@ export class MikooGatewayService implements OnModuleDestroy {
       gameId === 'crash' ||
       gameId === 'greedy-box' ||
       gameId === 'luck-car' ||
-      gameId === 'bounty-football'
+      gameId === 'bounty-football' ||
+      gameId === 'camel-racing'
         ? 18000
         : 10000);
     room.bets.clear();
@@ -1041,7 +1197,8 @@ export class MikooGatewayService implements OnModuleDestroy {
         gameSlug === 'crash' ||
         gameSlug === 'greedy-box' ||
         gameSlug === 'luck-car' ||
-        gameSlug === 'bounty-football'
+        gameSlug === 'bounty-football' ||
+        gameSlug === 'camel-racing'
           ? 18000
           : 10000);
       this.scheduleRound(gameSlug);
@@ -1155,6 +1312,40 @@ export class MikooGatewayService implements OnModuleDestroy {
           '.game.StartBetBroadcast',
           encodeBountyFootballStartBetBroadcast(1, timeLeft, room.round),
         );
+      }
+      return;
+    }
+    if (gameSlug === 'camel-racing') {
+      const camelState = room.phase === 'betting' ? 1 : 0;
+      let totalBet = 0;
+      for (const b of room.bets.values()) totalBet += b.amount;
+      const body = encodeCamelTableInfoRes({
+        state: camelState,
+        timeLeft: camelState === 1 ? timeLeft : 8,
+        totalPlayerNum: room.clients.size,
+        playerStatus: 0,
+        camelSpeed: 80,
+        curTurn: room.round,
+        currGroupId: 0,
+        curBingoIcon:
+          camelState === 0 && room.history.length
+            ? room.history[room.history.length - 1]
+            : 0,
+        totalBet,
+        totalGain: 0,
+        history: room.history.length ? room.history : [1, 3, 5, 2, 8, 4],
+        myBets: player ? this.camelMyBets(room, player.publicId) : [],
+        ratios: [...CAMEL_RACING_RATIOS],
+      });
+      this.send(ws, '.game.TableInfoRes', body);
+      this.send(ws, '.game.TableInfo', body);
+      this.send(
+        ws,
+        '.game.PlayerNumsBroadcast',
+        encodeCamelPlayerNumsBroadcast(player?.publicId ?? 0, player?.balance ?? 0, room.clients.size),
+      );
+      if (room.phase === 'betting' && timeLeft > 0) {
+        this.send(ws, '.game.StartBetBroadcast', encodeCamelStartBetBroadcast(1, timeLeft));
       }
       return;
     }
@@ -1357,7 +1548,8 @@ export class MikooGatewayService implements OnModuleDestroy {
           gameSlug === 'greedy-box' ||
           gameSlug === 'line-slots' ||
           gameSlug === 'luck-car' ||
-          gameSlug === 'bounty-football'
+          gameSlug === 'bounty-football' ||
+          gameSlug === 'camel-racing'
         ) {
           const ud = encodeGetUserDataFor(gameSlug, {
             code: 0,
@@ -1449,6 +1641,8 @@ export class MikooGatewayService implements OnModuleDestroy {
             this.send(ws, '.game.GetRankDataRes', encodeGreedyGetRankDataRes(mapped));
           } else if (gameSlug === 'bounty-football') {
             this.send(ws, '.game.GetRankDataRes', encodeBountyFootballGetRankDataRes(mapped));
+          } else if (gameSlug === 'camel-racing') {
+            this.send(ws, '.game.GetRankDataRes', encodeCamelGetRankDataRes(mapped));
           } else if (gameSlug === 'line-slots') {
             this.send(ws, '.game.GetRankDataRes', encodeLineSlotsGetRankDataRes(mapped));
           } else {
@@ -1467,6 +1661,8 @@ export class MikooGatewayService implements OnModuleDestroy {
                   ? encodeGreedyGetRankDataRes([])
                   : gameSlug === 'bounty-football'
                     ? encodeBountyFootballGetRankDataRes([])
+                  : gameSlug === 'camel-racing'
+                    ? encodeCamelGetRankDataRes([])
                   : gameSlug === 'line-slots'
                     ? encodeLineSlotsGetRankDataRes([])
                     : encodeLuckCarGetRankDataRes([]),
@@ -1481,6 +1677,8 @@ export class MikooGatewayService implements OnModuleDestroy {
             this.send(ws, '.game.GetUserRecordRes', encodeCrashGetUserRecordRes([]));
           } else if (gameSlug === 'luck-car') {
             this.send(ws, '.game.GetUserRecordRes', encodeLuckCarGetUserRecordRes([]));
+          } else if (gameSlug === 'camel-racing') {
+            this.send(ws, '.game.GetUserRecordRes', encodeCamelGetUserRecordRes([]));
           } else if (gameSlug === '7updown') {
             this.send(ws, '.game.GetUserRecordRes', encode7UpGetUserRecordRes([]));
           } else if (gameSlug === 'greedy-box') {
@@ -1792,6 +1990,11 @@ export class MikooGatewayService implements OnModuleDestroy {
           code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1,
           curBet: { iconId: req.areaId || 0, money: rawAmount },
         }));
+      } else if (gameSlug === 'camel-racing') {
+        this.send(ws, '.game.BetRsp', encodeCamelBetRsp({
+          code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1,
+          curBet: { icon: req.areaId || 0, money: rawAmount },
+        }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
           code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1,
@@ -1822,6 +2025,11 @@ export class MikooGatewayService implements OnModuleDestroy {
         this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
           code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1,
           curBet: { iconId: req.areaId || 0, money: 0 },
+        }));
+      } else if (gameSlug === 'camel-racing') {
+        this.send(ws, '.game.BetRsp', encodeCamelBetRsp({
+          code: 1, desc: 'Invalid bet', userMoney: player.balance, tipType: 1,
+          curBet: { icon: req.areaId || 0, money: 0 },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
@@ -1857,6 +2065,11 @@ export class MikooGatewayService implements OnModuleDestroy {
         this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
           code: 1, desc: 'Not betting phase', userMoney: player.balance, tipType: 1,
           curBet: { iconId: req.areaId || 0, money: amount },
+        }));
+      } else if (gameSlug === 'camel-racing') {
+        this.send(ws, '.game.BetRsp', encodeCamelBetRsp({
+          code: 1, desc: 'Not betting phase', userMoney: player.balance, tipType: 1,
+          curBet: { icon: req.areaId || 0, money: amount },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {
@@ -1944,6 +2157,37 @@ export class MikooGatewayService implements OnModuleDestroy {
             playerId: player.publicId,
             bet: { iconId: req.areaId || 0, money: amount },
           }),
+        );
+      } else if (gameSlug === 'camel-racing') {
+        const myBets = this.camelMyBets(room, player.publicId);
+        const pool = this.camelPool(room);
+        const icon = Math.max(1, Math.min(8, req.areaId || 1));
+        this.send(
+          ws,
+          '.game.BetRsp',
+          encodeCamelBetRsp({
+            code: 0,
+            desc: 'OK',
+            userMoney: bal,
+            tipType: 0,
+            betTotal: myBets,
+            curBet: { icon, money: amount },
+          }),
+        );
+        this.broadcast(
+          room,
+          '.game.PlayerBetBroadcast',
+          encodeCamelPlayerBetBroadcast({
+            arena: pool.arena,
+            money: pool.money,
+            myArena: myBets.map((b) => b.icon),
+            myMoney: myBets.map((b) => b.money),
+          }),
+        );
+        this.broadcast(
+          room,
+          '.game.PlayerNumsBroadcast',
+          encodeCamelPlayerNumsBroadcast(player.publicId, bal, room.clients.size),
         );
       } else if (gameSlug === 'lucky77') {
         const betTotal = this.lucky77AreaBets(room, player.publicId);
@@ -2056,6 +2300,11 @@ export class MikooGatewayService implements OnModuleDestroy {
         this.send(ws, '.game.BetRes', encodeBountyFootballBetRes({
           code: 1, desc: 'Insufficient balance', userMoney: player.balance, tipType: 2,
           curBet: { iconId: req.areaId || 0, money: amount },
+        }));
+      } else if (gameSlug === 'camel-racing') {
+        this.send(ws, '.game.BetRsp', encodeCamelBetRsp({
+          code: 1, desc: 'Insufficient balance', userMoney: player.balance, tipType: 2,
+          curBet: { icon: req.areaId || 0, money: amount },
         }));
       } else if (gameSlug === 'lucky77') {
         this.sendLucky77BetRsp(ws, {

@@ -54,6 +54,20 @@ export class RechargeAgentsController {
     );
   }
 
+  @Post('card-checkout')
+  @ApiOperation({
+    summary: 'Create Fourthwall card checkout for agent membership (no wallet credit)',
+  })
+  createCardCheckout(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { requestedCoins?: number },
+  ) {
+    return this.rechargeAgentsService.createCardCheckout(
+      userId,
+      Number(body?.requestedCoins || 0),
+    );
+  }
+
   @Get('resolve-user')
   @ApiOperation({ summary: 'Resolve recipient by publicId / username / UUID' })
   resolveUser(@Query('query') query: string) {

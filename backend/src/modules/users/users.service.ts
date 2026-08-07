@@ -44,6 +44,17 @@ const LEVEL_THRESHOLDS = [
   0, 100, 500, 1500, 4000, 10000, 25000, 60000, 150000, 400000, 1000000,
 ];
 
+/** Mikoo icon_info_guild_bg_base_lv1..6 visual tier from agency diamond pool. */
+function agencyVisualBannerTier(totalDiamonds: number): number {
+  const d = Math.max(0, Number(totalDiamonds) || 0);
+  if (d >= 5_000_000) return 6;
+  if (d >= 1_000_000) return 5;
+  if (d >= 200_000) return 4;
+  if (d >= 50_000) return 3;
+  if (d >= 10_000) return 2;
+  return 1;
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -133,7 +144,7 @@ export class UsersService {
     };
   }
 
-  private async resolveActiveAgency(userId: string) {
+    private async resolveActiveAgency(userId: string) {
     const row = await this.agencyMembersRepo.findOne({
       where: {
         userId,
@@ -162,16 +173,46 @@ export class UsersService {
     } catch {
       /* ignore — agency snip still works without cover fallback */
     }
+    // Lazy-assign agency public GID (never owner user publicId).
+    let publicId =
+      agency.publicId && String(agency.publicId).trim()
+        ? String(agency.publicId).trim()
+        : null;
+    if (!publicId) {
+      try {
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const candidate = String(10000 + Math.floor(Math.random() * 90000));
+          const clash = await this.dataSource.query(
+            `SELECT id FROM agencies WHERE "publicId" = $1 LIMIT 1`,
+            [candidate],
+          );
+          if (Array.isArray(clash) && clash.length) continue;
+          await this.dataSource.query(
+            `UPDATE agencies SET "publicId" = $1 WHERE id = $2 AND ("publicId" IS NULL OR TRIM("publicId") = '')`,
+            [candidate, agency.id],
+          );
+          publicId = candidate;
+          break;
+        }
+      } catch {
+        /* keep null — client shows placeholder */
+      }
+    }
     const logoUrl =
       (agency.logoUrl && String(agency.logoUrl).trim()) || coverUrl || null;
+    const totalDiamonds = Number(agency.totalDiamonds || 0);
+    // Mikoo user-card guild banner tiers (icon_info_guild_bg_base_lv1..6).
+    const level = agencyVisualBannerTier(totalDiamonds);
     return {
       id: agency.id,
       name: agency.name,
-      publicId: agency.publicId,
+      publicId: publicId || null,
       logoUrl,
       coverUrl: coverUrl || logoUrl,
       isVerified: !!agency.isVerified,
       role: row?.role || null,
+      level,
+      totalDiamonds,
     };
   }
 
@@ -285,6 +326,23 @@ export class UsersService {
       isFollowing = !!follow;
     }
     const agency = await this.resolveActiveAgency(id);
+    const visitorsCount = await this.visitsRepo.count({
+      where: { profileUserId: id },
+    });
+    let isOnline = false;
+    try {
+      isOnline = await this.realtimeGateway.isOnlineGlobal(id);
+    } catch {
+      isOnline = false;
+    }
+    // Respect privacy: if user hides online status, force offline for others.
+    if (
+      viewerId !== id &&
+      user.profile &&
+      user.profile.showOnlineStatus === false
+    ) {
+      isOnline = false;
+    }
     return this.withWearMeta(
       this.applyFixedVipWear(
         {
@@ -292,6 +350,8 @@ export class UsersService {
           vipLevel,
           isFollowing,
           agency,
+          visitorsCount,
+          isOnline,
         },
         vipLevel,
       ),

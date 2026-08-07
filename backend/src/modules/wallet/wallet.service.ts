@@ -48,6 +48,7 @@ import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { PromotionsService } from '../promotions/promotions.service';
+import { HostTargetService } from '../host-target/host-target.service';
 
 const DIAMOND_TO_COIN_RATE = 0.55;
 /**
@@ -55,6 +56,8 @@ const DIAMOND_TO_COIN_RATE = 0.55;
  * (~$0.000099 at $0.99/10k) so gift→diamond→cashout cannot bankrupt the store.
  */
 const DIAMOND_TO_FIAT = 0.00005;
+/** Cashout policy: never list packages under $10 (matches host target min). */
+const MIN_WITHDRAW_USD = 10;
 
 /** Fallback identical to canonical catalog (Play productId = sku). */
 const DEFAULT_PACKAGES = STANDARD_RECHARGE_PACKAGES.map((p) => ({ ...p }));
@@ -81,6 +84,7 @@ export class WalletService implements OnModuleInit {
     private readonly tasksService: TasksService,
     private readonly notifications: NotificationsService,
     @Optional() private readonly promotions?: PromotionsService,
+    @Optional() private readonly hostTarget?: HostTargetService,
   ) {}
 
   async onModuleInit() {
@@ -243,28 +247,34 @@ export class WalletService implements OnModuleInit {
         this.numberSetting('economy.diamondUsdRate', DIAMOND_TO_FIAT, 0.000001, DIAMOND_TO_FIAT),
         // Hard cap 1.0 — never allow diamond→coin mint printers (was 1000).
         this.numberSetting('economy.diamondCoinRate', DIAMOND_TO_COIN_RATE, 0.01, 1),
-        this.numberSetting('economy.minWithdrawDiamonds', 10000, 10000, 1_000_000_000),
+        this.numberSetting('economy.minWithdrawDiamonds', 200000, 1000, 1_000_000_000),
       ]);
-    const target = Math.floor(minWithdraw);
+    const rate = Number(fiatRate) || DIAMOND_TO_FIAT;
+    const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / rate));
+    const target = Math.max(minFromUsd, Math.floor(minWithdraw));
     return {
-      diamondUsdRate: fiatRate,
+      diamondUsdRate: rate,
       diamondCoinRate: coinRate,
       /** التارجت = الحد الأدنى للسحب بالألماس القابل للسحب */
       minWithdrawDiamonds: target,
       withdrawTargetDiamonds: target,
+      minWithdrawUsd: MIN_WITHDRAW_USD,
       currency: 'USD',
       managedByAdmin: true,
     };
   }
 
   /**
-   * Cashout package grid (Mikoo-style): USD label + diamond cost.
-   * Admin may override via setting `withdraw_packages` JSON array.
+   * Cashout package grid: USD + diamonds. Never under $10 (matches host target min).
+   * Admin may override via setting `withdraw_packages` JSON array (sub-$10 rows dropped).
    */
   async listWithdrawPackages() {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
-    const min = Math.max(1, Math.floor(Number(economy.minWithdrawDiamonds) || 10000));
+    const min = Math.max(
+      Math.round(MIN_WITHDRAW_USD / rate),
+      Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
+    );
     const raw = await this.settingsRepo.findOne({ where: { key: 'withdraw_packages' } });
     let configured: Array<{ id?: string; diamonds?: number; usd?: number; label?: string }> = [];
     if (raw?.value) {
@@ -276,8 +286,8 @@ export class WalletService implements OnModuleInit {
         configured = [];
       }
     }
-    const defaultsUsd = [0.5, 1, 2.5, 5, 10, 20, 50, 100];
-    const source =
+    const defaultsUsd = [10, 20, 50, 100, 200, 500, 1000];
+    let source =
       configured.length > 0
         ? configured
         : defaultsUsd.map((usd, i) => ({
@@ -286,7 +296,7 @@ export class WalletService implements OnModuleInit {
             diamonds: Math.max(min, Math.round(usd / rate)),
             label: `$${usd % 1 === 0 ? usd.toFixed(0) : usd.toFixed(2)}`,
           }));
-    const items = source
+    let items = source
       .map((row, i) => {
         const usd =
           Number(row.usd) > 0
@@ -300,7 +310,7 @@ export class WalletService implements OnModuleInit {
             : usd > 0
               ? Math.max(min, Math.round(usd / rate))
               : 0;
-        if (diamonds < min || usd <= 0) return null;
+        if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
           (row.label && String(row.label).trim()) ||
           `$${usd % 1 === 0 ? usd.toFixed(0) : usd.toFixed(2)}`;
@@ -313,10 +323,21 @@ export class WalletService implements OnModuleInit {
         };
       })
       .filter(Boolean);
+    // Admin grid may be all sub-$10 legacy rows — promote defaults.
+    if (items.length === 0) {
+      items = defaultsUsd.map((usd, i) => ({
+        id: String(i + 1),
+        diamonds: Math.max(min, Math.round(usd / rate)),
+        usd,
+        label: `$${usd}`,
+        currency: 'USD',
+      }));
+    }
     return {
       items,
       diamondUsdRate: rate,
       minWithdrawDiamonds: min,
+      minWithdrawUsd: MIN_WITHDRAW_USD,
       currency: 'USD',
     };
   }
@@ -325,7 +346,10 @@ export class WalletService implements OnModuleInit {
   async saveWithdrawPackages(items: Array<Record<string, unknown>>) {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
-    const min = Math.max(1, Math.floor(Number(economy.minWithdrawDiamonds) || 10000));
+    const min = Math.max(
+      Math.round(MIN_WITHDRAW_USD / rate),
+      Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
+    );
     const cleaned = (Array.isArray(items) ? items : [])
       .map((row, i) => {
         const usd = Number(row?.usd) || 0;
@@ -333,7 +357,7 @@ export class WalletService implements OnModuleInit {
         if (usd > 0 && diamonds <= 0) {
           diamonds = Math.max(min, Math.round(usd / rate));
         }
-        if (diamonds < min || usd <= 0) return null;
+        if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
           (row?.label && String(row.label).trim()) ||
           `$${usd % 1 === 0 ? usd.toFixed(0) : Number(usd).toFixed(2)}`;
@@ -350,7 +374,7 @@ export class WalletService implements OnModuleInit {
       row = this.settingsRepo.create({
         key: 'withdraw_packages',
         value: JSON.stringify(cleaned),
-        description: 'Mikoo-style withdraw packages (USD + diamonds)',
+        description: 'JEHO withdraw packages (USD + diamonds)',
       });
     } else {
       row.value = JSON.stringify(cleaned);
@@ -746,13 +770,10 @@ export class WalletService implements OnModuleInit {
   async requestWithdraw(userId: string, dto: WithdrawDto) {
     const [fiatRate, minWithdraw] = await Promise.all([
       this.numberSetting('economy.diamondUsdRate', DIAMOND_TO_FIAT, 0.000001, DIAMOND_TO_FIAT),
-      this.numberSetting('economy.minWithdrawDiamonds', 10000, 10000, 1_000_000_000),
+      this.numberSetting('economy.minWithdrawDiamonds', 200000, 1000, 1_000_000_000),
     ]);
-    if (dto.diamonds < minWithdraw) {
-      throw new BadRequestException(
-        `Minimum withdrawal is ${Math.floor(minWithdraw)} diamonds`,
-      );
-    }
+    const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
+    const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
 
     const viaAgent = dto.method === 'agent';
     const sourceRaw = String((dto.payoutDetails as any)?.source || '')
@@ -768,6 +789,47 @@ export class WalletService implements OnModuleInit {
     if (viaAgent && isAgencySource) {
       throw new BadRequestException(
         'سحب أرباح روم الوكالة يتم عبر إدارة المنصة مباشرة — وليس عبر وكيل الشحن',
+      );
+    }
+
+    // Agency host / commission:
+    // - host: one current target stage only
+    // - agency: free commission cash-out (no host target)
+    if (isAgencySource) {
+      if (dto.diamonds < 1) {
+        throw new BadRequestException('Invalid withdraw amount');
+      }
+      const role =
+        sourceRaw === 'agency_host' ||
+        String((dto.payoutDetails as any)?.role || '').toLowerCase() ===
+          'host'
+          ? 'host'
+          : 'agency';
+      if (role === 'host') {
+        if (this.hostTarget) {
+          const agencyId = String(
+            (dto.payoutDetails as any)?.agencyId || '',
+          ).trim();
+          await this.hostTarget.assertTargetWithdrawAllowed(
+            userId,
+            'host',
+            agencyId || null,
+            dto.diamonds,
+            String(
+              (dto.payoutDetails as any)?.stageId ||
+                (dto.payoutDetails as any)?.targetStageId ||
+                '',
+            ).trim() || null,
+          );
+        }
+      } else if (dto.diamonds < minW) {
+        throw new BadRequestException(
+          `Minimum withdrawal is ${Math.floor(minW)} diamonds (≈ $${MIN_WITHDRAW_USD})`,
+        );
+      }
+    } else if (dto.diamonds < minW) {
+      throw new BadRequestException(
+        `Minimum withdrawal is ${Math.floor(minW)} diamonds (≈ $${MIN_WITHDRAW_USD})`,
       );
     }
     let agentId: string | null = null;
@@ -792,7 +854,7 @@ export class WalletService implements OnModuleInit {
       agentId = agent.id;
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const request = await this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId },
         lock: { mode: 'pessimistic_write' },
@@ -828,7 +890,7 @@ export class WalletService implements OnModuleInit {
       const sourceTag = isAgencySource
         ? agencyKind
         : 'personal_room';
-      const request = await manager.save(
+      const created = await manager.save(
         manager.create(WithdrawRequest, {
           userId,
           diamonds: dto.diamonds,
@@ -861,7 +923,7 @@ export class WalletService implements OnModuleInit {
           referenceType: isAgencySource
             ? 'withdraw_request_agency'
             : 'withdraw_request_personal',
-          referenceId: request.id,
+          referenceId: created.id,
           description: isAgencySource
             ? agencyKind === 'agency_host'
               ? `سحب أرباح مضيفة (روم وكالة) ${dto.diamonds} ماسة`
@@ -870,8 +932,28 @@ export class WalletService implements OnModuleInit {
           metadata: { stream, source: sourceTag, method: dto.method },
         }),
       );
-      return request;
+      return { request: created, agencyKind };
     });
+
+    if (
+      this.hostTarget &&
+      isAgencySource &&
+      request.agencyKind === 'agency_host'
+    ) {
+      const stageId = String(
+        (dto.payoutDetails as any)?.stageId ||
+          (dto.payoutDetails as any)?.targetStageId ||
+          '',
+      ).trim();
+      if (stageId) {
+        try {
+          await this.hostTarget.markStageSalaryWithdrawn(userId, stageId);
+        } catch {
+          // Non-fatal: withdraw request already created.
+        }
+      }
+    }
+    return request.request;
   }
 
   async listWithdraws(userId: string, query: PaginationDto) {

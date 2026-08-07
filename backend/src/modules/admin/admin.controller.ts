@@ -137,12 +137,66 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Patch('auth/credentials')
-  @ApiOperation({ summary: 'Change super-admin email and/or password' })
+  @ApiOperation({ summary: 'Change own dashboard email and/or password' })
   updateCredentials(
     @CurrentUser('sub') userId: string,
     @Body() dto: UpdateAdminCredentialsDto,
   ) {
     return this.adminService.updateAdminCredentials(userId, dto);
+  }
+
+  // ─── Multi-admin operators (Super only via AdminGuard path map) ──
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('operators')
+  @ApiOperation({ summary: 'List limited dashboard admins (Super only)' })
+  listOperators() {
+    return this.adminService.listDashboardOperators();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('operators')
+  @ApiOperation({ summary: 'Create limited dashboard admin (Super only)' })
+  createOperator(@Body() body: Record<string, unknown>) {
+    return this.adminService.createDashboardOperator({
+      email: String(body.email || ''),
+      password: String(body.password || ''),
+      displayName:
+        body.displayName != null ? String(body.displayName) : undefined,
+      permissions:
+        body.permissions && typeof body.permissions === 'object'
+          ? (body.permissions as Record<string, string>)
+          : undefined,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('operators/:id')
+  @ApiOperation({ summary: 'Update limited dashboard admin (Super only)' })
+  updateOperator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.adminService.updateDashboardOperator(id, {
+      displayName:
+        body.displayName != null ? String(body.displayName) : undefined,
+      password: body.password != null ? String(body.password) : undefined,
+      permissions:
+        body.permissions && typeof body.permissions === 'object'
+          ? (body.permissions as Record<string, string>)
+          : undefined,
+      active: typeof body.active === 'boolean' ? body.active : undefined,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('operators/:id')
+  @ApiOperation({ summary: 'Remove dashboard access from limited admin' })
+  removeOperator(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.removeDashboardOperator(id);
   }
 
   // ─── Dashboard ─────────────────────────────────────────────
@@ -229,7 +283,16 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Patch('users/:id')
-  patchUser(@Param('id', ParseUUIDPipe) id: string, @Body() body: Record<string, unknown>) {
+  patchUser(
+    @CurrentUser() actor: { isSuperAdmin?: boolean; staffRole?: string },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    // Limited admins cannot grant Super / operator roles.
+    if (!actor?.isSuperAdmin && String(actor?.staffRole || '') !== 'super') {
+      delete body.staffRole;
+      delete body.isAdmin;
+    }
     return this.adminService.patchUser(id, body);
   }
 

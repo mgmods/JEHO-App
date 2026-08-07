@@ -10,7 +10,7 @@ import {
   pbString,
   pbUInt64,
 } from './mikoo-proto.util';
-import { chipsList } from './mikoo-game-economy';
+import { chipsList, GREEDY_BOX_RATIOS } from './mikoo-game-economy';
 
 function writeVarint(n: number): Buffer {
   const out: number[] = [];
@@ -480,6 +480,206 @@ export function encodeRoyalHistory(
     pbPackedInt32(1, winners),
     pbPackedInt32(2, handTypes),
   ]);
+}
+
+/**
+ * Greedy Lion (BaiShun 1068 / bounty_racing ClientMsg).
+ * Client treats config / detail durations as **milliseconds**
+ * (BetTotalTime/1e3 for countdown seconds).
+ */
+export const GREEDY_LION_ODDS = [...GREEDY_BOX_RATIOS];
+export const GREEDY_BET_MS = 15_000;
+export const GREEDY_PLAY_MS = 8_000;
+export const GREEDY_OVER_MS = 5_000;
+
+export function encodeGreedyGetConfigRes(
+  chips: number[] = CHIP_LIST,
+  odds: number[] = GREEDY_LION_ODDS,
+): Buffer {
+  const stake = chips.length ? chips : [50, 100, 200, 500, 1000];
+  const areas = odds.map((o) => pbBytes(5, encodeMessage([pbInt32(1, Math.floor(o))])));
+  return encodeMessage([
+    pbInt32(1, GREEDY_BET_MS),
+    pbInt32(2, GREEDY_PLAY_MS),
+    pbInt32(3, GREEDY_OVER_MS),
+    pbPackedInt32(4, stake),
+    ...areas,
+    pbBool(6, false), // notFullBet
+    pbInt32(7, 6), // limitAreasNum
+  ]);
+}
+
+export function encodeGreedyUserInfoRes(data: {
+  userId: string;
+  nickname: string;
+  avatar: string;
+  balance: number;
+}): Buffer {
+  return encodeHiloUserInfoRes(data);
+}
+
+export function encodeGreedyDetailRes(data: {
+  /** Elapsed betting time in ms (0 = full BetTotalTime left). */
+  betElapsedMs?: number;
+  selectedChipIndex?: number;
+  roundId?: string;
+  roomState?: number;
+  areaId?: number;
+}): Buffer {
+  return encodeMessage([
+    pbInt32(1, data.roomState ?? 1), // 1=Bet 2=Ing 3=Over
+    pbUInt64(2, Math.max(0, Math.floor(data.betElapsedMs ?? 0))),
+    pbUInt64(3, 0),
+    pbUInt64(4, 0),
+    pbInt32(5, data.areaId ?? 0),
+    pbUInt64(8, 0),
+    pbUInt64(9, 0),
+    pbInt32(10, data.selectedChipIndex ?? 0),
+    pbUInt64(11, 0),
+    pbBool(14, false),
+    pbString(17, data.roundId || `g${Date.now()}`),
+  ]);
+}
+
+export function encodeGreedyBetRes(newBalance: number, totalBetMy: number): Buffer {
+  return encodeMessage([
+    pbUInt64(1, Math.max(0, Math.floor(newBalance))),
+    pbUInt64(2, Math.max(0, Math.floor(totalBetMy))),
+  ]);
+}
+
+export function encodeGreedyBetStateNotify(roundId: string): Buffer {
+  return encodeMessage([pbString(1, roundId)]);
+}
+
+export function encodeGreedyBetNotify(data: {
+  userId: string;
+  chipIndex: number;
+  area: number;
+  totalBet: number;
+}): Buffer {
+  return encodeMessage([
+    pbString(1, data.userId),
+    pbInt32(2, Math.max(0, Math.floor(data.chipIndex))),
+    pbInt32(3, Math.max(0, Math.floor(data.area))),
+    pbUInt64(4, Math.max(0, Math.floor(data.totalBet))),
+  ]);
+}
+
+export function encodeGreedyPlayStateNotify(waitDurationMs: number, areaId: number): Buffer {
+  return encodeMessage([
+    pbUInt64(1, Math.max(0, Math.floor(waitDurationMs))),
+    pbInt32(2, Math.max(0, Math.floor(areaId))),
+  ]);
+}
+
+/** EndSettlementData — client ShowGameResult needs info.reward. */
+export function encodeGreedyEndSettlement(data: {
+  areaId: number;
+  otherTotalWin?: number;
+  info: {
+    userId: string;
+    nickname: string;
+    avatar: string;
+    reward: number;
+    bet?: number;
+    rank?: number;
+  };
+}): Buffer {
+  const reward = Math.max(0, Math.floor(data.info.reward));
+  const bet = Math.max(0, Math.floor(data.info.bet ?? 0));
+  const info = encodeMessage([
+    pbInt32(1, data.info.rank ?? 1),
+    pbString(2, data.info.userId),
+    pbString(3, data.info.avatar || ''),
+    pbString(4, data.info.nickname || 'Player'),
+    pbUInt64(5, reward),
+    pbUInt64(6, bet),
+  ]);
+  return encodeMessage([
+    pbBytes(2, info),
+    pbUInt64(3, Math.max(0, Math.floor(data.otherTotalWin ?? reward))),
+    pbInt32(4, Math.max(0, Math.floor(data.areaId))),
+    pbBool(5, true),
+  ]);
+}
+
+export function encodeGreedyMineSettlement(data: {
+  userId: string;
+  balance: number;
+  rewardAmount: number;
+  todayWin?: number;
+}): Buffer {
+  const bal = Math.max(0, Math.floor(data.balance));
+  const reward = Math.max(0, Math.floor(data.rewardAmount));
+  return encodeMessage([
+    pbString(1, data.userId),
+    pbUInt64(2, bal),
+    pbUInt64(3, Math.max(0, Math.floor(data.todayWin ?? reward))),
+    pbUInt64(4, reward),
+  ]);
+}
+
+/** Auto/repeat bet ack — same shape as BetRes. */
+export function encodeGreedyAutoBetRes(newBalance: number, totalBetMy: number): Buffer {
+  return encodeGreedyBetRes(newBalance, totalBetMy);
+}
+
+/**
+ * ResAutoBetNotify (526) BroadcastRepeatBet:
+ * userId@1, betList@2 AreaBetInfo{areaId@1, num@2 packed chip counts}, totalBet@3
+ */
+export function encodeGreedyAutoBetNotify(data: {
+  userId: string;
+  totalBet: number;
+  betList: { areaId: number; num: number[] }[];
+}): Buffer {
+  const areas = data.betList.map((b) => {
+    const packed = b.num.map((n) => writeVarint(Math.max(0, Math.floor(n)) | 0));
+    const numPacked = Buffer.concat(packed);
+    const numField = Buffer.concat([
+      tag(2, 2),
+      writeVarint(numPacked.length),
+      numPacked,
+    ]);
+    const body = encodeMessage([pbInt32(1, b.areaId), numField]);
+    return pbBytes(2, body);
+  });
+  return encodeMessage([
+    pbString(1, data.userId),
+    ...areas,
+    pbUInt64(3, Math.max(0, Math.floor(data.totalBet))),
+  ]);
+}
+
+/** History { list@1: { roundID@1, areaID@2 }[] }. */
+export function encodeGreedyHistory(areaIds: number[] = [0, 2, 5, 1, 7, 3, 4, 6]): Buffer {
+  return encodeMessage(
+    areaIds.map((areaID, i) =>
+      pbBytes(
+        1,
+        encodeMessage([pbString(1, `h${i}`), pbInt32(2, areaID)]),
+      ),
+    ),
+  );
+}
+
+export function encodeGreedyPlayerRank(
+  rows: { userId: string; nickname: string; avatar: string; reward: number }[],
+): Buffer {
+  return encodeMessage(
+    rows.map((r) =>
+      pbBytes(
+        1,
+        encodeMessage([
+          pbString(1, r.userId),
+          pbString(2, r.nickname),
+          pbString(3, r.avatar),
+          pbUInt64(4, Math.max(0, Math.floor(r.reward))),
+        ]),
+      ),
+    ),
+  );
 }
 
 /** google.protobuf.Any { value: bytes } — field 2 only (type_url omitted). */

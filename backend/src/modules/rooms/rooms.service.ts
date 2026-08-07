@@ -78,6 +78,17 @@ import {
 } from '../../common/staff-role';
 
 const DEFAULT_ROOM_SEAT_COUNT = 11; // host stage + numbered seats 1..10
+
+/** Visual guild banner tier 1–6 from lifetime agency diamonds (matches users/agencies). */
+function agencyVisualBannerTier(totalDiamonds: number): number {
+  const d = Math.max(0, Number(totalDiamonds) || 0);
+  if (d >= 5_000_000) return 6;
+  if (d >= 1_000_000) return 5;
+  if (d >= 200_000) return 4;
+  if (d >= 50_000) return 3;
+  if (d >= 10_000) return 2;
+  return 1;
+}
 /** Personal empty live rooms auto-end after this many minutes (owner-away / ghost rooms). */
 const DEFAULT_PERSONAL_EMPTY_CLOSE_MINUTES = 30;
 
@@ -692,6 +703,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const title = agencyName;
     const coverUrl = (
       dto.coverUrl ||
+      membership!.agency?.logoUrl ||
       this.defaultRoomCover({
         hostId,
         roomKind: RoomKind.AGENCY,
@@ -1389,13 +1401,60 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       String(decorated.title || '').trim() ||
       String(decorated.host?.displayName || decorated.host?.username || '').trim() ||
       'غرفة';
+    /** Agency room face uses agency brand (GID/logo/level) — never host publicId or host heart badge. */
+    let agencyPublicId: string | null = null;
+    let agencyLogoUrl: string | null = null;
+    let agencyLevel = 1;
+    let agencyTotalDiamonds = 0;
     if (isAgency && decorated.agencyId) {
       try {
         const agency = await this.agenciesRepo.findOne({
           where: { id: decorated.agencyId },
         });
-        const agencyName = String(agency?.name || '').trim();
-        if (agencyName) listTitle = agencyName;
+        if (agency) {
+          const agencyName = String(agency.name || '').trim();
+          if (agencyName) listTitle = agencyName;
+          agencyLogoUrl = agency.logoUrl ? String(agency.logoUrl).trim() : null;
+          // Room cover is often the actual brand photo when logoUrl was never set.
+          if (!agencyLogoUrl && coverUrl) {
+            const c = coverUrl.trim();
+            if (
+              c &&
+              !c.toLowerCase().includes('backgrounds/bg_') &&
+              !c.toLowerCase().includes('/assets/backgrounds')
+            ) {
+              agencyLogoUrl = c;
+            }
+          }
+          agencyTotalDiamonds = Math.max(0, Number(agency.totalDiamonds) || 0);
+          agencyLevel = agencyVisualBannerTier(agencyTotalDiamonds);
+          agencyPublicId = agency.publicId ? String(agency.publicId).trim() : null;
+          if (!agencyPublicId) {
+            // Lazy-assign GID so room UI never falls back to owner user id.
+            for (let i = 0; i < 12; i++) {
+              const candidate = String(10000 + Math.floor(Math.random() * 90000));
+              const clash = await this.agenciesRepo.findOne({
+                where: { publicId: candidate },
+              });
+              if (!clash) {
+                agency.publicId = candidate;
+                await this.agenciesRepo.update(
+                  { id: agency.id },
+                  { publicId: candidate },
+                );
+                agencyPublicId = candidate;
+                break;
+              }
+            }
+            if (!agencyPublicId) {
+              agencyPublicId = String(10000 + (Date.now() % 90000));
+              await this.agenciesRepo.update(
+                { id: agency.id },
+                { publicId: agencyPublicId },
+              );
+            }
+          }
+        }
       } catch {
         /* keep listTitle */
       }
@@ -1407,7 +1466,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       backgroundUrl: equippedBackground,
       roomLabel: isSupport ? 'support' : isAgency ? 'agency' : 'personal',
       isSupport,
-      displayRoomId: decorated.host?.publicId || null,
+      // Agency: show agency GID. Personal/support: host publicId.
+      displayRoomId: isAgency
+        ? agencyPublicId || decorated.host?.publicId || null
+        : decorated.host?.publicId || null,
+      agencyPublicId,
+      agencyLogoUrl,
+      agencyLevel,
+      agencyTotalDiamonds,
       viewerAvatars: this.collectViewerAvatars(decorated),
       moderatorIds: (room.moderators || []).map((m: any) => m.userId).filter(Boolean),
       moderatorPermissions: (room.moderators || []).map((m: RoomModerator) => ({
@@ -3341,6 +3407,29 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (dto.coverUrl !== undefined) {
       this.mediaCleanup.replaceUpload(room.coverUrl, dto.coverUrl || null);
       room.coverUrl = dto.coverUrl || null;
+      // Keep agency profile face in sync — cover often IS the brand image.
+      if (room.agencyId && room.coverUrl && String(room.coverUrl).trim()) {
+        const next = String(room.coverUrl).trim();
+        const generic =
+          next.toLowerCase().includes('backgrounds/bg_') ||
+          next.toLowerCase().includes('/assets/backgrounds');
+        if (!generic) {
+          try {
+            const ag = await this.agenciesRepo.findOne({
+              where: { id: room.agencyId },
+              select: ['id', 'logoUrl'],
+            });
+            if (ag && (!ag.logoUrl || !String(ag.logoUrl).trim())) {
+              await this.agenciesRepo.update(
+                { id: room.agencyId },
+                { logoUrl: next.slice(0, 512) },
+              );
+            }
+          } catch {
+            /* non-fatal */
+          }
+        }
+      }
     }
     if (dto.backgroundUrl !== undefined) {
       // Room wallpapers are shared catalog URLs (/assets or /uploads cosmetics).

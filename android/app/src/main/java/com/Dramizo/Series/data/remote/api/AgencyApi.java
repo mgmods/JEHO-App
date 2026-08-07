@@ -21,6 +21,12 @@ public interface AgencyApi {
     @GET("agencies/{id}")
     Call<ApiResponse<MiscDtos.AgencyDto>> get(@Path("id") String id);
 
+    @POST("agencies/{id}/follow")
+    Call<ApiResponse<Map<String, Object>>> followAgency(@Path("id") String id);
+
+    @DELETE("agencies/{id}/follow")
+    Call<ApiResponse<Map<String, Object>>> unfollowAgency(@Path("id") String id);
+
     @GET("agencies/pricing")
     Call<ApiResponse<MiscDtos.AgencyPricingDto>> pricing();
 

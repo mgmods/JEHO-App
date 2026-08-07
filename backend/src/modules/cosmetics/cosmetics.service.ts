@@ -892,8 +892,9 @@ export class CosmeticsService implements OnModuleInit {
   /** Strip competitor brand from user-visible cosmetic copy. */
   private stripCompetitorBrand(text: string | null | undefined): string {
     return String(text || '')
-      .replace(/ميكو/gi, '')
-      .replace(/mikoo/gi, '')
+      .replace(/(ال)?(ميكو|ميجو)/g, 'JEHO')
+      .replace(/mikoo/gi, 'JEHO')
+      .replace(/mego/gi, 'JEHO')
       .replace(/\s{2,}/g, ' ')
       .replace(/\s*·\s*·\s*/g, ' · ')
       .replace(/^\s*·\s*|\s*·\s*$/g, '')
@@ -903,7 +904,8 @@ export class CosmeticsService implements OnModuleInit {
   /** One-shot rename of any leftover brand text in the live catalog. */
   async ensurePublicBranding() {
     const verKey = 'cosmetics.public_branding_version';
-    const ver = '20260730-no-mikoo-v1';
+    // Bump when rewrite rules change so production re-applies.
+    const ver = '20260806-jeho-v2';
     const row = await this.settingsRepo.findOne({ where: { key: verKey } });
     if (row?.value === ver) return;
 

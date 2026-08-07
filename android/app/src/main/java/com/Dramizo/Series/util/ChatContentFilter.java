@@ -54,6 +54,10 @@ public final class ChatContentFilter {
     public static boolean isBlocked(@Nullable String text, @Nullable List<String> extraKeywords) {
         if (TextUtils.isEmpty(text)) return false;
         String raw = text.trim();
+        // Structured app cards (room share / agency family invite) are allowed.
+        if (raw.startsWith("[[room_share|") || raw.startsWith("[[agency_invite|")) {
+            return false;
+        }
         for (Pattern p : DEFAULT_BLOCKED) {
             if (p.matcher(raw).find()) return true;
         }

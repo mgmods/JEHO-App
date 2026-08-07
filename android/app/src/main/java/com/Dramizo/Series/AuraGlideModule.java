@@ -28,6 +28,7 @@ import okhttp3.Request;
 /**
  * Large disk/memory cache like Mikoo — do NOT force RGB_565 / global dontAnimate
  * (that breaks GIF/WebP/SVGA previews for frames & entries).
+ * Durable art freshness is driven by {@code mediaAssetEpoch} (MediaAssetSync).
  */
 @GlideModule
 public final class AuraGlideModule extends AppGlideModule {
@@ -51,12 +52,23 @@ public final class AuraGlideModule extends AppGlideModule {
                     .build();
             return chain.proceed(req);
         };
-        Cache cache = new Cache(new File(context.getCacheDir(), "glide_http"), 256L * 1024L * 1024L);
+        Cache cache = new Cache(new File(context.getCacheDir(), "glide_http"), 128L * 1024L * 1024L);
         OkHttpClient client = new OkHttpClient.Builder()
                 .cache(cache)
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(20, TimeUnit.SECONDS)
                 .addInterceptor(ua)
+                .addNetworkInterceptor(chain -> {
+                    okhttp3.Response resp = chain.proceed(chain.request());
+                    String cc = resp.header("Cache-Control");
+                    if (cc != null && (cc.contains("no-store") || cc.contains("no-cache"))) {
+                        return resp;
+                    }
+                    return resp.newBuilder()
+                            .header("Cache-Control", "public, max-age=3600, must-revalidate")
+                            .removeHeader("Pragma")
+                            .build();
+                })
                 .build();
         registry.replace(GlideUrl.class, InputStream.class, new OkHttpUrlLoader.Factory(client));
     }

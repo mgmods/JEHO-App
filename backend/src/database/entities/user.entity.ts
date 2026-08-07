@@ -84,11 +84,19 @@ export class User {
 
   /**
    * Platform staff: manager (room/people moderation in-app),
-   * super (full room powers + dashboard admin flag).
+   * operator (limited dashboard modules),
+   * super (full dashboard + rooms).
    * Stored as varchar so prod (synchronize=false) can ALTER IF NOT EXISTS easily.
    */
   @Column({ type: 'varchar', length: 16, nullable: true, default: null })
   staffRole: string | null;
+
+  /**
+   * Per-module dashboard ACL for operators: { users: 'read'|'write'|'none', ... }.
+   * Super ignores this (always full access).
+   */
+  @Column({ type: 'jsonb', nullable: true, default: null })
+  dashboardPermissions: Record<string, string> | null;
 
   @Column({ type: 'boolean', default: false })
   emailVerified: boolean;

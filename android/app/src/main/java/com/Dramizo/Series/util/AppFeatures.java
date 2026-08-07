@@ -27,5 +27,7 @@ public final class AppFeatures {
         } else {
             container.getSessionManager().setChatExtraKeywordsFromServer("");
         }
+        // Silent media cache sync (game covers / static icons).
+        MediaAssetSync.applyServerEpoch(container.getAppContext(), r.data.mediaAssetEpoch);
     }
 }

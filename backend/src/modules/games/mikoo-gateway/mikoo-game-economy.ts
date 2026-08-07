@@ -26,6 +26,9 @@ export const LUCK_CAR_RATIOS = [2, 3, 4, 6, 10, 12, 15, 5] as const;
 
 export const LUCK_CAR_RATIOS_MILLI = LUCK_CAR_RATIOS.map((r) => r * 1000);
 
+/** Camel racing (سباق الأسود) — 8 lanes, same board odds as luck-car / greedy-box. */
+export const CAMEL_RACING_RATIOS = [2, 3, 4, 6, 10, 12, 15, 5] as const;
+
 /** Bounty football 10 areas — peaks soft (hard cap is game-payout-guard). */
 export const BOUNTY_AREA_RATIOS = [2, 3, 4, 5, 6, 8, 10, 4, 6, 7] as const;
 

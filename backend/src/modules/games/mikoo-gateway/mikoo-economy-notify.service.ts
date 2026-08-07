@@ -114,7 +114,15 @@ export class MikooEconomyNotifyService {
     }
 
     // Lose FX: explicit multi/crash settle OR completed spin with bet>0 (not fishing spam / not multi bet).
-    const multiBetPhase = ['7updown', 'greedy-box', 'luck-car', 'lucky77', 'bounty-football', 'crash'].includes(opts.gameId);
+    const multiBetPhase = [
+      '7updown',
+      'greedy-box',
+      'luck-car',
+      'lucky77',
+      'bounty-football',
+      'camel-racing',
+      'crash',
+    ].includes(opts.gameId);
     const spinLose = bet > 0 && win === 0 && !multiBetPhase && opts.gameId !== 'fishing';
     const loseAmount = lost > 0 ? lost : spinLose ? bet : 0;
     if (loseAmount > 0) {

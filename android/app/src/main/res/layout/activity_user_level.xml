@@ -2,7 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#FFF5F5F7">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -10,68 +11,78 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white" />
+        android:src="@color/white"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingTop="16dp">
+        android:orientation="vertical">
 
+        <!-- Top bar -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
+            android:background="@color/white"
+            android:elevation="2dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:paddingHorizontal="4dp">
 
             <ImageView
                 android:id="@+id/btnBack"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/bg_pro_icon_circle"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:contentDescription="@string/back"
-                android:padding="10dp"
+                android:padding="12dp"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
                 android:layout_weight="1"
+                android:gravity="center"
                 android:text="@string/my_level_title"
                 android:textColor="@color/text_primary"
-                android:textSize="20sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
+
+            <View
+                android:layout_width="48dp"
+                android:layout_height="48dp" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout
             android:id="@+id/tabLevel"
             android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="12dp"
-            android:background="@android:color/transparent"
+            android:layout_height="48dp"
+            android:background="@color/white"
             app:tabGravity="fill"
             app:tabIndicatorColor="@color/aurora_gold"
             app:tabIndicatorFullWidth="false"
             app:tabMode="fixed"
             app:tabSelectedTextColor="@color/aurora_gold"
+            app:tabTextAppearance="@style/TextAppearance.AppCompat.Body2"
             app:tabTextColor="@color/text_secondary" />
 
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:fillViewport="true">
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:overScrollMode="never">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingBottom="28dp">
+                android:paddingHorizontal="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="32dp">
 
-                <!-- النمو -->
+                <!-- ═══ النمو ═══ -->
                 <LinearLayout
                     android:id="@+id/panelGrowth"
                     android:layout_width="match_parent"
@@ -81,27 +92,37 @@
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
                         android:background="@drawable/bg_level_hero_card"
                         android:gravity="center_horizontal"
                         android:orientation="vertical"
                         android:paddingHorizontal="20dp"
-                        android:paddingTop="28dp"
-                        android:paddingBottom="24dp">
+                        android:paddingTop="26dp"
+                        android:paddingBottom="22dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.12"
+                            android:text="JEHO GROWTH"
+                            android:textColor="#99FDE68A"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
 
                         <FrameLayout
-                            android:layout_width="96dp"
-                            android:layout_height="96dp">
+                            android:layout_width="100dp"
+                            android:layout_height="100dp"
+                            android:layout_marginTop="14dp">
 
                             <View
-                                android:layout_width="96dp"
-                                android:layout_height="96dp"
-                                android:background="@drawable/bg_pro_icon_circle" />
+                                android:layout_width="100dp"
+                                android:layout_height="100dp"
+                                android:background="@drawable/bg_pro_icon_circle"
+                                android:alpha="0.35" />
 
                             <ImageView
                                 android:id="@+id/imgLevelBadge"
-                                android:layout_width="72dp"
-                                android:layout_height="72dp"
+                                android:layout_width="76dp"
+                                android:layout_height="76dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
                                 android:scaleType="fitCenter"
@@ -112,10 +133,10 @@
                             android:id="@+id/tvLevel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="14dp"
+                            android:layout_marginTop="12dp"
                             android:text="Lv.1"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="34sp"
+                            android:textColor="#FFFFFF"
+                            android:textSize="36sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -124,8 +145,9 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:text="@string/level_rank_newcomer"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="13sp" />
+                            android:textColor="#CCFDE68A"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvXp"
@@ -133,7 +155,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="18dp"
                             android:text="0 / 100"
-                            android:textColor="@color/text_primary"
+                            android:textColor="#FFFFFF"
                             android:textSize="15sp"
                             android:textStyle="bold" />
 
@@ -153,26 +175,26 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="@string/level_xp_hint"
-                            android:textColor="@color/text_hint"
+                            android:textColor="#B8C4D4"
                             android:textSize="12sp" />
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="22dp"
+                        android:layout_marginTop="20dp"
                         android:text="@string/level_how_title"
                         android:textColor="@color/text_primary"
-                        android:textSize="16sp"
+                        android:textSize="15sp"
                         android:textStyle="bold" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="10dp"
                         android:background="@drawable/bg_level_tip_card"
                         android:orientation="vertical"
-                        android:padding="14dp">
+                        android:padding="16dp">
 
                         <TextView
                             android:layout_width="match_parent"
@@ -203,12 +225,12 @@
                         style="@style/Widget.AuraLive.Button.Gold"
                         android:layout_width="match_parent"
                         android:layout_height="52dp"
-                        android:layout_marginTop="22dp"
+                        android:layout_marginTop="18dp"
                         android:text="@string/task_center"
                         android:textAllCaps="false" />
                 </LinearLayout>
 
-                <!-- الثروة -->
+                <!-- ═══ الثروة ═══ -->
                 <LinearLayout
                     android:id="@+id/panelWealth"
                     android:layout_width="match_parent"
@@ -218,52 +240,83 @@
 
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="140dp"
-                        android:layout_marginTop="14dp">
+                        android:layout_height="152dp">
 
-                        <ImageView
+                        <com.google.android.material.imageview.ShapeableImageView
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:contentDescription="@null"
                             android:scaleType="centerCrop"
-                            android:src="@drawable/home_bg_wealth" />
+                            android:src="@drawable/home_bg_wealth"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded16" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_level_banner_scrim" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="bottom|start"
-                            android:layout_margin="14dp"
-                            android:text="@string/wealth_tab"
-                            android:textColor="@android:color/white"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
+                            android:layout_gravity="bottom"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:letterSpacing="0.1"
+                                android:text="JEHO WEALTH"
+                                android:textColor="#99FDE68A"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/wealth_tab"
+                                android:textColor="@android:color/white"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/level_wealth_banner_hint"
+                                android:textColor="#CCFFFFFF"
+                                android:textSize="12sp" />
+                        </LinearLayout>
                     </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_level_hero_card"
+                        android:background="@drawable/bg_level_stat_card"
                         android:gravity="center_horizontal"
                         android:orientation="vertical"
-                        android:padding="24dp">
+                        android:padding="22dp">
 
                         <TextView
                             android:id="@+id/tvWealthLevel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Lv.1"
-                            android:textColor="@color/text_primary"
-                            android:textSize="36sp"
+                            android:textColor="#B45309"
+                            android:textSize="40sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvWealthScore"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:lineSpacingExtra="3dp"
                             android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
+                            android:textSize="13sp" />
 
                         <ProgressBar
                             android:id="@+id/progressWealth"
@@ -279,7 +332,7 @@
                             android:id="@+id/tvWealthHint"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
+                            android:layout_marginTop="12dp"
                             android:gravity="center"
                             android:text="@string/wealth_coin_tip"
                             android:textColor="@color/text_hint"
@@ -287,7 +340,7 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <!-- السحر -->
+                <!-- ═══ السحر ═══ -->
                 <LinearLayout
                     android:id="@+id/panelCharm"
                     android:layout_width="match_parent"
@@ -297,52 +350,83 @@
 
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="140dp"
-                        android:layout_marginTop="14dp">
+                        android:layout_height="152dp">
 
-                        <ImageView
+                        <com.google.android.material.imageview.ShapeableImageView
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:contentDescription="@null"
                             android:scaleType="centerCrop"
-                            android:src="@drawable/home_bg_charm" />
+                            android:src="@drawable/home_bg_charm"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded16" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_level_banner_scrim" />
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_gravity="bottom|start"
-                            android:layout_margin="14dp"
-                            android:text="@string/charm_tab"
-                            android:textColor="@android:color/white"
-                            android:textSize="18sp"
-                            android:textStyle="bold" />
+                            android:layout_gravity="bottom"
+                            android:orientation="vertical"
+                            android:padding="16dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:letterSpacing="0.1"
+                                android:text="JEHO CHARM"
+                                android:textColor="#99F9A8D4"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/charm_tab"
+                                android:textColor="@android:color/white"
+                                android:textSize="22sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/level_charm_banner_hint"
+                                android:textColor="#CCFFFFFF"
+                                android:textSize="12sp" />
+                        </LinearLayout>
                     </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:background="@drawable/bg_level_hero_card"
+                        android:background="@drawable/bg_level_stat_card"
                         android:gravity="center_horizontal"
                         android:orientation="vertical"
-                        android:padding="24dp">
+                        android:padding="22dp">
 
                         <TextView
                             android:id="@+id/tvCharmLevel"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Lv.1"
-                            android:textColor="@color/text_primary"
-                            android:textSize="36sp"
+                            android:textColor="#BE185D"
+                            android:textSize="40sp"
                             android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvCharmScore"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
+                            android:gravity="center"
+                            android:lineSpacingExtra="3dp"
                             android:textColor="@color/text_secondary"
-                            android:textSize="14sp" />
+                            android:textSize="13sp" />
 
                         <ProgressBar
                             android:id="@+id/progressCharm"
@@ -358,7 +442,7 @@
                             android:id="@+id/tvCharmHint"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
+                            android:layout_marginTop="12dp"
                             android:gravity="center"
                             android:text="@string/charm_coin_tip"
                             android:textColor="@color/text_hint"

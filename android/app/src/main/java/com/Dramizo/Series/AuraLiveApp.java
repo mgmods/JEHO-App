@@ -86,12 +86,14 @@ public class AuraLiveApp extends Application {
     public void onCreate() {
         super.onCreate();
         container = new AppContainer(this);
+        com.Dramizo.Series.util.MediaAssetSync.hydrate(this);
         com.Dramizo.Series.util.RoomChatMemory.init(this);
         // Fetch runtime Zego client settings early (non-blocking).
         try {
             container.getIoExecutor().execute(() -> {
                 ZegoEngineManager.getInstance().fetchAndApplyRemote(this, container.getConfigApi());
                 AppFeatures.refresh(container);
+                com.Dramizo.Series.util.RemoteNavIcons.refreshBlocking(container);
             });
         } catch (Exception ignored) {
         }

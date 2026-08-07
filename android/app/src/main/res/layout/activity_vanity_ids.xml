@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF7F8FA">
+    android:background="#FFF4F5F7">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -20,10 +20,11 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Toolbar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="56dp"
+            android:background="@color/white"
+            android:elevation="2dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="4dp">
@@ -43,9 +44,9 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:gravity="center"
-                android:text="آي دي مميز"
+                android:text="@string/vanity_id"
                 android:textColor="@color/text_primary"
-                android:textSize="18sp"
+                android:textSize="17sp"
                 android:textStyle="bold" />
 
             <View
@@ -67,20 +68,20 @@
                 android:orientation="vertical"
                 android:paddingBottom="28dp">
 
-                <!-- My ID hero -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="14dp"
                     android:background="@drawable/bg_vanity_hero"
                     android:orientation="vertical"
-                    android:padding="20dp">
+                    android:padding="18dp">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:letterSpacing="0.12"
-                        android:text="YOUR ID"
+                        android:letterSpacing="0.1"
+                        android:text="JEHO SPECIAL ID"
                         android:textColor="#99FDE68A"
                         android:textSize="11sp"
                         android:textStyle="bold" />
@@ -93,14 +94,14 @@
                         android:fontFamily="sans-serif-medium"
                         android:gravity="center"
                         android:letterSpacing="0.08"
+                        android:maxLines="1"
                         android:text="—"
                         android:textColor="#FFFFFF"
                         android:textSize="34sp"
                         android:textStyle="bold"
                         app:autoSizeMaxTextSize="34sp"
                         app:autoSizeMinTextSize="18sp"
-                        app:autoSizeTextType="uniform"
-                        android:maxLines="1" />
+                        app:autoSizeTextType="uniform" />
 
                     <TextView
                         android:id="@+id/tvCurrentId"
@@ -108,7 +109,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:text="اشتراكك الحالي"
+                        android:text="@string/vanity_subscription_current"
                         android:textColor="#B6F5EE"
                         android:textSize="12sp" />
 
@@ -129,7 +130,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="رصيد الكوينز"
+                            android:text="@string/vanity_coins_balance_label"
                             android:textColor="#CCFBF1"
                             android:textSize="12sp" />
 
@@ -144,12 +145,36 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="16dp"
+                    android:hint="@string/vanity_search_hint"
+                    app:boxBackgroundMode="outline"
+                    app:boxCornerRadiusBottomEnd="14dp"
+                    app:boxCornerRadiusBottomStart="14dp"
+                    app:boxCornerRadiusTopEnd="14dp"
+                    app:boxCornerRadiusTopStart="14dp"
+                    app:boxStrokeColor="@color/aurora_gold"
+                    app:hintTextColor="@color/text_hint">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etVanitySearch"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="20dp"
-                    android:layout_marginTop="22dp"
-                    android:text="المتجر"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/vanity_store_title"
                     android:textColor="@color/text_primary"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -159,7 +184,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="20dp"
                     android:layout_marginTop="4dp"
-                    android:text="اختر آي دي يظهر بدل رقمك العادي · اشتراك 30 يوم"
+                    android:text="@string/vanity_store_subtitle"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
 
@@ -180,7 +205,7 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:padding="32dp"
-                    android:text="لا توجد آي ديات متاحة حالياً"
+                    android:text="@string/vanity_empty"
                     android:textColor="@color/text_secondary"
                     android:visibility="gone" />
             </LinearLayout>

@@ -164,6 +164,14 @@ export class ContentModerationService implements OnModuleInit {
     const raw = String(text || '').trim();
     if (!raw) return { ok: true };
 
+    // In-app structured cards (not user promo text).
+    if (
+      raw.startsWith('[[room_share|') ||
+      raw.startsWith('[[agency_invite|')
+    ) {
+      return { ok: true };
+    }
+
     const patterns = [...this.defaultBlocked];
     const extra = await this.stringSetting('chat_blocked_extra_keywords', '');
     for (const word of extra.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean)) {

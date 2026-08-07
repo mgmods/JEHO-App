@@ -48,7 +48,8 @@ public final class AssetCatalog {
     /** Canonical remote Mikoo medal URL (VIP1–7). */
     public static String vipMedalUrl(int level) {
         int n = Math.min(7, Math.max(1, level));
-        return absoluteUrl("/assets/cosmetics/vip/vip_medal_mikoo_" + n + ".png?v=20260801vip7");
+        return MediaAssetSync.bust(
+                absoluteUrl("/assets/cosmetics/vip/vip_medal_mikoo_" + n + ".png"));
     }
 
     /** Join-toast VIP avatar corner (Mikoo noble head 1–7 sequential). */

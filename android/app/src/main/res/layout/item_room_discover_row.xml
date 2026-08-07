@@ -17,10 +17,9 @@
         android:id="@+id/imgCover"
         android:layout_width="58dp"
         android:layout_height="58dp"
-        android:background="@drawable/bg_room_discover_cover"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/hams_background"
+        android:src="@drawable/img_placeholder_light"
         app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Small" />
 
     <LinearLayout
@@ -73,7 +72,7 @@
             android:layout_marginTop="3dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="مرحباً بك في ميكو"
+            android:text="@string/room_default_welcome"
             android:textColor="#88FFFFFF"
             android:textSize="11sp" />
     </LinearLayout>

@@ -9,7 +9,6 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,6 +16,7 @@ import android.view.Window;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,14 +26,14 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.ChatDtos;
-import com.Dramizo.Series.databinding.ItemMessageBinding;
+import com.Dramizo.Series.util.AgencyInviteCodec;
 import com.Dramizo.Series.util.AssetCatalog;
-import com.Dramizo.Series.util.VipStyle;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.RoomShareCodec;
+import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
@@ -45,11 +45,18 @@ import java.util.Map;
 import java.util.Set;
 
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
+    private static final int TYPE_PEER = 0;
+    private static final int TYPE_MINE = 1;
+
     public interface Listener {
         void onLongClick(ChatDtos.MessageDto msg);
         void onSwipeReply(ChatDtos.MessageDto msg);
         void onTranslate(ChatDtos.MessageDto msg, int adapterPosition);
         default void onAvatarClick(String userId) {}
+        /** Recipient tapped أوافق on a family/agency invite card. */
+        default void onAgencyInviteAgree(ChatDtos.MessageDto msg, AgencyInviteCodec.Parsed invite) {}
+        /** Recipient tapped لا أوافق → hide the invite bubble. */
+        default void onAgencyInviteDisagree(ChatDtos.MessageDto msg, AgencyInviteCodec.Parsed invite) {}
     }
 
     private final List<ChatDtos.MessageDto> items = new ArrayList<>();
@@ -204,27 +211,51 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
     }
 
+    @Override
+    public int getItemViewType(int position) {
+        return isMine(items.get(position)) ? TYPE_MINE : TYPE_PEER;
+    }
+
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new VH(ItemMessageBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+        int layout = viewType == TYPE_MINE
+                ? R.layout.item_message_mine
+                : R.layout.item_message_peer;
+        View root = LayoutInflater.from(parent.getContext()).inflate(layout, parent, false);
+        return new VH(root);
     }
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         ChatDtos.MessageDto msg = items.get(position);
-        boolean mine = isMine(msg);
+        boolean mine = holder.getItemViewType() == TYPE_MINE || isMine(msg);
 
-        bindRowOrder(holder, mine);
-        bindSideChrome(holder, msg, mine);
-        holder.b.tvVipChip.setVisibility(View.GONE);
-        holder.b.rowBadges.setVisibility(View.GONE);
-        holder.b.tvMeta.setVisibility(View.GONE);
+        bindClusterSpacing(holder, position, mine, msg);
+        bindSideChrome(holder, msg, mine, position);
 
+        if (holder.b.tvVipChip != null) holder.b.tvVipChip.setVisibility(View.GONE);
+        if (holder.b.rowBadges != null) holder.b.rowBadges.setVisibility(View.GONE);
+        if (holder.b.tvMeta != null) holder.b.tvMeta.setVisibility(View.GONE);
+
+        // Soft me/peer by default; VIP uses ornate 9-patch skins.
+        // Cards (room share / family invite) sit outside the VIP skin so they never collapse.
+        boolean cardLike = isCardMessage(msg);
         int vipLevel = resolveVipLevel(holder, msg, mine);
-        if (vipLevel > 0) {
+        if (cardLike) {
+            holder.b.bubbleRoot.setBackgroundResource(android.R.color.transparent);
+            holder.b.bubbleRoot.setPadding(0, 0, 0, 0);
+        } else if (vipLevel > 0) {
             VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
+            int padH = dp(holder, 16);
+            int padT = dp(holder, 12);
+            int padB = dp(holder, 10);
+            holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
         } else {
+            int padH = dp(holder, 12);
+            int padT = dp(holder, 8);
+            int padB = dp(holder, 6);
+            holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
             holder.b.bubbleRoot.setBackgroundResource(
                     mine ? R.drawable.bg_chat_bubble_me : R.drawable.bg_chat_bubble_peer);
         }
@@ -245,31 +276,64 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.bubbleRoot.setOnLongClickListener(longClick);
     }
 
-    /** WhatsApp-style: peer = avatar|bubble , mine = bubble|avatar (always LTR). */
-    private void bindRowOrder(@NonNull VH holder, boolean mine) {
-        LinearLayout root = holder.b.rootRow;
-        View avatar = holder.b.avatarWrap;
-        View column = holder.b.bubbleColumn;
-        root.setGravity(mine ? (Gravity.END | Gravity.BOTTOM) : (Gravity.START | Gravity.BOTTOM));
-        int avatarIndex = root.indexOfChild(avatar);
-        int columnIndex = root.indexOfChild(column);
-        if (mine) {
-            // bubble then avatar
-            if (avatarIndex < columnIndex) {
-                root.removeView(avatar);
-                root.addView(avatar);
-            }
+    /**
+     * WhatsApp-like spacing: roomy by default, still slightly tighter for a consecutive cluster.
+     * Cards and side switches always keep air so VIP skins / invites never overlap.
+     */
+    private void bindClusterSpacing(
+            @NonNull VH holder, int position, boolean mine, @NonNull ChatDtos.MessageDto msg) {
+        boolean sameAsPrev = position > 0 && isMine(items.get(position - 1)) == mine
+                && sameSender(items.get(position - 1), items.get(position));
+        boolean sameAsNext = position + 1 < items.size()
+                && isMine(items.get(position + 1)) == mine
+                && sameSender(items.get(position), items.get(position + 1));
+        boolean card = isCardMessage(msg);
+        boolean prevCard = position > 0 && isCardMessage(items.get(position - 1));
+        int topDp;
+        int bottomDp;
+        if (card || prevCard || !sameAsPrev) {
+            topDp = 10;
         } else {
-            // avatar then bubble
-            if (columnIndex < avatarIndex) {
-                root.removeView(avatar);
-                root.addView(avatar, 0);
-            }
+            topDp = 4;
         }
+        bottomDp = (card || !sameAsNext) ? 8 : 4;
+        View root = holder.b.rootRow;
+        root.setPadding(
+                root.getPaddingLeft(),
+                dp(holder, topDp),
+                root.getPaddingRight(),
+                dp(holder, bottomDp));
     }
 
-    private void bindSideChrome(@NonNull VH holder, ChatDtos.MessageDto msg, boolean mine) {
-        holder.b.avatarWrap.setVisibility(View.VISIBLE);
+    private static boolean isCardMessage(@Nullable ChatDtos.MessageDto msg) {
+        if (msg == null) return false;
+        if (isAgencyInviteMessage(msg)) return true;
+        return RoomShareCodec.isRoomShare(msg.content);
+    }
+
+    /** Public for conversation swipe guard (cards must stay tappable). */
+    public boolean isSwipeLocked(int position) {
+        if (position < 0 || position >= items.size()) return true;
+        return isCardMessage(items.get(position));
+    }
+
+    private void bindSideChrome(
+            @NonNull VH holder, ChatDtos.MessageDto msg, boolean mine, int position) {
+        boolean sameAsNext = position + 1 < items.size()
+                && isMine(items.get(position + 1)) == mine
+                && sameSender(msg, items.get(position + 1));
+        // Show avatar only on the last bubble of a consecutive cluster (Mikoo).
+        boolean showAvatar = !sameAsNext;
+        holder.b.avatarWrap.setVisibility(showAvatar ? View.VISIBLE : View.INVISIBLE);
+        if (holder.b.imgAvatar != null) {
+            holder.b.imgAvatar.setVisibility(showAvatar ? View.VISIBLE : View.INVISIBLE);
+        }
+        if (holder.b.imgFrame != null && !showAvatar) {
+            holder.b.imgFrame.setVisibility(View.GONE);
+        }
+        if (holder.b.imgHostBadge != null && !showAvatar) {
+            holder.b.imgHostBadge.setVisibility(View.GONE);
+        }
 
         String avatarUrl;
         String frameUrl;
@@ -279,7 +343,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         java.util.Map<String, Object> hostBadgeMeta = null;
 
         if (mine) {
-            // Always re-read session so equipped VIP/head frames show for all roles (incl. staff).
             AuthDtos.UserDto liveMe = me;
             try {
                 AuthDtos.UserDto sessionMe = com.Dramizo.Series.presentation.common.ContainerProvider
@@ -290,10 +353,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             } catch (Exception ignored) {
             }
             avatarUrl = liveMe != null ? liveMe.avatarUrl : null;
-            // Private chat: personal VIP frame only (host signal is agency-room wear).
             frameUrl = liveMe != null ? liveMe.vipBadgeUrl : null;
             hostBadgeUrl = null;
-            // Same rule as chat header: displayName first, then username.
             name = firstNonEmpty(
                     liveMe != null ? liveMe.displayName : null,
                     liveMe != null ? liveMe.username : null,
@@ -302,12 +363,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             AuthDtos.UserDto sender = msg.sender;
             avatarUrl = sender != null && sender.avatarUrl != null
                     ? sender.avatarUrl : peerAvatarUrl;
-            // Prefer sender payload frame, then conversation peer VIP frame (not host-signal).
             frameUrl = firstNonEmpty(
                     sender != null ? sender.vipBadgeUrl : null,
                     peerHostBadgeUrl);
             hostBadgeUrl = null;
-            // Same name shown above "متصل الآن" in the conversation header.
             name = firstNonEmpty(
                     sender != null ? sender.displayName : null,
                     peerDisplayName,
@@ -315,48 +374,56 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                     "صديق");
         }
 
-        AvatarCosmetics.bindAvatar(holder.b.imgAvatar, avatarUrl);
-        // Stack VIP frame on top of the face (staff roles included — no role-based strip).
-        AvatarCosmetics.applyHostWear(
-                holder.b.imgFrame,
-                holder.b.imgHostBadge,
-                holder.b.imgAvatar,
-                frameUrl,
-                hostBadgeUrl,
-                frameMeta,
-                hostBadgeMeta);
-        if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
-            holder.b.imgFrame.bringToFront();
+        if (showAvatar) {
+            AvatarCosmetics.bindAvatar(holder.b.imgAvatar, avatarUrl);
+            AvatarCosmetics.applyHostWear(
+                    holder.b.imgFrame,
+                    holder.b.imgHostBadge,
+                    holder.b.imgAvatar,
+                    frameUrl,
+                    hostBadgeUrl,
+                    frameMeta,
+                    hostBadgeMeta);
+            if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
+                holder.b.imgFrame.bringToFront();
+            }
         }
 
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
 
-        // VIP ornate skins are dark — use white text on both sides when VIP.
+        // Soft private bubbles use dark text; VIP ornate skins need light text for contrast.
+        // Card messages (invite / room share) keep dark ink even if sender is VIP.
         int vipForText = resolveVipLevel(holder, msg, mine);
-        boolean lightOnBubble = mine || vipForText > 0;
-        int bodyColor = lightOnBubble ? 0xFFFFFFFF
-                : holder.itemView.getContext().getColor(R.color.text_primary);
-        int metaColor = lightOnBubble ? 0xCCFFFFFF
-                : holder.itemView.getContext().getColor(R.color.text_hint);
+        boolean lightOnBubble = !isCardMessage(msg) && vipForText > 0;
+        int bodyColor = lightOnBubble ? 0xFFFFFFFF : 0xFF222222;
+        int metaColor = lightOnBubble ? 0xCCFFFFFF : 0x99000000;
+        int secondary = lightOnBubble
+                ? 0xE6FFFFFF
+                : holder.itemView.getContext().getColor(R.color.text_secondary);
         holder.b.tvContent.setTextColor(bodyColor);
         holder.b.tvTime.setTextColor(metaColor);
         if (holder.b.tvTranslated != null) {
-            holder.b.tvTranslated.setTextColor(lightOnBubble ? 0xE6FFFFFF
-                    : holder.itemView.getContext().getColor(R.color.text_secondary));
+            holder.b.tvTranslated.setTextColor(secondary);
         }
         if (holder.b.tvTranslateAction != null) {
-            holder.b.tvTranslateAction.setTextColor(lightOnBubble ? 0xCCFFFFFF
-                    : holder.itemView.getContext().getColor(R.color.text_secondary));
+            holder.b.tvTranslateAction.setTextColor(secondary);
         }
         if (holder.b.tvAudioDur != null) {
-            holder.b.tvAudioDur.setTextColor(metaColor);
+            holder.b.tvAudioDur.setTextColor(bodyColor);
         }
 
-        if (!mine && listener != null) {
-            String clickUserId = firstNonEmpty(
-                    msg.sender != null ? msg.sender.id : null,
-                    msg.senderId);
+        if (showAvatar && listener != null) {
+            String clickUserId;
+            if (mine) {
+                clickUserId = firstNonEmpty(
+                        myUserId,
+                        me != null ? me.id : null);
+            } else {
+                clickUserId = firstNonEmpty(
+                        msg.sender != null ? msg.sender.id : null,
+                        msg.senderId);
+            }
             final String avatarUserId = clickUserId;
             holder.b.avatarWrap.setOnClickListener(v -> {
                 if (avatarUserId != null && !avatarUserId.isEmpty()) {
@@ -369,6 +436,14 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.avatarWrap.setOnClickListener(null);
             holder.b.avatarWrap.setClickable(false);
         }
+    }
+
+    private boolean sameSender(@Nullable ChatDtos.MessageDto a, @Nullable ChatDtos.MessageDto b) {
+        if (a == null || b == null) return false;
+        String idA = firstNonEmpty(a.senderId, a.sender != null ? a.sender.id : null);
+        String idB = firstNonEmpty(b.senderId, b.sender != null ? b.sender.id : null);
+        if (!idA.isEmpty() && !idB.isEmpty() && idsEqual(idA, idB)) return true;
+        return isMine(a) == isMine(b);
     }
 
     private static String firstNonEmpty(String... values) {
@@ -396,6 +471,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             if (msg.sender != null) {
                 return Math.max(0, msg.sender.vipLevel);
             }
+            return Math.max(0, peerVipLevel);
         } catch (Exception ignored) {
         }
         return 0;
@@ -526,33 +602,8 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             return;
         }
 
-        if (isAgencyInviteType(type, msg.content) && holder.b.agencyInviteRow != null) {
-            holder.b.agencyInviteRow.setVisibility(View.VISIBLE);
-            String agencyName = firstNonEmpty(msg.content,
-                    holder.itemView.getContext().getString(R.string.agency_invite_title));
-            if (holder.b.tvAgencyInviteName != null) {
-                holder.b.tvAgencyInviteName.setText(agencyName);
-            }
-            if (holder.b.tvAgencyInviteBody != null) {
-                holder.b.tvAgencyInviteBody.setText(R.string.agency_invite_body);
-            }
-            if (holder.b.imgAgencyInviteLogo != null && mediaUrl != null && !mediaUrl.isEmpty()) {
-                Glide.with(holder.b.imgAgencyInviteLogo)
-                        .load(AssetCatalog.absoluteUrl(mediaUrl))
-                        .placeholder(R.drawable.icon_agency)
-                        .error(R.drawable.icon_agency)
-                        .into(holder.b.imgAgencyInviteLogo);
-            }
-            if (holder.b.btnAgencyInviteYes != null) {
-                holder.b.btnAgencyInviteYes.setOnClickListener(v ->
-                        Toast.makeText(holder.itemView.getContext(),
-                                R.string.agency_invite_agree, Toast.LENGTH_SHORT).show());
-            }
-            if (holder.b.btnAgencyInviteNo != null) {
-                holder.b.btnAgencyInviteNo.setOnClickListener(v ->
-                        Toast.makeText(holder.itemView.getContext(),
-                                R.string.agency_invite_disagree, Toast.LENGTH_SHORT).show());
-            }
+        if (isAgencyInviteMessage(msg) && holder.b.agencyInviteRow != null) {
+            bindAgencyInviteCard(holder, msg, mediaUrl);
             return;
         }
 
@@ -590,8 +641,98 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
         holder.b.tvContent.setVisibility(View.VISIBLE);
         holder.b.tvContent.setText(msg.content != null ? msg.content : "");
-        holder.b.tvContent.setTextColor(0xFF333333);
+        // Color already set in bindSideChrome (VIP-aware).
         bindTranslate(holder, msg);
+    }
+
+    private void bindAgencyInviteCard(
+            @NonNull VH holder, @NonNull ChatDtos.MessageDto msg, @Nullable String mediaUrl) {
+        holder.b.agencyInviteRow.setVisibility(View.VISIBLE);
+        AgencyInviteCodec.Parsed invite = AgencyInviteCodec.parse(msg.content);
+        Context ctx = holder.itemView.getContext();
+
+        String agencyName;
+        String logo = mediaUrl;
+        if (invite != null) {
+            agencyName = firstNonEmpty(invite.name, ctx.getString(R.string.agency_invite_title));
+            if (invite.logoUrl != null && !invite.logoUrl.isEmpty()) {
+                logo = invite.logoUrl;
+            }
+        } else {
+            // Legacy free-text fallback (not room join).
+            agencyName = firstNonEmpty(msg.content, ctx.getString(R.string.agency_invite_title));
+            if (agencyName.contains("\n")) {
+                agencyName = agencyName.split("\n", 2)[0].trim();
+            }
+            if (agencyName.length() > 40) agencyName = agencyName.substring(0, 40) + "…";
+        }
+
+        if (holder.b.tvAgencyInviteName != null) {
+            holder.b.tvAgencyInviteName.setText(agencyName);
+        }
+        if (holder.b.tvAgencyInviteBody != null) {
+            holder.b.tvAgencyInviteBody.setText(R.string.agency_invite_body);
+        }
+        if (holder.b.imgAgencyInviteLogo != null) {
+            if (logo != null && !logo.isEmpty()) {
+                Glide.with(holder.b.imgAgencyInviteLogo)
+                        .load(AssetCatalog.absoluteUrl(logo))
+                        .placeholder(R.drawable.icon_agency)
+                        .error(R.drawable.icon_agency)
+                        .centerCrop()
+                        .into(holder.b.imgAgencyInviteLogo);
+            } else {
+                holder.b.imgAgencyInviteLogo.setImageResource(R.drawable.icon_agency);
+            }
+            holder.b.imgAgencyInviteLogo.setClipToOutline(true);
+        }
+
+        boolean mine = isMine(msg);
+        final AgencyInviteCodec.Parsed inviteFinal = invite;
+        // Sender sees their own invite card but cannot accept/decline their outgoing invite.
+        if (holder.b.btnAgencyInviteYes != null) {
+            holder.b.btnAgencyInviteYes.setClickable(true);
+            holder.b.btnAgencyInviteYes.setFocusable(true);
+            holder.b.btnAgencyInviteYes.setEnabled(!mine);
+            holder.b.btnAgencyInviteYes.setAlpha(mine ? 0.5f : 1f);
+            holder.b.btnAgencyInviteYes.setOnClickListener(v -> {
+                if (mine) {
+                    Toast.makeText(ctx, R.string.agency_invite_only_recipient, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (listener != null) {
+                    listener.onAgencyInviteAgree(msg, inviteFinal);
+                }
+            });
+        }
+        if (holder.b.btnAgencyInviteNo != null) {
+            holder.b.btnAgencyInviteNo.setClickable(true);
+            holder.b.btnAgencyInviteNo.setFocusable(true);
+            holder.b.btnAgencyInviteNo.setEnabled(!mine);
+            holder.b.btnAgencyInviteNo.setAlpha(mine ? 0.5f : 1f);
+            holder.b.btnAgencyInviteNo.setOnClickListener(v -> {
+                if (mine) {
+                    Toast.makeText(ctx, R.string.agency_invite_only_recipient, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                if (listener != null) {
+                    listener.onAgencyInviteDisagree(msg, inviteFinal);
+                } else {
+                    Toast.makeText(ctx, R.string.agency_invite_declined, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+        // Keep card taps from bubbling into swipe-reply drag start on sparse moves.
+        if (holder.b.agencyInviteRow != null) {
+            holder.b.agencyInviteRow.setClickable(true);
+            holder.b.agencyInviteRow.setOnClickListener(v -> { /* consume */ });
+        }
+    }
+
+    private static boolean isAgencyInviteMessage(@Nullable ChatDtos.MessageDto msg) {
+        if (msg == null) return false;
+        if (AgencyInviteCodec.isAgencyInvite(msg.content)) return true;
+        return isAgencyInviteType(msg.type, msg.content);
     }
 
     private void hideTranslateViews(@NonNull VH holder) {
@@ -729,6 +870,12 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if ("audio".equals(type)) return "🎤 رسالة صوتية";
         if ("gift".equals(type)) return "🎁 " + (msg.content != null ? msg.content : "هدية");
         if (RoomShareCodec.isRoomShare(msg.content)) return RoomShareCodec.previewLabel(msg.content);
+        if (AgencyInviteCodec.isAgencyInvite(msg.content)) {
+            return AgencyInviteCodec.previewLabel(msg.content);
+        }
+        if (isAgencyInviteType(msg.type, msg.content)) {
+            return "دعوة للانضمام إلى العائلة";
+        }
         if (msg.content != null && !msg.content.isEmpty()) return msg.content;
         return "رسالة";
     }
@@ -744,6 +891,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     }
 
     private static boolean isAgencyInviteType(@Nullable String type, @Nullable String content) {
+        if (AgencyInviteCodec.isAgencyInvite(content)) return true;
         if (type != null) {
             String t = type.toLowerCase(Locale.US);
             if (t.contains("agency") || t.contains("guild") || t.contains("family_invite")) {
@@ -752,10 +900,11 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
         if (content != null) {
             String c = content;
+            // Avoid matching bare "وكالة" (too broad); require family-join phrasing.
             return c.contains("الانضمام إلى العائلة")
                     || c.contains("join the family")
                     || c.contains("join agency")
-                    || c.contains("وكالة");
+                    || c.contains("يدعوك للانضمام");
         }
         return false;
     }
@@ -817,7 +966,92 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        final ItemMessageBinding b;
-        VH(ItemMessageBinding b) { super(b.getRoot()); this.b = b; }
+        final Rows b;
+
+        VH(View root) {
+            super(root);
+            b = new Rows(root);
+        }
+    }
+
+    /** Manual binding so mine/peer layouts can share the same field graph. */
+    static final class Rows {
+        final View rootRow;
+        final View avatarWrap;
+        final ImageView imgAvatar;
+        final ImageView imgFrame;
+        final ImageView imgHostBadge;
+        final View bubbleColumn;
+        final LinearLayout bubbleRoot;
+        final TextView tvVipChip;
+        final View rowBadges;
+        final TextView tvMeta;
+        final TextView tvSender;
+        final View replyQuote;
+        final TextView tvReplyAuthor;
+        final TextView tvReplyBody;
+        final ImageView imgMedia;
+        final View audioRow;
+        final TextView tvAudioDur;
+        final AudioWaveformView waveAudio;
+        final View audioPlayWrap;
+        final ImageView imgAudioPlay;
+        final View agencyInviteRow;
+        final ImageView imgAgencyInviteLogo;
+        final TextView tvAgencyInviteName;
+        final TextView tvAgencyInviteBody;
+        final TextView btnAgencyInviteNo;
+        final TextView btnAgencyInviteYes;
+        final View giftRow;
+        final ImageView imgGift;
+        final TextView tvGiftLabel;
+        final View roomShareRow;
+        final ImageView imgRoomShareCover;
+        final TextView tvRoomShareTitle;
+        final TextView tvContent;
+        final TextView tvTranslateAction;
+        final TextView tvTranslated;
+        final TextView tvTime;
+        final ImageView imgMsgStatus;
+
+        Rows(View root) {
+            rootRow = root.findViewById(R.id.rootRow);
+            avatarWrap = root.findViewById(R.id.avatarWrap);
+            imgAvatar = root.findViewById(R.id.imgAvatar);
+            imgFrame = root.findViewById(R.id.imgFrame);
+            imgHostBadge = root.findViewById(R.id.imgHostBadge);
+            bubbleColumn = root.findViewById(R.id.bubbleColumn);
+            bubbleRoot = root.findViewById(R.id.bubbleRoot);
+            tvVipChip = root.findViewById(R.id.tvVipChip);
+            rowBadges = root.findViewById(R.id.rowBadges);
+            tvMeta = root.findViewById(R.id.tvMeta);
+            tvSender = root.findViewById(R.id.tvSender);
+            replyQuote = root.findViewById(R.id.replyQuote);
+            tvReplyAuthor = root.findViewById(R.id.tvReplyAuthor);
+            tvReplyBody = root.findViewById(R.id.tvReplyBody);
+            imgMedia = root.findViewById(R.id.imgMedia);
+            audioRow = root.findViewById(R.id.audioRow);
+            tvAudioDur = root.findViewById(R.id.tvAudioDur);
+            waveAudio = root.findViewById(R.id.waveAudio);
+            audioPlayWrap = root.findViewById(R.id.audioPlayWrap);
+            imgAudioPlay = root.findViewById(R.id.imgAudioPlay);
+            agencyInviteRow = root.findViewById(R.id.agencyInviteRow);
+            imgAgencyInviteLogo = root.findViewById(R.id.imgAgencyInviteLogo);
+            tvAgencyInviteName = root.findViewById(R.id.tvAgencyInviteName);
+            tvAgencyInviteBody = root.findViewById(R.id.tvAgencyInviteBody);
+            btnAgencyInviteNo = root.findViewById(R.id.btnAgencyInviteNo);
+            btnAgencyInviteYes = root.findViewById(R.id.btnAgencyInviteYes);
+            giftRow = root.findViewById(R.id.giftRow);
+            imgGift = root.findViewById(R.id.imgGift);
+            tvGiftLabel = root.findViewById(R.id.tvGiftLabel);
+            roomShareRow = root.findViewById(R.id.roomShareRow);
+            imgRoomShareCover = root.findViewById(R.id.imgRoomShareCover);
+            tvRoomShareTitle = root.findViewById(R.id.tvRoomShareTitle);
+            tvContent = root.findViewById(R.id.tvContent);
+            tvTranslateAction = root.findViewById(R.id.tvTranslateAction);
+            tvTranslated = root.findViewById(R.id.tvTranslated);
+            tvTime = root.findViewById(R.id.tvTime);
+            imgMsgStatus = root.findViewById(R.id.imgMsgStatus);
+        }
     }
 }

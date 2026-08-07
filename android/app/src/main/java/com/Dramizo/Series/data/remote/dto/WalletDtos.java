@@ -98,6 +98,17 @@ public final class WalletDtos {
         @SerializedName("label") public String label;
         @SerializedName("currency") public String currency;
         public transient boolean selected;
+        /** Target-ladder only (not wallet packages). */
+        public transient boolean cashable = true;
+        public transient boolean isFullBalance;
+        public transient int stageIndex;
+        public transient String stageStatus;
+        public transient int hostsLocked;
+        public transient double hostSalaryUsd;
+        public transient double agentSalaryUsd;
+        public transient long progressDiamonds;
+        public transient long remainingDiamonds;
+        public transient long thresholdDiamonds;
     }
 
     public static class WithdrawPackagesResult {
@@ -244,6 +255,11 @@ public final class WalletDtos {
         @SerializedName("status") public String status;
         @SerializedName("adminNote") public String adminNote;
         @SerializedName("createdAt") public String createdAt;
+        @SerializedName("updatedAt") public String updatedAt;
+        /** Present on some APIs; prefer payoutDetails when null. */
+        @SerializedName("source") public String source;
+        @SerializedName("stream") public String stream;
+        @SerializedName("payoutDetails") public java.util.Map<String, Object> payoutDetails;
     }
 
     public static class WithdrawList {

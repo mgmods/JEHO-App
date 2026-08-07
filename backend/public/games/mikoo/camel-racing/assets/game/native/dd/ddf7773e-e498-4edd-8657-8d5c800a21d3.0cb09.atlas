@@ -1,0 +1,34 @@
+
+Countdown.png
+size: 1296,382
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1
+  rotate: false
+  xy: 1187, 5
+  size: 107, 375
+  orig: 107, 375
+  offset: 0, 0
+  index: -1
+2
+  rotate: false
+  xy: 726, 12
+  size: 238, 368
+  orig: 238, 368
+  offset: 0, 0
+  index: -1
+3
+  rotate: false
+  xy: 966, 4
+  size: 219, 376
+  orig: 219, 376
+  offset: 0, 0
+  index: -1
+GO
+  rotate: false
+  xy: 2, 2
+  size: 722, 378
+  orig: 722, 378
+  offset: 0, 0
+  index: -1

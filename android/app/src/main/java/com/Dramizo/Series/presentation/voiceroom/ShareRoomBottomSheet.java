@@ -24,6 +24,7 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.util.AgencyInviteCodec;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.RoomShareCodec;
@@ -38,11 +39,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Pick friends / chats and send an in-app room invitation. */
+/** Pick friends / chats and send an in-app room or agency-family invitation. */
 public class ShareRoomBottomSheet extends BottomSheetDialogFragment {
     private static final String ARG_ROOM_ID = "room_id";
     private static final String ARG_TITLE = "title";
     private static final String ARG_COVER = "cover";
+    private static final String ARG_MODE = "mode";
+    private static final String ARG_AGENCY_ID = "agency_id";
+    private static final String ARG_AGENCY_CODE = "agency_code";
+    private static final String MODE_ROOM = "room";
+    private static final String MODE_AGENCY = "agency";
 
     public static void show(FragmentManager fm, String roomId, String title) {
         show(fm, roomId, title, null);
@@ -54,6 +60,7 @@ public class ShareRoomBottomSheet extends BottomSheetDialogFragment {
         if (fm.findFragmentByTag("share_room") != null) return;
         ShareRoomBottomSheet sheet = new ShareRoomBottomSheet();
         Bundle args = new Bundle();
+        args.putString(ARG_MODE, MODE_ROOM);
         args.putString(ARG_ROOM_ID, roomId);
         args.putString(ARG_TITLE, title);
         if (coverUrl != null && !coverUrl.isEmpty()) {
@@ -61,6 +68,26 @@ public class ShareRoomBottomSheet extends BottomSheetDialogFragment {
         }
         sheet.setArguments(args);
         sheet.show(fm, "share_room");
+    }
+
+    /** Send Mikoo-style family/agency join invite card into P2P chats. */
+    public static void showAgencyInvite(
+            FragmentManager fm,
+            String agencyId,
+            @Nullable String name,
+            @Nullable String logoUrl,
+            @Nullable String activationCode) {
+        if (fm == null || agencyId == null || agencyId.isEmpty() || fm.isStateSaved()) return;
+        if (fm.findFragmentByTag("share_agency") != null) return;
+        ShareRoomBottomSheet sheet = new ShareRoomBottomSheet();
+        Bundle args = new Bundle();
+        args.putString(ARG_MODE, MODE_AGENCY);
+        args.putString(ARG_AGENCY_ID, agencyId);
+        args.putString(ARG_TITLE, name);
+        args.putString(ARG_COVER, logoUrl);
+        args.putString(ARG_AGENCY_CODE, activationCode);
+        sheet.setArguments(args);
+        sheet.show(fm, "share_agency");
     }
 
     @Override
@@ -81,20 +108,28 @@ public class ShareRoomBottomSheet extends BottomSheetDialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.bottom_sheet_share_room, container, false);
+        String mode = getArguments() != null ? getArguments().getString(ARG_MODE, MODE_ROOM) : MODE_ROOM;
+        boolean agencyMode = MODE_AGENCY.equals(mode);
         String roomId = getArguments() != null ? getArguments().getString(ARG_ROOM_ID) : null;
+        String agencyId = getArguments() != null ? getArguments().getString(ARG_AGENCY_ID) : null;
         String title = getArguments() != null ? getArguments().getString(ARG_TITLE) : null;
         String coverUrl = getArguments() != null ? getArguments().getString(ARG_COVER) : null;
+        String agencyCode = getArguments() != null ? getArguments().getString(ARG_AGENCY_CODE) : null;
         RecyclerView recycler = root.findViewById(R.id.recyclerChats);
         View progress = root.findViewById(R.id.progress);
         TextView empty = root.findViewById(R.id.tvEmpty);
         MaterialButton btnSend = root.findViewById(R.id.btnSendShare);
         MaterialButton btnExternal = root.findViewById(R.id.btnShareExternal);
 
+        if (agencyMode && btnExternal != null) {
+            btnExternal.setVisibility(View.GONE);
+        }
+
         PickAdapter adapter = new PickAdapter(btnSend::setEnabled);
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         recycler.setAdapter(adapter);
 
-        if (btnExternal != null) {
+        if (btnExternal != null && !agencyMode) {
             btnExternal.setOnClickListener(v -> {
                 if (roomId == null || roomId.isEmpty()) return;
                 String link = com.Dramizo.Series.util.InviteReferralHelper.roomOpenUrl(roomId);
@@ -128,9 +163,22 @@ public class ShareRoomBottomSheet extends BottomSheetDialogFragment {
 
         btnSend.setOnClickListener(v -> {
             List<PickTarget> selected = adapter.selected();
-            if (selected.isEmpty() || roomId == null) return;
+            if (selected.isEmpty()) return;
+            if (agencyMode) {
+                if (agencyId == null || agencyId.isEmpty()) return;
+                String codeCheck = agencyCode != null ? agencyCode.trim() : "";
+                if (codeCheck.length() < 4) {
+                    Toast.makeText(requireContext(),
+                            R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+                    return;
+                }
+            } else if (roomId == null || roomId.isEmpty()) {
+                return;
+            }
             btnSend.setEnabled(false);
-            String payload = RoomShareCodec.encode(roomId, title, coverUrl);
+            String payload = agencyMode
+                    ? AgencyInviteCodec.encode(agencyId, title, coverUrl, agencyCode)
+                    : RoomShareCodec.encode(roomId, title, coverUrl);
             progress.setVisibility(View.VISIBLE);
             c.getIoExecutor().execute(() -> {
                 int ok = 0;

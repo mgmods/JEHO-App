@@ -72,7 +72,7 @@ public class LoginActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityLoginBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        EdgeToEdgeHelper.applyImmersiveDark(this);
+        EdgeToEdgeHelper.apply(this);
         EdgeToEdgeHelper.padStatusOnly(binding.contentRoot);
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))

@@ -481,6 +481,137 @@ export class PaymentsService {
     };
   }
 
+  /**
+   * Card checkout for recharge-agent membership (dynamic USD total).
+   * Does not credit wallet coins — agent float is granted only after admin approval.
+   */
+  async createAgentMembershipCardCheckout(
+    userId: string,
+    opts: {
+      amountUsd: number;
+      requestedCoins: number;
+      membershipFeeUsdt: number;
+      stockCostUsdt: number;
+    },
+  ) {
+    await this.ensureFourthwallProviderEnum();
+    const client = await this.fourthwallClient();
+    if (!client.configured) {
+      throw new ServiceUnavailableException(
+        'الدفع بالبطاقة غير مُعدّ — فعّل Fourthwall من لوحة التحكم',
+      );
+    }
+    const amountUsd = Math.round(Number(opts.amountUsd) * 100) / 100;
+    if (!(amountUsd > 0)) {
+      throw new BadRequestException('Invalid agent membership amount');
+    }
+    const requestedCoins = Math.max(0, Math.floor(Number(opts.requestedCoins) || 0));
+    const cents = Math.round(amountUsd * 100);
+    const sku = `agent_apply_${requestedCoins}_${cents}`;
+    const currency = 'USD';
+
+    let product;
+    try {
+      product = await client.ensureCoinPackageProduct({
+        sku,
+        coins: 0,
+        bonusCoins: 0,
+        priceUsd: amountUsd,
+      });
+      await this.rememberFourthwallVariant(sku, product.variantId);
+    } catch (e) {
+      throw new BadRequestException(
+        `تعذر تجهيز منتج البطاقة للعضوية: ${(e as Error).message || e}`,
+      );
+    }
+    const want = amountUsd;
+    const got = Number(product.priceUsd);
+    if (want > 0 && got > 0 && Math.abs(want - got) > 0.05) {
+      throw new BadRequestException(
+        `سعر عضوية الوكيل على البطاقة غير متزامن ($${got} بدل $${want}). أعد المحاولة.`,
+      );
+    }
+    const variantId = product.variantId;
+
+    await this.ordersRepo
+      .createQueryBuilder()
+      .update(RechargeOrder)
+      .set({ status: RechargeStatus.CANCELLED })
+      .where('userId = :userId', { userId })
+      .andWhere('provider = :provider', { provider: PaymentProvider.FOURTHWALL })
+      .andWhere('status = :status', { status: RechargeStatus.PENDING })
+      .execute();
+
+    const order = await this.ordersRepo.save(
+      this.ordersRepo.create({
+        userId,
+        sku,
+        coins: 0,
+        bonusCoins: 0,
+        amountFiat: amountUsd,
+        currency,
+        provider: PaymentProvider.FOURTHWALL,
+        status: RechargeStatus.PENDING,
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      }),
+    );
+    const claimCode = this.claimCodeForOrder(order.id);
+
+    let cart: { id: string };
+    try {
+      cart = await client.createCartWithVariant(variantId, currency);
+    } catch (e) {
+      order.status = RechargeStatus.FAILED;
+      order.providerPayload = {
+        error: (e as Error).message || String(e),
+        purpose: 'recharge_agent',
+      };
+      await this.ordersRepo.save(order);
+      throw new BadRequestException(
+        `تعذر إنشاء سلة البطاقة: ${(e as Error).message || e}`,
+      );
+    }
+
+    let userEmail = '';
+    try {
+      const u = await this.usersRepo.findOne({ where: { id: userId } as any });
+      userEmail = String(u?.email || '').trim().toLowerCase();
+    } catch {
+      userEmail = '';
+    }
+
+    const checkoutUrl = client.cartHasItems(cart as any)
+      ? client.checkoutUrl(cart.id, currency)
+      : client.checkoutUrlForVariant(variantId, currency);
+    order.providerOrderId = cart.id;
+    order.providerPayload = {
+      cartId: cart.id,
+      variantId,
+      productId: product.productId,
+      claimCode,
+      checkoutUrl,
+      userEmail,
+      purpose: 'recharge_agent',
+      requestedCoins,
+      membershipFeeUsdt: Number(opts.membershipFeeUsdt) || 0,
+      stockCostUsdt: Number(opts.stockCostUsdt) || 0,
+      totalUsd: amountUsd,
+    };
+    await this.ordersRepo.save(order);
+
+    return {
+      order,
+      checkoutUrl,
+      cartId: cart.id,
+      claimCode,
+      amountUsd,
+      requestedCoins,
+      purpose: 'recharge_agent' as const,
+      instruction:
+        'ادفع بالبطاقة ثم أكمل طلب عضوية الوكيل. الرصيد الافتتاحي يُفعَّل بعد موافقة الإدارة.',
+    };
+  }
+
   async getFourthwallAdminSettings() {
     const cfg = await this.loadFourthwallConfig();
     const mapRow = await this.settingsRepo.findOne({

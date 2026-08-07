@@ -1,42 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo nim_recent_contact_list_item style -->
+<!-- Systematic chat row: avatar · name · preview · time · unread -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/white"
-    android:clipChildren="false"
-    android:clipToPadding="false"
+    android:background="@color/bg_light"
     android:foreground="?attr/selectableItemBackground"
-    android:minHeight="71dp">
+    android:minHeight="72dp">
 
     <LinearLayout
         android:id="@+id/chatRowBody"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:clipChildren="false"
-        android:clipToPadding="false"
         android:gravity="center_vertical"
         android:layoutDirection="locale"
-        android:minHeight="71dp"
+        android:minHeight="72dp"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="10dp">
 
+        <!-- Avatar stack -->
         <FrameLayout
-            android:layout_width="55dp"
-            android:layout_height="55dp"
-            android:clipChildren="false"
-            android:clipToPadding="false">
+            android:layout_width="56dp"
+            android:layout_height="56dp">
 
             <ImageView
                 android:id="@+id/imgAvatar"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
                 android:layout_gravity="center"
-                android:background="@drawable/bg_seat_avatar_clip"
                 android:contentDescription="@string/chat"
                 android:scaleType="centerCrop"
                 android:src="@drawable/ic_default_avatar" />
@@ -52,29 +46,31 @@
 
             <ImageView
                 android:id="@+id/imgHostBadge"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
                 android:visibility="gone" />
 
             <View
                 android:id="@+id/onlineDot"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
+                android:layout_width="12dp"
+                android:layout_height="12dp"
                 android:layout_gravity="bottom|end"
+                android:layout_marginEnd="1dp"
+                android:layout_marginBottom="1dp"
                 android:background="@drawable/bg_online_dot"
-                android:visibility="gone" />
+                android:visibility="gone"
+                tools:visibility="visible" />
         </FrameLayout>
 
+        <!-- Text column -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- Name row + time -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -89,19 +85,20 @@
                     android:ellipsize="end"
                     android:includeFontPadding="false"
                     android:maxLines="1"
-                    android:textColor="#FF333333"
+                    android:textColor="@color/text_primary"
                     android:textDirection="locale"
-                    android:textSize="14sp"
+                    android:textSize="16sp"
                     android:textStyle="bold"
-                    tools:text="Mikoo Activity" />
+                    tools:text="سارة أحمد" />
 
                 <ImageView
                     android:id="@+id/imgOfficial"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
                     android:layout_marginStart="4dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/sys_ic"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_gender_verified"
                     android:visibility="gone" />
 
                 <TextView
@@ -109,12 +106,52 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
-                    android:textColor="#FF8C8C8C"
-                    android:textSize="10sp"
-                    tools:text="PM 08:00" />
+                    android:includeFontPadding="false"
+                    android:textColor="@color/text_hint"
+                    android:textSize="12sp"
+                    tools:text="10:42" />
             </LinearLayout>
 
-            <!-- reserved / legacy chips (hidden by default) -->
+            <!-- Preview + unread -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tvLast"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textDirection="locale"
+                    android:textSize="14sp"
+                    tools:text="مرحبا، كيف حالك؟" />
+
+                <TextView
+                    android:id="@+id/tvUnread"
+                    android:layout_width="wrap_content"
+                    android:layout_height="18dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_chat_unread_pill"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="18dp"
+                    android:paddingHorizontal="6dp"
+                    android:textColor="@color/white"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="3"
+                    tools:visibility="visible" />
+            </LinearLayout>
+
+            <!-- Legacy stubs for binding — always gone -->
             <TextView
                 android:id="@+id/tvStaffChip"
                 android:layout_width="0dp"
@@ -130,52 +167,28 @@
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone">
-                <TextView android:id="@+id/tvVipChip" android:layout_width="0dp" android:layout_height="0dp" />
-                <TextView android:id="@+id/tvLevelChip" android:layout_width="0dp" android:layout_height="0dp" />
-                <TextView android:id="@+id/tvWealthChip" android:layout_width="0dp" android:layout_height="0dp" />
-                <TextView android:id="@+id/tvCharmChip" android:layout_width="0dp" android:layout_height="0dp" />
+                <TextView
+                    android:id="@+id/tvVipChip"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <TextView
+                    android:id="@+id/tvLevelChip"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <TextView
+                    android:id="@+id/tvWealthChip"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+                <TextView
+                    android:id="@+id/tvCharmChip"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
             </LinearLayout>
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/tvLast"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#FFBEBEBE"
-                    android:textDirection="locale"
-                    android:textSize="14sp"
-                    tools:text="Last message preview" />
-
-                <TextView
-                    android:id="@+id/tvUnread"
-                    android:layout_width="wrap_content"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="8dp"
-                    android:background="@drawable/bg_msg_number"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:minWidth="16dp"
-                    android:paddingHorizontal="4dp"
-                    android:textColor="@color/white"
-                    android:textSize="12sp"
-                    android:visibility="gone"
-                    tools:text="17"
-                    tools:visibility="visible" />
-            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -183,6 +196,6 @@
         android:layout_width="match_parent"
         android:layout_height="0.5dp"
         android:layout_gravity="bottom"
-        android:layout_marginStart="70dp"
-        android:background="#14000000" />
+        android:layout_marginStart="84dp"
+        android:background="@color/divider_color" />
 </FrameLayout>

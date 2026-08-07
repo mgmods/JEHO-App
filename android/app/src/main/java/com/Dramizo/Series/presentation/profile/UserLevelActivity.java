@@ -1,5 +1,4 @@
 package com.Dramizo.Series.presentation.profile;
-import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -13,6 +12,8 @@ import com.Dramizo.Series.databinding.ActivityUserLevelBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
+import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.bumptech.glide.Glide;
@@ -20,12 +21,20 @@ import com.google.android.material.tabs.TabLayout;
 
 import java.util.Locale;
 
+/** Growth / Wealth / Charm progressive identity — professional hub. */
 public class UserLevelActivity extends ThemedActivity {
+    @Override
+    protected boolean wantsRemoteThemeChrome() {
+        return true;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         ActivityUserLevelBinding binding = ActivityUserLevelBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        EdgeToEdgeHelper.apply(this);
+        EdgeToEdgeHelper.padSystemBars(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());
         if (binding.btnTasks != null) {
             com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnTasks, this);
@@ -66,9 +75,15 @@ public class UserLevelActivity extends ThemedActivity {
                     bindEconomy(binding, me.data);
                 }
                 if (!r.success || r.data == null) {
-                    Toast.makeText(this,
-                            r.error != null ? r.error : getString(R.string.error_generic),
-                            Toast.LENGTH_SHORT).show();
+                    if (r.error != null) {
+                        Toast.makeText(this, r.error, Toast.LENGTH_SHORT).show();
+                    }
+                    // Keep economy bound even if XP call fails.
+                    if (binding.tvLevel != null && cached != null) {
+                        int lv = Math.max(1, cached.level);
+                        binding.tvLevel.setText(getString(R.string.level_number, lv));
+                        binding.tvLevelTitle.setText(rankTitleFor(lv));
+                    }
                     return;
                 }
                 MiscDtos.LevelInfoDto info = r.data;
@@ -101,37 +116,52 @@ public class UserLevelActivity extends ThemedActivity {
     }
 
     private void bindEconomy(ActivityUserLevelBinding binding, AuthDtos.UserDto user) {
-        int wealthLv = Math.max(1, user.wealthLevel > 0 ? user.wealthLevel : (int) Math.max(1, user.wealthScore));
-        int charmLv = Math.max(1, user.popularityLevel > 0
-                ? user.popularityLevel
-                : (int) Math.max(1, user.charmScore));
+        // Prefer server economy levels; never treat raw score as level.
+        int wealthLv = Math.max(1, user.wealthLevel);
+        if (wealthLv <= 1 && user.wealthScore > 0) {
+            wealthLv = Math.max(1, levelFromScore(user.wealthScore));
+        }
+        int charmLv = Math.max(1, user.popularityLevel);
+        if (charmLv <= 1 && user.charmScore > 0) {
+            charmLv = Math.max(1, levelFromScore(user.charmScore));
+        }
         long sent = Math.max(0, user.totalSentCoins);
         long received = Math.max(0, user.totalReceivedDiamonds);
+        // Prefer gift totals if score fields lag.
+        long wealthScore = Math.max(sent, Math.max(0, user.wealthScore));
+        long charmScore = Math.max(received, Math.max(0, user.charmScore));
+        if (wealthScore > 0) wealthLv = Math.max(wealthLv, levelFromScore(wealthScore));
+        if (charmScore > 0) charmLv = Math.max(charmLv, levelFromScore(charmScore));
 
         binding.tvWealthLevel.setText(getString(R.string.level_number, wealthLv));
         binding.tvCharmLevel.setText(getString(R.string.level_number, charmLv));
 
         long wealthNext = scoreForLevel(wealthLv + 1);
         long charmNext = scoreForLevel(charmLv + 1);
-        long wealthNeed = Math.max(0, wealthNext - sent);
-        long charmNeed = Math.max(0, charmNext - received);
+        long wealthNeed = Math.max(0, wealthNext - wealthScore);
+        long charmNeed = Math.max(0, charmNext - charmScore);
 
-        binding.tvWealthScore.setText(String.format(Locale.US,
-                "مرسل: %,d · %s",
-                sent,
+        binding.tvWealthScore.setText(getString(R.string.level_wealth_score_line,
+                wealthScore,
                 getString(R.string.level_next_need, formatNum(wealthNeed), wealthLv + 1)));
-        binding.tvCharmScore.setText(String.format(Locale.US,
-                "مستلم: %,d · %s",
-                received,
+        binding.tvCharmScore.setText(getString(R.string.level_charm_score_line,
+                charmScore,
                 getString(R.string.level_next_need, formatNum(charmNeed), charmLv + 1)));
 
-        binding.progressWealth.setProgress(progressToward(sent, wealthLv));
-        binding.progressCharm.setProgress(progressToward(received, charmLv));
+        binding.progressWealth.setProgress(progressToward(wealthScore, wealthLv));
+        binding.progressCharm.setProgress(progressToward(charmScore, charmLv));
         binding.tvWealthHint.setText(getString(R.string.wealth_coin_tip));
         binding.tvCharmHint.setText(getString(R.string.charm_coin_tip));
     }
 
-    /** Inverse of backend levelFromScore: level ≈ cbrt(score/10). */
+    /** Matches backend levelFromScore: level ≈ cbrt(score/10). */
+    private static int levelFromScore(long score) {
+        if (score <= 0) return 1;
+        double v = Math.cbrt(score / 10.0);
+        int lv = (int) Math.floor(v);
+        return Math.max(1, Math.min(600, lv));
+    }
+
     private static long scoreForLevel(int level) {
         long l = Math.max(1, level);
         return 10L * l * l * l;

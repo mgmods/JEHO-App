@@ -1,20 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo-style messages tab: title + my-room card + conversation list -->
+<!-- Chat inbox: clean white list — header · official · conversations -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFFFFFFF">
+    android:background="@color/bg_light">
 
+    <!-- Kept for Theme engine; no decorative banner clutter -->
     <ImageView
         android:id="@+id/imgThemeBg"
-        android:layout_width="match_parent"
-        android:layout_height="220dp"
-        android:layout_gravity="top"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:contentDescription="@null"
-        android:scaleType="centerCrop"
-        android:src="@drawable/bg_msg" />
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -22,182 +20,133 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Title row: رسالة + broom -->
+        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
+            android:layout_height="52dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="12dp"
+            android:paddingStart="16dp"
             android:paddingEnd="4dp">
 
             <TextView
                 android:id="@+id/tvMsgTitle"
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:gravity="center_vertical|start"
                 android:text="@string/chats_title"
-                android:textColor="#FF222222"
+                android:textColor="@color/text_primary"
                 android:textDirection="locale"
-                android:textSize="18sp"
+                android:textSize="22sp"
                 android:textStyle="bold" />
 
+            <FrameLayout
+                android:layout_width="48dp"
+                android:layout_height="48dp">
+
+                <ImageButton
+                    android:id="@+id/btnFriends"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/friends"
+                    android:padding="12dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_friends_header" />
+
+                <TextView
+                    android:id="@+id/tvRequestBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="16dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_unread_badge"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:minWidth="16dp"
+                    android:paddingHorizontal="4dp"
+                    android:textColor="@color/white"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    tools:text="3"
+                    tools:visibility="visible" />
+            </FrameLayout>
+
+            <!-- Legacy menu alias — same as friends -->
             <ImageButton
                 android:id="@+id/btnMsgMenu"
-                android:layout_width="48dp"
-                android:layout_height="40dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/chats_title"
-                android:padding="10dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/msg_del" />
-
-            <!-- Kept for badge compatibility; hidden when using Mikoo broom menu -->
-            <ImageButton
-                android:id="@+id/btnFriends"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
-            <FrameLayout
+            <ImageButton
+                android:id="@+id/btnRequests"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
-                android:visibility="gone">
-
-                <ImageButton
-                    android:id="@+id/btnRequests"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp" />
-
-                <TextView
-                    android:id="@+id/tvRequestBadge"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-            </FrameLayout>
+                android:visibility="gone" />
         </LinearLayout>
 
-        <!-- My room / create room card (Mikoo cl_create) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:background="@color/divider_color" />
+
+        <!-- Official JEHO channel (same row language as chats) -->
+        <include
+            android:id="@+id/officialNewsCardMsg"
+            layout="@layout/include_official_news_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <!-- Legacy my-room binding stubs (hidden — room open lives on Home) -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/cardMyRoom"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="4dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground">
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone">
 
             <ImageView
                 android:id="@+id/imgMyRoomBg"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
-                android:layout_marginHorizontal="6dp"
-                android:layout_marginTop="4dp"
-                android:contentDescription="@null"
-                android:scaleType="fitXY"
-                android:src="@drawable/follow_create_bg"
-                app:layout_constraintBottom_toBottomOf="parent"
-                app:layout_constraintDimensionRatio="363:88"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
+                android:contentDescription="@null" />
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/imgMyRoomAvatar"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginStart="25dp"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_default_avatar"
-                app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
-                app:layout_constraintStart_toStartOf="@id/imgMyRoomBg"
-                app:layout_constraintTop_toTopOf="@id/imgMyRoomBg"
-                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:contentDescription="@null" />
 
             <ImageView
                 android:id="@+id/imgMyRoomPlus"
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginStart="25dp"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/create_ic"
-                android:visibility="gone"
-                app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
-                app:layout_constraintStart_toStartOf="@id/imgMyRoomBg"
-                app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:contentDescription="@null" />
 
             <TextView
                 android:id="@+id/tvMyRoomName"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_marginEnd="12dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="#FF222222"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                app:layout_constraintBottom_toTopOf="@id/tvMyRoomHint"
-                app:layout_constraintEnd_toStartOf="@id/rowOnline"
-                app:layout_constraintStart_toEndOf="@id/imgMyRoomAvatar"
-                app:layout_constraintTop_toTopOf="@id/imgMyRoomBg"
-                app:layout_constraintVertical_chainStyle="packed"
-                tools:text="علاء اسماعيل" />
+                android:layout_height="0dp" />
 
             <TextView
                 android:id="@+id/tvMyRoomHint"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="@string/msg_my_room_welcome"
-                android:textColor="#FF9F9F9F"
-                android:textSize="12sp"
-                app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
-                app:layout_constraintEnd_toEndOf="@id/tvMyRoomName"
-                app:layout_constraintStart_toStartOf="@id/tvMyRoomName"
-                app:layout_constraintTop_toBottomOf="@id/tvMyRoomName" />
+                android:layout_height="0dp" />
 
             <LinearLayout
                 android:id="@+id/rowOnline"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="22dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                app:layout_constraintBottom_toBottomOf="@id/imgMyRoomBg"
-                app:layout_constraintEnd_toEndOf="@id/imgMyRoomBg"
-                app:layout_constraintTop_toTopOf="@id/imgMyRoomBg">
-
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/on_ic" />
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:orientation="horizontal">
 
                 <TextView
                     android:id="@+id/tvMyRoomOnline"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="0"
-                    android:textColor="#FF222222"
-                    android:textSize="12sp" />
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
             </LinearLayout>
         </androidx.constraintlayout.widget.ConstraintLayout>
-
-        <!-- official news (kept) -->
-        <include
-            android:id="@+id/officialNewsCardMsg"
-            layout="@layout/include_official_news_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="2dp" />
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipe"
@@ -205,26 +154,34 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recycler"
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:clipChildren="false"
-                android:clipToPadding="false"
-                android:overScrollMode="never"
-                android:paddingBottom="88dp" />
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:paddingBottom="96dp"
+                    android:scrollbars="none"
+                    tools:listitem="@layout/item_chat_preview" />
+
+                <TextView
+                    android:id="@+id/tvEmpty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center"
+                    android:lineSpacingExtra="4dp"
+                    android:paddingHorizontal="40dp"
+                    android:text="@string/msg_empty_chats"
+                    android:textColor="@color/text_hint"
+                    android:textSize="14sp"
+                    android:visibility="gone"
+                    tools:visibility="visible" />
+            </FrameLayout>
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/tvEmpty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:gravity="center"
-        android:padding="32dp"
-        android:text="@string/msg_empty_chats"
-        android:textColor="#FF9F9F9F"
-        android:textSize="14sp"
-        android:visibility="gone" />
 </FrameLayout>

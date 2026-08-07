@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '@/api'
+import { ROUTE_MODULE } from '@/utils/dashboard-permissions'
 
 const TOKEN_KEY = 'auralive_admin_token'
 const USER_KEY = 'auralive_admin_user'
@@ -12,7 +13,15 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref(null)
 
   const isAuthenticated = computed(() => Boolean(token.value))
-  const displayName = computed(() => user.value?.name || user.value?.email || 'Admin')
+  const displayName = computed(
+    () => user.value?.name || user.value?.displayName || user.value?.email || 'Admin',
+  )
+  const isSuperAdmin = computed(
+    () =>
+      Boolean(user.value?.isSuperAdmin) ||
+      String(user.value?.staffRole || '').toLowerCase() === 'super',
+  )
+  const permissions = computed(() => user.value?.permissions || {})
 
   function setSession(nextToken, nextUser) {
     token.value = nextToken || ''
@@ -21,6 +30,22 @@ export const useAuthStore = defineStore('auth', () => {
     else localStorage.removeItem(TOKEN_KEY)
     if (nextUser) localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
     else localStorage.removeItem(USER_KEY)
+  }
+
+  /** Super = always; operator needs module read|write. */
+  function can(module, need = 'read') {
+    if (isSuperAdmin.value) return true
+    if (!module) return false
+    const level = String(permissions.value?.[module] || 'none').toLowerCase()
+    if (need === 'write') return level === 'write'
+    return level === 'read' || level === 'write'
+  }
+
+  function canRoute(routeName, need = 'read') {
+    if (isSuperAdmin.value) return true
+    const mod = ROUTE_MODULE[routeName]
+    if (!mod) return true
+    return can(mod, need)
   }
 
   async function login(credentials) {
@@ -66,6 +91,10 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     displayName,
+    isSuperAdmin,
+    permissions,
+    can,
+    canRoute,
     login,
     fetchMe,
     logout,

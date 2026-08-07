@@ -12,6 +12,7 @@ import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { TasksModule } from '../tasks/tasks.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PromotionsModule } from '../promotions/promotions.module';
+import { HostTargetModule } from '../host-target/host-target.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PromotionsModule } from '../promotions/promotions.module';
     TasksModule,
     NotificationsModule,
     PromotionsModule,
+    HostTargetModule,
   ],
   controllers: [WalletController],
   providers: [WalletService],

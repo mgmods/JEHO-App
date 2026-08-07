@@ -16,7 +16,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="52dp"
         android:background="@drawable/bg_user_card_sheet"
-        app:layout_constraintBottom_toBottomOf="@id/bottom_layout"
+        app:layout_constraintBottom_toBottomOf="@id/moreActionsBlock"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/imgVipHead" />
@@ -93,12 +93,36 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxWidth="220dp"
+            android:maxWidth="180dp"
             android:maxLines="1"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold"
             tools:text="عمار" />
+
+        <ImageView
+            android:id="@+id/imgGender"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="6dp"
+            android:contentDescription="@null"
+            android:visibility="gone"
+            tools:src="@drawable/ic_gender_female"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/tvOnlineStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp"
+            android:textColor="#FF7CFFB2"
+            android:textSize="11sp"
+            android:visibility="gone"
+            tools:text="متصل"
+            tools:visibility="visible" />
     </LinearLayout>
 
     <!-- ID / flag / copy / level -->
@@ -159,6 +183,108 @@
             tools:text="30" />
     </LinearLayout>
 
+    <!-- Mikoo: three counters under ID (followers / fans / visitors) -->
+    <LinearLayout
+        android:id="@+id/rowSocialStats"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_user_card_stat_cell"
+        android:orientation="horizontal"
+        android:paddingVertical="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/id_layout">
+
+        <LinearLayout
+            android:id="@+id/cellStatFollowers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvStatFollowing"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/user_card_stat_following"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cellStatFans"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvStatFans"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/user_card_stat_fans"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/cellStatVisitors"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvStatVisitors"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/user_card_stat_visitors"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
     <!-- VIP medal + stats -->
     <LinearLayout
         android:id="@+id/ll_model"
@@ -171,12 +297,23 @@
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/id_layout">
+        app:layout_constraintTop_toBottomOf="@id/rowSocialStats">
+
+        <ImageView
+            android:id="@+id/imgEntryRide"
+            android:layout_width="36dp"
+            android:layout_height="25dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            tools:visibility="visible" />
 
         <ImageView
             android:id="@+id/imgVipMedal"
             android:layout_width="43dp"
             android:layout_height="25dp"
+            android:layout_marginStart="6dp"
             android:adjustViewBounds="true"
             android:contentDescription="@null"
             android:scaleType="fitCenter"
@@ -253,11 +390,11 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Agency / guild strip -->
-    <FrameLayout
+    <!-- Agency / guild strip (Mikoo clGuildInfo + icon_info_guild_bg_base_lvN) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/rowAgency"
         android:layout_width="0dp"
-        android:layout_height="58dp"
+        android:layout_height="wrap_content"
         android:layout_marginHorizontal="12dp"
         android:layout_marginTop="14dp"
         android:clickable="true"
@@ -270,70 +407,207 @@
 
         <ImageView
             android:id="@+id/imgAgencyBannerBg"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="14dp"
+            android:contentDescription="@null"
             android:scaleType="fitXY"
-            android:src="@drawable/icon_info_guild_bg_base_lv1" />
+            android:src="@drawable/icon_info_guild_bg_base_lv1"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintDimensionRatio="1035:219"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Logo + Lv under image (Mikoo guild strip). No heart/frame overlay. -->
+        <LinearLayout
+            android:id="@+id/agencyLogoWrap"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="@id/imgAgencyBannerBg"
+            app:layout_constraintStart_toStartOf="@id/imgAgencyBannerBg"
+            app:layout_constraintTop_toTopOf="@id/imgAgencyBannerBg">
+
+            <ImageView
+                android:id="@+id/imgAgencyLogo"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_voice_seat_circle"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:src="@drawable/icon_agency" />
+
+            <TextView
+                android:id="@+id/tvAgencyLevel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:background="@drawable/bg_top_lv_guild"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="36dp"
+                android:paddingHorizontal="5dp"
+                android:paddingVertical="1dp"
+                android:textColor="#FFFFCE00"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:visibility="visible"
+                tools:text="Lv.3" />
+        </LinearLayout>
 
         <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp">
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="12dp"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="@id/imgAgencyBannerBg"
+            app:layout_constraintEnd_toEndOf="@id/imgAgencyBannerBg"
+            app:layout_constraintStart_toEndOf="@id/agencyLogoWrap"
+            app:layout_constraintTop_toTopOf="@id/imgAgencyBannerBg">
 
-            <FrameLayout
-                android:layout_width="44dp"
-                android:layout_height="44dp">
-
-                <ImageView
-                    android:id="@+id/imgAgencyLogo"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_voice_seat_circle"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/icon_agency" />
-
-                <ImageView
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:contentDescription="@null"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ur_gh_tou" />
-            </FrameLayout>
-
-            <LinearLayout
-                android:layout_width="0dp"
+            <TextView
+                android:id="@+id/tvAgencyName"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:text="الوكالة" />
 
-                <TextView
-                    android:id="@+id/tvAgencyName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#FFFFFF"
-                    android:textSize="14sp"
-                    android:textStyle="bold"
-                    tools:text="الوكالة" />
-
-                <TextView
-                    android:id="@+id/tvAgencyGid"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#99FFFFFF"
-                    android:textSize="13sp"
-                    tools:text="GID:1895" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/tvAgencyGid"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#99FFFFFF"
+                android:textSize="12sp"
+                tools:text="GID:1895" />
         </LinearLayout>
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <androidx.constraintlayout.widget.Barrier
+        android:id="@+id/barrierAfterGuild"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:barrierDirection="bottom"
+        app:constraint_referenced_ids="ll_model,rowAgency" />
+
+    <TextView
+        android:id="@+id/tvPropertyTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="12dp"
+        android:text="@string/user_card_property_title"
+        android:textColor="#B3FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/barrierAfterGuild" />
+
+    <!-- Mikoo property strip: عائلة · داعمون · أصدقاء -->
+    <LinearLayout
+        android:id="@+id/rowProperty"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="14dp"
+        android:layout_marginTop="8dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvPropertyTitle">
+
+        <LinearLayout
+            android:id="@+id/propFamily"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_me_agency" />
+
+            <TextView
+                android:id="@+id/tvPropFamily"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/user_card_prop_family"
+                android:textColor="#E6FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/propSupporters"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_marginEnd="6dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPropSupportersCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/user_card_prop_supporters"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/propFriends"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_user_card_stat_cell"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvPropFriendsCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/user_card_prop_friends"
+                android:textColor="#99FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <HorizontalScrollView
         android:id="@+id/rowHostTasks"
@@ -345,7 +619,7 @@
         android:visibility="gone"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowAgency">
+        app:layout_constraintTop_toBottomOf="@id/rowProperty">
 
         <LinearLayout
             android:layout_width="wrap_content"

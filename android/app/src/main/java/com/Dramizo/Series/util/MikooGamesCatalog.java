@@ -26,8 +26,9 @@ public final class MikooGamesCatalog {
         g.mode = "mikoo_slot";
         g.sortOrder = sortOrder;
         g.enabled = Boolean.TRUE;
-        g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html?v=20260802g";
-        g.coverUrl = ApiOrigin.origin() + "/games/mikoo/covers/" + id + ".png?v=20260805bf";
+        g.playUrl = ApiOrigin.origin() + "/games/mikoo/" + id + "/index.html?v="
+                + MediaAssetSync.FALLBACK_EPOCH;
+        g.coverUrl = MediaAssetSync.mikooCoverUrl(id);
         return g;
     }
 
@@ -86,26 +87,29 @@ public final class MikooGamesCatalog {
         List<MiscDtos.GameDto> out = new ArrayList<>();
         out.add(slot("7updown", "٧ فوق تحت", "7 Up Down", 10));
         out.add(slot("bounty-football", "كرة القدم الجوائز", "Bounty Football", 14));
-        out.add(slot("cleopatra-slot", "كليوباترا", "Cleopatra Slot", 15));
-        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Spins", 16));
-        out.add(slot("crash", "كراش", "Crash", 17));
-        out.add(slot("fishing", "صيد السمك", "Fishing", 18));
-        out.add(slot("football-plinko", "بلينكو كرة القدم", "Football Plinko", 19));
-        out.add(slot("fortune-slot", "جواهر الحظ", "Fortune Gems", 20));
-        out.add(slot("greedy-box", "صندوق الطمع", "Greedy Box", 21));
-        out.add(slot("hilo", "هاي لو", "Hilo", 22));
-        out.add(slot("line-slots", "فتحات الخط", "Line Slots", 23));
-        out.add(slot("luck-car", "سيارة الحظ", "Lucky Car", 24));
-        out.add(slot("lucky77", "لاكي ٧٧", "Lucky 77", 25));
-        out.add(slot("megaways-slots", "ميجاوايز", "Megaways Slots", 26));
-        out.add(slot("olympians", "الأوليمبيون", "Olympians", 27));
-        out.add(slot("pirate-king", "ملك القراصنة", "Pirate King", 28));
-        out.add(slot("royal-battle", "المعركة الملكية", "Royal Battle", 29));
-        out.add(slot("slot777", "سلوت ٧٧٧", "Slot 777", 30));
-        out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 31));
-        out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 32));
+        out.add(slot("camel-racing", "سباق الأسود", "Camel Racing", 15));
+        out.add(slot("cleopatra-slot", "كليوباترا", "Cleopatra Slot", 16));
+        out.add(slot("cleopatra-slots", "فتحات كليوباترا", "Cleopatra Spins", 17));
+        out.add(slot("crash", "كراش", "Crash", 18));
+        out.add(slot("fishing", "صيد السمك", "Fishing", 19));
+        out.add(slot("football-plinko", "بلينكو كرة القدم", "Football Plinko", 20));
+        out.add(slot("fortune-slot", "جواهر الحظ", "Fortune Gems", 21));
+        out.add(slot("greedy-box", "صندوق الطمع", "Greedy Box", 22));
+        out.add(slot("greedy-lion", "الأسد الطماع", "Greedy Lion", 23));
+        out.add(slot("hilo", "هاي لو", "Hilo", 24));
+        out.add(slot("line-slots", "فتحات الخط", "Line Slots", 25));
+        out.add(slot("luck-car", "سيارة الحظ", "Lucky Car", 26));
+        out.add(slot("lucky77", "لاكي ٧٧", "Lucky 77", 27));
+        out.add(slot("megaways-slots", "ميجاوايز", "Megaways Slots", 28));
+        out.add(slot("olympians", "الأوليمبيون", "Olympians", 29));
+        out.add(slot("pirate-king", "ملك القراصنة", "Pirate King", 30));
+        out.add(slot("royal-battle", "المعركة الملكية", "Royal Battle", 31));
+        out.add(slot("slot777", "سلوت ٧٧٧", "Slot 777", 32));
+        out.add(slot("sugar-rush", "سكر راش", "Sugar Rush", 33));
+        out.add(slot("swimsuit-party", "حفلة السباحة", "Swimsuit Party", 34));
         return out;
     }
+
 
     /**
      * Cocos design size from each packaged game (Canvas / scene assets).
@@ -133,6 +137,7 @@ public final class MikooGamesCatalog {
         // Every default catalog game — sizes from package scene Canvas / splash assets.
         putVp("7updown", 750, 750);
         putVp("bounty-football", 750, 1334);
+        putVp("camel-racing", 750, 1334);
         putVp("cleopatra-slot", 750, 1334);
         putVp("cleopatra-slots", 750, 1334);
         putVp("crash", 750, 1334);
@@ -140,6 +145,7 @@ public final class MikooGamesCatalog {
         putVp("football-plinko", 750, 1334);
         putVp("fortune-slot", 750, 1200);
         putVp("greedy-box", 750, 1334);
+        putVp("greedy-lion", 750, 1334);
         putVp("hilo", 750, 1334);
         putVp("line-slots", 750, 944);
         putVp("luck-car", 750, 1334);
@@ -275,8 +281,18 @@ public final class MikooGamesCatalog {
             MiscDtos.GameDto def = defaults.get(id);
             if (override != null) {
                 if (def != null) {
-                    // Always serve package cover + AR/EN from local defaults when API is English-only.
-                    override.coverUrl = def.coverUrl;
+                    // Prefer live server cover; only package defaults when missing.
+                    // Optimized CDNs ship .jpg thumbs — never treat JPG as “stale”.
+                    String apiCover = override.coverUrl != null ? override.coverUrl.trim() : "";
+                    if (apiCover.isEmpty()) {
+                        override.coverUrl = def.coverUrl;
+                    } else if (MediaAssetSync.isPackageDefaultCover(apiCover, id)) {
+                        // Package art — rewrite with live epoch + jpg.
+                        override.coverUrl = MediaAssetSync.mikooCoverUrl(id);
+                    } else {
+                        // Dashboard custom cover (/uploads/…, CDN, etc.)
+                        override.coverUrl = MediaAssetSync.bust(apiCover);
+                    }
                     if (override.playUrl == null || override.playUrl.isEmpty()) {
                         override.playUrl = def.playUrl;
                     }
@@ -287,6 +303,8 @@ public final class MikooGamesCatalog {
                             || !hasArabic(override.title)) {
                         override.title = def.title;
                     }
+                } else if (override.coverUrl != null) {
+                    override.coverUrl = MediaAssetSync.bust(override.coverUrl);
                 }
                 out.add(override);
             } else if (def != null) {

@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="splash_system_bg">#070B14</color>
+    <color name="splash_system_bg">#FFFFFF</color>
 
     <style name="Theme.AuraLive.Splash" parent="Theme.AuraLive">
-        <item name="android:windowBackground">@color/aurora_night</item>
+        <item name="android:windowBackground">@color/bg_light</item>
         <item name="android:windowSplashScreenBackground">@color/splash_system_bg</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/jeho_logo</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/aurora_night</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/bg_light</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@color/aurora_night</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">@color/bg_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 </resources>

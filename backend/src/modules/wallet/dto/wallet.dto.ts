@@ -53,11 +53,12 @@ export class WithdrawDto {
 
   @ApiProperty({
     example: 'paypal',
-    enum: ['paypal', 'bank', 'usdt', 'agent'],
-    description: 'paypal/bank/usdt = self withdraw; agent = via recharge agent',
+    enum: ['paypal', 'bank', 'usdt', 'agent', 'sham_cash'],
+    description:
+      'paypal/bank/usdt/sham_cash = self withdraw; agent = via recharge agent',
   })
   @IsString()
-  @IsIn(['paypal', 'bank', 'usdt', 'agent'])
+  @IsIn(['paypal', 'bank', 'usdt', 'agent', 'sham_cash'])
   @MaxLength(32)
   method: string;
 

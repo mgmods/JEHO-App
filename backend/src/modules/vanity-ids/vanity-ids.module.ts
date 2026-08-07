@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { VanityIdsController } from './vanity-ids.controller';
+import { VanityIdsService } from './vanity-ids.service';
 import { VanityId } from '../../database/entities/vanity-id.entity';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
@@ -13,5 +14,6 @@ import { AuthModule } from '../auth/auth.module';
     TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction]),
   ],
   controllers: [VanityIdsController],
+  providers: [VanityIdsService],
 })
 export class VanityIdsModule {}

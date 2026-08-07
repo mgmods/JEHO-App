@@ -3,6 +3,7 @@
 import {
   BOUNTY_AREA_RATIOS,
   BOUNTY_BET_CHIPS,
+  CAMEL_RACING_RATIOS,
   GREEDY_BOX_RATIOS,
   LUCK_CAR_RATIOS_MILLI,
   LUCKY77_AREA_RATIOS,
@@ -14,6 +15,8 @@ import {
   lucky77ChipsList,
   randomWinMult,
 } from './mikoo-game-economy';
+
+export { CAMEL_RACING_RATIOS };
 
 function writeVarint(n: number): Buffer {
   const out: number[] = [];
@@ -321,8 +324,8 @@ export function encodeGetUserDataFor(
     ]);
   }
 
-  // sugar-rush / lucky77: money@6, erbanNo@7, tipType@8
-  if (slug === 'sugar-rush' || slug === 'lucky77') {
+  // sugar-rush / lucky77 / camel-racing: money@6, erbanNo@7, tipType@8
+  if (slug === 'sugar-rush' || slug === 'lucky77' || slug === 'camel-racing') {
     return encodeMessage([
       pbInt32(1, data.code),
       pbString(2, data.desc),
@@ -2043,3 +2046,232 @@ export function encodeLucky77ResultBroadcast(data: {
   parts.push(pbInt32(9, Math.max(0, Math.floor(data.todayWin ?? data.totalGain))));
   return encodeMessage(parts);
 }
+
+// ── Camel Racing (PORT=camelracing) — 8-lane multi-bet race ─────────────────
+
+function encodeCamelBetStruct(icon: number, money: number): Buffer {
+  return encodeMessage([
+    pbInt32(1, Math.max(0, Math.floor(icon))),
+    pbDouble(2, Math.max(0, Number(money) || 0)),
+  ]);
+}
+
+function encodeCamelRankStruct(name: string, head: string, winMoney: number): Buffer {
+  return encodeMessage([
+    pbString(1, name || 'Player'),
+    pbString(2, head || ''),
+    pbDouble(3, Math.max(0, Number(winMoney) || 0)),
+  ]);
+}
+
+function encodeCamelRecordStruct(data: {
+  cost: number;
+  reward: number;
+  time: number;
+  betTotal?: Array<{ icon: number; money: number }>;
+  result?: Array<{ icon: number; money: number }>;
+  curTurn?: number;
+  currGroupId?: number;
+  retIcon?: number;
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, Math.max(0, Math.floor(data.cost))),
+    pbInt32(2, Math.max(0, Math.floor(data.reward))),
+    pbInt32(3, Math.max(0, Math.floor(data.time))),
+  ];
+  for (const b of data.betTotal ?? []) {
+    const row = encodeCamelBetStruct(b.icon, b.money);
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(row.length), row]));
+  }
+  for (const b of data.result ?? []) {
+    const row = encodeCamelBetStruct(b.icon, b.money);
+    parts.push(Buffer.concat([tag(5, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(6, data.curTurn ?? 1));
+  parts.push(pbInt32(7, data.currGroupId ?? 0));
+  parts.push(pbInt32(8, data.retIcon ?? 0));
+  return encodeMessage(parts);
+}
+
+/** Camel TableInfoRes — GameState: waitting=0, betting=1. */
+export function encodeCamelTableInfoRes(data: {
+  state: number;
+  timeLeft: number;
+  totalPlayerNum: number;
+  playerStatus?: number;
+  camelSpeed?: number;
+  curTurn?: number;
+  currGroupId?: number;
+  curBingoIcon?: number;
+  totalBet?: number;
+  totalGain?: number;
+  history?: number[];
+  myBets?: Array<{ icon: number; money: number }>;
+  ratios?: number[];
+  chips?: number[];
+}): Buffer {
+  const ratios = data.ratios?.length ? data.ratios : [...CAMEL_RACING_RATIOS];
+  const chips = data.chips?.length ? data.chips : chipsList();
+  const state = data.state === 1 ? 1 : 0;
+  const parts: Buffer[] = [
+    pbInt32(1, state),
+    pbUInt32(2, Math.max(0, data.timeLeft | 0)),
+  ];
+  for (const b of data.myBets ?? []) {
+    if (b.money <= 0) continue;
+    const row = encodeCamelBetStruct(b.icon, b.money);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  for (const c of chips) parts.push(pbInt32(4, Math.max(0, Math.floor(c))));
+  if (data.totalBet != null) parts.push(pbInt32(5, Math.max(0, Math.floor(data.totalBet))));
+  if (data.totalGain != null) parts.push(pbInt32(6, Math.max(0, Math.floor(data.totalGain))));
+  if (data.curBingoIcon != null && data.curBingoIcon > 0) {
+    parts.push(pbInt32(8, data.curBingoIcon | 0));
+  }
+  parts.push(pbInt32(9, data.currGroupId ?? 0));
+  parts.push(pbInt32(10, data.curTurn ?? 1));
+  for (const r of ratios) parts.push(pbUInt32(11, Math.max(1, Math.floor(r))));
+  parts.push(pbUInt32(12, Math.max(0, data.totalPlayerNum | 0)));
+  for (const h of data.history ?? []) parts.push(pbUInt32(13, Math.max(0, h | 0)));
+  parts.push(pbInt32(14, data.playerStatus ?? 0));
+  parts.push(pbInt32(19, data.camelSpeed ?? 80));
+  return encodeMessage(parts);
+}
+
+/** StartBetBroadcast: state@1 betTime@2 — state must be betting=1. */
+export function encodeCamelStartBetBroadcast(state: number, betTime: number): Buffer {
+  return encodeMessage([
+    pbInt32(1, state === 1 ? 1 : 0),
+    pbInt32(2, Math.max(1, betTime | 0)),
+  ]);
+}
+
+export function encodeCamelBetRsp(data: {
+  code: number;
+  desc: string;
+  userMoney: number;
+  tipType?: number;
+  betTotal?: Array<{ icon: number; money: number }>;
+  curBet?: { icon: number; money: number };
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, data.code | 0),
+    pbString(2, data.desc || ''),
+    pbDouble(3, Math.max(0, Number(data.userMoney) || 0)),
+  ];
+  for (const b of data.betTotal ?? []) {
+    const row = encodeCamelBetStruct(b.icon, b.money);
+    parts.push(Buffer.concat([tag(4, 2), writeVarint(row.length), row]));
+  }
+  if (data.curBet) {
+    const row = encodeCamelBetStruct(data.curBet.icon, data.curBet.money);
+    parts.push(Buffer.concat([tag(5, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(6, data.tipType ?? 0));
+  return encodeMessage(parts);
+}
+
+export function encodeCamelPlayerBetBroadcast(data: {
+  arena: number[];
+  money: number[];
+  myArena?: number[];
+  myMoney?: number[];
+}): Buffer {
+  const parts: Buffer[] = [];
+  for (const a of data.arena) parts.push(pbUInt32(1, Math.max(0, a | 0)));
+  for (const m of data.money) parts.push(pbDouble(2, Math.max(0, Number(m) || 0)));
+  for (const a of data.myArena ?? []) parts.push(pbUInt32(3, Math.max(0, a | 0)));
+  for (const m of data.myMoney ?? []) parts.push(pbDouble(4, Math.max(0, Number(m) || 0)));
+  return encodeMessage(parts);
+}
+
+export function encodeCamelPlayerNumsBroadcast(
+  uid: number,
+  totalMoney: number,
+  totalPlayerNum: number,
+): Buffer {
+  return encodeMessage([
+    pbUInt32(1, Math.max(0, uid | 0)),
+    pbDouble(2, Math.max(0, Number(totalMoney) || 0)),
+    pbUInt32(3, Math.max(0, totalPlayerNum | 0)),
+  ]);
+}
+
+/** ResultBroadcast — race settle + animation seed. */
+export function encodeCamelResultBroadcast(data: {
+  state?: number;
+  betTime?: number;
+  totalBet: number;
+  totalGain: number;
+  curBingoIcon: number;
+  currGroupId?: number;
+  curTurn: number;
+  userMoney: number;
+  todayWin?: number;
+  playerStatus?: number;
+  betRank?: Array<{ name: string; head: string; winMoney: number }>;
+  animalRandom?: number[];
+  posRandom?: number[];
+}): Buffer {
+  const parts: Buffer[] = [
+    pbInt32(1, data.state ?? 0),
+    pbInt32(2, data.betTime ?? 8),
+    pbInt32(3, Math.max(0, Math.floor(data.totalBet))),
+    pbInt32(4, Math.max(0, Math.floor(data.totalGain))),
+  ];
+  for (const r of data.betRank ?? []) {
+    const row = encodeCamelRankStruct(r.name, r.head, r.winMoney);
+    parts.push(Buffer.concat([tag(5, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(6, Math.max(1, Math.min(8, data.curBingoIcon | 0))));
+  parts.push(pbInt32(7, data.currGroupId ?? 0));
+  parts.push(pbInt32(8, data.curTurn | 0));
+  parts.push(pbDouble(9, Math.max(0, Number(data.userMoney) || 0)));
+  parts.push(pbInt32(10, Math.max(0, Math.floor(data.todayWin ?? data.totalGain))));
+  parts.push(pbInt32(11, data.playerStatus ?? 0));
+  for (const p of data.posRandom ?? []) parts.push(pbUInt32(12, Math.max(0, p | 0)));
+  for (const a of data.animalRandom ?? []) parts.push(pbUInt32(13, Math.max(0, a | 0)));
+  return encodeMessage(parts);
+}
+
+export function encodeCamelGetRankDataRes(
+  ranks: Array<{ name: string; head: string; winMoney: number }>,
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const r of ranks) {
+    const row = encodeCamelRankStruct(r.name, r.head, r.winMoney);
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  parts.push(pbInt32(4, 0)); // tipType required
+  return encodeMessage(parts);
+}
+
+export function encodeCamelGetUserRecordRes(
+  records: Array<{
+    cost: number;
+    reward: number;
+    time?: number;
+    betTotal?: Array<{ icon: number; money: number }>;
+    retIcon?: number;
+    curTurn?: number;
+  }> = [],
+): Buffer {
+  const parts: Buffer[] = [pbInt32(1, 0), pbString(2, 'OK')];
+  for (const rec of records) {
+    const row = encodeCamelRecordStruct({
+      cost: rec.cost,
+      reward: rec.reward,
+      time: rec.time ?? Math.floor(Date.now() / 1000),
+      betTotal: rec.betTotal,
+      result: rec.retIcon
+        ? [{ icon: rec.retIcon, money: rec.reward }]
+        : [],
+      curTurn: rec.curTurn ?? 1,
+      currGroupId: 0,
+      retIcon: rec.retIcon ?? 0,
+    });
+    parts.push(Buffer.concat([tag(3, 2), writeVarint(row.length), row]));
+  }
+  return encodeMessage(parts);
+}
+

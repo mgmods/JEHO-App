@@ -97,6 +97,7 @@ import com.Dramizo.Series.util.GameProbeLog;
 import com.Dramizo.Series.util.GameUrls;
 import com.Dramizo.Series.util.MikooGameBridge;
 import com.Dramizo.Series.util.MikooGamesCatalog;
+import com.Dramizo.Series.util.MediaAssetSync;
 import com.Dramizo.Series.util.MikooHashBridge;
 import com.Dramizo.Series.util.DeviceMusicScanner;
 import com.Dramizo.Series.util.PermissionHelper;
@@ -1088,7 +1089,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean wasOnSeat = isOnSeat(currentSeats);
             currentSeats = seats;
             bindHeaderHostVisual(room, seats);
-            binding.tvRoomId.setText("ID:" + com.Dramizo.Series.util.RoomUiHelper.displayRoomId(room));
+            // Agency rooms show agency GID; personal rooms show host publicId.
+            String idLabel = RoomUiHelper.isAgencyRoom(room) ? "GID:" : "ID:";
+            binding.tvRoomId.setText(idLabel + com.Dramizo.Series.util.RoomUiHelper.displayRoomId(room));
             applyRoomGiftSounds(room.giftSoundsEnabled);
             applyRoomDisplaySettings(room);
             try {
@@ -2283,50 +2286,80 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         dialog.setOnDismissListener(d -> {
             if (roomSidePanelDialog == d) roomSidePanelDialog = null;
         });
+
+        final View scrim = sheet.findViewById(R.id.sidePanelScrim);
+        final View body = sheet.findViewById(R.id.sidePanelBody);
+
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        int panelWRaw = Math.round(dm.widthPixels * 0.78f);
+        final int panelW = Math.max(Math.round(260f * dm.density),
+                Math.min(panelWRaw, Math.round(360f * dm.density)));
+        if (body != null) {
+            // Force PHYSICAL right edge (Mikoo). layoutDirection rtl flips "end" → left.
+            body.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
+            FrameLayout.LayoutParams blp;
+            if (body.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+                blp = (FrameLayout.LayoutParams) body.getLayoutParams();
+            } else {
+                blp = new FrameLayout.LayoutParams(panelW, ViewGroup.LayoutParams.MATCH_PARENT);
+            }
+            blp.width = panelW;
+            blp.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            blp.gravity = Gravity.RIGHT | Gravity.TOP;
+            body.setLayoutParams(blp);
+
+            // Stay under status bar — don't eat the system clock/battery.
+            ViewCompat.setOnApplyWindowInsetsListener(body, (v, insets) -> {
+                Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+                int bot = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;
+                v.setPadding(v.getPaddingLeft(), bars.top, v.getPaddingRight(), bot);
+                return insets;
+            });
+            ViewCompat.requestApplyInsets(body);
+            body.setOnClickListener(v -> { /* consume */ });
+            // Slide in from off-screen RIGHT.
+            body.setTranslationX(panelW);
+            body.post(() -> body.animate()
+                    .translationX(0f)
+                    .setDuration(260)
+                    .setInterpolator(new DecelerateInterpolator())
+                    .start());
+        }
+
+        // Soft dismiss: slide back out to the right, then close.
+        final Runnable dismissRight = () -> {
+            if (body == null) {
+                dialog.dismiss();
+                return;
+            }
+            int w = body.getWidth() > 0 ? body.getWidth() : panelW;
+            body.animate()
+                    .translationX(w)
+                    .setDuration(200)
+                    .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                    .withEndAction(() -> {
+                        if (dialog.isShowing()) dialog.dismiss();
+                    })
+                    .start();
+        };
+        if (scrim != null) scrim.setOnClickListener(v -> dismissRight.run());
         // System / gesture back closes this sheet first (don't open another).
         dialog.setOnKeyListener((d, keyCode, event) -> {
             if (keyCode == android.view.KeyEvent.KEYCODE_BACK
                     && event.getAction() == android.view.KeyEvent.ACTION_UP) {
-                d.dismiss();
+                dismissRight.run();
                 return true;
             }
             return false;
         });
 
-        View scrim = sheet.findViewById(R.id.sidePanelScrim);
-        final View body = sheet.findViewById(R.id.sidePanelBody);
-        if (scrim != null) scrim.setOnClickListener(v -> dialog.dismiss());
-
-        DisplayMetrics dm = getResources().getDisplayMetrics();
-        int panelW = Math.round(dm.widthPixels * 0.78f);
-        panelW = Math.max(Math.round(260f * dm.density),
-                Math.min(panelW, Math.round(360f * dm.density)));
-        if (body != null) {
-            ViewGroup.LayoutParams lp = body.getLayoutParams();
-            if (lp != null) {
-                lp.width = panelW;
-                body.setLayoutParams(lp);
-            }
-            // Stay under status bar — don't eat the system clock/battery.
-            ViewCompat.setOnApplyWindowInsetsListener(body, (v, insets) -> {
-                Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-                v.setPadding(v.getPaddingLeft(), bars.top, v.getPaddingRight(), v.getPaddingBottom());
-                return insets;
-            });
-            ViewCompat.requestApplyInsets(body);
-            body.setOnClickListener(v -> { /* consume */ });
-            body.setTranslationX(panelW);
-            body.post(() -> body.animate()
-                    .translationX(0f)
-                    .setDuration(240)
-                    .setInterpolator(new DecelerateInterpolator())
-                    .start());
-        }
-
         View btnMore = sheet.findViewById(R.id.btnSideMore);
         View btnSettings = sheet.findViewById(R.id.btnSideSettings);
         View btnMin = sheet.findViewById(R.id.btnSideMinimize);
         View btnExit = sheet.findViewById(R.id.btnSideExit);
+        View rowHostActions = sheet.findViewById(R.id.rowSideHostActions);
+        View btnEndLive = sheet.findViewById(R.id.btnSideEndLive);
+        View btnSummon = sheet.findViewById(R.id.btnSideSummon);
         View tabDiscover = sheet.findViewById(R.id.tabDiscover);
         View tabHistory = sheet.findViewById(R.id.tabHistory);
         TextView tvDiscover = sheet.findViewById(R.id.tvTabDiscover);
@@ -2361,6 +2394,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             btnExit.setOnClickListener(v -> {
                 dialog.dismiss();
                 exitRoom(true);
+            });
+        }
+
+        // Host / owner: end live + summon (restored on side panel).
+        boolean hostActions = isHost || isOwner || canManageRoom;
+        if (rowHostActions != null) {
+            rowHostActions.setVisibility(hostActions ? View.VISIBLE : View.GONE);
+        }
+        if (btnEndLive != null) {
+            btnEndLive.setOnClickListener(v -> {
+                dialog.dismiss();
+                confirmEndBroadcast();
+            });
+        }
+        if (btnSummon != null) {
+            btnSummon.setOnClickListener(v -> {
+                dialog.dismiss();
+                summonRoomMembers();
             });
         }
 
@@ -2405,11 +2456,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             window.setLayout(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT);
-            window.setGravity(Gravity.END);
+            // Absolute gravity — never flip with RTL locale.
+            window.setGravity(Gravity.TOP | Gravity.RIGHT);
             try {
                 WindowManager.LayoutParams wlp = window.getAttributes();
                 wlp.width = WindowManager.LayoutParams.MATCH_PARENT;
                 wlp.height = WindowManager.LayoutParams.MATCH_PARENT;
+                wlp.gravity = Gravity.TOP | Gravity.RIGHT;
                 window.setAttributes(wlp);
             } catch (Exception ignored) {
             }
@@ -2485,7 +2538,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             h.tvTitle.setText(title);
             String sub = room.description != null && !room.description.trim().isEmpty()
                     ? room.description.trim()
-                    : "مرحباً بك في ميكو";
+                    : h.itemView.getContext().getString(R.string.room_default_welcome);
             if (h.tvSub != null) {
                 h.tvSub.setText(sub);
                 h.tvSub.setVisibility(View.VISIBLE);
@@ -2509,6 +2562,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String country = room.host != null ? room.host.country : null;
             if (h.imgFlag != null) {
                 com.Dramizo.Series.util.FlagImages.bind(h.imgFlag, country);
+                if (h.imgFlag.getDrawable() != null) {
+                    h.imgFlag.setVisibility(View.VISIBLE);
+                }
             }
             if (h.rowAvatars != null) {
                 h.rowAvatars.removeAllViews();
@@ -2568,6 +2624,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         clearRoomChatSession();
         viewModel.closeRoom(roomId);
         exitRoom(true);
+    }
+
+    /** Confirm before host ends broadcast and closes the room for everyone. */
+    private void confirmEndBroadcast() {
+        if (!(isHost || isOwner || canManageRoom)) {
+            Toast.makeText(this, "إنهاء البث لصاحب الغرفة فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.room_side_end_live)
+                .setMessage("هل تريد إنهاء البث وإغلاق الغرفة للجميع؟")
+                .setPositiveButton(R.string.room_side_end_live, (d, w) -> endBroadcastAndExit())
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     /** Room owner/host calls everyone currently in the room (incl. minimized) back. */
@@ -2695,6 +2765,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void startActivityKeepingRoom(Intent intent) {
         ensuringRoomKeepAlive(true);
         startActivity(intent);
+    }
+
+    /** Follow heart on user card: solid when following, faded when not. */
+    private static void applyFollowHeart(@Nullable ImageView heart, boolean following) {
+        if (heart == null) return;
+        if (following) {
+            heart.setImageResource(R.drawable.icon_attentioned);
+            heart.setAlpha(1f);
+        } else {
+            heart.setImageResource(R.drawable.icon_attention);
+            heart.setAlpha(0.42f);
+        }
     }
 
     private void openRoomSharePicker() {
@@ -6296,6 +6378,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Nullable TextView nameView,
             @Nullable TextView gidView,
             @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
+        bindUserCardAgency(rowAgency, logoView, nameView, gidView, null, null, agency);
+    }
+
+    private void bindUserCardAgency(
+            @Nullable View rowAgency,
+            @Nullable ImageView logoView,
+            @Nullable TextView nameView,
+            @Nullable TextView gidView,
+            @Nullable ImageView bannerBg,
+            @Nullable TextView levelView,
+            @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto.AgencySnip agency) {
         if (rowAgency == null) return;
         if (agency == null || agency.name == null || agency.name.trim().isEmpty()) {
             rowAgency.setVisibility(View.GONE);
@@ -6305,44 +6398,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (nameView != null) nameView.setText(agency.name.trim());
         if (gidView != null) {
             String gid = agency.publicId != null ? agency.publicId.trim() : "";
-            if (!gid.isEmpty()) {
-                gidView.setVisibility(View.VISIBLE);
-                gidView.setText("GID:" + gid);
-            } else {
-                gidView.setVisibility(View.GONE);
-            }
+            gidView.setVisibility(View.VISIBLE);
+            gidView.setText(gid.isEmpty() ? "GID: —" : ("GID:" + gid));
         }
+        int tier = agency.level > 0
+                ? agency.level
+                : com.Dramizo.Series.util.AgencyUi.bannerTierFromDiamonds(agency.totalDiamonds);
+        if (bannerBg == null && rowAgency != null) {
+            bannerBg = rowAgency.findViewById(R.id.imgAgencyBannerBg);
+        }
+        if (levelView == null && rowAgency != null) {
+            levelView = rowAgency.findViewById(R.id.tvAgencyLevel);
+        }
+        com.Dramizo.Series.util.AgencyUi.bindBanner(bannerBg, levelView, tier);
         if (logoView != null) {
-            String logo = firstNonEmpty(
+            com.Dramizo.Series.util.AgencyUi.bindLogo(
+                    logoView,
                     agency.logoUrl,
-                    agency.coverUrl,
-                    // Agency room: permanent cover is usually the agency brand.
-                    isAgencyRoom ? currentRoomCoverUrl : null);
-            logoView.setImageResource(R.drawable.icon_agency);
-            if (logo != null && !logo.isEmpty()) {
-                try {
-                    com.bumptech.glide.Glide.with(logoView.getContext())
-                            .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(logo))
-                            .circleCrop()
-                            .placeholder(R.drawable.icon_agency)
-                            .error(R.drawable.icon_agency)
-                            .into(logoView);
-                } catch (Exception ignored) {
-                    logoView.setImageResource(R.drawable.icon_agency);
-                }
-            }
+                    firstNonEmpty(agency.coverUrl,
+                            isAgencyRoom ? currentRoomCoverUrl : null));
         }
-        // Open manage screen when this is the viewer's own agency.
+        // Open family info card (Mikoo guild homepage) — follow agency lives there.
         rowAgency.setOnClickListener(v -> {
             if (agency.id == null || agency.id.isEmpty()) return;
             try {
-                android.content.Intent i = new android.content.Intent(
+                com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet.show(
                         this,
-                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.class);
-                i.putExtra(
-                        com.Dramizo.Series.presentation.agency.AgencyManageActivity.EXTRA_AGENCY_ID,
-                        agency.id);
-                startActivity(i);
+                        agency.id,
+                        agency.logoUrl,
+                        firstNonEmpty(agency.coverUrl,
+                                isAgencyRoom ? currentRoomCoverUrl : null));
             } catch (Exception ignored) {
             }
         });
@@ -6363,7 +6448,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView tvUserId = sheet.findViewById(R.id.tvUserId);
         ImageView btnCopyId = sheet.findViewById(R.id.btnCopyId);
         ImageView imgCountryFlag = sheet.findViewById(R.id.imgCountryFlag);
+        ImageView imgGender = sheet.findViewById(R.id.imgGender);
+        TextView tvOnlineStatus = sheet.findViewById(R.id.tvOnlineStatus);
+        TextView tvStatFollowing = sheet.findViewById(R.id.tvStatFollowing);
+        TextView tvStatFans = sheet.findViewById(R.id.tvStatFans);
+        TextView tvStatVisitors = sheet.findViewById(R.id.tvStatVisitors);
+        TextView tvPropFamily = sheet.findViewById(R.id.tvPropFamily);
+        TextView tvPropSupporters = sheet.findViewById(R.id.tvPropSupportersCount);
+        TextView tvPropFriends = sheet.findViewById(R.id.tvPropFriendsCount);
+        View propFamily = sheet.findViewById(R.id.propFamily);
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
+        ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
         ImageView vipHead = sheet.findViewById(R.id.imgVipHead);
@@ -6371,6 +6466,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         ImageView imgAgencyLogo = sheet.findViewById(R.id.imgAgencyLogo);
         TextView tvAgencyName = sheet.findViewById(R.id.tvAgencyName);
         TextView tvAgencyGid = sheet.findViewById(R.id.tvAgencyGid);
+        View userCardBg = sheet.findViewById(R.id.userCardBg);
+        View moreActionsBlock = sheet.findViewById(R.id.moreActionsBlock);
         TextView chipVip = sheet.findViewById(R.id.chipVip);
         TextView chipMember = sheet.findViewById(R.id.chipMember);
         TextView chipCharm = sheet.findViewById(R.id.chipCharm);
@@ -6386,6 +6483,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             chipMember.setText(String.valueOf(Math.max(1, userLevel)));
         }
         styleMikooStatChips(chipCharm, chipWealth);
+        if (userId != null && !userId.isEmpty()) {
+            com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
+                    this, sheet, userId, myUserId, dialog::dismiss);
+        }
+        com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipUserCardMedal(imgVipMedal, vipLevel, null);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         // In-room profile card: always fixed VIP nobility frame (ud_vip_tou_N) when VIP.
@@ -6416,6 +6518,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (userId != null && !userId.isEmpty()) {
             ContainerProvider.from(this).getIoExecutor().execute(() -> {
+                String myId = ContainerProvider.from(this).getSessionManager().getUserId();
+                if (myId != null && !myId.equals(userId)) {
+                    try {
+                        ContainerProvider.from(this).getUserApi().visit(userId).execute();
+                    } catch (Exception ignored) {
+                    }
+                }
                 Result<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto> r =
                         ApiCall.execute(ContainerProvider.from(this).getUserApi().getUser(userId));
                 if (!r.success || r.data == null) return;
@@ -6436,13 +6545,89 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     bindVipUserCardHead(vipHead, liveVip,
                             r.data.vipHeadUrl != null ? r.data.vipHeadUrl
                                     : VipStyle.fixedHeadPath(liveVip));
+                    // Head owns: entry ride + VIP medal.
+                    if (imgEntryRide != null) {
+                        String ride = r.data.entryAnimationUrl != null
+                                && !r.data.entryAnimationUrl.isEmpty()
+                                ? r.data.entryAnimationUrl
+                                : r.data.entryEffectUrl;
+                        if (ride != null && !ride.trim().isEmpty()) {
+                            String preview = ride.trim();
+                            if (preview.endsWith(".mp4") || preview.endsWith(".svga")) {
+                                int dot = preview.lastIndexOf('.');
+                                if (dot > 0) preview = preview.substring(0, dot) + ".png";
+                            }
+                            imgEntryRide.setVisibility(View.VISIBLE);
+                            try {
+                                com.bumptech.glide.Glide.with(imgEntryRide.getContext())
+                                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(preview))
+                                        .error(R.drawable.ic_medal_default)
+                                        .into(imgEntryRide);
+                            } catch (Exception ignored) {
+                                imgEntryRide.setImageResource(R.drawable.ic_medal_default);
+                            }
+                        } else {
+                            imgEntryRide.setVisibility(View.GONE);
+                        }
+                    }
                     bindVipUserCardMedal(imgVipMedal, liveVip, r.data.levelBadgeUrl);
                     bindUserCardAgency(rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, r.data.agency);
+                    com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(
+                            userCardBg, moreActionsBlock, liveVip);
                     if (r.data.displayName != null && !r.data.displayName.isEmpty()) {
                         tvName.setText(r.data.displayName);
                     }
                     com.Dramizo.Series.util.GenderVerifiedBadge.bind(
                             tvName, null, r.data.genderVerified);
+                    if (imgGender != null) {
+                        String g = r.data.gender != null ? r.data.gender.trim().toLowerCase() : "";
+                        if ("male".equals(g) || "m".equals(g)) {
+                            imgGender.setVisibility(View.VISIBLE);
+                            imgGender.setImageResource(R.drawable.ic_gender_male);
+                        } else if ("female".equals(g) || "f".equals(g)) {
+                            imgGender.setVisibility(View.VISIBLE);
+                            imgGender.setImageResource(R.drawable.ic_gender_female);
+                        } else {
+                            imgGender.setVisibility(View.GONE);
+                        }
+                    }
+                    if (tvOnlineStatus != null) {
+                        if (Boolean.TRUE.equals(r.data.isOnline)) {
+                            tvOnlineStatus.setVisibility(View.VISIBLE);
+                            tvOnlineStatus.setText(R.string.online_now);
+                            tvOnlineStatus.setTextColor(0xFF7CFFB2);
+                        } else {
+                            tvOnlineStatus.setVisibility(View.GONE);
+                        }
+                    }
+                    if (tvStatFollowing != null) {
+                        tvStatFollowing.setText(String.valueOf(Math.max(0, r.data.followersCount)));
+                    }
+                    if (tvStatFans != null) {
+                        tvStatFans.setText(String.valueOf(Math.max(0, r.data.followingCount)));
+                    }
+                    if (tvStatVisitors != null) {
+                        tvStatVisitors.setText(String.valueOf(Math.max(0, r.data.visitorsCount)));
+                    }
+                    if (tvPropFriends != null) {
+                        tvPropFriends.setText(String.valueOf(Math.max(0, r.data.friendsCount)));
+                    }
+                    if (tvPropSupporters != null) {
+                        tvPropSupporters.setText(String.valueOf(Math.max(0, r.data.followersCount)));
+                    }
+                    if (tvPropFamily != null) {
+                        if (r.data.agency != null && r.data.agency.name != null
+                                && !r.data.agency.name.isEmpty()) {
+                            tvPropFamily.setText(r.data.agency.name.trim());
+                        } else {
+                            tvPropFamily.setText(R.string.user_card_prop_family);
+                        }
+                    }
+                    com.Dramizo.Series.presentation.common.UserSocialNav.bindFamilyClick(
+                            VoiceRoomActivity.this,
+                            propFamily,
+                            r.data.agency != null ? r.data.agency.id : null,
+                            dialog::dismiss);
                     if (tvUserId != null) {
                         String pid = r.data.publicId != null ? r.data.publicId.trim() : "";
                         publicIdHold[0] = pid;
@@ -6574,9 +6759,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         sheet.findViewById(R.id.actProfile).setOnClickListener(v -> {
             dialog.dismiss();
             if (userId == null || userId.isEmpty()) return;
-            Intent i = new Intent(this, com.Dramizo.Series.presentation.profile.ProfileActivity.class);
-            i.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, userId);
-            startActivity(i);
+            com.Dramizo.Series.presentation.common.UserSocialNav.openFullProfile(
+                    VoiceRoomActivity.this, userId);
         });
         sheet.findViewById(R.id.actGift).setOnClickListener(v -> {
             dialog.dismiss();
@@ -6637,10 +6821,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         ImageView actFollow = sheet.findViewById(R.id.actFollow);
         if (actFollow != null) {
-            // Mikoo icon_attention — switch to check via alpha when following.
-            actFollow.setImageResource(R.drawable.icon_attention);
-            actFollow.setAlpha(1f);
+            // Mikoo icon_attention — solid when following, faded when not.
             final boolean[] following = {false};
+            final boolean[] followBusy = {false};
+            applyFollowHeart(actFollow, false);
             if (userId != null && !userId.isEmpty() && !userId.equals(myUserId)) {
                 AppContainer followContainer = ContainerProvider.from(this);
                 followContainer.getIoExecutor().execute(() -> {
@@ -6651,35 +6835,52 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         following[0] = true;
                         runOnUiThread(() -> {
                             if (actFollow.getWindowToken() != null) {
-                                actFollow.setImageResource(R.drawable.icon_attentioned);
-                                actFollow.setAlpha(1f);
+                                applyFollowHeart(actFollow, true);
                             }
                         });
                     }
                 });
             }
             actFollow.setOnClickListener(v -> {
-                dialog.dismiss();
                 if (userId == null || userId.isEmpty()) return;
                 if (userId.equals(myUserId)) {
                     Toast.makeText(this, R.string.cannot_follow_yourself, Toast.LENGTH_SHORT).show();
                     return;
                 }
-                AppContainer container = ContainerProvider.from(this);
+                if (followBusy[0]) return;
+                followBusy[0] = true;
+                actFollow.setEnabled(false);
                 final boolean unfollow = following[0];
+                applyFollowHeart(actFollow, !unfollow);
+                AppContainer container = ContainerProvider.from(this);
                 container.getIoExecutor().execute(() -> {
                     try {
                         retrofit2.Response<?> resp = (unfollow
                                 ? container.getUserApi().unfollow(userId)
                                 : container.getUserApi().follow(userId)).execute();
-                        runOnUiThread(() -> Toast.makeText(this,
-                                resp.isSuccessful()
-                                        ? (unfollow ? "تم إلغاء المتابعة ✓" : "تمت المتابعة ✓")
-                                        : getString(R.string.error_generic),
-                                Toast.LENGTH_SHORT).show());
+                        runOnUiThread(() -> {
+                            followBusy[0] = false;
+                            actFollow.setEnabled(true);
+                            if (resp.isSuccessful()) {
+                                following[0] = !unfollow;
+                                applyFollowHeart(actFollow, following[0]);
+                                Toast.makeText(this,
+                                        unfollow ? "تم إلغاء المتابعة ✓" : "تمت المتابعة ✓",
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                applyFollowHeart(actFollow, following[0]);
+                                Toast.makeText(this, getString(R.string.error_generic),
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
                     } catch (Exception e) {
-                        runOnUiThread(() -> Toast.makeText(this, getString(R.string.error_generic),
-                                Toast.LENGTH_SHORT).show());
+                        runOnUiThread(() -> {
+                            followBusy[0] = false;
+                            actFollow.setEnabled(true);
+                            applyFollowHeart(actFollow, following[0]);
+                            Toast.makeText(this, getString(R.string.error_generic),
+                                    Toast.LENGTH_SHORT).show();
+                        });
                     }
                 });
             });
@@ -12071,6 +12272,50 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.imgRoomHostAvatar == null) return;
 
+        // Agency room header = agency brand only (logo + Lv under image). Never host heart/badge.
+        if (RoomUiHelper.isAgencyRoom(room) && room.agencyId != null && !room.agencyId.isEmpty()) {
+            String logo = room.agencyLogoUrl != null ? room.agencyLogoUrl.trim() : "";
+            String cover = room.coverUrl != null ? room.coverUrl.trim() : "";
+            int tier = room.agencyLevel > 0
+                    ? room.agencyLevel
+                    : com.Dramizo.Series.util.AgencyUi.bannerTierFromDiamonds(room.agencyTotalDiamonds);
+            String visualKey = "agency|" + room.agencyId + "|" + logo + "|" + cover + "|" + tier;
+            if (!Objects.equals(lastBoundHostStageKey, visualKey)) {
+                lastBoundHostStageKey = visualKey;
+                if (binding.imgRoomCover != null) binding.imgRoomCover.setVisibility(View.GONE);
+                binding.imgRoomHostAvatar.setVisibility(View.VISIBLE);
+                if (binding.imgRoomHostFrame != null) {
+                    binding.imgRoomHostFrame.setVisibility(View.GONE);
+                    binding.imgRoomHostFrame.setImageDrawable(null);
+                }
+                if (binding.imgRoomHostBadge != null) {
+                    binding.imgRoomHostBadge.setVisibility(View.GONE);
+                    binding.imgRoomHostBadge.setImageDrawable(null);
+                }
+                if (binding.headerHostSignal != null) {
+                    binding.headerHostSignal.clearSignal();
+                    binding.headerHostSignal.setVisibility(View.GONE);
+                }
+                com.Dramizo.Series.util.AgencyUi.bindLogo(
+                        binding.imgRoomHostAvatar,
+                        logo.isEmpty() ? null : logo,
+                        cover.isEmpty() ? null : cover);
+                if (binding.tvHeaderAgencyLevel != null) {
+                    binding.tvHeaderAgencyLevel.setVisibility(View.VISIBLE);
+                    binding.tvHeaderAgencyLevel.setText("Lv." + Math.max(1, tier));
+                }
+            }
+            AuthDtos.UserDto host = room.host;
+            hostStageUserId = room.hostId != null ? room.hostId
+                    : (host != null ? host.id : null);
+            updateHeaderMicMuted(seats);
+            return;
+        }
+
+        if (binding.tvHeaderAgencyLevel != null) {
+            binding.tvHeaderAgencyLevel.setVisibility(View.GONE);
+        }
+
         AuthDtos.UserDto host = room.host;
         String hostId = room.hostId != null ? room.hostId
                 : (host != null ? host.id : null);
@@ -12431,6 +12676,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void onHostStageClick() {
         if (roomId == null || binding == null) return;
         RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
+        // Agency room header card → Mikoo family info (name / GID / stats / follow).
+        if (isAgencyRoom && room != null && room.agencyId != null && !room.agencyId.isEmpty()) {
+            com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet.show(
+                    this,
+                    room.agencyId,
+                    room.agencyLogoUrl,
+                    room.coverUrl);
+            return;
+        }
         AuthDtos.UserDto host = room != null ? room.host : null;
         String hostId = room != null && room.hostId != null ? room.hostId
                 : (host != null ? host.id : roomHostId);
@@ -13906,11 +14160,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         public void onBindViewHolder(@NonNull VH h, int position) {
             MiscDtos.GameDto g = items.get(position);
             h.tvTitle.setText(MikooGamesCatalog.displayTitle(h.itemView.getContext(), g));
-            Glide.with(h.imgIcon)
-                    .load(AssetCatalog.absoluteUrl(g.coverUrl))
-                    .placeholder(ImagePlaceholder.game())
-                    .error(ImagePlaceholder.game())
-                    .into(h.imgIcon);
+            String cover = g.coverUrl;
+            if (g.id != null && !g.id.isEmpty()
+                    && (cover == null || cover.isEmpty()
+                    || MediaAssetSync.isPackageDefaultCover(cover, g.id))) {
+                cover = MediaAssetSync.mikooCoverUrl(g.id);
+            } else {
+                cover = MediaAssetSync.bust(cover);
+            }
+            MediaAssetSync.loadInto(h.imgIcon, cover, ImagePlaceholder.game(), 192);
             h.itemView.setOnClickListener(v -> listener.onPlay(g));
         }
 

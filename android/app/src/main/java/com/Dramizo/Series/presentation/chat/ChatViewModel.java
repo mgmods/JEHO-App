@@ -143,6 +143,7 @@ public class ChatViewModel extends ViewModel {
                     List<ChatDtos.MessageDto> items = new ArrayList<>();
                     for (ChatDtos.MessageDto m : r.data.items) {
                         if (m == null || m.id == null) continue;
+                        if (isDismissed(m.id)) continue;
                         normalizeMine(m);
                         m.localPending = false;
                         items.add(m);
@@ -368,6 +369,54 @@ public class ChatViewModel extends ViewModel {
         }
     }
 
+    /**
+     * Hide a card message for this device only (family invite reject / after accept).
+     * Survives reloads so the invite does not reappear in this conversation.
+     */
+    public void dismissMessageLocally(String messageId) {
+        if (messageId == null || messageId.isEmpty()) return;
+        rememberDismissed(messageId);
+        removeMessage(messageId);
+    }
+
+    private void rememberDismissed(String messageId) {
+        if (conversationId == null || conversationId.isEmpty()) return;
+        try {
+            android.content.SharedPreferences prefs = c.getAppContext()
+                    .getSharedPreferences("chat_dismissed_msgs", android.content.Context.MODE_PRIVATE);
+            String key = "d:" + conversationId;
+            java.util.Set<String> set = new java.util.HashSet<>(
+                    prefs.getStringSet(key, java.util.Collections.emptySet()));
+            set.add(messageId);
+            prefs.edit().putStringSet(key, set).apply();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private boolean isDismissed(String messageId) {
+        if (messageId == null || conversationId == null) return false;
+        try {
+            android.content.SharedPreferences prefs = c.getAppContext()
+                    .getSharedPreferences("chat_dismissed_msgs", android.content.Context.MODE_PRIVATE);
+            java.util.Set<String> set = prefs.getStringSet("d:" + conversationId, null);
+            return set != null && set.contains(messageId);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    @androidx.annotation.Nullable
+    private List<ChatDtos.MessageDto> filterDismissed(
+            @androidx.annotation.Nullable List<ChatDtos.MessageDto> list) {
+        if (list == null || list.isEmpty()) return list;
+        List<ChatDtos.MessageDto> out = new ArrayList<>(list.size());
+        for (ChatDtos.MessageDto m : list) {
+            if (m != null && m.id != null && isDismissed(m.id)) continue;
+            out.add(m);
+        }
+        return out;
+    }
+
     private synchronized void mergeLoadedMessages(List<ChatDtos.MessageDto> loaded) {
         List<ChatDtos.MessageDto> current = messages.getValue();
         if (loaded == null || loaded.isEmpty()) {
@@ -379,6 +428,7 @@ public class ChatViewModel extends ViewModel {
         LinkedHashMap<String, ChatDtos.MessageDto> merged = new LinkedHashMap<>();
         for (ChatDtos.MessageDto m : loaded) {
             if (m == null || m.id == null) continue;
+            if (isDismissed(m.id)) continue;
             normalizeMine(m);
             m.localPending = false;
             merged.put(m.id, m);
@@ -387,6 +437,7 @@ public class ChatViewModel extends ViewModel {
         if (current != null) {
             for (ChatDtos.MessageDto m : current) {
                 if (m == null || m.id == null) continue;
+                if (isDismissed(m.id)) continue;
                 if (m.localPending && m.id.startsWith("local:") && !merged.containsKey(m.id)) {
                     merged.put(m.id, m);
                 }
@@ -400,6 +451,7 @@ public class ChatViewModel extends ViewModel {
         if (older != null) {
             for (ChatDtos.MessageDto m : older) {
                 if (m == null || m.id == null) continue;
+                if (isDismissed(m.id)) continue;
                 normalizeMine(m);
                 m.localPending = false;
                 merged.put(m.id, m);
@@ -409,6 +461,7 @@ public class ChatViewModel extends ViewModel {
         if (current != null) {
             for (ChatDtos.MessageDto m : current) {
                 if (m == null || m.id == null) continue;
+                if (isDismissed(m.id)) continue;
                 if (!merged.containsKey(m.id)) merged.put(m.id, m);
             }
         }
@@ -417,6 +470,7 @@ public class ChatViewModel extends ViewModel {
 
     private synchronized void appendMessage(ChatDtos.MessageDto message) {
         if (message == null) return;
+        if (message.id != null && isDismissed(message.id)) return;
         normalizeMine(message);
         List<ChatDtos.MessageDto> current = messages.getValue();
         List<ChatDtos.MessageDto> next = new ArrayList<>(current != null ? current : Collections.emptyList());

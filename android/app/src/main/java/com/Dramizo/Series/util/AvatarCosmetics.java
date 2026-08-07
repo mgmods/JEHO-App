@@ -603,8 +603,9 @@ public final class AvatarCosmetics {
             if (vip > 0) {
                 vipChip.setVisibility(View.VISIBLE);
                 vipChip.setText("VIP" + vip);
-                vipChip.setBackgroundResource(R.drawable.bg_chip_vip);
-                vipChip.setTextColor(0xFFFFFFFF);
+                // Gradual VIP palette (Mikoo-style tier colours).
+                com.Dramizo.Series.util.VipStyle.applyChip(vipChip, vip);
+                vipChip.setTextColor(com.Dramizo.Series.util.VipStyle.chipTextColor(vip));
             } else {
                 vipChip.setVisibility(View.GONE);
             }
@@ -613,7 +614,9 @@ public final class AvatarCosmetics {
             int lv = Math.max(1, userLevel);
             levelChip.setVisibility(View.VISIBLE);
             levelChip.setText("Lv." + lv);
-            levelChip.setBackgroundResource(R.drawable.bg_chip_level);
+            // Soft tier wash by user level (map 1..N into VIP palette buckets).
+            int band = Math.min(7, Math.max(1, 1 + (lv - 1) / 8));
+            com.Dramizo.Series.util.VipStyle.applyChip(levelChip, band);
             levelChip.setTextColor(0xFFFFFFFF);
         }
         if (charmChip != null) {

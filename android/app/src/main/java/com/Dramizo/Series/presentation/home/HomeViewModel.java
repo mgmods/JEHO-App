@@ -212,7 +212,12 @@ public class HomeViewModel extends ViewModel {
         c.micInteractEnabled = old.micInteractEnabled;
         c.entryEffectsEnabled = old.entryEffectsEnabled;
         c.lowGiftEffectsEnabled = old.lowGiftEffectsEnabled;
-        c.displayRoomId = old.displayRoomId;
+        c.displayRoomId = neu.displayRoomId != null ? neu.displayRoomId : old.displayRoomId;
+        c.agencyPublicId = neu.agencyPublicId != null ? neu.agencyPublicId : old.agencyPublicId;
+        c.agencyLogoUrl = neu.agencyLogoUrl != null ? neu.agencyLogoUrl : old.agencyLogoUrl;
+        c.agencyLevel = neu.agencyLevel > 0 ? neu.agencyLevel : old.agencyLevel;
+        c.agencyTotalDiamonds =
+                neu.agencyTotalDiamonds > 0 ? neu.agencyTotalDiamonds : old.agencyTotalDiamonds;
         return c;
     }
 

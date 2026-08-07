@@ -228,6 +228,8 @@ const boss = reactive({
 const ORIGIN = 'https://api.adnova.bbs.tr'
 const MIKOO = [
   ['7updown', '٧ فوق تحت', '7 Up Down'],
+  ['bounty-football', 'كرة القدم الجوائز', 'Bounty Football'],
+  ['camel-racing', 'سباق الأسود', 'Camel Racing'],
   ['cleopatra-slot', 'كليوباترا', 'Cleopatra Slot'],
   ['cleopatra-slots', 'فتحات كليوباترا', 'Cleopatra Spins'],
   ['crash', 'كراش', 'Crash'],
@@ -235,6 +237,7 @@ const MIKOO = [
   ['football-plinko', 'بلينكو كرة القدم', 'Football Plinko'],
   ['fortune-slot', 'جواهر الحظ', 'Fortune Gems'],
   ['greedy-box', 'صندوق الطمع', 'Greedy Box'],
+  ['greedy-lion', 'الأسد الطماع', 'Greedy Lion'],
   ['hilo', 'هاي لو', 'Hilo'],
   ['line-slots', 'فتحات الخط', 'Line slots'],
   ['luck-car', 'سيارة الحظ', 'Lucky Car'],
@@ -412,8 +415,19 @@ async function load() {
       const filtered = (Array.isArray(parsed) ? parsed : [])
         .filter((g) => !isLegacyHtmlGame(g))
         .map(normalizeGame)
-      games.value = filtered.length ? filtered : defaults.map(normalizeGame)
-      return
+      if (filtered.length) {
+        const seen = new Set(filtered.map((g) => String(g.id || '').toLowerCase()))
+        const merged = [...filtered]
+        for (const d of defaults) {
+          const id = String(d.id || '').toLowerCase()
+          if (id && !seen.has(id)) {
+            merged.push(normalizeGame(d))
+            seen.add(id)
+          }
+        }
+        games.value = merged
+        return
+      }
     } catch (_) { /* fallthrough */ }
   }
   games.value = defaults.map(normalizeGame)

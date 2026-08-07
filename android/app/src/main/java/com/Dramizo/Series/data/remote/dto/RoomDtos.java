@@ -56,8 +56,13 @@ public final class RoomDtos {
         @SerializedName("chatClearedAt") public String chatClearedAt;
         /** 0=off, 1/5/10 = auto wipe every N minutes. */
         @SerializedName("chatAutoClearMinutes") public int chatAutoClearMinutes;
-        /** Numeric room id shown in UI (host publicId). */
+        /** Numeric room id shown in UI (host publicId, or agency GID for agency rooms). */
         @SerializedName("displayRoomId") public String displayRoomId;
+        /** Agency brand on room payload (agency rooms only). */
+        @SerializedName("agencyPublicId") public String agencyPublicId;
+        @SerializedName("agencyLogoUrl") public String agencyLogoUrl;
+        @SerializedName("agencyLevel") public int agencyLevel;
+        @SerializedName("agencyTotalDiamonds") public long agencyTotalDiamonds;
     }
 
     public static class ModeratorPermissionDto {

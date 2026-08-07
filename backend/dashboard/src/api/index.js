@@ -127,9 +127,6 @@ export const agenciesApi = {
 }
 
 export const rechargeAgentsApi = {
-  applications: () => safeRequest(() => api.get('/admin/recharge-agents/applications')),
-  approve: (id, data = {}) => safeRequest(() => api.post(`/admin/recharge-agents/applications/${id}/approve`, data)),
-  reject: (id, data = {}) => safeRequest(() => api.post(`/admin/recharge-agents/applications/${id}/reject`, data)),
   agents: () => safeRequest(() => api.get('/admin/recharge-agents')),
   assign: (data) => safeRequest(() => api.post('/admin/recharge-agents/assign', data)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/recharge-agents/${id}`, data)),
@@ -137,9 +134,6 @@ export const rechargeAgentsApi = {
   remove: (id) => safeRequest(() => api.delete(`/admin/recharge-agents/${id}`)),
   pricing: () => safeRequest(() => api.get('/admin/recharge-agent-pricing')),
   updatePricing: (data) => safeRequest(() => api.patch('/admin/recharge-agent-pricing', data)),
-  contacts: () => safeRequest(() => api.get('/admin/recharge-agent-contacts')),
-  upsertContact: (data) => safeRequest(() => api.post('/admin/recharge-agent-contacts', data)),
-  removeContact: (id) => safeRequest(() => api.delete(`/admin/recharge-agent-contacts/${id}`)),
 }
 
 export const reportsApi = {

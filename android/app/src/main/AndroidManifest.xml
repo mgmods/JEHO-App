@@ -147,6 +147,18 @@
         <activity android:name=".presentation.agency.AgencyManageActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.agency.AgencyWithdrawActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait" />
+        <activity android:name=".presentation.agency.AgencyWithdrawHistoryActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait" />
+        <activity android:name=".presentation.agency.HostEarningsActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait" />
+        <activity android:name=".presentation.agency.AgencyOwnerDashboardActivity" android:exported="false"
+            android:windowSoftInputMode="adjustResize"
+            android:screenOrientation="portrait" />
         <activity android:name=".presentation.vip.VipActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
@@ -196,9 +208,6 @@
         <activity android:name=".presentation.wallet.WalletBillsActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
-        <activity android:name=".presentation.wallet.RechargeAgentDirectoryActivity" android:exported="false"
-            android:windowSoftInputMode="adjustResize" 
-            android:screenOrientation="portrait" />
         <activity android:name=".presentation.wallet.RechargeAgentActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
@@ -214,7 +223,9 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.TaskCenterActivity" android:exported="false" 
             android:screenOrientation="portrait" />
-        <activity android:name=".presentation.profile.VisitorsActivity" android:exported="false" 
+        <activity android:name=".presentation.profile.VisitorsActivity" android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.SocialListActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.GiftHistoryActivity" android:exported="false" 
             android:screenOrientation="portrait" />

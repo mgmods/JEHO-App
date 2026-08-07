@@ -1,5 +1,6 @@
 package com.Dramizo.Series.presentation.chat;
 
+import android.graphics.Typeface;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,25 +14,32 @@ import com.Dramizo.Series.databinding.ItemChatPreviewBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.RoomShareCodec;
-import com.Dramizo.Series.util.StaffRoleHelper;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
+/**
+ * Clean conversation list (inbox rows).
+ * Layout: avatar · name · last message · time · unread badge.
+ */
 public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.VH> {
     private static final Object PAYLOAD_META = "meta";
 
-    public interface Listener { void onClick(ChatDtos.ConversationDto item); }
+    public interface Listener {
+        void onClick(ChatDtos.ConversationDto item);
+    }
 
     private final List<ChatDtos.ConversationDto> items = new ArrayList<>();
     private final Listener listener;
 
-    public ChatPreviewAdapter(Listener listener) { this.listener = listener; }
+    public ChatPreviewAdapter(Listener listener) {
+        this.listener = listener;
+    }
 
     public void submit(List<ChatDtos.ConversationDto> data) {
         if (sameList(items, data)) {
-            // Presence / unread / last message — rebind avatar fully when face/frame changed.
             List<ChatDtos.ConversationDto> next = data != null ? data : Collections.emptyList();
             for (int i = 0; i < items.size() && i < next.size(); i++) {
                 ChatDtos.ConversationDto a = items.get(i);
@@ -77,7 +85,9 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         Boolean oa = a.peer != null ? a.peer.isOnline : null;
         Boolean ob = b.peer != null ? b.peer.isOnline : null;
         if (oa == null ? ob != null : !oa.equals(ob)) return false;
-        return true;
+        boolean va = a.peer != null && a.peer.genderVerified;
+        boolean vb = b.peer != null && b.peer.genderVerified;
+        return va == vb;
     }
 
     private static boolean sameAvatar(
@@ -108,7 +118,8 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     @NonNull
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new VH(ItemChatPreviewBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false));
+        return new VH(ItemChatPreviewBinding.inflate(
+                LayoutInflater.from(parent.getContext()), parent, false));
     }
 
     @Override
@@ -123,35 +134,17 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         ChatDtos.ConversationDto item = items.get(position);
-        String displayName = null;
-        if (item.peer != null) {
-            displayName = item.peer.displayName;
-        }
+        String displayName = item.peer != null ? item.peer.displayName : null;
         if (displayName == null || displayName.isEmpty()) {
-            displayName = item.title != null ? item.title
+            displayName = item.title != null && !item.title.isEmpty()
+                    ? item.title
                     : holder.itemView.getContext().getString(R.string.user_default);
         }
         holder.b.tvTitle.setText(displayName);
-        holder.b.tvUsername.setVisibility(View.GONE);
-        holder.b.tvTitle.setTextColor(
-                holder.itemView.getContext().getColor(R.color.text_primary));
 
-        // Optional staff label under name
-        if (holder.b.tvStaffChip != null) {
-            if (item.peer != null && StaffRoleHelper.isStaff(item.peer)) {
-                holder.b.tvStaffChip.setVisibility(View.VISIBLE);
-                holder.b.tvStaffChip.setText(StaffRoleHelper.badgeAr(item.peer));
-                String role = StaffRoleHelper.normalize(item.peer);
-                holder.b.tvStaffChip.setBackgroundResource(
-                        StaffRoleHelper.SUPER.equals(role)
-                                ? R.drawable.bg_chip_staff_super
-                                : R.drawable.bg_chip_staff_manager);
-            } else {
-                holder.b.tvStaffChip.setVisibility(View.GONE);
-            }
-        }
-        if (holder.b.rowBadges != null) {
-            holder.b.rowBadges.setVisibility(View.GONE);
+        boolean verified = item.peer != null && item.peer.genderVerified;
+        if (holder.b.imgOfficial != null) {
+            holder.b.imgOfficial.setVisibility(verified ? View.VISIBLE : View.GONE);
         }
 
         bindMeta(holder, item);
@@ -161,10 +154,7 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
                 holder.b.imgFrame,
                 resolveAvatarUrl(item),
                 resolveFrameUrl(item));
-        if (holder.b.imgHostBadge != null) {
-            holder.b.imgHostBadge.setVisibility(View.GONE);
-            holder.b.imgHostBadge.setImageDrawable(null);
-        }
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(item);
         });
@@ -172,75 +162,89 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
 
     private void bindMeta(@NonNull VH holder, ChatDtos.ConversationDto item) {
         android.content.Context ctx = holder.itemView.getContext();
-        String last = item.lastMessage != null ? item.lastMessage.content : "";
-        if (item.lastMessage != null && "image".equalsIgnoreCase(item.lastMessage.type)) {
-            last = ctx.getString(R.string.chat_preview_photo);
-        } else if (item.lastMessage != null && "audio".equalsIgnoreCase(item.lastMessage.type)) {
-            last = ctx.getString(R.string.chat_preview_voice);
-        } else if (item.lastMessage != null && "gift".equalsIgnoreCase(item.lastMessage.type)) {
-            last = ctx.getString(R.string.chat_preview_gift,
-                    item.lastMessage.content != null ? item.lastMessage.content
-                            : ctx.getString(R.string.gift_message));
-        } else if (RoomShareCodec.isRoomShare(last)) {
-            last = RoomShareCodec.previewLabel(last);
-        }
-        holder.b.tvLast.setText(last != null && !last.isEmpty()
-                ? last : ctx.getString(R.string.no_messages_yet));
-        // Bold last line when unread
-        holder.b.tvLast.setTextColor(item.unreadCount > 0
-                ? ctx.getColor(R.color.text_primary)
-                : ctx.getColor(R.color.text_secondary));
-        holder.b.tvLast.setTypeface(null,
-                item.unreadCount > 0 ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        String last = previewText(ctx, item);
+        holder.b.tvLast.setText(last);
+        boolean unread = item.unreadCount > 0;
+        holder.b.tvLast.setTextColor(ctx.getColor(
+                unread ? R.color.text_primary : R.color.text_secondary));
+        holder.b.tvLast.setTypeface(null, unread ? Typeface.BOLD : Typeface.NORMAL);
+        holder.b.tvTitle.setTypeface(null, unread ? Typeface.BOLD : Typeface.BOLD);
 
         String timeSource = item.lastMessage != null ? item.lastMessage.createdAt : item.updatedAt;
         String time = DeviceTimeFormat.messageTime(ctx, timeSource);
         if (time != null && !time.isEmpty()) {
             holder.b.tvTime.setVisibility(View.VISIBLE);
             holder.b.tvTime.setText(time);
-            holder.b.tvTime.setTextColor(item.unreadCount > 0
-                    ? 0xFFFE2C55 : ctx.getColor(R.color.text_secondary));
+            holder.b.tvTime.setTextColor(unread
+                    ? ctx.getColor(R.color.gift_accent)
+                    : ctx.getColor(R.color.text_hint));
         } else {
             holder.b.tvTime.setVisibility(View.GONE);
         }
 
-        String lastSeen = item.peer != null ? item.peer.lastSeenAt : null;
+        // Online dot only
         boolean showOnline = item.peer == null
                 || item.peer.showOnlineStatus == null
                 || Boolean.TRUE.equals(item.peer.showOnlineStatus);
-        if (!showOnline) {
-            holder.b.tvStatus.setText(R.string.offline);
-            holder.b.tvStatus.setTextColor(0xFF94A3B8);
-            holder.b.onlineDot.setVisibility(View.GONE);
-        } else {
-            java.util.Date d = DeviceTimeFormat.parse(lastSeen);
-            boolean recentlyActive =
-                    d != null && System.currentTimeMillis() - d.getTime() < 2 * 60_000L;
-            boolean online = item.peer != null && item.peer.isOnline != null
-                    ? Boolean.TRUE.equals(item.peer.isOnline)
-                    : recentlyActive;
-            holder.b.tvStatus.setText(online
-                    ? ctx.getString(R.string.online_now)
-                    : ctx.getString(R.string.offline));
-            holder.b.tvStatus.setTextColor(online ? 0xFF10B981 : 0xFF94A3B8);
+        boolean online = false;
+        if (showOnline && item.peer != null) {
+            if (item.peer.isOnline != null) {
+                online = Boolean.TRUE.equals(item.peer.isOnline);
+            } else {
+                Date d = DeviceTimeFormat.parse(item.peer.lastSeenAt);
+                online = d != null && System.currentTimeMillis() - d.getTime() < 2 * 60_000L;
+            }
+        }
+        if (holder.b.onlineDot != null) {
             holder.b.onlineDot.setVisibility(online ? View.VISIBLE : View.GONE);
         }
 
-        int unread = Math.max(0, item.unreadCount);
-        if (unread > 0) {
+        int unreadCount = Math.max(0, item.unreadCount);
+        if (unreadCount > 0) {
             holder.b.tvUnread.setVisibility(View.VISIBLE);
-            holder.b.tvUnread.setText(unread > 99 ? "99+" : String.valueOf(unread));
+            holder.b.tvUnread.setText(unreadCount > 99 ? "99+" : String.valueOf(unreadCount));
         } else {
             holder.b.tvUnread.setVisibility(View.GONE);
             holder.b.tvUnread.setText("");
         }
     }
 
+    private static String previewText(android.content.Context ctx, ChatDtos.ConversationDto item) {
+        if (item.lastMessage == null) {
+            return ctx.getString(R.string.no_messages_yet);
+        }
+        String type = item.lastMessage.type != null ? item.lastMessage.type : "";
+        String content = item.lastMessage.content != null ? item.lastMessage.content : "";
+        if ("image".equalsIgnoreCase(type)) {
+            return ctx.getString(R.string.chat_preview_photo);
+        }
+        if ("audio".equalsIgnoreCase(type)) {
+            return ctx.getString(R.string.chat_preview_voice);
+        }
+        if ("gift".equalsIgnoreCase(type)) {
+            return ctx.getString(R.string.chat_preview_gift,
+                    !content.isEmpty() ? content : ctx.getString(R.string.gift_message));
+        }
+        if (RoomShareCodec.isRoomShare(content)) {
+            return RoomShareCodec.previewLabel(content);
+        }
+        if (com.Dramizo.Series.util.AgencyInviteCodec.isAgencyInvite(content)) {
+            return com.Dramizo.Series.util.AgencyInviteCodec.previewLabel(content);
+        }
+        return !content.isEmpty() ? content : ctx.getString(R.string.no_messages_yet);
+    }
+
     @Override
-    public int getItemCount() { return items.size(); }
+    public int getItemCount() {
+        return items.size();
+    }
 
     static class VH extends RecyclerView.ViewHolder {
         final ItemChatPreviewBinding b;
-        VH(ItemChatPreviewBinding b) { super(b.getRoot()); this.b = b; }
+
+        VH(ItemChatPreviewBinding b) {
+            super(b.getRoot());
+            this.b = b;
+        }
     }
 }

@@ -49,6 +49,7 @@ import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.DeviceTimeFormat;
+import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.PermissionHelper;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
@@ -163,22 +164,27 @@ public class ChatConversationActivity extends ThemedActivity {
         if (binding.tvPeerStatus != null) {
             binding.tvPeerStatus.setText(R.string.loading);
         }
+        View.OnClickListener openPeerProfile = v -> openPeerProfile();
         if (binding.imgPeerAvatar != null) {
             AvatarCosmetics.bindAvatar(binding.imgPeerAvatar, avatar);
             AvatarCosmetics.applyHostWear(
                     binding.imgPeerFrame, binding.imgPeerHostBadge, binding.imgPeerAvatar,
                     vipFrame, null, null, null);
-            View.OnClickListener openPeerProfile = v -> openPeerProfile();
             binding.imgPeerAvatar.setOnClickListener(openPeerProfile);
             if (binding.imgPeerFrame != null) binding.imgPeerFrame.setOnClickListener(openPeerProfile);
-            if (binding.tvPeerName != null) binding.tvPeerName.setOnClickListener(openPeerProfile);
-            if (binding.imgStripAvatar != null) {
-                AvatarCosmetics.bindAvatar(binding.imgStripAvatar, avatar);
-                binding.imgStripAvatar.setOnClickListener(openPeerProfile);
-            }
-            if (binding.tvStripName != null && title != null && !title.isEmpty()) {
-                binding.tvStripName.setText(title);
-            }
+        }
+        if (binding.tvPeerName != null) binding.tvPeerName.setOnClickListener(openPeerProfile);
+        if (binding.tvPeerUsername != null) binding.tvPeerUsername.setOnClickListener(openPeerProfile);
+        if (binding.imgStripAvatar != null) {
+            AvatarCosmetics.bindAvatar(binding.imgStripAvatar, avatar);
+            binding.imgStripAvatar.setOnClickListener(openPeerProfile);
+        }
+        if (binding.tvStripName != null) {
+            binding.tvStripName.setOnClickListener(openPeerProfile);
+            if (title != null && !title.isEmpty()) binding.tvStripName.setText(title);
+        }
+        if (binding.peerProfileStrip != null) {
+            binding.peerProfileStrip.setOnClickListener(openPeerProfile);
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
         bindGiftButton();
@@ -220,6 +226,27 @@ public class ChatConversationActivity extends ThemedActivity {
             public void onAvatarClick(String userId) {
                 String id = (userId != null && !userId.isEmpty()) ? userId : peerId;
                 openUserCard(id);
+            }
+
+            @Override
+            public void onAgencyInviteAgree(
+                    ChatDtos.MessageDto msg,
+                    com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+                acceptAgencyInvite(msg, invite);
+            }
+
+            @Override
+            public void onAgencyInviteDisagree(
+                    ChatDtos.MessageDto msg,
+                    com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+                // Reject → bubble disappears completely from this chat.
+                if (msg != null && msg.id != null) {
+                    viewModel.dismissMessageLocally(msg.id);
+                }
+                Toast.makeText(
+                        ChatConversationActivity.this,
+                        R.string.agency_invite_declined,
+                        Toast.LENGTH_SHORT).show();
             }
         });
         LinearLayoutManager lm = new LinearLayoutManager(this);
@@ -645,6 +672,10 @@ public class ChatConversationActivity extends ThemedActivity {
             binding.tvPeerUsername.setVisibility(View.GONE);
         }
         if (binding.tvStripName != null) binding.tvStripName.setText(name);
+        GenderVerifiedBadge.bind(binding.tvPeerName, null, peer != null && peer.genderVerified);
+        if (binding.tvStripName != null) {
+            GenderVerifiedBadge.bind(binding.tvStripName, null, peer != null && peer.genderVerified);
+        }
     }
 
     private void bindPeerProfile(AuthDtos.UserDto peer) {
@@ -755,14 +786,65 @@ public class ChatConversationActivity extends ThemedActivity {
     }
 
     private void openUserCard(@Nullable String userId) {
-        if (userId == null || userId.isEmpty()) {
+        String id = userId;
+        if (id == null || id.isEmpty()) id = peerId;
+        if (id == null || id.isEmpty()) {
             Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
             return;
         }
         String name = binding.tvPeerName != null && binding.tvPeerName.getText() != null
                 ? binding.tvPeerName.getText().toString()
-                : null;
-        UserProfileCardSheet.show(this, userId, name, null);
+                : (binding.tvStripName != null && binding.tvStripName.getText() != null
+                        ? binding.tvStripName.getText().toString()
+                        : null);
+        String avatar = null;
+        try {
+            avatar = getIntent().getStringExtra(EXTRA_AVATAR);
+        } catch (Exception ignored) {
+        }
+        UserProfileCardSheet.show(this, id, name, avatar);
+    }
+
+    /** Join family/agency from invite card; remove the card after success. */
+    private void acceptAgencyInvite(
+            @Nullable ChatDtos.MessageDto msg,
+            @Nullable com.Dramizo.Series.util.AgencyInviteCodec.Parsed invite) {
+        String code = invite != null && invite.code != null ? invite.code.trim() : "";
+        // Fallback: re-parse raw message body (handles legacy / slightly mutated payloads).
+        if (code.isEmpty() && msg != null && msg.content != null) {
+            com.Dramizo.Series.util.AgencyInviteCodec.Parsed again =
+                    com.Dramizo.Series.util.AgencyInviteCodec.parse(msg.content);
+            if (again != null && again.code != null) code = again.code.trim();
+        }
+        if (code.isEmpty()) {
+            Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG).show();
+            return;
+        }
+        final String joinCode = code;
+        final String messageId = msg != null ? msg.id : null;
+        Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = c.getAgencyRepository().joinByCode(joinCode);
+            runOnUiThread(() -> {
+                if (r.success) {
+                    if (messageId != null && !messageId.isEmpty()) {
+                        viewModel.dismissMessageLocally(messageId);
+                    }
+                    Toast.makeText(this, R.string.agency_invite_joined, Toast.LENGTH_SHORT).show();
+                    try {
+                        startActivity(new Intent(this,
+                                com.Dramizo.Series.presentation.agency.AgencyActivity.class));
+                    } catch (Exception ignored) {
+                    }
+                } else {
+                    Toast.makeText(
+                            this,
+                            r.error != null ? r.error : getString(R.string.error_generic),
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
     }
 
     private void onMessageLongClick(ChatDtos.MessageDto msg) {
@@ -919,6 +1001,16 @@ public class ChatConversationActivity extends ThemedActivity {
 
     private void attachSwipeToReply() {
         ItemTouchHelper helper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView,
+                                        @NonNull RecyclerView.ViewHolder viewHolder) {
+                int pos = viewHolder.getBindingAdapterPosition();
+                if (adapter != null && adapter.isSwipeLocked(pos)) {
+                    return 0;
+                }
+                return super.getMovementFlags(recyclerView, viewHolder);
+            }
+
             @Override
             public boolean onMove(@NonNull RecyclerView recyclerView,
                                   @NonNull RecyclerView.ViewHolder viewHolder,
@@ -1164,6 +1256,10 @@ public class ChatConversationActivity extends ThemedActivity {
         } catch (Exception ignored) {}
         menu.setOnMenuItemClickListener(item -> {
             int id = item.getItemId();
+            if (id == R.id.action_view_profile) {
+                openPeerProfile();
+                return true;
+            }
             if (id == R.id.action_archive_chat) {
                 archiveConversation();
                 return true;

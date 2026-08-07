@@ -42,6 +42,17 @@
           </div>
         </div>
         <div class="col-md-2">
+          <label class="form-label">{{ t('agencies.hostShare') }}</label>
+          <input
+            v-model.number="pricing.hostSharePercent"
+            type="number"
+            min="0"
+            max="100"
+            class="form-control"
+            @input="onShareInput('host')"
+          />
+        </div>
+        <div class="col-md-2">
           <label class="form-label">{{ t('agencies.defaultCommission') }}</label>
           <input
             v-model.number="pricing.defaultCommissionPercent"
@@ -49,7 +60,7 @@
             min="0"
             max="100"
             class="form-control"
-            @input="clampPricingFields"
+            @input="onShareInput('agency')"
           />
         </div>
         <div class="col-md-2">
@@ -60,19 +71,9 @@
             min="0"
             max="100"
             class="form-control"
-            @input="clampPricingFields"
+            @input="onShareInput('platform')"
           />
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">{{ t('agencies.hostShare') }}</label>
-          <input
-            v-model.number="pricing.hostSharePercent"
-            type="number"
-            min="0"
-            max="100"
-            class="form-control"
-            @input="clampPricingFields"
-          />
+          <div class="form-text small">{{ t('agencies.platformCutAutoHint') }}</div>
         </div>
         <div class="col-md-2">
           <label class="form-label d-block">{{ t('agencies.autoApprove') }}</label>
@@ -98,19 +99,50 @@
         {{ t('agencies.pricingHint') }}
         <span
           class="ms-2"
-          :class="sharesOver100 ? 'text-danger' : (sharesSum === 100 ? 'text-success' : 'text-warning')"
+          :class="sharesSum === 100 ? 'text-success' : 'text-danger'"
         >
           · {{ t('agencies.sharesSum', { value: sharesSum }) }}
         </span>
-        <span v-if="sharesOver100" class="ms-2 text-danger">
-          · {{ t('agencies.sharesOver100Hint') }}
+        <span v-if="sharesSum !== 100" class="ms-2 text-danger">
+          · {{ t('agencies.sharesMustSum100') }}
         </span>
-        <span v-else-if="sharesSum !== 100" class="ms-2 text-warning">
-          · {{ t('agencies.sharesIndependentHint') }}
-        </span>
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0 ms-2 align-baseline"
+          @click="applySafeSharePreset"
+        >
+          {{ t('agencies.applySafePreset') }}
+        </button>
         <span v-if="pricing.platformRevenueDiamonds != null" class="ms-2 text-warning">
           · {{ t('agencies.platformRevenue', { value: Number(pricing.platformRevenueDiamonds || 0).toLocaleString() }) }}
         </span>
+      </div>
+      <div class="row g-2 mt-2">
+        <div class="col-md-12">
+          <div
+            class="rounded border px-3 py-2 small"
+            :class="economySim.profitable ? 'border-success bg-success bg-opacity-10' : 'border-danger bg-danger bg-opacity-10'"
+          >
+            <div class="fw-semibold mb-1">{{ t('agencies.economyTitle') }}</div>
+            <div>{{ t('agencies.economyFlow') }}</div>
+            <div class="mt-1">
+              {{ t('agencies.economyOn1m', {
+                mint: economySim.mint.toLocaleString(),
+                host: economySim.hostD.toLocaleString(),
+                agency: economySim.agencyD.toLocaleString(),
+                platform: economySim.platformD.toLocaleString(),
+                hostUsd: economySim.hostUsd,
+                agencyUsd: economySim.agencyUsd,
+                liability: economySim.liabilityUsd,
+                revenue: economySim.packageUsd,
+                profit: economySim.profitUsd,
+              }) }}
+            </div>
+            <div class="mt-1 fw-semibold" :class="economySim.profitable ? 'text-success' : 'text-danger'">
+              {{ economySim.profitable ? t('agencies.economyProfitOk') : t('agencies.economyLossWarn') }}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -490,11 +522,17 @@ const grantingExclusives = ref(false)
 const pricing = reactive({
   createPriceCoins: 50000,
   createFree: false,
+  /** Owner-safe preset: host 45 / agency 15 / platform 40 (must sum 100). */
   defaultCommissionPercent: 15,
-  platformCutPercent: 30,
-  hostSharePercent: 55,
+  platformCutPercent: 40,
+  hostSharePercent: 45,
   autoApproveAfterPayment: false,
   platformRevenueDiamonds: 0,
+  /** Coin → diamond mint ratio (fixed product rule). */
+  giftMintRatio: 0.35,
+  diamondUsdRate: 0.0000666667,
+  /** Example paid 1M coin package USD (Play catalog). */
+  packageUsdFor1m: 99.99,
 })
 
 const {
@@ -587,7 +625,6 @@ const sharesSum = computed(() =>
   + Number(pricing.platformCutPercent || 0)
   + Number(pricing.hostSharePercent || 0),
 )
-const sharesOver100 = computed(() => sharesSum.value > 100)
 
 function clampPct(n, max = 100) {
   const v = Number(n)
@@ -595,12 +632,93 @@ function clampPct(n, max = 100) {
   return Math.max(0, Math.min(max, Math.round(v)))
 }
 
-/** Each share is independent — do not auto-link residual math. */
 function clampPricingFields() {
   pricing.defaultCommissionPercent = clampPct(pricing.defaultCommissionPercent, 100)
   pricing.platformCutPercent = clampPct(pricing.platformCutPercent, 100)
   pricing.hostSharePercent = clampPct(pricing.hostSharePercent, 100)
 }
+
+/** Keep the three shares as a real 100% pie (platform auto-fills remainder). */
+function onShareInput(which) {
+  clampPricingFields()
+  const host = Number(pricing.hostSharePercent || 0)
+  const agency = Number(pricing.defaultCommissionPercent || 0)
+  const platform = Number(pricing.platformCutPercent || 0)
+  if (which === 'host' || which === 'agency') {
+    const cashable = host + agency
+    if (cashable > 100) {
+      if (which === 'host') {
+        pricing.hostSharePercent = Math.max(0, 100 - agency)
+      } else {
+        pricing.defaultCommissionPercent = Math.max(0, 100 - host)
+      }
+    }
+    pricing.platformCutPercent = Math.max(
+      0,
+      100 - Number(pricing.hostSharePercent || 0) - Number(pricing.defaultCommissionPercent || 0),
+    )
+  } else {
+    // Platform edited: shrink cashable proportionally if needed.
+    const rest = Math.max(0, 100 - platform)
+    const cash = host + agency
+    if (cash <= 0) {
+      pricing.hostSharePercent = 0
+      pricing.defaultCommissionPercent = 0
+    } else if (cash !== rest) {
+      const scale = rest / cash
+      pricing.hostSharePercent = clampPct(Math.floor(host * scale), 100)
+      pricing.defaultCommissionPercent = Math.max(
+        0,
+        rest - Number(pricing.hostSharePercent || 0),
+      )
+    }
+    pricing.platformCutPercent = clampPct(
+      100 - Number(pricing.hostSharePercent || 0) - Number(pricing.defaultCommissionPercent || 0),
+      100,
+    )
+  }
+}
+
+function applySafeSharePreset() {
+  pricing.hostSharePercent = 45
+  pricing.defaultCommissionPercent = 15
+  pricing.platformCutPercent = 40
+}
+
+/** Simulation: paid 1M coins gifted in agency room with current splits. */
+const economySim = computed(() => {
+  const coins = 1_000_000
+  const mintR = Math.min(1, Math.max(0, Number(pricing.giftMintRatio) || 0.35))
+  const rate = Math.max(0, Number(pricing.diamondUsdRate) || 0.00005)
+  const packageUsd = Math.max(0, Number(pricing.packageUsdFor1m) || 99.99)
+  const h = Number(pricing.hostSharePercent || 0)
+  const a = Number(pricing.defaultCommissionPercent || 0)
+  const p = Number(pricing.platformCutPercent || 0)
+  const sum = h + a + p || 1
+  const hn = (h * 100) / sum
+  const an = (a * 100) / sum
+  const pn = Math.max(0, 100 - hn - an)
+  const mint = Math.floor(coins * mintR)
+  const hostD = Math.floor((mint * hn) / 100)
+  const agencyD = Math.floor((mint * an) / 100)
+  const platformD = Math.max(0, mint - hostD - agencyD)
+  const hostUsd = Number((hostD * rate).toFixed(2))
+  const agencyUsd = Number((agencyD * rate).toFixed(2))
+  const liabilityUsd = Number(((hostD + agencyD) * rate).toFixed(2))
+  const profitUsd = Number((packageUsd - liabilityUsd).toFixed(2))
+  return {
+    mint,
+    hostD,
+    agencyD,
+    platformD,
+    hostUsd,
+    agencyUsd,
+    liabilityUsd,
+    packageUsd,
+    profitUsd,
+    profitable: profitUsd > 0,
+  }
+})
 
 const pendingAppsCount = computed(() =>
   applications.value.filter((a) => isPendingApp(a)).length,
@@ -643,6 +761,8 @@ async function loadPricing() {
   pricing.defaultCommissionPercent = Number(map.agency_default_commission_percent ?? pricing.defaultCommissionPercent)
   pricing.platformCutPercent = Number(map.agency_platform_cut_percent ?? pricing.platformCutPercent)
   pricing.platformRevenueDiamonds = Number(map.platform_gift_revenue_diamonds ?? pricing.platformRevenueDiamonds)
+  const rateRaw = Number(map['economy.diamondUsdRate'])
+  if (Number.isFinite(rateRaw) && rateRaw > 0) pricing.diamondUsdRate = rateRaw
   const autoRaw = String(map.agency_auto_approve_after_payment ?? 'false').toLowerCase()
   pricing.autoApproveAfterPayment = autoRaw === 'true' || autoRaw === '1' || autoRaw === 'yes'
   const hostRaw = map.agency_host_share_percent
@@ -650,6 +770,10 @@ async function loadPricing() {
     ? Number(hostRaw)
     : Math.max(0, 100 - Number(pricing.defaultCommissionPercent || 0) - Number(pricing.platformCutPercent || 0))
   clampPricingFields()
+  // Force a clean pie for display (legacy independent shares may not sum 100).
+  if (sharesSum.value !== 100) {
+    onShareInput('host')
+  }
 }
 
 function onCreateFreeToggle() {
@@ -940,11 +1064,24 @@ async function savePricing() {
   savingPricing.value = true
   error.value = ''
   clampPricingFields()
-  if (sharesOver100.value) {
+  if (sharesSum.value !== 100) {
+    onShareInput('host')
+  }
+  if (sharesSum.value !== 100) {
     savingPricing.value = false
-    error.value = t('agencies.sharesOver100Hint')
+    error.value = t('agencies.sharesMustSum100')
     toast().danger(error.value)
     return
+  }
+  // Guard: cashable (host+agency) too high still usually profitable at Play prices,
+  // but platform share under 25% is marked unsafe for operator messaging.
+  const platform = Number(pricing.platformCutPercent || 0)
+  if (platform < 25) {
+    const ok = window.confirm(t('agencies.lowPlatformConfirm', { value: platform }))
+    if (!ok) {
+      savingPricing.value = false
+      return
+    }
   }
   const createFree = !!pricing.createFree
   let coins = Math.floor(Number(pricing.createPriceCoins) || 0)

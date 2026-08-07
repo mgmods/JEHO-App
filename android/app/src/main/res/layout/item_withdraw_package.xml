@@ -13,13 +13,14 @@
         android:background="@drawable/bg_withdraw_package"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingHorizontal="10dp"
-        android:paddingTop="16dp"
-        android:paddingBottom="14dp">
+        android:paddingHorizontal="8dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="12dp"
+        android:minHeight="128dp">
 
         <ImageView
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:contentDescription="@null"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_asset_diamond"
@@ -29,7 +30,7 @@
             android:id="@+id/tvUsd"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:text="$10"
             android:textColor="#FE2C55"
             android:textSize="20sp"
@@ -37,12 +38,24 @@
 
         <TextView
             android:id="@+id/tvDiamonds"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:gravity="center"
             android:text="200,000 ألماس"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvPkgHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:gravity="center"
+            android:lineSpacingExtra="1dp"
+            android:text="تارجت / سحب"
             android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
+            android:textSize="10sp" />
     </LinearLayout>
 </FrameLayout>

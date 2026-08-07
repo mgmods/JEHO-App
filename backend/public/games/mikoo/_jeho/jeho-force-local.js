@@ -4,20 +4,40 @@
   window.__jehoForceLocal = 1;
   var LOCAL = 'https://api.adnova.bbs.tr';
   var LOCAL_WS = 'wss://api.adnova.bbs.tr';
-  var BAD = /(jieyou\.shop|sruner\.com|zkruner\.com)/i;
+  var BAD = /(jieyou\.shop|sruner\.com|zkruner\.com|soofun\.online)/i;
+
+  function fixPath(path) {
+    // BaiShun historical path is /game_route; JEHO serves /games/route.
+    if (!path) return path;
+    return String(path)
+      .replace(/\/game_route(?=\/|\?|$)/gi, '/games/route')
+      .replace(/\/game-route(?=\/|\?|$)/gi, '/games/route');
+  }
 
   function rewrite(u) {
     if (u == null) return u;
     var s = String(u);
-    if (!BAD.test(s)) return s;
+    var needsHost = BAD.test(s);
+    var needsPath = /\/game_route(\/|\?|$)/i.test(s) || /\/game-route(\/|\?|$)/i.test(s);
+    if (!needsHost && !needsPath) return s;
     try {
       var a = document.createElement('a');
       a.href = s;
-      var path = (a.pathname || '/') + (a.search || '') + (a.hash || '');
-      if (/^wss?:/i.test(s)) return LOCAL_WS + path;
-      return LOCAL + path;
+      var path = fixPath((a.pathname || '/') + (a.search || '') + (a.hash || ''));
+      if (/^wss?:/i.test(s)) {
+        var wsOrigin = needsHost ? LOCAL_WS : a.protocol + '//' + a.host;
+        return wsOrigin.replace(/\/$/, '') + path;
+      }
+      var origin = needsHost ? LOCAL : a.protocol + '//' + a.host;
+      return origin.replace(/\/$/, '') + path;
     } catch (e) {
-      return s.replace(/^https?:\/\/[^/]+/i, LOCAL).replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
+      var out = s;
+      if (needsHost) {
+        out = out
+          .replace(/^https?:\/\/[^/]+/i, LOCAL)
+          .replace(/^wss?:\/\/[^/]+/i, LOCAL_WS);
+      }
+      return fixPath(out);
     }
   }
 
@@ -29,7 +49,7 @@
       LOCAL = String(dom).replace(/\/$/, '');
       // Keep host only — never keep /games/route path on LOCAL_WS.
       try {
-        var u = new URL(LOCAL.indexOf('http') === 0 ? LOCAL : ('https://' + LOCAL));
+        var u = new URL(LOCAL.indexOf('http') === 0 ? LOCAL : 'https://' + LOCAL);
         LOCAL = u.origin;
       } catch (e2) {}
       if (/^https?:/i.test(LOCAL)) {

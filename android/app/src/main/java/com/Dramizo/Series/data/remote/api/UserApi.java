@@ -22,6 +22,12 @@ public interface UserApi {
     @GET("host-target/me")
     Call<ApiResponse<Map<String, Object>>> hostTargetMe();
 
+    /** Ladder stage withdraw amounts (host salary / agency agent share). No wallet packages. */
+    @GET("host-target/withdraw-options")
+    Call<ApiResponse<Map<String, Object>>> hostTargetWithdrawOptions(
+            @Query("role") String role,
+            @Query("agencyId") String agencyId);
+
     @GET("users/{id}")
     Call<ApiResponse<AuthDtos.UserDto>> getUser(@Path("id") String id);
 

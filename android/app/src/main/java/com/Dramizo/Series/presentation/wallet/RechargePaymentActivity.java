@@ -159,8 +159,8 @@ public class RechargePaymentActivity extends ThemedActivity {
         findViewById(R.id.btnPayCard).setOnClickListener(v ->
                 startActivity(CardCheckoutActivity.intent(this, pkg)));
         findViewById(R.id.btnPayShamCash).setOnClickListener(v -> payWithShamCash());
-        findViewById(R.id.btnPayAgent).setOnClickListener(v ->
-                startActivity(RechargeAgentDirectoryActivity.intent(this, pkg)));
+        View btnPayAgent = findViewById(R.id.btnPayAgent);
+        if (btnPayAgent != null) btnPayAgent.setVisibility(View.GONE);
         findViewById(R.id.btnNetworkTrx).setOnClickListener(v -> buyWithCrypto("TRX"));
         findViewById(R.id.btnNetworkBsc).setOnClickListener(v -> buyWithCrypto("BSC"));
 

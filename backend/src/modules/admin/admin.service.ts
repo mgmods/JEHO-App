@@ -73,9 +73,18 @@ import { salaryLadderToHostTargetStages } from '../../common/host-salary-ladder'
 import {
   normalizeStaffRole,
   isDashboardSuper,
+  hasDashboardAccess,
+  isDashboardOperator,
   staffRank,
   type PlatformStaffRole,
 } from '../../common/staff-role';
+import {
+  DASHBOARD_MODULES,
+  fullPermissions,
+  hasAnyPermission,
+  normalizePermissions,
+  type PermissionsMap,
+} from '../../common/dashboard-permissions';
 
 /** Reasonable monthly VIP coin prices (not explosion formula). */
 export function vipPriceForLevel(level: number): number {
@@ -206,6 +215,7 @@ export class ReviewWithdrawDto {
 @Injectable()
 export class AdminService {
   private staffRoleColumnReady = false;
+  private dashboardPermissionsColumnReady = false;
 
   constructor(
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -457,6 +467,40 @@ export class AdminService {
       // column may already exist or DB user lacks ALTER
     }
     this.staffRoleColumnReady = true;
+  }
+
+  private async ensureDashboardPermissionsColumn() {
+    if (this.dashboardPermissionsColumnReady) return;
+    try {
+      await this.dataSource.query(`
+        ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS "dashboardPermissions" jsonb DEFAULT NULL
+      `);
+    } catch {
+      // column may already exist
+    }
+    this.dashboardPermissionsColumnReady = true;
+  }
+
+  private publicAdminUser(user: User) {
+    const staffRole = normalizeStaffRole(user);
+    const superAdmin = staffRole === 'super';
+    const permissions = superAdmin
+      ? fullPermissions()
+      : normalizePermissions(user.dashboardPermissions);
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      displayName: user.displayName,
+      name: user.displayName,
+      isAdmin: superAdmin || staffRole === 'operator',
+      isSuperAdmin: superAdmin,
+      staffRole,
+      role: 'admin',
+      permissions,
+      modules: [...DASHBOARD_MODULES],
+    };
   }
 
   /** Equipped headwear frames (vip_badge / host_badge) keyed by userId. */
@@ -1805,10 +1849,39 @@ export class AdminService {
       setting.value = nextValue;
       if (description) setting.description = description;
     }
-    return this.settingsRepo.save(setting);
+    const saved = await this.settingsRepo.save(setting);
+    // New covers / catalog → force clients to drop Glide disk cache.
+    if (key === 'app_games') {
+      await this.bumpMediaAssetEpoch();
+    }
+    return saved;
+  }
+
+  /** Bumps app.media_asset_epoch so Android reloads static/custom images. */
+  private async bumpMediaAssetEpoch() {
+    try {
+      const ep = `g${Date.now().toString(36)}`;
+      let row = await this.settingsRepo.findOne({
+        where: { key: 'app.media_asset_epoch' },
+      });
+      if (!row) {
+        row = this.settingsRepo.create({
+          key: 'app.media_asset_epoch',
+          value: ep,
+          description: 'Client media cache bust for covers / static art',
+        });
+      } else {
+        row.value = ep;
+      }
+      await this.settingsRepo.save(row);
+    } catch {
+      // non-fatal
+    }
   }
 
   async adminLogin(email: string, password: string) {
+    await this.ensureStaffRoleColumn();
+    await this.ensureDashboardPermissionsColumn();
     const user = await this.usersRepo
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
@@ -1817,74 +1890,76 @@ export class AdminService {
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid admin credentials');
     }
-    // Browser dashboard is Super-only. Managers (in-app staff) cannot log in.
-    if (!isDashboardSuper(user)) {
+    if (!hasDashboardAccess(user)) {
       throw new UnauthorizedException(
-        'Super admin only — dashboard is not available for managers or regular accounts',
+        'Dashboard access denied — Super owner or limited admin only',
       );
+    }
+    const staffRole = normalizeStaffRole(user);
+    if (staffRole === 'operator') {
+      const perms = normalizePermissions(user.dashboardPermissions);
+      if (!hasAnyPermission(perms)) {
+        throw new UnauthorizedException(
+          'This admin has no modules enabled — contact Super admin',
+        );
+      }
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Invalid admin credentials');
 
     // Keep isAdmin + staffRole in sync for Super accounts.
     let dirty = false;
-    if (!user.isAdmin) {
-      user.isAdmin = true;
-      dirty = true;
-    }
-    if (normalizeStaffRole(user) === 'super' && String(user.staffRole || '').toLowerCase() !== 'super') {
-      user.staffRole = 'super';
-      dirty = true;
+    if (staffRole === 'super') {
+      if (!user.isAdmin) {
+        user.isAdmin = true;
+        dirty = true;
+      }
+      if (String(user.staffRole || '').toLowerCase() !== 'super') {
+        user.staffRole = 'super';
+        dirty = true;
+      }
+    } else if (staffRole === 'operator') {
+      // Operators must not look like Super via isAdmin.
+      if (user.isAdmin) {
+        user.isAdmin = false;
+        dirty = true;
+      }
+      if (String(user.staffRole || '').toLowerCase() !== 'operator') {
+        user.staffRole = 'operator';
+        dirty = true;
+      }
     }
     if (dirty) await this.usersRepo.save(user);
 
+    const profile = this.publicAdminUser(user);
     const accessToken = await this.jwtService.signAsync({
       sub: user.id,
       username: user.username,
       isAdmin: true,
-      isSuperAdmin: true,
-      staffRole: 'super',
+      isSuperAdmin: profile.isSuperAdmin,
+      staffRole: profile.staffRole,
       role: 'admin',
     });
     return {
       accessToken,
       token: accessToken,
       tokenType: 'Bearer',
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        name: user.displayName,
-        isAdmin: true,
-        isSuperAdmin: true,
-        staffRole: 'super',
-        role: 'admin',
-      },
+      user: profile,
     };
   }
 
   async adminMe(userId: string) {
+    await this.ensureDashboardPermissionsColumn();
     const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user || !isDashboardSuper(user)) {
-      throw new UnauthorizedException('Super admin access required');
+    if (!user || !hasDashboardAccess(user)) {
+      throw new UnauthorizedException('Dashboard access required');
     }
-    return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      displayName: user.displayName,
-      name: user.displayName,
-      isAdmin: true,
-      isSuperAdmin: true,
-      staffRole: 'super',
-      role: 'admin',
-    };
+    return this.publicAdminUser(user);
   }
 
   /**
-   * Super-admin only: update dashboard login email and/or password.
-   * Requires current password. Mirrors into admin_users when linked.
+   * Self-service: update dashboard login email and/or password.
+   * Requires current password. Super or limited operator for own account.
    */
   async updateAdminCredentials(
     userId: string,
@@ -1899,8 +1974,8 @@ export class AdminService {
       .addSelect('u.passwordHash')
       .where('u.id = :id', { id: userId })
       .getOne();
-    if (!user || !isDashboardSuper(user)) {
-      throw new UnauthorizedException('Super admin access required');
+    if (!user || !hasDashboardAccess(user)) {
+      throw new UnauthorizedException('Dashboard access required');
     }
     if (!user.passwordHash) {
       throw new BadRequestException('This account has no password set');
@@ -1944,7 +2019,6 @@ export class AdminService {
 
     await this.usersRepo.save(user);
 
-    // Keep legacy admin_users table in sync when present.
     const linked = await this.adminUsersRepo.find({
       where: [{ linkedUserId: user.id }],
     });
@@ -1960,6 +2034,143 @@ export class AdminService {
       username: user.username,
       message: 'Admin credentials updated',
     };
+  }
+
+  // ─── Multi-admin operators (Super only) ─────────────────────
+
+  async listDashboardOperators() {
+    await this.ensureDashboardPermissionsColumn();
+    const items = await this.usersRepo
+      .createQueryBuilder('u')
+      .where('LOWER(COALESCE(u.staffRole, \'\')) = :role', { role: 'operator' })
+      .orderBy('u.createdAt', 'DESC')
+      .getMany();
+    return {
+      items: items.map((u) => this.publicAdminUser(u)),
+      modules: [...DASHBOARD_MODULES],
+    };
+  }
+
+  async createDashboardOperator(dto: {
+    email: string;
+    password: string;
+    displayName?: string;
+    permissions?: Record<string, string>;
+  }) {
+    await this.ensureStaffRoleColumn();
+    await this.ensureDashboardPermissionsColumn();
+    const email = String(dto.email || '')
+      .trim()
+      .toLowerCase();
+    const password = String(dto.password || '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new BadRequestException('Invalid email address');
+    }
+    if (password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
+    }
+    const perms = normalizePermissions(dto.permissions);
+    if (!hasAnyPermission(perms)) {
+      throw new BadRequestException(
+        'Grant at least one module as read or write',
+      );
+    }
+    const existing = await this.usersRepo
+      .createQueryBuilder('u')
+      .where('LOWER(u.email) = :email', { email })
+      .getOne();
+    if (existing) {
+      // Promote existing user to operator only if not Super.
+      if (isDashboardSuper(existing)) {
+        throw new ConflictException('This email belongs to Super admin');
+      }
+      existing.staffRole = 'operator';
+      existing.isAdmin = false;
+      existing.dashboardPermissions = perms as Record<string, string>;
+      existing.passwordHash = await bcrypt.hash(password, 12);
+      if (dto.displayName?.trim()) {
+        existing.displayName = dto.displayName.trim();
+      }
+      if (!existing.email) existing.email = email;
+      await this.usersRepo.save(existing);
+      return this.publicAdminUser(existing);
+    }
+
+    const baseUsername =
+      email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) ||
+      'admin';
+    let username = baseUsername.slice(0, 24);
+    let n = 0;
+    while (await this.usersRepo.findOne({ where: { username } })) {
+      n += 1;
+      username = `${baseUsername.slice(0, 20)}${n}`;
+    }
+    const user = this.usersRepo.create({
+      email,
+      username,
+      displayName: (dto.displayName || baseUsername || 'Admin').trim(),
+      passwordHash: await bcrypt.hash(password, 12),
+      staffRole: 'operator',
+      isAdmin: false,
+      dashboardPermissions: perms as Record<string, string>,
+      status: UserStatus.ACTIVE,
+      emailVerified: true,
+    });
+    await this.usersRepo.save(user);
+    return this.publicAdminUser(user);
+  }
+
+  async updateDashboardOperator(
+    id: string,
+    dto: {
+      displayName?: string;
+      password?: string;
+      permissions?: Record<string, string>;
+      active?: boolean;
+    },
+  ) {
+    await this.ensureDashboardPermissionsColumn();
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user || !isDashboardOperator(user)) {
+      throw new NotFoundException('Limited admin not found');
+    }
+    if (dto.displayName != null) {
+      user.displayName = String(dto.displayName).trim() || user.displayName;
+    }
+    if (dto.password) {
+      if (String(dto.password).length < 8) {
+        throw new BadRequestException('Password must be at least 8 characters');
+      }
+      user.passwordHash = await bcrypt.hash(String(dto.password), 12);
+    }
+    if (dto.permissions != null) {
+      const perms = normalizePermissions(dto.permissions);
+      if (!hasAnyPermission(perms)) {
+        throw new BadRequestException(
+          'Grant at least one module as read or write',
+        );
+      }
+      user.dashboardPermissions = perms as Record<string, string>;
+    }
+    if (typeof dto.active === 'boolean') {
+      user.status = dto.active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
+    }
+    user.staffRole = 'operator';
+    user.isAdmin = false;
+    await this.usersRepo.save(user);
+    return this.publicAdminUser(user);
+  }
+
+  async removeDashboardOperator(id: string) {
+    const user = await this.usersRepo.findOne({ where: { id } });
+    if (!user || !isDashboardOperator(user)) {
+      throw new NotFoundException('Limited admin not found');
+    }
+    user.staffRole = null;
+    user.isAdmin = false;
+    user.dashboardPermissions = null;
+    await this.usersRepo.save(user);
+    return { ok: true };
   }
 
   async charts() {

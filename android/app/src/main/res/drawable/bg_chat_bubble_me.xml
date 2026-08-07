@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Private chat outgoing — soft mint, tail at top-end (row is LTR, mine on right). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#FFFFFFFF" />
-    <corners android:radius="12dp" />
-    <stroke
-        android:width="0.5dp"
-        android:color="#FFD8D8D8" />
+    <solid android:color="#FFCFF5E4" />
+    <corners
+        android:topLeftRadius="16dp"
+        android:topRightRadius="4dp"
+        android:bottomLeftRadius="16dp"
+        android:bottomRightRadius="16dp" />
 </shape>

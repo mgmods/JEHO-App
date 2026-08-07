@@ -1,0 +1,111 @@
+
+Camel1.png
+size: 493,1077
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+1/x
+  rotate: false
+  xy: 2, 373
+  size: 218, 157
+  orig: 602, 502
+  offset: 128, 226
+  index: -1
+2/x
+  rotate: true
+  xy: 336, 649
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+3/x
+  rotate: true
+  xy: 335, 435
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+4/x
+  rotate: true
+  xy: 335, 221
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+5/x
+  rotate: false
+  xy: 2, 216
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+6/x
+  rotate: true
+  xy: 2, 2
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+7/x
+  rotate: true
+  xy: 159, 2
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+8/x
+  rotate: true
+  xy: 336, 863
+  size: 212, 155
+  orig: 602, 502
+  offset: 133, 227
+  index: -1
+houtui1
+  rotate: true
+  xy: 2, 762
+  size: 87, 265
+  orig: 602, 502
+  offset: 107, 80
+  index: -1
+houtui2
+  rotate: true
+  xy: 2, 663
+  size: 97, 249
+  orig: 602, 502
+  offset: 141, 85
+  index: -1
+qiantui1
+  rotate: false
+  xy: 253, 530
+  size: 80, 230
+  orig: 80, 230
+  offset: 0, 0
+  index: -1
+qiantui2
+  rotate: true
+  xy: 2, 532
+  size: 129, 222
+  orig: 602, 502
+  offset: 333, 82
+  index: -1
+shhenti
+  rotate: false
+  xy: 2, 851
+  size: 332, 224
+  orig: 602, 502
+  offset: 122, 180
+  index: -1
+tou
+  rotate: false
+  xy: 316, 27
+  size: 172, 192
+  orig: 602, 502
+  offset: 357, 228
+  index: -1
+weiba
+  rotate: false
+  xy: 222, 339
+  size: 111, 189
+  orig: 602, 502
+  offset: 35, 146
+  index: -1

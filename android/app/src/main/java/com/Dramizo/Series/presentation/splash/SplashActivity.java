@@ -14,6 +14,7 @@ import android.view.animation.ScaleAnimation;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
@@ -55,12 +56,13 @@ public class SplashActivity extends ThemedActivity {
             parseDeepLink(getIntent());
             ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
-            EdgeToEdgeHelper.applyImmersiveDark(this);
+            EdgeToEdgeHelper.apply(this);
             EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
             EdgeToEdgeHelper.padBottom(binding.splashContent);
             if (getWindow() != null) {
                 getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
-                getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+                getWindow().setNavigationBarColor(
+                        androidx.core.content.ContextCompat.getColor(this, R.color.bg_light));
             }
 
             android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, SPLASH_MIN_MS);

@@ -70,6 +70,16 @@ public final class MiscDtos {
         @SerializedName("isLive") public boolean isLive;
         @SerializedName("openRoomId") public String openRoomId;
         @SerializedName("liveViewerCount") public int liveViewerCount;
+        /** Family-card metrics (Mikoo guild homepage). */
+        @SerializedName("followerCount") public int followerCount;
+        @SerializedName("isFollowing") public Boolean isFollowing;
+        @SerializedName("roomCount") public int roomCount;
+        @SerializedName("maxOnline") public int maxOnline;
+        @SerializedName("liveOnline") public int liveOnline;
+        @SerializedName("giftsReceivedDiamonds") public long giftsReceivedDiamonds;
+        @SerializedName("level") public int level;
+        @SerializedName("medals") public int medals;
+        @SerializedName("owner") public AuthDtos.UserDto owner;
     }
 
     public static class AgencyMemberDto {
@@ -270,7 +280,7 @@ public final class MiscDtos {
         @SerializedName("titleEn") public String titleEn;
         @SerializedName("coverUrl") public String coverUrl;
         @SerializedName("playUrl") public String playUrl;
-        @SerializedName("sortOrder") public int sortOrder;
+        @SerializedName("sortOrder") public Number sortOrder;
         @SerializedName("mode") public String mode;
         /** When false, game is hidden. Null/omitted means visible. */
         @SerializedName("enabled") public Boolean enabled;
@@ -294,6 +304,11 @@ public final class MiscDtos {
         @SerializedName("chatPromoKickEnabled") public boolean chatPromoKickEnabled = true;
         @SerializedName("liveNsfwEnabled") public boolean liveNsfwEnabled = true;
         @SerializedName("extraKeywords") public java.util.List<String> extraKeywords;
+        /**
+         * Server media epoch — when this changes, clients wipe image caches and
+         * re-bust static asset URLs (game covers, icons, banners).
+         */
+        @SerializedName("mediaAssetEpoch") public String mediaAssetEpoch;
     }
 
     /** Store update prompt from GET /config/app-update. */
@@ -453,6 +468,8 @@ public final class MiscDtos {
         @SerializedName("platformCutPercent") public double platformCutPercent;
         @SerializedName("hostSharePercent") public double hostSharePercent;
         @SerializedName("memberCount") public int memberCount;
+        @SerializedName("activeHosts") public int activeHosts;
+        @SerializedName("monthCommissionDeltaPct") public double monthCommissionDeltaPct;
         @SerializedName("diamondUsdRate") public double diamondUsdRate;
         @SerializedName("totals") public AgencyEarningsTotals totals;
         @SerializedName("periods") public AgencyEarningsPeriods periods;
@@ -490,12 +507,21 @@ public final class MiscDtos {
         @SerializedName("giftsGrossWeek") public long giftsGrossWeek;
         @SerializedName("giftsGrossMonth") public long giftsGrossMonth;
         @SerializedName("giftsGrossAllTime") public long giftsGrossAllTime;
+        @SerializedName("giftsGrossPrevMonth") public long giftsGrossPrevMonth;
+        @SerializedName("giftsCountMonth") public long giftsCountMonth;
+        @SerializedName("giftsCountPrevMonth") public long giftsCountPrevMonth;
+        @SerializedName("fansCount") public long fansCount;
+        @SerializedName("level") public int level;
         @SerializedName("diamondsEarnedWeek") public long diamondsEarnedWeek;
         @SerializedName("diamondsEarnedMonth") public long diamondsEarnedMonth;
         @SerializedName("diamondsEarnedAllTime") public long diamondsEarnedAllTime;
+        @SerializedName("diamondsEarnedPrevMonth") public long diamondsEarnedPrevMonth;
         @SerializedName("usdEarnedWeek") public double usdEarnedWeek;
         @SerializedName("usdEarnedMonth") public double usdEarnedMonth;
         @SerializedName("usdEarnedAllTime") public double usdEarnedAllTime;
+        @SerializedName("usdEarnedPrevMonth") public double usdEarnedPrevMonth;
+        @SerializedName("monthUsdDeltaPct") public double monthUsdDeltaPct;
+        @SerializedName("giftsMonthDeltaPct") public double giftsMonthDeltaPct;
         @SerializedName("walletDiamonds") public long walletDiamonds;
         @SerializedName("walletUsd") public double walletUsd;
         @SerializedName("personalDiamonds") public long personalDiamonds;

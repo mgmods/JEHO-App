@@ -42,7 +42,7 @@ public class AgencyViewModel extends ViewModel {
                         uid,
                         EncryptedFeatureCache.NS_AGENCY_MINE,
                         MiscDtos.AgencyMineDto.class,
-                        java.util.concurrent.TimeUnit.DAYS.toMillis(7));
+                        java.util.concurrent.TimeUnit.SECONDS.toMillis(45));
                 if (cached != null) {
                     mine.postValue(cached);
                     if (cached.earnings != null) earnings.postValue(cached.earnings);

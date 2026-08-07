@@ -91,12 +91,59 @@ export class GiftsService implements OnModuleInit {
     await this.ensureDefaultGiftCategories();
     // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
     await this.healZeroDiamondCatalog();
+    // Always rewrite competitor brand text in gift titles/descriptions for app UI.
+    await this.ensureJehoPublicBranding();
     if (!bootCatalogSeedEnabled()) {
       this.log.log('Gifts catalog: DB authoritative (no boot seed)');
       return;
     }
     await this.ensureDefaultLuckyGift();
     await this.ensureMikooGiftTabs();
+  }
+
+  /** Replace Mikoo/Mego branding in gift names (and descriptions) visible in the app. */
+  private stripCompetitorBrand(text: string | null | undefined): string {
+    return String(text || '')
+      .replace(/(ال)?(ميكو|ميجو)/g, 'JEHO')
+      .replace(/mikoo/gi, 'JEHO')
+      .replace(/mego/gi, 'JEHO')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s*·\s*·\s*/g, ' · ')
+      .replace(/^\s*·\s*|\s*·\s*$/g, '')
+      .trim();
+  }
+
+  private async ensureJehoPublicBranding() {
+    const verKey = 'gifts.public_branding_version';
+    // Bump when rewrite rules change so production re-applies.
+    const ver = '20260806-jeho-v2';
+    try {
+      const row = await this.settingsRepo.findOne({ where: { key: verKey } });
+      if (row?.value === ver) return;
+      const all = await this.giftsRepo.find();
+      let updated = 0;
+      for (const g of all) {
+        const nextName = this.stripCompetitorBrand(g.name);
+        const nextDesc = this.stripCompetitorBrand(g.description);
+        if (nextName !== (g.name || '') || nextDesc !== (g.description || '')) {
+          g.name = nextName || g.name;
+          g.description = nextDesc || g.description;
+          await this.giftsRepo.save(g);
+          updated += 1;
+        }
+      }
+      if (row) {
+        row.value = ver;
+        await this.settingsRepo.save(row);
+      } else {
+        await this.settingsRepo.save(this.settingsRepo.create({ key: verKey, value: ver }));
+      }
+      if (updated > 0) this.log.log(`Gifts public branding rewritten (${updated} rows)`);
+    } catch (err) {
+      this.log.warn(
+        `ensureJehoPublicBranding skipped: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   /**
@@ -395,7 +442,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/gift_back_lv1.webp',
           coinPrice: 0,
           sortOrder: 10,
-          description: 'هدية حقيبة (من ميكو) — تظهر في تبويب الحقيبة',
+          description: 'هدية حقيبة — تظهر في تبويب الحقيبة',
         },
         {
           name: 'حقيبة فضية',
@@ -440,7 +487,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/egg_gift_d.webp',
           coinPrice: 50,
           sortOrder: 50,
-          description: 'هدية فتات (debris) — عملة خاصة مثل ميكو',
+          description: 'هدية فتات (debris) — عملة خاصة',
         },
         {
           name: 'هدية وكالة',
@@ -467,7 +514,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/bg_lucky_gift_low_plus.webp',
           coinPrice: 2000,
           sortOrder: 4,
-          description: 'طبقة حظ إضافية من ميكو',
+          description: 'طبقة حظ إضافية',
         },
       ];
 
@@ -889,7 +936,7 @@ export class GiftsService implements OnModuleInit {
         await this.giftsRepo.save(
           this.giftsRepo.create({
             name,
-            description: `هدية علم دولة (ميكو) · ${c?.short || ''}`.trim(),
+            description: `هدية علم دولة · ${c?.short || ''}`.trim(),
             iconUrl,
             animationUrl: '/visual-system/runtime.html',
             coinPrice,
@@ -955,7 +1002,7 @@ export class GiftsService implements OnModuleInit {
         await this.giftsRepo.save(
           this.giftsRepo.create({
             name,
-            description: `مستورد من ميكو (${category})`,
+            description: `مستورد (${category})`,
             iconUrl,
             animationUrl: item.animationUrl || '/visual-system/runtime.html',
             coinPrice,

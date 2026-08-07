@@ -44,7 +44,22 @@ async function bootstrap() {
       'games/route/client_log/dev/add',
       'games/route/client_log/test/add',
       'games/route/client_log/prod/add',
+      // BaiShun legacy path (no s) — some packages still request /game_route/*
+      'game_route/get_addr',
+      'game_route/update_time',
+      'game_route/client_log/dev/add',
+      'game_route/client_log/test/add',
+      'game_route/client_log/prod/add',
     ],
+  });
+  // Remap historical BaiShun /game_route → /games/route before routing.
+  const expressForRoute = app.getHttpAdapter().getInstance();
+  expressForRoute.use((req: { url?: string; originalUrl?: string }, _res: unknown, next: () => void) => {
+    const raw = String(req.url || '');
+    if (raw.startsWith('/game_route') || raw.startsWith('/game-route')) {
+      req.url = raw.replace(/^\/game-?route/i, '/games/route');
+    }
+    next();
   });
   app.useGlobalPipes(
     new ValidationPipe({
@@ -82,7 +97,7 @@ async function bootstrap() {
     const pathName = String(req.path || req.url || '').split('?')[0];
     if (
       req.method === 'GET' &&
-      /^\/games\/mikoo\/(slot777|cleopatra-slot|football-plinko|fishing|hilo|royal-battle|swimsuit-party)\/?(index\.html)?$/i.test(
+      /^\/games\/mikoo\/(slot777|cleopatra-slot|football-plinko|fishing|hilo|royal-battle|swimsuit-party|greedy-lion)\/?(index\.html)?$/i.test(
         pathName,
       )
     ) {
@@ -190,6 +205,7 @@ const baishunModuleMap: Record<string, string> = {
     '1107': 'cleopatra-slot',
     '1022': 'fishing',
     '1184': 'football-plinko',
+    '1068': 'greedy-lion',
     '1072': 'hilo',
     '1174': 'royal-battle',
     '1098': 'slot777',
@@ -197,12 +213,12 @@ const baishunModuleMap: Record<string, string> = {
   };
   const apiOrigin = (process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '');
   const wsOrigin = apiOrigin.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
-  expressApp.get('/games/route/get_addr', (req: { query: Record<string, string | undefined> }, res: {
+  const baishunGetAddr = (req: { query: Record<string, string | undefined> }, res: {
     setHeader: (k: string, v: string) => void;
     json: (body: unknown) => void;
   }) => {
-    const rawId = String(req.query?.game_id || '1107').trim();
-    const slug = baishunModuleMap[rawId] || rawId.toLowerCase();
+    const rawId = String(req.query?.game_id || '1107').trim().toLowerCase();
+    const slug = baishunModuleMap[rawId] || rawId;
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       code: 200,
@@ -211,20 +227,28 @@ const baishunModuleMap: Record<string, string> = {
         ws_addr: `${wsOrigin}/games/ws/${slug}`,
       },
     });
-  });
-  expressApp.get('/games/route/update_time', (_req: unknown, res: {
+  };
+  expressApp.get('/games/route/get_addr', baishunGetAddr);
+  expressApp.get('/game_route/get_addr', baishunGetAddr);
+  expressApp.get('/game-route/get_addr', baishunGetAddr);
+  const baishunUpdateTime = (_req: unknown, res: {
     json: (body: unknown) => void;
   }) => {
     res.json({ code: 200, data: {} });
-  });
+  };
+  expressApp.get('/games/route/update_time', baishunUpdateTime);
+  expressApp.get('/game_route/update_time', baishunUpdateTime);
+  expressApp.get('/game-route/update_time', baishunUpdateTime);
   const clientLogOk = (_req: unknown, res: { status: (n: number) => { json: (b: unknown) => void } }) => {
     res.status(200).json({ code: 200, data: true });
   };
   for (const env of ['dev', 'test', 'prod'] as const) {
-    (expressApp as { all: (path: string, handler: typeof clientLogOk) => void }).all(
-      `/games/route/client_log/${env}/add`,
-      clientLogOk,
-    );
+    for (const base of ['/games/route', '/game_route', '/game-route'] as const) {
+      (expressApp as { all: (path: string, handler: typeof clientLogOk) => void }).all(
+        `${base}/client_log/${env}/add`,
+        clientLogOk,
+      );
+    }
   }
 
   await app.listen(port);

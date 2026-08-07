@@ -83,7 +83,7 @@ public class AgencyManageActivity extends ThemedActivity {
                 .get(AgencyViewModel.class);
 
         setupMenuRow(binding.menuSearchHosts, R.string.agency_manage_menu_search, v -> dialogSearchHosts());
-        setupMenuRow(binding.menuAddHost, R.string.agency_manage_menu_add, v -> dialogAddHost());
+        setupMenuRow(binding.menuAddHost, R.string.agency_manage_menu_add, v -> dialogAddHostChooser());
         setupMenuRow(binding.menuPending, R.string.agency_manage_menu_pending, v -> dialogPending());
         setupMenuRow(binding.menuCode, R.string.agency_manage_menu_code, v -> dialogActivationCode());
         setupMenuRow(binding.menuStyle, R.string.agency_manage_menu_style, v -> dialogNoticeStyle());
@@ -311,6 +311,64 @@ public class AgencyManageActivity extends ThemedActivity {
                             m, name, pid, m.isActive == null || !m.isActive));
                 }
                 showCustomList(getString(R.string.agency_manage_menu_search), labels, actions);
+            });
+        });
+    }
+
+    private void dialogAddHostChooser() {
+        ArrayList<String> labels = new ArrayList<>();
+        ArrayList<Runnable> actions = new ArrayList<>();
+        labels.add("إضافة مباشرة بالـ ID");
+        actions.add(this::dialogAddHost);
+        labels.add("دعوة عبر الدردشة (بطاقة عائلة)");
+        actions.add(this::openAgencyChatInvite);
+        showCustomList(getString(R.string.agency_manage_menu_add), labels, actions);
+    }
+
+    private void openAgencyChatInvite() {
+        // Always re-read the secret code so invite cards are never sent incomplete.
+        String readyCode = activationCode != null ? activationCode.trim() : "";
+        String nameHint = myAgency != null && myAgency.agency != null ? myAgency.agency.name : null;
+        String logoHint = myAgency != null && myAgency.agency != null ? myAgency.agency.logoUrl : null;
+        if (readyCode.length() >= 4) {
+            com.Dramizo.Series.presentation.voiceroom.ShareRoomBottomSheet.showAgencyInvite(
+                    getSupportFragmentManager(),
+                    agencyId,
+                    nameHint,
+                    logoHint,
+                    readyCode);
+            return;
+        }
+        Toast.makeText(this, R.string.loading, Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.AgencyMineDto> mineResult = ApiCall.execute(c.getAgencyApi().mine());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                String code = "";
+                String name = nameHint;
+                String logo = logoHint;
+                if (mineResult.success && mineResult.data != null
+                        && mineResult.data.agency != null
+                        && agencyId != null
+                        && agencyId.equals(mineResult.data.agency.id)) {
+                    code = mineResult.data.agency.activationCode != null
+                            ? mineResult.data.agency.activationCode.trim() : "";
+                    activationCode = code;
+                    if (mineResult.data.agency.name != null) name = mineResult.data.agency.name;
+                    if (mineResult.data.agency.logoUrl != null) logo = mineResult.data.agency.logoUrl;
+                }
+                if (code.length() < 4) {
+                    Toast.makeText(this, R.string.agency_invite_missing_code, Toast.LENGTH_LONG)
+                            .show();
+                    return;
+                }
+                com.Dramizo.Series.presentation.voiceroom.ShareRoomBottomSheet.showAgencyInvite(
+                        getSupportFragmentManager(),
+                        agencyId,
+                        name,
+                        logo,
+                        code);
             });
         });
     }

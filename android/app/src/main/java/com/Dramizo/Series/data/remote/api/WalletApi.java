@@ -77,24 +77,8 @@ public interface WalletApi {
     @GET("wallet/transactions")
     Call<ApiResponse<MiscDtos.ListResult<WalletDtos.TransactionDto>>> transactions(@retrofit2.http.Query("page") int page);
 
-    @POST("recharge-agents/apply")
-    Call<ApiResponse<Map<String, Object>>> applyRechargeAgent(@Body Map<String, Object> body);
-
     @GET("recharge-agents/me")
     Call<ApiResponse<Map<String, Object>>> rechargeAgentMe();
-
-    @GET("recharge-agents/config")
-    Call<ApiResponse<Map<String, Object>>> rechargeAgentConfig();
-
-    @GET("recharge-agents/quote")
-    Call<ApiResponse<Map<String, Object>>> rechargeAgentQuote(@Query("coins") long coins);
-
-    @GET("recharge-agents/payment-details")
-    Call<ApiResponse<Map<String, Object>>> rechargeAgentPaymentDetails(
-            @Query("network") String network);
-
-    @POST("recharge-agents/deposit-order")
-    Call<ApiResponse<Map<String, Object>>> createAgentDepositOrder(@Body Map<String, Object> body);
 
     @GET("recharge-agents/resolve-user")
     Call<ApiResponse<Map<String, Object>>> resolveRechargeRecipient(
@@ -122,8 +106,4 @@ public interface WalletApi {
 
     @GET("recharge-agents/recharges")
     Call<ApiResponse<Map<String, Object>>> agentRecharges();
-
-    @GET("recharge-agents/directory")
-    Call<ApiResponse<WalletDtos.AgentDirectoryResult>> rechargeAgentDirectory(
-            @Query("country") String country);
 }

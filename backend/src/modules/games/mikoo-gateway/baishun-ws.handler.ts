@@ -44,6 +44,23 @@ import {
   encodeRoyalHistory,
   encodeRoyalPlayStateNotify,
   encodeRoyalUserInfoRes,
+  encodeGreedyGetConfigRes,
+  encodeGreedyUserInfoRes,
+  encodeGreedyDetailRes,
+  encodeGreedyBetRes,
+  encodeGreedyBetStateNotify,
+  encodeGreedyBetNotify,
+  encodeGreedyPlayStateNotify,
+  encodeGreedyEndSettlement,
+  encodeGreedyMineSettlement,
+  encodeGreedyHistory,
+  encodeGreedyPlayerRank,
+  encodeGreedyAutoBetRes,
+  encodeGreedyAutoBetNotify,
+  GREEDY_LION_ODDS,
+  GREEDY_BET_MS,
+  GREEDY_PLAY_MS,
+  GREEDY_OVER_MS,
   encodeSpinRes,
 } from './swimsuit-pb.util';
 import { decodeFields, encodeMessage, pbInt32, pbString, pbUInt64 } from './mikoo-proto.util';
@@ -53,7 +70,7 @@ type BaishunMsg = { msgId?: string; data?: Record<string, unknown> };
 type BaishunProtocol = 'json' | 'packer' | 'clientmsg';
 
 const PACKER_GAMES = new Set(['swimsuit-party']);
-const CLIENTMSG_GAMES = new Set(['hilo', 'royal-battle']);
+const CLIENTMSG_GAMES = new Set(['hilo', 'royal-battle', 'greedy-lion']);
 
 const HILO_MSG = {
   ResMessageError: 401,
@@ -88,11 +105,15 @@ const HILO_MSG = {
   ResUpdateCode: 515,
   ReqUserRank: 417,
   ResUserRank: 517,
-  // Royal notifies
+  ReqAutoBet: 419,
+  ResAutoBet: 519,
+  // Multi-table notifies (royal / greedy)
   ResBetStateNotify: 520,
   ResStartStateNotify: 521,
   ResOverStateNotify: 522,
+  ResBetNotify: 523,
   ResAllPlayerGameResultNotify: 525,
+  ResAutoBetNotify: 526,
   ResMineGameResultNotify: 527,
 } as const;
 
@@ -914,18 +935,33 @@ export class BaishunWsHandler {
     });
   }
 
-  /** Hilo / Royal Battle — raw ClientMsg protobuf (no Packer). */
+  /** Hilo / Royal Battle / Greedy Lion — raw ClientMsg protobuf (no Packer). */
   private handleClientMsg(ws: WebSocket, gameSlug: string, rawUrl: string) {
     let player: MikooPlayerContext | null = null;
     const query = this.parseQuery(rawUrl);
     const isRoyal = gameSlug === 'royal-battle';
+    const isGreedy = gameSlug === 'greedy-lion';
     // Per-connection Hilo round state
     let hiloCard = { id: 7, flower: 0 };
     let hiloBet = 0;
     let hiloRounds = 0;
     let royalRoundId = `r${Date.now()}`;
     let royalMyBet = 0;
+    let greedyRoundId = `g${Date.now()}`;
+    let greedyMyBet = 0;
+    /** areaId -> stake total this round */
+    const greedyAreaBets: Record<number, number> = {};
+    /** areaId -> counts per chip index (for Auto/repeat). */
+    const greedyChipCounts: Record<number, number[]> = {};
+    /** Snapshot of previous completed round for ReqAutoBet. */
+    let lastGreedyPattern: { areaId: number; num: number[] }[] = [];
+    let lastGreedyTotal = 0;
+    let greedyPhase: 'bet' | 'play' | 'over' = 'bet';
+    let greedyRoundTimer: ReturnType<typeof setTimeout> | null = null;
     let chain: Promise<void> = Promise.resolve();
+    const greedyChips = CHIP_LIST.length ? CHIP_LIST : [50, 100, 200, 500, 1000];
+    /** Mesh session publicId — MUST match native bridge userId for chip fly / auto. */
+    const queryUserId = String(query.user_id || query.userId || '').trim();
 
     const ensurePlayer = async () => {
       if (player) return player;
@@ -935,10 +971,203 @@ export class BaishunWsHandler {
       return player;
     };
 
+    const clientUserId = (p: MikooPlayerContext | null) => {
+      // Prefer query userId (exactly what Android injects into PlayerData).
+      if (queryUserId) return queryUserId;
+      if (p?.publicId && Number(p.publicId) > 0) return String(p.publicId);
+      return String(p?.userId || '0');
+    };
+
+    const emptyChipRow = () => greedyChips.map(() => 0);
+
+    const addGreedyChipCount = (area: number, chipIdx: number, count = 1) => {
+      if (!greedyChipCounts[area]) greedyChipCounts[area] = emptyChipRow();
+      const row = greedyChipCounts[area]!;
+      while (row.length < greedyChips.length) row.push(0);
+      row[chipIdx] = (row[chipIdx] || 0) + count;
+    };
+
+    const snapshotGreedyPattern = () => {
+      lastGreedyPattern = Object.keys(greedyChipCounts)
+        .map((k) => Number(k))
+        .sort((a, b) => a - b)
+        .map((areaId) => ({
+          areaId,
+          num: [...(greedyChipCounts[areaId] || emptyChipRow())],
+        }))
+        .filter((x) => x.num.some((n) => n > 0));
+      lastGreedyTotal = greedyMyBet;
+    };
+
+    const clearGreedyRoundBets = () => {
+      greedyMyBet = 0;
+      for (const k of Object.keys(greedyAreaBets)) delete greedyAreaBets[Number(k)];
+      for (const k of Object.keys(greedyChipCounts)) delete greedyChipCounts[Number(k)];
+    };
+
     const randCard = () => ({
       id: 1 + Math.floor(Math.random() * 13),
       flower: Math.floor(Math.random() * 4),
     });
+
+    const clearGreedyTimers = () => {
+      if (greedyRoundTimer) {
+        clearTimeout(greedyRoundTimer);
+        greedyRoundTimer = null;
+      }
+    };
+
+    const beginGreedyBetPhase = (p: MikooPlayerContext | null) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      greedyPhase = 'bet';
+      clearGreedyRoundBets();
+      greedyRoundId = `g${Date.now()}`;
+      this.sendBin(
+        ws,
+        encodeClientMsg(HILO_MSG.ResBetStateNotify, encodeGreedyBetStateNotify(greedyRoundId)),
+      );
+      clearGreedyTimers();
+      // Full bet window → spin → result dialog (same cadence as real Mikoo table).
+      greedyRoundTimer = setTimeout(() => {
+        void settleGreedyRound(p);
+      }, GREEDY_BET_MS);
+    };
+
+    const settleGreedyRound = async (pIn: MikooPlayerContext | null) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if (greedyPhase !== 'bet') return;
+      greedyPhase = 'play';
+      clearGreedyTimers();
+      snapshotGreedyPattern();
+
+      const p = pIn || (await ensurePlayer());
+      const weights = GREEDY_LION_ODDS.map((o) => 1 / Math.max(1, o));
+      const sumW = weights.reduce((a, b) => a + b, 0);
+      let roll = Math.random() * sumW;
+      let winner = 0;
+      for (let i = 0; i < weights.length; i++) {
+        roll -= weights[i]!;
+        if (roll <= 0) {
+          winner = i;
+          break;
+        }
+      }
+      const odds = GREEDY_LION_ODDS[winner] || 2;
+      const stakeOnWin = greedyAreaBets[winner] || 0;
+      let win = Math.floor(stakeOnWin * odds);
+      if (win > 0) {
+        const capped = clampGamePayout({ bet: Math.max(greedyMyBet, 1), win });
+        win = capped.win;
+      }
+      const stakeThisRound = greedyMyBet;
+      const uid = clientUserId(p);
+
+      // 1) Stop betting → Start rotate (client spin uses IngTotalTime from config ≈ 8s)
+      this.sendBin(
+        ws,
+        encodeClientMsg(
+          HILO_MSG.ResStartStateNotify,
+          encodeGreedyPlayStateNotify(GREEDY_PLAY_MS, winner),
+        ),
+      );
+
+      // 2) Wait most of spin, then settle + bottom result panel
+      await new Promise((r) => setTimeout(r, Math.max(4500, GREEDY_PLAY_MS - 1200)));
+      if (ws.readyState !== WebSocket.OPEN) return;
+
+      let bal = p ? await this.sessions.refreshBalance(p) : 0;
+      if (p && win > 0) {
+        bal = await this.credit(p.userId, win, gameSlug, stakeThisRound || 1);
+        p.balance = bal;
+        void this.economy.onBetWin({
+          sessionId: p.sessionId,
+          userId: p.userId,
+          gameId: gameSlug,
+          betCoins: 0,
+          winCoins: win,
+          balanceAfter: bal,
+        });
+      }
+
+      // Round result sheet: stake + reward of THIS round (info.bet / info.reward)
+      this.sendBin(
+        ws,
+        encodeClientMsg(
+          HILO_MSG.ResAllPlayerGameResultNotify,
+          encodeGreedyEndSettlement({
+            areaId: winner,
+            otherTotalWin: Math.max(0, Math.floor(win * 0.3)),
+            info: {
+              userId: uid,
+              nickname: p?.displayName || 'Player',
+              avatar: p?.avatarUrl || '',
+              reward: win,
+              bet: stakeThisRound,
+              rank: 1,
+            },
+          }),
+        ),
+      );
+      this.sendBin(
+        ws,
+        encodeClientMsg(
+          HILO_MSG.ResMineGameResultNotify,
+          encodeGreedyMineSettlement({
+            userId: uid,
+            balance: bal,
+            rewardAmount: win,
+            todayWin: win,
+          }),
+        ),
+      );
+      this.sendBin(ws, encodeClientMsg(HILO_MSG.ResOverStateNotify, Buffer.alloc(0)));
+      greedyPhase = 'over';
+      clearGreedyRoundBets();
+      this.logger.log(
+        `baishun settle ${gameSlug} user=${p?.userId || '?'} winArea=${winner} stake=${stakeThisRound} win=${win} bal=${bal}`,
+      );
+
+      // 3) Keep result panel ~OVER_MS, then next bet phase (countdown + finger tip)
+      greedyRoundTimer = setTimeout(() => {
+        beginGreedyBetPhase(p);
+      }, GREEDY_OVER_MS + 800);
+    };
+
+    ws.on('close', () => clearGreedyTimers());
+
+    const placeGreedyBet = async (
+      p: MikooPlayerContext,
+      area: number,
+      chipIdx: number,
+      count: number,
+    ): Promise<{ ok: boolean; bal: number }> => {
+      const chip = Math.max(
+        1,
+        Math.min(10_000, Math.floor(Number(greedyChips[chipIdx] ?? 50))),
+      );
+      const stake = chip * Math.max(1, count);
+      try {
+        const bal = await this.debit(p.userId, stake, gameSlug);
+        p.balance = bal;
+        greedyMyBet += stake;
+        greedyAreaBets[area] = (greedyAreaBets[area] || 0) + stake;
+        addGreedyChipCount(area, chipIdx, count);
+        void this.economy.onBetWin({
+          sessionId: p.sessionId,
+          userId: p.userId,
+          gameId: gameSlug,
+          betCoins: stake,
+          winCoins: 0,
+          balanceAfter: bal,
+        });
+        return { ok: true, bal };
+      } catch (err) {
+        this.logger.warn(
+          `baishun Bet fail ${gameSlug} user=${p.userId}: ${(err as Error).message}`,
+        );
+        return { ok: false, bal: p.balance || 0 };
+      }
+    };
 
     void (async () => {
       const p0 = await ensurePlayer();
@@ -946,7 +1175,7 @@ export class BaishunWsHandler {
       if (p0) {
         const bal = await this.sessions.refreshBalance(p0);
         this.logger.log(
-          `baishun connect ${gameSlug} user=${p0.userId} bal=${bal} room=${p0.roomId || '-'}`,
+          `baishun connect ${gameSlug} user=${p0.userId} bal=${bal} room=${p0.roomId || '-'} clientUid=${clientUserId(p0)}`,
         );
       }
       if (isRoyal) {
@@ -955,6 +1184,8 @@ export class BaishunWsHandler {
           ws,
           encodeClientMsg(HILO_MSG.ResBetStateNotify, encodeRoyalBetStateNotify(royalRoundId)),
         );
+      } else if (isGreedy) {
+        greedyRoundId = `g${Date.now()}`;
       }
     })();
 
@@ -975,19 +1206,17 @@ export class BaishunWsHandler {
           if (msgId === HILO_MSG.ReqUpdateCode || msgId === HILO_MSG.ReqUserInfo) {
             const p = await ensurePlayer();
             const bal = p ? await this.sessions.refreshBalance(p) : 0;
+            const base = {
+              userId: clientUserId(p),
+              nickname: p?.displayName || 'Player',
+              avatar: p?.avatarUrl || '',
+              balance: bal,
+            };
             const info = isRoyal
-              ? encodeRoyalUserInfoRes({
-                  userId: String(p?.publicId || '0'),
-                  nickname: p?.displayName || 'Player',
-                  avatar: p?.avatarUrl || '',
-                  balance: bal,
-                })
-              : encodeHiloUserInfoRes({
-                  userId: String(p?.publicId || '0'),
-                  nickname: p?.displayName || 'Player',
-                  avatar: p?.avatarUrl || '',
-                  balance: bal,
-                });
+              ? encodeRoyalUserInfoRes(base)
+              : isGreedy
+                ? encodeGreedyUserInfoRes(base)
+                : encodeHiloUserInfoRes(base);
             this.sendBin(ws, encodeClientMsg(HILO_MSG.ResUserInfo, info));
             if (msgId === HILO_MSG.ReqUpdateCode) {
               this.sendBin(
@@ -999,13 +1228,12 @@ export class BaishunWsHandler {
           }
 
           if (msgId === HILO_MSG.ReqGameConfig) {
-            this.sendBin(
-              ws,
-              encodeClientMsg(
-                HILO_MSG.ResGameConfig,
-                isRoyal ? encodeRoyalGetConfigRes() : encodeHiloGetConfigRes(),
-              ),
-            );
+            const cfg = isRoyal
+              ? encodeRoyalGetConfigRes()
+              : isGreedy
+                ? encodeGreedyGetConfigRes(greedyChips)
+                : encodeHiloGetConfigRes();
+            this.sendBin(ws, encodeClientMsg(HILO_MSG.ResGameConfig, cfg));
             if (isRoyal) {
               this.sendBin(
                 ws,
@@ -1032,6 +1260,21 @@ export class BaishunWsHandler {
                 ws,
                 encodeClientMsg(HILO_MSG.ResBetStateNotify, encodeRoyalBetStateNotify(royalRoundId)),
               );
+            } else if (isGreedy) {
+              const p = await ensurePlayer();
+              this.sendBin(
+                ws,
+                encodeClientMsg(
+                  HILO_MSG.ResGameDetail,
+                  encodeGreedyDetailRes({
+                    betElapsedMs: 0,
+                    selectedChipIndex: 0,
+                    roundId: greedyRoundId,
+                    roomState: 1,
+                  }),
+                ),
+              );
+              beginGreedyBetPhase(p);
             } else {
               hiloCard = randCard();
               this.sendBin(
@@ -1055,6 +1298,49 @@ export class BaishunWsHandler {
               return;
             }
             const fields = decodeFields(body);
+            if (isGreedy) {
+              if (greedyPhase !== 'bet') {
+                this.sendBin(
+                  ws,
+                  encodeClientMsg(
+                    HILO_MSG.ResBet,
+                    encodeGreedyBetRes(p.balance || 0, greedyMyBet),
+                  ),
+                );
+                return;
+              }
+              const area = Math.max(0, Math.min(7, Math.floor(Number(fields[1] ?? 0))));
+              const chipIdx = Math.max(
+                0,
+                Math.min(greedyChips.length - 1, Math.floor(Number(fields[2] ?? 0))),
+              );
+              const placed = await placeGreedyBet(p, area, chipIdx, 1);
+              this.sendBin(
+                ws,
+                encodeClientMsg(
+                  HILO_MSG.ResBet,
+                  encodeGreedyBetRes(placed.bal, greedyMyBet),
+                ),
+              );
+              if (placed.ok) {
+                this.sendBin(
+                  ws,
+                  encodeClientMsg(
+                    HILO_MSG.ResBetNotify,
+                    encodeGreedyBetNotify({
+                      userId: clientUserId(p),
+                      chipIndex: chipIdx,
+                      area,
+                      totalBet: greedyMyBet,
+                    }),
+                  ),
+                );
+                this.logger.log(
+                  `baishun Bet ${gameSlug} user=${p.userId} area=${area} chipIdx=${chipIdx} bal=${placed.bal}`,
+                );
+              }
+              return;
+            }
             if (isRoyal) {
               const chip = Math.max(
                 10,
@@ -1293,6 +1579,14 @@ export class BaishunWsHandler {
               );
               return;
             }
+            if (isGreedy) {
+              // Greedy Lion: 412 = ReqHistory → { list: {roundID, areaID}[] }
+              this.sendBin(
+                ws,
+                encodeClientMsg(HILO_MSG.ResHistory, encodeGreedyHistory()),
+              );
+              return;
+            }
             hiloCard = randCard();
             this.sendBin(
               ws,
@@ -1301,6 +1595,67 @@ export class BaishunWsHandler {
                 encodeHiloSwitchCardRes(hiloCard.id, hiloCard.flower),
               ),
             );
+            return;
+          }
+
+          if (msgId === HILO_MSG.ReqAutoBet) {
+            const p = await ensurePlayer();
+            if (!isGreedy) {
+              const bal = p ? await this.sessions.refreshBalance(p) : 0;
+              this.sendBin(
+                ws,
+                encodeClientMsg(HILO_MSG.ResAutoBet, encodeMessage([pbUInt64(1, bal)])),
+              );
+              return;
+            }
+            if (!p || greedyPhase !== 'bet' || lastGreedyPattern.length === 0) {
+              const bal = p ? p.balance || (await this.sessions.refreshBalance(p)) : 0;
+              this.sendBin(
+                ws,
+                encodeClientMsg(HILO_MSG.ResAutoBet, encodeGreedyAutoBetRes(bal, greedyMyBet)),
+              );
+              return;
+            }
+            // Re-apply last round pattern (chip stacks per food area)
+            clearGreedyRoundBets();
+            let lastBal = p.balance || 0;
+            let ok = true;
+            for (const row of lastGreedyPattern) {
+              for (let chipIdx = 0; chipIdx < row.num.length; chipIdx++) {
+                const n = row.num[chipIdx] || 0;
+                if (n <= 0) continue;
+                const r = await placeGreedyBet(p, row.areaId, chipIdx, n);
+                lastBal = r.bal;
+                if (!r.ok) {
+                  ok = false;
+                  break;
+                }
+              }
+              if (!ok) break;
+            }
+            this.sendBin(
+              ws,
+              encodeClientMsg(
+                HILO_MSG.ResAutoBet,
+                encodeGreedyAutoBetRes(lastBal, greedyMyBet),
+              ),
+            );
+            if (ok && greedyMyBet > 0) {
+              this.sendBin(
+                ws,
+                encodeClientMsg(
+                  HILO_MSG.ResAutoBetNotify,
+                  encodeGreedyAutoBetNotify({
+                    userId: clientUserId(p),
+                    totalBet: greedyMyBet,
+                    betList: lastGreedyPattern,
+                  }),
+                ),
+              );
+              this.logger.log(
+                `baishun AutoBet ${gameSlug} user=${p.userId} total=${greedyMyBet} bal=${lastBal}`,
+              );
+            }
             return;
           }
 
@@ -1324,6 +1679,23 @@ export class BaishunWsHandler {
             msgId === 418
           ) {
             const ranks = await this.economy.topWinners(gameSlug, 20);
+            if (isGreedy && msgId === HILO_MSG.ReqPlayerRank) {
+              this.sendBin(
+                ws,
+                encodeClientMsg(
+                  HILO_MSG.ResPlayerRank,
+                  encodeGreedyPlayerRank(
+                    ranks.map((r) => ({
+                      userId: r.userId,
+                      nickname: r.nickname,
+                      avatar: r.avatar,
+                      reward: r.score,
+                    })),
+                  ),
+                ),
+              );
+              return;
+            }
             const resId =
               msgId === HILO_MSG.ReqPlayerRank
                 ? HILO_MSG.ResPlayerRank

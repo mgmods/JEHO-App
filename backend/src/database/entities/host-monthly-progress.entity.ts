@@ -18,7 +18,7 @@ export class HostMonthlyProgress {
   @Column({ type: 'uuid' })
   userId: string;
 
-  /** YYYY-MM */
+  /** Period key: monthly `YYYY-MM` or weekly `YYYYWww` (always ≤7 chars for legacy column). */
   @Index()
   @Column({ type: 'varchar', length: 7 })
   yearMonth: string;
@@ -29,6 +29,14 @@ export class HostMonthlyProgress {
   /** JSON array of claimed stage ids (current cycle only). */
   @Column({ type: 'simple-json', default: [] })
   claimedStageIds: string[];
+
+  /**
+   * Stages whose host-target *salary package* was already submitted for payout
+   * this cycle (separate from reward claims). Only ONE current stage is shown
+   * for withdraw; after salary withdraw, host advances to the next stage.
+   */
+  @Column({ type: 'simple-json', default: [] })
+  withdrawnStageIds: string[];
 
   /** How many full stage sets the host already finished this month. */
   @Column({ type: 'int', default: 0 })

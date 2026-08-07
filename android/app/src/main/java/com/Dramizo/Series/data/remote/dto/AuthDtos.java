@@ -130,6 +130,8 @@ public final class AuthDtos {
         @SerializedName("followersCount") public int followersCount;
         @SerializedName("followingCount") public int followingCount;
         @SerializedName("friendsCount") public int friendsCount;
+        /** Unique profile visitors (Mikoo counter under ID). */
+        @SerializedName("visitorsCount") public int visitorsCount;
         @SerializedName("vipLevel") public int vipLevel;
         @SerializedName("charmScore") public long charmScore;
         @SerializedName("wealthScore") public long wealthScore;
@@ -174,6 +176,10 @@ public final class AuthDtos {
             @SerializedName("coverUrl") public String coverUrl;
             @SerializedName("isVerified") public boolean isVerified;
             @SerializedName("role") public String role;
+            /** Visual guild banner tier 1–6 (Mikoo icon_info_guild_bg_base_lvN). */
+            @SerializedName("level") public int level;
+            /** Lifetime agency diamond pool — used to derive level when needed. */
+            @SerializedName("totalDiamonds") public long totalDiamonds;
         }
 
         /** App-facing ID: numeric publicId, never the login/store username. */

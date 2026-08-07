@@ -81,8 +81,29 @@ export class AgenciesController {
 
   @Public()
   @Get(':id')
-  get(@Param('id', ParseUUIDPipe) id: string) {
-    return this.agenciesService.get(id);
+  get(
+    @Param('id') id: string,
+    @CurrentUser('sub') viewerId?: string,
+  ) {
+    return this.agenciesService.get(id, viewerId);
+  }
+
+  @Post(':id/follow')
+  @ApiOperation({ summary: 'Follow agency family (Mikoo attention)' })
+  followAgency(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.agenciesService.followAgency(id, userId);
+  }
+
+  @Delete(':id/follow')
+  @ApiOperation({ summary: 'Unfollow agency family' })
+  unfollowAgency(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+  ) {
+    return this.agenciesService.unfollowAgency(id, userId);
   }
 
   @Public()

@@ -1,44 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Professional light splash — white brand plane matching JEHO chrome -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fitsSystemWindows="false">
 
-    <!-- Brand night surface + soft atmospheric depth -->
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/bg_auth_surface" />
 
-    <ImageView
-        android:id="@+id/imgSplashBg"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0.42"
-        android:contentDescription="@null"
-        android:scaleType="centerCrop"
-        android:src="@drawable/bg_auth_3d" />
+    <!-- Ambient brand light (no dark artwork) -->
+    <View
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginTop="48dp"
+        android:background="@drawable/bg_auth_glow_rose" />
+
+    <View
+        android:layout_width="240dp"
+        android:layout_height="240dp"
+        android:layout_gravity="end|bottom"
+        android:layout_marginEnd="-56dp"
+        android:layout_marginBottom="88dp"
+        android:background="@drawable/bg_auth_glow_gold" />
 
     <View
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@drawable/bg_auth_vignette" />
 
-    <View
-        android:layout_width="280dp"
-        android:layout_height="280dp"
-        android:layout_gravity="center_horizontal|top"
-        android:layout_marginTop="72dp"
-        android:background="@drawable/bg_auth_glow_rose" />
-
-    <View
-        android:layout_width="220dp"
-        android:layout_height="220dp"
-        android:layout_gravity="end|bottom"
-        android:layout_marginEnd="-40dp"
-        android:layout_marginBottom="96dp"
-        android:background="@drawable/bg_auth_glow_gold" />
+    <!-- Theme hook (kept for binding compatibility) -->
+    <ImageView
+        android:id="@+id/imgSplashBg"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:contentDescription="@null"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/splashContent"
@@ -56,8 +56,8 @@
             android:layout_weight="1" />
 
         <FrameLayout
-            android:layout_width="188dp"
-            android:layout_height="188dp">
+            android:layout_width="176dp"
+            android:layout_height="176dp">
 
             <View
                 android:layout_width="match_parent"
@@ -65,51 +65,51 @@
                 android:background="@drawable/bg_auth_logo_ring" />
 
             <View
-                android:layout_width="156dp"
-                android:layout_height="156dp"
+                android:layout_width="148dp"
+                android:layout_height="148dp"
                 android:layout_gravity="center"
                 android:background="@drawable/bg_auth_logo_plate" />
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/imgSplashLogo"
-                android:layout_width="148dp"
-                android:layout_height="148dp"
+                android:layout_width="136dp"
+                android:layout_height="136dp"
                 android:layout_gravity="center"
                 android:contentDescription="@string/app_name"
-                android:padding="6dp"
+                android:padding="4dp"
                 android:scaleType="centerCrop"
                 android:src="@drawable/jeho_logo"
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
-                app:strokeColor="#18FE2C55"
-                app:strokeWidth="1.5dp" />
+                app:strokeColor="#22FE2C55"
+                app:strokeWidth="1dp" />
         </FrameLayout>
 
         <TextView
             android:id="@+id/tvSplashBrand"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:letterSpacing="0.08"
+            android:layout_marginTop="26dp"
+            android:letterSpacing="0.12"
             android:text="@string/app_name"
             android:textAllCaps="true"
-            android:textColor="#FFFFFFFF"
-            android:textSize="30sp"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp"
             android:textStyle="bold" />
 
         <View
-            android:layout_width="56dp"
+            android:layout_width="48dp"
             android:layout_height="3dp"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="12dp"
             android:background="@drawable/bg_auth_accent_line" />
 
         <TextView
             android:id="@+id/tvSplashTagline"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:letterSpacing="0.06"
+            android:layout_marginTop="12dp"
+            android:letterSpacing="0.04"
             android:text="@string/splash_tagline"
-            android:textColor="#B8FFFFFF"
+            android:textColor="@color/text_secondary"
             android:textSize="15sp" />
 
         <View
@@ -120,16 +120,16 @@
         <ProgressBar
             android:id="@+id/splashProgress"
             style="?android:attr/progressBarStyle"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:indeterminateTint="@color/gift_accent" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
+            android:layout_marginTop="14dp"
             android:text="@string/splash_loading"
-            android:textColor="#66FFFFFF"
+            android:textColor="@color/text_hint"
             android:textSize="12sp" />
     </LinearLayout>
 </FrameLayout>

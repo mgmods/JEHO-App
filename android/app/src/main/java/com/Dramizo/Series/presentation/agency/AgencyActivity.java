@@ -62,6 +62,11 @@ public class AgencyActivity extends ThemedActivity {
     private BottomSheetDialog applicationSheet;
     private com.google.android.material.button.MaterialButton applicationSubmit;
     private boolean awaitingFirstMine = true;
+    /** Live cashable agency-room diamonds (wallet.agencyDiamonds). */
+    private long liveCashableDiamonds = -1L;
+    private double liveCashableRate = 0.00005d;
+    private long lastRefreshAt;
+    private boolean roleRouted;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -165,12 +170,11 @@ public class AgencyActivity extends ThemedActivity {
             binding.btnHostWithdraw.setOnClickListener(v -> { /* disabled */ });
         }
         if (binding.btnHostViewEarnings != null) {
-            binding.btnHostViewEarnings.setOnClickListener(v -> {
-                Intent i = new Intent(this,
-                        com.Dramizo.Series.presentation.wallet.BagActivity.class);
-                i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_TAB, 1);
-                startActivity(i);
-            });
+            binding.btnHostViewEarnings.setOnClickListener(v ->
+                    startActivity(new Intent(this, HostEarningsActivity.class)));
+        }
+        if (binding.btnWithdrawHistory != null) {
+            binding.btnWithdrawHistory.setOnClickListener(v -> openWithdrawHistory());
         }
         View btnHostRequest = binding.getRoot().findViewById(R.id.btnHostRequestPayout);
         if (btnHostRequest != null) {
@@ -209,13 +213,39 @@ public class AgencyActivity extends ThemedActivity {
                 boolean isHost = !pendingJoin
                         && ("host".equals(role) || "member".equals(role));
                 boolean isAgent = !pendingJoin && ("owner".equals(role) || "manager".equals(role));
+                // Dedicated professional boards for host vs agency (owner/manager).
+                if (!roleRouted && isHost) {
+                    roleRouted = true;
+                    startActivity(new Intent(this, HostEarningsActivity.class));
+                    finish();
+                    return;
+                }
+                if (!roleRouted && isAgent) {
+                    roleRouted = true;
+                    startActivity(new Intent(this, AgencyOwnerDashboardActivity.class));
+                    finish();
+                    return;
+                }
+                if (binding.tvAgencyToolbarTitle != null) {
+                    binding.tvAgencyToolbarTitle.setText(isHost
+                            ? R.string.agency_host_dashboard_title
+                            : (isAgent
+                            ? R.string.agency_owner_dashboard_title
+                            : R.string.agency_dashboard_title));
+                }
                 if (binding.sectionEarnings != null) {
+                    // Owners/managers only — host never sees agency commission board.
                     binding.sectionEarnings.setVisibility(isAgent ? View.VISIBLE : View.GONE);
                 }
                 if (binding.rowOwnerEarningsActions != null) {
                     // Withdraw / distribute: owner only (not manager, not host/member).
                     binding.rowOwnerEarningsActions.setVisibility(
                             !pendingJoin && "owner".equals(role) ? View.VISIBLE : View.GONE);
+                }
+                if (binding.btnWithdrawHistory != null) {
+                    binding.btnWithdrawHistory.setVisibility(
+                            !pendingJoin && (isHost || "owner".equals(role))
+                                    ? View.VISIBLE : View.GONE);
                 }
                 if (binding.rowPeriodChips != null) {
                     binding.rowPeriodChips.setVisibility(pendingJoin ? View.GONE : View.VISIBLE);
@@ -250,9 +280,12 @@ public class AgencyActivity extends ThemedActivity {
                     showHostEarningsOnly();
                     if (m.hostDashboard != null) bindHostDashboard(m.hostDashboard);
                     rebindPeriodUi();
+                    refreshCashableBalance();
                 } else if (m.earnings == null) {
                     hideHostDashboard();
                     showEarningsMessage(getString(R.string.agency_earn_owner_only));
+                } else {
+                    refreshCashableBalance();
                 }
             } else {
                 myAgencyId = null;
@@ -302,6 +335,7 @@ public class AgencyActivity extends ThemedActivity {
                 binding.btnHostWithdraw.setVisibility(View.GONE);
             }
             syncHostEarningsHelp(false);
+            refreshCashableBalance();
         });
         vm.getMessage().observe(this, m -> {
             if ("application_submitted".equals(m)) {
@@ -333,8 +367,81 @@ public class AgencyActivity extends ThemedActivity {
         vm.load();
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Live board: re-pull mine + wallet after withdraw / gift / reject refund.
+        long now = System.currentTimeMillis();
+        if (now - lastRefreshAt < 800L) return;
+        lastRefreshAt = now;
+        if (vm != null) {
+            vm.load();
+            refreshCashableBalance();
+        }
+    }
+
+    private void openWithdrawHistory() {
+        boolean forHost = myAgency != null && myAgency.role != null
+                && ("host".equalsIgnoreCase(myAgency.role)
+                || "member".equalsIgnoreCase(myAgency.role));
+        startActivity(AgencyWithdrawHistoryActivity.intent(this, forHost));
+    }
+
+    /** Pull wallet.agencyDiamonds so hero balance moves without restarting the app. */
+    private void refreshCashableBalance() {
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            Result<WalletDtos.WalletDto> wr =
+                    ApiCall.execute(ContainerProvider.from(this).getWalletApi().getWallet());
+            Result<WalletDtos.EconomyConfig> er =
+                    ApiCall.execute(ContainerProvider.from(this).getWalletApi().economyConfig());
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (er.success && er.data != null && er.data.diamondUsdRate > 0) {
+                    liveCashableRate = er.data.diamondUsdRate;
+                }
+                if (wr.success && wr.data != null) {
+                    liveCashableDiamonds = Math.max(0L, wr.data.agencyDiamonds);
+                    if (wr.data.diamondUsdRate > 0) {
+                        liveCashableRate = wr.data.diamondUsdRate;
+                    }
+                } else if (lastHostDash != null && lastHostDash.agencyDiamonds >= 0) {
+                    liveCashableDiamonds = Math.max(0L, lastHostDash.agencyDiamonds);
+                    if (lastHostDash.diamondUsdRate > 0) {
+                        liveCashableRate = lastHostDash.diamondUsdRate;
+                    }
+                } else if (lastEarnings != null && lastEarnings.available != null) {
+                    liveCashableDiamonds = Math.max(0L, lastEarnings.available.agencyDiamonds);
+                    if (lastEarnings.diamondUsdRate > 0) {
+                        liveCashableRate = lastEarnings.diamondUsdRate;
+                    }
+                }
+                bindCashableHero();
+            });
+        });
+    }
+
+    private void bindCashableHero() {
+        if (binding == null) return;
+        long d = Math.max(0L, liveCashableDiamonds);
+        double usd = usdOf(d, liveCashableRate);
+        if (binding.tvHeroAvailableValue != null) {
+            binding.tvHeroAvailableValue.setText(formatUsd(usd));
+        }
+        if (binding.tvHeroAvailableSub != null) {
+            binding.tvHeroAvailableSub.setText(diamondUsdLine(d, usd));
+        }
+        if (binding.tvHeroAvailableLabel != null) {
+            boolean isHost = myAgency != null && myAgency.role != null
+                    && ("host".equalsIgnoreCase(myAgency.role)
+                    || "member".equalsIgnoreCase(myAgency.role));
+            binding.tvHeroAvailableLabel.setText(isHost
+                    ? R.string.agency_host_cashable_label
+                    : R.string.agency_owner_cashable_label);
+        }
+    }
+
     private void openDiamondWithdraw() {
-        // Agency owner: request cash from platform admin (not agent mall / packages UI).
+        // Agency owner: full-screen platform withdraw (not dialog / agent mall).
         showAgencyPlatformWithdrawDialog();
     }
 
@@ -383,128 +490,10 @@ public class AgencyActivity extends ThemedActivity {
                         balance = Math.max(0L, lastEarnings.available.agencyDiamonds);
                     }
                 }
-                openAgencyWithdrawForm(balance, rate, minW, forHost);
-            });
-        });
-    }
-
-    private void openAgencyWithdrawForm(
-            long balanceDiamonds, double diamondUsdRate, long minDiamonds, boolean forHost) {
-        double balUsd = usdOf(balanceDiamonds, diamondUsdRate);
-        final android.widget.EditText etAmount = new android.widget.EditText(this);
-        etAmount.setHint(R.string.agency_platform_withdraw_amount_hint);
-        etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        final android.widget.EditText etAccount = new android.widget.EditText(this);
-        etAccount.setHint(R.string.agency_platform_withdraw_account_hint);
-        etAccount.setMinLines(2);
-        etAccount.setSingleLine(false);
-        final String[] methods = new String[]{"bank", "usdt", "paypal", "other"};
-        final String[] methodLabels = new String[]{
-                getString(R.string.agency_withdraw_method_bank),
-                getString(R.string.agency_withdraw_method_usdt),
-                getString(R.string.agency_withdraw_method_paypal),
-                getString(R.string.agency_withdraw_method_other),
-        };
-        final android.widget.Spinner spMethod = new android.widget.Spinner(this);
-        spMethod.setAdapter(new android.widget.ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, methodLabels));
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        int pad = Math.round(16 * getResources().getDisplayMetrics().density);
-        box.setPadding(pad, pad / 2, pad, pad);
-        TextView bal = new TextView(this);
-        bal.setText(getString(
-                forHost
-                        ? R.string.agency_host_platform_withdraw_balance_line
-                        : R.string.agency_platform_withdraw_balance_line,
-                balanceDiamonds, formatUsdMoney(balUsd)));
-        bal.setTextColor(getColor(R.color.text_primary));
-        bal.setPadding(0, 0, 0, pad / 2);
-        box.addView(bal);
-        TextView minHint = new TextView(this);
-        minHint.setText(getString(R.string.agency_platform_withdraw_min_line, minDiamonds));
-        minHint.setTextColor(getColor(R.color.text_secondary));
-        minHint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        minHint.setPadding(0, 0, 0, pad / 2);
-        box.addView(minHint);
-        TextView methodLab = new TextView(this);
-        methodLab.setText(R.string.agency_platform_withdraw_method);
-        methodLab.setTextColor(getColor(R.color.text_secondary));
-        methodLab.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        box.addView(methodLab);
-        box.addView(spMethod);
-        box.addView(etAmount);
-        box.addView(etAccount);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(forHost
-                        ? R.string.agency_host_platform_withdraw_title
-                        : R.string.agency_platform_withdraw_title)
-                .setMessage(forHost
-                        ? R.string.agency_host_platform_withdraw_message
-                        : R.string.agency_platform_withdraw_message)
-                .setView(box)
-                .setPositiveButton(R.string.agency_payout_send, (d, w) -> {
-                    long diamonds = 0;
-                    try {
-                        diamonds = Long.parseLong(etAmount.getText() != null
-                                ? etAmount.getText().toString().trim() : "0");
-                    } catch (NumberFormatException ignored) {}
-                    String account = etAccount.getText() != null
-                            ? etAccount.getText().toString().trim() : "";
-                    int mIdx = Math.max(0, Math.min(methods.length - 1, spMethod.getSelectedItemPosition()));
-                    String method = methods[mIdx];
-                    if (diamonds < minDiamonds) {
-                        Toast.makeText(this,
-                                getString(R.string.agency_platform_withdraw_min_line, minDiamonds),
-                                Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    if (diamonds > balanceDiamonds) {
-                        Toast.makeText(this, R.string.agency_platform_withdraw_insufficient,
-                                Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    if (account.isEmpty()) {
-                        Toast.makeText(this, R.string.agency_distribute_invalid, Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    submitAgencyPlatformWithdraw(diamonds, method, account, forHost);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
-    }
-
-    private void submitAgencyPlatformWithdraw(
-            long diamonds, String method, String account, boolean forHost) {
-        ContainerProvider.from(this).getIoExecutor().execute(() -> {
-            WalletDtos.WithdrawRequest body =
-                    new WalletDtos.WithdrawRequest((int) Math.min(Integer.MAX_VALUE, diamonds),
-                            method, account);
-            if (body.payoutDetails == null) {
-                body.payoutDetails = new java.util.HashMap<>();
-            }
-            body.payoutDetails.put("channel", "platform");
-            // Host share vs owner commission — both deduct agencyDiamonds on backend.
-            body.payoutDetails.put("source", forHost ? "agency_host" : "agency_commission");
-            body.payoutDetails.put("stream", "agency");
-            if (myAgencyId != null) {
-                body.payoutDetails.put("agencyId", myAgencyId);
-            }
-            if (myAgency != null && myAgency.agency != null && myAgency.agency.name != null) {
-                body.payoutDetails.put("agencyName", myAgency.agency.name);
-            }
-            if (forHost) {
-                body.payoutDetails.put("role", "host");
-            }
-            Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
-                    ContainerProvider.from(this).getWalletApi().withdraw(body));
-            runOnUiThread(() -> {
-                if (r.success) {
-                    Toast.makeText(this, R.string.agency_platform_withdraw_ok, Toast.LENGTH_LONG).show();
-                    vm.load();
-                } else {
-                    com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
-                }
+                String agencyName = myAgency != null && myAgency.agency != null
+                        ? myAgency.agency.name : null;
+                startActivity(AgencyWithdrawActivity.intent(
+                        this, forHost, balance, rate, minW, myAgencyId, agencyName));
             });
         });
     }
@@ -696,6 +685,8 @@ public class AgencyActivity extends ThemedActivity {
                     labelRes = R.string.agency_period_month;
                     break;
             }
+            // Cashable first (live), period earned second.
+            bindCashableHero();
             if (binding.tvHeroPrimaryLabel != null) {
                 binding.tvHeroPrimaryLabel.setText(
                         getString(R.string.agency_host_kpi_earned) + " · " + getString(labelRes));
@@ -710,7 +701,10 @@ public class AgencyActivity extends ThemedActivity {
             return;
         }
 
-        if (lastEarnings == null) return;
+        if (lastEarnings == null) {
+            bindCashableHero();
+            return;
+        }
         MiscDtos.AgencyPeriodSlice slice = periodSliceOf(lastEarnings, selectedPeriod);
         long commissionDiamonds;
         double commissionUsd;
@@ -766,6 +760,7 @@ public class AgencyActivity extends ThemedActivity {
         if (binding.tvEarnCommission != null) {
             binding.tvEarnCommission.setText(formatUsd(commissionUsd));
         }
+        bindCashableHero();
     }
 
     @androidx.annotation.Nullable
@@ -819,6 +814,16 @@ public class AgencyActivity extends ThemedActivity {
         if (next <= 0) next = Math.max(progress, 1);
         String month = String.valueOf(hostTarget.data.get("yearMonth"));
         if (month == null || "null".equals(month)) month = "";
+        Object periodLabel = hostTarget.data.get("periodLabel");
+        if (periodLabel != null && !String.valueOf(periodLabel).isEmpty()
+                && !"null".equals(String.valueOf(periodLabel))) {
+            month = String.valueOf(periodLabel);
+        }
+        Object period = hostTarget.data.get("period");
+        if (period != null && "weekly".equals(String.valueOf(period))
+                && (month == null || month.isEmpty())) {
+            month = "أسبوعي";
+        }
         binding.cardHostTarget.setVisibility(View.VISIBLE);
         if (binding.tvHostTargetMeta != null) {
             binding.tvHostTargetMeta.setText(getString(
@@ -944,6 +949,10 @@ public class AgencyActivity extends ThemedActivity {
                 sheet.dismiss();
                 openDiamondWithdraw();
             });
+            addMenuRow(box, R.string.agency_withdraw_history_open, () -> {
+                sheet.dismiss();
+                startActivity(AgencyWithdrawHistoryActivity.intent(this, false));
+            });
         }
         if (canManage) {
             addMenuRow(box, R.string.agency_activation_code, () -> {
@@ -962,10 +971,11 @@ public class AgencyActivity extends ThemedActivity {
             });
             addMenuRow(box, R.string.agency_host_view_earnings, () -> {
                 sheet.dismiss();
-                Intent i = new Intent(this,
-                        com.Dramizo.Series.presentation.wallet.BagActivity.class);
-                i.putExtra(com.Dramizo.Series.presentation.wallet.BagActivity.EXTRA_TAB, 1);
-                startActivity(i);
+                startActivity(new Intent(this, HostEarningsActivity.class));
+            });
+            addMenuRow(box, R.string.agency_withdraw_history_open, () -> {
+                sheet.dismiss();
+                startActivity(AgencyWithdrawHistoryActivity.intent(this, true));
             });
         }
         if (eligibleLive) {

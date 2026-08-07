@@ -14,7 +14,6 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.engine.DiskCacheStrategy;
 import com.caverock.androidsvg.SVG;
 
 import java.io.InputStream;
@@ -44,6 +43,12 @@ public final class RemoteNavIcons {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private RemoteNavIcons() {}
+
+    /** Drop memory caches so new mediaepoch/icons re-download. */
+    public static void invalidateCaches() {
+        SVG_CACHE.clear();
+        // Keep encrypted config; fresh paint uses MediaAssetSync.bust on load.
+    }
 
     @Nullable
     public static MiscDtos.NavIconsDto get() {
@@ -104,7 +109,7 @@ public final class RemoteNavIcons {
             try {
                 Glide.with(view)
                         .load(url)
-                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                        .apply(MediaAssetSync.requestOptions())
                         .dontAnimate()
                         .fitCenter()
                         .into(view);
@@ -215,7 +220,7 @@ public final class RemoteNavIcons {
                 ? first(pair.selected, pair.normal, pair.icon)
                 : first(pair.normal, pair.icon, pair.selected);
         if (primary == null || primary.isEmpty()) return null;
-        return AssetCatalog.absoluteUrl(primary);
+        return MediaAssetSync.bust(AssetCatalog.absoluteUrl(primary));
     }
 
     @Nullable

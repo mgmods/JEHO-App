@@ -27,7 +27,7 @@
             android:letterSpacing="0.12"
             android:maxLines="1"
             android:text="00000000"
-            android:textColor="#FFFFFF"
+            android:textColor="#454444"
             android:textSize="28sp"
             android:textStyle="bold"
             app:autoSizeMaxTextSize="28sp"
@@ -50,7 +50,7 @@
             android:background="@drawable/bg_vanity_chip"
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
-            android:text="مميز"
+            android:text="@string/vanity_tier_special"
             android:textColor="#0F766E"
             android:textSize="11sp"
             android:textStyle="bold" />
@@ -63,7 +63,7 @@
             android:background="@drawable/bg_vanity_chip_gold"
             android:paddingHorizontal="10dp"
             android:paddingVertical="4dp"
-            android:text="آيدي الحالي"
+            android:text="@string/vanity_mine_badge"
             android:textColor="#9A6700"
             android:textSize="11sp"
             android:textStyle="bold"
@@ -98,7 +98,7 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_marginTop="14dp"
-        android:text="شراء"
+        android:text="@string/vanity_buy"
         android:textAllCaps="false"
         android:textSize="14sp" />
 </LinearLayout>

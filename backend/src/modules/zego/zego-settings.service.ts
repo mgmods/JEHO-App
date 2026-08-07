@@ -228,7 +228,7 @@ export class ZegoSettingsService {
     if (!parsed?.appId && !parsed?.serverSecret && !parsed?.appSign) {
       throw new BadRequestException({
         message:
-          'لم يُعثر على إعدادات Zego في الرابط. تأكد أنه API يعيد appId (ومن الأفضل ServerSecret). تطبيقات مثل ميجو تستخدم Agora وليس Zego.',
+          'لم يُعثر على إعدادات Zego في الرابط. تأكد أنه API يعيد appId (ومن الأفضل ServerSecret). بعض التطبيقات تستخدم Agora وليس Zego.',
         warnings: warnings.slice(0, 8),
       });
     }
@@ -363,7 +363,7 @@ export class ZegoSettingsService {
       (typeof data.agora === 'object' ? 'agora' : '');
     if (agoraHint && !pick('appId', 'app_id', 'zegoAppId', 'zego_app_id')) {
       return {
-        note: 'الرابط يبدو لإعدادات Agora (ميجو وما شابه) وليس Zego — لا يمكن استيرادها كتطبيق Zego.',
+        note: 'الرابط يبدو لإعدادات Agora (تطبيقات أخرى) وليس Zego — لا يمكن استيرادها كتطبيق Zego.',
       };
     }
 

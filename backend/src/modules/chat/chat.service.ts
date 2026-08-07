@@ -195,6 +195,7 @@ export class ChatService {
             roomCardUrl: profile?.roomCardUrl ?? null,
             level: Number(sender.level || 1),
             vipLevel: Number(vipLevel || sender._vipLevel || 0),
+            genderVerified: !!sender.genderVerified,
             ...this.economyStats(profile),
           }
         : undefined,
@@ -290,6 +291,7 @@ export class ChatService {
             lastSeenAt: (peerPart.user as any).updatedAt || null,
             showOnlineStatus: showPeerOnline,
             isOnline: peerOnline,
+            genderVerified: !!(peerPart.user as any).genderVerified,
           }
         : null,
       myParticipant: my,

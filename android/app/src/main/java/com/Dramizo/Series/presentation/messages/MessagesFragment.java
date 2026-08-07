@@ -40,6 +40,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 
+/** Messages tab — clean conversation inbox list. */
 public class MessagesFragment extends Fragment {
     public static final String ACTION_OFFICIAL_NEWS_UPDATED =
             "com.Dramizo.Series.OFFICIAL_NEWS_UPDATED";
@@ -56,15 +57,18 @@ public class MessagesFragment extends Fragment {
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(
+            @NonNull LayoutInflater inflater,
+            @Nullable ViewGroup container,
+            @Nullable Bundle savedInstanceState) {
         binding = FragmentMessagesBinding.inflate(inflater, container, false);
         return binding.getRoot();
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(binding.getRoot(), "chat");
-        viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
+        viewModel = new ViewModelProvider(
+                this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(MessagesViewModel.class);
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.contentRoot, (v, insets) -> {
@@ -77,7 +81,9 @@ public class MessagesFragment extends Fragment {
             Intent i = new Intent(requireContext(), ChatConversationActivity.class);
             i.putExtra(ChatConversationActivity.EXTRA_CONVERSATION_ID, item.id);
             String title = item.title != null ? item.title
-                    : (item.peer != null ? (item.peer.displayName != null ? item.peer.displayName : item.peer.username)
+                    : (item.peer != null
+                    ? (item.peer.displayName != null
+                    ? item.peer.displayName : item.peer.username)
                     : getString(R.string.conversation_default));
             i.putExtra(ChatConversationActivity.EXTRA_TITLE, title);
             if (item.peer != null) {
@@ -93,38 +99,34 @@ public class MessagesFragment extends Fragment {
             }
             startActivity(i);
         });
+
         binding.recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recycler.setAdapter(adapter);
         binding.recycler.setHasFixedSize(true);
         binding.recycler.setItemAnimator(null);
         binding.recycler.setNestedScrollingEnabled(true);
         binding.recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        // Mikoo-style: SRL must ask the RecyclerView, not the FrameLayout wrapper.
+
+        binding.swipe.setColorSchemeResources(R.color.gift_accent);
         binding.swipe.setOnChildScrollUpCallback((parent, child) ->
                 binding.recycler != null && binding.recycler.canScrollVertically(-1));
         binding.swipe.setOnRefreshListener(() -> {
             viewModel.load(true);
             loadOfficialNewsPreview();
-            bindMyRoomCard();
         });
-        if (binding.btnMsgMenu != null) {
-            binding.btnMsgMenu.setOnClickListener(v -> {
-                // Mikoo broom menu: friends + requests (+ mark clear path for later).
-                openFriendsTab(0);
-            });
-        }
+
+        View.OnClickListener openFriends = v -> openFriendsTab(0);
         if (binding.btnFriends != null) {
-            binding.btnFriends.setOnClickListener(v -> openFriendsTab(0));
+            binding.btnFriends.setOnClickListener(openFriends);
+        }
+        if (binding.btnMsgMenu != null) {
+            binding.btnMsgMenu.setOnClickListener(openFriends);
         }
         if (binding.btnRequests != null) {
             binding.btnRequests.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), RequestsActivity.class)));
         }
-        if (binding.cardMyRoom != null) {
-            binding.cardMyRoom.setOnClickListener(v ->
-                    com.Dramizo.Series.util.RoomOpenChooser.open(requireActivity()));
-        }
-        bindMyRoomCard();
+
         loadPendingRequestBadge();
 
         if (binding.officialNewsCardMsg != null) {
@@ -136,9 +138,11 @@ public class MessagesFragment extends Fragment {
         viewModel.getConversations().observe(getViewLifecycleOwner(), list -> {
             adapter.submit(list);
             boolean empty = list == null || list.isEmpty();
-            binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            if (binding.tvEmpty != null) {
+                binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            }
             binding.swipe.setRefreshing(false);
-            AppLoadingOverlay.hide(requireActivity());
+            if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.getError().observe(getViewLifecycleOwner(), e -> {
             if (e != null) Toast.makeText(requireContext(), e, Toast.LENGTH_SHORT).show();
@@ -207,40 +211,10 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // Force reload after leaving a chat so unread badges clear (server marks read on open).
-        // Adapter soft-updates rows by id so avatars do not blink.
         if (viewModel != null) viewModel.load(true);
         loadPendingRequestBadge();
         loadOfficialNewsPreview();
-        bindMyRoomCard();
         registerOfficialNewsReceiver();
-    }
-
-    private void bindMyRoomCard() {
-        if (binding == null || !isAdded()) return;
-        AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
-            com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto me =
-                    c.getSessionManager().getUser();
-            if (!isAdded()) return;
-            requireActivity().runOnUiThread(() -> {
-                if (binding == null) return;
-                if (me != null) {
-                    String name = me.displayName != null && !me.displayName.isEmpty()
-                            ? me.displayName
-                            : (me.username != null ? me.username : getString(R.string.app_name));
-                    if (binding.tvMyRoomName != null) binding.tvMyRoomName.setText(name);
-                    if (binding.imgMyRoomAvatar != null && me.avatarUrl != null) {
-                        com.Dramizo.Series.util.ServerAssets.load(binding.imgMyRoomAvatar, me.avatarUrl);
-                    }
-                    if (binding.imgMyRoomPlus != null) {
-                        binding.imgMyRoomPlus.setVisibility(
-                                me.avatarUrl == null || me.avatarUrl.isEmpty()
-                                        ? View.VISIBLE : View.GONE);
-                    }
-                }
-            });
-        });
     }
 
     @Override
@@ -253,7 +227,8 @@ public class MessagesFragment extends Fragment {
         if (!isAdded()) return;
         IntentFilter filter = new IntentFilter(ACTION_OFFICIAL_NEWS_UPDATED);
         if (Build.VERSION.SDK_INT >= 33) {
-            requireContext().registerReceiver(officialNewsReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            requireContext().registerReceiver(
+                    officialNewsReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
             requireContext().registerReceiver(officialNewsReceiver, filter);
         }

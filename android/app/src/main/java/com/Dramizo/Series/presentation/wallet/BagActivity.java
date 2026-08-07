@@ -124,7 +124,6 @@ public class BagActivity extends ThemedActivity {
         binding.recyclerPackages.setNestedScrollingEnabled(false);
         binding.recyclerPackages.setHasFixedSize(false);
         binding.recyclerPackages.setAdapter(adapter);
-        setupAgentsStrip();
         if (binding.btnMonthlyOffers != null) {
             binding.btnMonthlyOffers.setOnClickListener(v -> showMonthlyOffersSheet());
         }
@@ -144,10 +143,6 @@ public class BagActivity extends ThemedActivity {
         if (binding.btnOpenAgentPortal != null) {
             binding.btnOpenAgentPortal.setOnClickListener(v ->
                     startActivity(new Intent(this, RechargeAgentActivity.class)));
-        }
-        if (binding.btnOpenAgentDirectory != null) {
-            binding.btnOpenAgentDirectory.setOnClickListener(v ->
-                    openAgentDirectoryWithPackageHint());
         }
 
         withdrawAdapter = new WithdrawAdapter();
@@ -470,17 +465,23 @@ public class BagActivity extends ThemedActivity {
         OffersBottomSheet.show(getSupportFragmentManager());
     }
 
-    /** Hub shows balance + menu; each action opens this activity focused on one form. */
+    /** Hub shows balance + target; legacy actions still work via EXTRA_DIAMOND_ACTION. */
     private void applyDiamondActionMode(@Nullable String mode) {
         if (binding == null) return;
         boolean focused = mode != null && !mode.isEmpty();
         if (!focused) {
-            // Hub: keep forms hidden — only menu rows.
+            // Hub: diamond balance + host target only.
             if (binding.sectionWithdrawForm != null) binding.sectionWithdrawForm.setVisibility(View.GONE);
             if (binding.sectionConvert != null) binding.sectionConvert.setVisibility(View.GONE);
             if (binding.sectionHostTrade != null) binding.sectionHostTrade.setVisibility(View.GONE);
+            if (binding.btnFocusConvert != null) binding.btnFocusConvert.setVisibility(View.GONE);
+            if (binding.btnFocusTransfer != null) binding.btnFocusTransfer.setVisibility(View.GONE);
+            if (binding.btnFocusWithdraw != null) binding.btnFocusWithdraw.setVisibility(View.GONE);
+            if (binding.btnOpenEarnings != null) binding.btnOpenEarnings.setVisibility(View.GONE);
+            if (binding.btnFocusTarget != null) binding.btnFocusTarget.setVisibility(View.VISIBLE);
+            // Target card stays on hub (not buried in a sub-screen).
             if (binding.sectionHostMonthlyTarget != null) {
-                binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
+                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
             }
             return;
         }
@@ -501,17 +502,23 @@ public class BagActivity extends ThemedActivity {
         }
         String title = "الماس";
         if ("convert".equals(mode)) {
-            title = "فك الألماس";
-            if (binding.sectionConvert != null) binding.sectionConvert.setVisibility(View.VISIBLE);
+            // Convert removed from product; fall through to target.
+            title = "تارجت المضيف";
+            if (binding.sectionHostMonthlyTarget != null) {
+                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
+            }
         } else if ("transfer".equals(mode)) {
-            title = "تحويل لفتاة";
-            if (binding.sectionHostTrade != null) binding.sectionHostTrade.setVisibility(View.VISIBLE);
+            title = "تارجت المضيف";
+            if (binding.sectionHostMonthlyTarget != null) {
+                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
+            }
         } else if ("target".equals(mode)) {
             title = "تارجت المضيف";
             if (binding.sectionHostMonthlyTarget != null) {
                 binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
             }
         } else {
+            // Personal diamond withdraw (not agency-room host earnings).
             title = "سحب الدخل";
             if (binding.sectionWithdrawForm != null) {
                 binding.sectionWithdrawForm.setVisibility(View.VISIBLE);
@@ -602,7 +609,10 @@ public class BagActivity extends ThemedActivity {
                         withdrawAgents.addAll(r.data.items);
                     }
                     if (withdrawAgents.isEmpty()) {
-                        Toast.makeText(this, "لا يوجد وكلاء نشطون حالياً", Toast.LENGTH_LONG).show();
+                        String err = !r.success && r.error != null
+                                ? r.error
+                                : "لا يوجد وكلاء شحن نشطون حالياً — فعّلهم من لوحة التحكم";
+                        Toast.makeText(this, err, Toast.LENGTH_LONG).show();
                     } else {
                         showAgentPickerDialog();
                     }
@@ -1179,20 +1189,25 @@ public class BagActivity extends ThemedActivity {
 
     private void bindHostMonthlyTarget(Result<Map<String, Object>> hostTarget) {
         if (binding.sectionHostMonthlyTarget == null) return;
-        // Only reveal on the dedicated target screen (or when already visible).
-        boolean showOnHub = "target".equals(diamondActionMode);
+        // Diamond hub always shows target (when enabled); focused convert/transfer removed.
+        boolean canShowTarget = diamondActionMode == null
+                || diamondActionMode.isEmpty()
+                || "target".equals(diamondActionMode)
+                || "convert".equals(diamondActionMode)
+                || "transfer".equals(diamondActionMode);
         if (!hostTarget.success || hostTarget.data == null
                 || !Boolean.TRUE.equals(hostTarget.data.get("enabled"))) {
-            if (binding.btnFocusTarget != null && diamondActionMode == null) {
+            if (binding.btnFocusTarget != null) {
                 binding.btnFocusTarget.setVisibility(View.GONE);
             }
-            if (!showOnHub) binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
+            if (canShowTarget) binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
             return;
         }
-        if (binding.btnFocusTarget != null && diamondActionMode == null) {
-            binding.btnFocusTarget.setVisibility(View.VISIBLE);
+        if (binding.btnFocusTarget != null) {
+            // Card is under balance — no need for duplicate row on hub.
+            binding.btnFocusTarget.setVisibility(View.GONE);
         }
-        if (!showOnHub) {
+        if (!canShowTarget) {
             binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
             return;
         }
@@ -1210,10 +1225,22 @@ public class BagActivity extends ThemedActivity {
         Object cyc = hostTarget.data.get("cycle");
         if (cyc instanceof Number) cycle = Math.max(1, ((Number) cyc).intValue());
         String month = String.valueOf(hostTarget.data.get("yearMonth"));
+        Object periodLabel = hostTarget.data.get("periodLabel");
+        if (periodLabel != null && !String.valueOf(periodLabel).isEmpty()
+                && !"null".equals(String.valueOf(periodLabel))) {
+            month = String.valueOf(periodLabel);
+        }
+        Object period = hostTarget.data.get("period");
+        String periodTag = "";
+        if (period != null) {
+            String periodKey = String.valueOf(period);
+            if ("weekly".equals(periodKey)) periodTag = " · أسبوعي";
+            else if ("monthly".equals(periodKey)) periodTag = " · شهري";
+        }
         if (binding.tvHostTargetMonth != null) {
             String monthLabel = month != null && !month.isEmpty() && !"null".equals(month)
-                    ? month : "الشهر الحالي";
-            binding.tvHostTargetMonth.setText(monthLabel + " · دورة " + cycle);
+                    ? month : "الفترة الحالية";
+            binding.tvHostTargetMonth.setText(monthLabel + periodTag + " · دورة " + cycle);
         }
         if (binding.tvHostMonthlyProgress != null) {
             if (next > 0) {
@@ -1281,14 +1308,20 @@ public class BagActivity extends ThemedActivity {
                     }
                     if (tvTitle != null) tvTitle.setText(title);
                     if (tvTh != null) {
-                        tvTh.setText(String.format(Locale.US,
-                                "التارجت: %,d كوين = %,d ألماسة", th, th));
+                        if (hostSalary > 0) {
+                            tvTh.setText(String.format(Locale.US,
+                                    "%,d ألماس تارجت  ·  = $%.0f للمضيف",
+                                    th, hostSalary));
+                        } else {
+                            tvTh.setText(String.format(Locale.US,
+                                    "التارجت: %,d ألماس (1 كوين = 1 ألماسة)", th));
+                        }
                     }
                     if (tvSalary != null) {
                         if (hostSalary > 0 || agentSalary > 0 || totalSalary > 0) {
                             tvSalary.setVisibility(View.VISIBLE);
                             tvSalary.setText(String.format(Locale.US,
-                                    "مضيف $%.0f · وكيل $%.0f · إجمالي $%.0f",
+                                    "راتب مضيف $%.0f  ·  عمولة وكالة $%.0f  ·  إجمالي $%.0f",
                                     hostSalary, agentSalary, totalSalary));
                         } else {
                             tvSalary.setVisibility(View.GONE);
@@ -1380,113 +1413,6 @@ public class BagActivity extends ThemedActivity {
         }
     }
 
-    private void openAgentDirectoryWithPackageHint() {
-        // Directory requires package pick before WhatsApp (avoids 0 coins message).
-        startActivity(RechargeAgentDirectoryActivity.intent(this, null));
-        Toast.makeText(this, "اختر باقة ثم راسل الوكيل", Toast.LENGTH_SHORT).show();
-        if (binding.tabs != null && binding.tabs.getTabCount() > 0) {
-            binding.tabs.getTabAt(0).select();
-        }
-    }
-
-    private void setupAgentsStrip() {
-        if (binding.recyclerAgentsStrip == null) return;
-        AgentStripAdapter stripAdapter = new AgentStripAdapter(agent ->
-                openAgentDirectoryWithPackageHint());
-        binding.recyclerAgentsStrip.setLayoutManager(
-                new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
-        binding.recyclerAgentsStrip.setAdapter(stripAdapter);
-        if (binding.btnAgentsSeeAll != null) {
-            binding.btnAgentsSeeAll.setOnClickListener(v -> openAgentDirectoryWithPackageHint());
-        }
-        c.getIoExecutor().execute(() -> {
-            Result<WalletDtos.AgentDirectoryResult> result =
-                    ApiCall.execute(c.getWalletApi().rechargeAgentDirectory(null));
-            runOnUiThread(() -> {
-                if (!result.success || result.data == null
-                        || result.data.items == null || result.data.items.isEmpty()) {
-                    if (binding.sectionAgentsStrip != null) {
-                        binding.sectionAgentsStrip.setVisibility(View.GONE);
-                    }
-                    return;
-                }
-                if (binding.sectionAgentsStrip != null) {
-                    binding.sectionAgentsStrip.setVisibility(View.VISIBLE);
-                }
-                List<WalletDtos.AgentDirectoryEntry> preview = new ArrayList<>();
-                int limit = Math.min(12, result.data.items.size());
-                for (int i = 0; i < limit; i++) preview.add(result.data.items.get(i));
-                stripAdapter.submit(preview);
-            });
-        });
-    }
-
-    private static class AgentStripAdapter extends RecyclerView.Adapter<AgentStripAdapter.VH> {
-        interface Listener { void onTap(WalletDtos.AgentDirectoryEntry agent); }
-        private final List<WalletDtos.AgentDirectoryEntry> items = new ArrayList<>();
-        private final Listener listener;
-        AgentStripAdapter(Listener listener) { this.listener = listener; }
-        void submit(List<WalletDtos.AgentDirectoryEntry> data) {
-            items.clear();
-            if (data != null) items.addAll(data);
-            notifyDataSetChanged();
-        }
-        @NonNull @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_recharge_agent_strip, parent, false);
-            return new VH(v);
-        }
-        @Override
-        public void onBindViewHolder(@NonNull VH h, int position) {
-            WalletDtos.AgentDirectoryEntry e = items.get(position);
-            String name = e.displayName != null && !e.displayName.trim().isEmpty()
-                    ? e.displayName.trim() : "وكيل شحن";
-            h.tvName.setText(name);
-            h.tvCountry.setText(com.Dramizo.Series.util.CountryCatalog.labelWithFlag(e.country));
-            h.tvLetter.setText(name.substring(0, 1).toUpperCase(Locale.US));
-            android.widget.ImageView cover = h.itemView.findViewById(R.id.imgAgentCover);
-            android.widget.ImageView avatar = h.itemView.findViewById(R.id.imgAgentAvatar);
-            if (cover != null) {
-                if (e.coverUrl != null && !e.coverUrl.isEmpty()) {
-                    com.bumptech.glide.Glide.with(cover)
-                            .load(AssetCatalog.absoluteUrl(e.coverUrl))
-                            .centerCrop()
-                            .placeholder(R.drawable.bg_agent_card_cover)
-                            .into(cover);
-                } else {
-                    cover.setImageResource(R.drawable.bg_agent_card_cover);
-                }
-            }
-            if (avatar != null) {
-                if (e.avatarUrl != null && !e.avatarUrl.isEmpty()) {
-                    avatar.setVisibility(View.VISIBLE);
-                    h.tvLetter.setVisibility(View.GONE);
-                    com.bumptech.glide.Glide.with(avatar)
-                            .load(AssetCatalog.absoluteUrl(e.avatarUrl))
-                            .circleCrop()
-                            .into(avatar);
-                } else {
-                    avatar.setVisibility(View.GONE);
-                    h.tvLetter.setVisibility(View.VISIBLE);
-                }
-            }
-            h.itemView.setOnClickListener(v -> listener.onTap(e));
-        }
-        @Override public int getItemCount() { return items.size(); }
-        static class VH extends RecyclerView.ViewHolder {
-            final TextView tvName;
-            final TextView tvCountry;
-            final TextView tvLetter;
-            VH(@NonNull View itemView) {
-                super(itemView);
-                tvName = itemView.findViewById(R.id.tvName);
-                tvCountry = itemView.findViewById(R.id.tvCountry);
-                tvLetter = itemView.findViewById(R.id.tvAvatarLetter);
-            }
-        }
-    }
-
     private static class PkgAdapter extends RecyclerView.Adapter<PkgAdapter.VH> {
         interface Listener { void onBuy(WalletDtos.RechargePackageDto pkg); }
         private final List<WalletDtos.RechargePackageDto> items = new ArrayList<>();
@@ -1563,9 +1489,28 @@ public class BagActivity extends ThemedActivity {
             WalletDtos.WithdrawPackageDto p = items.get(position);
             String usd = p.label != null && !p.label.isEmpty()
                     ? p.label
-                    : String.format(Locale.US, "$%.2f", p.usd);
+                    : String.format(Locale.US, "$%.0f", p.usd);
+            // Prefer clean $N from numeric usd if label is just $x.
+            if (p.usd > 0) {
+                usd = String.format(Locale.US, "$%.0f", p.usd);
+            }
             h.tvUsd.setText(usd);
             h.tvDiamonds.setText(String.format(Locale.US, "%,d ألماس", p.diamonds));
+            if (h.tvHint != null) {
+                double rate = p.usd > 0 && p.diamonds > 0
+                        ? p.usd / (double) p.diamonds
+                        : 0d;
+                if (p.usd >= 9.995d) {
+                    h.tvHint.setText(String.format(Locale.US,
+                            "سحب $%.0f\nتارجت مضيف ≈ $%.0f",
+                            p.usd, p.usd));
+                } else if (rate > 0) {
+                    h.tvHint.setText(String.format(Locale.US,
+                            "≈ $%.2f · معدل %.6f", p.usd, rate));
+                } else {
+                    h.tvHint.setText("باقة سحب ألماس");
+                }
+            }
             h.card.setBackgroundResource(position == selected
                     ? R.drawable.bg_withdraw_package_selected
                     : R.drawable.bg_withdraw_package);
@@ -1586,11 +1531,13 @@ public class BagActivity extends ThemedActivity {
             final View card;
             final TextView tvUsd;
             final TextView tvDiamonds;
+            final TextView tvHint;
             VH(@NonNull View itemView) {
                 super(itemView);
                 card = itemView.findViewById(R.id.cardPackage);
                 tvUsd = itemView.findViewById(R.id.tvUsd);
                 tvDiamonds = itemView.findViewById(R.id.tvDiamonds);
+                tvHint = itemView.findViewById(R.id.tvPkgHint);
             }
         }
     }

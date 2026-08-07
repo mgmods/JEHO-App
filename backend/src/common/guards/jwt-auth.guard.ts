@@ -11,7 +11,15 @@ import { IS_PUBLIC_KEY } from '../decorators';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
-import { normalizeStaffRole } from '../staff-role';
+import {
+  hasDashboardAccess,
+  isDashboardSuper,
+  normalizeStaffRole,
+} from '../staff-role';
+import {
+  fullPermissions,
+  normalizePermissions,
+} from '../dashboard-permissions';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -30,7 +38,6 @@ export class JwtAuthGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
 
     if (isPublic) {
-      // Optional auth on public routes (e.g. profile isFollowing for logged-in viewers).
       await this.tryAttachUser(request, false);
       return true;
     }
@@ -42,9 +49,11 @@ export class JwtAuthGuard implements CanActivate {
     return true;
   }
 
-  /** Returns true when request.user was set. When required, invalid tokens throw. */
   private async tryAttachUser(
-    request: { headers: { authorization?: string }; user?: Record<string, unknown> },
+    request: {
+      headers: { authorization?: string };
+      user?: Record<string, unknown>;
+    },
     required: boolean,
   ): Promise<boolean> {
     const token = this.extractToken(request);
@@ -64,14 +73,20 @@ export class JwtAuthGuard implements CanActivate {
         return false;
       }
       const staffRole = normalizeStaffRole(user);
+      const superAdmin = isDashboardSuper(user);
+      const dashboardAccess = hasDashboardAccess(user);
+      const permissions = superAdmin
+        ? fullPermissions()
+        : normalizePermissions(user.dashboardPermissions);
       request.user = {
         ...payload,
         sub: user.id,
         username: user.username,
-        isAdmin: staffRole === 'super',
-        isSuperAdmin: staffRole === 'super',
+        isAdmin: dashboardAccess,
+        isSuperAdmin: superAdmin,
         staffRole,
-        role: staffRole === 'super' ? 'admin' : 'user',
+        permissions,
+        role: dashboardAccess ? 'admin' : 'user',
         isGuest: user.isGuest,
       };
       return true;
@@ -82,7 +97,9 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 
-  private extractToken(request: { headers: { authorization?: string } }): string | null {
+  private extractToken(request: {
+    headers: { authorization?: string };
+  }): string | null {
     const auth = request.headers.authorization;
     if (!auth) return null;
     const [type, token] = auth.split(' ');
