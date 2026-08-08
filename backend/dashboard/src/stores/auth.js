@@ -16,11 +16,22 @@ export const useAuthStore = defineStore('auth', () => {
   const displayName = computed(
     () => user.value?.name || user.value?.displayName || user.value?.email || 'Admin',
   )
-  const isSuperAdmin = computed(
-    () =>
-      Boolean(user.value?.isSuperAdmin) ||
-      String(user.value?.staffRole || '').toLowerCase() === 'super',
-  )
+  const isSuperAdmin = computed(() => {
+    const u = user.value
+    if (!u) return false
+    if (u.isSuperAdmin === true) return true
+    const role = String(u.staffRole || '')
+      .trim()
+      .toLowerCase()
+    if (role === 'super' || role === 'super_admin' || role === 'superadmin' || role === 'admin') {
+      return true
+    }
+    // Legacy sessions: isAdmin without operator/manager = Super owner
+    if (u.isAdmin && role !== 'operator' && role !== 'manager' && role !== 'moderator') {
+      return true
+    }
+    return false
+  })
   const permissions = computed(() => user.value?.permissions || {})
 
   function setSession(nextToken, nextUser) {

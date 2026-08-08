@@ -4,6 +4,7 @@ import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -26,23 +27,30 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.ChatDtos;
+import com.Dramizo.Series.data.remote.dto.RoomDtos;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.util.AgencyInviteCodec;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CosmeticMedia;
 import com.Dramizo.Series.util.DeviceTimeFormat;
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private static final int TYPE_PEER = 0;
@@ -79,6 +87,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private View playingPlayWrap;
     private AudioWaveformView playingWave;
     private final Handler audioHandler = new Handler(Looper.getMainLooper());
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    /** Short TTL cache so scroll rebinds don't hammer GET /rooms/:id. */
+    private static final long ROOM_LIVE_CACHE_MS = 25_000L;
+    private static final Map<String, RoomLiveSnap> ROOM_LIVE_CACHE = new ConcurrentHashMap<>();
     private final Runnable progressTick = new Runnable() {
         @Override public void run() {
             if (playing == null || playingWave == null) return;
@@ -238,14 +250,24 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         if (holder.b.rowBadges != null) holder.b.rowBadges.setVisibility(View.GONE);
         if (holder.b.tvMeta != null) holder.b.tvMeta.setVisibility(View.GONE);
 
-        // Soft me/peer by default; VIP uses ornate 9-patch skins.
-        // Cards (room share / family invite) sit outside the VIP skin so they never collapse.
+        // Soft me/peer bubbles; paid VIP skins (1–7) for text/voice when sender has VIP.
+        // Cards / photos / gifts keep their own chrome so VIP 9-patches don't collapse.
         boolean cardLike = isCardMessage(msg);
+        boolean chromeFree = cardLike || isBareImageMessage(msg);
+        boolean giftLike = isGiftType(msg);
         int vipLevel = resolveVipLevel(holder, msg, mine);
-        if (cardLike) {
+        boolean useVipSkin = vipLevel > 0 && !chromeFree && !giftLike;
+        if (chromeFree) {
             holder.b.bubbleRoot.setBackgroundResource(android.R.color.transparent);
             holder.b.bubbleRoot.setPadding(0, 0, 0, 0);
-        } else if (vipLevel > 0) {
+        } else if (giftLike) {
+            int padH = dp(holder, 12);
+            int padT = dp(holder, 8);
+            int padB = dp(holder, 6);
+            holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
+            holder.b.bubbleRoot.setBackgroundResource(R.drawable.bg_chat_bubble_peer);
+        } else if (useVipSkin) {
+            // Paid VIP bubble skins apply to BOTH mine and peer (sender's VIP tier).
             VipStyle.applyBubble(holder.b.bubbleRoot, vipLevel);
             int padH = dp(holder, 16);
             int padT = dp(holder, 12);
@@ -256,9 +278,15 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             int padT = dp(holder, 8);
             int padB = dp(holder, 6);
             holder.b.bubbleRoot.setPadding(padH, padT, padH, padB);
-            holder.b.bubbleRoot.setBackgroundResource(
-                    mine ? R.drawable.bg_chat_bubble_me : R.drawable.bg_chat_bubble_peer);
+            if (mine) {
+                applyBrandMineBubble(holder.b.bubbleRoot);
+            } else {
+                holder.b.bubbleRoot.setBackgroundResource(R.drawable.bg_chat_bubble_peer);
+            }
         }
+
+        // VIP-aware body colors (white on rose/VIP; dark on peer light gray).
+        applyBubbleInk(holder, mine, useVipSkin ? vipLevel : 0);
 
         bindReplyQuote(holder, msg);
         bindBody(holder, msg);
@@ -266,7 +294,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         String time = DeviceTimeFormat.messageTime(holder.itemView.getContext(), msg.createdAt);
         if (msg.isEdited) time = time + " · معدّلة";
         holder.b.tvTime.setText(time);
+        bindImageTimeOverlay(holder, msg, time);
         bindStatusTick(holder, msg, mine);
+        bindDaySeparator(holder, position, msg);
 
         View.OnLongClickListener longClick = v -> {
             if (listener != null) listener.onLongClick(msg);
@@ -274,6 +304,75 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         };
         holder.itemView.setOnLongClickListener(longClick);
         holder.b.bubbleRoot.setOnLongClickListener(longClick);
+    }
+
+    private void bindDaySeparator(
+            @NonNull VH holder, int position, @NonNull ChatDtos.MessageDto msg) {
+        if (holder.b.tvDaySeparator == null) return;
+        boolean show = position == 0 || !sameCalendarDay(
+                items.get(position - 1).createdAt, msg.createdAt);
+        if (!show) {
+            holder.b.tvDaySeparator.setVisibility(View.GONE);
+            return;
+        }
+        String label = daySeparatorLabel(holder.itemView.getContext(), msg.createdAt);
+        if (label.isEmpty()) {
+            holder.b.tvDaySeparator.setVisibility(View.GONE);
+            return;
+        }
+        holder.b.tvDaySeparator.setText(label);
+        holder.b.tvDaySeparator.setVisibility(View.VISIBLE);
+    }
+
+    private static boolean sameCalendarDay(@Nullable String a, @Nullable String b) {
+        java.util.Date da = DeviceTimeFormat.parse(a);
+        java.util.Date db = DeviceTimeFormat.parse(b);
+        if (da == null || db == null) return a != null && a.equals(b);
+        java.util.Calendar ca = java.util.Calendar.getInstance();
+        java.util.Calendar cb = java.util.Calendar.getInstance();
+        ca.setTime(da);
+        cb.setTime(db);
+        return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR)
+                && ca.get(java.util.Calendar.DAY_OF_YEAR) == cb.get(java.util.Calendar.DAY_OF_YEAR);
+    }
+
+    @NonNull
+    private static String daySeparatorLabel(@NonNull Context context, @Nullable String iso) {
+        java.util.Date date = DeviceTimeFormat.parse(iso);
+        if (date == null) return "";
+        java.util.Calendar msg = java.util.Calendar.getInstance();
+        msg.setTime(date);
+        java.util.Calendar now = java.util.Calendar.getInstance();
+        String time = DeviceTimeFormat.messageTime(context, iso);
+        boolean sameDay = msg.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR)
+                && msg.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR);
+        if (sameDay) {
+            return context.getString(R.string.chat_day_today, time);
+        }
+        now.add(java.util.Calendar.DAY_OF_YEAR, -1);
+        boolean yesterday = msg.get(java.util.Calendar.YEAR) == now.get(java.util.Calendar.YEAR)
+                && msg.get(java.util.Calendar.DAY_OF_YEAR) == now.get(java.util.Calendar.DAY_OF_YEAR);
+        if (yesterday) {
+            return context.getString(R.string.chat_day_yesterday, time);
+        }
+        java.text.DateFormat df = android.text.format.DateFormat.getMediumDateFormat(context);
+        return df.format(date) + " · " + time;
+    }
+
+    private void bindImageTimeOverlay(
+            @NonNull VH holder, @NonNull ChatDtos.MessageDto msg, @NonNull String time) {
+        boolean bareImage = isBareImageMessage(msg);
+        if (holder.b.tvImageTime != null) {
+            if (bareImage) {
+                holder.b.tvImageTime.setVisibility(View.VISIBLE);
+                holder.b.tvImageTime.setText(time);
+            } else {
+                holder.b.tvImageTime.setVisibility(View.GONE);
+            }
+        }
+        if (holder.b.rowMetaFooter != null) {
+            holder.b.rowMetaFooter.setVisibility(bareImage ? View.GONE : View.VISIBLE);
+        }
     }
 
     /**
@@ -311,6 +410,17 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         return RoomShareCodec.isRoomShare(msg.content);
     }
 
+    private static boolean isBareImageMessage(@Nullable ChatDtos.MessageDto msg) {
+        if (msg == null || msg.type == null) return false;
+        String type = msg.type.toLowerCase(Locale.US);
+        if (!"image".equals(type) && !"media".equals(type)) return false;
+        return msg.content == null || msg.content.trim().isEmpty();
+    }
+
+    private static boolean isGiftType(@Nullable ChatDtos.MessageDto msg) {
+        return msg != null && msg.type != null && "gift".equalsIgnoreCase(msg.type);
+    }
+
     /** Public for conversation swipe guard (cards must stay tappable). */
     public boolean isSwipeLocked(int position) {
         if (position < 0 || position >= items.size()) return true;
@@ -322,9 +432,23 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         boolean sameAsNext = position + 1 < items.size()
                 && isMine(items.get(position + 1)) == mine
                 && sameSender(msg, items.get(position + 1));
-        // Show avatar only on the last bubble of a consecutive cluster (Mikoo).
-        boolean showAvatar = !sameAsNext;
-        holder.b.avatarWrap.setVisibility(showAvatar ? View.VISIBLE : View.INVISIBLE);
+        String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
+        // Mock: peer avatar on every cluster end (and cards); mine avatar mainly on voice notes.
+        boolean showAvatar;
+        if (mine) {
+            showAvatar = "audio".equals(type) && !sameAsNext;
+        } else {
+            showAvatar = !sameAsNext;
+        }
+        // Room / invite / image still show peer avatar for mock rhythm.
+        if (!mine && (isCardMessage(msg) || isBareImageMessage(msg) || isGiftType(msg))) {
+            showAvatar = true;
+        }
+        // Layout: peer keeps slot (INVISIBLE) for alignment; mine audio shows, else GONE so bubble hugs edge.
+        int avatarState = showAvatar
+                ? View.VISIBLE
+                : (mine ? View.GONE : View.INVISIBLE);
+        holder.b.avatarWrap.setVisibility(avatarState);
         if (holder.b.imgAvatar != null) {
             holder.b.imgAvatar.setVisibility(showAvatar ? View.VISIBLE : View.INVISIBLE);
         }
@@ -392,27 +516,6 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvSender.setVisibility(View.GONE);
         holder.b.tvSender.setText(name);
 
-        // Soft private bubbles use dark text; VIP ornate skins need light text for contrast.
-        // Card messages (invite / room share) keep dark ink even if sender is VIP.
-        int vipForText = resolveVipLevel(holder, msg, mine);
-        boolean lightOnBubble = !isCardMessage(msg) && vipForText > 0;
-        int bodyColor = lightOnBubble ? 0xFFFFFFFF : 0xFF222222;
-        int metaColor = lightOnBubble ? 0xCCFFFFFF : 0x99000000;
-        int secondary = lightOnBubble
-                ? 0xE6FFFFFF
-                : holder.itemView.getContext().getColor(R.color.text_secondary);
-        holder.b.tvContent.setTextColor(bodyColor);
-        holder.b.tvTime.setTextColor(metaColor);
-        if (holder.b.tvTranslated != null) {
-            holder.b.tvTranslated.setTextColor(secondary);
-        }
-        if (holder.b.tvTranslateAction != null) {
-            holder.b.tvTranslateAction.setTextColor(secondary);
-        }
-        if (holder.b.tvAudioDur != null) {
-            holder.b.tvAudioDur.setTextColor(bodyColor);
-        }
-
         if (showAvatar && listener != null) {
             String clickUserId;
             if (mine) {
@@ -436,6 +539,33 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             holder.b.avatarWrap.setOnClickListener(null);
             holder.b.avatarWrap.setClickable(false);
         }
+    }
+
+    /** Text / meta ink for light peer, rose me, and VIP skins. */
+    private void applyBubbleInk(@NonNull VH holder, boolean mine, int vipLevel) {
+        int bodyColor;
+        int metaColor;
+        int secondary;
+        if (vipLevel > 0) {
+            bodyColor = VipStyle.messageColor(vipLevel);
+            metaColor = 0xCCFFFFFF;
+            secondary = 0xE6FFFFFF;
+        } else if (mine) {
+            bodyColor = 0xFFFFFFFF;
+            metaColor = 0xCCFFFFFF;
+            secondary = 0xE6FFFFFF;
+        } else {
+            bodyColor = 0xFF1A1A1A;
+            metaColor = 0xFF9F9F9F;
+            secondary = 0xFF595959;
+        }
+        if (holder.b.tvContent != null) holder.b.tvContent.setTextColor(bodyColor);
+        if (holder.b.tvTime != null) holder.b.tvTime.setTextColor(metaColor);
+        if (holder.b.tvTranslated != null) holder.b.tvTranslated.setTextColor(secondary);
+        if (holder.b.tvTranslateAction != null) holder.b.tvTranslateAction.setTextColor(secondary);
+        if (holder.b.tvAudioDur != null) holder.b.tvAudioDur.setTextColor(bodyColor);
+        if (holder.b.tvReplyAuthor != null) holder.b.tvReplyAuthor.setTextColor(bodyColor);
+        if (holder.b.tvReplyBody != null) holder.b.tvReplyBody.setTextColor(secondary);
     }
 
     private boolean sameSender(@Nullable ChatDtos.MessageDto a, @Nullable ChatDtos.MessageDto b) {
@@ -517,8 +647,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         String type = msg.type != null ? msg.type.toLowerCase(Locale.US) : "text";
         String mediaUrl = msg.media != null ? msg.media.url : null;
 
+        if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.GONE);
         holder.b.imgMedia.setVisibility(View.GONE);
         holder.b.imgMedia.setOnClickListener(null);
+        if (holder.b.rowImageReaction != null) holder.b.rowImageReaction.setVisibility(View.GONE);
         if (holder.b.audioRow != null) holder.b.audioRow.setVisibility(View.GONE);
         if (holder.b.agencyInviteRow != null) holder.b.agencyInviteRow.setVisibility(View.GONE);
         if (holder.b.giftRow != null) holder.b.giftRow.setVisibility(View.GONE);
@@ -531,29 +663,14 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
         RoomShareCodec.Parsed share = RoomShareCodec.parse(msg.content);
         if (share != null && holder.b.roomShareRow != null) {
-            holder.b.roomShareRow.setVisibility(View.VISIBLE);
-            holder.b.tvRoomShareTitle.setText(share.title);
-            if (share.coverUrl != null && !share.coverUrl.isEmpty()) {
-                Glide.with(holder.b.imgRoomShareCover)
-                        .load(AssetCatalog.absoluteUrl(share.coverUrl))
-                        .placeholder(ImagePlaceholder.cover())
-                        .centerCrop()
-                        .into(holder.b.imgRoomShareCover);
-            } else {
-                holder.b.imgRoomShareCover.setImageResource(ImagePlaceholder.cover());
-            }
-            holder.b.imgRoomShareCover.setClipToOutline(true);
-            holder.b.roomShareRow.setOnClickListener(v -> {
-                // Validate live/exists first — never open an empty closed room from chat shares.
-                com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity.open(
-                        holder.itemView.getContext(), share.roomId);
-            });
+            bindLiveRoomShare(holder, msg, share);
             return;
         }
 
         if ("image".equals(type) || "media".equals(type)) {
             if (mediaUrl != null && !mediaUrl.isEmpty()) {
                 String fullUrl = AssetCatalog.absoluteUrl(mediaUrl);
+                if (holder.b.imageWrap != null) holder.b.imageWrap.setVisibility(View.VISIBLE);
                 holder.b.imgMedia.setVisibility(View.VISIBLE);
                 Glide.with(holder.b.imgMedia)
                         .load(fullUrl)
@@ -561,6 +678,11 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                         .centerCrop()
                         .into(holder.b.imgMedia);
                 holder.b.imgMedia.setOnClickListener(v -> showImage(holder.b.imgMedia, fullUrl));
+                // Reaction chip (mock-style presence; real reaction API not required for layout parity).
+                if (holder.b.rowImageReaction != null && holder.b.tvImageReaction != null) {
+                    holder.b.rowImageReaction.setVisibility(View.VISIBLE);
+                    holder.b.tvImageReaction.setText("❤️ 3");
+                }
             }
             if (msg.content != null && !msg.content.trim().isEmpty()) {
                 holder.b.tvContent.setVisibility(View.VISIBLE);
@@ -585,7 +707,15 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             if (holder.b.waveAudio != null) {
                 holder.b.waveAudio.setProgress(0f);
                 holder.b.waveAudio.setAnimating(false);
-                holder.b.waveAudio.setWaveColors(0xFF4A90E2, 0x664A90E2);
+                if (mine) {
+                    holder.b.waveAudio.setWaveColors(0xFFFFFFFF, 0x66FFFFFF);
+                } else {
+                    holder.b.waveAudio.setWaveColors(0xFFFE2C55, 0x44FE2C55);
+                }
+            }
+            // Play glyph: brand rose on white circle.
+            if (holder.b.imgAudioPlay != null) {
+                holder.b.imgAudioPlay.setColorFilter(0xFFFE2C55);
             }
             holder.b.imgAudioPlay.setImageResource(R.drawable.ic_audio_play);
             View.OnClickListener play = v -> playAudio(
@@ -608,34 +738,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
 
         if ("gift".equals(type) && holder.b.giftRow != null) {
-            holder.b.giftRow.setVisibility(View.VISIBLE);
-            String label = msg.content != null && !msg.content.isEmpty() ? msg.content : "هدية";
-            holder.b.tvGiftLabel.setText(label);
-            String giftIcon = mediaUrl;
-            if (giftIcon != null) {
-                CosmeticMedia.Kind k = CosmeticMedia.kind(giftIcon);
-                if (k == CosmeticMedia.Kind.VIDEO || k == CosmeticMedia.Kind.SVGA) {
-                    giftIcon = null;
-                }
-            }
-            if (giftIcon != null && !giftIcon.isEmpty()) {
-                holder.b.imgGift.setVisibility(View.VISIBLE);
-                try {
-                    Glide.with(holder.b.imgGift.getContext().getApplicationContext())
-                            .load(AssetCatalog.absoluteUrl(giftIcon))
-                            .placeholder(ImagePlaceholder.gift())
-                            .error(ImagePlaceholder.gift())
-                            .override(160, 160)
-                            .centerInside()
-                            .dontAnimate()
-                            .into(holder.b.imgGift);
-                } catch (Exception e) {
-                    holder.b.imgGift.setImageResource(ImagePlaceholder.gift());
-                }
-            } else {
-                holder.b.imgGift.setVisibility(View.VISIBLE);
-                holder.b.imgGift.setImageResource(ImagePlaceholder.gift());
-            }
+            bindGiftCard(holder, msg, mediaUrl);
             return;
         }
 
@@ -643,6 +746,365 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         holder.b.tvContent.setText(msg.content != null ? msg.content : "");
         // Color already set in bindSideChrome (VIP-aware).
         bindTranslate(holder, msg);
+    }
+
+    private void bindGiftCard(
+            @NonNull VH holder, @NonNull ChatDtos.MessageDto msg, @Nullable String mediaUrl) {
+        holder.b.giftRow.setVisibility(View.VISIBLE);
+        Context ctx = holder.itemView.getContext();
+        boolean mine = isMine(msg);
+        String raw = msg.content != null ? msg.content.trim() : "";
+        int qty = parseGiftQuantity(raw);
+        String name = stripGiftQuantity(raw);
+        if (name.isEmpty()) name = ctx.getString(R.string.gift_message);
+
+        TextView caption = holder.b.tvGiftCaption;
+        View leading = holder.b.imgGiftLeading;
+        View trail = holder.b.giftIconTrail;
+        TextView qtyView = holder.b.tvGiftQty;
+
+        if (mine) {
+            if (caption != null) {
+                caption.setVisibility(View.VISIBLE);
+                caption.setText(R.string.gift_message_sent);
+                caption.setTextColor(0xFFFE2C55);
+            }
+            holder.b.tvGiftLabel.setText(name);
+            holder.b.tvGiftLabel.setTextColor(0xFF1A1A1A);
+            holder.b.tvGiftLabel.setTextSize(15f);
+            holder.b.tvGiftLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+            if (caption != null) {
+                caption.setTextSize(11f);
+                caption.setTypeface(null, android.graphics.Typeface.NORMAL);
+            }
+            if (leading != null) leading.setVisibility(View.GONE);
+            if (trail != null) trail.setVisibility(View.VISIBLE);
+            loadGiftIcon(holder.b.imgGift, mediaUrl);
+            if (qtyView != null) {
+                if (qty > 1) {
+                    qtyView.setVisibility(View.VISIBLE);
+                    qtyView.setText(ctx.getString(R.string.gift_qty_x, qty));
+                    qtyView.setTextColor(0xFF1A1A1A);
+                } else {
+                    qtyView.setVisibility(View.GONE);
+                }
+            }
+        } else {
+            // Received: mystery-box style (icon left, title + “tap to open”).
+            if (caption != null) {
+                caption.setVisibility(View.VISIBLE);
+                caption.setText(R.string.gift_mystery_title);
+                caption.setTextColor(0xFF1A1A1A);
+                caption.setTextSize(15f);
+                caption.setTypeface(caption.getTypeface(), android.graphics.Typeface.BOLD);
+            }
+            holder.b.tvGiftLabel.setText(R.string.gift_mystery_hint);
+            holder.b.tvGiftLabel.setTextColor(0xFF595959);
+            holder.b.tvGiftLabel.setTextSize(12f);
+            holder.b.tvGiftLabel.setTypeface(null, android.graphics.Typeface.NORMAL);
+            if (leading != null) {
+                leading.setVisibility(View.VISIBLE);
+                if (leading instanceof ImageView) {
+                    loadGiftIcon((ImageView) leading, mediaUrl);
+                }
+            }
+            if (trail != null) trail.setVisibility(View.GONE);
+            if (qtyView != null) qtyView.setVisibility(View.GONE);
+        }
+    }
+
+    private static int parseGiftQuantity(@Nullable String content) {
+        if (content == null || content.isEmpty()) return 1;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?:x|×|\\*)\\s*(\\d{1,4})\\s*$", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(content.trim());
+        if (m.find()) {
+            try {
+                return Math.max(1, Integer.parseInt(m.group(1)));
+            } catch (Exception ignored) {
+            }
+        }
+        return 1;
+    }
+
+    @NonNull
+    private static String stripGiftQuantity(@Nullable String content) {
+        if (content == null) return "";
+        return content.trim()
+                .replaceAll("(?i)\\s*(?:x|×|\\*)\\s*\\d{1,4}\\s*$", "")
+                .trim();
+    }
+
+    private void loadGiftIcon(@Nullable ImageView target, @Nullable String mediaUrl) {
+        if (target == null) return;
+        String giftIcon = mediaUrl;
+        if (giftIcon != null) {
+            CosmeticMedia.Kind k = CosmeticMedia.kind(giftIcon);
+            if (k == CosmeticMedia.Kind.VIDEO || k == CosmeticMedia.Kind.SVGA) {
+                giftIcon = null;
+            }
+        }
+        target.setVisibility(View.VISIBLE);
+        if (giftIcon != null && !giftIcon.isEmpty()) {
+            try {
+                Glide.with(target.getContext().getApplicationContext())
+                        .load(AssetCatalog.absoluteUrl(giftIcon))
+                        .placeholder(ImagePlaceholder.gift())
+                        .error(ImagePlaceholder.gift())
+                        .override(160, 160)
+                        .centerInside()
+                        .dontAnimate()
+                        .into(target);
+            } catch (Exception e) {
+                target.setImageResource(ImagePlaceholder.gift());
+            }
+        } else {
+            target.setImageResource(ImagePlaceholder.gift());
+        }
+    }
+
+    private void bindLiveRoomShare(
+            @NonNull VH holder,
+            @NonNull ChatDtos.MessageDto msg,
+            @NonNull RoomShareCodec.Parsed share) {
+        Context ctx = holder.itemView.getContext();
+        final String roomId = share.roomId != null ? share.roomId.trim() : "";
+        if (roomId.isEmpty()) {
+            showRoomShareEnded(holder);
+            return;
+        }
+
+        // Tag binding so async result only applies if this row still shows the same room.
+        holder.b.roomShareRow.setTag(R.id.roomShareRow, roomId);
+        holder.b.roomShareRow.setVisibility(View.GONE);
+        holder.b.tvContent.setVisibility(View.GONE);
+        holder.b.roomShareRow.setOnClickListener(null);
+
+        RoomLiveSnap cached = ROOM_LIVE_CACHE.get(roomId);
+        if (cached != null && !cached.expired()) {
+            applyRoomLiveSnap(holder, share, cached);
+            return;
+        }
+
+        // Soft loading line while we resolve live status (no fake listener counts).
+        holder.b.tvContent.setVisibility(View.VISIBLE);
+        holder.b.tvContent.setText(R.string.chat_room_share_loading);
+        holder.b.tvContent.setTextColor(0xFF9F9F9F);
+
+        AppContainer c;
+        try {
+            c = ContainerProvider.from(ctx);
+        } catch (Exception e) {
+            showRoomShareEnded(holder);
+            return;
+        }
+        final int bindGen = holder.getBindingAdapterPosition();
+        c.getIoExecutor().execute(() -> {
+            Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(roomId);
+            RoomLiveSnap snap = RoomLiveSnap.fromResult(r);
+            ROOM_LIVE_CACHE.put(roomId, snap);
+            mainHandler.post(() -> {
+                if (holder.getBindingAdapterPosition() != bindGen) return;
+                Object tag = holder.b.roomShareRow.getTag(R.id.roomShareRow);
+                if (!(tag instanceof String) || !roomId.equals(tag)) return;
+                applyRoomLiveSnap(holder, share, snap);
+            });
+        });
+    }
+
+    private void applyRoomLiveSnap(
+            @NonNull VH holder,
+            @NonNull RoomShareCodec.Parsed share,
+            @NonNull RoomLiveSnap snap) {
+        if (!snap.live) {
+            showRoomShareEnded(holder);
+            return;
+        }
+        Context ctx = holder.itemView.getContext();
+        holder.b.tvContent.setVisibility(View.GONE);
+        holder.b.roomShareRow.setVisibility(View.VISIBLE);
+
+        String title = firstNonEmpty(snap.title, share.title, ctx.getString(R.string.chat_room_listening));
+        holder.b.tvRoomShareTitle.setText(title);
+
+        TextView listeners = holder.b.roomShareRow.findViewById(R.id.tvRoomShareListeners);
+        if (listeners != null) {
+            listeners.setText(ctx.getString(R.string.chat_room_listening_count, Math.max(0, snap.viewerCount)));
+        }
+        TextView people = holder.b.roomShareRow.findViewById(R.id.tvRoomSharePeople);
+        if (people != null) {
+            int extra = Math.max(0, snap.viewerCount - Math.min(3, snap.avatarUrls.size()));
+            if (extra > 0) {
+                people.setVisibility(View.VISIBLE);
+                people.setText("+" + extra);
+            } else if (snap.viewerCount > 0) {
+                people.setVisibility(View.VISIBLE);
+                people.setText(String.valueOf(snap.viewerCount));
+            } else {
+                people.setVisibility(View.GONE);
+            }
+        }
+        TextView live = holder.b.roomShareRow.findViewById(R.id.tvRoomShareLive);
+        if (live != null) live.setVisibility(View.VISIBLE);
+        TextView sub = holder.b.roomShareRow.findViewById(R.id.tvRoomShareSubtitle);
+        if (sub != null) sub.setText(R.string.chat_room_share_subtitle);
+
+        TextView cta = holder.b.roomShareRow.findViewById(R.id.tvRoomShareCta);
+        if (cta != null) {
+            tintSolidRoundRect(cta, RemoteTheme.primaryColor(ctx), dp(holder, 14));
+        }
+
+        String cover = firstNonEmpty(snap.coverUrl, share.coverUrl);
+        if (cover != null && !cover.isEmpty()) {
+            Glide.with(holder.b.imgRoomShareCover)
+                    .load(AssetCatalog.absoluteUrl(cover))
+                    .placeholder(ImagePlaceholder.cover())
+                    .centerCrop()
+                    .into(holder.b.imgRoomShareCover);
+        } else {
+            holder.b.imgRoomShareCover.setImageResource(ImagePlaceholder.cover());
+        }
+        holder.b.imgRoomShareCover.setClipToOutline(true);
+
+        bindRoomShareAvatars(holder, snap.avatarUrls);
+
+        final String roomId = share.roomId;
+        holder.b.roomShareRow.setOnClickListener(v ->
+                com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity.open(
+                        holder.itemView.getContext(), roomId));
+    }
+
+    private void showRoomShareEnded(@NonNull VH holder) {
+        if (holder.b.roomShareRow != null) {
+            holder.b.roomShareRow.setVisibility(View.GONE);
+            holder.b.roomShareRow.setOnClickListener(null);
+        }
+        holder.b.tvContent.setVisibility(View.VISIBLE);
+        holder.b.tvContent.setText(R.string.chat_room_share_ended);
+        holder.b.tvContent.setTextColor(0xFF9F9F9F);
+    }
+
+    private void bindRoomShareAvatars(@NonNull VH holder, @Nullable List<String> urls) {
+        ImageView[] avatars = {
+                holder.b.roomShareRow.findViewById(R.id.imgRoomShareAvatar1),
+                holder.b.roomShareRow.findViewById(R.id.imgRoomShareAvatar2),
+                holder.b.roomShareRow.findViewById(R.id.imgRoomShareAvatar3),
+        };
+        List<String> list = urls != null ? urls : Collections.emptyList();
+        for (int i = 0; i < avatars.length; i++) {
+            ImageView iv = avatars[i];
+            if (iv == null) continue;
+            if (i < list.size() && list.get(i) != null && !list.get(i).isEmpty()) {
+                iv.setVisibility(View.VISIBLE);
+                try {
+                    Glide.with(iv)
+                            .load(AssetCatalog.absoluteUrl(list.get(i)))
+                            .placeholder(R.drawable.ic_default_avatar)
+                            .circleCrop()
+                            .into(iv);
+                } catch (Exception e) {
+                    iv.setImageResource(R.drawable.ic_default_avatar);
+                }
+            } else {
+                iv.setVisibility(View.GONE);
+                iv.setImageDrawable(null);
+            }
+        }
+    }
+
+    private void applyBrandMineBubble(@NonNull View bubble) {
+        int primary = RemoteTheme.primaryColor(bubble.getContext());
+        int light = lightenColor(primary, 0.22f);
+        float d = bubble.getResources().getDisplayMetrics().density;
+        GradientDrawable g = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[]{light, primary});
+        g.setCornerRadii(new float[]{
+                18 * d, 18 * d,
+                4 * d, 4 * d,
+                18 * d, 18 * d,
+                18 * d, 18 * d
+        });
+        bubble.setBackground(g);
+    }
+
+    private static int lightenColor(int color, float amount) {
+        int a = Color.alpha(color);
+        int r = Color.red(color);
+        int g = Color.green(color);
+        int b = Color.blue(color);
+        r = Math.min(255, (int) (r + (255 - r) * amount));
+        g = Math.min(255, (int) (g + (255 - g) * amount));
+        b = Math.min(255, (int) (b + (255 - b) * amount));
+        return Color.argb(a, r, g, b);
+    }
+
+    private static void tintSolidRoundRect(@NonNull View view, int color, float radiusPx) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(radiusPx);
+        view.setBackground(g);
+    }
+
+    private static final class RoomLiveSnap {
+        final boolean live;
+        final int viewerCount;
+        @Nullable final String title;
+        @Nullable final String coverUrl;
+        @NonNull final List<String> avatarUrls;
+        final long fetchedAt;
+
+        RoomLiveSnap(
+                boolean live,
+                int viewerCount,
+                @Nullable String title,
+                @Nullable String coverUrl,
+                @Nullable List<String> avatarUrls) {
+            this.live = live;
+            this.viewerCount = viewerCount;
+            this.title = title;
+            this.coverUrl = coverUrl;
+            this.avatarUrls = avatarUrls != null ? avatarUrls : Collections.emptyList();
+            this.fetchedAt = System.currentTimeMillis();
+        }
+
+        boolean expired() {
+            return System.currentTimeMillis() - fetchedAt > ROOM_LIVE_CACHE_MS;
+        }
+
+        @NonNull
+        static RoomLiveSnap fromResult(@Nullable Result<RoomDtos.RoomDto> r) {
+            if (r == null || !r.success || r.data == null) {
+                String err = r != null && r.error != null ? r.error.toLowerCase(Locale.US) : "";
+                // Forbidden private rooms may still be live — don't hard-end the card.
+                if (err.contains("join this room") || err.contains("forbidden")
+                        || err.contains("password") || err.contains("كلمة")) {
+                    return new RoomLiveSnap(true, 0, null, null, null);
+                }
+                return new RoomLiveSnap(false, 0, null, null, null);
+            }
+            RoomDtos.RoomDto room = r.data;
+            boolean closed = room.status != null && "closed".equalsIgnoreCase(room.status.trim());
+            if (closed) {
+                return new RoomLiveSnap(false, 0, room.title, room.coverUrl, room.viewerAvatars);
+            }
+            List<String> avatars = new ArrayList<>();
+            if (room.viewerAvatars != null) {
+                for (String u : room.viewerAvatars) {
+                    if (u != null && !u.trim().isEmpty()) avatars.add(u.trim());
+                    if (avatars.size() >= 3) break;
+                }
+            }
+            if (avatars.isEmpty() && room.host != null && room.host.avatarUrl != null) {
+                avatars.add(room.host.avatarUrl);
+            }
+            return new RoomLiveSnap(
+                    true,
+                    Math.max(0, room.viewerCount),
+                    room.title,
+                    firstNonEmpty(room.coverUrl, room.roomCardUrl, room.backgroundUrl),
+                    avatars);
+        }
     }
 
     private void bindAgencyInviteCard(
@@ -775,9 +1237,9 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
     private static void applyAudioPlayStyle(@Nullable View playWrap, boolean played) {
         if (playWrap == null) return;
-        playWrap.setBackgroundResource(played
-                ? R.drawable.bg_chat_audio_play_played
-                : R.drawable.bg_chat_audio_play);
+        // Mock: white circular play control on purple voice bubble.
+        playWrap.setBackgroundResource(R.drawable.bg_chat_audio_play_dot);
+        playWrap.setAlpha(played ? 0.85f : 1f);
     }
 
     private void markAudioPlayed(@Nullable String messageId, @Nullable View playWrap) {
@@ -983,6 +1445,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final ImageView imgHostBadge;
         final View bubbleColumn;
         final LinearLayout bubbleRoot;
+        final TextView tvDaySeparator;
         final TextView tvVipChip;
         final View rowBadges;
         final TextView tvMeta;
@@ -990,7 +1453,11 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final View replyQuote;
         final TextView tvReplyAuthor;
         final TextView tvReplyBody;
+        final View imageWrap;
         final ImageView imgMedia;
+        final View rowImageReaction;
+        final TextView tvImageReaction;
+        final TextView tvImageTime;
         final View audioRow;
         final TextView tvAudioDur;
         final AudioWaveformView waveAudio;
@@ -1004,13 +1471,18 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final TextView btnAgencyInviteYes;
         final View giftRow;
         final ImageView imgGift;
+        final ImageView imgGiftLeading;
+        final View giftIconTrail;
+        final TextView tvGiftCaption;
         final TextView tvGiftLabel;
+        final TextView tvGiftQty;
         final View roomShareRow;
         final ImageView imgRoomShareCover;
         final TextView tvRoomShareTitle;
         final TextView tvContent;
         final TextView tvTranslateAction;
         final TextView tvTranslated;
+        final View rowMetaFooter;
         final TextView tvTime;
         final ImageView imgMsgStatus;
 
@@ -1022,6 +1494,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imgHostBadge = root.findViewById(R.id.imgHostBadge);
             bubbleColumn = root.findViewById(R.id.bubbleColumn);
             bubbleRoot = root.findViewById(R.id.bubbleRoot);
+            tvDaySeparator = root.findViewById(R.id.tvDaySeparator);
             tvVipChip = root.findViewById(R.id.tvVipChip);
             rowBadges = root.findViewById(R.id.rowBadges);
             tvMeta = root.findViewById(R.id.tvMeta);
@@ -1029,7 +1502,11 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             replyQuote = root.findViewById(R.id.replyQuote);
             tvReplyAuthor = root.findViewById(R.id.tvReplyAuthor);
             tvReplyBody = root.findViewById(R.id.tvReplyBody);
+            imageWrap = root.findViewById(R.id.imageWrap);
             imgMedia = root.findViewById(R.id.imgMedia);
+            rowImageReaction = root.findViewById(R.id.rowImageReaction);
+            tvImageReaction = root.findViewById(R.id.tvImageReaction);
+            tvImageTime = root.findViewById(R.id.tvImageTime);
             audioRow = root.findViewById(R.id.audioRow);
             tvAudioDur = root.findViewById(R.id.tvAudioDur);
             waveAudio = root.findViewById(R.id.waveAudio);
@@ -1043,13 +1520,18 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             btnAgencyInviteYes = root.findViewById(R.id.btnAgencyInviteYes);
             giftRow = root.findViewById(R.id.giftRow);
             imgGift = root.findViewById(R.id.imgGift);
+            imgGiftLeading = root.findViewById(R.id.imgGiftLeading);
+            giftIconTrail = root.findViewById(R.id.giftIconTrail);
+            tvGiftCaption = root.findViewById(R.id.tvGiftCaption);
             tvGiftLabel = root.findViewById(R.id.tvGiftLabel);
+            tvGiftQty = root.findViewById(R.id.tvGiftQty);
             roomShareRow = root.findViewById(R.id.roomShareRow);
             imgRoomShareCover = root.findViewById(R.id.imgRoomShareCover);
             tvRoomShareTitle = root.findViewById(R.id.tvRoomShareTitle);
             tvContent = root.findViewById(R.id.tvContent);
             tvTranslateAction = root.findViewById(R.id.tvTranslateAction);
             tvTranslated = root.findViewById(R.id.tvTranslated);
+            rowMetaFooter = root.findViewById(R.id.rowMetaFooter);
             tvTime = root.findViewById(R.id.tvTime);
             imgMsgStatus = root.findViewById(R.id.imgMsgStatus);
         }

@@ -56,9 +56,34 @@ export class AdminPushDto {
   @IsString()
   title: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Plain text for preview / FCM (HTML is stripped if only rich content)' })
   @IsString()
   body: string;
+
+  @ApiPropertyOptional({ description: 'Rich HTML for Official News bubble (optional)' })
+  @IsOptional()
+  @IsString()
+  html?: string;
+
+  @ApiPropertyOptional({ description: 'Alias of html' })
+  @IsOptional()
+  @IsString()
+  bodyHtml?: string;
+
+  @ApiPropertyOptional({ description: 'Promo / banner image URL' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'CTA deep-link or https URL' })
+  @IsOptional()
+  @IsString()
+  link?: string;
+
+  @ApiPropertyOptional({ description: 'Alias of link' })
+  @IsOptional()
+  @IsString()
+  url?: string;
 
   @ApiPropertyOptional({ enum: ['all', 'hosts', 'vip', 'user'] })
   @IsOptional()
@@ -67,7 +92,7 @@ export class AdminPushDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsUUID()
+  @IsString()
   userId?: string;
 
   @ApiPropertyOptional({ enum: ['push', 'in_app', 'both'] })
@@ -184,8 +209,14 @@ export class NotificationsService {
     return {
       unread,
       lastTitle: latest?.title || null,
-      lastBody: latest?.body || null,
+      lastBody: latest
+        ? plainTextPreview(latest.body, (latest.data as any)?.html || (latest.data as any)?.bodyHtml)
+        : null,
       lastAt: latest?.createdAt || null,
+      lastImageUrl:
+        latest && latest.data && typeof (latest.data as any).imageUrl === 'string'
+          ? (latest.data as any).imageUrl
+          : null,
     };
   }
 
@@ -246,6 +277,17 @@ export class NotificationsService {
         'لم يتم العثور على المستخدم — أدخل رقم المعرّف الظاهر (publicId) أو UUID',
       );
     }
+
+    const richHtml = sanitizeOfficialHtml(dto.html || dto.bodyHtml || '');
+    const imageUrl = sanitizeHttpUrl(dto.imageUrl || '');
+    const link = sanitizeHttpUrl(dto.link || dto.url || '');
+    // FCM + preview must stay plain text.
+    const plainBody =
+      String(dto.body || '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim() || stripTags(richHtml) || dto.title;
+
     let saved = 0;
     let pushed = 0;
 
@@ -263,14 +305,16 @@ export class NotificationsService {
           userId,
           type,
           title: dto.title,
-          body: dto.body,
+          body: plainBody,
           data: {
             audience,
             channel,
             officialNews: isOfficial,
             source: 'admin',
-            // Helps clients/debug: this bubble belongs only to this userId.
             targetUserId: userId,
+            ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(link ? { url: link, link } : {}),
           },
           // create() already pushes when sendPush is true — avoid double FCM.
           sendPush: pushNow,
@@ -278,12 +322,14 @@ export class NotificationsService {
         saved += 1;
         if (notif.fcmSent) pushed += 1;
       } else if (pushNow) {
-        const ok = await this.sendFcm(userId, dto.title, dto.body, {
+        const ok = await this.sendFcm(userId, dto.title, plainBody, {
           type,
           audience,
           title: dto.title,
-          body: dto.body,
+          body: plainBody,
           targetUserId: userId,
+          ...(imageUrl ? { imageUrl } : {}),
+          ...(link ? { url: link } : {}),
         });
         if (ok) pushed += 1;
       }
@@ -297,7 +343,9 @@ export class NotificationsService {
       saved,
       pushed,
       title: dto.title,
-      body: dto.body,
+      body: plainBody,
+      hasHtml: !!richHtml,
+      hasImage: !!imageUrl,
     };
   }
 
@@ -401,4 +449,60 @@ export class NotificationsService {
     );
     return { unregistered: true };
   }
+}
+
+/** Strip tags for inbox previews / FCM. */
+function stripTags(value: string): string {
+  return String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function plainTextPreview(body?: string | null, html?: string | null): string | null {
+  const fromBody = stripTags(body || '');
+  if (fromBody) return fromBody.slice(0, 240);
+  const fromHtml = stripTags(html || '');
+  return fromHtml ? fromHtml.slice(0, 240) : null;
+}
+
+/**
+ * Lightweight allowlist sanitizer for admin Official News HTML.
+ * Blocks script/style and inline handlers — keeps common formatting + links + images.
+ */
+function sanitizeOfficialHtml(raw: string): string {
+  let html = String(raw || '').trim();
+  if (!html) return '';
+  if (html.length > 50_000) html = html.slice(0, 50_000);
+  html = html
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/<\/?(iframe|object|embed|form|input|button|meta|link|base)[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/data:text\/html/gi, '');
+  return html.trim();
+}
+
+function sanitizeHttpUrl(raw: string): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (s.length > 2_000) return '';
+  const lower = s.toLowerCase();
+  if (
+    lower.startsWith('https://') ||
+    lower.startsWith('http://') ||
+    lower.startsWith('/') ||
+    lower.startsWith('jeho://') ||
+    lower.startsWith('auralive://')
+  ) {
+    return s;
+  }
+  // relative path without scheme — treat as app/CDN path
+  if (s.startsWith('uploads/') || s.startsWith('assets/')) return '/' + s;
+  return '';
 }

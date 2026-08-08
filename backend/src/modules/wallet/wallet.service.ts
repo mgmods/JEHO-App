@@ -947,9 +947,22 @@ export class WalletService implements OnModuleInit {
       ).trim();
       if (stageId) {
         try {
-          await this.hostTarget.markStageSalaryWithdrawn(userId, stageId);
-        } catch {
-          // Non-fatal: withdraw request already created.
+          const marked = await this.hostTarget.markStageSalaryWithdrawn(
+            userId,
+            stageId,
+          );
+          if (!marked) {
+            this.logger.warn(
+              `Host target stage mark returned null after withdraw user=${userId} stage=${stageId}`,
+            );
+          }
+        } catch (err) {
+          // Withdraw request already created — never lose money silently without a log.
+          this.logger.error(
+            `Host target markStageSalaryWithdrawn FAILED after withdraw user=${userId} stage=${stageId}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
         }
       }
     }

@@ -1,0 +1,59 @@
+{
+  "steps": [
+    "column_withdrawnStageIds_ensured",
+    "null_withdrawn_backfilled"
+  ],
+  "before": [
+    {
+      "yearMonth": "2026W32",
+      "progress": "1314200",
+      "claimedStageIds": "[\"salary_v2_1\",\"salary_v2_2\",\"salary_v2_3\",\"salary_v2_4\",\"salary_v2_5\",\"salary_v2_6\"]",
+      "withdrawnStageIds": "[]",
+      "cyclesCompleted": 0
+    },
+    {
+      "yearMonth": "2026-08",
+      "progress": "63221",
+      "claimedStageIds": "[\"salary_1\",\"salary_2\",\"salary_3\",\"salary_4\"]",
+      "withdrawnStageIds": "[]",
+      "cyclesCompleted": 0
+    }
+  ],
+  "reset": [
+    {
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "withdrawnStageIds": "[]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T22:24:25.495Z"
+    }
+  ],
+  "after": [
+    {
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "withdrawnStageIds": "[]",
+      "cyclesCompleted": 0
+    },
+    {
+      "yearMonth": "2026-08",
+      "progress": "63221",
+      "claimedStageIds": "[\"salary_1\",\"salary_2\",\"salary_3\",\"salary_4\"]",
+      "withdrawnStageIds": "[]",
+      "cyclesCompleted": 0
+    }
+  ],
+  "columns": [
+    "id",
+    "userId",
+    "yearMonth",
+    "progress",
+    "claimedStageIds",
+    "createdAt",
+    "updatedAt",
+    "cyclesCompleted",
+    "withdrawnStageIds"
+  ]
+}

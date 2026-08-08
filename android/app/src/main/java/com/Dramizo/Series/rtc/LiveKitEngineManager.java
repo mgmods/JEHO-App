@@ -61,6 +61,8 @@ public final class LiveKitEngineManager {
     private boolean micEnabled = false;
     private boolean speakerMuted = false;
     private boolean publishing;
+    /** JWT canPublish grant of the currently connected LiveKit session. */
+    private boolean sessionCanPublish = false;
     @Nullable private String publishingStreamId;
     /** Publish requested before room was CONNECTED — applied on connect. */
     @Nullable private String pendingPublishStreamId;
@@ -163,8 +165,18 @@ public final class LiveKitEngineManager {
                 } catch (InterruptedException ignored) {
                     Thread.currentThread().interrupt();
                 }
-                if (publishing || micEnabled) {
+                // Always re-apply intended mic after connect (tracks often join muted:true).
+                if (publishing || pendingPublishStreamId != null || micEnabled) {
                     applyMicOnEngine(micEnabled);
+                    // Second nudge — some devices need capture after ICE settles.
+                    try {
+                        Thread.sleep(220L);
+                    } catch (InterruptedException ignored) {
+                        Thread.currentThread().interrupt();
+                    }
+                    if (micEnabled && (publishing || pendingPublishStreamId != null)) {
+                        applyMicOnEngine(true);
+                    }
                 } else {
                     trySetRemotePlaybackGain(newRoom, speakerMuted ? 0f : 1f);
                 }
@@ -208,6 +220,7 @@ public final class LiveKitEngineManager {
             publishingStreamId = keepStream;
         }
         micEnabled = keepMic;
+        // Grant from caller (RoomRtcEngine.setSessionCanPublish) must already be set.
     }
 
     private void seedRemoteAudioTracks(Room r) {
@@ -530,6 +543,7 @@ public final class LiveKitEngineManager {
         publishing = false;
         publishingStreamId = null;
         pendingPublishStreamId = null;
+        sessionCanPublish = false;
         currentRoomId = null;
         lastToken = null;
         connected.set(false);
@@ -551,8 +565,13 @@ public final class LiveKitEngineManager {
 
     public void setMicEnabled(boolean enabled) {
         micEnabled = enabled;
+        // Remember intent even before startPublishing — when already CONNECTED apply immediately
+        // so take-seat mic does not sit muted until a later publish race.
+        if (!connected.get() && !publishing && pendingPublishStreamId == null) {
+            return;
+        }
         if (!publishing && pendingPublishStreamId == null) {
-            // Still remember intent; applied when startPublishing runs / connect finishes.
+            // Connected as audience: keep track off; intent stored in micEnabled.
             return;
         }
         io.execute(() -> applyMicOnEngine(enabled));
@@ -723,6 +742,14 @@ public final class LiveKitEngineManager {
     @Nullable
     public String getLastToken() {
         return lastToken;
+    }
+
+    public void setSessionCanPublish(boolean canPublish) {
+        this.sessionCanPublish = canPublish;
+    }
+
+    public boolean isSessionCanPublish() {
+        return sessionCanPublish;
     }
 
     public boolean isConnectInFlight() {

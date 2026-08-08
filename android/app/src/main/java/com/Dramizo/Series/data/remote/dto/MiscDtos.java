@@ -161,6 +161,7 @@ public final class MiscDtos {
         @SerializedName("lastTitle") public String lastTitle;
         @SerializedName("lastBody") public String lastBody;
         @SerializedName("lastAt") public String lastAt;
+        @SerializedName("lastImageUrl") public String lastImageUrl;
     }
 
     public static class UpdateProfileRequest {

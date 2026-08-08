@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo nim_message_activity / p2p conversation chrome -->
+<!-- Light app private chat â€” header / list / composer (mock-accurate). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF3F6F5">
+    android:background="@drawable/bg_chat_screen">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -22,134 +22,208 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Title bar (wrap_content so status-bar padding is not crushed by fixed 50dp) -->
+        <!-- Header -->
         <LinearLayout
             android:id="@+id/headerBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/white"
+            android:background="@drawable/bg_chat_header_bar"
             android:clipChildren="false"
             android:gravity="center_vertical"
             android:layoutDirection="locale"
-            android:minHeight="50dp"
+            android:minHeight="58dp"
             android:orientation="horizontal"
             android:paddingStart="4dp"
-            android:paddingEnd="4dp">
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="8dp">
 
             <FrameLayout
                 android:id="@+id/btnBack"
-                android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_width="42dp"
+                android:layout_height="48dp"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
                     android:id="@+id/imgBackIcon"
-                    android:layout_width="18dp"
-                    android:layout_height="18dp"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/back"
-                    android:src="@drawable/ic_p2p_message_back" />
+                    android:src="@drawable/ic_arrow_back"
+                    app:tint="@color/text_primary" />
             </FrameLayout>
 
-            <!-- Hidden avatar pack kept for code that binds peer wear -->
+            <!-- Peer avatar + purple ring -->
             <FrameLayout
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone">
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:layout_marginStart="2dp"
+                android:clipChildren="false">
 
-                <ImageView
+                <View
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:background="@drawable/bg_chat_avatar_ring" />
+
+                <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgPeerAvatar"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:contentDescription="@null" />
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_default_avatar"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
 
                 <ImageView
                     android:id="@+id/imgPeerFrame"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
                     android:visibility="gone" />
 
                 <ImageView
                     android:id="@+id/imgPeerHostBadge"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:layout_gravity="bottom|end"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
                     android:visibility="gone" />
+
+                <!-- Green online pill on avatar (mock) -->
+                <View
+                    android:id="@+id/dotPeerOnline"
+                    android:layout_width="12dp"
+                    android:layout_height="12dp"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="1dp"
+                    android:layout_marginBottom="1dp"
+                    android:background="@drawable/bg_online_dot_ring" />
             </FrameLayout>
 
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
+                android:layout_marginStart="10dp"
                 android:layout_weight="1"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tvPeerName"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/tvPeerName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxWidth="150dp"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        tools:text="Lana" />
+
+                    <!-- Gender verification only when peer is verified (bound in Java) -->
+                    <ImageView
+                        android:id="@+id/imgPeerVerified"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="5dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_gender_verified"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxWidth="160dp"
-                    android:maxLines="1"
-                    android:textColor="#FF333333"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    tools:text="علاء" />
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/tvPeerUsername"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="#FFB2B2B2"
-                    android:textSize="14sp"
-                    tools:text="(ID:2477164)" />
+                    <TextView
+                        android:id="@+id/tvPeerStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/chat_status_online"
+                        android:textColor="@color/aurora_success"
+                        android:textSize="12sp"
+                        tools:text="Online" />
+
+                    <TextView
+                        android:id="@+id/tvPeerUsername"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+                </LinearLayout>
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tvPeerStatus"
+            <ImageView
+                android:id="@+id/imgChatCall"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:visibility="gone"
+                android:background="@drawable/bg_chat_header_icon_circle"
+                android:contentDescription="@null"
+                android:padding="9dp"
+                android:src="@drawable/ic_chat_call"
+                app:tint="@color/text_primary" />
+
+            <ImageView
+                android:id="@+id/imgChatVideo"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:visibility="gone"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_chat_header_icon_circle"
+                android:contentDescription="@null"
+                android:padding="9dp"
+                android:src="@drawable/ic_chat_video"
+                app:tint="@color/text_primary" />
+
+            <!-- legacy heart id kept for bind compatibility -->
+            <ImageView
+                android:id="@+id/imgChatHeart"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
-            <ImageView
-                android:id="@+id/imgChatHeart"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:contentDescription="@null"
-                android:padding="6dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/p2p_yg" />
-
             <FrameLayout
                 android:id="@+id/btnChatMenu"
-                android:layout_width="40dp"
-                android:layout_height="match_parent"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
                     android:id="@+id/imgChatMenu"
-                    android:layout_width="24dp"
-                    android:layout_height="18dp"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/chat_menu"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/p2p_more" />
+                    android:src="@drawable/ic_chat_menu_more"
+                    app:tint="@color/text_primary" />
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Peer strip (Mikoo p2p_zl_cl) — fixed height avoids wrap+ratio circular constraint -->
+        <!-- Peer strip optional (usually gone) -->
         <FrameLayout
             android:id="@+id/peerProfileStrip"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#FFF3F6F5"
-            android:paddingStart="12dp"
-            android:paddingTop="12dp"
             android:visibility="gone"
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
             android:paddingEnd="8dp"
             android:paddingBottom="8dp">
 
@@ -181,9 +255,9 @@
                 android:layout_height="76dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-               android:visibility="gone"
                 android:paddingStart="12dp"
-                android:paddingEnd="80dp">
+                android:paddingEnd="80dp"
+                android:visibility="gone">
 
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgStripAvatar"
@@ -214,19 +288,18 @@
                             android:ellipsize="end"
                             android:maxWidth="140dp"
                             android:maxLines="1"
-                            android:textColor="#FF222222"
+                            android:textColor="@color/text_primary"
                             android:textSize="15sp"
-                            android:textStyle="bold"
-                            tools:text="علاء" />
+                            android:textStyle="bold" />
 
                         <ImageView
                             android:id="@+id/imgStripFlag"
                             android:layout_width="20dp"
                             android:layout_height="14dp"
                             android:layout_marginStart="5dp"
-                            android:visibility="gone"
                             android:contentDescription="@null"
-                            android:scaleType="fitCenter" />
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -247,8 +320,7 @@
                             android:paddingHorizontal="6dp"
                             android:textColor="@color/white"
                             android:textSize="10sp"
-                            android:textStyle="bold"
-                            tools:text="14" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvStripLv2"
@@ -261,8 +333,7 @@
                             android:paddingHorizontal="6dp"
                             android:textColor="@color/white"
                             android:textSize="10sp"
-                            android:textStyle="bold"
-                            tools:text="12" />
+                            android:textStyle="bold" />
 
                         <TextView
                             android:id="@+id/tvStripLv3"
@@ -275,8 +346,7 @@
                             android:paddingHorizontal="6dp"
                             android:textColor="@color/white"
                             android:textSize="10sp"
-                            android:textStyle="bold"
-                            tools:text="12" />
+                            android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
@@ -286,12 +356,12 @@
             android:id="@+id/recycler"
             android:layout_width="match_parent"
             android:layout_height="0dp"
+            android:layout_weight="1"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:layout_weight="1"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="4dp"
             android:paddingTop="4dp"
-            android:paddingBottom="8dp" />
+            android:paddingBottom="10dp" />
 
         <TextView
             android:id="@+id/tvTyping"
@@ -303,7 +373,7 @@
             android:id="@+id/editBanner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#33000000"
+            android:background="#F5F5F7"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="14dp"
@@ -340,7 +410,7 @@
                 android:layout_height="wrap_content"
                 android:padding="8dp"
                 android:text="@string/cancel"
-                android:textColor="@color/aurora_gold"
+                android:textColor="@color/gift_accent"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -349,7 +419,7 @@
             android:id="@+id/replyBanner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#22000000"
+            android:background="#F5F5F7"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="12dp"
@@ -359,7 +429,7 @@
             <View
                 android:layout_width="3dp"
                 android:layout_height="36dp"
-                android:background="#FF43D3A2" />
+                android:background="@color/gift_accent" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -397,156 +467,146 @@
                 app:tint="@color/text_primary" />
         </LinearLayout>
 
-        <!-- Bottom: text row + icon strip (Mikoo) -->
+        <!-- Composer: + | pill input+emoji | mic/send -->
         <LinearLayout
             android:id="@+id/inputBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#FFF0F0F0"
-            android:orientation="vertical"
-            android:paddingTop="4dp"
-            android:paddingBottom="2dp">
+            android:background="@color/bg_light"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="12dp">
 
-            <RelativeLayout
+            <FrameLayout
+                android:id="@+id/btnAttach"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_chat_circle_action"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/imgChatImage"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/pick_gallery_photo"
+                    android:src="@drawable/ic_chat_plus"
+                    app:tint="@color/white" />
+            </FrameLayout>
+
+            <FrameLayout
                 android:id="@+id/composerShell"
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:minHeight="40dp"
-                android:paddingStart="15dp"
-                android:paddingEnd="15dp"
-                android:paddingTop="8dp">
+                android:layout_marginHorizontal="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_chat_input_field"
+                android:minHeight="46dp">
 
                 <EditText
                     android:id="@+id/etMessage"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_centerVertical="true"
-                    android:layout_marginEnd="52dp"
-                    android:background="@drawable/bg_chat_input_field"
+                    android:layout_gravity="center_vertical"
+                    android:background="@null"
                     android:hint="@string/msg_input_hint"
                     android:imeOptions="actionSend"
                     android:importantForAutofill="no"
                     android:inputType="textCapSentences|textMultiLine"
-                    android:maxHeight="72dp"
+                    android:maxHeight="96dp"
                     android:maxLines="4"
-                    android:minHeight="40dp"
-                    android:paddingHorizontal="12dp"
-                    android:paddingVertical="8dp"
+                    android:minHeight="46dp"
+                    android:paddingStart="14dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="42dp"
+                    android:paddingBottom="10dp"
                     android:textAlignment="viewStart"
-                    android:textColor="#FF333333"
-                    android:textColorHint="#FFCCCCCC"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
                     android:textCursorDrawable="@null"
                     android:textDirection="locale"
-                    android:textSize="13sp" />
+                    android:textSize="14sp" />
 
                 <FrameLayout
-                    android:id="@+id/btnSend"
-                    android:layout_width="50dp"
-                    android:layout_height="50dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
+                    android:id="@+id/btnChatEmoji"
+                    android:layout_width="40dp"
+                    android:layout_height="46dp"
+                    android:layout_gravity="end|center_vertical"
                     android:clickable="true"
                     android:focusable="true">
 
                     <ImageView
-                        android:id="@+id/imgChatSend"
-                        android:layout_width="36dp"
-                        android:layout_height="36dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/send_btn"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/ic_p2p_message_send" />
-                </FrameLayout>
-            </RelativeLayout>
-
-            <!-- Mikoo icon order: emoji · audio · gift · pic (RTL reverses to match screenshots) -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="62dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <FrameLayout
-                    android:id="@+id/btnChatEmoji"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
-
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/emoji"
-                        android:src="@drawable/ic_p2p_modify_emoji" />
+                        android:src="@drawable/ic_p2p_modify_emoji"
+                        app:tint="@color/text_secondary" />
                 </FrameLayout>
+            </FrameLayout>
 
-                <FrameLayout
-                    android:id="@+id/btnVoice"
+            <FrameLayout
+                android:id="@+id/btnChatGift"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/imgChatGift"
                     android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
+                    android:layout_height="0dp" />
+            </FrameLayout>
 
-                    <ImageView
-                        android:id="@+id/imgChatVoice"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/voice_message"
-                        android:src="@drawable/ic_p2p_modify_audio" />
-                </FrameLayout>
+            <!-- Mic when empty; Send when typing (mock) -->
+            <FrameLayout
+                android:id="@+id/btnVoice"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_chat_circle_action"
+                android:clickable="true"
+                android:focusable="true">
 
-                <FrameLayout
-                    android:id="@+id/btnChatGift"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                    android:id="@+id/imgChatVoice"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/voice_message"
+                    android:src="@drawable/ic_pro_mic"
+                    app:tint="@color/white" />
+            </FrameLayout>
 
-                    <ImageView
-                        android:id="@+id/imgChatGift"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/gifts"
-                        android:src="@drawable/ic_p2p_gift" />
-                </FrameLayout>
+            <FrameLayout
+                android:id="@+id/btnSend"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_chat_circle_action"
+                android:clickable="true"
+                android:focusable="true"
+                android:visibility="gone">
 
-                <FrameLayout
-                    android:id="@+id/btnAttach"
-                    android:layout_width="0dp"
-                    android:layout_height="match_parent"
-                    android:layout_weight="1"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
-
-                    <ImageView
-                        android:id="@+id/imgChatImage"
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/pick_gallery_photo"
-                        android:src="@drawable/ic_p2p_pic" />
-                </FrameLayout>
-            </LinearLayout>
+                <ImageView
+                    android:id="@+id/imgChatSend"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/send_btn"
+                    android:src="@drawable/ic_pro_send"
+                    app:tint="@color/white" />
+            </FrameLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Mikoo voice panel: big green record circle -->
+    <!-- Voice record overlay -->
     <FrameLayout
         android:id="@+id/voiceRecordOverlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#FFF0F0F0"
+        android:background="@color/bg_light"
         android:clickable="true"
         android:elevation="24dp"
         android:focusable="true"
@@ -566,7 +626,7 @@
                 android:id="@+id/voiceMicCircle"
                 android:layout_width="92dp"
                 android:layout_height="92dp"
-                android:background="@drawable/shape_dialog_btn_audio_record_press_12">
+                android:background="@drawable/bg_chat_circle_action">
 
                 <View
                     android:id="@+id/voicePulseOuter"
@@ -585,6 +645,14 @@
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:visibility="gone" />
+
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_p2p_modify_audio"
+                    app:tint="@color/text_primary" />
             </FrameLayout>
 
             <TextView
@@ -593,7 +661,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:text="@string/press_to_record"
-                android:textColor="#FF333333"
+                android:textColor="@color/text_primary"
                 android:textSize="13sp" />
 
             <TextView
@@ -602,7 +670,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="0:00"
-                android:textColor="#FF666666"
+                android:textColor="@color/text_hint"
                 android:textSize="12sp"
                 android:visibility="gone"
                 tools:text="0:12" />
@@ -629,12 +697,16 @@
                     android:layout_width="52dp"
                     android:layout_height="52dp"
                     android:layout_marginStart="28dp"
-                    android:background="@drawable/bg_voice_send_circle"
+                    android:background="@drawable/bg_chat_circle_action"
                     android:contentDescription="@string/send_btn"
                     android:padding="14dp"
-                    android:src="@drawable/ic_p2p_message_send"
-                    app:tint="@android:color/white" />
+                    android:src="@drawable/ic_pro_send"
+                    app:tint="@color/white" />
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>
 </FrameLayout>
+
+
+
+

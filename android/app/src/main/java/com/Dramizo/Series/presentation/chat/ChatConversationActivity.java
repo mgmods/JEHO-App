@@ -14,6 +14,7 @@ import android.text.TextWatcher;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.Toast;
 
@@ -188,6 +189,7 @@ public class ChatConversationActivity extends ThemedActivity {
         }
         binding.btnBack.setOnClickListener(v -> navigateUp());
         bindGiftButton();
+        paintComposerBrandChrome();
         if (binding.btnChatMenu != null) {
             binding.btnChatMenu.setOnClickListener(v -> showChatMenu());
         }
@@ -672,7 +674,8 @@ public class ChatConversationActivity extends ThemedActivity {
             binding.tvPeerUsername.setVisibility(View.GONE);
         }
         if (binding.tvStripName != null) binding.tvStripName.setText(name);
-        GenderVerifiedBadge.bind(binding.tvPeerName, null, peer != null && peer.genderVerified);
+        ImageView peerVerified = binding.getRoot().findViewById(R.id.imgPeerVerified);
+        GenderVerifiedBadge.bind(binding.tvPeerName, peerVerified, peer != null && peer.genderVerified);
         if (binding.tvStripName != null) {
             GenderVerifiedBadge.bind(binding.tvStripName, null, peer != null && peer.genderVerified);
         }
@@ -762,23 +765,28 @@ public class ChatConversationActivity extends ThemedActivity {
         if (binding == null || binding.tvPeerStatus == null) return;
         // Typing only under the name — never duplicate below the chat list.
         if (binding.tvTyping != null) binding.tvTyping.setVisibility(View.GONE);
+        View onlineDot = binding.getRoot().findViewById(R.id.dotPeerOnline);
         if (peerTyping) {
             binding.tvPeerStatus.setText(R.string.typing);
-            binding.tvPeerStatus.setTextColor(getColor(R.color.text_secondary));
+            binding.tvPeerStatus.setTextColor(0xFFFE2C55);
+            if (onlineDot != null) onlineDot.setVisibility(View.GONE);
             return;
         }
         if (!showOnlineAllowed) {
             binding.tvPeerStatus.setText(R.string.offline);
-            binding.tvPeerStatus.setTextColor(getColor(R.color.text_hint));
+            binding.tvPeerStatus.setTextColor(0xFF9F9F9F);
+            if (onlineDot != null) onlineDot.setVisibility(View.GONE);
             return;
         }
         if (peerOnline) {
-            binding.tvPeerStatus.setText(R.string.online_now);
-            binding.tvPeerStatus.setTextColor(getColor(R.color.aurora_success));
+            binding.tvPeerStatus.setText(R.string.chat_status_online);
+            binding.tvPeerStatus.setTextColor(0xFF34D399);
+            if (onlineDot != null) onlineDot.setVisibility(View.VISIBLE);
             return;
         }
         binding.tvPeerStatus.setText(DeviceTimeFormat.lastSeen(this, peerLastSeenAt));
-        binding.tvPeerStatus.setTextColor(getColor(R.color.text_hint));
+        binding.tvPeerStatus.setTextColor(0xFF9F9F9F);
+        if (onlineDot != null) onlineDot.setVisibility(View.GONE);
     }
 
     private void openPeerProfile() {
@@ -992,11 +1000,85 @@ public class ChatConversationActivity extends ThemedActivity {
     private void refreshSendMicVisibility() {
         CharSequence text = binding.etMessage.getText();
         boolean hasText = text != null && text.toString().trim().length() > 0;
-        binding.btnSend.setEnabled(hasText);
-        binding.btnSend.setAlpha(hasText ? 1f : 0.35f);
-        if (binding.imgChatSend != null) {
-            binding.imgChatSend.setAlpha(hasText ? 1f : 0.35f);
+        // Mic alone when empty; send replaces mic when typing.
+        if (binding.btnVoice != null) {
+            binding.btnVoice.setVisibility(hasText ? View.GONE : View.VISIBLE);
         }
+        binding.btnSend.setVisibility(hasText ? View.VISIBLE : View.GONE);
+        binding.btnSend.setEnabled(hasText);
+        binding.btnSend.setAlpha(1f);
+        if (binding.imgChatSend != null) {
+            binding.imgChatSend.setAlpha(1f);
+        }
+        // Ensure brand chrome sticks after visibility swaps.
+        paintComposerBrandChrome();
+    }
+
+    /**
+     * Brand filled circles (+ / mic / send). Icon glyph is always white; never paint a
+     * light/near-white fill (dashboard mis-config would make the button look blank).
+     */
+    private void paintComposerBrandChrome() {
+        if (binding == null) return;
+        int primary = resolveAppPrimaryColor();
+        paintOvalChrome(binding.btnAttach, primary);
+        paintOvalChrome(binding.btnVoice, primary);
+        paintOvalChrome(binding.btnSend, primary);
+        paintOvalChrome(binding.getRoot().findViewById(R.id.voiceMicCircle), primary);
+        View voiceSend = binding.getRoot().findViewById(R.id.btnVoiceSend);
+        paintOvalChrome(voiceSend, primary);
+        tintComposerGlyph(binding.imgChatImage);
+        tintComposerGlyph(binding.imgChatVoice);
+        tintComposerGlyph(binding.imgChatSend);
+        if (voiceSend instanceof android.widget.ImageView) {
+            tintComposerGlyph((android.widget.ImageView) voiceSend);
+        }
+    }
+
+    private static void tintComposerGlyph(@Nullable android.widget.ImageView iv) {
+        if (iv == null) return;
+        // White plane/mic on brand oval — vectors only; avoid whitening baked-in raster circles.
+        iv.clearColorFilter();
+        androidx.core.widget.ImageViewCompat.setImageTintList(
+                iv, android.content.res.ColorStateList.valueOf(android.graphics.Color.WHITE));
+    }
+
+    private int resolveAppPrimaryColor() {
+        int brandFallback = 0xFFFE2C55;
+        try {
+            brandFallback = getColor(R.color.gift_accent);
+        } catch (Exception ignored) {
+        }
+        int remote = com.Dramizo.Series.util.RemoteTheme.primaryColor(this);
+        if (isUnusableBrandFill(remote)) {
+            return brandFallback;
+        }
+        return remote;
+    }
+
+    /** Reject white / near-white / ghostly grays as button fills. */
+    private static boolean isUnusableBrandFill(int color) {
+        int a = (color >>> 24) & 0xFF;
+        if (a < 180) return true;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        // Relative luminance (sRGB approx).
+        double lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        if (lum >= 0.78) return true;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        // Near-gray and very light → unusable on white composer bar.
+        return (max - min) < 18 && lum > 0.55;
+    }
+
+    private static void paintOvalChrome(@Nullable View view, int color) {
+        if (view == null) return;
+        android.graphics.drawable.GradientDrawable oval =
+                new android.graphics.drawable.GradientDrawable();
+        oval.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        oval.setColor(color);
+        view.setBackground(oval);
     }
 
     private void attachSwipeToReply() {

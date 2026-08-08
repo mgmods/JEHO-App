@@ -35,7 +35,7 @@ export class HostMonthlyProgress {
    * this cycle (separate from reward claims). Only ONE current stage is shown
    * for withdraw; after salary withdraw, host advances to the next stage.
    */
-  @Column({ type: 'simple-json', default: [] })
+  @Column({ type: 'simple-json', default: [], nullable: true })
   withdrawnStageIds: string[];
 
   /** How many full stage sets the host already finished this month. */

@@ -53,6 +53,12 @@
           <section class="settings-card">
             <h3 class="settings-card-title">{{ t('settings.accountTitle') }}</h3>
             <p class="form-text mb-3">{{ t('settings.accountHint') }}</p>
+            <div class="alert alert-info py-2 small mb-3" v-if="auth.isSuperAdmin">
+              {{ t('settings.youAreSuper') }}
+              <button type="button" class="btn btn-sm btn-aurora ms-2" @click="selectTab('admins')">
+                {{ t('settings.goToAdmins') }}
+              </button>
+            </div>
             <div class="row g-3">
               <div class="col-md-6">
                 <label class="form-label">{{ t('settings.accountEmail') }}</label>
@@ -102,6 +108,15 @@
                 {{ t('settings.accountSave') }}
               </button>
             </div>
+          </section>
+
+          <!-- Super: second dashboard accounts right on this screen too -->
+          <section v-if="auth.isSuperAdmin" class="settings-card mt-3">
+            <h3 class="settings-card-title">{{ t('settings.adminsTitle') }}</h3>
+            <p class="form-text mb-3">{{ t('settings.adminsHint') }}</p>
+            <button type="button" class="btn btn-aurora" @click="selectTab('admins')">
+              {{ t('settings.goToAdmins') }} →
+            </button>
           </section>
         </template>
 
@@ -309,6 +324,16 @@
 
           <!-- ECONOMY -->
           <template v-else-if="settingsTab === 'economy'">
+            <section class="settings-card mb-3">
+              <h3 class="settings-card-title">{{ t('settings.economyExplainerTitle') }}</h3>
+              <ol class="mb-0 ps-3 small" style="line-height:1.8">
+                <li>{{ t('settings.economyExplainer1') }}</li>
+                <li>{{ t('settings.economyExplainer2') }}</li>
+                <li>{{ t('settings.economyExplainer3') }}</li>
+                <li>{{ t('settings.economyExplainer4') }}</li>
+                <li>{{ t('settings.economyExplainer5') }}</li>
+              </ol>
+            </section>
             <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.economy') }}</h3>
               <div class="row g-3">
@@ -993,10 +1018,9 @@ async function save() {
 }
 
 onMounted(async () => {
+  // Always refresh Super/operator flags so "أدمنز اللوحة" appears after deploy
+  await auth.fetchMe()
   syncTabFromRoute()
-  if (!auth.user?.email) {
-    await auth.fetchMe()
-  }
   fillAccountFromAuth()
   load()
 })

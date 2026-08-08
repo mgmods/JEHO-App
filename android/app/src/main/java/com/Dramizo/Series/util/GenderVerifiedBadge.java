@@ -22,6 +22,11 @@ public final class GenderVerifiedBadge {
         boolean show = user != null && user.genderVerified;
         if (badgeView != null) {
             badgeView.setVisibility(show ? View.VISIBLE : View.GONE);
+            // Dedicated badge image: don't also attach a compound drawable (would double).
+            if (nameView != null) {
+                nameView.setCompoundDrawablesRelative(null, null, null, null);
+            }
+            return;
         }
         if (nameView != null && show) {
             nameView.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, R.drawable.ic_gender_verified, 0);

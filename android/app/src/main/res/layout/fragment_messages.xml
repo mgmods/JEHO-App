@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Chat inbox: clean white list — header · official · conversations -->
+<!-- Chat inbox: light white list — matches app theme -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_light">
 
-    <!-- Kept for Theme engine; no decorative banner clutter -->
     <ImageView
         android:id="@+id/imgThemeBg"
         android:layout_width="0dp"
@@ -20,7 +19,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="52dp"
@@ -74,7 +72,6 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
-            <!-- Legacy menu alias — same as friends -->
             <ImageButton
                 android:id="@+id/btnMsgMenu"
                 android:layout_width="0dp"
@@ -93,14 +90,12 @@
             android:layout_height="0.5dp"
             android:background="@color/divider_color" />
 
-        <!-- Official JEHO channel (same row language as chats) -->
         <include
             android:id="@+id/officialNewsCardMsg"
             layout="@layout/include_official_news_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
-        <!-- Legacy my-room binding stubs (hidden — room open lives on Home) -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/cardMyRoom"
             android:layout_width="0dp"

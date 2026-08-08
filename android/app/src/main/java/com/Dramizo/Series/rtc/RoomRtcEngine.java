@@ -25,6 +25,8 @@ public final class RoomRtcEngine {
     private String provider = PROVIDER_ZEGO;
     @Nullable private String livekitUrl;
     @Nullable private String livekitRoomName;
+    /** JWT grant from last join/refresh (LiveKit needs rejoin when this flips false→true). */
+    private boolean sessionCanPublish = false;
 
     public static synchronized RoomRtcEngine getInstance() {
         if (instance == null) instance = new RoomRtcEngine();
@@ -45,6 +47,10 @@ public final class RoomRtcEngine {
         return !isLiveKit();
     }
 
+    public boolean isSessionCanPublish() {
+        return sessionCanPublish;
+    }
+
     /**
      * Read {@link RoomDtos.JoinRoomResult#voiceProvider} and connect the matching engine.
      */
@@ -54,6 +60,7 @@ public final class RoomRtcEngine {
             @Nullable String fallbackRoomId,
             @Nullable String fallbackUserId) {
         if (session == null) return;
+        sessionCanPublish = session.canPublish;
         String p = session.voiceProvider != null ? session.voiceProvider.trim() : PROVIDER_ZEGO;
         if (PROVIDER_LIVEKIT.equalsIgnoreCase(p)) {
             provider = PROVIDER_LIVEKIT;
@@ -75,6 +82,7 @@ public final class RoomRtcEngine {
                     session.token,
                     livekitRoomName,
                     userId);
+            LiveKitEngineManager.getInstance().setSessionCanPublish(session.canPublish);
             Log.i(TAG, "RTC provider=livekit room=" + livekitRoomName
                     + " url=" + livekitUrl
                     + " canPublish=" + session.canPublish);
@@ -122,20 +130,29 @@ public final class RoomRtcEngine {
 
     public void renewRoomToken(String roomId, String token) {
         if (isLiveKit()) {
-            // LiveKit JWT is immutable — reconnect when publish rights change (audience → seat).
-            // Skip only if already publishing with identical token payload (no-op renew).
+            // LiveKit validates JWT only at join. Once connected + publishing, TTL refresh must
+            // NOT tear the SFU session down (that caused leave/rejoin storms + one-way audio).
+            // Reconnect only when we need a new grant (audience → seat canPublish).
             LiveKitEngineManager lk = LiveKitEngineManager.getInstance();
-            if (lk.isReady() && lk.isPublishing()
-                    && token != null && token.equals(lk.getLastToken())) {
-                Log.i(TAG, "livekit skip reconnect — same token already live");
+            boolean needPublishUpgrade =
+                    sessionCanPublish && !lk.isSessionCanPublish();
+            if (lk.isReady() && !needPublishUpgrade
+                    && (lk.isPublishing() || token != null && token.equals(lk.getLastToken()))) {
+                Log.i(TAG, "livekit skip reconnect — session already live");
                 return;
             }
             LiveKitEngineManager.getInstance().reconnectWithToken(
                     null, livekitUrl, token, roomId != null ? roomId : livekitRoomName, null);
-            Log.i(TAG, "livekit reconnect with seat-aware token");
+            LiveKitEngineManager.getInstance().setSessionCanPublish(sessionCanPublish);
+            Log.i(TAG, "livekit reconnect with seat-aware token canPublish=" + sessionCanPublish);
             return;
         }
         ZegoEngineManager.getInstance().renewRoomToken(roomId, token);
+    }
+
+    /** Update grant flag after /zego-token (before renew / publish). */
+    public void setSessionCanPublish(boolean canPublish) {
+        this.sessionCanPublish = canPublish;
     }
 
     public void setMicEnabled(boolean enabled) {

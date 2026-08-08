@@ -3352,6 +3352,11 @@ export class AdminService {
     channel?: 'push' | 'in_app' | 'both';
     type?: NotificationType;
     message?: string;
+    html?: string;
+    bodyHtml?: string;
+    imageUrl?: string;
+    link?: string;
+    url?: string;
   }) {
     return this.notificationsService.adminSend({
       title: body.title,
@@ -3360,6 +3365,11 @@ export class AdminService {
       audience: body.audience || (body.userId ? 'user' : 'all'),
       channel: body.channel || 'both',
       type: body.type || NotificationType.SYSTEM,
+      html: body.html || body.bodyHtml,
+      bodyHtml: body.bodyHtml || body.html,
+      imageUrl: body.imageUrl,
+      link: body.link || body.url,
+      url: body.url || body.link,
     });
   }
 

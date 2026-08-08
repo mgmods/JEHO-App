@@ -1,0 +1,14 @@
+﻿python : Traceback (most recent call last):
+At C:\Users\momf\AppData\Local\Temp\ps-script-97baff33-13e7-4b5b-9144-8d88f11b63c6.ps1:104 char:28
++ ... tion D:\JEHO-CHAT; python scripts/_watch_livekit_logs.py 2>&1 | Out-F ...
++                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "D:\JEHO-CHAT\scripts\_watch_livekit_logs.py", line 66, in <module>
+    raise SystemExit(main())
+                     ~~~~^^
+  File "D:\JEHO-CHAT\scripts\_watch_livekit_logs.py", line 21, in main
+    host = env.get("DEPLOY_SSH_HOST", "79.143.180.50")
+           ^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'get'

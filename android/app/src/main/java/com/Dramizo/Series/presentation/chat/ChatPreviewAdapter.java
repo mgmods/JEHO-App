@@ -165,10 +165,12 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
         String last = previewText(ctx, item);
         holder.b.tvLast.setText(last);
         boolean unread = item.unreadCount > 0;
-        holder.b.tvLast.setTextColor(ctx.getColor(
-                unread ? R.color.text_primary : R.color.text_secondary));
+        holder.b.tvLast.setTextColor(unread
+                ? ctx.getColor(R.color.text_primary)
+                : ctx.getColor(R.color.text_secondary));
         holder.b.tvLast.setTypeface(null, unread ? Typeface.BOLD : Typeface.NORMAL);
-        holder.b.tvTitle.setTypeface(null, unread ? Typeface.BOLD : Typeface.BOLD);
+        holder.b.tvTitle.setTextColor(ctx.getColor(R.color.text_primary));
+        holder.b.tvTitle.setTypeface(null, Typeface.BOLD);
 
         String timeSource = item.lastMessage != null ? item.lastMessage.createdAt : item.updatedAt;
         String time = DeviceTimeFormat.messageTime(ctx, timeSource);

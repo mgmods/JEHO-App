@@ -22,7 +22,8 @@ import java.util.Map;
 /**
  * Room public chat for the active live session.
  * Survives Activity recreate / minimize; wiped on staff clear, auto-clear, or end of live.
- * Disk + memory + cleared-epoch so wipe is complete on this device.
+ * Disk persists are debounced on a worker thread so append from UI does not rewrite JSON
+ * on the main thread (ANR risk on mid-range MIUI devices).
  */
 public final class RoomChatMemory {
     private static final int SOFT_CAP = 800;
@@ -31,13 +32,32 @@ public final class RoomChatMemory {
             Collections.synchronizedMap(new LinkedHashMap<>());
     private static final Map<String, Long> CLEARED_AT =
             Collections.synchronizedMap(new LinkedHashMap<>());
+    private static final Map<String, Long> PERSIST_SEQ =
+            Collections.synchronizedMap(new LinkedHashMap<>());
     @Nullable private static Context appCtx;
+    @Nullable private static java.util.concurrent.ExecutorService diskIo;
 
     private RoomChatMemory() {}
 
     public static void init(@Nullable Context context) {
         if (context == null) return;
         appCtx = context.getApplicationContext();
+    }
+
+    private static java.util.concurrent.ExecutorService diskIo() {
+        if (diskIo == null) {
+            synchronized (RoomChatMemory.class) {
+                if (diskIo == null) {
+                    diskIo = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                        Thread t = new Thread(r, "room-chat-disk");
+                        t.setDaemon(true);
+                        t.setPriority(Thread.NORM_PRIORITY - 1);
+                        return t;
+                    });
+                }
+            }
+        }
+        return diskIo;
     }
 
     public static final class Line {
@@ -88,8 +108,38 @@ public final class RoomChatMemory {
             }
             list.add(line);
             while (list.size() > SOFT_CAP) list.remove(0);
-            persistLocked(roomId, list);
         }
+        // Never rewrite session JSON on the caller (often main) thread.
+        schedulePersist(roomId);
+    }
+
+    /** Best-effort flush of pending lines without blocking the UI for long. */
+    private static void schedulePersist(String roomId) {
+        final long seq;
+        synchronized (PERSIST_SEQ) {
+            Long prev = PERSIST_SEQ.get(roomId);
+            seq = (prev != null ? prev : 0L) + 1L;
+            PERSIST_SEQ.put(roomId, seq);
+        }
+        diskIo().execute(() -> {
+            try {
+                Thread.sleep(180L); // coalesce bursts during join welcome + floods
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            Long latest;
+            synchronized (PERSIST_SEQ) {
+                latest = PERSIST_SEQ.get(roomId);
+            }
+            if (latest == null || latest != seq) return; // superseded
+            List<Line> copy;
+            synchronized (BY_ROOM) {
+                List<Line> list = BY_ROOM.get(roomId);
+                if (list == null) return;
+                copy = new ArrayList<>(list);
+            }
+            persistLocked(roomId, copy);
+        });
     }
 
     public static List<Line> snapshot(@Nullable String roomId) {

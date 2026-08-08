@@ -1589,7 +1589,13 @@ export class GiftsService implements OnModuleInit {
                 amount,
               );
             })
-            .catch(() => undefined);
+            .catch((err) => {
+              this.log.warn(
+                `hostTarget.recordHostProgress failed: ${
+                  err instanceof Error ? err.message : String(err)
+                }`,
+              );
+            });
         }
       }
       const spent = gift.coinPrice * qty;
@@ -2213,6 +2219,32 @@ export class GiftsService implements OnModuleInit {
           agencyId: room.agencyId || undefined,
         })
         .catch(() => undefined);
+      // Host target: all-mic gifts must count for the room host (was missing → under-target).
+      if (roomHostId && this.hostTarget && Number(result.hostDiamonds || 0) > 0) {
+        const ht = this.hostTarget;
+        const hostDiamonds = Number(result.hostDiamonds || 0);
+        const diamondPool = Math.max(1, Number(result.breakdown?.diamondPool || hostDiamonds));
+        const hostCoinsShare = Math.max(
+          1,
+          Math.floor((Number(result.totalCoins || totalCoins) * hostDiamonds) / diamondPool),
+        );
+        void ht
+          .getConfig()
+          .then((cfg) => {
+            if (!cfg?.enabled) return null;
+            const amount =
+              cfg.currency === 'gift_coins' ? hostCoinsShare : hostDiamonds;
+            if (amount <= 0) return null;
+            return ht.recordHostProgress(roomHostId, amount);
+          })
+          .catch((err) => {
+            this.log.warn(
+              `hostTarget all-mic progress failed: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          });
+      }
       const perTargetCoins = coinPrice * qty;
       for (const rid of receiverIds) {
         void this.contestsService

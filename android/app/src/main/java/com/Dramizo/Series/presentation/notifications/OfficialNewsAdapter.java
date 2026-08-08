@@ -6,12 +6,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
+import android.text.Spannable;
 import android.text.SpannableString;
+import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.text.style.URLSpan;
 import android.text.util.Linkify;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,6 +23,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.text.HtmlCompat;
 import androidx.core.text.util.LinkifyCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -27,6 +31,8 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ItemOfficialNewsBubbleBinding;
 import com.Dramizo.Series.presentation.web.PromoWebActivity;
+import com.Dramizo.Series.util.AssetCatalog;
+import com.bumptech.glide.Glide;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -39,7 +45,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Official News bubbles: clickable http(s) links + tap/copy agency activation codes.
+ * Official News bubbles: HTML body + image + clickable http(s) links + agency codes.
  */
 public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapter.VH> {
     private static final Pattern ACTIVATION_CODE = Pattern.compile(
@@ -83,7 +89,6 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapte
         h.b.tvBubbleTime.setText(formatTime(n.createdAt));
 
         // Agency copy-code UI only for real agency notifications — never for system/admin news.
-        // Guard: even if data accidentally carries activationCode on a system broadcast, hide it.
         String typeNorm = n.type != null ? n.type.trim().toLowerCase(Locale.US) : "";
         boolean isAgency = "agency".equals(typeNorm);
         boolean isSystemBroadcast = "system".equals(typeNorm)
@@ -97,12 +102,19 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapte
                 codeFromData = extractActivationCode(body);
             }
         }
+        String htmlFromData = firstString(n.data, "html", "bodyHtml", "richHtml");
+        String imageFromData = firstString(n.data, "imageUrl", "image", "bannerUrl", "coverUrl");
         String linkFromData = firstString(n.data, "url", "link", "href", "webUrl");
         if (TextUtils.isEmpty(linkFromData)) {
-            linkFromData = extractFirstUrl(body);
+            linkFromData = extractFirstUrl(!TextUtils.isEmpty(htmlFromData) ? htmlFromData : body);
         }
 
-        bindRichBody(h.b.tvBubbleBody, body, isAgency ? codeFromData : null);
+        bindPromoImage(h, imageFromData);
+        if (!TextUtils.isEmpty(htmlFromData)) {
+            bindHtmlBody(h.b.tvBubbleBody, htmlFromData, isAgency ? codeFromData : null);
+        } else {
+            bindRichBody(h.b.tvBubbleBody, body, isAgency ? codeFromData : null);
+        }
 
         boolean hasCode = isAgency && !TextUtils.isEmpty(codeFromData);
         boolean hasLink = !TextUtils.isEmpty(linkFromData);
@@ -126,7 +138,9 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapte
             h.b.btnOpenLink.setOnClickListener(null);
         }
 
-        String copyPayload = TextUtils.isEmpty(body) ? title : body;
+        String copyPayload = !TextUtils.isEmpty(htmlFromData)
+                ? HtmlCompat.fromHtml(htmlFromData, HtmlCompat.FROM_HTML_MODE_COMPACT).toString()
+                : (TextUtils.isEmpty(body) ? title : body);
         h.itemView.setOnLongClickListener(v -> {
             copyText(ctx, copyPayload, false);
             return true;
@@ -135,6 +149,95 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapte
             copyText(ctx, copyPayload, false);
             return true;
         });
+        if (h.b.imgBubbleMedia != null) {
+            final String fullImage = AssetCatalog.absoluteUrl(imageFromData);
+            h.b.imgBubbleMedia.setOnClickListener(v -> {
+                if (!TextUtils.isEmpty(fullImage)) openLink(ctx, fullImage, title);
+            });
+        }
+    }
+
+    private void bindPromoImage(@NonNull VH h, @Nullable String imageUrl) {
+        if (h.b.imgBubbleMedia == null) return;
+        if (TextUtils.isEmpty(imageUrl)) {
+            h.b.imgBubbleMedia.setVisibility(View.GONE);
+            h.b.imgBubbleMedia.setImageDrawable(null);
+            h.b.imgBubbleMedia.setOnClickListener(null);
+            return;
+        }
+        h.b.imgBubbleMedia.setVisibility(View.VISIBLE);
+        try {
+            Glide.with(h.b.imgBubbleMedia)
+                    .load(AssetCatalog.absoluteUrl(imageUrl))
+                    .centerCrop()
+                    .into(h.b.imgBubbleMedia);
+        } catch (Exception e) {
+            h.b.imgBubbleMedia.setVisibility(View.GONE);
+        }
+    }
+
+    private void bindHtmlBody(
+            android.widget.TextView tv, String html, @Nullable String knownCode) {
+        if (TextUtils.isEmpty(html)) {
+            tv.setText("");
+            return;
+        }
+        Spanned spanned = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT);
+        SpannableStringBuilder span = new SpannableStringBuilder(spanned);
+
+        // Re-wire <a href> URLSpans for in-app browser.
+        URLSpan[] urls = span.getSpans(0, span.length(), URLSpan.class);
+        if (urls != null) {
+            for (URLSpan urlSpan : urls) {
+                int start = span.getSpanStart(urlSpan);
+                int end = span.getSpanEnd(urlSpan);
+                String url = urlSpan.getURL();
+                span.removeSpan(urlSpan);
+                if (start < 0 || end <= start) continue;
+                span.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NonNull View widget) {
+                        openLink(widget.getContext(), normalizeUrl(url), null);
+                    }
+
+                    @Override
+                    public void updateDrawState(@NonNull TextPaint ds) {
+                        ds.setColor(0xFF1565C0);
+                        ds.setUnderlineText(true);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+
+        if (!TextUtils.isEmpty(knownCode)) {
+            String plain = span.toString();
+            Matcher m = ACTIVATION_CODE.matcher(plain);
+            while (m.find()) {
+                String code = m.group(1);
+                if (code == null || !knownCode.equalsIgnoreCase(code)) continue;
+                int start = m.start(1);
+                int end = m.end(1);
+                if (hasClickableOverlap(span, start, end)) continue;
+                final String copyCode = code.toUpperCase(Locale.US);
+                span.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NonNull View widget) {
+                        copyText(widget.getContext(), copyCode, true);
+                    }
+
+                    @Override
+                    public void updateDrawState(@NonNull TextPaint ds) {
+                        ds.setColor(0xFFB8860B);
+                        ds.setFakeBoldText(true);
+                        ds.setUnderlineText(true);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+
+        tv.setText(span);
+        tv.setMovementMethod(LinkMovementMethod.getInstance());
+        tv.setHighlightColor(Color.TRANSPARENT);
     }
 
     private void bindRichBody(android.widget.TextView tv, String body, @Nullable String knownCode) {
@@ -200,7 +303,7 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<OfficialNewsAdapte
         tv.setHighlightColor(Color.TRANSPARENT);
     }
 
-    private static boolean hasClickableOverlap(SpannableString span, int start, int end) {
+    private static boolean hasClickableOverlap(Spannable span, int start, int end) {
         ClickableSpan[] existing = span.getSpans(start, end, ClickableSpan.class);
         return existing != null && existing.length > 0;
     }

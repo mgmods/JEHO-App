@@ -166,6 +166,15 @@ const sections = computed(() => [
       { name: 'reports', icon: 'bi-flag', label: t('nav.reports') },
       { name: 'notifications', icon: 'bi-bell', label: t('nav.notifications') },
       { name: 'settings', icon: 'bi-gear', label: t('nav.settings'), settingsRoot: true },
+      ...(auth.isSuperAdmin
+        ? [{
+            name: 'settings',
+            query: { tab: 'admins' },
+            icon: 'bi-people-fill',
+            label: t('settings.tabAdmins'),
+            module: 'settings',
+          }]
+        : []),
       { name: 'logs', icon: 'bi-journal-text', label: t('nav.logs') },
     ],
   },

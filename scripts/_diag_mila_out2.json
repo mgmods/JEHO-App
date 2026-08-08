@@ -1,0 +1,402 @@
+{
+  "publicId": "48067367",
+  "progress_columns": [
+    {
+      "column_name": "id",
+      "data_type": "uuid"
+    },
+    {
+      "column_name": "userId",
+      "data_type": "uuid"
+    },
+    {
+      "column_name": "yearMonth",
+      "data_type": "character varying"
+    },
+    {
+      "column_name": "progress",
+      "data_type": "bigint"
+    },
+    {
+      "column_name": "claimedStageIds",
+      "data_type": "text"
+    },
+    {
+      "column_name": "createdAt",
+      "data_type": "timestamp with time zone"
+    },
+    {
+      "column_name": "updatedAt",
+      "data_type": "timestamp with time zone"
+    },
+    {
+      "column_name": "cyclesCompleted",
+      "data_type": "integer"
+    }
+  ],
+  "user": {
+    "id": "9eb79cf6-4c82-4583-ad60-17a35e32dc75",
+    "publicId": "48067367",
+    "username": "tt5327274",
+    "displayName": "ميــــلا"
+  },
+  "progress_all": [
+    {
+      "id": "6b1a7fb2-1e57-4712-ac71-6358b024b0e4",
+      "userId": "9eb79cf6-4c82-4583-ad60-17a35e32dc75",
+      "yearMonth": "2026W32",
+      "progress": "1314200",
+      "claimedStageIds": "[\"salary_v2_1\",\"salary_v2_2\",\"salary_v2_3\",\"salary_v2_4\",\"salary_v2_5\",\"salary_v2_6\"]",
+      "createdAt": "2026-08-07T17:23:21.298Z",
+      "updatedAt": "2026-08-07T21:52:49.707Z",
+      "cyclesCompleted": 0
+    },
+    {
+      "id": "86adb4e5-5cb9-45e9-a785-64c58b080c91",
+      "userId": "9eb79cf6-4c82-4583-ad60-17a35e32dc75",
+      "yearMonth": "2026-08",
+      "progress": "63221",
+      "claimedStageIds": "[\"salary_1\",\"salary_2\",\"salary_3\",\"salary_4\"]",
+      "createdAt": "2026-08-01T00:00:24.983Z",
+      "updatedAt": "2026-08-06T14:10:45.327Z",
+      "cyclesCompleted": 0
+    }
+  ],
+  "sample_recent_any_user": [
+    {
+      "userId": "9eb79cf6-4c82-4583-ad60-17a35e32dc75",
+      "yearMonth": "2026W32",
+      "progress": "1314200",
+      "claimedStageIds": "[\"salary_v2_1\",\"salary_v2_2\",\"salary_v2_3\",\"salary_v2_4\",\"salary_v2_5\",\"salary_v2_6\"]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T21:52:49.707Z"
+    },
+    {
+      "userId": "c53c06b9-d54e-4349-ac76-e81fef98f9a6",
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T19:42:56.183Z"
+    },
+    {
+      "userId": "279aa46c-7453-4c8a-900d-7d9968ced1b4",
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T18:45:33.081Z"
+    },
+    {
+      "userId": "02805b91-917b-47ba-b4a1-fcf879d39198",
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T18:14:10.683Z"
+    },
+    {
+      "userId": "aac763ce-3a84-4ded-beb3-4418bd162ab5",
+      "yearMonth": "2026W32",
+      "progress": "0",
+      "claimedStageIds": "[]",
+      "cyclesCompleted": 0,
+      "updatedAt": "2026-08-07T15:39:49.712Z"
+    }
+  ],
+  "wallet": {
+    "coins": "24",
+    "diamonds": "0",
+    "agencyDiamonds": "243281",
+    "updatedAt": "2026-08-07T21:52:49.619Z"
+  },
+  "gift_tx_cols": [],
+  "withdraw_request_cols": [
+    "id",
+    "userId",
+    "diamonds",
+    "amountFiat",
+    "currency",
+    "method",
+    "payoutDetails",
+    "status",
+    "reviewedById",
+    "adminNote",
+    "createdAt",
+    "updatedAt",
+    "agentId"
+  ],
+  "withdraw_requests": [],
+  "recent_wallet_txs": [
+    {
+      "createdAt": "2026-08-07T21:52:49.619Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "8662",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "0cedafdb-54f6-466e-8b18-ec2c2f4a17df",
+      "description": "هدية روم وكالة 1x القطار الملكي"
+    },
+    {
+      "createdAt": "2026-08-07T21:52:23.061Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "49609",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "4734ebf4-d2cf-49a7-811c-14f4067d1a57",
+      "description": "هدية روم وكالة 7x الدراجة الخارقة"
+    },
+    {
+      "createdAt": "2026-08-07T21:51:43.139Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "99221",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "60c35fd1-b212-4716-81f4-9463f57e76dd",
+      "description": "هدية روم وكالة 7x الفيل الملكي"
+    },
+    {
+      "createdAt": "2026-08-07T21:38:12.648Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "5512",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "fe562c09-482b-4bbe-8049-e7d79afb3602",
+      "description": "هدية روم وكالة 7x التاج الملكي"
+    },
+    {
+      "createdAt": "2026-08-07T21:37:42.332Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "18742",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "b0b28fab-b80c-4b96-82fc-d58c49f1e96a",
+      "description": "هدية روم وكالة 7x خاتم الحب"
+    },
+    {
+      "createdAt": "2026-08-07T21:27:00.094Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "2054",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "37c8f364-46ae-486e-84d0-de2e397ce1f6",
+      "description": "هدية روم وكالة 1x عرش ذهبي"
+    },
+    {
+      "createdAt": "2026-08-07T19:15:38.024Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "3451",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "9350500f-739b-407c-bf59-800775306e67",
+      "description": "هدية روم وكالة 7x ساعة فاخرة"
+    },
+    {
+      "createdAt": "2026-08-07T19:15:00.204Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "14380",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "33c3ab8c-2afb-4842-8450-871d9d9ed4f6",
+      "description": "هدية روم وكالة 7x عرش ذهبي"
+    },
+    {
+      "createdAt": "2026-08-07T19:04:29.493Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "2054",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "b63b5c10-41a0-42e7-9a6b-b07aa68f31c8",
+      "description": "هدية روم وكالة 1x المصباح السحري"
+    },
+    {
+      "createdAt": "2026-08-06T14:15:31.318Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "0ff11455-d05b-4108-b101-5fe285051cec",
+      "description": "Mikoo bounty-football bet"
+    },
+    {
+      "createdAt": "2026-08-06T14:15:25.545Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "5f4aaa04-e0a0-43b5-9d45-050664463bce",
+      "description": "Mikoo bounty-football bet"
+    },
+    {
+      "createdAt": "2026-08-06T14:15:25.034Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "059f4db0-04c9-4a39-8e34-109b6e11a24b",
+      "description": "Mikoo bounty-football bet"
+    },
+    {
+      "createdAt": "2026-08-06T14:15:23.984Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "edfd747a-5dc1-46e9-8bef-cefba1cf9134",
+      "description": "Mikoo bounty-football bet"
+    },
+    {
+      "createdAt": "2026-08-06T14:14:50.365Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "175",
+      "referenceType": null,
+      "referenceId": null,
+      "description": "Received 175 coins from diamond exchange"
+    },
+    {
+      "createdAt": "2026-08-06T14:14:50.365Z",
+      "type": "exchange",
+      "currency": "diamonds",
+      "amount": "-175",
+      "referenceType": null,
+      "referenceId": null,
+      "description": "Exchanged 175 diamonds for 175 coins"
+    },
+    {
+      "createdAt": "2026-08-06T14:10:45.095Z",
+      "type": "gift_receive",
+      "currency": "diamonds",
+      "amount": "10543",
+      "referenceType": "gift_receive_agency",
+      "referenceId": "c55ad03a-9b78-4661-90ac-35c1af55ef37",
+      "description": "هدية روم وكالة 7x يونيكورن"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:18.768Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "4b92673c-6056-4686-991e-f1faf2c9a3f0",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:15.196Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "f9f384a2-f958-4315-9e27-d6c15d3311b4",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:12.455Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "7e15c976-dbf1-4383-bae1-0e4d37866357",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:09.776Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "bb8cfe9d-18ac-4eb6-b0a9-02b2bf8086a7",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:06.452Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "a784d0c3-1b38-4ae9-8efa-587257238f25",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:03.745Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "45b164ed-5854-474a-993a-99ac93c11329",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:26:00.924Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "fe2ad43b-10d5-4c1d-9683-021d425f3c8a",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:58.290Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-100",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "849854db-1b97-419d-99c8-06dc496f2747",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:51.636Z",
+      "type": "lucky_reward",
+      "currency": "coins",
+      "amount": "500",
+      "referenceType": "mikoo_game_win",
+      "referenceId": "6e266545-9784-44e2-99d4-35d7da2c8b8e",
+      "description": "Mikoo olympians win"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:51.623Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "5b6659aa-de2a-4a37-b8a7-63f12b0410c3",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:48.878Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "968e8cdb-a265-4cbb-b842-4b30b03c0632",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:46.117Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "180efceb-bc26-4c54-a6fa-2c45ee13604e",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:43.521Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "ca6bbd3d-ccd2-4ac8-b25a-18a8acb5bda7",
+      "description": "Mikoo olympians bet"
+    },
+    {
+      "createdAt": "2026-08-05T23:25:40.800Z",
+      "type": "exchange",
+      "currency": "coins",
+      "amount": "-50",
+      "referenceType": "mikoo_game_bet",
+      "referenceId": "683be2fe-da77-436b-a38f-6d340e0aa715",
+      "description": "Mikoo olympians bet"
+    }
+  ]
+}

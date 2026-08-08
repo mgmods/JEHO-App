@@ -435,13 +435,33 @@ public final class RemoteTheme {
 
     public static int primaryColor(Context context) {
         MiscDtos.ThemeDto theme = getCached(context);
-        int fallback = 0xFF00C2A8;
+        int fallback = 0xFFFE2C55;
         try {
-            fallback = context.getColor(R.color.aurora_teal);
+            fallback = context.getColor(R.color.gift_accent);
         } catch (Exception ignored) {
+            try {
+                fallback = context.getColor(R.color.aurora_teal);
+            } catch (Exception ignored2) {
+            }
         }
         if (theme == null || theme.colors == null) return fallback;
-        return parseColor(theme.colors.primary, fallback);
+        int parsed = parseColor(theme.colors.primary, fallback);
+        // Dashboard sometimes stores surface/white as "primary" for light themes.
+        if (isWeakBrandFill(parsed)) return fallback;
+        return parsed;
+    }
+
+    private static boolean isWeakBrandFill(int color) {
+        int a = (color >>> 24) & 0xFF;
+        if (a < 180) return true;
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        double lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0;
+        if (lum >= 0.78) return true;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        return (max - min) < 18 && lum > 0.55;
     }
 
     public static void loadInto(ImageView view, @Nullable String pathOrUrl, int fallbackRes) {

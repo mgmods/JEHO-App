@@ -127,6 +127,7 @@ import com.Dramizo.Series.util.YoutubeAudioResolver;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import com.Dramizo.Series.rtc.LiveKitEngineManager;
 import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
 import com.bumptech.glide.Glide;
@@ -170,6 +171,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean isPersistentRoom;
     private boolean isAgencyRoom;
     private boolean roomWelcomePosted;
+    /** Guards cancel of deferred chrome/bg when a newer room LiveData lands. */
+    private int roomUiBindSeq;
     @Nullable private String welcomePostedForRoomId;
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
@@ -914,11 +917,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
-            // Discard any disk cache older than the last staff/auto wipe stamp.
-            if (room.chatClearedAt != null && !room.chatClearedAt.isEmpty()) {
-                RoomChatMemory.honorServerWipe(room.id, parseIsoMillis(room.chatClearedAt));
-            }
-            restoreRoomChatIfNeeded();
+            final int bindSeq = ++roomUiBindSeq;
+            // Disk chat wipe + history restore: off main thread (ANR on mid-range MIUI).
+            final String chatClearedAtIso = room.chatClearedAt;
+            final String chatRoomId = room.id;
+            final String welcomeTitle = room.title != null ? room.title : getString(R.string.voice_room);
+            final String welcomeDesc = room.description;
+            scheduleRoomChatBootstrap(bindSeq, chatRoomId, chatClearedAtIso, welcomeTitle, welcomeDesc);
             roomHostId = room.hostId;
             roomCohostId = room.cohostId;
             currentRoomCoverUrl = room.coverUrl;
@@ -1007,8 +1012,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canChangeFrames = false;
                 canControlGames = false;
             }
-            applyMusicState(room.musicUrl, room.musicTitle, room.musicArtist,
-                    room.musicStatus, room.musicPositionMs, room.musicStartedAt);
             updateAdminControls();
             seatAdapter.setHostUserId(roomHostId);
             refreshSelfHostWearOnSeats();
@@ -1029,71 +1032,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             setTextIfChanged(binding.tvRoomBannerSubtitle,
                     room.description != null && !room.description.trim().isEmpty()
                             ? room.description : "مرحبًا بكم في الغرفة الصوتية");
-            if (!roomWelcomePosted || !Objects.equals(welcomePostedForRoomId, room.id)) {
-                roomWelcomePosted = true;
-                welcomePostedForRoomId = room.id;
-                String welcomeName = displayTitle != null ? displayTitle : getString(R.string.voice_room);
-                String welcomeBody = room.description != null && !room.description.trim().isEmpty()
-                        ? room.description.trim()
-                        : ("مرحباً بكم في الغرفة الصوتية · " + welcomeName);
-                appendChatLine("النظام", welcomeBody, 0, 1, null, null, null, null);
-            }
-            if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
-                lastBoundCoverUrl = room.coverUrl;
-                // Room cover = permanent room photo (list + header face). Banner mirrors it.
-                if (binding.imgRoomBannerCover != null) {
-                    Glide.with(this)
-                            .load(AssetCatalog.absoluteUrl(room.coverUrl))
-                            .centerCrop()
-                            .placeholder(R.drawable.placeholder_cover)
-                            .error(R.drawable.placeholder_cover)
-                            .into(binding.imgRoomBannerCover);
-                }
-                // Force header rebind when cover changes from settings.
-                lastBoundHostStageKey = null;
-                bindHeaderHostVisual(room, currentSeats);
-            }
             setRoomViewerCount(Math.max(0, room.viewerCount));
-            // Always keep the compact dark glass card unless an ornate kenar is active.
-            if (binding.hostCard != null
-                    && (room.roomCardUrl == null || room.roomCardUrl.isEmpty()
-                    || RoomKenarHelper.sanitize(room.roomCardUrl) == null)) {
-                binding.hostCard.setBackgroundResource(R.drawable.bg_room_compact_card);
-            }
-            if (binding.tvHostName != null) {
-                binding.tvHostName.setVisibility(View.GONE);
-            }
-            String hostCardKey = hostVisualKey(room.host) + "|" + room.roomCardUrl
-                    + "|" + (room.host != null ? room.host.roomCardUrl : null);
-            if (!Objects.equals(lastBoundHostCardKey, hostCardKey)) {
-                lastBoundHostCardKey = hostCardKey;
-                bindHostCardRankBadges(room.host);
-                if (binding.imgHostKenar != null) {
-                    String cardUrl = room.roomCardUrl;
-                    if ((cardUrl == null || cardUrl.isEmpty()) && room.host != null) {
-                        cardUrl = room.host.roomCardUrl;
-                    }
-                    String lower = cardUrl != null ? cardUrl.toLowerCase(java.util.Locale.US) : "";
-                    boolean animated = lower.contains(".gif") || lower.contains(".webp")
-                            || RoomKenarHelper.isRoomFrameUrl(cardUrl);
-                    RoomKenarHelper.bind(
-                            binding.imgHostKenar,
-                            binding.hostCard,
-                            cardUrl,
-                            room.id,
-                            animated,
-                            true);
-                }
-            }
-            List<RoomDtos.SeatDto> seats = room.seats != null ? room.seats : new ArrayList<>();
-            boolean wasOnSeat = isOnSeat(currentSeats);
-            currentSeats = seats;
-            bindHeaderHostVisual(room, seats);
             // Agency rooms show agency GID; personal rooms show host publicId.
             String idLabel = RoomUiHelper.isAgencyRoom(room) ? "GID:" : "ID:";
             binding.tvRoomId.setText(idLabel + com.Dramizo.Series.util.RoomUiHelper.displayRoomId(room));
             applyRoomGiftSounds(room.giftSoundsEnabled);
             applyRoomDisplaySettings(room);
+
+            // First paint: seats only. Heavy cover/kenar/host wear/bg staged after.
+            List<RoomDtos.SeatDto> seats = room.seats != null ? room.seats : new ArrayList<>();
+            boolean wasOnSeat = isOnSeat(currentSeats);
+            currentSeats = seats;
             try {
                 List<RoomDtos.SeatDto> gridSeats = prepareGuestSeatsForGrid(seats);
                 if (binding.hostStage != null) binding.hostStage.setVisibility(View.GONE);
@@ -1153,11 +1102,36 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             }
             syncMicUi();
-            activateSeatAudio(seats, nowOnSeat && (!wasOnSeat || isHost));
-            applyRoomBackground(room.backgroundUrl);
+            // Seat audio only after RTC is up (session observer) — avoid triple fan-out on paint.
+            if (zegoLoggedIn) {
+                activateSeatAudio(seats, nowOnSeat && (!wasOnSeat || isHost));
+            }
             locked = room.hasPassword || "locked".equalsIgnoreCase(room.status);
             ActiveRoomSession.get().updateRoom(room);
             ActiveRoomSession.get().syncFlags(isHost, isAgencyRoom, micOn, roomSpeakerMuted);
+
+            // Stage heavy visuals so G85/MIUI can keep the first frame under ANR budget.
+            final RoomDtos.RoomDto roomSnap = room;
+            final List<RoomDtos.SeatDto> seatsSnap = seats;
+            handler.post(() -> {
+                if (bindSeq != roomUiBindSeq || exiting || isFinishing() || isDestroyed()) return;
+                if (binding == null || roomSnap == null) return;
+                try {
+                    bindDeferredRoomChrome(roomSnap, seatsSnap);
+                } catch (Exception e) {
+                    android.util.Log.e("VoiceRoom", "deferred chrome bind failed", e);
+                }
+            });
+            handler.postDelayed(() -> {
+                if (bindSeq != roomUiBindSeq || exiting || isFinishing() || isDestroyed()) return;
+                try {
+                    applyRoomBackground(roomSnap.backgroundUrl);
+                    applyMusicState(roomSnap.musicUrl, roomSnap.musicTitle, roomSnap.musicArtist,
+                            roomSnap.musicStatus, roomSnap.musicPositionMs, roomSnap.musicStartedAt);
+                } catch (Exception e) {
+                    android.util.Log.e("VoiceRoom", "deferred bg/music failed", e);
+                }
+            }, 280L);
             // The realtime join event is authoritative, including this viewer's own spend/cosmetics.
         });
         viewModel.getSession().observe(this, session -> {
@@ -1183,9 +1157,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             });
             if (zegoLoggedIn) return;
-            // Paint seats/chat first; RTC attach next frame (avoids freeze concurrent with bind).
+            // Give seats/chat a frame budget before native RTC create/login/audio route.
             final RoomDtos.JoinRoomResult sess = session;
-            handler.post(() -> attachRtcForSession(sess));
+            handler.postDelayed(() -> attachRtcForSession(sess), 320L);
         });
 
         handler.postDelayed(refreshRunnable, 60_000L);
@@ -1219,7 +1193,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** RTC side of session observer — deferred one frame after LiveData so UI can paint. */
+    /** RTC side of session observer — deferred so first room paint stays under ANR budget. */
     private void attachRtcForSession(@Nullable RoomDtos.JoinRoomResult session) {
         if (session == null || exiting || isFinishing() || zegoLoggedIn) return;
         zegoLoggedIn = true;
@@ -1252,15 +1226,142 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } catch (Exception ignored) {
         }
         final int audioEpoch = roomAudioEpoch;
+        // One audio activate + one retry (was 0/180/700 triple — overloaded MIUI audio path).
         activateSeatAudio(currentSeats, true);
         handler.postDelayed(() -> {
             if (audioEpoch != roomAudioEpoch || exiting) return;
             activateSeatAudio(currentSeats, true);
-        }, 180);
-        handler.postDelayed(() -> {
-            if (audioEpoch != roomAudioEpoch || exiting) return;
-            activateSeatAudio(currentSeats, true);
-        }, 700);
+        }, 450);
+    }
+
+    /**
+     * Cover/kenar/header host — run after first seats paint (not in the same main pass).
+     */
+    private void bindDeferredRoomChrome(
+            @NonNull RoomDtos.RoomDto room, @Nullable List<RoomDtos.SeatDto> seats) {
+        if (binding == null) return;
+        if (!Objects.equals(lastBoundCoverUrl, room.coverUrl)) {
+            lastBoundCoverUrl = room.coverUrl;
+            if (binding.imgRoomBannerCover != null) {
+                Glide.with(this)
+                        .load(AssetCatalog.absoluteUrl(room.coverUrl))
+                        .centerCrop()
+                        .placeholder(R.drawable.placeholder_cover)
+                        .error(R.drawable.placeholder_cover)
+                        .into(binding.imgRoomBannerCover);
+            }
+            lastBoundHostStageKey = null;
+        }
+        if (binding.hostCard != null
+                && (room.roomCardUrl == null || room.roomCardUrl.isEmpty()
+                || RoomKenarHelper.sanitize(room.roomCardUrl) == null)) {
+            binding.hostCard.setBackgroundResource(R.drawable.bg_room_compact_card);
+        }
+        if (binding.tvHostName != null) {
+            binding.tvHostName.setVisibility(View.GONE);
+        }
+        String hostCardKey = hostVisualKey(room.host) + "|" + room.roomCardUrl
+                + "|" + (room.host != null ? room.host.roomCardUrl : null);
+        if (!Objects.equals(lastBoundHostCardKey, hostCardKey)) {
+            lastBoundHostCardKey = hostCardKey;
+            bindHostCardRankBadges(room.host);
+            if (binding.imgHostKenar != null) {
+                String cardUrl = room.roomCardUrl;
+                if ((cardUrl == null || cardUrl.isEmpty()) && room.host != null) {
+                    cardUrl = room.host.roomCardUrl;
+                }
+                String lower = cardUrl != null ? cardUrl.toLowerCase(java.util.Locale.US) : "";
+                boolean animated = lower.contains(".gif") || lower.contains(".webp")
+                        || RoomKenarHelper.isRoomFrameUrl(cardUrl);
+                RoomKenarHelper.bind(
+                        binding.imgHostKenar,
+                        binding.hostCard,
+                        cardUrl,
+                        room.id,
+                        animated,
+                        true);
+            }
+        }
+        List<RoomDtos.SeatDto> seatList = seats != null ? seats : currentSeats;
+        bindHeaderHostVisual(room, seatList);
+    }
+
+    /**
+     * Load chat disk + respect server wipe on I/O; paint history + welcome after seats are up.
+     */
+    private void scheduleRoomChatBootstrap(
+            int bindSeq,
+            @NonNull String chatRoomId,
+            @Nullable String chatClearedAtIso,
+            @NonNull String welcomeTitle,
+            @Nullable String welcomeDesc) {
+        ContainerProvider.from(this).getIoExecutor().execute(() -> {
+            try {
+                if (chatClearedAtIso != null && !chatClearedAtIso.isEmpty()) {
+                    RoomChatMemory.honorServerWipe(chatRoomId, parseIsoMillis(chatClearedAtIso));
+                }
+            } catch (Exception ignored) {
+            }
+            List<RoomChatMemory.Line> lines;
+            try {
+                lines = RoomChatMemory.snapshot(chatRoomId);
+            } catch (Exception e) {
+                lines = Collections.emptyList();
+            }
+            // Cap first paint rows so recreate doesn't inflate 800 bubbles at once.
+            final List<RoomChatMemory.Line> paintLines;
+            if (lines.size() > 40) {
+                paintLines = new ArrayList<>(lines.subList(lines.size() - 40, lines.size()));
+            } else {
+                paintLines = lines;
+            }
+            final int fullCount = lines.size();
+            runOnUiThread(() -> {
+                if (bindSeq != roomUiBindSeq || exiting || isFinishing() || isDestroyed()) return;
+                if (binding == null || binding.chatLog == null) return;
+                if (!Objects.equals(roomId, chatRoomId)) return;
+                if (!roomChatRestored) {
+                    restoringRoomChat = true;
+                    try {
+                        if (!paintLines.isEmpty()) {
+                            binding.chatLog.removeAllViews();
+                            for (RoomChatMemory.Line line : paintLines) {
+                                if (line == null) continue;
+                                appendChatLine(
+                                        line.name,
+                                        line.text,
+                                        line.vipLevel,
+                                        line.userLevel,
+                                        line.frameUrl,
+                                        line.userId,
+                                        line.avatarUrl,
+                                        line.giftIconUrl,
+                                        line.wealthScore,
+                                        line.charmScore);
+                            }
+                        }
+                    } finally {
+                        restoringRoomChat = false;
+                        roomChatRestored = true;
+                        roomChatMemorySyncedCount = fullCount;
+                    }
+                    if (!paintLines.isEmpty()) scrollChatToBottom(false);
+                }
+                if (!roomWelcomePosted || !Objects.equals(welcomePostedForRoomId, chatRoomId)) {
+                    roomWelcomePosted = true;
+                    welcomePostedForRoomId = chatRoomId;
+                    String welcomeName = welcomeTitle;
+                    boolean agencyRoom = isAgencyRoom;
+                    if (agencyRoom && welcomeName != null && !welcomeName.contains("وكالة")) {
+                        welcomeName = "وكالة · " + welcomeName;
+                    }
+                    String welcomeBody = welcomeDesc != null && !welcomeDesc.trim().isEmpty()
+                            ? welcomeDesc.trim()
+                            : ("مرحباً بكم في الغرفة الصوتية · " + welcomeName);
+                    appendChatLine("النظام", welcomeBody, 0, 1, null, null, null, null);
+                }
+            });
+        });
     }
 
     /**
@@ -12012,13 +12113,37 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String zegoRoom = result.data.zegoRoomId != null
                         ? result.data.zegoRoomId
                         : (pendingSession != null ? pendingSession.zegoRoomId : roomId);
-                RoomRtcEngine.getInstance().renewRoomToken(zegoRoom, result.data.token);
                 rtcPublishTokenExpiresAtMs = result.data.expireAt > 0
                         ? result.data.expireAt * 1000L
                         : System.currentTimeMillis() + 60_000L;
                 rtcCanPublish = result.data.canPublish;
+                RoomRtcEngine.getInstance().setSessionCanPublish(rtcCanPublish);
+                // LiveKit: JWT is join-time only. If already connected AND grant already allows
+                // publish, just open the mic (no reconnect thrash). Audience→seat still renews.
+                boolean livekitAlreadyPublishable =
+                        RoomRtcEngine.getInstance().isLiveKit()
+                                && RoomRtcEngine.getInstance().isReady()
+                                && rtcCanPublish
+                                && LiveKitEngineManager.getInstance().isSessionCanPublish();
+                if (livekitAlreadyPublishable) {
+                    if (isOnSeat(currentSeats)) {
+                        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                        RoomRtcEngine.getInstance().setMicEnabled(micOn);
+                        handler.removeCallbacks(rtcTokenRefreshRunnable);
+                        long refreshDelay = Math.max(
+                                60_000L,
+                                rtcPublishTokenExpiresAtMs - System.currentTimeMillis() - 20_000L);
+                        handler.postDelayed(rtcTokenRefreshRunnable, refreshDelay);
+                    } else {
+                        handler.removeCallbacks(rtcTokenRefreshRunnable);
+                        RoomRtcEngine.getInstance().stopPublishing();
+                    }
+                    return;
+                }
+                RoomRtcEngine.getInstance().renewRoomToken(zegoRoom, result.data.token);
                 if (isOnSeat(currentSeats) && rtcCanPublish) {
                     RoomRtcEngine.getInstance().startPublishingAudio(streamId);
+                    RoomRtcEngine.getInstance().setMicEnabled(micOn);
                     handler.removeCallbacks(rtcTokenRefreshRunnable);
                     long refreshDelay = Math.max(
                             15_000L,

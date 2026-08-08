@@ -149,8 +149,8 @@ export class HostTargetService implements OnModuleInit {
         ADD COLUMN IF NOT EXISTS "cyclesCompleted" integer NOT NULL DEFAULT 0
       `);
     } catch (err) {
-      this.log.warn(
-        `cyclesCompleted column ensure skipped: ${
+      this.log.error(
+        `cyclesCompleted column ensure FAILED: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -160,9 +160,14 @@ export class HostTargetService implements OnModuleInit {
         ALTER TABLE host_monthly_progress
         ADD COLUMN IF NOT EXISTS "withdrawnStageIds" text
       `);
+      await this.dataSource.query(`
+        UPDATE host_monthly_progress
+        SET "withdrawnStageIds" = '[]'
+        WHERE "withdrawnStageIds" IS NULL
+      `);
     } catch (err) {
-      this.log.warn(
-        `withdrawnStageIds column ensure skipped: ${
+      this.log.error(
+        `withdrawnStageIds column ensure FAILED: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -501,17 +506,28 @@ export class HostTargetService implements OnModuleInit {
 
       await awardDueStages();
 
-      // When every stage in this cycle is claimed, restart from stage 1 (keep overflow).
-      let safety = 0;
-      while (safety++ < 40) {
-        const allClaimed = config.stages.every((s) => claimed.has(s.id));
-        if (!allClaimed) break;
-        if (row.progress < maxThreshold) break;
-        row.progress = Number(row.progress) - maxThreshold;
-        claimed.clear();
-        withdrawn.clear();
-        row.cyclesCompleted = Number(row.cyclesCompleted || 0) + 1;
-        await awardDueStages();
+      // Overflow recycle (wallet-reward ladder only). NEVER clear salary withdrawn ids —
+      // that ladder advances only via markStageSalaryWithdrawn / cashout.
+      // Clearing withdrawn here re-opened paid stages for hosts (prod incidents).
+      const hasWalletReward = config.stages.some(
+        (s) => Number(s.rewardCoins) > 0 || Number(s.rewardDiamonds) > 0,
+      );
+      if (hasWalletReward) {
+        let safety = 0;
+        while (safety++ < 40) {
+          const allClaimed = config.stages.every((s) => claimed.has(s.id));
+          if (!allClaimed) break;
+          if (row.progress < maxThreshold) break;
+          row.progress = Number(row.progress) - maxThreshold;
+          claimed.clear();
+          // Keep `withdrawn` intact — salary history must not reset on gift overflow.
+          row.cyclesCompleted = Number(row.cyclesCompleted || 0) + 1;
+          await awardDueStages();
+        }
+      } else if (row.progress >= maxThreshold) {
+        // Salary ladder: keep progress as lifetime bucket for the period (no auto recycle
+        // that would re-open already cashed stages). Cap display at max + small overflow.
+        // Progress stays; withdraw gate is withdrawnStageIds.
       }
 
       row.claimedStageIds = [...claimed];
@@ -735,10 +751,41 @@ export class HostTargetService implements OnModuleInit {
         });
       }
       const known = new Set(config.stages.map((s) => String(s.id)));
-      if (!known.has(sid)) return null;
+      if (!known.has(sid)) {
+        this.log.warn(
+          `markStageSalaryWithdrawn: unknown stageId=${sid} user=${userId} period=${yearMonth}`,
+        );
+        return null;
+      }
       const withdrawn = new Set(
         Array.isArray(row.withdrawnStageIds) ? row.withdrawnStageIds : [],
       );
+      if (withdrawn.has(sid)) {
+        // Idempotent — do not re-open or double-count.
+        return {
+          yearMonth,
+          stageId: sid,
+          cyclesCompleted: Number(row.cyclesCompleted || 0),
+          restarted: false,
+          alreadyMarked: true,
+          withdrawnStageIds: [...withdrawn],
+        };
+      }
+      // Only allow marking the next unpaid stage in ladder order.
+      const nextUnpaid = config.stages.find((s) => !withdrawn.has(String(s.id)));
+      if (!nextUnpaid || String(nextUnpaid.id) !== sid) {
+        this.log.warn(
+          `markStageSalaryWithdrawn: stage ${sid} is not current unpaid for user=${userId}`,
+        );
+        return null;
+      }
+      const stageMeta = config.stages.find((s) => String(s.id) === sid);
+      if (stageMeta && Number(row.progress || 0) < Number(stageMeta.threshold || 0)) {
+        this.log.warn(
+          `markStageSalaryWithdrawn: progress ${row.progress} < threshold ${stageMeta.threshold} for ${sid}`,
+        );
+        return null;
+      }
       withdrawn.add(sid);
 
       const allPaid = config.stages.every((s) => withdrawn.has(String(s.id)));
