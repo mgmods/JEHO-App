@@ -47,9 +47,11 @@ import com.google.android.material.tabs.TabLayoutMediator;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class GiftBottomSheet extends BottomSheetDialogFragment {
 
@@ -83,15 +85,10 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable private ProgressBar loadingBar;
     @Nullable private PopupWindow qtyPopup;
     @Nullable private Long lastCoinsBalance;
-    private static final String[] FALLBACK_TAB_LABELS = {
-            "عادي", "حظ", "كومبو", "مميز"
-    };
-    private static final String[] FALLBACK_TAB_KEYS = {
-            "normal", "lucky", "combo", "premium"
-    };
+    // Categories are 100% owned by the dashboard/API. No hardcoded labels or keys.
     private final List<GiftDtos.GiftCategoryDto> tabCategories = new ArrayList<>();
-    private String[] tabLabels = FALLBACK_TAB_LABELS;
-    private String[] tabKeys = FALLBACK_TAB_KEYS;
+    private String[] tabLabels = new String[0];
+    private String[] tabKeys = new String[0];
 
     // From included layouts (not exposed on DialogRoomGiftBinding without include ids).
     @Nullable private com.Dramizo.Series.widget.XProgressBar wealthProgress;
@@ -262,13 +259,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         vm.getGifts().observe(getViewLifecycleOwner(), gifts -> {
             if (binding == null || giftPageAdapter == null) return;
             allGifts.clear();
-            if (gifts != null) allGifts.addAll(gifts);
+            if (gifts != null) allGifts.addAll(dedupeGiftsForBoard(gifts));
             applyFilter();
             setLoading(false);
             // Room only: warm gift MP4s. DM chat must not buffer dozens of videos (OOM / process kill).
-            if (!chatMode && gifts != null && !gifts.isEmpty() && getContext() != null) {
+            if (!chatMode && !allGifts.isEmpty() && getContext() != null) {
                 java.util.ArrayList<String> warm = new java.util.ArrayList<>();
-                for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : gifts) {
+                for (com.Dramizo.Series.data.remote.dto.GiftDtos.GiftDto g : allGifts) {
                     if (g == null) continue;
                     String resolved = com.Dramizo.Series.util.GiftMediaResolver.resolvePlayable(
                             g.name, g.iconUrl, g.animationUrl);
@@ -314,7 +311,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             List<GiftDtos.GiftDto> warm = vm.getGifts().getValue();
             if (warm != null) {
                 allGifts.clear();
-                allGifts.addAll(warm);
+                allGifts.addAll(dedupeGiftsForBoard(warm));
                 applyFilter();
             }
             List<GiftDtos.GiftCategoryDto> warmCats = vm.getCategories().getValue();
@@ -529,16 +526,25 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private void applyCategories(@Nullable List<GiftDtos.GiftCategoryDto> cats) {
-        if (cats == null || cats.isEmpty()) return;
+        // Dashboard is the ONLY source of truth. If empty → the board shows no tabs.
         List<GiftDtos.GiftCategoryDto> active = new ArrayList<>();
-        for (GiftDtos.GiftCategoryDto c : cats) {
-            if (c == null) continue;
-            String key = c.key != null ? c.key.trim().toLowerCase(Locale.US) : "";
-            if (key.isEmpty()) continue;
-            // Client/categories endpoint only returns active tabs.
-            active.add(c);
+        if (cats != null) {
+            for (GiftDtos.GiftCategoryDto c : cats) {
+                if (c == null) continue;
+                String key = c.key != null ? c.key.trim().toLowerCase(Locale.US) : "";
+                if (key.isEmpty()) continue;
+                if (c.isActive == false) continue;
+                active.add(c);
+            }
         }
-        if (active.isEmpty()) return;
+        Collections.sort(active, (a, b) -> {
+            int sa = a != null ? a.sortOrder : 0;
+            int sb = b != null ? b.sortOrder : 0;
+            if (sa != sb) return Integer.compare(sa, sb);
+            String ka = a != null && a.key != null ? a.key : "";
+            String kb = b != null && b.key != null ? b.key : "";
+            return ka.compareToIgnoreCase(kb);
+        });
         String[] keys = new String[active.size()];
         String[] labels = new String[active.size()];
         for (int i = 0; i < active.size(); i++) {
@@ -566,6 +572,66 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             rebuildGiftTabs();
         }
         applyFilter();
+    }
+
+    /**
+     * Client-side board sanitize: drop clones so local cache cannot re-show
+     * gifts the dashboard already deactivated.
+     */
+    @NonNull
+    private static List<GiftDtos.GiftDto> dedupeGiftsForBoard(@Nullable List<GiftDtos.GiftDto> src) {
+        if (src == null || src.isEmpty()) return Collections.emptyList();
+        Map<String, GiftDtos.GiftDto> byStem = new LinkedHashMap<>();
+        Map<String, GiftDtos.GiftDto> byName = new LinkedHashMap<>();
+        Map<String, GiftDtos.GiftDto> byId = new LinkedHashMap<>();
+        List<GiftDtos.GiftDto> ordered = new ArrayList<>();
+        for (GiftDtos.GiftDto g : src) {
+            if (g == null || isLuckyBoxGift(g)) continue;
+            if (g.id != null && !g.id.isEmpty()) {
+                if (byId.containsKey(g.id)) continue;
+                byId.put(g.id, g);
+            }
+            String nameKey = g.name != null
+                    ? g.name.trim().toLowerCase(Locale.US).replaceAll("\\s+", " ")
+                    : "";
+            String stem = giftArtStem(g.iconUrl);
+            if (stem.isEmpty()) stem = giftArtStem(g.animationUrl);
+            String key = !stem.isEmpty() ? "s:" + stem
+                    : (!nameKey.isEmpty() ? "n:" + nameKey
+                    : (g.id != null ? "id:" + g.id : null));
+            if (key == null) continue;
+            if (byStem.containsKey(key)) continue;
+            if (!nameKey.isEmpty() && byName.containsKey(nameKey)) continue;
+            byStem.put(key, g);
+            if (!nameKey.isEmpty()) byName.put(nameKey, g);
+            // Cap diamonds on board display/send path (server also enforces).
+            if (g.diamondValue > 1000) g.diamondValue = 1000;
+            // Keep dashboard category if set; only fill empty.
+            // Never guess a category from price on the client — dashboard decides.
+            ordered.add(g);
+        }
+        return ordered;
+    }
+
+    /** Dashboard gift.category (lowercased) is the ONLY bucket key. */
+    @NonNull
+    private static String giftBucket(@NonNull GiftDtos.GiftDto g) {
+        return g.category != null ? g.category.trim().toLowerCase(Locale.US) : "";
+    }
+
+    @NonNull
+    private static String giftArtStem(@Nullable String url) {
+        if (url == null || url.isEmpty()) return "";
+        String raw = url.trim().toLowerCase(Locale.US).split("#")[0].split("\\?")[0]
+                .replace('\\', '/');
+        int slash = raw.lastIndexOf('/');
+        String base = slash >= 0 ? raw.substring(slash + 1) : raw;
+        if (base.isEmpty() || base.endsWith(".html") || "runtime.html".equals(base)) return "";
+        base = base.replaceAll("\\.(png|webp|jpe?g|gif|svg|mp4|webm)$", "");
+        base = base.replaceAll("^bg_", "");
+        base = base.replaceAll("^gift[-_]?", "");
+        base = base.replaceAll("[-_\\s]+", "");
+        return base;
     }
 
     private void rebuildGiftTabs() {
@@ -605,7 +671,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     @Nullable
     private String typeForTab(int pos) {
         if (pos >= 0 && pos < tabKeys.length) return tabKeys[pos];
-        return "normal";
+        return null;
     }
 
     // ─── Filter: build one gift list per tab (no sub-page dots) ────────────────
@@ -633,30 +699,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
 
     @NonNull
     private List<GiftDtos.GiftDto> filterForTab(@Nullable String filter) {
-        String want = filter != null && !filter.isEmpty()
-                ? filter.trim().toLowerCase(Locale.US)
-                : "normal";
+        if (filter == null || filter.isEmpty()) return Collections.emptyList();
+        String want = filter.trim().toLowerCase(Locale.US);
         List<GiftDtos.GiftDto> out = new ArrayList<>();
         for (GiftDtos.GiftDto g : allGifts) {
             if (g == null || isLuckyBoxGift(g)) continue;
             if (want.equals(giftBucket(g))) out.add(g);
         }
         return out;
-    }
-
-    /**
-     * Prefer explicit gift.category (dashboard tabs); fall back to type-based bucket
-     * for legacy rows that only set type.
-     */
-    @NonNull
-    private static String giftBucket(@NonNull GiftDtos.GiftDto g) {
-        String c = g.category != null ? g.category.trim().toLowerCase(Locale.US) : "";
-        if (!c.isEmpty()) return c;
-        String t = g.type != null ? g.type.trim().toLowerCase(Locale.US) : "";
-        if ("lucky".equals(t)) return "lucky";
-        if ("combo".equals(t)) return "combo";
-        if ("premium".equals(t)) return "premium";
-        return "normal";
     }
 
     /** صندوق الحظ العائم في الغرفة — ليس من تبويب المحظوظ. */

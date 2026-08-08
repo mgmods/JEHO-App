@@ -1310,25 +1310,23 @@ public class BagActivity extends ThemedActivity {
                     if (tvTh != null) {
                         if (hostSalary > 0) {
                             tvTh.setText(String.format(Locale.US,
-                                    "%,d ألماس تارجت  ·  = $%.0f للمضيف",
-                                    th, hostSalary));
+                                    "%,d ألماس\n= $%.0f للمضيف", th, hostSalary));
                         } else {
-                            tvTh.setText(String.format(Locale.US,
-                                    "التارجت: %,d ألماس (1 كوين = 1 ألماسة)", th));
+                            tvTh.setText(String.format(Locale.US, "%,d ألماس", th));
                         }
                     }
                     if (tvSalary != null) {
                         if (hostSalary > 0 || agentSalary > 0 || totalSalary > 0) {
                             tvSalary.setVisibility(View.VISIBLE);
                             tvSalary.setText(String.format(Locale.US,
-                                    "راتب مضيف $%.0f  ·  عمولة وكالة $%.0f  ·  إجمالي $%.0f",
-                                    hostSalary, agentSalary, totalSalary));
+                                    "مضيف $%.0f · وكالة $%.0f",
+                                    hostSalary, agentSalary));
                         } else {
                             tvSalary.setVisibility(View.GONE);
                         }
                     }
                     if (tvReward != null) {
-                        StringBuilder reward = new StringBuilder("مكافأة إضافية: ");
+                        StringBuilder reward = new StringBuilder();
                         boolean any = false;
                         if (rewardCoins > 0) {
                             reward.append("+").append(String.format(Locale.US, "%,d", rewardCoins))
@@ -1405,6 +1403,29 @@ public class BagActivity extends ThemedActivity {
                         }
                     }
                     binding.hostTargetStagesRow.addView(item);
+                }
+                // Auto-scroll slider so the current stage is in view.
+                if (binding.hostTargetStagesScroll != null) {
+                    int currentIndex = -1;
+                    int i = 0;
+                    for (Object row : (List<?>) stagesObj) {
+                        if (!(row instanceof Map)) continue;
+                        String st = String.valueOf(((Map<?, ?>) row).get("status"));
+                        if ("current".equals(st)) {
+                            currentIndex = i;
+                            break;
+                        }
+                        i++;
+                    }
+                    final int scrollTo = Math.max(0, currentIndex);
+                    binding.hostTargetStagesScroll.post(() -> {
+                        if (binding.hostTargetStagesRow.getChildCount() <= scrollTo) return;
+                        View target = binding.hostTargetStagesRow.getChildAt(scrollTo);
+                        if (target != null) {
+                            binding.hostTargetStagesScroll.smoothScrollTo(
+                                    Math.max(0, target.getLeft() - 24), 0);
+                        }
+                    });
                 }
             }
         }

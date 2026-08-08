@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Legendary agency menu row (manage hub only) -->
+<!-- Agency menu row — light app chrome -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -17,7 +17,7 @@
         android:layout_width="4dp"
         android:layout_height="match_parent"
         android:layout_marginVertical="12dp"
-        android:background="#E0B84A" />
+        android:background="@color/md_theme_light_primary" />
 
     <TextView
         android:id="@+id/tvMenuLabel"
@@ -27,7 +27,7 @@
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="#FFF6ECD0"
+        android:textColor="@color/text_primary"
         android:textSize="15sp"
         android:textStyle="bold" />
 
@@ -37,5 +37,5 @@
         android:contentDescription="@null"
         android:rotation="180"
         android:src="@drawable/ic_arrow_back"
-        app:tint="#99E0B84A" />
+        app:tint="@color/text_hint" />
 </LinearLayout>

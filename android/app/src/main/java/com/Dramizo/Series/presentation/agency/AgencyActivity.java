@@ -73,7 +73,10 @@ public class AgencyActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityAgencyBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        // Avoid guest/flash until mine cache or network paints the real role.
+        // Keep hub hidden until /mine decides guest vs host/agency dashboard (no flash).
+        if (binding.contentRoot != null) {
+            binding.contentRoot.setVisibility(View.INVISIBLE);
+        }
         if (binding.tvPricing != null) binding.tvPricing.setVisibility(View.GONE);
         if (binding.cardJoinByCode != null) binding.cardJoinByCode.setVisibility(View.GONE);
         if (binding.btnBecomeAgent != null) binding.btnBecomeAgent.setVisibility(View.GONE);
@@ -88,9 +91,10 @@ public class AgencyActivity extends ThemedActivity {
         }
         // Safety: never leave Mikoo spinner forever if mine fails silently.
         binding.getRoot().postDelayed(() -> {
-            if (awaitingFirstMine) {
+            if (awaitingFirstMine && !roleRouted && !isFinishing()) {
                 awaitingFirstMine = false;
                 AppLoadingOverlay.hide(this);
+                revealHubContent();
                 if (binding.tvPricing != null) binding.tvPricing.setVisibility(View.VISIBLE);
                 if (binding.cardJoinByCode != null) binding.cardJoinByCode.setVisibility(View.VISIBLE);
                 if (binding.btnBecomeAgent != null) binding.btnBecomeAgent.setVisibility(View.VISIBLE);
@@ -189,10 +193,6 @@ public class AgencyActivity extends ThemedActivity {
         vm.getAgencies().observe(this, list -> rebindAgencyDirectory());
         vm.getSearchAttempted().observe(this, attempted -> rebindAgencyDirectory());
         vm.getMine().observe(this, m -> {
-            if (awaitingFirstMine) {
-                awaitingFirstMine = false;
-                AppLoadingOverlay.hide(this);
-            }
             if (m != null && m.application != null && m.agency == null
                     && "approved".equalsIgnoreCase(m.application.status)) {
                 // An approved application is only valid while its created agency still exists.
@@ -206,26 +206,27 @@ public class AgencyActivity extends ThemedActivity {
                 canLeave = pendingJoin || !"owner".equals(role);
                 canManage = !pendingJoin && ("owner".equals(role) || "manager".equals(role));
                 canDeleteAgency = !pendingJoin && "owner".equals(role);
+                boolean isHost = !pendingJoin
+                        && ("host".equals(role) || "member".equals(role));
+                boolean isAgent = !pendingJoin && ("owner".equals(role) || "manager".equals(role));
+                // Route BEFORE painting hub UI — prevents flash of intermediate agency screen.
+                if (!roleRouted && isHost) {
+                    routeToDedicatedBoard(HostEarningsActivity.class);
+                    return;
+                }
+                if (!roleRouted && isAgent) {
+                    routeToDedicatedBoard(AgencyOwnerDashboardActivity.class);
+                    return;
+                }
+                if (awaitingFirstMine) {
+                    awaitingFirstMine = false;
+                    AppLoadingOverlay.hide(this);
+                }
+                revealHubContent();
                 binding.tvPricing.setVisibility(View.GONE);
                 binding.cardJoinByCode.setVisibility(View.GONE);
                 if (binding.btnBecomeAgent != null) binding.btnBecomeAgent.setVisibility(View.GONE);
                 binding.cardMyAgency.setVisibility(View.VISIBLE);
-                boolean isHost = !pendingJoin
-                        && ("host".equals(role) || "member".equals(role));
-                boolean isAgent = !pendingJoin && ("owner".equals(role) || "manager".equals(role));
-                // Dedicated professional boards for host vs agency (owner/manager).
-                if (!roleRouted && isHost) {
-                    roleRouted = true;
-                    startActivity(new Intent(this, HostEarningsActivity.class));
-                    finish();
-                    return;
-                }
-                if (!roleRouted && isAgent) {
-                    roleRouted = true;
-                    startActivity(new Intent(this, AgencyOwnerDashboardActivity.class));
-                    finish();
-                    return;
-                }
                 if (binding.tvAgencyToolbarTitle != null) {
                     binding.tvAgencyToolbarTitle.setText(isHost
                             ? R.string.agency_host_dashboard_title
@@ -288,6 +289,11 @@ public class AgencyActivity extends ThemedActivity {
                     refreshCashableBalance();
                 }
             } else {
+                if (awaitingFirstMine) {
+                    awaitingFirstMine = false;
+                    AppLoadingOverlay.hide(this);
+                }
+                revealHubContent();
                 myAgencyId = null;
                 canLeave = false;
                 canManage = false;
@@ -1424,6 +1430,24 @@ public class AgencyActivity extends ThemedActivity {
                 startActivity(i);
             });
         });
+    }
+
+    private void revealHubContent() {
+        if (binding != null && binding.contentRoot != null) {
+            binding.contentRoot.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void routeToDedicatedBoard(Class<?> boardClass) {
+        if (roleRouted || isFinishing()) return;
+        roleRouted = true;
+        awaitingFirstMine = false;
+        // Keep loading overlay while chaining — destination draws the real board.
+        Intent i = new Intent(this, boardClass);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        startActivity(i);
+        finish();
+        overridePendingTransition(0, 0);
     }
 
     private void openManage(String agencyId) {

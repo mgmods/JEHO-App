@@ -529,7 +529,8 @@
 <string name="official_news_hint">App updates and important notices</string>
 <string name="official_news_readonly">You can only read messages here</string>
 <string name="official_news_empty">No official news yet</string>
-<string name="official_news_open_link">Open link</string>
+    <string name="official_news_open_link">Open link</string>
+    <string name="official_news_view_page">View full page</string>
 <string name="official_news_link_hint">Tap links to open · long-press to copy</string>
 <string name="back">Back</string>
 <string name="daily_tasks">Daily tasks</string>
@@ -706,7 +707,7 @@
 <string name="agency_manage_menu_delete">Delete agency</string>
     <string name="agency_manage_section_team">Team</string>
     <string name="agency_manage_section_tools">Tools</string>
-    <string name="agency_manage_legend_badge">Legendary command</string>
+    <string name="agency_manage_legend_badge">Agency management</string>
 <string name="agency_kpi_gross">Gifts volume</string>
 <string name="agency_kpi_hosts">Hosts share</string>
 <string name="agency_kpi_agent_share">Agent estimate</string>
@@ -928,7 +929,7 @@
 <string name="level_rank_star">Star</string>
 <string name="level_rank_legend">Legend</string>
 <string name="lazy_no_signature">No signature yet</string>
-<string name="diamond_tips">Gifts convert about 45%% of coins into diamonds. With an agency: platform 30%% · agency 15%% · host 55%%. Diamonds cash out at a low rate; exchanging diamonds back to coins is about 55%%.</string>
+<string name="diamond_tips">Economy is gift-first: each gift costs coins and awards a fixed diamond amount written on that gift (capped so the platform stays profitable). Agency split: host 45%% · agency 15%% · platform 40%%. Host target &amp; salaries track diamonds earned from gifts — not a fixed “1 diamond = N coins” exchange.</string>
 <string name="auto_convert">Auto-convert diamonds to coins</string>
 <string name="store_dice">Dice</string>
 <string name="store_tiles">Tiles</string>

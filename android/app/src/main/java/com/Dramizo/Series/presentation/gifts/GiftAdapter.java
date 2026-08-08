@@ -48,6 +48,7 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
                             && Objects.equals(oldItem.iconUrl, newItem.iconUrl)
                             && Objects.equals(oldItem.animationUrl, newItem.animationUrl)
                             && oldItem.coinPrice == newItem.coinPrice
+                            && oldItem.diamondValue == newItem.diamondValue
                             && oldItem.sortOrder == newItem.sortOrder;
                 }
             };
@@ -112,7 +113,13 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
         holder.b.tvGiftName.setEllipsize(TextUtils.TruncateAt.END);
         holder.b.tvGiftName.setSingleLine(true);
         holder.b.tvGiftName.setHorizontallyScrolling(false);
-        holder.b.giftGold.setText(String.valueOf(gift.coinPrice));
+        // Gift-first: show coin cost · diamonds this gift awards (not a global FX).
+        if (gift.diamondValue > 0) {
+            holder.b.giftGold.setText(String.format(Locale.US, "%,d · %,d💎",
+                    gift.coinPrice, gift.diamondValue));
+        } else {
+            holder.b.giftGold.setText(String.valueOf(gift.coinPrice));
+        }
         applySelection(holder, gift);
 
         // Prefer icon; if icon missing use animation; animate gif/webp when that is the file type.
@@ -203,9 +210,29 @@ public class GiftAdapter extends ListAdapter<GiftDtos.GiftDto, GiftAdapter.VH> {
     }
 
     private static String stableKey(GiftDtos.GiftDto gift) {
-        if (gift.id != null && !gift.id.trim().isEmpty()) return "id:" + gift.id;
-        if (gift.iconUrl != null && !gift.iconUrl.trim().isEmpty()) return "icon:" + gift.iconUrl;
-        return "gift:" + String.valueOf(gift.name) + ':' + gift.coinPrice + ':' + gift.sortOrder;
+        // Prefer art stem so dual database ids with the same rose cannot both render.
+        String stem = artStem(gift != null ? gift.iconUrl : null);
+        if (stem.isEmpty() && gift != null) stem = artStem(gift.animationUrl);
+        if (!stem.isEmpty()) return "stem:" + stem;
+        if (gift != null && gift.name != null && !gift.name.trim().isEmpty()) {
+            return "name:" + gift.name.trim().toLowerCase(Locale.US);
+        }
+        if (gift != null && gift.id != null && !gift.id.trim().isEmpty()) return "id:" + gift.id;
+        return "gift:" + (gift != null ? gift.coinPrice : 0) + ':' + (gift != null ? gift.sortOrder : 0);
+    }
+
+    private static String artStem(@Nullable String url) {
+        if (url == null || url.isEmpty()) return "";
+        String raw = url.trim().toLowerCase(Locale.US).split("#")[0].split("\\?")[0]
+                .replace('\\', '/');
+        int slash = raw.lastIndexOf('/');
+        String base = slash >= 0 ? raw.substring(slash + 1) : raw;
+        if (base.isEmpty() || base.endsWith(".html")) return "";
+        base = base.replaceAll("\\.(png|webp|jpe?g|gif|svg|mp4|webm)$", "");
+        base = base.replaceAll("^bg_", "");
+        base = base.replaceAll("^gift[-_]?", "");
+        base = base.replaceAll("[-_\\s]+", "");
+        return base;
     }
 
     static class VH extends RecyclerView.ViewHolder {

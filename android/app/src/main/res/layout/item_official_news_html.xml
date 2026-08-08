@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HTML offer fills the feed row width; height is set in code to match content. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="6dp"
+    android:paddingVertical="6dp">
+
+    <FrameLayout
+        android:id="@+id/webHtmlHost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent">
+
+        <android.webkit.WebView
+            android:id="@+id/webBubbleHtml"
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@android:color/transparent"
+            android:overScrollMode="never"
+            android:scrollbars="none" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/tvBubbleTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="4dp"
+        android:textColor="@color/text_hint"
+        android:textSize="10sp"
+        tools:text="اليوم 10:42" />
+</LinearLayout>

@@ -526,7 +526,8 @@
 <string name="official_news_hint">تحديثات التطبيق والإشعارات المهمة</string>
 <string name="official_news_readonly">لا يمكنك الرد — للقراءة فقط</string>
 <string name="official_news_empty">لا توجد أخبار رسمية بعد</string>
-<string name="official_news_open_link">فتح الرابط</string>
+    <string name="official_news_open_link">فتح الرابط</string>
+    <string name="official_news_view_page">عرض الصفحة كاملة</string>
 <string name="official_news_link_hint">اضغط الروابط للفتح · اضغط مطولاً للنسخ</string>
 <string name="back">رجوع</string>
 <string name="daily_tasks">المهام اليومية</string>
@@ -707,7 +708,7 @@
 <string name="agency_manage_menu_delete">حذف الوكالة</string>
     <string name="agency_manage_section_team">الفريق</string>
     <string name="agency_manage_section_tools">أدوات</string>
-    <string name="agency_manage_legend_badge">قيادة أسطورية</string>
+    <string name="agency_manage_legend_badge">إدارة الوكالة</string>
 <string name="agency_host_target_title">هدف الراتب الشهري</string>
 <string name="agency_host_target_format">%1$s · التقدم %2$,d / %3$,d</string>
 <string name="agency_tools_section">أدوات الفريق</string>
@@ -923,7 +924,7 @@
 <string name="level_rank_star">نجمة</string>
 <string name="level_rank_legend">أسطورة</string>
 <string name="lazy_no_signature">كسلان لا توقيع الآن</string>
-<string name="diamond_tips">الهدايا تحوّل حوالي 45٪ من العملات إلى ماس. مع وكالة: المنصة 30٪ · الوكالة 15٪ · المضيف 55٪. سحب الماس بسعر منخفض، وتحويل الماس لعملات حوالي 55٪.</string>
+<string name="diamond_tips">الاقتصاد يعتمد على الهدايا: كل هدية لها سعر بالكوينز وماس محدد لها (محدود حتى لا تخسر المنصة). تقسيم الوكالة: مضيف 45٪ · وكالة 15٪ · منصة 40٪. التارجت والرواتب من ماس الهدايا — مو صرف ثابت «ألماسة = عدد كوينز».</string>
 <string name="auto_convert">تحويل تلقائي من الألماس إلى العملات</string>
 <string name="store_dice">نرد</string>
 <string name="store_tiles">قطع الطاية</string>

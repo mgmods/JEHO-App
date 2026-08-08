@@ -95,19 +95,21 @@ public class GiftRepositoryImpl implements GiftRepository {
     @Override
     public Result<List<GiftDtos.GiftCategoryDto>> refreshCategories() {
         Result<GiftDtos.GiftCategoryList> r = ApiCall.execute(api.categories());
-        if (r.success && r.data != null && !r.data.isEmpty()) {
+        if (r.success && r.data != null) {
+            // Dashboard is authoritative — even an empty list wins over any cached fallback.
             MEMORY_CATS.set(new ArrayList<>(r.data));
             return Result.ok(new ArrayList<>(r.data));
         }
         List<GiftDtos.GiftCategoryDto> mem = peekCategoriesOrNull();
         if (mem != null) return Result.ok(mem);
-        return Result.ok(defaultCategories());
+        return Result.ok(new ArrayList<>());
     }
 
     private Result<GiftDtos.GiftList> fetchNetwork() {
         Result<GiftDtos.GiftList> r = ApiCall.execute(api.list());
         if (r.success && r.data != null && !r.data.isEmpty()) {
             GiftDtos.GiftList list = copyList(r.data);
+            // Always replace memory — never merge old Room clones with new rows.
             MEMORY.set(list);
             memoryAt = System.currentTimeMillis();
             persistAsync(list);
@@ -118,6 +120,7 @@ public class GiftRepositoryImpl implements GiftRepository {
 
     private void persistAsync(GiftDtos.GiftList list) {
         final List<GiftEntity> cached = new ArrayList<>();
+        java.util.LinkedHashMap<String, GiftEntity> uniq = new java.util.LinkedHashMap<>();
         for (GiftDtos.GiftDto g : list) {
             if (g == null || g.id == null || g.id.isEmpty()) continue;
             GiftEntity e = new GiftEntity();
@@ -131,8 +134,14 @@ public class GiftRepositoryImpl implements GiftRepository {
             e.category = g.category;
             e.sortOrder = g.sortOrder;
             e.cachedAt = System.currentTimeMillis();
-            cached.add(e);
+            String stem = localArtStem(g.iconUrl);
+            if (stem.isEmpty()) stem = localArtStem(g.animationUrl);
+            String key = !stem.isEmpty() ? "s:" + stem
+                    : (g.name != null ? "n:" + g.name.trim().toLowerCase() : "id:" + g.id);
+            if (uniq.containsKey(key)) continue;
+            uniq.put(key, e);
         }
+        cached.addAll(uniq.values());
         if (cached.isEmpty()) return;
         io.execute(() -> {
             try {
@@ -141,6 +150,20 @@ public class GiftRepositoryImpl implements GiftRepository {
             } catch (Exception ignored) {
             }
         });
+    }
+
+    private static String localArtStem(String url) {
+        if (url == null || url.isEmpty()) return "";
+        String raw = url.trim().toLowerCase(java.util.Locale.US).split("#")[0].split("\\?")[0]
+                .replace('\\', '/');
+        int slash = raw.lastIndexOf('/');
+        String base = slash >= 0 ? raw.substring(slash + 1) : raw;
+        if (base.isEmpty() || base.endsWith(".html")) return "";
+        base = base.replaceAll("\\.(png|webp|jpe?g|gif|svg|mp4|webm)$", "");
+        base = base.replaceAll("^bg_", "");
+        base = base.replaceAll("^gift[-_]?", "");
+        base = base.replaceAll("[-_\\s]+", "");
+        return base;
     }
 
     private static GiftDtos.GiftList fromEntities(List<GiftEntity> local) {
@@ -168,24 +191,9 @@ public class GiftRepositoryImpl implements GiftRepository {
         return out;
     }
 
+    /** No hardcoded categories — dashboard/API only. Empty list = board shows no tabs. */
     public static List<GiftDtos.GiftCategoryDto> defaultCategories() {
-        List<GiftDtos.GiftCategoryDto> out = new ArrayList<>();
-        String[][] rows = {
-                {"normal", "عادي", "Normal"},
-                {"lucky", "حظ", "Lucky"},
-                {"combo", "كومبو", "Combo"},
-                {"premium", "مميز", "Premium"},
-        };
-        for (int i = 0; i < rows.length; i++) {
-            GiftDtos.GiftCategoryDto c = new GiftDtos.GiftCategoryDto();
-            c.key = rows[i][0];
-            c.labelAr = rows[i][1];
-            c.labelEn = rows[i][2];
-            c.sortOrder = i;
-            c.isActive = true;
-            out.add(c);
-        }
-        return out;
+        return new ArrayList<>();
     }
 
     @Override

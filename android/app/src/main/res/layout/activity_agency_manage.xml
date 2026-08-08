@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Legendary agency manage hub -->
+<!-- Agency manage hub — light theme matching app shell -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -12,8 +12,9 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:alpha="0.22"
-        android:src="@color/black" />
+        android:alpha="0"
+        android:src="@color/white"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -26,7 +27,8 @@
             android:layout_height="56dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="4dp">
+            android:paddingHorizontal="4dp"
+            android:background="@color/white">
 
             <ImageView
                 android:id="@+id/btnBack"
@@ -35,7 +37,7 @@
                 android:contentDescription="@string/back"
                 android:padding="12dp"
                 android:src="@drawable/ic_arrow_back"
-                app:tint="#FFF0D78A" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="0dp"
@@ -43,10 +45,9 @@
                 android:layout_weight="1"
                 android:gravity="center"
                 android:text="@string/agency_manage_title"
-                android:textColor="#FFF5E6A8"
+                android:textColor="@color/text_primary"
                 android:textSize="17sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04" />
+                android:textStyle="bold" />
 
             <View
                 android:layout_width="48dp"
@@ -67,7 +68,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="16dp"
+                android:paddingTop="8dp">
 
                 <LinearLayout
                     android:id="@+id/boxAgencyHero"
@@ -76,7 +78,7 @@
                     android:background="@drawable/bg_agency_manage_hero"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="22dp">
+                    android:padding="20dp">
 
                     <FrameLayout
                         android:layout_width="88dp"
@@ -86,7 +88,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_voice_seat_circle"
-                            android:backgroundTint="#33E8C468" />
+                            android:backgroundTint="#14FE2C55" />
 
                         <ImageView
                             android:id="@+id/imgAgencyLogo"
@@ -103,10 +105,10 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:letterSpacing="0.12"
+                        android:letterSpacing="0.06"
                         android:text="@string/agency_manage_legend_badge"
                         android:textAllCaps="true"
-                        android:textColor="#CCE0B84A"
+                        android:textColor="@color/md_theme_light_primary"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -117,8 +119,8 @@
                         android:layout_marginTop="6dp"
                         android:gravity="center"
                         android:text="—"
-                        android:textColor="#FFFFF6D8"
-                        android:textSize="24sp"
+                        android:textColor="@color/text_primary"
+                        android:textSize="22sp"
                         android:textStyle="bold" />
 
                     <TextView
@@ -127,7 +129,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:gravity="center"
-                        android:textColor="#B3E8D9A0"
+                        android:textColor="@color/text_secondary"
                         android:textSize="13sp" />
 
                     <TextView
@@ -136,7 +138,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:gravity="center"
-                        android:textColor="#99F0D78A"
+                        android:textColor="@color/text_hint"
                         android:textSize="12sp"
                         android:visibility="gone" />
                 </LinearLayout>
@@ -148,18 +150,16 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
                     android:layout_marginTop="12dp"
-                    android:indeterminateTint="#E0B84A"
+                    android:indeterminateTint="@color/md_theme_light_primary"
                     android:visibility="gone" />
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.08"
+                    android:layout_marginTop="20dp"
                     android:text="@string/agency_manage_section_team"
-                    android:textAllCaps="true"
-                    android:textColor="#CCE0B84A"
-                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <include
@@ -186,12 +186,10 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="22dp"
-                    android:letterSpacing="0.08"
+                    android:layout_marginTop="20dp"
                     android:text="@string/agency_manage_section_tools"
-                    android:textAllCaps="true"
-                    android:textColor="#CCE0B84A"
-                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp"
                     android:textStyle="bold" />
 
                 <include
@@ -241,7 +239,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/agency_manage_menu_live"
-                        android:textColor="#FFFFE7A0"
+                        android:textColor="@color/white"
                         android:textSize="15sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -250,7 +248,7 @@
                     android:id="@+id/menuDelete"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
-                    android:layout_marginTop="22dp"
+                    android:layout_marginTop="20dp"
                     android:background="@drawable/bg_agency_menu_row_danger"
                     android:clickable="true"
                     android:focusable="true"
@@ -264,7 +262,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/agency_manage_menu_delete"
-                        android:textColor="#FFFF8A8A"
+                        android:textColor="@color/aurora_danger"
                         android:textSize="14sp"
                         android:textStyle="bold" />
                 </LinearLayout>
