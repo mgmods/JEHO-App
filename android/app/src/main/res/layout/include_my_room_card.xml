@@ -50,7 +50,7 @@
         app:layout_constraintStart_toStartOf="@id/imgMyRoomBg"
         app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
 
-    <TextView
+    <com.Dramizo.Series.widget.MarqueeTextView
         android:id="@+id/tvMyRoomTitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
@@ -58,6 +58,7 @@
         android:layout_marginTop="18dp"
         android:layout_marginEnd="8dp"
         android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
         android:singleLine="true"
         android:text="@string/my_room"
         android:textColor="@color/text_primary"
@@ -67,13 +68,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/imgMyRoomBg" />
 
-    <TextView
+    <com.Dramizo.Series.widget.MarqueeTextView
         android:id="@+id/tvMyRoomSubtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:layout_marginEnd="8dp"
         android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
         android:singleLine="true"
         android:text="@string/agency_room_host_subtitle"
         android:textColor="@color/text_hint"

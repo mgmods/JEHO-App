@@ -147,7 +147,8 @@ public class RechargePackagesBottomSheet extends BottomSheetDialogFragment {
                                 int total = pkg.coins + Math.max(0, pkg.bonusCoins);
                                 c.getIoExecutor().execute(() -> {
                                     Result<WalletDtos.WalletDto> r =
-                                            c.getWalletRepository().verifyPurchase(
+                                            com.Dramizo.Series.billing.PlayPurchaseFulfillment.verifyWithRetry(
+                                                    c.getWalletRepository(),
                                                     sku, purchaseToken, orderId, total,
                                                     pkg.amountForVerify());
                                     requireActivity().runOnUiThread(() -> {
@@ -159,7 +160,7 @@ public class RechargePackagesBottomSheet extends BottomSheetDialogFragment {
                                         } else {
                                             Toast.makeText(requireContext(),
                                                     r.error != null ? r.error
-                                                            : getString(R.string.error_generic),
+                                                            : "تم الدفع — افتح المحفظة لتأكيد الرصيد",
                                                     Toast.LENGTH_LONG).show();
                                         }
                                     });

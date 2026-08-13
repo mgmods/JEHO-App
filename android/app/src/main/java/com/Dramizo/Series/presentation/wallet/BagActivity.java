@@ -38,9 +38,9 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.offers.OffersBottomSheet;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
-import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.QrBitmap;
+import com.Dramizo.Series.util.HostTargetStagesUi;
 import com.Dramizo.Series.util.RewardBurstOverlay;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.tabs.TabLayout;
@@ -58,7 +58,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class BagActivity extends ThemedActivity {
     public static final String EXTRA_TAB = "extra_tab";
-    /** convert | transfer | withdraw | target — opens a focused diamonds screen. */
+    /** withdraw — opens focused personal diamond withdraw screen. */
     public static final String EXTRA_DIAMOND_ACTION = "diamond_action";
     private static final String[] PAY_VALUES = {"paypal", "bank", "usdt"};
 
@@ -112,7 +112,7 @@ public class BagActivity extends ThemedActivity {
 
         binding.tabs.addTab(binding.tabs.newTab().setText("كوينزات"));
         binding.tabs.addTab(binding.tabs.newTab().setText("ماسة"));
-        binding.tabs.addTab(binding.tabs.newTab().setText("وكيل"));
+        // Recharge-agent entry moved to Profile → services list.
         binding.tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override public void onTabSelected(TabLayout.Tab tab) { showPanel(tab.getPosition()); }
             @Override public void onTabUnselected(TabLayout.Tab tab) {}
@@ -140,10 +140,6 @@ public class BagActivity extends ThemedActivity {
             }
         }
 
-        if (binding.btnOpenAgentPortal != null) {
-            binding.btnOpenAgentPortal.setOnClickListener(v ->
-                    startActivity(new Intent(this, RechargeAgentActivity.class)));
-        }
 
         withdrawAdapter = new WithdrawAdapter();
         binding.recyclerWithdrawHistory.setLayoutManager(new LinearLayoutManager(this));
@@ -162,113 +158,14 @@ public class BagActivity extends ThemedActivity {
         if (binding.rowWithdrawChannel != null) {
             binding.rowWithdrawChannel.setOnClickListener(v -> showWithdrawChannelChooser());
         }
-        binding.btnOpenEarnings.setOnClickListener(v ->
-                startActivity(new Intent(this, EarningsActivity.class)));
-        View.OnClickListener openDiamondScreen = v -> {
-            String action;
-            int id = v.getId();
-            if (id == R.id.btnFocusConvert) action = "convert";
-            else if (id == R.id.btnFocusTransfer) action = "transfer";
-            else if (id == R.id.btnFocusTarget) action = "target";
-            else action = "withdraw";
-            Intent i = new Intent(this, BagActivity.class);
-            i.putExtra(EXTRA_TAB, 1);
-            i.putExtra(EXTRA_DIAMOND_ACTION, action);
-            startActivity(i);
-        };
-        if (binding.btnFocusWithdraw != null) {
-            binding.btnFocusWithdraw.setOnClickListener(openDiamondScreen);
-        }
-        if (binding.btnOpenDebrisStore != null) {
-            binding.btnOpenDebrisStore.setOnClickListener(v ->
-                    startActivity(new Intent(this,
-                            com.Dramizo.Series.presentation.games.GameStoreActivity.class)));
-        }
-        if (binding.btnOpenDebrisTasks != null) {
-            com.Dramizo.Series.util.TasksFeature.applyVisibility(binding.btnOpenDebrisTasks, this);
-            binding.btnOpenDebrisTasks.setOnClickListener(v -> {
-                if (!com.Dramizo.Series.util.TasksFeature.isEnabled(this)) return;
-                startActivity(new Intent(this,
-                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
-            });
-        }
-        if (binding.btnFocusConvert != null) {
-            binding.btnFocusConvert.setOnClickListener(openDiamondScreen);
-        }
-        if (binding.btnFocusTransfer != null) {
-            binding.btnFocusTransfer.setOnClickListener(openDiamondScreen);
-        }
         if (binding.btnFocusTarget != null) {
-            binding.btnFocusTarget.setOnClickListener(openDiamondScreen);
+            binding.btnFocusTarget.setOnClickListener(v -> scrollToHostTargetSection());
+        }
+        if (binding.btnWithdrawEarnings != null) {
+            binding.btnWithdrawEarnings.setOnClickListener(v -> openWithdrawForm());
         }
         if (binding.btnRechargeAgent != null) {
-            binding.btnRechargeAgent.setOnClickListener(v ->
-                    startActivity(new Intent(this, RechargeAgentActivity.class)));
-        }
-
-        binding.btnExchangeDiamonds.setOnClickListener(v -> {
-            String raw = binding.etDiamonds.getText() != null ? binding.etDiamonds.getText().toString().trim() : "";
-            int amount;
-            try { amount = Integer.parseInt(raw); } catch (Exception e) { amount = 0; }
-            if (amount <= 0) {
-                Toast.makeText(this, R.string.invalid_amount, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            final int diamonds = amount;
-            c.getIoExecutor().execute(() -> {
-                Result<WalletDtos.WalletDto> r = ApiCall.execute(c.getWalletApi().exchange(
-                        new WalletDtos.ExchangeRequest(diamonds)));
-                runOnUiThread(() -> {
-                    if (r.success) {
-                        RewardBurstOverlay.show(
-                                this,
-                                RewardBurstOverlay.Kind.DIAMONDS,
-                                "تم التحويل!",
-                                diamonds + " ماس → عملات");
-                        applyWallet(r.data);
-                    } else Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
-                });
-            });
-        });
-
-        if (binding.btnHostTrade != null) {
-            binding.btnHostTrade.setOnClickListener(v -> {
-                String toId = binding.etTradeHostId.getText() != null
-                        ? binding.etTradeHostId.getText().toString().trim() : "";
-                String raw = binding.etTradeDiamonds.getText() != null
-                        ? binding.etTradeDiamonds.getText().toString().trim() : "";
-                int amount;
-                try { amount = Integer.parseInt(raw); } catch (Exception e) { amount = 0; }
-                if (toId.isEmpty() || amount <= 0) {
-                    Toast.makeText(this, R.string.invalid_amount, Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                final String peerId = toId;
-                final int diamonds = amount;
-                c.getIoExecutor().execute(() -> {
-                    Result<java.util.Map<String, Object>> r = ApiCall.execute(
-                            c.getWalletApi().hostTrade(new WalletDtos.HostTradeRequest(peerId, diamonds)));
-                    runOnUiThread(() -> {
-                        if (r.success) {
-                            RewardBurstOverlay.show(
-                                    this,
-                                    RewardBurstOverlay.Kind.DIAMONDS,
-                                    "تم التبديل!",
-                                    diamonds + " ماس أُضيفت للتاجر");
-                            c.getIoExecutor().execute(() -> {
-                                Result<WalletDtos.WalletDto> w = ApiCall.execute(c.getWalletApi().getWallet());
-                                runOnUiThread(() -> {
-                                    if (w.success) applyWallet(w.data);
-                                });
-                            });
-                        } else {
-                            Toast.makeText(this,
-                                    r.error != null ? r.error : getString(R.string.error_generic),
-                                    Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                });
-            });
+            binding.btnRechargeAgent.setVisibility(View.GONE);
         }
 
         binding.etWithdrawMethod.setFocusable(false);
@@ -350,7 +247,6 @@ public class BagActivity extends ThemedActivity {
         });
 
         load();
-        applyWalletIcons();
         preloadWithdrawAgents();
         diamondActionMode = getIntent() != null
                 ? getIntent().getStringExtra(EXTRA_DIAMOND_ACTION) : null;
@@ -427,8 +323,10 @@ public class BagActivity extends ThemedActivity {
                         public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
                             if (sku == null || sku.isEmpty() || purchaseToken == null) return;
                             c.getIoExecutor().execute(() -> {
-                                Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
-                                        sku, purchaseToken, orderId, 0, 0);
+                                Result<WalletDtos.WalletDto> r =
+                                        com.Dramizo.Series.billing.PlayPurchaseFulfillment.verifyWithRetry(
+                                                c.getWalletRepository(),
+                                                sku, purchaseToken, orderId, 0, 0);
                                 runOnUiThread(() -> {
                                     if (isFinishing()) return;
                                     if (r.success) {
@@ -465,66 +363,33 @@ public class BagActivity extends ThemedActivity {
         OffersBottomSheet.show(getSupportFragmentManager());
     }
 
-    /** Hub shows balance + target; legacy actions still work via EXTRA_DIAMOND_ACTION. */
+    /** Hub shows balance + target; withdraw opens a focused payout form. */
     private void applyDiamondActionMode(@Nullable String mode) {
         if (binding == null) return;
-        boolean focused = mode != null && !mode.isEmpty();
-        if (!focused) {
-            // Hub: diamond balance + host target only.
+        boolean withdrawMode = "withdraw".equals(mode);
+        if (!withdrawMode) {
+            if (binding.tabs != null) binding.tabs.setVisibility(View.VISIBLE);
             if (binding.sectionWithdrawForm != null) binding.sectionWithdrawForm.setVisibility(View.GONE);
-            if (binding.sectionConvert != null) binding.sectionConvert.setVisibility(View.GONE);
-            if (binding.sectionHostTrade != null) binding.sectionHostTrade.setVisibility(View.GONE);
-            if (binding.btnFocusConvert != null) binding.btnFocusConvert.setVisibility(View.GONE);
-            if (binding.btnFocusTransfer != null) binding.btnFocusTransfer.setVisibility(View.GONE);
-            if (binding.btnFocusWithdraw != null) binding.btnFocusWithdraw.setVisibility(View.GONE);
-            if (binding.btnOpenEarnings != null) binding.btnOpenEarnings.setVisibility(View.GONE);
             if (binding.btnFocusTarget != null) binding.btnFocusTarget.setVisibility(View.VISIBLE);
-            // Target card stays on hub (not buried in a sub-screen).
+            if (binding.btnWithdrawEarnings != null) binding.btnWithdrawEarnings.setVisibility(View.VISIBLE);
             if (binding.sectionHostMonthlyTarget != null) {
                 binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
             }
+            if (binding.tvWalletTitle != null) binding.tvWalletTitle.setText("الماس");
             return;
         }
         if (binding.tabs != null) binding.tabs.setVisibility(View.GONE);
         if (binding.panelCoins != null) binding.panelCoins.setVisibility(View.GONE);
-        if (binding.panelDebris != null) binding.panelDebris.setVisibility(View.GONE);
         if (binding.panelDiamonds != null) binding.panelDiamonds.setVisibility(View.VISIBLE);
-        if (binding.btnFocusConvert != null) binding.btnFocusConvert.setVisibility(View.GONE);
-        if (binding.btnFocusTransfer != null) binding.btnFocusTransfer.setVisibility(View.GONE);
-        if (binding.btnFocusWithdraw != null) binding.btnFocusWithdraw.setVisibility(View.GONE);
         if (binding.btnFocusTarget != null) binding.btnFocusTarget.setVisibility(View.GONE);
-        if (binding.btnOpenEarnings != null) binding.btnOpenEarnings.setVisibility(View.GONE);
-        if (binding.sectionWithdrawForm != null) binding.sectionWithdrawForm.setVisibility(View.GONE);
-        if (binding.sectionConvert != null) binding.sectionConvert.setVisibility(View.GONE);
-        if (binding.sectionHostTrade != null) binding.sectionHostTrade.setVisibility(View.GONE);
+        if (binding.btnWithdrawEarnings != null) binding.btnWithdrawEarnings.setVisibility(View.GONE);
         if (binding.sectionHostMonthlyTarget != null) {
             binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
         }
-        String title = "الماس";
-        if ("convert".equals(mode)) {
-            // Convert removed from product; fall through to target.
-            title = "تارجت المضيف";
-            if (binding.sectionHostMonthlyTarget != null) {
-                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
-            }
-        } else if ("transfer".equals(mode)) {
-            title = "تارجت المضيف";
-            if (binding.sectionHostMonthlyTarget != null) {
-                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
-            }
-        } else if ("target".equals(mode)) {
-            title = "تارجت المضيف";
-            if (binding.sectionHostMonthlyTarget != null) {
-                binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
-            }
-        } else {
-            // Personal diamond withdraw (not agency-room host earnings).
-            title = "سحب الدخل";
-            if (binding.sectionWithdrawForm != null) {
-                binding.sectionWithdrawForm.setVisibility(View.VISIBLE);
-            }
+        if (binding.sectionWithdrawForm != null) {
+            binding.sectionWithdrawForm.setVisibility(View.VISIBLE);
         }
-        if (binding.tvWalletTitle != null) binding.tvWalletTitle.setText(title);
+        if (binding.tvWalletTitle != null) binding.tvWalletTitle.setText("سحب الدخل");
     }
 
     @Override
@@ -634,10 +499,6 @@ public class BagActivity extends ThemedActivity {
         });
     }
 
-    private void applyWalletIcons() {
-        // Coin/diamond icons come from activity_bag.xml android:src.
-    }
-
     private static void bindPackageIcon(ImageView view, WalletDtos.RechargePackageDto pkg, int position) {
         if (view == null) return;
         int tierRes = com.Dramizo.Series.util.AssetCatalog.rechargeBagForIndex(position);
@@ -684,8 +545,10 @@ public class BagActivity extends ThemedActivity {
                             @Override
                             public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
                                 c.getIoExecutor().execute(() -> {
-                                    Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
-                                            sku, purchaseToken, orderId, totalCoins, pkg.amountForVerify());
+                                    Result<WalletDtos.WalletDto> r =
+                                            com.Dramizo.Series.billing.PlayPurchaseFulfillment.verifyWithRetry(
+                                                    c.getWalletRepository(),
+                                                    sku, purchaseToken, orderId, totalCoins, pkg.amountForVerify());
                                     runOnUiThread(() -> {
                                         if (r.success) {
                                             c.getBillingHelper().consumePendingPurchase();
@@ -696,7 +559,8 @@ public class BagActivity extends ThemedActivity {
                                             applyWallet(r.data);
                                         } else {
                                             Toast.makeText(BagActivity.this,
-                                                    r.error != null ? r.error : getString(R.string.error_generic),
+                                                    r.error != null ? r.error
+                                                            : "تم الدفع — افتح المحفظة مرة أخرى لتأكيد الرصيد",
                                                     Toast.LENGTH_LONG).show();
                                         }
                                     });
@@ -1025,13 +889,6 @@ public class BagActivity extends ThemedActivity {
     private void showPanel(int index) {
         binding.panelCoins.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
         binding.panelDiamonds.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
-        if (binding.panelDebris != null) {
-            binding.panelDebris.setVisibility(View.GONE);
-        }
-        if (binding.panelAgent != null) {
-            binding.panelAgent.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
-        }
-        // Mikoo: sign float only on coins tab.
         if (binding.ivSignFloat != null) {
             binding.ivSignFloat.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
         }
@@ -1143,35 +1000,15 @@ public class BagActivity extends ThemedActivity {
         if (w == null || binding == null) return;
         currentWallet = w;
         String coinsTxt = String.format(Locale.US, "%,d", w.coins);
-        // Personal pool only on the big number (withdraw path uses personal diamonds).
         String diamondsTxt = String.format(Locale.US, "%,d", w.diamonds);
         binding.tvGoldBalance.setText(coinsTxt);
         binding.tvDiamondBalance.setText(diamondsTxt);
-        if (binding.tvDebrisBalance != null) {
-            binding.tvDebrisBalance.setText(coinsTxt);
-        }
         binding.tvDiamondUsdValue.setText(String.format(Locale.US,
-                "شخصي ≈ $%,.2f USD", w.diamonds * diamondUsdRate));
-        if (binding.tvTraderDiamonds != null) {
-            // Agency-room gift share lands in agencyDiamonds — was invisible before → “no diamonds”.
-            long agency = Math.max(0L, w.agencyDiamonds);
-            long trader = Math.max(0L, w.traderDiamonds);
-            String extra = String.format(Locale.US,
-                    "وكالة: %,d (≈ $%,.2f) · تاجر: %,d",
-                    agency, agency * diamondUsdRate, trader);
-            binding.tvTraderDiamonds.setText(extra);
-            binding.tvTraderDiamonds.setVisibility(View.VISIBLE);
-        }
-        if (binding.sectionHostTrade != null) {
-            // Never show the form on the hub — only the focused "transfer" screen.
-            boolean showForm = "transfer".equals(diamondActionMode);
-            binding.sectionHostTrade.setVisibility(showForm ? View.VISIBLE : View.GONE);
-        }
+                "≈ $%,.2f USD", w.diamonds * diamondUsdRate));
         if (binding.tvWithdrawHint != null) {
-            long agency = Math.max(0L, w.agencyDiamonds);
             binding.tvWithdrawHint.setText(String.format(Locale.US,
-                    "شخصي: %,d · وكالة: %,d · حد السحب الشخصي: %,d",
-                    w.diamonds, agency, minWithdrawDiamonds));
+                    "الألماس: %,d · حد السحب: %,d",
+                    w.diamonds, minWithdrawDiamonds));
             binding.tvWithdrawHint.setContentDescription(String.format(Locale.US,
                     "1 diamond equals $%.6f; exchange rate %.2f coins",
                     diamondUsdRate, diamondCoinRate));
@@ -1187,251 +1024,80 @@ public class BagActivity extends ThemedActivity {
         }
     }
 
+    private void scrollToHostTargetSection() {
+        if (binding == null || binding.sectionHostMonthlyTarget == null) return;
+        TabLayout.Tab diamondsTab = binding.tabs != null ? binding.tabs.getTabAt(1) : null;
+        if (diamondsTab != null) binding.tabs.selectTab(diamondsTab);
+        showPanel(1);
+        diamondActionMode = null;
+        applyDiamondActionMode(null);
+        binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
+        if (binding.panelDiamonds != null) {
+            binding.panelDiamonds.post(() ->
+                    binding.panelDiamonds.smoothScrollTo(0, offsetInScrollView(binding.sectionHostMonthlyTarget)));
+        }
+    }
+
+    /** Open personal diamond withdraw form from the diamonds hub. */
+    private void openWithdrawForm() {
+        if (binding == null) return;
+        diamondActionMode = "withdraw";
+        TabLayout.Tab diamondsTab = binding.tabs != null ? binding.tabs.getTabAt(1) : null;
+        if (diamondsTab != null) binding.tabs.selectTab(diamondsTab);
+        showPanel(1);
+        applyDiamondActionMode("withdraw");
+        if (binding.sectionWithdrawForm != null && binding.panelDiamonds != null) {
+            binding.panelDiamonds.post(() ->
+                    binding.panelDiamonds.smoothScrollTo(0, offsetInScrollView(binding.sectionWithdrawForm)));
+        }
+    }
+
+    private void setHostTargetBodyVisible(boolean visible) {
+        if (binding.hostTargetActiveBody != null) {
+            binding.hostTargetActiveBody.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void bindHostMonthlyTarget(Result<Map<String, Object>> hostTarget) {
         if (binding.sectionHostMonthlyTarget == null) return;
-        // Diamond hub always shows target (when enabled); focused convert/transfer removed.
-        boolean canShowTarget = diamondActionMode == null
-                || diamondActionMode.isEmpty()
-                || "target".equals(diamondActionMode)
-                || "convert".equals(diamondActionMode)
-                || "transfer".equals(diamondActionMode);
-        if (!hostTarget.success || hostTarget.data == null
-                || !Boolean.TRUE.equals(hostTarget.data.get("enabled"))) {
-            if (binding.btnFocusTarget != null) {
-                binding.btnFocusTarget.setVisibility(View.GONE);
-            }
-            if (canShowTarget) binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
-            return;
-        }
-        if (binding.btnFocusTarget != null) {
-            // Card is under balance — no need for duplicate row on hub.
-            binding.btnFocusTarget.setVisibility(View.GONE);
-        }
-        if (!canShowTarget) {
+        if ("withdraw".equals(diamondActionMode)) {
             binding.sectionHostMonthlyTarget.setVisibility(View.GONE);
             return;
         }
         binding.sectionHostMonthlyTarget.setVisibility(View.VISIBLE);
-        long progress = 0;
-        Object p = hostTarget.data.get("progress");
-        if (p instanceof Number) progress = ((Number) p).longValue();
-        long next = 0;
-        Object n = hostTarget.data.get("nextThreshold");
-        if (n instanceof Number) next = ((Number) n).longValue();
-        long remaining = 0;
-        Object r = hostTarget.data.get("remaining");
-        if (r instanceof Number) remaining = ((Number) r).longValue();
-        int cycle = 1;
-        Object cyc = hostTarget.data.get("cycle");
-        if (cyc instanceof Number) cycle = Math.max(1, ((Number) cyc).intValue());
-        String month = String.valueOf(hostTarget.data.get("yearMonth"));
-        Object periodLabel = hostTarget.data.get("periodLabel");
-        if (periodLabel != null && !String.valueOf(periodLabel).isEmpty()
-                && !"null".equals(String.valueOf(periodLabel))) {
-            month = String.valueOf(periodLabel);
-        }
-        Object period = hostTarget.data.get("period");
-        String periodTag = "";
-        if (period != null) {
-            String periodKey = String.valueOf(period);
-            if ("weekly".equals(periodKey)) periodTag = " · أسبوعي";
-            else if ("monthly".equals(periodKey)) periodTag = " · شهري";
-        }
-        if (binding.tvHostTargetMonth != null) {
-            String monthLabel = month != null && !month.isEmpty() && !"null".equals(month)
-                    ? month : "الفترة الحالية";
-            binding.tvHostTargetMonth.setText(monthLabel + periodTag + " · دورة " + cycle);
-        }
-        if (binding.tvHostMonthlyProgress != null) {
-            if (next > 0) {
-                binding.tvHostMonthlyProgress.setText(String.format(Locale.US,
-                        "التقدّم %,d / %,d · متبقي %,d", progress, next, remaining));
-            } else {
-                binding.tvHostMonthlyProgress.setText(String.format(Locale.US,
-                        "%,d — جاهز لإعادة الدورة من المرحلة 1", progress));
+        if (!hostTarget.success || hostTarget.data == null) {
+            setHostTargetBodyVisible(false);
+            if (binding.tvHostTargetMonth != null) {
+                binding.tvHostTargetMonth.setText(R.string.host_target_section_title);
             }
-        }
-        if (binding.progressHostMonthly != null) {
-            int pct = next <= 0 ? 100 : (int) Math.min(100, (progress * 100L) / Math.max(1, next));
-            binding.progressHostMonthly.setProgress(pct);
-        }
-        if (binding.hostTargetStagesRow != null) {
-            binding.hostTargetStagesRow.removeAllViews();
-            Object stagesObj = hostTarget.data.get("stages");
-            if (stagesObj instanceof List) {
-                LayoutInflater inflater = LayoutInflater.from(this);
-                int index = 0;
-                for (Object row : (List<?>) stagesObj) {
-                    if (!(row instanceof Map)) continue;
-                    Map<?, ?> s = (Map<?, ?>) row;
-                    index++;
-                    View item = inflater.inflate(R.layout.item_host_target_stage,
-                            binding.hostTargetStagesRow, false);
-                    TextView tvIndex = item.findViewById(R.id.tvStageIndex);
-                    TextView tvTitle = item.findViewById(R.id.tvStageTitle);
-                    TextView tvTh = item.findViewById(R.id.tvStageThreshold);
-                    TextView tvSalary = item.findViewById(R.id.tvStageSalary);
-                    TextView tvReward = item.findViewById(R.id.tvStageReward);
-                    TextView tvState = item.findViewById(R.id.tvStageState);
-                    ImageView imgStatus = item.findViewById(R.id.imgStageStatus);
-
-                    String status = String.valueOf(s.get("status"));
-                    boolean claimed = Boolean.TRUE.equals(s.get("claimed"));
-                    boolean reached = Boolean.TRUE.equals(s.get("reached"));
-                    if ("null".equals(status) || status.isEmpty()) {
-                        status = claimed || reached ? "done"
-                                : (index == 1 ? "current" : "locked");
-                    }
-                    String title = String.valueOf(s.get("title"));
-                    if (title == null || "null".equals(title) || title.isEmpty()) {
-                        title = "مرحلة " + index;
-                    }
-                    long th = s.get("threshold") instanceof Number
-                            ? ((Number) s.get("threshold")).longValue() : 0;
-                    long rewardCoins = s.get("rewardCoins") instanceof Number
-                            ? ((Number) s.get("rewardCoins")).longValue() : 0;
-                    long rewardDiamonds = s.get("rewardDiamonds") instanceof Number
-                            ? ((Number) s.get("rewardDiamonds")).longValue() : 0;
-                    double hostSalary = s.get("hostSalaryUsd") instanceof Number
-                            ? ((Number) s.get("hostSalaryUsd")).doubleValue() : 0;
-                    double agentSalary = s.get("agentSalaryUsd") instanceof Number
-                            ? ((Number) s.get("agentSalaryUsd")).doubleValue() : 0;
-                    double totalSalary = s.get("totalUsd") instanceof Number
-                            ? ((Number) s.get("totalUsd")).doubleValue()
-                            : hostSalary + agentSalary;
-
-                    if (tvIndex != null) {
-                        Object idxObj = s.get("index");
-                        int shown = idxObj instanceof Number
-                                ? ((Number) idxObj).intValue() : index;
-                        tvIndex.setText(String.valueOf(shown));
-                    }
-                    if (tvTitle != null) tvTitle.setText(title);
-                    if (tvTh != null) {
-                        if (hostSalary > 0) {
-                            tvTh.setText(String.format(Locale.US,
-                                    "%,d ألماس\n= $%.0f للمضيف", th, hostSalary));
-                        } else {
-                            tvTh.setText(String.format(Locale.US, "%,d ألماس", th));
-                        }
-                    }
-                    if (tvSalary != null) {
-                        if (hostSalary > 0 || agentSalary > 0 || totalSalary > 0) {
-                            tvSalary.setVisibility(View.VISIBLE);
-                            tvSalary.setText(String.format(Locale.US,
-                                    "مضيف $%.0f · وكالة $%.0f",
-                                    hostSalary, agentSalary));
-                        } else {
-                            tvSalary.setVisibility(View.GONE);
-                        }
-                    }
-                    if (tvReward != null) {
-                        StringBuilder reward = new StringBuilder();
-                        boolean any = false;
-                        if (rewardCoins > 0) {
-                            reward.append("+").append(String.format(Locale.US, "%,d", rewardCoins))
-                                    .append(" كوينز");
-                            any = true;
-                        }
-                        if (rewardDiamonds > 0) {
-                            if (any) reward.append(" · ");
-                            reward.append("+").append(String.format(Locale.US, "%,d", rewardDiamonds))
-                                    .append(" ماسة");
-                            any = true;
-                        }
-                        Object cosCode = s.get("rewardCosmeticCode");
-                        if (cosCode != null && !"null".equals(String.valueOf(cosCode))
-                                && !String.valueOf(cosCode).trim().isEmpty()) {
-                            if (any) reward.append(" · ");
-                            long days = s.get("rewardCosmeticDays") instanceof Number
-                                    ? ((Number) s.get("rewardCosmeticDays")).longValue() : 7;
-                            reward.append("إطار ").append(days).append("ي");
-                            any = true;
-                        }
-                        Object vipLv = s.get("rewardVipLevel");
-                        if (vipLv instanceof Number && ((Number) vipLv).intValue() > 0) {
-                            if (any) reward.append(" · ");
-                            int vl = ((Number) vipLv).intValue();
-                            long vd = s.get("rewardVipDays") instanceof Number
-                                    ? ((Number) s.get("rewardVipDays")).longValue() : 7;
-                            reward.append("VIP").append(vl).append(" · ").append(vd).append("ي");
-                            any = true;
-                        }
-                        if (!any) {
-                            tvReward.setVisibility(View.GONE);
-                        } else {
-                            tvReward.setVisibility(View.VISIBLE);
-                            tvReward.setText(reward.toString());
-                        }
-                    }
-
-                    if ("done".equals(status)) {
-                        item.setBackgroundResource(R.drawable.bg_host_target_stage_done);
-                        if (tvIndex != null) {
-                            tvIndex.setBackgroundResource(R.drawable.bg_host_target_stage_badge_done);
-                        }
-                        if (imgStatus != null) {
-                            imgStatus.setVisibility(View.VISIBLE);
-                            imgStatus.setImageResource(R.drawable.ic_host_target_check);
-                        }
-                        if (tvState != null) {
-                            tvState.setText("مكتمل ✓");
-                            tvState.setTextColor(0xFF0F766E);
-                        }
-                    } else if ("current".equals(status)) {
-                        item.setBackgroundResource(R.drawable.bg_host_target_stage_current);
-                        if (tvIndex != null) {
-                            tvIndex.setBackgroundResource(R.drawable.bg_host_target_stage_badge);
-                        }
-                        if (imgStatus != null) imgStatus.setVisibility(View.GONE);
-                        if (tvState != null) {
-                            tvState.setText("الحالية");
-                            tvState.setTextColor(0xFFB45309);
-                        }
-                    } else {
-                        item.setBackgroundResource(R.drawable.bg_host_target_stage);
-                        if (tvIndex != null) {
-                            tvIndex.setBackgroundResource(R.drawable.bg_host_target_stage_badge_locked);
-                        }
-                        if (imgStatus != null) {
-                            imgStatus.setVisibility(View.VISIBLE);
-                            imgStatus.setImageResource(R.drawable.ic_host_target_lock);
-                        }
-                        if (tvState != null) {
-                            tvState.setText("مقفلة");
-                            tvState.setTextColor(0xFF64748B);
-                        }
-                    }
-                    binding.hostTargetStagesRow.addView(item);
-                }
-                // Auto-scroll slider so the current stage is in view.
-                if (binding.hostTargetStagesScroll != null) {
-                    int currentIndex = -1;
-                    int i = 0;
-                    for (Object row : (List<?>) stagesObj) {
-                        if (!(row instanceof Map)) continue;
-                        String st = String.valueOf(((Map<?, ?>) row).get("status"));
-                        if ("current".equals(st)) {
-                            currentIndex = i;
-                            break;
-                        }
-                        i++;
-                    }
-                    final int scrollTo = Math.max(0, currentIndex);
-                    binding.hostTargetStagesScroll.post(() -> {
-                        if (binding.hostTargetStagesRow.getChildCount() <= scrollTo) return;
-                        View target = binding.hostTargetStagesRow.getChildAt(scrollTo);
-                        if (target != null) {
-                            binding.hostTargetStagesScroll.smoothScrollTo(
-                                    Math.max(0, target.getLeft() - 24), 0);
-                        }
-                    });
-                }
+            if (binding.tvHostMonthlyProgress != null) {
+                binding.tvHostMonthlyProgress.setText(
+                        hostTarget.error != null && !hostTarget.error.isEmpty()
+                                ? hostTarget.error
+                                : getString(R.string.host_target_load_fail));
             }
+            return;
         }
-        if (binding.tvHostMonthlyStages != null) {
-            binding.tvHostMonthlyStages.setVisibility(View.GONE);
+        if (!HostTargetStagesUi.isEnabled(hostTarget.data)) {
+            setHostTargetBodyVisible(false);
+            if (binding.tvHostTargetMonth != null) {
+                binding.tvHostTargetMonth.setText(R.string.host_target_section_title);
+            }
+            if (binding.tvHostMonthlyProgress != null) {
+                binding.tvHostMonthlyProgress.setText(R.string.host_target_disabled_hint);
+            }
+            return;
         }
+        setHostTargetBodyVisible(true);
+        HostTargetStagesUi.bindSection(
+                this,
+                binding.sectionHostMonthlyTarget,
+                binding.tvHostTargetMonth,
+                binding.tvHostMonthlyProgress,
+                binding.progressHostMonthly,
+                binding.hostTargetStagesRow,
+                binding.hostTargetStagesScroll,
+                hostTarget.data);
     }
 
     private static class PkgAdapter extends RecyclerView.Adapter<PkgAdapter.VH> {

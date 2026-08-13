@@ -202,32 +202,6 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Host monthly target lives in Wallet (Bag) — never here (covers daily tasks). -->
-    <LinearLayout
-        android:id="@+id/sectionHostMonthlyTarget"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone">
-
-        <TextView
-            android:id="@+id/tvHostMonthlyProgress"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-
-        <ProgressBar
-            android:id="@+id/progressHostMonthly"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/tvHostMonthlyStages"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone" />
-    </LinearLayout>
-
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

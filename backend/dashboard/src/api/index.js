@@ -84,6 +84,9 @@ export const giftsApi = {
   createCategory: (data) => safeRequest(() => api.post('/admin/gift-categories', data)),
   updateCategory: (id, data) => safeRequest(() => api.patch(`/admin/gift-categories/${id}`, data)),
   deleteCategory: (id) => safeRequest(() => api.delete(`/admin/gift-categories/${id}`)),
+  /** Clone mall entry effects (الدخولية) into gift panel. */
+  importEntryEffects: () =>
+    safeRequest(() => api.post('/admin/gifts/import-entry-effects')),
 }
 
 export const walletApi = {
@@ -135,6 +138,11 @@ export const agenciesApi = {
 
 export const rechargeAgentsApi = {
   agents: () => safeRequest(() => api.get('/admin/recharge-agents')),
+  applications: () => safeRequest(() => api.get('/admin/recharge-agents/applications')),
+  approveApplication: (id, data = {}) =>
+    safeRequest(() => api.post(`/admin/recharge-agents/applications/${id}/approve`, data)),
+  rejectApplication: (id, data = {}) =>
+    safeRequest(() => api.post(`/admin/recharge-agents/applications/${id}/reject`, data)),
   assign: (data) => safeRequest(() => api.post('/admin/recharge-agents/assign', data)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/recharge-agents/${id}`, data)),
   adjustFloat: (id, data) => safeRequest(() => api.post(`/admin/recharge-agents/${id}/float`, data)),
@@ -178,6 +186,31 @@ export const dramaApi = {
 export const gameAdsApi = {
   settings: () => safeRequest(() => api.get('/admin/games/ads')),
   patchSettings: (data) => safeRequest(() => api.patch('/admin/games/ads', data)),
+}
+
+export const economyApi = {
+  get: () => safeRequest(() => api.get('/admin/economy/settings')),
+  update: (patch, opts = {}) =>
+    safeRequest(() =>
+      api.patch('/admin/economy/settings', patch, {
+        params: opts.renormalize ? { renormalize: opts.renormalize } : undefined,
+      }),
+    ),
+  reset: () => safeRequest(() => api.post('/admin/economy/settings/reset')),
+  renormalizeGifts: (mode) =>
+    safeRequest(() =>
+      api.post('/admin/economy/renormalize-gifts', null, {
+        params: mode ? { mode } : undefined,
+      }),
+    ),
+}
+
+/** House odds / RTP for all coin games (Mikoo + BaiShun + casual). */
+export const gameOddsApi = {
+  get: () => safeRequest(() => api.get('/admin/games/odds')),
+  update: (patch) => safeRequest(() => api.patch('/admin/games/odds', patch)),
+  applyPreset: (preset) =>
+    safeRequest(() => api.patch('/admin/games/odds', { preset })),
 }
 
 export const paymentSettingsApi = {

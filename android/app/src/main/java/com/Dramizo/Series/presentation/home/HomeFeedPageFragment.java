@@ -150,7 +150,8 @@ public class HomeFeedPageFragment extends Fragment {
         Fragment parent = getParentFragment();
         if (!(parent instanceof HomeFragment)) return null;
         HomeFragment home = (HomeFragment) parent;
-        if (tab == TAB_LOCATION) return home.getMyCountryCode();
+        // Country tab → browse country (picker prefs). Hot → optional filter icon.
+        if (tab == TAB_LOCATION) return home.getLocationCountryCode();
         return home.getSelectedCountry();
     }
 

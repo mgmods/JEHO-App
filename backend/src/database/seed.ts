@@ -337,7 +337,7 @@ async function seed() {
 
   const defaults: Array<[string, string, string]> = [
     ['brand_name', 'JEHO CHAT', 'Product brand name'],
-    ['coin_to_diamond_rate', '0.5', 'Default gift diamond ratio (capped at send)'],
+    ['coin_to_diamond_rate', '0.35', 'Legacy note: gift diamond capped at coin×0.35; actual mint is gift.diamondValue'],
     ['diamond_to_fiat', '0.00005', 'Withdraw conversion USD per diamond'],
     ['min_withdraw_diamonds', '10000', 'Minimum withdraw amount'],
     ['economy.minWithdrawDiamonds', '10000', 'Minimum withdraw amount (runtime)'],

@@ -28,6 +28,7 @@ import {
 } from '../../database/entities/wallet-transaction.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Room, RoomKind, RoomStatus, RoomType } from '../../database/entities/room.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
 import { RoomModerator, ModeratorRole } from '../../database/entities/room-moderator.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
@@ -56,11 +57,9 @@ import {
   normalizeActivationCode,
 } from './agency-activation';
 import { AGENCY_CREATE } from '../../common/pricing-catalog';
+import { ECONOMY } from '../../common/economy-config';
 import { purgeRoomReferencesBeforeDelete } from '../../common/room-delete-sql';
-import {
-  clampSharePct,
-  independentAgencyGiftSplit,
-} from './agency-gift-split';
+import { clampSharePct } from './agency-gift-split';
 import {
   isValidAgencyPublicId,
   normalizeAgencyPublicId,
@@ -68,10 +67,13 @@ import {
 import { normalizeStaffRole } from '../../common/staff-role';
 
 const DEFAULT_CREATE_PRICE = AGENCY_CREATE.defaultCoins;
-/** Matches pricing-catalog DEFAULT_GIFT_SPLIT — owner-safe economy v3. */
-const DEFAULT_COMMISSION = 15;
-const DEFAULT_PLATFORM_CUT = 40;
-const DEFAULT_HOST_SHARE = 45;
+/**
+ * Single source of truth for the agency owner's commission: the live economy
+ * split (`ECONOMY.defaultGiftSplit.agencyOwnerPercent`). The host keeps the
+ * remainder. There is NO separate platform cut at the split — the platform
+ * margin is already taken at the coin→diamond mint.
+ */
+const ownerCommissionDefault = () => ECONOMY.defaultGiftSplit.agencyOwnerPercent;
 const DEFAULT_AGENCY_SEAT_COUNT = 11;
 const DEFAULT_DIAMOND_USD_RATE = 0.00005;
 
@@ -92,6 +94,7 @@ export class AgenciesService implements OnModuleInit {
     @InjectRepository(RoomSeat) private readonly seatsRepo: Repository<RoomSeat>,
     @InjectRepository(RoomModerator) private readonly modsRepo: Repository<RoomModerator>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
+    @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
     private readonly dataSource: DataSource,
     @Inject(forwardRef(() => RoomsService))
     private readonly roomsService: RoomsService,
@@ -99,7 +102,7 @@ export class AgenciesService implements OnModuleInit {
   ) {}
 
   private async diamondUsdRate(): Promise<number> {
-    const rate = await this.getSettingNumber('economy.diamondUsdRate', DEFAULT_DIAMOND_USD_RATE);
+    const rate = Number(ECONOMY.diamondUsd);
     return rate > 0 ? rate : DEFAULT_DIAMOND_USD_RATE;
   }
 
@@ -226,91 +229,16 @@ export class AgenciesService implements OnModuleInit {
       this.logger.warn(`ensure agency create price setting: ${(err as Error).message}`);
     }
     try {
-      await this.ensureSetting(
-        'agency_default_commission_percent',
-        String(DEFAULT_COMMISSION),
-        'حصة صاحب الوكالة من هدايا الأعضاء %',
-      );
-      await this.ensureSetting(
-        'agency_platform_cut_percent',
-        String(DEFAULT_PLATFORM_CUT),
-        'حصة المنصة من هدايا الوكالة %',
-      );
-      await this.ensureSetting(
-        'agency_host_share_percent',
-        String(DEFAULT_HOST_SHARE),
-        'حصة المضيفة من بركة ماس هدايا الوكالة % (مع المنصة+الوكالة = 100%)',
-      );
+      // The gift split (owner commission vs host share) is owned entirely by the
+      // live ECONOMY config (dashboard → Economy panel). No per-share app_settings
+      // rows are seeded here anymore — that old system was fully removed.
       await this.ensureSetting(
         'agency_auto_approve_after_payment',
         'false',
         'موافقة تلقائية على طلب الوكالة بعد الدفع (true/false)',
       );
-      // Soft-migrate platform cut → 40% house default (legacy low cuts).
-      const cut = await this.settingsRepo.findOne({
-        where: { key: 'agency_platform_cut_percent' },
-      });
-      if (cut) {
-        const n = Number(String(cut.value).trim());
-        if ([20, 25, 30, 35, 38].includes(n)) {
-          cut.value = String(DEFAULT_PLATFORM_CUT);
-          cut.description = 'حصة المنصة من هدايا الوكالة % (economy-v5)';
-          await this.settingsRepo.save(cut);
-        }
-      }
-      // Soft-migrate host share → 45 when still on previous defaults.
-      const hostShare = await this.settingsRepo.findOne({
-        where: { key: 'agency_host_share_percent' },
-      });
-      if (hostShare) {
-        const hn = String(hostShare.value).trim();
-        if (['55', '50', '47'].includes(hn)) {
-          hostShare.value = String(DEFAULT_HOST_SHARE);
-          hostShare.description =
-            'حصة المضيفة من بركة ماس هدايا الوكالة % (100% pie — economy-v5)';
-          await this.settingsRepo.save(hostShare);
-        }
-      }
-      // Soft-migrate default agency commission 20 → 15 when still on legacy default.
-      const defComm = await this.settingsRepo.findOne({
-        where: { key: 'agency_default_commission_percent' },
-      });
-      if (defComm && String(defComm.value).trim() === '20') {
-        defComm.value = String(DEFAULT_COMMISSION);
-        defComm.description = 'حصة صاحب الوكالة من هدايا الأعضاء %';
-        await this.settingsRepo.save(defComm);
-      }
-      // Keep admin economy readout fractions aligned with live %.
-      for (const [key, value, description] of [
-        ['economy.platform_share', '0.40', 'Platform gift share fraction'],
-        ['gift_platform_share', '0.40', 'Platform gift share fraction'],
-        ['economy.agency_share', '0.15', 'Agency owner gift share fraction'],
-        ['gift_agency_share', '0.15', 'Agency owner gift share fraction'],
-        ['economy.host_share_agency', '0.45', 'Host share in agency room'],
-        ['economy.host_share_solo', '0.60', 'Host share personal room (100-platform)'],
-      ] as const) {
-        const row = await this.settingsRepo.findOne({ where: { key } });
-        if (!row) {
-          await this.settingsRepo.save(
-            this.settingsRepo.create({ key, value, description }),
-          );
-        } else if (
-          (key.includes('platform') &&
-            ['0.2', '0.20', '0.25', '0.3', '0.30', '0.35', '0.38'].includes(
-              String(row.value).trim(),
-            )) ||
-          (key.includes('host_share_agency') &&
-            ['0.55', '0.5', '0.50', '0.47'].includes(String(row.value).trim())) ||
-          (key.includes('host_share_solo') &&
-            ['0.7', '0.70', '0.65', '0.62'].includes(String(row.value).trim()))
-        ) {
-          row.value = value;
-          row.description = description;
-          await this.settingsRepo.save(row);
-        }
-      }
     } catch (err) {
-      this.logger.warn(`ensure agency commission settings: ${(err as Error).message}`);
+      this.logger.warn(`ensure agency settings: ${(err as Error).message}`);
     }
   }
 
@@ -402,21 +330,14 @@ export class AgenciesService implements OnModuleInit {
       );
     }
     const defaultCommissionPercent = clampSharePct(
-      await this.getSettingNumber('agency_default_commission_percent', DEFAULT_COMMISSION),
-      DEFAULT_COMMISSION,
+      ownerCommissionDefault(),
+      ownerCommissionDefault(),
     );
-    const platformCutPercent = clampSharePct(
-      await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT),
-      DEFAULT_PLATFORM_CUT,
-    );
-    const hostSharePercent = clampSharePct(
-      await this.getSettingNumber('agency_host_share_percent', DEFAULT_HOST_SHARE),
-      DEFAULT_HOST_SHARE,
-    );
-    const platformRevenueDiamonds = await this.getSettingNumber(
-      'platform_gift_revenue_diamonds',
-      0,
-    );
+    // Clean economy: host keeps the remainder of the gift pool; the platform
+    // margin is taken at the mint, so there is no split-time platform cut.
+    const platformCutPercent = 0;
+    const hostSharePercent = clampSharePct(100 - defaultCommissionPercent, 70);
+    const platformRevenueDiamonds = 0;
     const autoRaw = String(
       (await this.settingsRepo.findOne({ where: { key: 'agency_auto_approve_after_payment' } }))
         ?.value || 'false',
@@ -722,9 +643,6 @@ export class AgenciesService implements OnModuleInit {
         );
       }
 
-      const commissionRow = await manager.findOne(AppSetting, {
-        where: { key: 'agency_default_commission_percent' },
-      });
       let activationCode = generateActivationCode();
       for (let attempt = 0; attempt < 12; attempt++) {
         const clash = await manager.findOne(Agency, {
@@ -751,7 +669,7 @@ export class AgenciesService implements OnModuleInit {
           status: AgencyStatus.ACTIVE,
           memberCount: 1,
           totalDiamonds: 0,
-          commissionPercent: Number(commissionRow?.value || DEFAULT_COMMISSION),
+          commissionPercent: ownerCommissionDefault(),
           activationCode,
           publicId,
           isVerified: false,
@@ -1032,6 +950,7 @@ export class AgenciesService implements OnModuleInit {
       null;
     const verified =
       !!agency.isVerified && agency.status === AgencyStatus.ACTIVE;
+    const exclusiveFrameUrl = await this.resolveExclusiveFramePreviewUrl(agency);
     return {
       ...base,
       logoUrl,
@@ -1039,11 +958,11 @@ export class AgenciesService implements OnModuleInit {
       isVerified: verified,
       verifiedAt: agency.verifiedAt || null,
       coverUrl: liveCover || brand?.coverUrl || logoUrl,
-      // Prefer live room card frame, else exclusive admin-assigned frame art.
-      frameUrl: live?.roomCardUrl || agency.exclusiveFrameUrl || null,
+      // Prefer live room card, then resolved exclusive frame art from catalog code.
+      frameUrl: live?.roomCardUrl || exclusiveFrameUrl || null,
       exclusiveFrameCode: agency.exclusiveFrameCode || null,
       exclusiveRoomCardCode: agency.exclusiveRoomCardCode || null,
-      exclusiveFrameUrl: agency.exclusiveFrameUrl || null,
+      exclusiveFrameUrl,
       isLive: !!live,
       openRoomId: live?.id || null,
       liveViewerCount: live ? Number(live.viewerCount || 0) : 0,
@@ -1141,6 +1060,7 @@ export class AgenciesService implements OnModuleInit {
     const totalDiamonds = Number(agency.totalDiamonds || 0);
     const level = this.agencyBannerTier(totalDiamonds);
     const brand = await this.resolveAgencyBrandUrls(agency.id, agency.logoUrl);
+    const exclusiveFrameUrl = await this.resolveExclusiveFramePreviewUrl(agency);
 
     return {
       ...safeAgency,
@@ -1149,8 +1069,8 @@ export class AgenciesService implements OnModuleInit {
       verifiedAt: agency.verifiedAt || null,
       exclusiveFrameCode: agency.exclusiveFrameCode || null,
       exclusiveRoomCardCode: agency.exclusiveRoomCardCode || null,
-      exclusiveFrameUrl: agency.exclusiveFrameUrl || null,
-      frameUrl: agency.exclusiveFrameUrl || null,
+      exclusiveFrameUrl,
+      frameUrl: exclusiveFrameUrl,
       logoUrl: brand.logoUrl,
       coverUrl: brand.coverUrl || brand.logoUrl,
       owner: publicUser(owner),
@@ -1178,6 +1098,43 @@ export class AgenciesService implements OnModuleInit {
     if (d >= 50_000) return 3;
     if (d >= 10_000) return 2;
     return 1;
+  }
+
+  /** Admin/catalog preview for agency card overlay — code wins over stale manual URL. */
+  private async resolveExclusiveFramePreviewUrl(
+    agency: Pick<Agency, 'exclusiveFrameCode' | 'exclusiveFrameUrl'>,
+  ): Promise<string | null> {
+    const code = agency.exclusiveFrameCode?.trim();
+    if (code) {
+      try {
+        const row = await this.cosmeticsRepo.findOne({
+          where: { code, isActive: true },
+        });
+        const fromCatalog =
+          row?.previewUrl?.trim() || row?.animationUrl?.trim() || null;
+        if (fromCatalog) return fromCatalog;
+      } catch {
+        /* fall through */
+      }
+    }
+    const manual = agency.exclusiveFrameUrl?.trim();
+    return manual || null;
+  }
+
+  /** Catalog preview for agency room-card kenar (home feed). */
+  async resolveExclusiveRoomCardPreviewUrl(
+    agency: Pick<Agency, 'exclusiveRoomCardCode'>,
+  ): Promise<string | null> {
+    const code = agency.exclusiveRoomCardCode?.trim();
+    if (!code) return null;
+    try {
+      const row = await this.cosmeticsRepo.findOne({
+        where: { code, isActive: true },
+      });
+      return row?.previewUrl?.trim() || row?.animationUrl?.trim() || null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -2092,20 +2049,17 @@ export class AgenciesService implements OnModuleInit {
     return Number(raw?.total || 0);
   }
 
-  private estimateSplit(
-    gross: number,
-    commissionPct: number,
-    platformPct: number,
-    hostPct?: number,
-  ) {
-    const hostShare = hostPct != null
-      ? clampSharePct(hostPct, DEFAULT_HOST_SHARE)
-      : DEFAULT_HOST_SHARE;
-    const split = independentAgencyGiftSplit(gross, hostShare, commissionPct, platformPct);
+  private estimateSplit(gross: number, commissionPct: number) {
+    // CLEAN ECONOMY: gift diamonds split host / agency owner only (no platform
+    // cut — the margin was taken at the coin→diamond mint).
+    const g = Math.max(0, Math.floor(Number(gross) || 0));
+    const pct = Math.min(100, Math.max(0, Number(commissionPct) || 0));
+    const agentShare = Math.floor((g * pct) / 100);
+    const hostShare = Math.max(0, g - agentShare);
     return {
-      estimatedPlatformCut: split.platformCut,
-      estimatedAgentShare: split.agentShare,
-      estimatedHostShare: split.hostDiamonds,
+      estimatedPlatformCut: 0,
+      estimatedAgentShare: agentShare,
+      estimatedHostShare: hostShare,
     };
   }
 
@@ -2114,15 +2068,13 @@ export class AgenciesService implements OnModuleInit {
     ownerId: string,
     memberIds: string[],
     commissionPct: number,
-    platformPct: number,
-    hostPct: number,
     from?: Date,
   ) {
     const [gross, ownerCommissionEarned] = await Promise.all([
       this.sumGiftsReceived(memberIds, from),
       this.sumOwnerCommission(agencyId, ownerId, from),
     ]);
-    const split = this.estimateSplit(gross, commissionPct, platformPct, hostPct);
+    const split = this.estimateSplit(gross, commissionPct);
     return {
       from: from ? from.toISOString() : null,
       grossGiftsDiamonds: gross,
@@ -2169,7 +2121,7 @@ export class AgenciesService implements OnModuleInit {
     ]);
     const rate = await this.diamondUsdRate();
     const walletDiamonds = Number(wallet?.diamonds || 0);
-    const agencyDiamonds = Number((wallet as any)?.agencyDiamonds || 0);
+    const agencyDiamonds = 0; // deprecated dual-pool field, always 0
     return {
       giftsGrossWeek: grossWeek,
       giftsGrossMonth: grossMonth,
@@ -2265,19 +2217,13 @@ export class AgenciesService implements OnModuleInit {
       }
     }
 
-    const platformPct = clampSharePct(
-      await this.getSettingNumber('agency_platform_cut_percent', DEFAULT_PLATFORM_CUT),
-      DEFAULT_PLATFORM_CUT,
-    );
-    const hostPct = clampSharePct(
-      await this.getSettingNumber('agency_host_share_percent', DEFAULT_HOST_SHARE),
-      DEFAULT_HOST_SHARE,
-    );
     const commissionPct = clampSharePct(
-      Number(agency.commissionPercent) || DEFAULT_COMMISSION,
-      DEFAULT_COMMISSION,
+      Number(agency.commissionPercent) || ownerCommissionDefault(),
+      ownerCommissionDefault(),
     );
-    const platformRevenueAll = await this.getSettingNumber('platform_gift_revenue_diamonds', 0);
+    // Clean economy: host keeps the remainder, no split-time platform cut.
+    const platformPct = 0;
+    const hostPct = clampSharePct(100 - commissionPct, 70);
     const { weekStart, monthStart } = this.periodStarts();
 
     const members = await this.membersRepo.find({
@@ -2287,9 +2233,9 @@ export class AgenciesService implements OnModuleInit {
     const memberIds = members.map((m) => m.userId);
 
     const [week, month, allTime, recentRows] = await Promise.all([
-      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct, weekStart),
-      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct, monthStart),
-      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, platformPct, hostPct),
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, weekStart),
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct, monthStart),
+      this.periodSlice(agencyId, agency.ownerId, memberIds, commissionPct),
       this.dataSource.getRepository(WalletTransaction).find({
         where: {
           userId: agency.ownerId,
@@ -2317,7 +2263,8 @@ export class AgenciesService implements OnModuleInit {
     const ownerWallet = await this.walletsRepo.findOne({
       where: { userId: agency.ownerId },
     });
-    const agencyDiamonds = Number((ownerWallet as any)?.agencyDiamonds || 0);
+    // Single unified pool: the owner's commission lives in wallet.diamonds.
+    const agencyDiamonds = 0; // deprecated dual-pool field, always 0
     const personalDiamonds = Number(ownerWallet?.diamonds || 0);
 
     const activeHosts = await this.membersRepo.count({
@@ -2358,7 +2305,6 @@ export class AgenciesService implements OnModuleInit {
         estimatedHostShareUsd: this.diamondsToUsd(allTime.estimatedHostShare, rate),
         estimatedPlatformCut: allTime.estimatedPlatformCut,
         estimatedAgentShare: allTime.estimatedAgentShare,
-        platformRevenueAllTime: platformRevenueAll,
       },
       periods: {
         week: weekUsd,
@@ -2384,7 +2330,7 @@ export class AgenciesService implements OnModuleInit {
         personalUsd: this.diamondsToUsd(personalDiamonds, rate),
       },
       explanation: {
-        ar: `روم الوكالة وروم الشخصي منفصلان تماماً. عمولة الوكالة تُسحَب لإدارة المنصة من رصيد agency. أرباح الروم الشخصي تُسحَب من رصيد personal. سعر الماسة ≈ $${rate}.`,
+        ar: `أرباحك كلها في رصيد ماس واحد. عمولة الوكالة من هدايا أعضائها = ${commissionPct}% وتُضاف مباشرة لرصيدك، والمضيف يأخذ الباقي ${hostPct}%. سعر الماسة ≈ $${rate}.`,
       },
     };
   }
@@ -2447,11 +2393,9 @@ export class AgenciesService implements OnModuleInit {
         where: { userId: ownerId },
         lock: { mode: 'pessimistic_write' },
       });
-      const senderAgencyBal = Number((sender as any)?.agencyDiamonds || 0);
+      const senderAgencyBal = Number(sender?.diamonds || 0);
       if (!sender || senderAgencyBal < diamonds) {
-        throw new BadRequestException(
-          'رصيد عمولة الوكالة غير كافٍ للتوزيع (منفصل عن أرباح الروم الشخصي)',
-        );
+        throw new BadRequestException('رصيد الألماس غير كافٍ للتوزيع');
       }
       let receiver = await manager.findOne(Wallet, {
         where: { userId: toUserId },
@@ -2475,10 +2419,9 @@ export class AgenciesService implements OnModuleInit {
       }
       if (!receiver) throw new NotFoundException('محفظة المستلم غير موجودة');
 
-      // Keep agency pool ↔ agency pool; never touch personal-room diamonds.
-      (sender as any).agencyDiamonds = senderAgencyBal - diamonds;
-      (receiver as any).agencyDiamonds =
-        Number((receiver as any).agencyDiamonds || 0) + diamonds;
+      // CLEAN ECONOMY: one diamond pool → move diamonds owner → host.
+      sender.diamonds = senderAgencyBal - diamonds;
+      receiver.diamonds = Number(receiver.diamonds || 0) + diamonds;
       await manager.save(sender);
       await manager.save(receiver);
       await manager.save(
@@ -2487,7 +2430,7 @@ export class AgenciesService implements OnModuleInit {
           type: TransactionType.EXCHANGE,
           currency: CurrencyType.DIAMONDS,
           amount: -diamonds,
-          balanceAfter: Number((sender as any).agencyDiamonds || 0),
+          balanceAfter: Number(sender.diamonds || 0),
           referenceType: 'agency_distribute_send',
           referenceId: refId,
           description: `توزيع أرباح وكالة`,
@@ -2500,7 +2443,7 @@ export class AgenciesService implements OnModuleInit {
           type: TransactionType.EXCHANGE,
           currency: CurrencyType.DIAMONDS,
           amount: diamonds,
-          balanceAfter: Number((receiver as any).agencyDiamonds || 0),
+          balanceAfter: Number(receiver.diamonds || 0),
           referenceType: 'agency_distribute_recv',
           referenceId: refId,
           description: `استلام توزيع من صاحب الوكالة`,
@@ -2511,8 +2454,8 @@ export class AgenciesService implements OnModuleInit {
         ok: true,
         diamonds,
         toUserId,
-        senderBalance: Number((sender as any).agencyDiamonds || 0),
-        receiverBalance: Number((receiver as any).agencyDiamonds || 0),
+        senderBalance: Number(sender.diamonds || 0),
+        receiverBalance: Number(receiver.diamonds || 0),
         stream: 'agency' as const,
       };
     });
@@ -2685,8 +2628,7 @@ export class AgenciesService implements OnModuleInit {
         lock: { mode: 'pessimistic_write' },
       });
       if (!wallet) throw new NotFoundException('محفظة المضيفة');
-      (wallet as any).agencyDiamonds =
-        Number((wallet as any).agencyDiamonds || 0) + diamonds;
+      wallet.diamonds = Number(wallet.diamonds || 0) + diamonds;
       await manager.save(wallet);
       await manager.save(
         manager.create(WalletTransaction, {
@@ -2694,7 +2636,7 @@ export class AgenciesService implements OnModuleInit {
           type: TransactionType.REFUND,
           currency: CurrencyType.DIAMONDS,
           amount: diamonds,
-          balanceAfter: Number((wallet as any).agencyDiamonds || 0),
+          balanceAfter: Number(wallet.diamonds || 0),
           referenceType: 'agency_payout_refund',
           referenceId: refId,
           description: note,

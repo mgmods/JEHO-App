@@ -31,8 +31,8 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <!--
-      Header: close · clock · share | viewers + room card (trailing).
-      Seat-count / seat-request controls live under أدوات / إعدادات الغرفة — not here.
+      Header LTR: close · clock · share | flexible gap | viewers | room card.
+      Room title marquees inside a capped card so it never covers viewers/share.
     -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/headerRoom"
@@ -58,10 +58,10 @@
             android:clipToPadding="false"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            app:layout_constrainedWidth="true"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/tvRoomViewerCount"
+            app:layout_constraintEnd_toStartOf="@id/headerMidSpace"
             app:layout_constraintHorizontal_bias="0"
+            app:layout_constraintHorizontal_chainStyle="packed"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
@@ -103,8 +103,8 @@
                 android:id="@+id/btnHeaderHome"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
-                android:visibility="gone"
-                android:contentDescription="ضبط المقاعد" />
+                android:contentDescription="ضبط المقاعد"
+                android:visibility="gone" />
 
             <FrameLayout
                 android:id="@+id/btnHeaderMore"
@@ -128,8 +128,8 @@
                 android:id="@+id/btnPlusWrap"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
-                android:visibility="gone"
-                android:contentDescription="طلبات الانضمام للمايك">
+                android:contentDescription="طلبات الانضمام للمايك"
+                android:visibility="gone">
 
                 <ImageView
                     android:id="@+id/btnPlus"
@@ -144,12 +144,23 @@
                     android:layout_width="15dp"
                     android:layout_height="15dp"
                     android:layout_gravity="top|end"
-                    android:visibility="gone"
-                    android:text="0" />
+                    android:text="0"
+                    android:visibility="gone" />
             </FrameLayout>
         </LinearLayout>
 
-        <!-- Viewers always parked next to the room card (never clipped by leading tools). -->
+        <!-- Absorbs leftover width so title never shoves viewers onto share. -->
+        <Space
+            android:id="@+id/headerMidSpace"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/tvRoomViewerCount"
+            app:layout_constraintStart_toEndOf="@id/headerLeadingTools"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintWidth_min="4dp" />
+
+        <!-- Viewers always parked next to the room card (never under share). -->
         <TextView
             android:id="@+id/tvRoomViewerCount"
             android:layout_width="wrap_content"
@@ -170,6 +181,7 @@
             android:visibility="visible"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/hostCardWrap"
+            app:layout_constraintStart_toEndOf="@id/headerMidSpace"
             app:layout_constraintTop_toTopOf="parent" />
 
         <FrameLayout
@@ -177,14 +189,15 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minHeight="56dp"
-            android:clipChildren="false"
-            android:clipToPadding="false"
+            android:clipChildren="true"
+            android:clipToPadding="true"
             app:layout_constrainedWidth="true"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintHorizontal_bias="1"
+            app:layout_constraintStart_toEndOf="@id/tvRoomViewerCount"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintWidth_max="210dp">
+            app:layout_constraintWidth_max="188dp">
 
             <LinearLayout
                 android:id="@+id/hostCard"
@@ -193,18 +206,17 @@
                 android:minHeight="52dp"
                 android:background="@drawable/bg_room_compact_card"
                 android:gravity="center_vertical"
-                android:minWidth="128dp"
                 android:orientation="horizontal"
                 android:paddingStart="5dp"
                 android:paddingTop="4dp"
-                android:paddingEnd="12dp"
+                android:paddingEnd="10dp"
                 android:paddingBottom="4dp">
 
                 <LinearLayout
                     android:id="@+id/headerHostAvatarColumn"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
+                    android:layout_marginEnd="6dp"
                     android:gravity="center_horizontal"
                     android:orientation="vertical">
 
@@ -302,15 +314,27 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
+                <!-- Flexible text rail so long personal/agency names marquee like Mikoo. -->
                 <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minWidth="72dp"
                     android:orientation="vertical">
 
-                    <TextView
+                    <com.Dramizo.Series.widget.MarqueeTextView
                         android:id="@+id/tvHostName"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:ellipsize="marquee"
+                        android:fadingEdge="horizontal"
+                        android:fadingEdgeLength="12dp"
+                        android:marqueeRepeatLimit="marquee_forever"
+                        android:requiresFadingEdge="horizontal"
+                        android:singleLine="true"
+                        android:textColor="@color/white"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold"
                         android:visibility="gone" />
 
                     <LinearLayout
@@ -347,20 +371,41 @@
                             android:visibility="gone" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/tvRoomTitle"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:text="@string/voice_room"
-                        android:textColor="@color/white"
-                        android:textSize="12.5sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.Dramizo.Series.widget.MarqueeTextView
+                            android:id="@+id/tvRoomTitle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:ellipsize="marquee"
+                            android:fadingEdge="horizontal"
+                            android:fadingEdgeLength="12dp"
+                            android:marqueeRepeatLimit="marquee_forever"
+                            android:requiresFadingEdge="horizontal"
+                            android:singleLine="true"
+                            android:text="@string/voice_room"
+                            android:textColor="@color/white"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <ImageView
+                            android:id="@+id/imgHeaderAgencyVerified"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="4dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_agency_verified"
+                            android:visibility="gone" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/tvRoomId"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="1dp"
                         android:ellipsize="end"

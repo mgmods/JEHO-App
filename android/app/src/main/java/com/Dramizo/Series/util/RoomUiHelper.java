@@ -1,6 +1,7 @@
 package com.Dramizo.Series.util;
 
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -32,21 +33,40 @@ public final class RoomUiHelper {
     }
 
     public static void bindTypeBadge(@Nullable TextView badge, @Nullable RoomDtos.RoomDto room) {
+        bindTypeBadge(badge, null, room);
+    }
+
+    /**
+     * Type chip + optional agency verification icon beside the green «وكالة» label.
+     */
+    public static void bindTypeBadge(
+            @Nullable TextView badge,
+            @Nullable ImageView verifiedIcon,
+            @Nullable RoomDtos.RoomDto room) {
         if (badge == null) return;
         if (room == null) {
             badge.setVisibility(View.GONE);
+            if (verifiedIcon != null) verifiedIcon.setVisibility(View.GONE);
             return;
         }
         badge.setVisibility(View.VISIBLE);
         if (isSupportRoom(room)) {
             badge.setText(R.string.room_badge_support);
             badge.setBackgroundResource(R.drawable.bg_room_badge_support);
+            if (verifiedIcon != null) verifiedIcon.setVisibility(View.GONE);
         } else if (isAgencyRoom(room)) {
             badge.setText(R.string.room_badge_agency);
             badge.setBackgroundResource(R.drawable.bg_room_badge_agency);
+            if (verifiedIcon != null) {
+                verifiedIcon.setVisibility(room.agencyIsVerified ? View.VISIBLE : View.GONE);
+                if (room.agencyIsVerified) {
+                    verifiedIcon.setImageResource(R.drawable.ic_agency_verified);
+                }
+            }
         } else {
             badge.setText(R.string.room_badge_personal);
             badge.setBackgroundResource(R.drawable.bg_room_badge_personal);
+            if (verifiedIcon != null) verifiedIcon.setVisibility(View.GONE);
         }
     }
 

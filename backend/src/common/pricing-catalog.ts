@@ -1,12 +1,22 @@
 /**
  * Canonical social-app pricing (USD Play product IDs = sku).
  *
- * Owner-safe density: ≈ 10,000–11,000 coins per $1 (not 17k–25k).
- * Break-even under pure gifts (ratio 0.35 × 60% cashable × $0.00005/d):
- *   liability ≈ $0.0105 per 1,000 coins → $5 supports up to ~476k coins before loss.
- * Packages stay far under that (Play fees included still profitable).
+ * ═══════════════════════════════════════════════════════════════════
+ * GIFT-FIRST ECONOMY (not “1 diamond = N coins”)
+ * ═══════════════════════════════════════════════════════════════════
+ * • Users buy COINS (recharge). They spend coins on GIFTS only.
+ * • Each gift row defines: coinPrice (cost) + diamondValue (host pool).
+ * • diamondValue is the diamond mint for that gift (per unit), capped so
+ *   the platform never mints more than the house ratio of coins spent.
+ * • Agency split / host salary targets / withdraw all use DIAMONDS from gifts.
+ * • There is no product surface of “convert diamonds ↔ coins at a fixed FX”.
+ *   Any leftover diamondCoinRate is withdraw-exotics only, not gift pricing.
+ *
+ * Owner-safe density: ≈ 10,000–11,000 coins per $1.
+ * Break-even under gifts (0.35 mint × 60% cashable × $0.00005/d):
+ *   liability ≈ $0.0000105 per coin → packages stay profitable.
  */
-export const PRICING_VERSION = '20260806economy-v5';
+export const PRICING_VERSION = '20260808economy-v6-giftfirst';
 
 /** Google Play productId == sku. Total coins = coins + bonusCoins. */
 export const STANDARD_RECHARGE_PACKAGES = [
@@ -75,42 +85,68 @@ export const STANDARD_RECHARGE_PACKAGES = [
   },
 ] as const;
 
-/**
- * Coin → diamond mint on gifts (before platform/agency/host split).
- * 0.35 × (host+agency 60%) × $0.00005 ≈ $0.0000105 cashout risk per coin.
- */
-export const GIFT_DIAMOND_RATIO = 0.35;
-/** Lucky gifts: lower mint — rebate already returns coins to sender. */
-export const LUCKY_GIFT_DIAMOND_RATIO = 0.12;
-export const LUCKY_GIFT_MAX_MULTIPLIER = 4;
-export const LUCKY_GIFT_TARGET_EV = 0.38;
+import { ECONOMY } from './economy-config';
 
-/** Independent gift split % (agency room). */
-export const DEFAULT_GIFT_SPLIT = {
-  platformPercent: 40,
-  hostPercent: 45,
-  agencyOwnerPercent: 15,
-} as const;
+/**
+ * ══════════════════════════════════════════════════════════════════════
+ * ECONOMY CONSTANTS ARE DASHBOARD-OWNED — DO NOT HARDCODE
+ * ══════════════════════════════════════════════════════════════════════
+ * The exports below are backed by `ECONOMY` (backend/src/common/economy-config.ts),
+ * which is loaded from `app_settings` on boot and can be changed live from
+ * the Admin → Economy Settings page. The literals here are only the "day 0"
+ * fallbacks used when the DB row is missing.
+ *
+ * If you need the current live value at call time, prefer reading `ECONOMY.*`
+ * directly. The ES named exports below are Object.defineProperty getters and
+ * always return the current value.
+ */
+
+/** Live getter helpers — always return the current value from the mutable ECONOMY cache. */
+export function giftDiamondRatio(): number { return ECONOMY.giftDiamondRatio; }
+export function luckyGiftDiamondRatio(): number { return ECONOMY.luckyGiftDiamondRatio; }
+export function giftMaxDiamondsPerUnit(): number { return ECONOMY.maxDiamondsPerUnit; }
+export function luckyGiftMaxMultiplier(): number { return ECONOMY.luckyGiftMaxMultiplier; }
+export function defaultGiftSplit() { return { ...ECONOMY.defaultGiftSplit }; }
+
+/** Constant kept as-is (seed-only, not a live economy lever). */
+export const LUCKY_GIFT_TARGET_EV = ECONOMY.luckyGiftTargetEv;
+
+/**
+ * Recommended catalog diamondValue for a gift (explicit, not a FX rate).
+ * Send path still safety-caps with mintDiamondsPerUnit.
+ */
+export function recommendedGiftDiamonds(
+  coinPrice: number,
+  lucky = false,
+): number {
+  return mintDiamondsPerUnit(
+    coinPrice,
+    0,
+    lucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio,
+  );
+}
 
 /**
  * Diamonds minted per single gift unit (before split).
- * - Always floor(coinPrice × ratio) from coin burn.
- * - If catalog diamondValue &gt; 0, cap at that (admin lower ceiling only — never inflate above house ratio).
- * - If catalog is 0/missing (legacy bad rows), mint full ratio so hosts never receive 0 on paid gifts.
+ * Source of truth is the gift: catalog diamondValue when set.
+ * Hard ceilings: house ratio of coins, and the live absolute cap from ECONOMY.
+ * If catalog is 0/missing, fall back to house ratio so paid gifts never mint 0.
  */
 export function mintDiamondsPerUnit(
   coinPrice: number,
   catalogDiamondValue: number | null | undefined,
-  ratio: number = GIFT_DIAMOND_RATIO,
+  ratio?: number,
 ): number {
   const price = Math.max(0, Math.floor(Number(coinPrice) || 0));
   if (price <= 0) return 0;
-  const r = Number(ratio);
-  const safeRatio = Number.isFinite(r) && r > 0 ? Math.min(1, Math.max(0, r)) : GIFT_DIAMOND_RATIO;
+  const r = ratio !== undefined ? Number(ratio) : ECONOMY.giftDiamondRatio;
+  const safeRatio =
+    Number.isFinite(r) && r > 0 ? Math.min(1, Math.max(0, r)) : ECONOMY.giftDiamondRatio;
   const fromCoins = Math.floor(price * safeRatio);
   const catalog = Math.max(0, Math.floor(Number(catalogDiamondValue) || 0));
-  if (catalog <= 0) return fromCoins;
-  return Math.min(catalog, fromCoins);
+  const raw = catalog <= 0 ? fromCoins : Math.min(catalog, fromCoins);
+  const cap = Math.max(1, Math.floor(ECONOMY.maxDiamondsPerUnit));
+  return Math.min(cap, Math.max(0, raw));
 }
 
 /** Soft currency mall ladder — sinks coins (good for platform). Nothing free in mall. */

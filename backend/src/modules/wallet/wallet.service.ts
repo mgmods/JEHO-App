@@ -43,6 +43,7 @@ import {
   HOST_DIAMOND_TRADE,
 } from '../../common/pricing-catalog';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
+import { ECONOMY } from '../../common/economy-config';
 import { CreateRechargeDto, ExchangeDto, WithdrawDto } from './dto/wallet.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -214,44 +215,47 @@ export class WalletService implements OnModuleInit {
       wallet.gamePoints = 0;
       wallet = await this.walletsRepo.save(wallet);
     }
+    // CLEAN ECONOMY: ONE diamond pool. Host earnings, agency commission and
+    // personal-room earnings all live in wallet.diamonds. The legacy split
+    // fields are kept in the response (zeroed / mirrored) only so the current
+    // app build keeps parsing without a crash.
     const diamonds = Number(wallet.diamonds);
-    const agencyDiamonds = Number((wallet as any).agencyDiamonds || 0);
-    const traderDiamonds = Number(wallet.traderDiamonds || 0);
     const economy = await this.economyConfig();
     const target = economy.withdrawTargetDiamonds;
     const fiatRate = economy.diamondUsdRate;
     return {
       ...wallet,
       coins: Number(wallet.coins),
-      /** Personal-room gift earnings — platform withdraw pool */
+      /** The one and only diamond balance. */
       diamonds,
-      /** Agency-room host share + owner commission — agency withdraw pool */
-      agencyDiamonds,
-      traderDiamonds,
       personalDiamonds: diamonds,
       personalUsd: Number((diamonds * fiatRate).toFixed(4)),
-      agencyUsd: Number((agencyDiamonds * fiatRate).toFixed(4)),
+      agencyDiamonds: 0,
+      agencyUsd: 0,
+      diamondsUsd: Number((diamonds * fiatRate).toFixed(4)),
+      traderDiamonds: 0,
       silverCoins: 0,
       gamePoints: 0,
       withdrawTargetDiamonds: target,
       withdrawProgress: target > 0 ? Math.min(1, diamonds / target) : 1,
       canWithdraw: diamonds >= target,
-      canWithdrawAgency: agencyDiamonds >= target,
+      canWithdrawAgency: diamonds >= target,
       diamondUsdRate: fiatRate,
     };
   }
 
   async economyConfig() {
-    const [fiatRate, coinRate, minWithdraw] =
-      await Promise.all([
-        this.numberSetting('economy.diamondUsdRate', DIAMOND_TO_FIAT, 0.000001, DIAMOND_TO_FIAT),
-        // Hard cap 1.0 — never allow diamond→coin mint printers (was 1000).
-        this.numberSetting('economy.diamondCoinRate', DIAMOND_TO_COIN_RATE, 0.01, 1),
-        this.numberSetting('economy.minWithdrawDiamonds', 200000, 1000, 1_000_000_000),
-      ]);
-    const rate = Number(fiatRate) || DIAMOND_TO_FIAT;
+    // CLEAN ECONOMY: the diamond USD rate and withdraw threshold are owned by
+    // the live ECONOMY config (dashboard → Economy Settings), not scattered keys.
+    const coinRate = await this.numberSetting(
+      'economy.diamondCoinRate',
+      DIAMOND_TO_COIN_RATE,
+      0.01,
+      1,
+    );
+    const rate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / rate));
-    const target = Math.max(minFromUsd, Math.floor(minWithdraw));
+    const target = Math.max(minFromUsd, Math.floor(ECONOMY.minWithdrawDiamonds || 200000));
     return {
       diamondUsdRate: rate,
       diamondCoinRate: coinRate,
@@ -641,8 +645,9 @@ export class WalletService implements OnModuleInit {
       }
       if (!receiver) throw new NotFoundException('محفظة المستلمة غير موجودة');
 
+      // CLEAN ECONOMY: swap moves diamonds between the two single pools.
       sender.diamonds = Number(sender.diamonds) - diamonds;
-      receiver.traderDiamonds = Number(receiver.traderDiamonds || 0) + diamonds;
+      receiver.diamonds = Number(receiver.diamonds || 0) + diamonds;
       await manager.save(sender);
       await manager.save(receiver);
 
@@ -665,11 +670,11 @@ export class WalletService implements OnModuleInit {
           type: TransactionType.EXCHANGE,
           currency: CurrencyType.DIAMONDS,
           amount: diamonds,
-          balanceAfter: Number(receiver.traderDiamonds || 0),
+          balanceAfter: Number(receiver.diamonds || 0),
           referenceType: 'host_trade_receive',
           referenceId: `${refId}:recv`,
-          description: `استلام ماس تاجر من مضيفة`,
-          metadata: { fromUserId, diamonds, trader: true },
+          description: `استلام ماس من مضيفة`,
+          metadata: { fromUserId, diamonds },
         }),
       );
 
@@ -679,11 +684,11 @@ export class WalletService implements OnModuleInit {
         toUserId,
         sender: {
           diamonds: Number(sender.diamonds),
-          traderDiamonds: Number(sender.traderDiamonds || 0),
+          traderDiamonds: 0,
         },
         receiver: {
           diamonds: Number(receiver.diamonds),
-          traderDiamonds: Number(receiver.traderDiamonds || 0),
+          traderDiamonds: 0,
         },
       };
     }).then(async (result) => {
@@ -768,10 +773,8 @@ export class WalletService implements OnModuleInit {
   }
 
   async requestWithdraw(userId: string, dto: WithdrawDto) {
-    const [fiatRate, minWithdraw] = await Promise.all([
-      this.numberSetting('economy.diamondUsdRate', DIAMOND_TO_FIAT, 0.000001, DIAMOND_TO_FIAT),
-      this.numberSetting('economy.minWithdrawDiamonds', 200000, 1000, 1_000_000_000),
-    ]);
+    const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
+    const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
     const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
 
@@ -785,49 +788,28 @@ export class WalletService implements OnModuleInit {
       sourceRaw === 'agency' ||
       sourceRaw === 'agency_room' ||
       sourceRaw === 'agency_earnings';
-    // Personal diamond withdraw vs agency-room pool (host share / owner commission) — never mixed.
-    if (viaAgent && isAgencySource) {
-      throw new BadRequestException(
-        'سحب أرباح روم الوكالة يتم عبر إدارة المنصة مباشرة — وليس عبر وكيل الشحن',
-      );
-    }
-
-    // Agency host / commission:
-    // - host: one current target stage only
-    // - agency: free commission cash-out (no host target)
-    if (isAgencySource) {
-      if (dto.diamonds < 1) {
-        throw new BadRequestException('Invalid withdraw amount');
-      }
-      const role =
-        sourceRaw === 'agency_host' ||
-        String((dto.payoutDetails as any)?.role || '').toLowerCase() ===
-          'host'
-          ? 'host'
-          : 'agency';
-      if (role === 'host') {
-        if (this.hostTarget) {
-          const agencyId = String(
-            (dto.payoutDetails as any)?.agencyId || '',
-          ).trim();
-          await this.hostTarget.assertTargetWithdrawAllowed(
-            userId,
-            'host',
-            agencyId || null,
-            dto.diamonds,
-            String(
-              (dto.payoutDetails as any)?.stageId ||
-                (dto.payoutDetails as any)?.targetStageId ||
-                '',
-            ).trim() || null,
-          );
-        }
-      } else if (dto.diamonds < minW) {
-        throw new BadRequestException(
-          `Minimum withdrawal is ${Math.floor(minW)} diamonds (≈ $${MIN_WITHDRAW_USD})`,
+    const stageIdRaw = String(
+      (dto.payoutDetails as any)?.stageId ||
+        (dto.payoutDetails as any)?.targetStageId ||
+        '',
+    ).trim();
+    let hostTargetStageApproved = false;
+    if (isAgencySource && sourceRaw === 'agency_host' && this.hostTarget) {
+      const cfg = await this.hostTarget.getConfig().catch(() => null);
+      if (cfg?.enabled) {
+        const agencyId = String((dto.payoutDetails as any)?.agencyId || '').trim();
+        await this.hostTarget.assertTargetWithdrawAllowed(
+          userId,
+          'host',
+          agencyId || null,
+          dto.diamonds,
+          stageIdRaw || null,
         );
+        hostTargetStageApproved = !!stageIdRaw;
       }
-    } else if (dto.diamonds < minW) {
+    }
+    // Global min applies to agency commission + non-target host. Target host uses stage gate.
+    if (!hostTargetStageApproved && dto.diamonds < minW) {
       throw new BadRequestException(
         `Minimum withdrawal is ${Math.floor(minW)} diamonds (≈ $${MIN_WITHDRAW_USD})`,
       );
@@ -862,23 +844,13 @@ export class WalletService implements OnModuleInit {
       if (!wallet) {
         throw new BadRequestException('Insufficient diamonds');
       }
-      const personalBal = Number(wallet.diamonds || 0);
-      const agencyBal = Number((wallet as any).agencyDiamonds || 0);
-      if (isAgencySource) {
-        if (agencyBal < dto.diamonds) {
-          throw new BadRequestException(
-            'رصيد أرباح الوكالة غير كافٍ (منفصل عن أرباح الروم الشخصي)',
-          );
-        }
-        (wallet as any).agencyDiamonds = agencyBal - dto.diamonds;
-      } else {
-        if (personalBal < dto.diamonds) {
-          throw new BadRequestException(
-            'رصيد أرباح الروم الشخصي غير كافٍ (منفصل عن عمولة الوكالة)',
-          );
-        }
-        wallet.diamonds = personalBal - dto.diamonds;
+      // CLEAN ECONOMY: one diamond pool. Host earnings, agency commission and
+      // personal-room earnings all withdraw from wallet.diamonds.
+      const bal = Number(wallet.diamonds || 0);
+      if (bal < dto.diamonds) {
+        throw new BadRequestException('رصيد الألماس غير كافٍ');
       }
+      wallet.diamonds = bal - dto.diamonds;
       await manager.save(wallet);
 
       const amountFiat = Number((dto.diamonds * fiatRate).toFixed(2));
@@ -917,9 +889,7 @@ export class WalletService implements OnModuleInit {
           type: TransactionType.WITHDRAW,
           currency: CurrencyType.DIAMONDS,
           amount: -dto.diamonds,
-          balanceAfter: isAgencySource
-            ? Number((wallet as any).agencyDiamonds || 0)
-            : Number(wallet.diamonds),
+          balanceAfter: Number(wallet.diamonds),
           referenceType: isAgencySource
             ? 'withdraw_request_agency'
             : 'withdraw_request_personal',

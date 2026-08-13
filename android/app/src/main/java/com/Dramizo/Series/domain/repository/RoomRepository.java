@@ -35,6 +35,7 @@ public interface RoomRepository {
     Result<Object> setMic(String id, boolean muted, String targetUserId);
     Result<RoomDtos.RoomDto> takeSeat(String id, int seatIndex);
     Result<RoomDtos.RoomDto> leaveSeat(String id);
+    Result<Object> forceLeaveSeat(String id, String userId, String reason);
     Result<RoomDtos.RoomDto> lockSeat(String id, int seatIndex, boolean locked);
     Result<RoomDtos.RoomDto> resizeSeats(String id, int seatCount);
     Result<Object> kick(String id, String userId, String reason);

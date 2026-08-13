@@ -370,6 +370,21 @@ public final class MiscDtos {
         @SerializedName("icon") public String icon;
     }
 
+    /** Seat mic stickers from GET /config/seat-stickers. */
+    public static class SeatStickersDto {
+        @SerializedName("version") public int version;
+        @SerializedName("updatedAt") public String updatedAt;
+        @SerializedName("items") public java.util.List<SeatStickerItemDto> items;
+    }
+
+    public static class SeatStickerItemDto {
+        @SerializedName("id") public String id;
+        @SerializedName("key") public String key;
+        @SerializedName("url") public String url;
+        @SerializedName("name") public String name;
+        @SerializedName("sortOrder") public int sortOrder;
+    }
+
     public static class ThemeDto {
         @SerializedName("version") public int version;
         @SerializedName("updatedAt") public String updatedAt;

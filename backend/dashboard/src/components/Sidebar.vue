@@ -157,6 +157,7 @@ const sections = computed(() => [
       { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
       { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
+      { name: 'seat-stickers', icon: 'bi-emoji-smile', label: t('nav.seatStickers') },
     ],
   },
   {

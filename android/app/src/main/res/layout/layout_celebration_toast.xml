@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo home toast: avatar | one line body | times badge (100 Times). -->
+<!-- Home celebration strip: avatar/gift icon | مبروك line | times badge (no Go chip). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -26,7 +26,7 @@
             android:background="@drawable/bg_notification_avatar"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
-            android:src="@drawable/ic_tab_me" />
+            android:src="@drawable/ic_screen_chat_lottery" />
     </FrameLayout>
 
     <TextView
@@ -44,7 +44,7 @@
         android:textColor="#FFFFFFFF"
         android:textSize="13sp"
         android:textStyle="bold"
-        tools:text="برو™ أرسل هدايا حظ للفوز بـ 200000 عملة. (100 مرة)" />
+        tools:text="مبروك أحمد حصل على 200000 · هدية الحظ" />
 
     <!-- Hidden title kept for binding compatibility -->
     <TextView
@@ -81,22 +81,13 @@
             android:textColor="#FFFFFFFF"
             android:textSize="11sp"
             android:textStyle="bold"
-            tools:text="100\nTimes" />
+            tools:text="100\nمرات" />
     </FrameLayout>
 
-    <!-- Mikoo planet / detonate “Go” chip -->
+    <!-- Legacy id kept gone — luck/game home toast never shows a Go chip. -->
     <TextView
         android:id="@+id/btnCelebrationGo"
-        android:layout_width="wrap_content"
-        android:layout_height="36dp"
-        android:background="@drawable/bg_planet_go_btn"
-        android:gravity="center"
-        android:minWidth="52dp"
-        android:paddingHorizontal="14dp"
-        android:text="Go"
-        android:textColor="#FF4A148C"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:visibility="gone"
-        tools:visibility="visible" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
 </LinearLayout>

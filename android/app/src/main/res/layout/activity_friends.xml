@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
-                android:text="@string/friends"
+                android:text="@string/friends_hub_title"
                 android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold" />
@@ -67,7 +67,7 @@
             app:tabIndicatorColor="@color/aurora_mint"
             app:tabIndicatorFullWidth="false"
             app:tabIndicatorHeight="3dp"
-            app:tabMode="fixed"
+            app:tabMode="scrollable"
             app:tabSelectedTextColor="@color/text_primary"
             app:tabTextColor="@color/text_hint" />
 

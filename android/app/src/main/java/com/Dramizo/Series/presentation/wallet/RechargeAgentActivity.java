@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Internal sell-agent portal only (admin assign + float).
- * Paid membership / WhatsApp directory join flow was retired.
+ * Internal sell-agent portal: active agents sell coins; others can apply for free.
+ * Admin approves applications and grants floatCoins.
  */
 public class RechargeAgentActivity extends ThemedActivity {
     private static final DecimalFormat MONEY = new DecimalFormat("0.##");
@@ -74,30 +74,43 @@ public class RechargeAgentActivity extends ThemedActivity {
                     Toast.makeText(this,
                             result.error != null ? result.error : getString(R.string.error_generic),
                             Toast.LENGTH_LONG).show();
-                    showStatusCard(
-                            "لا يوجد حساب وكيل بيع داخلي",
-                            "يُعيَّن وكلاء البيع الداخلي فقط من إدارة التطبيق.",
-                            false);
+                    showApplyForm(null);
                     return;
                 }
                 pricing = mutableMap(asMap(result.data.get("pricing")));
                 Map<?, ?> agent = asMap(result.data.get("agent"));
+                Map<?, ?> application = asMap(result.data.get("application"));
                 if (agent != null && "active".equals(String.valueOf(agent.get("status")))) {
-                    setScreenTitle("لوحة وكيل البيع الداخلي");
+                    setScreenTitle(getString(R.string.recharge_agent));
                     showSellUi(agent);
                     return;
                 }
                 if (agent != null && "suspended".equals(String.valueOf(agent.get("status")))) {
-                    setScreenTitle("وكيل البيع الداخلي");
+                    setScreenTitle(getString(R.string.recharge_agent));
                     showStatusCard("حساب الوكيل معلّق",
                             "السبب: " + string(agent.get("notes")), false);
                     return;
                 }
-                setScreenTitle("وكيل البيع الداخلي");
-                showStatusCard(
-                        "لا يوجد حساب وكيل بيع داخلي",
-                        "يُعيَّن وكلاء البيع الداخلي فقط من إدارة التطبيق مع رصيد (float).",
-                        false);
+                setScreenTitle(getString(R.string.recharge_agent_apply_title));
+                if (application != null
+                        && "pending".equalsIgnoreCase(String.valueOf(application.get("status")))) {
+                    showStatusCard(
+                            getString(R.string.recharge_agent_pending),
+                            "وسيلة التواصل: " + string(application.get("contact")),
+                            true);
+                    return;
+                }
+                if (application != null
+                        && "rejected".equalsIgnoreCase(String.valueOf(application.get("status")))) {
+                    showStatusCard(
+                            getString(R.string.recharge_agent_rejected),
+                            string(application.get("reviewNote")),
+                            false);
+                    // Still allow re-apply form below status
+                    showApplyForm(application);
+                    return;
+                }
+                showApplyForm(application);
             });
         });
     }
@@ -118,12 +131,108 @@ public class RechargeAgentActivity extends ThemedActivity {
         t.setTextColor(ok ? getColor(R.color.aurora_gold) : getColor(R.color.aurora_coral));
         t.setTypeface(null, android.graphics.Typeface.BOLD);
         TextView b = new TextView(this);
-        b.setText(body);
+        b.setText(body != null ? body : "");
         b.setTextSize(14);
         b.setTextColor(0xFF1A1A1A);
         b.setPadding(0, dp(8), 0, 0);
         cardStatus.addView(t);
         cardStatus.addView(b);
+    }
+
+    private void showApplyForm(@Nullable Map<?, ?> previous) {
+        cardSell.setVisibility(View.VISIBLE);
+        cardSell.removeAllViews();
+
+        if (previous == null || !"rejected".equalsIgnoreCase(String.valueOf(previous.get("status")))) {
+            if (cardStatus.getChildCount() == 0) {
+                showStatusCard(
+                        getString(R.string.recharge_agent_apply_title),
+                        getString(R.string.recharge_agent_apply_hint),
+                        true);
+            }
+        }
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(0, dp(12), 0, 0);
+
+        TextInputEditText etContact = newField(getString(R.string.recharge_agent_contact_hint));
+        TextInputEditText etRegion = newField(getString(R.string.recharge_agent_region_hint));
+        TextInputEditText etReason = newField(getString(R.string.recharge_agent_reason_hint));
+        etReason.setMinLines(3);
+        etReason.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        if (previous != null) {
+            etContact.setText(string(previous.get("contact")));
+            etRegion.setText(string(previous.get("region")));
+            etReason.setText(string(previous.get("reason")));
+        }
+        form.addView(etContact, match());
+        form.addView(gap(8));
+        form.addView(etRegion, match());
+        form.addView(gap(8));
+        form.addView(etReason, match());
+        form.addView(gap(16));
+
+        MaterialButton submit = new MaterialButton(this);
+        submit.setText(R.string.recharge_agent_submit);
+        submit.setOnClickListener(v -> {
+            String contact = value(etContact);
+            String region = value(etRegion);
+            String reason = value(etReason);
+            if (contact.length() < 5) {
+                Toast.makeText(this, R.string.recharge_agent_need_contact, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            submit.setEnabled(false);
+            setLoading(true);
+            container.getIoExecutor().execute(() -> {
+                Map<String, Object> body = new HashMap<>();
+                body.put("contact", contact);
+                body.put("region", region);
+                body.put("reason", reason);
+                body.put("requestedCoins", 0);
+                Result<Map<String, Object>> r =
+                        ApiCall.execute(container.getWalletApi().applyRechargeAgent(body));
+                runOnUiThread(() -> {
+                    submit.setEnabled(true);
+                    setLoading(false);
+                    if (r.success) {
+                        Toast.makeText(this, R.string.recharge_agent_apply_ok, Toast.LENGTH_LONG).show();
+                        loadStatus();
+                    } else {
+                        Toast.makeText(this,
+                                r.error != null ? r.error : getString(R.string.error_generic),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            });
+        });
+        form.addView(submit, match());
+        cardSell.addView(form);
+    }
+
+    private TextInputEditText newField(String hint) {
+        TextInputEditText et = new TextInputEditText(this);
+        et.setHint(hint);
+        et.setMinHeight(dp(48));
+        et.setPadding(dp(12), dp(12), dp(12), dp(12));
+        et.setBackgroundResource(R.drawable.bg_form_sheet_input);
+        et.setTextColor(getColor(R.color.text_primary));
+        et.setHintTextColor(getColor(R.color.text_hint));
+        return et;
+    }
+
+    private View gap(int dpV) {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(dpV)));
+        return v;
+    }
+
+    private static LinearLayout.LayoutParams match() {
+        return new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
     }
 
     private void showSellUi(Map<?, ?> agent) {

@@ -34,15 +34,23 @@
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/text_primary" />
 
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="4dp"
+                android:contentDescription="@string/recharge_agent"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_recharge_agent" />
+
             <TextView
                 android:id="@+id/tvScreenTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
+                android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="وكيل البيع الداخلي"
+                android:text="@string/recharge_agent"
                 android:textColor="@color/text_primary"
                 android:textSize="17sp"
                 android:textStyle="bold" />

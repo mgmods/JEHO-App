@@ -111,6 +111,22 @@ export class CosmeticsService implements OnModuleInit {
     return this.cosmeticsRepo.find({ where, order: { sortOrder: 'ASC', createdAt: 'DESC' } });
   }
 
+  /** Resolve mall/catalog preview URL from cosmetic code (agency exclusives, admin). */
+  async resolvePreviewUrl(code: string | null | undefined): Promise<string | null> {
+    const trimmed = String(code || '').trim();
+    if (!trimmed) return null;
+    try {
+      const row = await this.cosmeticsRepo.findOne({
+        where: { code: trimmed, isActive: true },
+      });
+      if (!row) return null;
+      const url = String(row.previewUrl || row.animationUrl || '').trim();
+      return url || null;
+    } catch {
+      return null;
+    }
+  }
+
   async adminCreate(dto: Partial<Cosmetic> & { type: CosmeticType; code: string; name: string; previewUrl: string }) {
     this.assertSupportedType(dto.type);
     const code = String(dto.code || '').trim();

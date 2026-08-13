@@ -21,8 +21,8 @@ import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
- * Mikoo-style global celebration toast on Home / outside rooms.
- * Avatar + one line + optional "N Times" badge, or planet "Go" chip.
+ * Global celebration toast on Home / outside rooms.
+ * Avatar or gift/game icon + مبروك line + optional times badge (no Go chip).
  */
 public final class GlobalCelebrationToast {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
@@ -160,7 +160,7 @@ public final class GlobalCelebrationToast {
         // Game/luck home strip: game cover/gift icon only — never a personal portrait bubble.
         String leftUrl = gameOrLucky
                 ? firstNonEmpty(badgeUrl, null)
-                : avatarUrl;
+                : firstNonEmpty(avatarUrl, badgeUrl);
         String absLeft = AssetCatalog.absoluteUrl(leftUrl);
         if (absLeft != null) {
             com.Dramizo.Series.util.CosmeticMedia.Kind badgeKind =
@@ -183,36 +183,36 @@ public final class GlobalCelebrationToast {
                     avatar.setImageResource(R.drawable.ic_screen_chat_lottery);
                 }
             } else {
-                avatar.setImageResource(gameOrLucky
+                avatar.setImageResource(gameOrLucky || planet
                         ? R.drawable.ic_screen_chat_lottery
                         : R.drawable.jeho_logo);
             }
         }
 
-        boolean showGo = planet && roomId != null && !roomId.trim().isEmpty();
-        boolean showTimes = !showGo && multiplier >= 2;
-        if (btnGo != null) {
-            if (showGo) {
-                btnGo.setVisibility(View.VISIBLE);
-                final String targetRoom = roomId.trim();
-                btnGo.setOnClickListener(v -> {
-                    removeBanner(banner);
-                    RoomJoinGateActivity.open(activity, targetRoom);
-                });
-                banner.setOnClickListener(v -> btnGo.performClick());
-            } else {
-                btnGo.setVisibility(View.GONE);
-            }
+        // Never show a "Go" chip on home luck/game toast — optional room open via banner tap.
+        if (btnGo != null) btnGo.setVisibility(View.GONE);
+        boolean canOpenRoom = roomId != null && !roomId.trim().isEmpty();
+        if (canOpenRoom) {
+            final String targetRoom = roomId.trim();
+            banner.setOnClickListener(v -> {
+                removeBanner(banner);
+                RoomJoinGateActivity.open(activity, targetRoom);
+            });
+        } else {
+            banner.setOnClickListener(null);
+            banner.setClickable(false);
         }
+
+        boolean showTimes = multiplier >= 2;
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
-            tvTimes.setText(String.format(Locale.US, "%d\nTimes", multiplier));
+            tvTimes.setText(String.format(Locale.US, "%d\nمرات", multiplier));
             if (badge != null) badge.setVisibility(View.GONE);
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
             // Game/luck already put badge on the left icon — hide trailing personal badge.
             String absBadge = gameOrLucky ? null : AssetCatalog.absoluteUrl(badgeUrl);
-            if (badge != null && !showGo) {
+            if (badge != null) {
                 if (absBadge != null && !absBadge.isEmpty()) {
                     badge.setVisibility(View.VISIBLE);
                     try {
@@ -226,8 +226,6 @@ public final class GlobalCelebrationToast {
                 } else {
                     badge.setVisibility(View.GONE);
                 }
-            } else if (badge != null) {
-                badge.setVisibility(View.GONE);
             }
         }
 
@@ -248,10 +246,10 @@ public final class GlobalCelebrationToast {
                 .setDuration(220)
                 .start();
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, showGo ? 6500L : 4800L);
+        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6500L : 4800L);
     }
 
-    /** Match Mikoo home strip wording when we have structured lucky/game fields. */
+    /** Home strip wording: مبروك … حصل على … (luck + games). */
     private static String buildMikooLine(
             @Nullable String kind,
             @Nullable String displayName,
@@ -265,18 +263,27 @@ public final class GlobalCelebrationToast {
             if (!name.isEmpty()) return "رائع ~ " + name + " استدعى كوكبًا رائعًا";
             return "رائع ~ استدعاء كوكب رائع";
         }
-        if ("lucky_hit".equalsIgnoreCase(kind) && !name.isEmpty() && coinsWon > 0) {
-            // Use server body (includes real gift name from our catalog) when present.
-            if (body != null && !body.isEmpty()) return body;
-            if (multiplier >= 2) {
-                return name + " فاز بـ " + coinsWon + " عملة. (" + multiplier + " مرة)";
+        if ("lucky_hit".equalsIgnoreCase(kind)) {
+            if (!name.isEmpty() && coinsWon > 0) {
+                if (multiplier >= 2) {
+                    return "مبروك " + name + " حصل على " + coinsWon + " · ×" + multiplier;
+                }
+                return "مبروك " + name + " حصل على " + coinsWon;
             }
-            return name + " فاز بـ " + coinsWon + " عملة.";
+            if (body != null && !body.isEmpty()) return body;
+            if (!name.isEmpty()) return "مبروك " + name + " فاز بهدية حظ";
+            return "مبروك! فاز بهدية حظ";
         }
-        if ("game_win".equalsIgnoreCase(kind) && !name.isEmpty() && coinsWon > 0) {
-            return "مبروك " + name + " حصل على " + coinsWon;
+        if ("game_win".equalsIgnoreCase(kind)) {
+            if (!name.isEmpty() && coinsWon > 0) {
+                return "مبروك " + name + " حصل على " + coinsWon;
+            }
+            if (body != null && !body.isEmpty()) return body;
+            if (!name.isEmpty()) return "مبروك " + name + " فاز باللعبة";
+            return "مبروك! فاز باللعبة";
         }
         if (body != null && !body.isEmpty()) return body;
+        if (!name.isEmpty() && coinsWon > 0) return "مبروك " + name + " حصل على " + coinsWon;
         if (!name.isEmpty()) return "مبروك " + name;
         return "مبروك!";
     }

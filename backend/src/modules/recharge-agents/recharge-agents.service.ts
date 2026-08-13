@@ -180,9 +180,35 @@ export class RechargeAgentsService implements OnModuleInit {
     }
   }
 
-  async apply(_userId: string, _dto: ApplyRechargeAgentDto) {
-    throw new GoneException(
-      'طلب الانضمام المدفوع لوكلاء الشحن أُوقف — الوكلاء بيع داخلي يُعيَّنون من الإدارة فقط',
+  /**
+   * Free application to become an internal sell agent.
+   * Admin reviews from the dashboard and grants floatCoins on approve.
+   * (Paid deposit join was retired — no USDT membership fee required.)
+   */
+  async apply(userId: string, dto: ApplyRechargeAgentDto) {
+    await this.assertCanApplyAsAgent(userId);
+    const contact = String(dto.contact || '').trim();
+    if (contact.length < 5 || contact.length > 128) {
+      throw new BadRequestException('أدخل وسيلة تواصل صالحة (واتساب / تليجرام / هاتف)');
+    }
+    const region = String(dto.region || '').trim().slice(0, 64) || null;
+    const reason = String(dto.reason || '').trim().slice(0, 1000) || null;
+    const requestedCoins = Math.max(0, Math.floor(Number(dto.requestedCoins) || 0));
+
+    return this.applicationsRepo.save(
+      this.applicationsRepo.create({
+        userId,
+        contact,
+        region,
+        reason,
+        requestedCoins,
+        membershipFeeUsdt: 0,
+        stockCostUsdt: 0,
+        totalPaidUsdt: 0,
+        paymentNetwork: null,
+        paymentReference: null,
+        status: RechargeAgentStatus.PENDING,
+      }),
     );
   }
 
@@ -766,11 +792,6 @@ export class RechargeAgentsService implements OnModuleInit {
   }
 
   async adminListApplications() {
-    // Paid join applications retired — internal assign only.
-    return { items: [], total: 0 };
-  }
-
-  private async _legacyAdminListApplicationsDisabled() {
     const items = await this.applicationsRepo.find({
       relations: { user: true },
       order: { createdAt: 'DESC' },
@@ -782,19 +803,6 @@ export class RechargeAgentsService implements OnModuleInit {
   }
 
   async adminReviewApplication(
-    _id: string,
-    _action: 'approve' | 'reject',
-    _adminId: string,
-    _note?: string,
-    _options?: { floatCoins?: number; commissionBps?: number },
-  ) {
-    throw new GoneException(
-      'طلبات الانضمام المدفوعة أُوقفت — عيّن وكلاء البيع الداخلي يدوياً',
-    );
-  }
-
-  /** @deprecated Paid applications retired. */
-  private async _legacyAdminReviewApplication(
     id: string,
     action: 'approve' | 'reject',
     adminId: string,

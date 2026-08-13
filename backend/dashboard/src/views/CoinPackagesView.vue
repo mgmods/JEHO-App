@@ -36,65 +36,62 @@
         @clear="clear"
         @action="onBulkAction"
       />
-      <div class="widget-grid">
+      <div class="pkg-grid">
         <div v-if="!packages.length" class="glass p-4 empty-state">{{ t('coinPackages.empty') }}</div>
-        <article v-for="(p, idx) in packages" :key="p.id || idx" class="widget-card position-relative" :class="{ 'is-selected': isSelected(p.id || String(idx)) }">
+        <article
+          v-for="(p, idx) in packages"
+          :key="p.id || idx"
+          class="pkg-card glass"
+          :class="{ 'is-selected': isSelected(p.id || String(idx)), 'pkg-card--popular': p.popular }"
+        >
           <BulkCheck :checked="isSelected(p.id || String(idx))" @toggle="toggle(p.id || String(idx))" />
-          <div class="widget-card-media bag-visual">
-          <img v-if="packageIcon(p)" :src="packageIcon(p)" alt="" class="pkg-preview" />
-          <div v-else class="pkg-preview pkg-preview-empty small text-muted">{{ t('coinPackages.noImage') }}</div>
-          <div class="bag-amount">{{ formatNumber(p.coins) }}</div>
-        </div>
-        <div class="widget-card-body">
-          <div class="mb-2">
-            <label class="form-label small">{{ t('coinPackages.coinImage') }}</label>
-            <div class="d-flex flex-wrap gap-2 align-items-center">
+
+          <div class="pkg-card__head">
+            <div class="pkg-card__amount">
+              <span class="pkg-card__coins">{{ formatNumber(Number(p.coins) || 0) }}</span>
+              <span class="pkg-card__unit">{{ t('common.coins') }}</span>
+            </div>
+            <div v-if="Number(p.bonusCoins) > 0" class="pkg-card__bonus">
+              +{{ formatNumber(Number(p.bonusCoins) || 0) }} {{ t('common.bonus') }}
+            </div>
+            <div class="pkg-card__price">${{ Number(p.priceUsd || 0).toFixed(2) }}</div>
+          </div>
+
+          <div class="pkg-card__fields">
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
               <input
-                type="file"
-                accept="image/*,.webp"
+                v-model="p.label"
                 class="form-control form-control-sm"
-                @change="(e) => uploadPackageImage(e, p)"
+                :placeholder="t('coinPackages.labelPlaceholder')"
               />
-              <button
-                v-if="p.imageUrl || p.iconUrl"
-                class="btn btn-sm btn-outline-danger"
-                type="button"
-                @click="clearPackageImage(p)"
-              >
-                {{ t('theme.clearAsset') }}
-              </button>
+              <div class="form-check m-0 text-nowrap">
+                <input :id="'pop'+idx" v-model="p.popular" class="form-check-input" type="checkbox" />
+                <label class="form-check-label" :for="'pop'+idx">{{ t('common.popular') }}</label>
+              </div>
             </div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small">{{ t('common.coins') }}</label>
+                <input v-model.number="p.coins" type="number" min="1" class="form-control" />
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ t('common.bonus') }}</label>
+                <input v-model.number="p.bonusCoins" type="number" min="0" class="form-control" />
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ t('common.priceUsd') }}</label>
+                <input v-model.number="p.priceUsd" type="number" min="0" step="0.01" class="form-control" />
+              </div>
+              <div class="col-6">
+                <label class="form-label small">{{ t('common.sku') }}</label>
+                <input v-model="p.sku" class="form-control" dir="ltr" />
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger mt-3 w-100" type="button" @click="askRemovePackage(idx)">
+              {{ t('coinPackages.delete') }}
+            </button>
           </div>
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <input v-model="p.label" class="form-control form-control-sm w-50" :placeholder="t('coinPackages.labelPlaceholder')" />
-            <div class="form-check m-0">
-              <input :id="'pop'+idx" v-model="p.popular" class="form-check-input" type="checkbox" />
-              <label class="form-check-label" :for="'pop'+idx">{{ t('common.popular') }}</label>
-            </div>
-          </div>
-          <div class="row g-2">
-            <div class="col-6">
-              <label class="form-label small">{{ t('common.coins') }}</label>
-              <input v-model.number="p.coins" type="number" min="1" class="form-control" />
-            </div>
-            <div class="col-6">
-              <label class="form-label small">{{ t('common.bonus') }}</label>
-              <input v-model.number="p.bonusCoins" type="number" min="0" class="form-control" />
-            </div>
-            <div class="col-6">
-              <label class="form-label small">{{ t('common.priceUsd') }}</label>
-              <input v-model.number="p.priceUsd" type="number" min="0" step="0.01" class="form-control" />
-            </div>
-            <div class="col-6">
-              <label class="form-label small">{{ t('common.sku') }}</label>
-              <input v-model="p.sku" class="form-control" />
-            </div>
-          </div>
-          <button class="btn btn-sm btn-outline-danger mt-3 w-100" type="button" @click="askRemovePackage(idx)">
-            {{ t('coinPackages.delete') }}
-          </button>
-        </div>
-      </article>
+        </article>
       </div>
     </template>
 
@@ -110,9 +107,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { walletApi, uploadsApi } from '@/api'
+import { walletApi } from '@/api'
 import { formatNumber } from '@/composables/useUtils'
-import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -155,32 +151,6 @@ function onBulkAction(key) {
   pendingRemoveIdx.value = -2
   confirmMsg.value = t('bulk.confirmDelete', { count: ids.length })
   confirmOpen.value = true
-}
-
-function packageIcon(p) {
-  const url = p?.imageUrl || p?.iconUrl
-  return url ? resolveAsset(url) : ''
-}
-
-function clearPackageImage(p) {
-  p.imageUrl = ''
-  p.iconUrl = ''
-}
-
-async function uploadPackageImage(e, p) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  const { data, error: err } = await uploadsApi.upload(file)
-  if (err) {
-    error.value = err.message
-    return
-  }
-  const url = data?.url || data?.data?.url || ''
-  const resolved = url.startsWith('http') ? url : resolveAsset(url)
-  p.imageUrl = resolved
-  p.iconUrl = resolved
-  e.target.value = ''
-  toast().success(t('app.success'))
 }
 
 function addPackage() {
@@ -250,42 +220,72 @@ onMounted(load)
 
 <style scoped>
 .tip {
-  border: 1px solid rgba(255, 200, 80, 0.25);
+  border: 1px solid rgba(255, 200, 80, 0.22);
 }
-.bag-visual {
+.pkg-grid {
   display: grid;
-  place-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.pkg-card {
   position: relative;
-  background: radial-gradient(circle at 50% 40%, rgba(255, 196, 72, 0.18), transparent 60%);
-  min-height: 140px;
-  aspect-ratio: auto;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 20, 28, 0.72);
 }
-.bag-visual img,
-.pkg-preview {
-  width: 96px;
-  height: 96px;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
-  max-width: none;
-  max-height: none;
-}
-.pkg-preview-empty {
-  width: 96px;
-  height: 96px;
-  display: grid;
-  place-items: center;
-  border: 1px dashed rgba(255, 196, 72, 0.35);
-  border-radius: 12px;
-}
-.bag-amount {
-  margin-top: 0.35rem;
-  font-family: var(--al-display);
-  font-weight: 700;
-  font-size: 1.25rem;
-  color: #ffe08a;
-}
-.widget-card.is-selected {
+.pkg-card.is-selected {
   outline: 2px solid rgba(45, 212, 191, 0.65);
   outline-offset: 2px;
+}
+.pkg-card--popular {
+  border-color: rgba(234, 179, 8, 0.4);
+}
+.pkg-card__head {
+  padding: 18px 16px 14px;
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(234, 179, 8, 0.12), transparent 70%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pkg-card__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.pkg-card__coins {
+  font-family: var(--al-display, ui-sans-serif, system-ui);
+  font-weight: 800;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  color: #fde68a;
+  letter-spacing: -0.02em;
+}
+.pkg-card__unit {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.pkg-card__bonus {
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.pkg-card__price {
+  margin-top: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+.pkg-card__fields {
+  padding: 14px 16px 16px;
 }
 </style>

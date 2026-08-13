@@ -25,6 +25,7 @@ import { RoomBan } from '../../database/entities/room-ban.entity';
 import { RoomGameAccessService } from './room-game-access.service';
 import { GameAdsService } from './game-ads.service';
 import { GameAdsController } from './game-ads.controller';
+import { GameOddsSettingsService } from './game-odds-settings.service';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { WalletModule } from '../wallet/wallet.module';
@@ -65,6 +66,7 @@ import { WalletModule } from '../wallet/wallet.module';
     MikooEconomyNotifyService,
     RoomGameAccessService,
     GameAdsService,
+    GameOddsSettingsService,
   ],
   exports: [
     GamesService,
@@ -73,6 +75,7 @@ import { WalletModule } from '../wallet/wallet.module';
     MikooGatewayService,
     RoomGameAccessService,
     GameAdsService,
+    GameOddsSettingsService,
   ],
 })
 export class GamesModule {}

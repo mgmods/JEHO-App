@@ -4,11 +4,11 @@
     android:height="18dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-    <!-- Official agency verification badge (gold) -->
+    <!-- Official agency verification — blue (dashboard-style) -->
     <path
-        android:fillColor="#F5C542"
-        android:pathData="M12,2l2.4,4.9 5.4,0.8 -3.9,3.8 0.9,5.4L12,14.3 7.2,16.9l0.9,-5.4L4.2,7.7l5.4,-0.8z" />
+        android:fillColor="#1D9BF0"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2z" />
     <path
-        android:fillColor="#1A237E"
-        android:pathData="M10.1,11.2l1.3,1.3 3.5,-3.5 1.1,1.1 -4.6,4.6 -2.4,-2.4z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M10.1,15.5L6.6,12l1.4,-1.4 2.1,2.1 5.5,-5.5L17,8.6z" />
 </vector>

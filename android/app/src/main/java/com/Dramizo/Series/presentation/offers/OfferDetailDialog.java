@@ -88,8 +88,10 @@ public class OfferDetailDialog extends DialogFragment {
               public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
                 int total = offer.coins + Math.max(0, offer.bonusCoins);
                 c.getIoExecutor().execute(() -> {
-                  Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
-                      sku, purchaseToken, orderId, total, offer.amountForVerify());
+                  Result<WalletDtos.WalletDto> r =
+                      com.Dramizo.Series.billing.PlayPurchaseFulfillment.verifyWithRetry(
+                          c.getWalletRepository(),
+                          sku, purchaseToken, orderId, total, offer.amountForVerify());
                   requireActivity().runOnUiThread(() -> {
                     binding.btnBuy.setEnabled(true);
                     if (r.success) {
@@ -98,7 +100,8 @@ public class OfferDetailDialog extends DialogFragment {
                       dismiss();
                     } else {
                       Toast.makeText(requireContext(),
-                          r.error != null ? r.error : getString(R.string.error_generic),
+                          r.error != null ? r.error
+                              : "تم الدفع — افتح المحفظة لتأكيد الرصيد",
                           Toast.LENGTH_LONG).show();
                     }
                   });

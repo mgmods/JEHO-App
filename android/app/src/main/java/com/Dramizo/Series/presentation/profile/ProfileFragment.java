@@ -29,6 +29,7 @@ import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.presentation.settings.SettingsActivity;
 import com.Dramizo.Series.presentation.vip.VipActivity;
 import com.Dramizo.Series.presentation.wallet.BagActivity;
+import com.Dramizo.Series.presentation.wallet.RechargeAgentActivity;
 import com.Dramizo.Series.util.AppLoadingOverlay;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.CountryCatalog;
@@ -103,6 +104,10 @@ public class ProfileFragment extends Fragment {
                 startActivity(new Intent(requireContext(), RankingActivity.class)));
         bindRow(binding.btnAgency, v ->
                 startActivity(new Intent(requireContext(), AgencyActivity.class)));
+        if (binding.btnRechargeAgent != null) {
+            bindRow(binding.btnRechargeAgent, v ->
+                    startActivity(new Intent(requireContext(), RechargeAgentActivity.class)));
+        }
         if (binding.btnVanityId != null) {
             bindRow(binding.btnVanityId, v ->
                     startActivity(new Intent(requireContext(), VanityIdsActivity.class)));

@@ -2,6 +2,7 @@ package com.Dramizo.Series.billing;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -27,23 +28,40 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * Simple Play Billing flow (normal apps):
+ * 1) User pays → PURCHASED
+ * 2) Acknowledge immediately (stops Google auto-refund after ~3 days)
+ * 3) App/server credits coins (idempotent by purchaseToken)
+ * 4) Consume so the SKU can be bought again
+ */
 public class BillingHelper implements PurchasesUpdatedListener {
     private static final String TAG = "BillingHelper";
+    private static final String PREFS = "play_billing_pending";
+    private static final String KEY_SKU = "sku";
+    private static final String KEY_TOKEN = "token";
+    private static final String KEY_ORDER = "orderId";
 
     public interface PurchaseCallback {
         void onPurchaseSuccess(String sku, String purchaseToken, String orderId);
         void onPurchaseError(String message);
     }
 
+    public interface RecoverCallback {
+        void onPending(@Nullable String sku, @Nullable String token, @Nullable String orderId);
+    }
+
+    private final Context appContext;
     private final BillingClient billingClient;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final AtomicBoolean ready = new AtomicBoolean(false);
     private PurchaseCallback callback;
     private final List<ProductDetails> productDetailsList = new ArrayList<>();
-    private Purchase pendingConsume;
+    @Nullable private Purchase pendingConsume;
 
     public BillingHelper(Context context) {
-        billingClient = BillingClient.newBuilder(context.getApplicationContext())
+        this.appContext = context.getApplicationContext();
+        billingClient = BillingClient.newBuilder(appContext)
                 .setListener(this)
                 .enablePendingPurchases(
                         PendingPurchasesParams.newBuilder()
@@ -60,7 +78,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
                 ready.set(billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK);
                 Log.i(TAG, "Billing setup: " + billingResult.getResponseCode());
                 if (ready.get()) {
-                    // Resubmit any unconsumed paid purchases (app killed after pay before verify).
                     queryAndRestoreUnacked();
                 }
             }
@@ -74,56 +91,79 @@ public class BillingHelper implements PurchasesUpdatedListener {
         });
     }
 
-    /**
-     * Hold callback used by restore; Store UI sets its own when launching a buy.
-     */
     public void setPurchaseCallback(@Nullable PurchaseCallback cb) {
         this.callback = cb;
     }
 
-    /** Re-deliver owned INAPP purchases that were not yet consumed (server credit pending). */
+    /** Re-query owned INAPP purchases that still need server credit / consume. */
     public void queryAndRestoreUnacked() {
-        if (!isReady()) return;
+        queryAndRestoreUnacked(null);
+    }
+
+    public void queryAndRestoreUnacked(@Nullable Runnable onDone) {
+        if (!isReady()) {
+            if (onDone != null) main.post(onDone);
+            return;
+        }
         try {
             billingClient.queryPurchasesAsync(
                     com.android.billingclient.api.QueryPurchasesParams.newBuilder()
                             .setProductType(BillingClient.ProductType.INAPP)
                             .build(),
                     (billingResult, purchases) -> {
-                        if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
-                                || purchases == null || purchases.isEmpty()) {
-                            return;
-                        }
-                        for (Purchase purchase : purchases) {
-                            if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
-                                Log.i(TAG, "restore unconsumed product="
-                                        + (purchase.getProducts().isEmpty()
-                                        ? "?" : purchase.getProducts().get(0)));
-                                // Don’t invoke store callback without an active buyer UI —
-                                // store last pending for explicit recoverPending().
-                                pendingConsume = purchase;
+                        if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK
+                                && purchases != null) {
+                            for (Purchase purchase : purchases) {
+                                if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                                    pendingConsume = purchase;
+                                    persistPending(purchase);
+                                    // Always ack early — refunds happen when unacked.
+                                    acknowledgeIfNeeded(purchase);
+                                    Log.i(TAG, "restore unconsumed product="
+                                            + (purchase.getProducts().isEmpty()
+                                            ? "?" : purchase.getProducts().get(0)));
+                                }
                             }
                         }
+                        if (onDone != null) main.post(onDone);
                     });
         } catch (Throwable t) {
             Log.w(TAG, "queryPurchases restore failed: " + t.getMessage());
+            if (onDone != null) main.post(onDone);
         }
     }
 
     /**
-     * After wallet opens: if a paid token is still owned, call verify again.
+     * After wallet / app opens: re-run server credit for any paid-but-unconsumed purchase.
+     * Waits for Play query so we do not race an empty pendingConsume.
      */
     public void recoverPendingIfAny(@Nullable PurchaseCallback cb) {
-        if (pendingConsume == null) {
-            queryAndRestoreUnacked();
-        }
-        Purchase p = pendingConsume;
-        if (p == null || p.getPurchaseState() != Purchase.PurchaseState.PURCHASED) return;
         if (cb != null) callback = cb;
-        if (callback != null) {
-            String sku = p.getProducts().isEmpty() ? "" : p.getProducts().get(0);
-            callback.onPurchaseSuccess(sku, p.getPurchaseToken(), p.getOrderId());
+        Runnable deliver = () -> {
+            String sku = null;
+            String token = null;
+            String orderId = null;
+            Purchase p = pendingConsume;
+            if (p != null && p.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
+                sku = p.getProducts().isEmpty() ? "" : p.getProducts().get(0);
+                token = p.getPurchaseToken();
+                orderId = p.getOrderId();
+            } else {
+                SharedPreferences prefs = prefs();
+                sku = prefs.getString(KEY_SKU, null);
+                token = prefs.getString(KEY_TOKEN, null);
+                orderId = prefs.getString(KEY_ORDER, null);
+            }
+            if (token == null || token.isEmpty() || sku == null || sku.isEmpty()) return;
+            if (callback != null) {
+                callback.onPurchaseSuccess(sku, token, orderId != null ? orderId : "");
+            }
+        };
+        if (pendingConsume != null) {
+            deliver.run();
+            return;
         }
+        queryAndRestoreUnacked(deliver);
     }
 
     public boolean isReady() {
@@ -234,10 +274,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
         return null;
     }
 
-    /**
-     * Localized price string from Google Play Console for this SKU
-     * (e.g. "$0.99", "₺29,99"), or null if not queried yet / missing.
-     */
     @Nullable
     public String getFormattedPrice(String sku) {
         ProductDetails details = findDetails(sku);
@@ -248,7 +284,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
         return formatted != null && !formatted.isEmpty() ? formatted : null;
     }
 
-    /** Price amount in the Play store currency (micros / 1e6), or {@code fallback} if unknown. */
     public double getPriceAmount(String sku, double fallback) {
         ProductDetails details = findDetails(sku);
         if (details == null) return fallback;
@@ -262,7 +297,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
             @NonNull ProductDetails details) {
         ProductDetails.OneTimePurchaseOfferDetails offer = details.getOneTimePurchaseOfferDetails();
         if (offer != null) return offer;
-        // Billing 8 may expose multiple one-time offers; take the first available.
         try {
             List<ProductDetails.OneTimePurchaseOfferDetails> list =
                     details.getOneTimePurchaseOfferDetailsList();
@@ -272,7 +306,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
         return null;
     }
 
-    /** Apply Play Console prices onto package DTOs (call after {@link #queryProducts}). */
     public void applyPlayPrices(List<WalletDtos.RechargePackageDto> packages) {
         if (packages == null) return;
         for (WalletDtos.RechargePackageDto pkg : packages) {
@@ -286,7 +319,6 @@ public class BillingHelper implements PurchasesUpdatedListener {
         }
     }
 
-    /** Same for first-recharge / promo offers that use Play SKUs. */
     public void applyPlayPricesToOffers(List<com.Dramizo.Series.data.remote.dto.MiscDtos.OfferDto> offers) {
         if (offers == null) return;
         for (com.Dramizo.Series.data.remote.dto.MiscDtos.OfferDto offer : offers) {
@@ -320,26 +352,67 @@ public class BillingHelper implements PurchasesUpdatedListener {
         if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) return;
         String sku = purchase.getProducts().isEmpty() ? "" : purchase.getProducts().get(0);
         pendingConsume = purchase;
+        persistPending(purchase);
+        // CRITICAL: acknowledge immediately so Google does not auto-refund.
+        acknowledgeIfNeeded(purchase);
         if (callback != null) {
             callback.onPurchaseSuccess(sku, purchase.getPurchaseToken(), purchase.getOrderId());
         }
     }
 
-    /** Call only after backend verification succeeds. */
-    public void consumePendingPurchase() {
-        Purchase purchase = pendingConsume;
-        pendingConsume = null;
-        if (purchase == null) return;
-        if (!purchase.isAcknowledged()) {
+    private void acknowledgeIfNeeded(@NonNull Purchase purchase) {
+        if (purchase.isAcknowledged()) return;
+        try {
             AcknowledgePurchaseParams ack = AcknowledgePurchaseParams.newBuilder()
                     .setPurchaseToken(purchase.getPurchaseToken())
                     .build();
-            billingClient.acknowledgePurchase(ack, result -> Log.i(TAG, "Ack: " + result.getResponseCode()));
+            billingClient.acknowledgePurchase(ack, result ->
+                    Log.i(TAG, "Ack: " + result.getResponseCode()
+                            + " " + result.getDebugMessage()));
+        } catch (Throwable t) {
+            Log.w(TAG, "acknowledge failed: " + t.getMessage());
         }
-        ConsumeParams consumeParams = ConsumeParams.newBuilder()
-                .setPurchaseToken(purchase.getPurchaseToken())
-                .build();
-        billingClient.consumeAsync(consumeParams, (result, token) -> Log.i(TAG, "Consumed: " + result.getResponseCode()));
+    }
+
+    /** Call after backend credits coins successfully. */
+    public void consumePendingPurchase() {
+        Purchase purchase = pendingConsume;
+        String tokenFromPrefs = prefs().getString(KEY_TOKEN, null);
+        pendingConsume = null;
+        clearPersisted();
+
+        String token = purchase != null ? purchase.getPurchaseToken() : tokenFromPrefs;
+        if (token == null || token.isEmpty()) return;
+
+        if (purchase != null) {
+            acknowledgeIfNeeded(purchase);
+        }
+        try {
+            ConsumeParams consumeParams = ConsumeParams.newBuilder()
+                    .setPurchaseToken(token)
+                    .build();
+            billingClient.consumeAsync(consumeParams, (result, consumed) ->
+                    Log.i(TAG, "Consumed: " + result.getResponseCode()));
+        } catch (Throwable t) {
+            Log.w(TAG, "consume failed: " + t.getMessage());
+        }
+    }
+
+    private void persistPending(@NonNull Purchase purchase) {
+        String sku = purchase.getProducts().isEmpty() ? "" : purchase.getProducts().get(0);
+        prefs().edit()
+                .putString(KEY_SKU, sku)
+                .putString(KEY_TOKEN, purchase.getPurchaseToken())
+                .putString(KEY_ORDER, purchase.getOrderId() != null ? purchase.getOrderId() : "")
+                .apply();
+    }
+
+    private void clearPersisted() {
+        prefs().edit().clear().apply();
+    }
+
+    private SharedPreferences prefs() {
+        return appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     public void endConnection() {

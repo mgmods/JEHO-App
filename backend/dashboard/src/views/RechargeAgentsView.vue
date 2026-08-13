@@ -1,8 +1,8 @@
-﻿<template>
+<template>
   <div>
     <PageHeader
       :title="t('rechargeAgents.title')"
-      subtitle="وكلاء البيع الداخلي فقط — بدون واتساب ودون طلبات انضمام مدفوعة"
+      subtitle="وكلاء البيع الداخلي + طلبات الانضمام من التطبيق (موافقة الإدارة + رصيد float)"
     />
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
@@ -16,11 +16,53 @@
       </div>
     </div>
 
+    <div class="glass p-0 overflow-hidden mb-4">
+      <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">طلبات الانضمام من التطبيق</h5>
+        <span class="badge text-bg-secondary">{{ pendingApps.length }} قيد المراجعة</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-glass table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>المستخدم</th>
+              <th>التواصل</th>
+              <th>المنطقة</th>
+              <th>السبب</th>
+              <th>الحالة</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!applications.length">
+              <td colspan="6" class="empty-state">لا توجد طلبات بعد</td>
+            </tr>
+            <tr v-for="app in applications" :key="app.id">
+              <td>
+                <div class="fw-semibold">{{ userName(app) }}</div>
+                <small class="text-muted">{{ app.userId }}</small>
+              </td>
+              <td>{{ app.contact || '—' }}</td>
+              <td>{{ app.region || '—' }}</td>
+              <td class="small" style="max-width:16rem">{{ app.reason || '—' }}</td>
+              <td><StatusBadge :status="app.status" /></td>
+              <td>
+                <div class="d-flex gap-2 justify-content-end flex-wrap" v-if="app.status === 'pending'">
+                  <button class="btn btn-sm btn-outline-success" @click="approveApp(app)">قبول + float</button>
+                  <button class="btn btn-sm btn-outline-danger" @click="rejectApp(app)">رفض</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="glass p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <h5 class="mb-1">أسعار الجملة (للمرجعية الإدارية)</h5>
-          <p class="text-secondary small mb-0">الوكلاء يُعيَّنون يدوياً برصيد float — لا يوجد انضمام من التطبيق.</p>
+          <p class="text-secondary small mb-0">التعيين اليدوي يبقى متاحاً. الطلبات المجانية من التطبيق تحتاج موافقة ثم float.</p>
         </div>
         <button class="btn btn-aurora" :disabled="saving" @click="savePricing">حفظ الأسعار</button>
       </div>
@@ -161,6 +203,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 const agents = ref([])
+const applications = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -174,6 +217,10 @@ const pricing = reactive({
   maxInitialCoins: 10000000,
 })
 const assignForm = reactive({ userId: '', floatCoins: 0, commissionPercent: 0 })
+
+const pendingApps = computed(() =>
+  applications.value.filter((a) => String(a.status || '').toLowerCase() === 'pending'),
+)
 
 const {
   selectedIds: agentSelectedIds,
@@ -217,16 +264,16 @@ async function onAgentBulkAction(key) {
 const stats = computed(() => [
   { label: 'الوكلاء النشطون', value: agents.value.filter((x) => x.status === 'active').length },
   {
+    label: 'طلبات معلّقة',
+    value: pendingApps.value.length,
+  },
+  {
     label: 'إجمالي أرصدة الوكلاء (float)',
     value: formatNumber(agents.value.reduce((n, x) => n + Number(x.floatCoins || 0), 0)),
   },
   {
     label: 'مبيعات اليوم (عملات)',
     value: formatNumber(agents.value.reduce((n, x) => n + Number(x.dailySoldCoins || 0), 0)),
-  },
-  {
-    label: 'حد يومي الإجمالي',
-    value: formatNumber(agents.value.reduce((n, x) => n + Number(x.dailyLimitCoins || 0), 0)),
   },
 ])
 const quoteExample = computed(() =>
@@ -246,15 +293,64 @@ function unwrap(data) {
 async function load() {
   loading.value = true
   error.value = ''
-  const [agentsResult, pricingResult] = await Promise.all([
+  const [agentsResult, pricingResult, appsResult] = await Promise.all([
     rechargeAgentsApi.agents(),
     rechargeAgentsApi.pricing(),
+    rechargeAgentsApi.applications(),
   ])
   loading.value = false
-  const failed = agentsResult.error || pricingResult.error
+  const failed = agentsResult.error || pricingResult.error || appsResult.error
   if (failed) return (error.value = failed.message)
   agents.value = extractList(agentsResult.data)
+  applications.value = extractList(appsResult.data)
   Object.assign(pricing, unwrap(pricingResult.data))
+}
+
+async function approveApp(app) {
+  const floatRaw = await askPrompt({
+    title: 'قبول طلب وكيل شحن',
+    label: 'رصيد float (عملات) عند التفعيل — 0 = بدون رصيد الآن',
+    defaultValue: String(app.requestedCoins || 0),
+    required: true,
+  })
+  if (floatRaw === null) return
+  const floatCoins = Math.max(0, Math.floor(Number(floatRaw) || 0))
+  const noteRaw = await askPrompt({
+    title: 'ملاحظة (اختياري)',
+    label: 'ملاحظة الموافقة',
+    defaultValue: '',
+  })
+  if (noteRaw === null) return
+  const result = await rechargeAgentsApi.approveApplication(app.id, {
+    floatCoins,
+    note: noteRaw,
+  })
+  if (result.error) {
+    error.value = result.error.message
+    toast().danger(error.value)
+  } else {
+    success.value = 'تم قبول الطلب وتفعيل الوكيل'
+    toast().success(success.value)
+    await load()
+  }
+}
+
+async function rejectApp(app) {
+  const noteRaw = await askPrompt({
+    title: 'رفض الطلب',
+    label: 'سبب الرفض',
+    defaultValue: '',
+  })
+  if (noteRaw === null) return
+  const result = await rechargeAgentsApi.rejectApplication(app.id, { note: noteRaw })
+  if (result.error) {
+    error.value = result.error.message
+    toast().danger(error.value)
+  } else {
+    success.value = 'تم رفض الطلب'
+    toast().success(success.value)
+    await load()
+  }
 }
 
 async function savePricing() {

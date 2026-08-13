@@ -708,6 +708,17 @@ public class ZegoEngineManager {
         Log.i(TAG, "speaker unmuted — restored play streams");
     }
 
+    /** Headset plug/unplug — route only, no stream stop/start or SCO restart. */
+    public void reapplyRouteOnly() {
+        if (engine == null) return;
+        try {
+            engine.setAudioRouteToSpeaker(
+                    RoomAudioRoute.zegoRouteToSpeaker(application, speakerMuted));
+        } catch (Exception ignored) {
+        }
+        RoomAudioRoute.applyRouteOnly(application, !speakerMuted);
+    }
+
     public boolean isSpeakerMuted() {
         return speakerMuted;
     }

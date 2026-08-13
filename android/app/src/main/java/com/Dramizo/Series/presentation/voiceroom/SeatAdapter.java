@@ -475,14 +475,6 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
                     ? emojiKey.trim().toLowerCase(Locale.US)
                     : null;
         }
-        // Legacy: resolve by drawable index when unique; shared fallback cannot map alone.
-        if (emojiResId != 0 && emojiResId != SeatReactionEmojis.FALLBACK_DRAWABLE) {
-            for (int i = 0; i < SeatReactionEmojis.DRAWABLES.length; i++) {
-                if (SeatReactionEmojis.DRAWABLES[i] == emojiResId) {
-                    return SeatReactionEmojis.KEYS[i];
-                }
-            }
-        }
         return null;
     }
 
@@ -976,25 +968,29 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (key == null || key.isEmpty()) {
             key = null;
         }
-        String uri = key != null ? SeatReactionEmojis.assetUriForKey(key) : null;
+        String uri = key != null ? SeatReactionEmojis.urlForKey(key) : null;
         holder.b.imgSeatReaction.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         if (uri != null) {
-            // GIF pack (e01-e26) + Mikoo animated WebP (e27+).
-            if (SeatReactionEmojis.isWebpKey(key)) {
+            if (SeatReactionEmojis.isWebpUrl(uri)) {
                 Glide.with(holder.b.imgSeatReaction)
                         .load(uri)
                         .fitCenter()
-                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
-                        .skipMemoryCache(true)
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
-            } else {
+            } else if (uri.toLowerCase(java.util.Locale.US).contains(".gif")) {
                 Glide.with(holder.b.imgSeatReaction)
                         .asGif()
                         .load(uri)
                         .fitCenter()
-                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
-                        .skipMemoryCache(true)
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
+                        .error(res)
+                        .into(holder.b.imgSeatReaction);
+            } else {
+                Glide.with(holder.b.imgSeatReaction)
+                        .load(uri)
+                        .fitCenter()
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.AUTOMATIC)
                         .error(res)
                         .into(holder.b.imgSeatReaction);
             }

@@ -72,6 +72,7 @@
                     tools:visibility="visible" />
             </FrameLayout>
 
+            <!-- Kept for binding compatibility; hidden — one hub icon only. -->
             <ImageButton
                 android:id="@+id/btnMsgMenu"
                 android:layout_width="0dp"

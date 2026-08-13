@@ -780,6 +780,40 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/btnRechargeAgent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingVertical="10dp">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@string/recharge_agent"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/ic_recharge_agent" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="11dp"
+                        android:layout_weight="1"
+                        android:text="@string/recharge_agent"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_arrow_right_me"
+                        app:tint="#8A8A8A" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/btnVanityId"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"

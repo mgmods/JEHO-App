@@ -86,6 +86,7 @@ public final class RoomRtcEngine {
             Log.i(TAG, "RTC provider=livekit room=" + livekitRoomName
                     + " url=" + livekitUrl
                     + " canPublish=" + session.canPublish);
+            RoomAudioSession.acquire(context);
             return;
         }
         provider = PROVIDER_ZEGO;
@@ -106,6 +107,7 @@ public final class RoomRtcEngine {
                 : (fallbackUserId != null ? fallbackUserId : "guest");
         ZegoEngineManager.getInstance().loginRoom(zegoRoom, userId, session.token);
         Log.i(TAG, "RTC provider=zego room=" + zegoRoom);
+        RoomAudioSession.acquire(context);
     }
 
     public void init(Application application) {
@@ -255,6 +257,7 @@ public final class RoomRtcEngine {
             ZegoEngineManager.getInstance().hardLeaveRoom();
         } catch (Throwable ignored) {
         }
+        RoomAudioSession.release(null);
     }
 
     public void logoutRoom() {
@@ -370,14 +373,12 @@ public final class RoomRtcEngine {
         ZegoEngineManager.getInstance().fetchAndApplyRemote(context, api);
     }
 
-    /** Re-run headset/speaker routing (plug/unplug events). */
+    /** Re-run headset/speaker routing (plug/unplug) without restarting play streams. */
     public void reapplyAudioRoute() {
         if (isLiveKit()) {
-            LiveKitEngineManager.getInstance().setSpeakerMuted(
-                    LiveKitEngineManager.getInstance().isSpeakerMuted());
+            LiveKitEngineManager.getInstance().reapplyRouteOnly();
         } else {
-            ZegoEngineManager.getInstance().setSpeakerMuted(
-                    ZegoEngineManager.getInstance().isSpeakerMuted());
+            ZegoEngineManager.getInstance().reapplyRouteOnly();
         }
     }
 }

@@ -1,24 +1,30 @@
 /**
  * House-favored payout RNG for Mikoo games.
- * Target long-run player RTP ≈ 70–80% (house edge 20–30%).
- * Win table display — high mults rare; hard clamps in game-payout-guard.
+ * Live knobs come from dashboard → game.house_odds (see game-odds-runtime).
  */
-import { clampGamePayout, GAME_PAYOUT } from '../game-payout-guard';
+import { clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
+import { getGameOdds } from '../game-odds-runtime';
 import { MIKOO_WIN_MULTS } from './mikoo-game-economy';
 
-/** Global player return target for multi-area tables. */
-export const MULTI_AREA_TARGET_RTP = 0.75;
+/** @deprecated use getGameOdds().playerRtp — kept for import compatibility */
+export function MULTI_AREA_TARGET_RTP(): number {
+  return getGameOdds().playerRtp;
+}
 
 /**
- * Weighted multipliers so EV when hit ≈ 5.9:
- * Hit rate 0.125 → RTP ≈ 0.74 (house ~26%). Peaks stay in display table (≤25).
+ * Weighted multipliers so EV when hit ≈ 5.9;
+ * hitRate from dashboard → RTP ≈ hitRate * 5.9.
  */
 export function spinPayout(
   betAmount: number,
   opts?: { hitRate?: number },
 ): { win: number; mult: number } {
   const bet = Math.max(1, Math.floor(betAmount || 0));
-  const hitRate = Math.min(0.25, Math.max(0.05, Number(opts?.hitRate) || 0.125));
+  const odds = getGameOdds();
+  const hitRate = Math.min(
+    0.25,
+    Math.max(0.05, Number(opts?.hitRate) || odds.spinHitRate || 0.115),
+  );
   if (Math.random() >= hitRate) {
     return { win: 0, mult: 0 };
   }
@@ -39,42 +45,32 @@ export function spinPayout(
 
 /**
  * Crash bust point — early hard bust common so cashout@1.2–1.5 is not player+.
- * Tail hard-capped at GAME_PAYOUT.maxCrashRatio.
+ * Tail hard-capped at live maxCrashRatio.
  */
 export function biasedCrashAt(): number {
-  const maxR = GAME_PAYOUT.maxCrashRatio;
+  const maxR = gamePayoutLimits().maxCrashRatio;
   const u = Math.random();
-  // Instant / near instant bust (~12%)
   if (u < 0.12) return 1.0;
-  // Early crash 1.01–1.45 (~43%)
   if (u < 0.55) return Math.round((1.01 + Math.random() * 0.44) * 100) / 100;
-  // Mid 1.5–3.0 (~27%)
   if (u < 0.82) return Math.round((1.5 + Math.random() * 1.5) * 100) / 100;
-  // High tail up to maxR (~18%)
   const tail = 3.0 + Math.pow(Math.random(), 1.6) * Math.max(0.5, maxR - 3);
   return Math.min(maxR, Math.round(tail * 100) / 100);
 }
 
-/**
- * Multi-area (7updown-style) display mults.
- * Pay under inverse-weight land, not uniform (see pickWeightedAreaIndex).
- */
 export function multiAreaMultipliers(): Record<number, number> {
-  // Display slightly under "fair" so even if UI guesses dice feel, house stays safe.
   return { 1: 1.9, 2: 4.5, 3: 1.9 };
 }
 
-/**
- * Pick area index 0..n-1 with P_i ∝ (targetRtp / mult_i).
- * When every mult gets P_i * mult_i = targetRtp (normalized), RTP ≈ target for single-icon play.
- */
 export function pickWeightedAreaIndex(
   multipliers: readonly number[],
-  targetRtp: number = MULTI_AREA_TARGET_RTP,
+  targetRtp?: number,
 ): number {
   const m = multipliers.map((x) => Math.max(1.01, Number(x) || 1));
   if (!m.length) return 0;
-  const tau = Math.min(0.9, Math.max(0.5, Number(targetRtp) || MULTI_AREA_TARGET_RTP));
+  const tau = Math.min(
+    0.9,
+    Math.max(0.5, Number(targetRtp) || getGameOdds().playerRtp),
+  );
   const weights = m.map((mult) => tau / mult);
   const sum = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * sum;
@@ -85,13 +81,17 @@ export function pickWeightedAreaIndex(
   return m.length - 1;
 }
 
-/** 1-based area id for multi boards that use areas 1..N. */
 export function pickWeightedAreaId(
   multipliers: readonly number[],
-  targetRtp: number = MULTI_AREA_TARGET_RTP,
+  targetRtp?: number,
 ): number {
   return pickWeightedAreaIndex(multipliers, targetRtp) + 1;
 }
 
-/** Cashout rake on crash (extra house on top of bust distribution). */
+/** Cashout rake on crash — live from dashboard. */
+export function crashCashoutRake(): number {
+  return getGameOdds().crashCashoutRake;
+}
+
+/** @deprecated use crashCashoutRake() */
 export const CRASH_CASHOUT_RAKE = 0.97;

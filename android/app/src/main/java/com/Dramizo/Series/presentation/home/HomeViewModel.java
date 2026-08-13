@@ -326,7 +326,16 @@ public class HomeViewModel extends ViewModel {
     }
 
     public void loadFollowingRooms() {
-        loading.postValue(true);
+        loadFollowingRooms(false);
+    }
+
+    /** Resume / background refresh without SwipeRefresh spinner. */
+    public void loadFollowingRoomsQuietly() {
+        loadFollowingRooms(true);
+    }
+
+    private void loadFollowingRooms(boolean quiet) {
+        if (!quiet) loading.postValue(true);
         c.getIoExecutor().execute(() -> {
             String myId = c.getSessionManager().getUserId();
             java.util.Set<String> followingIds = new java.util.HashSet<>();
@@ -360,7 +369,7 @@ public class HomeViewModel extends ViewModel {
                 if (batch.size() < PAGE_SIZE) break;
                 page++;
             }
-            loading.postValue(false);
+            if (!quiet) loading.postValue(false);
             followingRooms.postValue(matched);
         });
     }

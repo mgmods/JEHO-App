@@ -105,9 +105,10 @@ import {
 import { findMikooGame, MikooGameDef } from '../mikoo-games.catalog';
 import { BaishunWsHandler } from './baishun-ws.handler';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
-import { biasedCrashAt, multiAreaMultipliers, pickWeightedAreaId, pickWeightedAreaIndex, spinPayout, CRASH_CASHOUT_RAKE } from './mikoo-house-edge.util';
+import { biasedCrashAt, multiAreaMultipliers, pickWeightedAreaId, pickWeightedAreaIndex, spinPayout, crashCashoutRake } from './mikoo-house-edge.util';
 import { GREEDY_BOX_RATIOS, LUCK_CAR_RATIOS } from './mikoo-game-economy';
-import { clampBetAmount, clampGamePayout, GAME_PAYOUT } from '../game-payout-guard';
+import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
+import { getGameOdds } from '../game-odds-runtime';
 
 type GameKind = 'crash' | 'multi' | 'spin';
 
@@ -506,12 +507,11 @@ export class MikooGatewayService implements OnModuleDestroy {
     const room = this.rooms.get(gameId);
     if (!room) return;
     room.phase = 'over';
-    // House-safe land: inverse-weight multi-area (RTP≈75%). Fair dice only for pure 7updown after.
-    const d1 = 1 + Math.floor(Math.random() * 6);
-    const d2 = 1 + Math.floor(Math.random() * 6);
-    const total = d1 + d2;
+    // House-safe land: inverse-weight multi-area from live dashboard RTP (all boards).
+    const targetRtp = getGameOdds().playerRtp;
+    const sevenMults = [multiAreaMultipliers()[1], multiAreaMultipliers()[2], multiAreaMultipliers()[3]];
     // Lucky77: pick icon 0/1/2 by inverse ratio weight, then a matching board position.
-    const lucky77Icon = pickWeightedAreaIndex(LUCKY77_RATIOS, 0.75);
+    const lucky77Icon = pickWeightedAreaIndex(LUCKY77_RATIOS, targetRtp);
     const lucky77Positions = LUCKY77_ROUNDNO.map((t, i) => ({ pos: i + 1, type: t }))
       .filter((x) => x.type === lucky77Icon + 1);
     const lucky77WinPos =
@@ -521,21 +521,31 @@ export class MikooGatewayService implements OnModuleDestroy {
     const lucky77WinIcon = lucky77Icon;
     const winArea =
       gameId === 'greedy-box'
-        ? pickWeightedAreaId(GREEDY_BOX_RATIOS, 0.75)
+        ? pickWeightedAreaId(GREEDY_BOX_RATIOS, targetRtp)
         : gameId === 'luck-car'
-          ? pickWeightedAreaId(LUCK_CAR_RATIOS, 0.75)
+          ? pickWeightedAreaId(LUCK_CAR_RATIOS, targetRtp)
           : gameId === 'bounty-football'
-            ? pickWeightedAreaId(BOUNTY_FOOTBALL_RATIOS, 0.75)
+            ? pickWeightedAreaId(BOUNTY_FOOTBALL_RATIOS, targetRtp)
             : gameId === 'camel-racing'
-              ? pickWeightedAreaId(CAMEL_RACING_RATIOS, 0.75)
+              ? pickWeightedAreaId(CAMEL_RACING_RATIOS, targetRtp)
             : gameId === 'lucky77'
               ? lucky77WinIcon
-              : // 7updown: use actual dice total (classic feel) + slightly reduced mults.
-                total < 7
-                ? 1
-                : total === 7
-                  ? 2
-                  : 3;
+              : // 7updown: weighted by dashboard RTP (not fair dice).
+                pickWeightedAreaId(sevenMults as number[], targetRtp);
+    // Synthesize dice faces that match the chosen 7updown area for the UI.
+    let d1 = 1 + Math.floor(Math.random() * 6);
+    let d2 = 1 + Math.floor(Math.random() * 6);
+    if (gameId === '7updown') {
+      const combos =
+        winArea === 2
+          ? [[1, 6], [2, 5], [3, 4], [4, 3], [5, 2], [6, 1]]
+          : winArea === 1
+            ? [[1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [2, 1], [2, 2], [2, 3], [2, 4], [3, 1], [3, 2], [3, 3], [4, 1], [4, 2], [5, 1]]
+            : [[6, 6], [6, 5], [6, 4], [6, 3], [6, 2], [5, 6], [5, 5], [5, 4], [5, 3], [4, 6], [4, 5], [4, 4], [3, 6], [3, 5], [2, 6]];
+      const pick = combos[Math.floor(Math.random() * combos.length)] || [3, 4];
+      d1 = pick[0]!;
+      d2 = pick[1]!;
+    }
     if (gameId === '7updown') {
       room.history = [...room.history, winArea].slice(-12);
     } else if (gameId === 'lucky77') {
@@ -1831,7 +1841,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     style: 'doslots' | 'fortune',
   ): Promise<MikooPlayerContext> {
     const req = decodeCostBetReq(body);
-    let amount = clampBetAmount(Number(req.money) || 0, GAME_PAYOUT.maxBet);
+    let amount = clampBetAmount(Number(req.money) || 0, gamePayoutLimits().maxBet);
     if (amount < 1) amount = 0;
     const fail = (code: number, desc: string, tip: number) => {
       if (style === 'fortune') {
@@ -1887,7 +1897,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     style: 'olympians' | 'sugar' | 'megaways' | 'pirate' | 'cleopatra',
   ): Promise<MikooPlayerContext> {
     const req = decodeBetReq(body, style === 'pirate' ? 'pirate' : 'default');
-    let amount = clampBetAmount(Number(req.money) || 0, GAME_PAYOUT.maxBet);
+    let amount = clampBetAmount(Number(req.money) || 0, gamePayoutLimits().maxBet);
     if (amount < 1) amount = 0;
     this.logger.log(
       `GAME_PROBE SPIN_DECODE game=${gameSlug} style=${style} amount=${amount} roomId=${req.roomId} user=${player.userId} bal=${player.balance}`,
@@ -1980,7 +1990,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       `GAME_PROBE BET_DECODE game=${gameSlug} phase=${room.phase} amount=${rawAmount} area=${req.areaId} user=${player.userId} bal=${player.balance}`,
     );
     // All multi boards share the same stake rail (bounty used to allow 1_000_000).
-    if (rawAmount > GAME_PAYOUT.maxBet) {
+    if (rawAmount > gamePayoutLimits().maxBet) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
           code: 1, desc: 'Bet too high', userMoney: player.balance, tipType: 1, iconId: req.areaId,
@@ -2015,7 +2025,7 @@ export class MikooGatewayService implements OnModuleDestroy {
       }
       return player;
     }
-    const amount = clampBetAmount(rawAmount, GAME_PAYOUT.maxBet);
+    const amount = clampBetAmount(rawAmount, gamePayoutLimits().maxBet);
     if (amount <= 0) {
       if (gameSlug === 'greedy-box') {
         this.send(ws, '.game.BetRes', encodeGreedyBetRes({
@@ -2346,11 +2356,11 @@ export class MikooGatewayService implements OnModuleDestroy {
       return player;
     }
     bet.cashedOut = true;
-    // Bust dist already houses; rake + hard ratio/abs caps.
-    const ratio = Math.min(room.ratio, GAME_PAYOUT.maxCrashRatio);
+    // Bust dist already houses; rake + hard ratio/abs caps (live from dashboard).
+    const ratio = Math.min(room.ratio, gamePayoutLimits().maxCrashRatio);
     const { win, capped } = clampGamePayout({
       bet: bet.amount,
-      win: Math.floor(bet.amount * ratio * CRASH_CASHOUT_RAKE),
+      win: Math.floor(bet.amount * ratio * crashCashoutRake()),
     });
     if (capped) {
       this.logger.warn(

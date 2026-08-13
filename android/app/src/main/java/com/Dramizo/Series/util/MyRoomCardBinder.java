@@ -1,7 +1,6 @@
 package com.Dramizo.Series.util;
 
 import android.view.View;
-import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
@@ -50,17 +49,29 @@ public final class MyRoomCardBinder {
                 .centerCrop()
                 .into(card.imgMyRoomAvatar);
 
-        String title;
-        if (owned != null && owned.title != null && !owned.title.isEmpty()) {
-            title = owned.title;
-        } else if (me != null && me.displayName != null && !me.displayName.isEmpty()) {
-            title = me.displayName;
-        } else {
-            title = card.getRoot().getContext().getString(R.string.my_room);
+        String hostName = resolveDisplayName(me);
+        if ((hostName == null || hostName.isEmpty()) && owned != null && owned.host != null) {
+            hostName = resolveDisplayName(owned.host);
         }
-        card.tvMyRoomTitle.setText(title);
-        card.tvMyRoomSubtitle.setText(card.getRoot().getContext().getString(R.string.my_room));
+        String roomTitle = owned != null && owned.title != null && !owned.title.isEmpty()
+                ? owned.title.trim() : null;
+        if (hostName != null && !hostName.isEmpty()) {
+            card.tvMyRoomTitle.setText(hostName);
+            if (roomTitle != null && !roomTitle.isEmpty()) {
+                card.tvMyRoomSubtitle.setText(roomTitle);
+            } else {
+                card.tvMyRoomSubtitle.setText(card.getRoot().getContext().getString(R.string.my_room));
+            }
+        } else if (roomTitle != null && !roomTitle.isEmpty()) {
+            card.tvMyRoomTitle.setText(roomTitle);
+            card.tvMyRoomSubtitle.setText(card.getRoot().getContext().getString(R.string.my_room));
+        } else {
+            card.tvMyRoomTitle.setText(card.getRoot().getContext().getString(R.string.my_room));
+            card.tvMyRoomSubtitle.setText(card.getRoot().getContext().getString(R.string.my_room));
+        }
         card.btnMyRoomGo.setText(R.string.enter_room);
+        card.tvMyRoomTitle.setSelected(true);
+        card.tvMyRoomSubtitle.setSelected(true);
         card.getRoot().setOnClickListener(onOpenMyRoom);
         card.btnMyRoomGo.setOnClickListener(onOpenMyRoom);
     }
@@ -109,5 +120,13 @@ public final class MyRoomCardBinder {
     private static boolean isOwnedBy(RoomDtos.RoomDto r, String myUserId) {
         if (myUserId.equals(r.hostId)) return true;
         return r.host != null && myUserId.equals(r.host.id);
+    }
+
+    @Nullable
+    private static String resolveDisplayName(@Nullable AuthDtos.UserDto user) {
+        if (user == null) return null;
+        if (user.displayName != null && !user.displayName.isEmpty()) return user.displayName.trim();
+        if (user.username != null && !user.username.isEmpty()) return user.username.trim();
+        return null;
     }
 }

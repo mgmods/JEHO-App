@@ -170,6 +170,12 @@ public class HomeMeFragment extends Fragment {
         }
     }
 
+    public boolean canScrollListUp() {
+        return binding != null
+                && binding.recyclerMeRooms != null
+                && binding.recyclerMeRooms.canScrollVertically(-1);
+    }
+
     @Override
     public void onDestroyView() {
         super.onDestroyView();

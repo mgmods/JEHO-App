@@ -201,7 +201,6 @@ public class TaskCenterActivity extends ThemedActivity {
         c.getIoExecutor().execute(() -> {
             Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
             Result<WalletDtos.WalletDto> wallet = c.getWalletUseCase.execute();
-            Result<Map<String, Object>> hostTarget = ApiCall.execute(c.getUserApi().hostTargetMe());
             runOnUiThread(() -> {
                 if (binding == null) return;
                 if (me.success && me.data != null) {
@@ -212,16 +211,8 @@ public class TaskCenterActivity extends ThemedActivity {
                 }
                 long points = wallet.success && wallet.data != null ? wallet.data.coins : 0;
                 binding.tvPointsSummary.setText(points + " كوينز");
-                bindHostMonthlyTarget(hostTarget);
             });
         });
-    }
-
-    private void bindHostMonthlyTarget(Result<Map<String, Object>> hostTarget) {
-        // Monthly host target is shown in Wallet only — never cover daily tasks here.
-        if (binding.sectionHostMonthlyTarget != null) {
-            binding.sectionHostMonthlyTarget.setVisibility(android.view.View.GONE);
-        }
     }
 
     private void load() {

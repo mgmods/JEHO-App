@@ -14,6 +14,7 @@ import com.Dramizo.Series.databinding.ActivityCpCenterBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.friends.RequestsActivity;
@@ -41,6 +42,9 @@ public class CpCenterActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         binding = ActivityCpCenterBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        // Ensure toolbar clears status bar (root contentRoot is padded by ThemedActivity;
+        // extra explicit pad is safe and covers any race before onPostCreate).
+        EdgeToEdgeHelper.padSystemBars(binding.contentRoot);
         c = ContainerProvider.from(this);
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
@@ -72,6 +76,12 @@ public class CpCenterActivity extends ThemedActivity {
                     Math.max(1, partner.level));
         });
         loadPartner();
+    }
+
+    /** Manual edge padding — avoid ThemedActivity targeting only the fixed 56dp header. */
+    @Override
+    protected boolean wantsContentSystemPadding() {
+        return false;
     }
 
     @Override

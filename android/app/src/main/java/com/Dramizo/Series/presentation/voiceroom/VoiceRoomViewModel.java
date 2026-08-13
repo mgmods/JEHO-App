@@ -254,6 +254,18 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
+    public void forceLeaveSeat(String roomId, String userId) {
+        c.getIoExecutor().execute(() -> {
+            Result<Object> r = c.getRoomRepository().forceLeaveSeat(roomId, userId, "moderator");
+            if (r.success) {
+                info.postValue("تم إنزال المستخدم من المايك");
+                refresh(roomId);
+            } else {
+                error.postValue(r.error != null ? r.error : "تعذر إنزال المستخدم من المايك");
+            }
+        });
+    }
+
     public void lockSeat(String roomId, int seatIndex, boolean locked) {
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r = c.getRoomRepository().lockSeat(roomId, seatIndex, locked);

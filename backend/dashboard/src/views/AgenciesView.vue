@@ -255,91 +255,24 @@
         />
       </div>
       <LoadingSpinner v-if="loading" />
-      <div v-else class="table-responsive">
-        <table class="table table-glass table-hover align-middle">
-          <thead>
-            <tr>
-              <th style="width:2.2rem"></th>
-              <th>{{ t('common.agency') }}</th>
-              <th>{{ t('agencies.publicId') }}</th>
-              <th>{{ t('common.owner') }}</th>
-              <th>{{ t('agencies.hosts') }}</th>
-              <th>{{ t('agencies.commission') }}</th>
-              <th>{{ t('agencies.activationCode') }}</th>
-              <th>{{ t('common.status') }}</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!agencies.length">
-              <td colspan="9" class="empty-state">{{ t('agencies.noAgencies') }}</td>
-            </tr>
-            <tr v-for="a in agencies" :key="a.id">
-              <td>
-                <input
-                  type="checkbox"
-                  class="form-check-input"
-                  :checked="agencyIsSelected(a.id)"
-                  @change="agencyToggle(a.id)"
-                />
-              </td>
-              <td>
-                <div class="fw-medium d-flex align-items-center gap-1">
-                  <span>{{ a.name }}</span>
-                  <i
-                    v-if="a.isVerified"
-                    class="bi bi-patch-check-fill text-info"
-                    :title="t('agencies.verified')"
-                  ></i>
-                </div>
-                <div class="small text-muted">{{ t('common.diamonds') }}: {{ formatNumber(a.totalDiamonds || 0) }}</div>
-              </td>
-              <td>
-                <code v-if="a.publicId" class="font-monospace">{{ a.publicId }}</code>
-                <span v-else class="text-muted">—</span>
-              </td>
-              <td>{{ a.ownerName || a.owner?.displayName || a.owner?.username || a.ownerId || '—' }}</td>
-              <td>{{ formatNumber(a.hostsCount ?? a.membersCount ?? a.memberCount ?? 0) }}</td>
-              <td>{{ a.commission ?? a.commissionRate ?? a.commissionPercent ?? '—' }}%</td>
-              <td>
-                <div v-if="a.activationCode" class="d-flex align-items-center gap-1 flex-wrap">
-                  <code class="font-monospace">{{ a.activationCode }}</code>
-                  <button class="btn btn-sm btn-ghost" type="button" :title="t('agencies.copyCode')" @click="copyCode(a.activationCode)">
-                    <i class="bi bi-clipboard"></i>
-                  </button>
-                  <button class="btn btn-sm btn-ghost" type="button" :title="t('agencies.regenerateCode')" @click="regenCode(a)">
-                    <i class="bi bi-arrow-repeat"></i>
-                  </button>
-                </div>
-                <span v-else class="text-muted">—</span>
-              </td>
-              <td><StatusBadge :status="a.status || 'pending'" /></td>
-              <td class="text-end">
-                <div class="action-btns justify-content-end">
-                  <button
-                    v-if="(a.status || '').toLowerCase() === 'pending' || (a.status || '').toLowerCase() === 'suspended'"
-                    class="btn btn-sm btn-outline-success"
-                    type="button"
-                    @click="approve(a)"
-                  >{{ (a.status || '').toLowerCase() === 'suspended' ? t('agencies.reactivate') : t('agencies.approve') }}</button>
-                  <button
-                    v-if="(a.status || '').toLowerCase() === 'active' || (a.status || '').toLowerCase() === 'pending'"
-                    class="btn btn-sm btn-outline-warning"
-                    type="button"
-                    @click="suspend(a)"
-                  >{{ t('agencies.suspend') }}</button>
-                  <button class="btn btn-sm btn-outline-danger" type="button" @click="removeAgency(a)" :title="t('app.delete')">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                  <button class="btn btn-sm btn-ghost" type="button" @click="openMembers(a)" :title="t('common.members')">
-                    <i class="bi bi-people"></i>
-                  </button>
-                  <button class="btn btn-sm btn-ghost" type="button" @click="openEdit(a)"><i class="bi bi-pencil"></i></button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div v-else class="p-3">
+        <div v-if="!agencies.length" class="empty-state p-4 text-center">{{ t('agencies.noAgencies') }}</div>
+        <div v-else class="widget-grid agencies-grid">
+          <AgencyCard
+            v-for="a in agencies"
+            :key="a.id"
+            :agency="a"
+            :selected="agencyIsSelected(a.id)"
+            @toggle-select="(row) => agencyToggle(row.id)"
+            @approve="approve"
+            @suspend="suspend"
+            @delete="removeAgency"
+            @edit="openEdit"
+            @members="openMembers"
+            @copy-code="copyCode"
+            @regen-code="regenCode"
+          />
+        </div>
       </div>
     </div>
 
@@ -487,6 +420,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import BulkActionBar from '@/components/BulkActionBar.vue'
+import AgencyCard from '@/components/AgencyCard.vue'
 
 const { t } = useI18n()
 

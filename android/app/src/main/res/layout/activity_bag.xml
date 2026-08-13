@@ -264,28 +264,7 @@
                             android:textColor="#E8FFF8"
                             android:textSize="13sp"
                             android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvTraderDiamonds"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:background="@drawable/bg_withdraw_status_chip"
-                            android:paddingHorizontal="10dp"
-                            android:paddingVertical="3dp"
-                            android:text="تاجر: 0"
-                            android:textColor="#D8FAFF"
-                            android:textSize="11sp"
-                            android:visibility="gone" />
                     </LinearLayout>
-
-                    <ImageView
-                        android:id="@+id/imgDiamondIcon"
-                        android:layout_width="1dp"
-                        android:layout_height="1dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/icon_diamond"
-                        android:visibility="gone" />
                 </FrameLayout>
 
                 <TextView
@@ -305,30 +284,22 @@
                     android:textStyle="bold"
                     app:drawableStartCompat="@drawable/icon_exchange" />
 
-                <!-- Removed: convert / girl-transfer / personal income history from diamond hub -->
                 <TextView
-                    android:id="@+id/btnFocusConvert"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/btnFocusTransfer"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/btnFocusWithdraw"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/btnOpenEarnings"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
+                    android:id="@+id/btnWithdrawEarnings"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/dia_bg"
+                    android:drawablePadding="18dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical|start"
+                    android:paddingStart="18dp"
+                    android:paddingEnd="16dp"
+                    android:text="@string/bag_withdraw_earnings"
+                    android:textColor="#333333"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    app:drawableStartCompat="@drawable/icon_bills_withdraw" />
 
                 <!-- Host monthly target always under diamond hub -->
                 <LinearLayout
@@ -399,6 +370,7 @@
                     </FrameLayout>
 
                     <LinearLayout
+                        android:id="@+id/hostTargetActiveBody"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
@@ -449,12 +421,6 @@
                                 android:orientation="horizontal"
                                 android:paddingEnd="4dp" />
                         </HorizontalScrollView>
-
-                        <TextView
-                            android:id="@+id/tvHostMonthlyStages"
-                            android:layout_width="0dp"
-                            android:layout_height="0dp"
-                            android:visibility="gone" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -747,302 +713,6 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
-                <!-- Convert card -->
-                <LinearLayout
-                    android:id="@+id/sectionConvert"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_wallet_section"
-                    android:orientation="vertical"
-                    android:padding="16dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="فك الألماس"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@string/diamond_tips"
-                        android:textColor="@color/text_hint"
-                        android:textSize="12sp"
-                        android:maxLines="2" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:hint="كمية الألماس">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etDiamonds"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnExchangeDiamonds"
-                        style="@style/Widget.AuraLive.Button"
-                        android:layout_width="match_parent"
-                        android:layout_height="50dp"
-                        android:layout_marginTop="10dp"
-                        android:text="@string/exchange"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-
-                <!-- Host trade (advanced — hidden by default) -->
-                <LinearLayout
-                    android:id="@+id/sectionHostTrade"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_wallet_section"
-                    android:orientation="vertical"
-                    android:padding="14dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="تحويل لفتاة"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="يُضاف للتاجر بعد التحويل"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:hint="معرّف المضيفة">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etTradeHostId"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="text"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.AuraLive.TextInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:hint="كمية الماس">
-
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/etTradeDiamonds"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="number"
-                            android:textColor="@color/text_primary" />
-                    </com.google.android.material.textfield.TextInputLayout>
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnHostTrade"
-                        style="@style/Widget.AuraLive.Button.Outlined"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="10dp"
-                        android:text="تحويل لفتاة"
-                        android:textAllCaps="false" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
-
-        <!-- Mikoo فتات / debris tab -->
-        <ScrollView
-            android:id="@+id/panelDebris"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:overScrollMode="never"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="28dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_wallet_section"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="18dp">
-
-                    <ImageView
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:contentDescription="@null"
-                        android:src="@drawable/ic_asset_bag_silver" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="فتات"
-                            android:textColor="@color/text_primary"
-                            android:textSize="16sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvDebrisBalance"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
-                            android:text="0"
-                            android:textColor="@color/text_primary"
-                            android:textSize="26sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:lineSpacingExtra="3dp"
-                    android:text="الفتات تُجمع من المهام والأنشطة ويمكن استخدامها في متجر الألعاب."
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <TextView
-                    android:id="@+id/btnOpenDebrisStore"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_lucky_win_btn"
-                    android:gravity="center"
-                    android:text="فتح متجر الألعاب"
-                    android:textColor="#FFFFFF"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/btnOpenDebrisTasks"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_wallet_section"
-                    android:gravity="center"
-                    android:text="مركز المهام · اجمع فتات"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <LinearLayout
-                    android:id="@+id/sectionHostMonthlyTargetDebris"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="18dp"
-                    android:background="@drawable/bg_wallet_section"
-                    android:orientation="vertical"
-                    android:padding="14dp"
-                    android:visibility="gone">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="تارجيت المضيف الشهري"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvDebrisTargetHint"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="فعّل المراحل من الداشبورد"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </LinearLayout>
-        </ScrollView>
-
-        <!-- Tab: وكيل الشحن -->
-        <ScrollView
-            android:id="@+id/panelAgent"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:overScrollMode="never"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="28dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_mikoo_charge_card"
-                    android:orientation="vertical"
-                    android:padding="18dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="وكيل الشحن"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:lineSpacingExtra="2dp"
-                        android:text="بوابة وكيل البيع الداخلي لشحن المستخدمين من رصيدك (تعيين من الإدارة)."
-                        android:textColor="@color/text_secondary"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/btnOpenAgentPortal"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:layout_marginTop="16dp"
-                        android:background="@drawable/bg_mikoo_charge_price"
-                        android:gravity="center"
-                        android:text="دخول لوحة الوكيل"
-                        android:textColor="#FFFFFF"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
             </LinearLayout>
         </ScrollView>
 

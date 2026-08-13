@@ -106,7 +106,7 @@ export class MikooEconomyNotifyService {
           coinsWon: win,
           roomId,
           title: 'مبروك!',
-          body: `${displayName} لعب ${gameTitle} وفاز بـ ${win}`,
+          body: `مبروك ${displayName} حصل على ${win}${gameTitle ? ` · ${gameTitle}` : ''}`,
           at: new Date().toISOString(),
         });
       }

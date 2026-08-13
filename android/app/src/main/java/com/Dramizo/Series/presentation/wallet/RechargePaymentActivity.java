@@ -256,8 +256,10 @@ public class RechargePaymentActivity extends ThemedActivity {
                             public void onPurchaseSuccess(String sku, String purchaseToken, String orderId) {
                             showLoading(getString(R.string.loading));
                             c.getIoExecutor().execute(() -> {
-                                Result<WalletDtos.WalletDto> r = c.getWalletRepository().verifyPurchase(
-                                        sku, purchaseToken, orderId, totalCoins, pkg.amountForVerify());
+                                Result<WalletDtos.WalletDto> r =
+                                        com.Dramizo.Series.billing.PlayPurchaseFulfillment.verifyWithRetry(
+                                                c.getWalletRepository(),
+                                                sku, purchaseToken, orderId, totalCoins, pkg.amountForVerify());
                                 runOnUiThread(() -> {
                                     hideLoading();
                                     if (r.success && r.data != null) {
@@ -276,10 +278,8 @@ public class RechargePaymentActivity extends ThemedActivity {
                                             if (!isFinishing()) finish();
                                         }, 1400);
                                     } else {
-                                        // Purchase may already be paid on Play — keep token for retry;
-                                        // do NOT consume until server credits.
                                         String err = r.error != null ? r.error
-                                                : "تم الدفع لكن لم يُضف الرصيد — أعد فتح المحفظة";
+                                                : "تم الدفع — الرصيد سيُضاف عند إعادة فتح المحفظة";
                                         Toast.makeText(RechargePaymentActivity.this,
                                                 err, Toast.LENGTH_LONG).show();
                                     }

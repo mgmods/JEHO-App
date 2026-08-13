@@ -43,6 +43,7 @@ public class HomeActivitiesFragment extends Fragment {
     private final List<EventDtos.EventDto> items = new ArrayList<>();
     private Adapter adapter;
     private boolean loading;
+    private long lastLoadAtMs;
 
     public static HomeActivitiesFragment newInstance() {
         return new HomeActivitiesFragment();
@@ -63,19 +64,35 @@ public class HomeActivitiesFragment extends Fragment {
         binding.recyclerEvents.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recyclerEvents.setAdapter(adapter);
         binding.recyclerEvents.setNestedScrollingEnabled(true);
-        binding.swipeEvents.setOnRefreshListener(this::load);
+        // Outer HomeFragment SwipeRefresh owns pull-to-refresh — nested SRL causes flip/jitter.
+        binding.swipeEvents.setEnabled(false);
+        binding.swipeEvents.setOnRefreshListener(null);
         notifyHostSized();
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        if (System.currentTimeMillis() - lastLoadAtMs > 15_000L || items.isEmpty()) {
+            load();
+        }
+    }
+
+    /** Called from HomeFragment pull-to-refresh. */
+    public void reloadFromHost() {
         load();
+    }
+
+    public boolean canScrollListUp() {
+        return binding != null
+                && binding.recyclerEvents != null
+                && binding.recyclerEvents.canScrollVertically(-1);
     }
 
     private void load() {
         if (binding == null || loading) return;
         loading = true;
+        lastLoadAtMs = System.currentTimeMillis();
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<EventDtos.EventList> r = ApiCall.execute(c.getEventsApi().list("square"));

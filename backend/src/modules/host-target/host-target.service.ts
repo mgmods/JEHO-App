@@ -7,7 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { HostMonthlyProgress } from '../../database/entities/host-monthly-progress.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
@@ -25,13 +25,14 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { VipService } from '../vip/vip.service';
-import {
-  salaryLadderToHostTargetStages,
-  stagesBelowMinHostUsd,
-  stagesMissingSalaryFields,
-  HOST_SALARY_LADDER_VERSION,
-  HOST_TARGET_MIN_USD,
-} from '../../common/host-salary-ladder';
+import { ECONOMY } from '../../common/economy-config';
+
+/**
+ * CLEAN ECONOMY: the 28-stage salary ladder is gone. The monthly target is now
+ * an OPTIONAL, simple 3-tier diamond goal that is OFF by default. Turn it on
+ * from the dashboard and edit the tiers/bonus there.
+ */
+const HOST_TARGET_VERSION = 'clean-3tier-v1';
 
 export type HostTargetStage = {
   id: string;
@@ -72,11 +73,19 @@ export type HostMonthlyTargetConfig = {
   stages: HostTargetStage[];
 };
 
+/** Simple, editable 3-tier diamond goal (thresholds in diamonds earned). */
+const SIMPLE_STAGES: HostTargetStage[] = [
+  { id: 'tier1', threshold: 200000, rewardCoins: 0, rewardDiamonds: 10000, title: 'المستوى الأول' },
+  { id: 'tier2', threshold: 600000, rewardCoins: 0, rewardDiamonds: 40000, title: 'المستوى الثاني' },
+  { id: 'tier3', threshold: 1500000, rewardCoins: 0, rewardDiamonds: 120000, title: 'المستوى الثالث' },
+];
+
 const DEFAULT_CONFIG: HostMonthlyTargetConfig = {
-  enabled: true,
+  // OFF by default — admin can enable it from the dashboard.
+  enabled: false,
   currency: 'diamonds',
   period: 'monthly',
-  stages: salaryLadderToHostTargetStages(),
+  stages: SIMPLE_STAGES.map((s) => ({ ...s })),
 };
 
 @Injectable()
@@ -107,30 +116,9 @@ export class HostTargetService implements OnModuleInit {
         where: { key: 'host_monthly_target' },
       });
       if (!row?.value) {
+        // Seed the simple (disabled) default so the dashboard has something to edit.
         await this.saveConfig(DEFAULT_CONFIG);
-        this.log.log('Seeded default host_monthly_target stages');
-        return;
-      }
-      const parsed = JSON.parse(row.value) as Partial<HostMonthlyTargetConfig> & {
-        ladderVersion?: string;
-      };
-      const stages = Array.isArray(parsed.stages) ? parsed.stages : [];
-      const needsUpgrade =
-        stages.length === 0 ||
-        stagesMissingSalaryFields(stages) ||
-        stages.length < 20 ||
-        stagesBelowMinHostUsd(stages, HOST_TARGET_MIN_USD) ||
-        parsed.ladderVersion !== HOST_SALARY_LADDER_VERSION;
-      if (needsUpgrade) {
-        await this.saveConfig({
-          ...DEFAULT_CONFIG,
-          enabled: parsed.enabled !== false,
-          currency: parsed.currency === 'gift_coins' ? 'gift_coins' : 'diamonds',
-          period: this.normalizePeriod((parsed as { period?: string }).period),
-        });
-        this.log.log(
-          `Upgraded host_monthly_target to salary ladder ${HOST_SALARY_LADDER_VERSION} (min $${HOST_TARGET_MIN_USD})`,
-        );
+        this.log.log('Seeded simple host_monthly_target (disabled by default)');
       }
     } catch (err) {
       this.log.warn(
@@ -269,57 +257,43 @@ export class HostTargetService implements OnModuleInit {
     const row = await this.settingsRepo.findOne({
       where: { key: 'host_monthly_target' },
     });
-    if (!row?.value) return { ...DEFAULT_CONFIG, stages: [...DEFAULT_CONFIG.stages] };
+    if (!row?.value) return { ...DEFAULT_CONFIG, stages: DEFAULT_CONFIG.stages.map((s) => ({ ...s })) };
     try {
       const parsed = JSON.parse(row.value) as Partial<HostMonthlyTargetConfig>;
-      let stages = Array.isArray(parsed.stages)
-        ? parsed.stages
-            .map((s, i) => this.normalizeStage(s, i))
-            .sort((a, b) => a.threshold - b.threshold)
-        : [...DEFAULT_CONFIG.stages];
-      // Never expose sub-$10 host steps to clients / withdraw package builders.
-      if (stagesBelowMinHostUsd(stages, HOST_TARGET_MIN_USD)) {
-        stages = salaryLadderToHostTargetStages();
-      } else {
-        stages = stages.filter(
-          (s) =>
-            Number(s.hostSalaryUsd) <= 0 ||
-            Number(s.hostSalaryUsd) >= HOST_TARGET_MIN_USD - 0.001,
-        );
-        if (stages.length === 0) stages = salaryLadderToHostTargetStages();
-      }
+      const stages =
+        Array.isArray(parsed.stages) && parsed.stages.length
+          ? parsed.stages
+              .map((s, i) => this.normalizeStage(s, i))
+              .sort((a, b) => a.threshold - b.threshold)
+          : DEFAULT_CONFIG.stages.map((s) => ({ ...s }));
       return {
         enabled: !!parsed.enabled,
-        currency: parsed.currency === 'gift_coins' ? 'gift_coins' : 'diamonds',
+        currency: 'diamonds',
         period: this.normalizePeriod(parsed.period),
         stages,
       };
     } catch {
-      return { ...DEFAULT_CONFIG, stages: [...DEFAULT_CONFIG.stages] };
+      return { ...DEFAULT_CONFIG, stages: DEFAULT_CONFIG.stages.map((s) => ({ ...s })) };
     }
   }
 
   async saveConfig(config: HostMonthlyTargetConfig) {
-    const MIN = HOST_TARGET_MIN_USD;
     let stages = (config.stages || [])
       .map((s, i) => this.normalizeStage(s, i))
-      .sort((a, b) => a.threshold - b.threshold)
-      .filter((s) => Number(s.hostSalaryUsd) <= 0 || Number(s.hostSalaryUsd) >= MIN - 0.001);
-
-    if (stages.length === 0 || stagesBelowMinHostUsd(stages, MIN)) {
-      stages = salaryLadderToHostTargetStages();
+      .sort((a, b) => a.threshold - b.threshold);
+    if (stages.length === 0) {
+      stages = SIMPLE_STAGES.map((s) => ({ ...s }));
     }
 
     const normalized: HostMonthlyTargetConfig = {
       enabled: !!config.enabled,
-      currency: config.currency === 'gift_coins' ? 'gift_coins' : 'diamonds',
+      currency: 'diamonds',
       period: this.normalizePeriod(config.period),
       stages,
     };
     const payload = {
       ...normalized,
-      ladderVersion: HOST_SALARY_LADDER_VERSION,
-      minHostTargetUsd: HOST_TARGET_MIN_USD,
+      ladderVersion: HOST_TARGET_VERSION,
     };
     let row = await this.settingsRepo.findOne({
       where: { key: 'host_monthly_target' },
@@ -500,6 +474,48 @@ export class HostTargetService implements OnModuleInit {
                 },
               }),
             );
+          } else if (Number(stage.hostSalaryUsd) > 0) {
+            // Salary ladder: credit host USD step as diamonds so cashout can deduct them.
+            const rate = Number(ECONOMY.diamondUsd || 0.00005);
+            const salaryDiamonds = this.usdToDiamonds(
+              Number(stage.hostSalaryUsd) || 0,
+              rate > 0 ? rate : 0.00005,
+            );
+            if (salaryDiamonds > 0) {
+              wallet.diamonds = Number(wallet.diamonds || 0) + salaryDiamonds;
+              await manager.save(
+                manager.create(WalletTransaction, {
+                  userId,
+                  type: TransactionType.LUCKY_REWARD,
+                  currency: CurrencyType.DIAMONDS,
+                  amount: salaryDiamonds,
+                  balanceAfter: Number(wallet.diamonds),
+                  referenceType: 'host_monthly_target',
+                  referenceId: `${yearMonth}:c${row.cyclesCompleted + 1}:${stage.id}:salary`,
+                  description: `راتب مرحلة التارجت: ${stage.title || stage.id}`,
+                  metadata: {
+                    stageId: stage.id,
+                    title: stage.title,
+                    hostSalaryUsd: stage.hostSalaryUsd,
+                    cycle: row.cyclesCompleted + 1,
+                    period: config.period,
+                    periodKey: yearMonth,
+                    kind: 'stage_salary_credit',
+                  },
+                }),
+              );
+            }
+          }
+          // Agency ladder cut (e.g. stage1 host $10 + agent $2) → owner wallet.
+          if (Number(stage.agentSalaryUsd) > 0) {
+            await this.creditAgencyStageBonus(
+              manager,
+              userId,
+              stage,
+              yearMonth,
+              config.period,
+              Number(row.cyclesCompleted || 0) + 1,
+            );
           }
         }
       };
@@ -551,8 +567,54 @@ export class HostTargetService implements OnModuleInit {
         progress: Number(row.progress),
         cyclesCompleted: Number(row.cyclesCompleted || 0),
         newlyClaimed,
+        yearMonth,
+        period: config.period,
       };
     });
+
+    // Notify agency owners that stage agent cuts landed in their wallet.
+    for (const stage of result.newlyClaimed || []) {
+      if (!(Number(stage.agentSalaryUsd) > 0)) continue;
+      try {
+        const membership = await this.membersRepo.findOne({
+          where: {
+            userId,
+            status: AgencyMemberStatus.ACTIVE,
+            isActive: true,
+          },
+          order: { joinedAt: 'DESC' },
+        });
+        if (!membership?.agencyId) continue;
+        const agency = await this.agencyRepo.findOne({
+          where: { id: membership.agencyId },
+        });
+        const ownerId = agency?.ownerId ? String(agency.ownerId) : '';
+        if (!ownerId || ownerId === userId) continue;
+        const rate = Number(ECONOMY.diamondUsd || 0.00005);
+        const diamonds = this.usdToDiamonds(
+          Number(stage.agentSalaryUsd) || 0,
+          rate > 0 ? rate : 0.00005,
+        );
+        this.realtime?.emitToUser(ownerId, 'host_target:agent_salary', {
+          hostUserId: userId,
+          agencyId: membership.agencyId,
+          stageId: stage.id,
+          title: stage.title,
+          agentSalaryUsd: Number(stage.agentSalaryUsd) || 0,
+          diamonds,
+          period: result.period,
+          periodKey: result.yearMonth,
+          cycle: stage.cycle,
+          at: new Date().toISOString(),
+        });
+      } catch (err) {
+        this.log.warn(
+          `host target agent notify failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
+    }
 
     for (const stage of result.newlyClaimed || []) {
       const cosmeticCode = String(stage.rewardCosmeticCode || '').trim();
@@ -592,16 +654,92 @@ export class HostTargetService implements OnModuleInit {
   }
 
   private async diamondUsdRate(): Promise<number> {
-    const row = await this.settingsRepo.findOne({
-      where: { key: 'economy.diamondUsdRate' },
-    });
-    const n = Number(row?.value || 0.00005);
+    const n = Number(ECONOMY.diamondUsd || 0.00005);
     return Number.isFinite(n) && n > 0 ? n : 0.00005;
   }
 
   private usdToDiamonds(usd: number, rate: number): number {
     if (usd <= 0 || rate <= 0) return 0;
     return Math.max(0, Math.round(usd / rate));
+  }
+
+  /**
+   * When a host locks a salary-ladder stage, credit the agency owner's
+   * agentSalaryUsd cut into their diamond wallet (same pool they withdraw from).
+   * Idempotent via referenceId on wallet_transactions.
+   */
+  private async creditAgencyStageBonus(
+    manager: EntityManager,
+    hostUserId: string,
+    stage: HostTargetStage,
+    yearMonth: string,
+    period: HostTargetPeriod,
+    cycle: number,
+  ) {
+    const agentUsd = Math.max(0, Number(stage.agentSalaryUsd) || 0);
+    if (agentUsd <= 0) return null;
+    const membership = await manager.findOne(AgencyMember, {
+      where: {
+        userId: hostUserId,
+        status: AgencyMemberStatus.ACTIVE,
+        isActive: true,
+      },
+      order: { joinedAt: 'DESC' },
+    });
+    if (!membership?.agencyId) return null;
+    const agency = await manager.findOne(Agency, {
+      where: { id: membership.agencyId },
+    });
+    const ownerId = agency?.ownerId ? String(agency.ownerId) : '';
+    if (!ownerId || ownerId === hostUserId) return null;
+
+    const rate = Number(ECONOMY.diamondUsd || 0.00005);
+    const diamonds = this.usdToDiamonds(agentUsd, rate > 0 ? rate : 0.00005);
+    if (diamonds <= 0) return null;
+
+    const referenceId = `${yearMonth}:c${cycle}:${stage.id}:agent:${hostUserId}`;
+    const existing = await manager.findOne(WalletTransaction, {
+      where: {
+        userId: ownerId,
+        referenceType: 'host_target_agent_salary',
+        referenceId,
+      },
+    });
+    if (existing) return { ownerId, diamonds, alreadyCredited: true };
+
+    let ownerWallet = await manager.findOne(Wallet, {
+      where: { userId: ownerId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!ownerWallet) {
+      ownerWallet = manager.create(Wallet, { userId: ownerId });
+    }
+    ownerWallet.diamonds = Number(ownerWallet.diamonds || 0) + diamonds;
+    await manager.save(ownerWallet);
+    await manager.save(
+      manager.create(WalletTransaction, {
+        userId: ownerId,
+        type: TransactionType.LUCKY_REWARD,
+        currency: CurrencyType.DIAMONDS,
+        amount: diamonds,
+        balanceAfter: Number(ownerWallet.diamonds),
+        referenceType: 'host_target_agent_salary',
+        referenceId,
+        description: `عمولة تارجت مضيفة · ${stage.title || stage.id}`,
+        metadata: {
+          stageId: stage.id,
+          title: stage.title,
+          agentSalaryUsd: agentUsd,
+          hostUserId,
+          agencyId: membership.agencyId,
+          cycle,
+          period,
+          periodKey: yearMonth,
+          kind: 'stage_agent_salary_credit',
+        },
+      }),
+    );
+    return { ownerId, diamonds, agentUsd, agencyId: membership.agencyId };
   }
 
   /**
@@ -646,21 +784,23 @@ export class HostTargetService implements OnModuleInit {
         targetRequired: false,
         hostsWithLockedStages: 0,
         totalHostsTracked: 0,
-        message: 'اسحب عمولة الوكالة من رصيدك المتاح — التارجت خاص بالمضيفات فقط',
+        message: 'اسحب عمولة الوكالة من رصيدك (هدايا + عمولة مراحل التارجت عند إقفال المضيفة). التارجت خاص بالمضيفات فقط',
       };
     }
 
     if (!config.enabled || !config.stages?.length) {
+      // CLEAN ECONOMY: when the (optional) target ladder is off, hosts withdraw
+      // by balance packages + global minWithdraw — same rules as agency.
       return {
         enabled: false,
         role: 'host' as const,
         diamondUsdRate: rate,
         items: [],
-        fullBalanceAllowed: false,
-        targetRequired: true,
+        fullBalanceAllowed: true,
+        targetRequired: false,
         hostsWithLockedStages: 0,
         totalHostsTracked: 0,
-        message: 'التارجت غير مفعّل',
+        message: 'التارجت غير مفعّل — اسحبي حسب الحد الأدنى لرصيدك',
       };
     }
 
@@ -673,7 +813,11 @@ export class HostTargetService implements OnModuleInit {
         diamondUsdRate: rate,
         period: me.period,
         periodKey: me.periodKey,
+        periodLabel: me.periodLabel,
         progress: me.progress,
+        cycle: me.cycle,
+        stages: me.stages,
+        totalStages: (me.stages || []).length,
         items: [],
         fullBalanceAllowed: false,
         targetRequired: true,
@@ -686,7 +830,8 @@ export class HostTargetService implements OnModuleInit {
 
     const usd = Math.max(0, Number(current.hostSalaryUsd) || 0);
     const reached = !!current.reached || Number(me.progress) >= Number(current.threshold);
-    const cashable = reached && usd >= HOST_TARGET_MIN_USD;
+    // Tier cashable once diamond threshold reached (150k, 200k, … — not global minWithdraw).
+    const cashable = reached;
     const item = {
       id: String(current.id),
       stageIndex: Number(current.index) || 0,
@@ -710,7 +855,11 @@ export class HostTargetService implements OnModuleInit {
       diamondUsdRate: rate,
       period: me.period,
       periodKey: me.periodKey,
+      periodLabel: me.periodLabel,
       progress: me.progress,
+      cycle: me.cycle,
+      stages: me.stages,
+      totalStages: (me.stages || []).length,
       items: [item],
       fullBalanceAllowed: cashable,
       targetRequired: true,
@@ -719,8 +868,8 @@ export class HostTargetService implements OnModuleInit {
       totalHostsTracked: 1,
       currentStageId: item.id,
       message: cashable
-        ? `مرحلتك الحالية جاهزة للسحب — المرحلة ${item.stageIndex}`
-        : `مرحلتك الحالية: ${item.title} — أكملي ${item.remaining} ألماس للفتح`,
+        ? `مرحلتك ${item.stageIndex} جاهزة — اسحبي ${usd > 0 ? `$${usd.toFixed(0)}` : 'راتب المرحلة'} (${item.diamonds.toLocaleString()} ◆)`
+        : `مرحلتك ${item.stageIndex}: ${item.title} — أكملي ${item.remaining.toLocaleString()} ◆ (${item.threshold.toLocaleString()} هدف المرحلة)`,
     };
   }
 
@@ -835,6 +984,10 @@ export class HostTargetService implements OnModuleInit {
     }
 
     const opts = await this.getWithdrawOptions(userId, role, agencyId);
+    // Target ladder off → min-amount packages only (half/full), no stage gate.
+    if (!opts.enabled && opts.fullBalanceAllowed) {
+      return { ...opts, message: 'ok' };
+    }
     if (!opts.enabled) {
       throw new BadRequestException(opts.message || 'التارجت غير مفعّل');
     }
@@ -844,7 +997,12 @@ export class HostTargetService implements OnModuleInit {
       );
     }
     const sid = String(stageId || '').trim();
-    if (!sid || sid === 'full' || sid === 'full_balance') {
+    if (!sid || sid === 'full' || sid === 'full_balance' || sid === 'half') {
+      // Balance packages (when target off) already allowed above; on target
+      // mode only stage ids may be submitted.
+      if (opts.targetRequired === false) {
+        return { ...opts, message: 'ok' };
+      }
       throw new BadRequestException('اسحبي راتب مرحلتك الحالية فقط');
     }
     const items = Array.isArray(opts.items) ? opts.items : [];

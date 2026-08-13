@@ -84,7 +84,8 @@ public class HomeFragment extends Fragment {
     private final List<com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto> roomCache = new ArrayList<>();
     private LeadingRoomAdapter exploreAdapter;
     private final java.util.LinkedHashSet<String> exploreRoomIds = new java.util.LinkedHashSet<>();
-    private String selectedCountry;
+    private String hotCountryFilter;
+    private String browseCountry;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private RealtimeClient.RoomListener roomListListener;
     private final Runnable roomRefreshRunnable = new Runnable() {
@@ -167,7 +168,6 @@ public class HomeFragment extends Fragment {
             }
         });
 
-        binding.pagerFeed.setOffscreenPageLimit(1);
         binding.pagerFeed.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override public void onPageSelected(int position) {
                 onLogicalTabSelected(logicalTabFromPager(position));
@@ -190,15 +190,31 @@ public class HomeFragment extends Fragment {
         AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
-        binding.btnFilter.setOnClickListener(v -> showCountryPicker());
+        binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
+        View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
+        if (appBar instanceof com.google.android.material.appbar.AppBarLayout) {
+            ((com.google.android.material.appbar.AppBarLayout) appBar)
+                    .addOnOffsetChangedListener((bar, verticalOffset) -> {
+                        // Mikoo-smooth: never fight AppBar collapse with pull-to-refresh.
+                        if (binding == null || binding.swipe == null) return;
+                        binding.swipe.setEnabled(verticalOffset == 0);
+                    });
+        }
         binding.swipe.setOnRefreshListener(() -> {
             if (activeTab == TAB_ME) {
                 viewModel.loadFollowingRooms();
                 reapplyFeedPages();
             } else if (activeTab == TAB_HOT || activeTab == TAB_LOCATION) {
                 viewModel.loadRooms();
+            } else if (activeTab == TAB_ACTIVITIES) {
+                for (Fragment f : getChildFragmentManager().getFragments()) {
+                    if (f instanceof HomeActivitiesFragment) {
+                        ((HomeActivitiesFragment) f).reloadFromHost();
+                    }
+                }
+                binding.swipe.setRefreshing(false);
             } else {
                 reapplyFeedPages();
                 binding.swipe.setRefreshing(false);
@@ -248,7 +264,10 @@ public class HomeFragment extends Fragment {
         });
         viewModel.getLoading().observe(getViewLifecycleOwner(), l -> {
             boolean loading = Boolean.TRUE.equals(l);
-            binding.swipe.setRefreshing(loading);
+            // Never leave the spinner stuck if quiet paths raced with a pull.
+            if (binding != null && binding.swipe != null) {
+                binding.swipe.setRefreshing(loading);
+            }
             if (!loading && isAdded()) {
                 AppLoadingOverlay.hide(requireActivity());
             }
@@ -468,8 +487,15 @@ public class HomeFragment extends Fragment {
         startActivity(intent);
     }
 
+    /** Optional Hot-tab country filter (null = worldwide). */
     public String getSelectedCountry() {
-        return selectedCountry;
+        return hotCountryFilter;
+    }
+
+    /** Country tab: preferred browse country (prefs / profile / device). */
+    @Nullable
+    public String getLocationCountryCode() {
+        return getBrowseCountryCode();
     }
 
     /** ISO country from profile, then device locale (e.g. TR for Turkey). */
@@ -550,6 +576,12 @@ public class HomeFragment extends Fragment {
                     return page.canScrollListUp();
                 }
             }
+            if (activeTab == TAB_ME && f instanceof HomeMeFragment && f.isResumed()) {
+                return ((HomeMeFragment) f).canScrollListUp();
+            }
+            if (activeTab == TAB_ACTIVITIES && f instanceof HomeActivitiesFragment && f.isResumed()) {
+                return ((HomeActivitiesFragment) f).canScrollListUp();
+            }
         }
         return false;
     }
@@ -573,17 +605,29 @@ public class HomeFragment extends Fragment {
             @Override public int getItemCount() { return TAB_COUNT; }
         };
         binding.pagerFeed.setAdapter(feedPagerAdapter);
-        // Tabs only via top labels — no horizontal swipe between Me/Hot/Location/Activities.
         binding.pagerFeed.setUserInputEnabled(false);
-        binding.pagerFeed.setOffscreenPageLimit(1);
+        binding.pagerFeed.setOffscreenPageLimit(3);
         if (binding.pagerFeed.getCurrentItem() != TAB_HOT) {
             binding.pagerFeed.setCurrentItem(TAB_HOT, false);
+        }
+        if (browseCountry == null) {
+            browseCountry = loadBrowseCountryCode();
         }
     }
 
     private void selectLogicalTab(int tab) {
         if (tab < TAB_ME || tab > TAB_ACTIVITIES) return;
         if (binding == null || binding.pagerFeed == null) return;
+       
+        if (tab == TAB_LOCATION) {
+            showCountryPicker(true, () -> {
+                onLogicalTabSelected(TAB_LOCATION);
+                if (binding != null && binding.pagerFeed.getCurrentItem() != TAB_LOCATION) {
+                    binding.pagerFeed.setCurrentItem(TAB_LOCATION, true);
+                }
+            });
+            return;
+        }
         onLogicalTabSelected(tab);
         if (binding.pagerFeed.getCurrentItem() != tab) {
             binding.pagerFeed.setCurrentItem(tab, true);
@@ -595,9 +639,19 @@ public class HomeFragment extends Fragment {
         styleTabs(tab);
         updateHeaderForTab(tab);
         if (tab == TAB_ME) {
-            viewModel.loadFollowingRooms();
+            java.util.List<?> following = viewModel.getFollowingRooms().getValue();
+            if (following != null && !following.isEmpty()) {
+                viewModel.loadFollowingRoomsQuietly();
+            } else {
+                viewModel.loadFollowingRooms();
+            }
         } else if (tab == TAB_HOT || tab == TAB_LOCATION) {
-            viewModel.loadRooms();
+            java.util.List<?> cur = viewModel.getRooms().getValue();
+            if (cur != null && !cur.isEmpty()) {
+                viewModel.refreshRoomsQuietly();
+            } else {
+                viewModel.loadRooms();
+            }
         }
         reapplyFeedPages();
         refreshEmptyStateForActiveTab();
@@ -611,7 +665,8 @@ public class HomeFragment extends Fragment {
             binding.homeActBanners.getRoot().setVisibility(
                     tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
         }
-        // Country filter picker only on Hot (Mikoo: flag lives next to country tab title).
+        // Country filter: always available as Hot filter; long-press or filter icon.
+        // Country tab itself opens the picker (see selectLogicalTab).
         if (binding.btnFilter != null) {
             binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
         }
@@ -622,12 +677,11 @@ public class HomeFragment extends Fragment {
     }
 
     /**
-     * Mikoo home_country + iv_guoqi: always show the user's country name + flag as the
-     * third tab label — not "موقعي"/Nearby, and not a pressable location picker.
+     * Country tab chrome: selected browse country (prefs) + flag — like Mikoo home_country + iv_guoqi.
      */
     private void refreshLocationTabChrome() {
         if (binding == null || binding.tvTabLocation == null) return;
-        String code = getMyCountryCode();
+        String code = getBrowseCountryCode();
         CountryCatalog.Entry e = code != null ? CountryCatalog.resolve(code) : null;
         if (e != null) {
             binding.tvTabLocation.setText(e.displayName());
@@ -635,7 +689,7 @@ public class HomeFragment extends Fragment {
                 FlagImages.bind(binding.imgTabLocationFlag, e.code);
             }
         } else {
-            binding.tvTabLocation.setText(R.string.tab_location);
+            binding.tvTabLocation.setText(R.string.country);
             if (binding.imgTabLocationFlag != null) {
                 binding.imgTabLocationFlag.setVisibility(View.GONE);
                 binding.imgTabLocationFlag.setImageDrawable(null);
@@ -654,38 +708,44 @@ public class HomeFragment extends Fragment {
     }
 
     private void styleTabs(int selected) {
-        // Mikoo fragment_home_live_pager: all tabs 17sp bold; active = full alpha.
+        // Mikoo HomeLivePagerFragment.highlightTab: 18sp bold dark vs 16sp muted.
         float activeAlpha = 1f;
-        float inactiveAlpha = 0.45f;
-        float activeSize = 17f;
-        float inactiveSize = 17f;
+        float inactiveAlpha = 1f;
+        float activeSize = 18f;
+        float inactiveSize = 16f;
+        int activeColor = 0xFF222222;
+        int inactiveColor = 0xFFB3B3B3;
         styleOneTab(binding.tvTabMe, binding.dotMe, selected == TAB_ME,
-                activeAlpha, inactiveAlpha, activeSize, inactiveSize);
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
         styleOneTab(binding.tvTabHot, binding.dotHot, selected == TAB_HOT,
-                activeAlpha, inactiveAlpha, activeSize, inactiveSize);
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
         styleOneTab(binding.tvTabLocation, binding.dotLocation, selected == TAB_LOCATION,
-                activeAlpha, inactiveAlpha, activeSize, inactiveSize);
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
         if (binding.imgTabLocationFlag != null) {
-            binding.imgTabLocationFlag.setAlpha(selected == TAB_LOCATION ? activeAlpha : inactiveAlpha);
+            binding.imgTabLocationFlag.setAlpha(selected == TAB_LOCATION ? 1f : 0.55f);
         }
         styleOneTab(binding.tvTabActivities, binding.dotActivities, selected == TAB_ACTIVITIES,
-                activeAlpha, inactiveAlpha, activeSize, inactiveSize);
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
     }
 
     private static void styleOneTab(android.widget.TextView tv, View dot, boolean selected,
                                     float activeAlpha, float inactiveAlpha,
-                                    float activeSize, float inactiveSize) {
+                                    float activeSize, float inactiveSize,
+                                    int activeColor, int inactiveColor) {
         if (tv == null) return;
         tv.setAlpha(selected ? activeAlpha : inactiveAlpha);
         tv.setTextSize(selected ? activeSize : inactiveSize);
+        tv.setTextColor(selected ? activeColor : inactiveColor);
+        tv.setTypeface(null, selected ? android.graphics.Typeface.BOLD
+                : android.graphics.Typeface.NORMAL);
         if (dot != null) {
-            dot.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            // Mikoo uses size/weight/color, not a under-dot — keep dots subtle & hidden.
+            dot.setVisibility(View.GONE);
         }
     }
 
-    private void showCountryPicker() {
-        // Location tab uses fixed country chrome (name+flag); filter picker is Hot-only.
-        if (activeTab != TAB_HOT) return;
+    /** Country picker: Hot filter (allows "all") vs Country-tab browse country. */
+    private void showCountryPicker(boolean forCountryTab, @Nullable Runnable afterPick) {
         BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(requireContext());
         View sheet = getLayoutInflater().inflate(R.layout.dialog_country_filter, null, false);
         AuraDialogHelper.applyContent(sheet);
@@ -693,6 +753,8 @@ public class HomeFragment extends Fragment {
         androidx.recyclerview.widget.RecyclerView rv = sheet.findViewById(R.id.recyclerCountries);
         rv.setLayoutManager(new androidx.recyclerview.widget.GridLayoutManager(requireContext(), 2));
         java.util.List<CountryCatalog.Entry> entries = CountryCatalog.all();
+        String current = forCountryTab ? getBrowseCountryCode() : hotCountryFilter;
+        final boolean showAllRow = !forCountryTab;
         rv.setAdapter(new androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
             @NonNull
             @Override
@@ -706,35 +768,84 @@ public class HomeFragment extends Fragment {
             public void onBindViewHolder(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder holder, int position) {
                 android.widget.TextView tv = holder.itemView.findViewById(R.id.tvCountry);
                 android.widget.ImageView imgFlag = holder.itemView.findViewById(R.id.imgCountryFlag);
-                if (position == 0) {
+                final int entryIndex = showAllRow ? position - 1 : position;
+                if (showAllRow && position == 0) {
                     tv.setText(R.string.all_countries);
                     if (imgFlag != null) {
                         imgFlag.setVisibility(View.GONE);
                         imgFlag.setImageDrawable(null);
                     }
                 } else {
-                    CountryCatalog.Entry e = entries.get(position - 1);
+                    CountryCatalog.Entry e = entries.get(entryIndex);
                     tv.setText(e.nameAr);
                     FlagImages.bind(imgFlag, e.code);
                 }
-                boolean selected = position == 0
-                        ? selectedCountry == null
-                        : selectedCountry != null && selectedCountry.equals(entries.get(position - 1).code);
+                boolean selected;
+                if (showAllRow && position == 0) {
+                    selected = current == null || current.isEmpty();
+                } else {
+                    selected = current != null && current.equals(entries.get(entryIndex).code);
+                }
                 holder.itemView.setAlpha(selected ? 1f : 0.75f);
                 holder.itemView.setOnClickListener(v -> {
-                    if (position == 0) selectedCountry = null;
-                    else selectedCountry = entries.get(position - 1).code;
+                    if (showAllRow && position == 0) {
+                        hotCountryFilter = null;
+                    } else {
+                        String code = entries.get(entryIndex).code;
+                        if (forCountryTab) {
+                            browseCountry = code;
+                            saveBrowseCountryCode(code);
+                        } else {
+                            hotCountryFilter = code;
+                        }
+                    }
+                    refreshLocationTabChrome();
                     reapplyFeedPages();
                     dialog.dismiss();
+                    if (afterPick != null) afterPick.run();
                 });
             }
 
             @Override
             public int getItemCount() {
-                return entries.size() + 1;
+                return entries.size() + (showAllRow ? 1 : 0);
             }
         });
         dialog.show();
+    }
+
+    private static final String UI_PREFS = "ui_prefs";
+    private static final String KEY_HOME_COUNTRY = "home_country";
+
+    @Nullable
+    private String loadBrowseCountryCode() {
+        try {
+            SharedPreferences p = requireContext().getSharedPreferences(UI_PREFS, android.content.Context.MODE_PRIVATE);
+            String saved = p.getString(KEY_HOME_COUNTRY, null);
+            if (saved != null && !saved.isEmpty()) {
+                CountryCatalog.Entry e = CountryCatalog.resolve(saved);
+                return e != null ? e.code : saved;
+            }
+        } catch (Exception ignored) {}
+        return getMyCountryCode();
+    }
+
+    private void saveBrowseCountryCode(@Nullable String code) {
+        try {
+            requireContext().getSharedPreferences(UI_PREFS, android.content.Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_HOME_COUNTRY, code != null ? code : "")
+                    .apply();
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Country used for the Country tab + flag chrome (prefs → profile → device).
+     */
+    @Nullable
+    public String getBrowseCountryCode() {
+        if (browseCountry != null && !browseCountry.isEmpty()) return browseCountry;
+        return loadBrowseCountryCode();
     }
 
     private void openVoiceRoom(com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto room) {
@@ -1068,13 +1179,25 @@ public class HomeFragment extends Fragment {
         }
         loadWalletBalance();
         if (viewModel == null) return;
+        // Resume / return from Games/etc → silent background refresh (no top spinner).
+        // Pull-to-refresh still uses loadRooms() / loadFollowingRooms() with visible indicator.
         if (activeTab == TAB_ME) {
-            viewModel.loadFollowingRooms();
+            java.util.List<?> following = viewModel.getFollowingRooms().getValue();
+            if (following != null && !following.isEmpty()) {
+                viewModel.loadFollowingRoomsQuietly();
+            } else {
+                viewModel.loadFollowingRooms();
+            }
             reapplyFeedPages();
         } else if (activeTab == TAB_ACTIVITIES) {
-            /* activities fragment is static */
+            /* activities fragment manages itself */
         } else {
-            viewModel.loadRooms();
+            java.util.List<?> cur = viewModel.getRooms().getValue();
+            if (cur != null && !cur.isEmpty()) {
+                viewModel.refreshRoomsQuietly();
+            } else {
+                viewModel.loadRooms();
+            }
             viewModel.loadHomeRankings();
             attachRoomListRealtime();
             handler.removeCallbacks(roomRefreshRunnable);

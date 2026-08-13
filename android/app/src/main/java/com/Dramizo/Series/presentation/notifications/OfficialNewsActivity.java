@@ -2,6 +2,7 @@ package com.Dramizo.Series.presentation.notifications;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -22,6 +23,7 @@ import java.util.List;
 public class OfficialNewsActivity extends ThemedActivity {
     private ActivityOfficialNewsBinding binding;
     private OfficialNewsAdapter adapter;
+    private ProgressBar progress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,17 +37,28 @@ public class OfficialNewsActivity extends ThemedActivity {
         lm.setStackFromEnd(true);
         binding.recycler.setLayoutManager(lm);
         binding.recycler.setAdapter(adapter);
+        binding.recycler.setItemAnimator(null);
+
+        progress = new ProgressBar(this);
+        android.widget.FrameLayout.LayoutParams lp = new android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER);
+        if (binding.getRoot() instanceof android.widget.FrameLayout) {
+            ((android.widget.FrameLayout) binding.getRoot()).addView(progress, lp);
+        }
         load();
     }
 
     private void load() {
+        if (progress != null) progress.setVisibility(View.VISIBLE);
         AppContainer c = ContainerProvider.from(this);
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.ListResult<MiscDtos.NotificationDto>> r =
                     ApiCall.execute(c.getNotificationApi().officialList(1));
-            ApiCall.execute(c.getNotificationApi().officialMarkAllRead());
             if (isFinishing()) return;
             runOnUiThread(() -> {
+                if (progress != null) progress.setVisibility(View.GONE);
                 List<MiscDtos.NotificationDto> items = new ArrayList<>();
                 if (r.success && r.data != null && r.data.items != null) {
                     items.addAll(r.data.items);
@@ -57,11 +70,12 @@ public class OfficialNewsActivity extends ThemedActivity {
                 if (!items.isEmpty()) {
                     binding.recycler.scrollToPosition(items.size() - 1);
                 }
-                // Clear parent Messages list badge
                 sendBroadcast(new android.content.Intent(
                         com.Dramizo.Series.presentation.messages.MessagesFragment.ACTION_OFFICIAL_NEWS_UPDATED)
                         .setPackage(getPackageName()));
             });
+            // Mark-read after paint — never block first render.
+            ApiCall.execute(c.getNotificationApi().officialMarkAllRead());
         });
     }
 }

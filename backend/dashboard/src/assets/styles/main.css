@@ -890,9 +890,10 @@ body.route-loading::before {
   color: #0f172a;
 }
 
-/* Wider cards for users/rooms grids */
+/* Wider cards for users/rooms/agencies grids */
 .users-grid.widget-grid,
-.rooms-grid.widget-grid {
+.rooms-grid.widget-grid,
+.agencies-grid.widget-grid {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 

@@ -324,6 +324,7 @@
 
           <!-- ECONOMY -->
           <template v-else-if="settingsTab === 'economy'">
+            <EconomyPanel class="mb-3" />
             <section class="settings-card mb-3">
               <h3 class="settings-card-title">{{ t('settings.economyExplainerTitle') }}</h3>
               <ol class="mb-0 ps-3 small" style="line-height:1.8">
@@ -563,6 +564,7 @@ import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
+import EconomyPanel from '@/components/settings/EconomyPanel.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
 import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
 import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'

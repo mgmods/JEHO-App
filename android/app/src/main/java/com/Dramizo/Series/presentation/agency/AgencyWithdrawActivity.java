@@ -24,6 +24,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.BalanceRedirect;
+import com.Dramizo.Series.util.HostTargetStagesUi;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
@@ -57,10 +58,13 @@ public class AgencyWithdrawActivity extends ThemedActivity {
     private long selectedDiamonds = 0L;
     private String selectedStageId = null;
     private boolean canSubmit = false;
+    private boolean hostTargetOn;
+    @Nullable private Map<String, Object> hostTargetSnapshot;
 
     private TextView tvMethodLabel;
     private TextView tvSelectedAmount;
     private TextView tvMessage;
+    private TextView tvEmptyPackages;
     private TextInputLayout tilAccount;
     private TextInputEditText etAccount;
     private MaterialButton btnSubmit;
@@ -100,6 +104,7 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         ImageView btnBack = findViewById(R.id.btnBack);
         TextView tvTitle = findViewById(R.id.tvTitle);
         tvMessage = findViewById(R.id.tvMessage);
+        tvEmptyPackages = findViewById(R.id.tvEmptyPackages);
         TextView tvBalance = findViewById(R.id.tvBalance);
         TextView tvMin = findViewById(R.id.tvMin);
         LinearLayout rowMethodPicker = findViewById(R.id.rowMethodPicker);
@@ -119,7 +124,7 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         if (tvMessage != null) {
             tvMessage.setText(forHost
                     ? R.string.agency_host_platform_withdraw_message
-                    : R.string.agency_platform_withdraw_message);
+                    : R.string.agency_owner_withdraw_no_target);
         }
         paintBalance(tvBalance, tvMin);
         applyMethodUi();
@@ -157,12 +162,38 @@ public class AgencyWithdrawActivity extends ThemedActivity {
                     balance, formatUsd(balUsd)));
         }
         if (tvMin != null) {
-            if (forHost) {
-                tvMin.setText(getString(R.string.agency_withdraw_target_min_hint));
+            if (forHost && hostTargetOn) {
+                tvMin.setText(R.string.agency_withdraw_target_min_hint);
+            } else if (forHost) {
+                tvMin.setText(getString(R.string.agency_platform_withdraw_min_line, minDiamonds));
             } else {
                 tvMin.setText(getString(R.string.agency_platform_withdraw_min_line, minDiamonds));
             }
         }
+    }
+
+    private void bindHostTargetSection(@Nullable Map<String, Object> data) {
+        View section = findViewById(R.id.sectionHostTargetWithdraw);
+        if (!forHost || section == null) {
+            if (section != null) section.setVisibility(View.GONE);
+            return;
+        }
+        if (data == null || !Boolean.TRUE.equals(data.get("enabled"))) {
+            section.setVisibility(View.GONE);
+            hostTargetOn = false;
+            hostTargetSnapshot = null;
+            return;
+        }
+        hostTargetOn = true;
+        hostTargetSnapshot = data;
+        HostTargetStagesUi.bindSection(
+                this,
+                section,
+                findViewById(R.id.tvHostTargetMonthWithdraw),
+                findViewById(R.id.tvHostTargetProgressWithdraw),
+                findViewById(R.id.progressHostTargetWithdraw),
+                findViewById(R.id.hostTargetStagesRowWithdraw),
+                data);
     }
 
     private void loadPackages() {
@@ -173,7 +204,7 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         }
     }
 
-    /** Host: exactly one card — current target stage. */
+    /** Host: current target-stage card when ladder is on; otherwise min balance packages. */
     private void loadHostCurrentStage() {
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
             String aid = agencyId != null ? agencyId : "";
@@ -184,14 +215,17 @@ public class AgencyWithdrawActivity extends ThemedActivity {
             List<WalletDtos.WithdrawPackageDto> items = new ArrayList<>();
             String serverMessage = null;
             boolean allowed = false;
+            boolean useBalancePackages = false;
 
             if (opts != null && opts.success && opts.data != null) {
                 Map<String, Object> data = opts.data;
                 double r = toDouble(data.get("diamondUsdRate"));
                 if (r > 0) rate = r;
                 long minFrom10 = Math.max(1L, Math.round(10.0 / Math.max(1e-9, rate)));
-                minDiamonds = Math.max(1000L, minFrom10);
+                minDiamonds = Math.max(minDiamonds, minFrom10);
                 allowed = Boolean.TRUE.equals(data.get("fullBalanceAllowed"));
+                boolean targetOn = Boolean.TRUE.equals(data.get("enabled"))
+                        || Boolean.TRUE.equals(data.get("targetRequired"));
                 Object msg = data.get("message");
                 if (msg != null) serverMessage = String.valueOf(msg);
 
@@ -208,21 +242,40 @@ public class AgencyWithdrawActivity extends ThemedActivity {
                         break; // one stage only
                     }
                 }
+                // Target ladder OFF (or no stage) → half/full packages by min amount.
+                if (items.isEmpty() && allowed && !targetOn) {
+                    useBalancePackages = true;
+                }
             } else {
                 serverMessage = opts != null && opts.error != null
                         ? String.valueOf(opts.error)
                         : getString(R.string.agency_withdraw_target_load_fail);
             }
 
+            if (useBalancePackages) {
+                items = buildBalancePackages();
+                allowed = !items.isEmpty();
+                if (serverMessage == null || serverMessage.isEmpty()) {
+                    serverMessage = getString(R.string.agency_host_platform_withdraw_message_nontarget);
+                }
+            }
+
             final List<WalletDtos.WithdrawPackageDto> finalItems = items;
             final String finalMsg = serverMessage;
             final boolean finalAllowed = allowed;
+            final boolean balanceMode = useBalancePackages;
+            final Map<String, Object> targetSnap = opts != null && opts.success && opts.data != null
+                    ? opts.data : null;
             runOnUiThread(() -> {
+                hostTargetOn = targetSnap != null && (Boolean.TRUE.equals(targetSnap.get("enabled"))
+                        || Boolean.TRUE.equals(targetSnap.get("targetRequired")));
+                bindHostTargetSection(targetSnap);
                 canSubmit = finalAllowed;
                 paintBalance(findViewById(R.id.tvBalance), findViewById(R.id.tvMin));
                 if (tvMessage != null && finalMsg != null && !finalMsg.isEmpty()) {
                     tvMessage.setText(finalMsg);
                 }
+                paintEmptyPackages(finalItems, balanceMode, targetSnap);
                 if (packageAdapter != null) packageAdapter.submit(finalItems);
                 selectedDiamonds = 0L;
                 selectedStageId = null;
@@ -248,6 +301,100 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         });
     }
 
+    /** Builds half/full packages when balance ≥ min (agency + host-without-target). */
+    private List<WalletDtos.WithdrawPackageDto> buildBalancePackages() {
+        List<WalletDtos.WithdrawPackageDto> items = new ArrayList<>();
+        if (balance < minDiamonds) return items;
+        long half = balance / 2;
+        if (half >= minDiamonds) {
+            WalletDtos.WithdrawPackageDto p = makePkg("half", half, half * rate,
+                    getString(R.string.agency_withdraw_pkg_half));
+            p.cashable = true;
+            p.stageStatus = "balance";
+            items.add(p);
+        }
+        WalletDtos.WithdrawPackageDto full = makePkg("full", balance, balance * rate,
+                getString(R.string.agency_withdraw_pkg_full_balance));
+        full.cashable = true;
+        full.isFullBalance = true;
+        full.stageStatus = "full";
+        items.add(full);
+        return items;
+    }
+
+    private void paintEmptyPackages(
+            List<WalletDtos.WithdrawPackageDto> items,
+            boolean showMinGate,
+            @Nullable Map<String, Object> targetSnap) {
+        if (tvEmptyPackages == null) return;
+        boolean empty = items == null || items.isEmpty();
+        if (!empty) {
+            // Show stage-specific hint on the single non-cashable card.
+            if (forHost && hostTargetOn && items.size() == 1 && !items.get(0).cashable) {
+                WalletDtos.WithdrawPackageDto p = items.get(0);
+                tvEmptyPackages.setVisibility(View.VISIBLE);
+                tvEmptyPackages.setText(getString(
+                        R.string.agency_withdraw_stage_progress_blocked,
+                        p.stageIndex > 0 ? p.stageIndex : 1,
+                        p.thresholdDiamonds,
+                        p.progressDiamonds,
+                        Math.max(0L, p.remainingDiamonds)));
+                return;
+            }
+            if (forHost && hostTargetOn && items.size() == 1 && items.get(0).cashable
+                    && items.get(0).diamonds > balance) {
+                WalletDtos.WithdrawPackageDto p = items.get(0);
+                tvEmptyPackages.setVisibility(View.VISIBLE);
+                tvEmptyPackages.setText(getString(
+                        R.string.agency_withdraw_stage_balance_blocked,
+                        p.stageIndex > 0 ? p.stageIndex : 1,
+                        formatUsd(p.hostSalaryUsd > 0 ? p.hostSalaryUsd : p.usd),
+                        p.diamonds,
+                        balance));
+                return;
+            }
+            tvEmptyPackages.setVisibility(View.GONE);
+            return;
+        }
+        tvEmptyPackages.setVisibility(View.VISIBLE);
+        if (forHost && hostTargetOn && targetSnap != null) {
+            long progress = toLong(targetSnap.get("progress"));
+            Object stagesObj = targetSnap.get("stages");
+            if (stagesObj instanceof List) {
+                for (Object row : (List<?>) stagesObj) {
+                    if (!(row instanceof Map)) continue;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> s = (Map<String, Object>) row;
+                    if (!"current".equals(String.valueOf(s.get("status")))) continue;
+                    long th = toLong(s.get("threshold"));
+                    int idx = (int) toLong(s.get("index"));
+                    tvEmptyPackages.setText(getString(
+                            R.string.agency_withdraw_stage_progress_blocked,
+                            idx > 0 ? idx : 1,
+                            th,
+                            progress,
+                            Math.max(0L, th - progress)));
+                    return;
+                }
+            }
+            tvEmptyPackages.setText(R.string.agency_withdraw_stage_not_ready);
+            return;
+        }
+        long need = Math.max(0L, minDiamonds - balance);
+        if (showMinGate && balance < minDiamonds) {
+            tvEmptyPackages.setText(getString(
+                    R.string.agency_withdraw_below_min,
+                    minDiamonds,
+                    balance,
+                    need,
+                    formatUsd(minDiamonds * rate)));
+        } else if (forHost) {
+            tvEmptyPackages.setText(R.string.agency_withdraw_stage_not_ready);
+        } else {
+            tvEmptyPackages.setText(R.string.agency_platform_withdraw_insufficient);
+        }
+    }
+
     /** Agency: balance slices + full — no target stages. */
     private void loadAgencyBalancePackages() {
         ContainerProvider.from(this).getIoExecutor().execute(() -> {
@@ -267,32 +414,19 @@ public class AgencyWithdrawActivity extends ThemedActivity {
             long minFrom10 = Math.max(1L, Math.round(10.0 / Math.max(1e-9, rate)));
             minDiamonds = Math.max(minDiamonds, minFrom10);
 
-            List<WalletDtos.WithdrawPackageDto> items = new ArrayList<>();
-            if (balance >= minDiamonds) {
-                long half = balance / 2;
-                if (half >= minDiamonds) {
-                    WalletDtos.WithdrawPackageDto p = makePkg("half", half, half * rate,
-                            getString(R.string.agency_withdraw_pkg_half));
-                    p.cashable = true;
-                    p.stageStatus = "balance";
-                    items.add(p);
-                }
-                WalletDtos.WithdrawPackageDto full = makePkg("full", balance, balance * rate,
-                        getString(R.string.agency_withdraw_pkg_full_balance));
-                full.cashable = true;
-                full.isFullBalance = true;
-                full.stageStatus = "full";
-                items.add(full);
-            }
+            List<WalletDtos.WithdrawPackageDto> items = buildBalancePackages();
 
             final List<WalletDtos.WithdrawPackageDto> finalItems = items;
             final String finalMsg = serverMessage != null
                     ? serverMessage
-                    : getString(R.string.agency_platform_withdraw_message);
+                    : getString(R.string.agency_owner_withdraw_no_target);
             runOnUiThread(() -> {
+                hostTargetOn = false;
+                bindHostTargetSection(null);
                 canSubmit = !finalItems.isEmpty();
                 paintBalance(findViewById(R.id.tvBalance), findViewById(R.id.tvMin));
                 if (tvMessage != null) tvMessage.setText(finalMsg);
+                paintEmptyPackages(finalItems, true, null);
                 if (packageAdapter != null) packageAdapter.submit(finalItems);
                 selectedDiamonds = 0L;
                 selectedStageId = null;
@@ -428,16 +562,34 @@ public class AgencyWithdrawActivity extends ThemedActivity {
         String account = etAccount != null && etAccount.getText() != null
                 ? etAccount.getText().toString().trim() : "";
         if (diamonds <= 0 || selectedStageId == null || selectedStageId.isEmpty()) {
-            Toast.makeText(this, R.string.agency_withdraw_pick_amount_first, Toast.LENGTH_SHORT)
-                    .show();
+            if (balance < minDiamonds && !forHost) {
+                Toast.makeText(this, getString(
+                        R.string.agency_withdraw_below_min,
+                        minDiamonds,
+                        balance,
+                        Math.max(0L, minDiamonds - balance),
+                        formatUsd(minDiamonds * rate)), Toast.LENGTH_LONG).show();
+            } else {
+                Toast.makeText(this, R.string.agency_withdraw_pick_amount_first, Toast.LENGTH_SHORT)
+                        .show();
+            }
             return;
         }
         if (forHost) {
             WalletDtos.WithdrawPackageDto sel =
                     packageAdapter != null ? packageAdapter.selectedPackage() : null;
             if (sel == null || !sel.cashable || !canSubmit) {
-                Toast.makeText(this, R.string.agency_withdraw_stage_not_ready, Toast.LENGTH_LONG)
-                        .show();
+                if (sel != null && !sel.cashable && hostTargetOn) {
+                    Toast.makeText(this, getString(
+                            R.string.agency_withdraw_stage_progress_blocked,
+                            sel.stageIndex > 0 ? sel.stageIndex : 1,
+                            sel.thresholdDiamonds,
+                            sel.progressDiamonds,
+                            Math.max(0L, sel.remainingDiamonds)), Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, R.string.agency_withdraw_stage_not_ready, Toast.LENGTH_LONG)
+                            .show();
+                }
                 return;
             }
         } else if (!canSubmit) {
@@ -604,7 +756,12 @@ public class AgencyWithdrawActivity extends ThemedActivity {
             }
             h.tvDiamonds.setText(String.format(Locale.US, "%,d ألماس", p.diamonds));
             if (h.tvHint != null) {
-                if (!forHost) {
+                boolean balancePkg = p.isFullBalance
+                        || "full".equals(p.id)
+                        || "half".equals(p.id)
+                        || "balance".equals(p.stageStatus)
+                        || "full".equals(p.stageStatus);
+                if (!forHost || balancePkg) {
                     if (p.isFullBalance || "full".equals(p.id)) {
                         h.tvHint.setText(R.string.agency_withdraw_pkg_full_balance);
                     } else {

@@ -1383,9 +1383,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ? String((hostDto as any).roomCardUrl).trim() || null
         : null;
     const roomCardUrl = fromRoom || fromHostProfile || fromHostDto || null;
+    let finalRoomCardUrl = roomCardUrl;
     const decorated = {
       ...room,
-      roomCardUrl,
+      roomCardUrl: finalRoomCardUrl,
       host: hostDto,
       seats: decoratedSeats,
     };
@@ -1406,6 +1407,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     let agencyLogoUrl: string | null = null;
     let agencyLevel = 1;
     let agencyTotalDiamonds = 0;
+    let agencyIsVerified = false;
     if (isAgency && decorated.agencyId) {
       try {
         const agency = await this.agenciesRepo.findOne({
@@ -1414,6 +1416,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         if (agency) {
           const agencyName = String(agency.name || '').trim();
           if (agencyName) listTitle = agencyName;
+          agencyIsVerified = !!agency.isVerified;
           agencyLogoUrl = agency.logoUrl ? String(agency.logoUrl).trim() : null;
           // Room cover is often the actual brand photo when logoUrl was never set.
           if (!agencyLogoUrl && coverUrl) {
@@ -1454,6 +1457,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
               );
             }
           }
+          if (!finalRoomCardUrl && agency.exclusiveRoomCardCode) {
+            const code = String(agency.exclusiveRoomCardCode).trim();
+            if (code) {
+              const cosmetic = await this.cosmeticsRepo.findOne({
+                where: { code, isActive: true },
+              });
+              const kenar =
+                cosmetic?.previewUrl?.trim() || cosmetic?.animationUrl?.trim();
+              if (kenar) finalRoomCardUrl = kenar;
+            }
+          }
+          decorated.roomCardUrl = finalRoomCardUrl;
         }
       } catch {
         /* keep listTitle */
@@ -1474,6 +1489,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       agencyLogoUrl,
       agencyLevel,
       agencyTotalDiamonds,
+      agencyIsVerified,
       viewerAvatars: this.collectViewerAvatars(decorated),
       moderatorIds: (room.moderators || []).map((m: any) => m.userId).filter(Boolean),
       moderatorPermissions: (room.moderators || []).map((m: RoomModerator) => ({
@@ -2916,7 +2932,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return this.getRoom(roomId);
   }
 
-  /** Force a seated user into audience (keeps room access). Used by auto-mod. */
+  /** Force a seated user into audience (keeps room access). Used by auto-mod + host/mod. */
   async forceLeaveSeat(roomId: string, userId: string, reason?: string) {
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
     if (!seat) return { left: false, userId };
@@ -2936,6 +2952,29 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     });
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true, userId };
+  }
+
+  /** Host/moderator: remove someone from mic without kicking them from the room. */
+  async forceLeaveSeatByModerator(
+    roomId: string,
+    actorId: string,
+    targetUserId: string,
+    reason?: string,
+  ) {
+    const uid = String(targetUserId || '').trim();
+    if (!uid) throw new BadRequestException('معرّف المستخدم مطلوب');
+    await this.assertModeratorPermission(
+      roomId,
+      actorId,
+      'canManageSeats',
+      'لا تملك صلاحية إنزال المستخدمين من المايك',
+    );
+    await this.assertCanTargetUser(roomId, actorId, uid);
+    const seat = await this.seatsRepo.findOne({ where: { roomId, userId: uid } });
+    if (!seat) {
+      throw new BadRequestException('المستخدم ليس على المايك حالياً');
+    }
+    return this.forceLeaveSeat(roomId, uid, reason || 'moderator');
   }
 
   private async clearUserSeat(roomId: string, userId: string) {

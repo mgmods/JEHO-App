@@ -660,6 +660,11 @@ public final class LiveKitEngineManager {
         return speakerMuted;
     }
 
+    /** Headset plug/unplug — speaker route only, no SCO/mode restart. */
+    public void reapplyRouteOnly() {
+        RoomAudioRoute.applyRouteOnly(application, !speakerMuted);
+    }
+
     private void applyAudioRoute() {
         // wantOpenSpeaker = !speakerMuted (room “speaker” button on).
         RoomAudioRoute.applyCommunicationRoute(application, !speakerMuted);

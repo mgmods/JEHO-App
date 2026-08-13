@@ -152,6 +152,12 @@ public abstract class ThemedActivity extends AppCompatActivity {
         View named = group.findViewById(R.id.contentRoot);
         if (named != null) return named;
 
+        // Vertical/horizontal LinearLayout shells: pad the whole root — not the first
+        // child (often a fixed-height toolbar whose padding would stay under the status bar).
+        if (group instanceof android.widget.LinearLayout) {
+            return root;
+        }
+
         // FrameLayout pattern: full-bleed ImageView bg + content column.
         if (group instanceof android.widget.FrameLayout || group instanceof androidx.constraintlayout.widget.ConstraintLayout) {
             boolean hasFullBleedBg = false;

@@ -27,19 +27,10 @@ import java.util.Set;
 
 /**
  * Mikoo {@code HomeLiveListAdapter} / {@code item_home_live_list} binder.
- * Cover, level badge image, pretty ID (ic_pretty_id_level_* by room level), flag, title, online chips, viewer count.
+ * Cover, numeric room level above viewers, flag, title, online chips, viewer count.
  */
 public final class RoomCardBinder {
     private static final int MAX_AVATARS = 5;
-    /** Mikoo pretty-ID banners — curved ends + "ID" shield; index by roomLevel 1..6. */
-    private static final int[] PRETTY_ID_BG = {
-            R.drawable.ic_pretty_id_level_1,
-            R.drawable.ic_pretty_id_level_2,
-            R.drawable.ic_pretty_id_level_3,
-            R.drawable.ic_pretty_id_level_4,
-            R.drawable.ic_pretty_id_level_5,
-            R.drawable.ic_pretty_id_level_6,
-    };
 
     private RoomCardBinder() {}
 
@@ -55,12 +46,12 @@ public final class RoomCardBinder {
         if (b.rowRoomLevel != null) b.rowRoomLevel.setVisibility(View.GONE);
         // Always show type chip so users separate personal vs agency rooms at a glance.
         if (b.tvRoomTypeBadge != null) {
-            RoomUiHelper.bindTypeBadge(b.tvRoomTypeBadge, room);
+            RoomUiHelper.bindTypeBadge(b.tvRoomTypeBadge, b.imgAgencyVerified, room);
         }
 
         String title = displayTitle(room);
         b.tvTitle.setText(title);
-        b.tvTitle.setSelected(false);
+        b.tvTitle.setSelected(true);
         b.tvHost.setText(resolveHostName(room));
 
         RoomUiHelper.bindLockOverlay(b.flLock, room);
@@ -78,12 +69,16 @@ public final class RoomCardBinder {
 
     private static String displayTitle(RoomDtos.RoomDto room) {
         boolean agency = RoomUiHelper.isAgencyRoom(room);
+        if (!agency) {
+            String hostName = resolveHostName(room);
+            if (hostName != null && !hostName.isEmpty() && !"مضيف".equals(hostName)) {
+                return hostName;
+            }
+        }
         String title = room.title != null && !room.title.isEmpty() ? room.title.trim() : "";
         if (title.startsWith("وكالة · ")) title = title.substring("وكالة · ".length()).trim();
         if (title.startsWith("وكالة·")) title = title.substring("وكالة·".length()).trim();
-        if (!title.isEmpty()) {
-            return agency ? title : title;
-        }
+        if (!title.isEmpty()) return title;
         String hostName = resolveHostName(room);
         if (hostName != null && !hostName.isEmpty() && !"مضيف".equals(hostName)) {
             return hostName;
@@ -91,17 +86,14 @@ public final class RoomCardBinder {
         return "غرفة";
     }
 
-    /** Mikoo ivRoomLevel — only when room has a real level (>1); default gone like Mikoo XML. */
+    /** Numeric Lv.N above viewer count — never an image (room frames would cover images). */
     private static void bindRoomLevelBadge(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
-        if (b.imgRoomLevel == null) return;
-        int level = Math.max(0, room.roomLevel);
-        if (level <= 1) {
-            b.imgRoomLevel.setVisibility(View.GONE);
-            return;
-        }
-        b.imgRoomLevel.setImageResource(R.drawable.icon_room_level_1);
-        b.imgRoomLevel.setVisibility(View.VISIBLE);
-        b.imgRoomLevel.setContentDescription("LV" + level);
+        if (b.imgRoomLevel != null) b.imgRoomLevel.setVisibility(View.GONE);
+        if (b.tvRoomLevelNum == null) return;
+        int level = Math.max(1, room.roomLevel);
+        b.tvRoomLevelNum.setText("Lv." + level);
+        b.tvRoomLevelNum.setVisibility(View.VISIBLE);
+        b.tvRoomLevelNum.bringToFront();
     }
 
     private static void bindOfficialBadge(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
@@ -200,14 +192,16 @@ public final class RoomCardBinder {
     private static void bindViewerCount(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
         int viewers = Math.max(room.viewerCount, 0);
         String text = formatCount(Math.max(viewers, 1));
-        // Mikoo uses tv_room_num TextView with drawableStart — prefer that.
         if (b.tvExtraCount != null) {
             b.tvExtraCount.setVisibility(View.VISIBLE);
             b.tvExtraCount.setText(text);
+            b.tvExtraCount.bringToFront();
         }
         if (b.rowViewerCount != null) {
             b.rowViewerCount.setVisibility(View.GONE);
         }
+        if (b.tvRoomLevelNum != null) b.tvRoomLevelNum.bringToFront();
+        if (b.rowRoomTypeBadge != null) b.rowRoomTypeBadge.bringToFront();
     }
 
     private static void bindLiveEqualizer(ItemPartyRoomBinding b) {

@@ -270,6 +270,43 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('seat-stickers')
+  @ApiOperation({
+    summary: 'Seat mic reaction stickers (GIF/WebP) managed from dashboard',
+  })
+  async seatStickers() {
+    const {
+      defaultSeatStickersConfig,
+      sanitizeSeatStickersConfig,
+      seatStickersClientPayload,
+      rememberSeatStickersCache,
+    } = await import('./seat-stickers.util');
+    const row = await this.settingsRepo.findOne({ where: { key: 'seat_stickers' } });
+    let cfg = defaultSeatStickersConfig();
+    if (row?.value) {
+      try {
+        cfg = sanitizeSeatStickersConfig(JSON.parse(row.value));
+      } catch {
+        cfg = sanitizeSeatStickersConfig(row.value);
+      }
+    } else {
+      // First boot: persist defaults so dashboard can edit immediately.
+      try {
+        const created = this.settingsRepo.create({
+          key: 'seat_stickers',
+          value: JSON.stringify(cfg),
+          description: 'Seat mic reaction stickers catalog',
+        });
+        await this.settingsRepo.save(created);
+      } catch {
+        // non-fatal
+      }
+    }
+    rememberSeatStickersCache(cfg);
+    return seatStickersClientPayload(cfg);
+  }
+
+  @Public()
   @Get('games')
   @ApiOperation({ summary: 'Playable games catalog for the app (managed from dashboard)' })
   async games() {

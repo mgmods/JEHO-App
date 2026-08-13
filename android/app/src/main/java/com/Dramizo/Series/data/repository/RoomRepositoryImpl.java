@@ -200,6 +200,14 @@ public class RoomRepositoryImpl implements RoomRepository {
     }
 
     @Override
+    public Result<Object> forceLeaveSeat(String id, String userId, String reason) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("userId", userId);
+        if (reason != null) body.put("reason", reason);
+        return ApiCall.execute(api.forceLeaveSeat(id, body));
+    }
+
+    @Override
     public Result<RoomDtos.RoomDto> lockSeat(String id, int seatIndex, boolean locked) {
         Map<String, Object> body = new HashMap<>();
         body.put("seatIndex", seatIndex);

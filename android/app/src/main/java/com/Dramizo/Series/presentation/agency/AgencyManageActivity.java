@@ -316,13 +316,7 @@ public class AgencyManageActivity extends ThemedActivity {
     }
 
     private void dialogAddHostChooser() {
-        ArrayList<String> labels = new ArrayList<>();
-        ArrayList<Runnable> actions = new ArrayList<>();
-        labels.add("إضافة مباشرة بالـ ID");
-        actions.add(this::dialogAddHost);
-        labels.add("دعوة عبر الدردشة (بطاقة عائلة)");
-        actions.add(this::openAgencyChatInvite);
-        showCustomList(getString(R.string.agency_manage_menu_add), labels, actions);
+        openAgencyChatInvite();
     }
 
     private void openAgencyChatInvite() {

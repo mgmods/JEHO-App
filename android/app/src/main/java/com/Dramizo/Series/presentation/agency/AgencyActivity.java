@@ -256,8 +256,13 @@ public class AgencyActivity extends ThemedActivity {
                 else hideHostTarget();
                 binding.tvMyAgencyName.setText(
                         m.agency.name != null ? m.agency.name : getString(R.string.agency));
+                ImageView verifiedIv = binding.getRoot().findViewById(R.id.imgMyAgencyVerified);
                 com.Dramizo.Series.util.AgencyVerifiedBadge.bind(
-                        binding.tvMyAgencyName, null, m.agency);
+                        null, verifiedIv, m.agency);
+                if (verifiedIv == null) {
+                    com.Dramizo.Series.util.AgencyVerifiedBadge.bind(
+                            binding.tvMyAgencyName, null, m.agency);
+                }
                 binding.tvMyAgencyMeta.setText(formatAgencyMeta(m));
                 updateHeroEyebrow(role, pendingJoin);
                 if (canManage && m.agency.activationCode != null
@@ -405,18 +410,19 @@ public class AgencyActivity extends ThemedActivity {
                 if (er.success && er.data != null && er.data.diamondUsdRate > 0) {
                     liveCashableRate = er.data.diamondUsdRate;
                 }
+                // CLEAN ECONOMY: cashable balance = the single wallet.diamonds pool.
                 if (wr.success && wr.data != null) {
-                    liveCashableDiamonds = Math.max(0L, wr.data.agencyDiamonds);
+                    liveCashableDiamonds = Math.max(0L, wr.data.diamonds);
                     if (wr.data.diamondUsdRate > 0) {
                         liveCashableRate = wr.data.diamondUsdRate;
                     }
-                } else if (lastHostDash != null && lastHostDash.agencyDiamonds >= 0) {
-                    liveCashableDiamonds = Math.max(0L, lastHostDash.agencyDiamonds);
+                } else if (lastHostDash != null && lastHostDash.walletDiamonds >= 0) {
+                    liveCashableDiamonds = Math.max(0L, lastHostDash.walletDiamonds);
                     if (lastHostDash.diamondUsdRate > 0) {
                         liveCashableRate = lastHostDash.diamondUsdRate;
                     }
                 } else if (lastEarnings != null && lastEarnings.available != null) {
-                    liveCashableDiamonds = Math.max(0L, lastEarnings.available.agencyDiamonds);
+                    liveCashableDiamonds = Math.max(0L, lastEarnings.available.personalDiamonds);
                     if (lastEarnings.diamondUsdRate > 0) {
                         liveCashableRate = lastEarnings.diamondUsdRate;
                     }
@@ -474,8 +480,9 @@ public class AgencyActivity extends ThemedActivity {
                 long balance = 0L;
                 double rate = 0.00005d;
                 long minW = 10000L;
+                // CLEAN ECONOMY: withdraw from the single wallet.diamonds pool.
                 if (wr.success && wr.data != null) {
-                    balance = Math.max(0L, wr.data.agencyDiamonds);
+                    balance = Math.max(0L, wr.data.diamonds);
                     if (wr.data.diamondUsdRate > 0) rate = wr.data.diamondUsdRate;
                 }
                 if (er.success && er.data != null) {
@@ -486,14 +493,14 @@ public class AgencyActivity extends ThemedActivity {
                 }
                 if (forHost && lastHostDash != null) {
                     if (lastHostDash.diamondUsdRate > 0) rate = lastHostDash.diamondUsdRate;
-                    if (lastHostDash.agencyDiamonds >= 0) {
-                        balance = Math.max(0L, lastHostDash.agencyDiamonds);
+                    if (lastHostDash.walletDiamonds >= 0) {
+                        balance = Math.max(0L, lastHostDash.walletDiamonds);
                     }
                 } else if (lastEarnings != null) {
                     if (lastEarnings.diamondUsdRate > 0) rate = lastEarnings.diamondUsdRate;
                     if (lastEarnings.available != null
-                            && lastEarnings.available.agencyDiamonds >= 0) {
-                        balance = Math.max(0L, lastEarnings.available.agencyDiamonds);
+                            && lastEarnings.available.personalDiamonds >= 0) {
+                        balance = Math.max(0L, lastEarnings.available.personalDiamonds);
                     }
                 }
                 String agencyName = myAgency != null && myAgency.agency != null

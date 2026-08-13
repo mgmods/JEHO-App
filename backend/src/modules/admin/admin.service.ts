@@ -69,7 +69,6 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { GiftType } from '../../database/entities/gift.entity';
 import { v4 as uuidv4 } from 'uuid';
-import { salaryLadderToHostTargetStages } from '../../common/host-salary-ladder';
 import {
   normalizeStaffRole,
   isDashboardSuper,
@@ -310,7 +309,21 @@ export class AdminService {
       };
     }).sort((a, b) => b.total - a.total);
 
-    const totalRev = Number(rechargeSum?.total || 0);
+    const rawTotal = Number(rechargeSum?.total || 0);
+    const baselineRow = await this.settingsRepo.findOne({
+      where: { key: 'dashboard_revenue_baseline_fiat' },
+    });
+    const baseline = Math.max(0, Number(baselineRow?.value || 0) || 0);
+    const totalRev = Math.max(0, rawTotal - baseline);
+    const scale = rawTotal > 0 ? totalRev / rawTotal : 0;
+    const scaledProviders = revenueByProvider.map((row) => ({
+      ...row,
+      total: Math.round(Number(row.total || 0) * scale * 100) / 100,
+    }));
+    const todayRaw = Number(todayRechargeSum?.total || 0);
+    // After a revenue reset, hide legacy totals; keep today's new sales visible.
+    const todayRevenue = baseline > 0 && totalRev <= 0 ? 0 : todayRaw;
+
     return {
       brand: 'JEHO CHAT',
       users,
@@ -327,8 +340,8 @@ export class AdminService {
       totalRechargeFiat: totalRev,
       revenue: totalRev,
       totalRevenue: totalRev,
-      todayRevenue: Number(todayRechargeSum?.total || 0),
-      revenueByProvider,
+      todayRevenue,
+      revenueByProvider: scaledProviders,
     };
   }
 
@@ -1230,6 +1243,11 @@ export class AdminService {
     return this.giftsService.importJehoDesignedGifts();
   }
 
+  /** Clone cosmetics entry_effect → gifts catalog (video gifts). */
+  importEntryEffectsAsGifts() {
+    return this.giftsService.importEntryEffectsAsGifts();
+  }
+
   async upsertGift(id: string | null, dto: UpsertGiftDto) {
     let gift = id ? await this.giftsRepo.findOne({ where: { id } }) : null;
     if (id && !gift) throw new NotFoundException('Gift not found');
@@ -1240,17 +1258,34 @@ export class AdminService {
         coinPrice: dto.coinPrice,
       });
     }
+    const nextType = dto.type ?? gift.type;
+    const isLucky = nextType === GiftType.LUCKY;
+    const {
+      mintDiamondsPerUnit,
+      recommendedGiftDiamonds,
+    } = require('../../common/pricing-catalog') as typeof import('../../common/pricing-catalog');
+    const { ECONOMY } = require('../../common/economy-config') as typeof import('../../common/economy-config');
+    const ratio = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
+    const price = Math.max(0, Math.floor(Number(dto.coinPrice) || 0));
+    const diamondCatalog =
+      dto.diamondValue != null && Number(dto.diamondValue) > 0
+        ? Number(dto.diamondValue)
+        : recommendedGiftDiamonds(price, isLucky);
+    const diamondSafe = mintDiamondsPerUnit(price, diamondCatalog, ratio);
+    // Category is chosen from the dashboard — never invented from price.
+    const categoryDefault =
+      dto.category ?? (gift as any).category ?? null;
     Object.assign(gift, {
       name: dto.name,
       description: dto.description ?? gift.description,
       iconUrl: dto.iconUrl,
       animationUrl: dto.animationUrl ?? gift.animationUrl,
       coinPrice: dto.coinPrice,
-      diamondValue: dto.diamondValue ?? gift.diamondValue ?? Math.floor(dto.coinPrice * 0.5),
-      type: dto.type ?? gift.type,
+      diamondValue: diamondSafe,
+      type: nextType,
       isActive: dto.isActive ?? gift.isActive ?? true,
       sortOrder: dto.sortOrder ?? gift.sortOrder ?? 0,
-      category: dto.category ?? (gift as any).category ?? 'normal',
+      category: categoryDefault,
       brandAgencyId:
         dto.brandAgencyId === undefined
           ? (gift as any).brandAgencyId ?? null
@@ -1382,19 +1417,9 @@ export class AdminService {
             const amount = Number(req.diamonds);
             const details = (req.payoutDetails || {}) as Record<string, unknown>;
             const src = String(details.source || details.channel || '').toLowerCase();
-            const agencyPool =
-              src.includes('agency') ||
-              src === 'agency_commission' ||
-              src === 'agency_host' ||
-              src === 'agency' ||
-              src === 'agency_room' ||
-              String(details.stream || '') === 'agency';
-            if (agencyPool) {
-              (wallet as any).agencyDiamonds =
-                Number((wallet as any).agencyDiamonds || 0) + amount;
-            } else {
-              wallet.diamonds = Number(wallet.diamonds || 0) + amount;
-            }
+            // CLEAN ECONOMY: withdrawals come from the single diamond pool, so
+            // every rejected-withdraw refund goes straight back to wallet.diamonds.
+            wallet.diamonds = Number(wallet.diamonds || 0) + amount;
             await manager.save(wallet);
             await manager.save(
               manager.create(WalletTransaction, {
@@ -1402,17 +1427,11 @@ export class AdminService {
                 type: TransactionType.ADMIN_ADJUST,
                 currency: CurrencyType.DIAMONDS,
                 amount,
-                balanceAfter: agencyPool
-                  ? Number((wallet as any).agencyDiamonds || 0)
-                  : Number(wallet.diamonds),
+                balanceAfter: Number(wallet.diamonds),
                 referenceType: 'withdraw_refund',
                 referenceId: refundRef,
-                description: agencyPool
-                  ? src.includes('host')
-                    ? `رفض سحب أرباح مضيفة — إرجاع`
-                    : `رفض سحب عمولة وكالة — إرجاع`
-                  : `رفض سحب روم شخصي — إرجاع`,
-                metadata: { stream: agencyPool ? 'agency' : 'personal', source: src },
+                description: `رفض سحب — إرجاع الألماس`,
+                metadata: { stream: 'unified', source: src },
               }),
             );
           }
@@ -1545,13 +1564,12 @@ export class AdminService {
     };
 
     const {
-      GIFT_DIAMOND_RATIO,
-      LUCKY_GIFT_DIAMOND_RATIO,
       AGENCY_CREATE,
       HOST_ROOM_INVITE_REWARD,
       STANDARD_RECHARGE_PACKAGES,
       MALL_COSMETIC_PRICES,
     } = await import('../../common/pricing-catalog');
+    const { ECONOMY } = await import('../../common/economy-config');
 
     const gifts = await this.giftsRepo.find({
       where: { isActive: true },
@@ -1635,21 +1653,23 @@ export class AdminService {
     } else if (hostTargetRaw && Array.isArray(hostTargetRaw.stages)) {
       hostTarget = hostTargetRaw.stages;
     }
-    const hasSalary = hostTarget.some(
-      (s) => Number(s?.hostSalaryUsd) > 0 || Number(s?.agentSalaryUsd) > 0,
-    );
-    if (!hostTarget.length || !hasSalary) {
-      hostTarget = salaryLadderToHostTargetStages();
-    }
+    // CLEAN ECONOMY: no forced salary ladder — show whatever the (optional,
+    // off-by-default) simple target holds. Empty is fine.
 
     const agencyCreateCoins = Number(
       settings[AGENCY_CREATE.settingKey] || AGENCY_CREATE.defaultCoins,
     );
 
     const economy = {
-      giftDiamondRatio: GIFT_DIAMOND_RATIO,
-      luckyGiftDiamondRatio: LUCKY_GIFT_DIAMOND_RATIO,
-      diamondUsdRate: Number(settings['economy.diamondUsdRate'] || 0.00005),
+      coinsPerUsd: ECONOMY.coinsPerUsd,
+      diamondUsd: ECONOMY.diamondUsd,
+      minWithdrawDiamonds: ECONOMY.minWithdrawDiamonds,
+      giftDiamondRatio: ECONOMY.giftDiamondRatio,
+      luckyGiftDiamondRatio: ECONOMY.luckyGiftDiamondRatio,
+      maxDiamondsPerUnit: ECONOMY.maxDiamondsPerUnit,
+      luckyGiftMaxMultiplier: ECONOMY.luckyGiftMaxMultiplier,
+      defaultGiftSplit: { ...ECONOMY.defaultGiftSplit },
+      diamondUsdRate: ECONOMY.diamondUsd,
       diamondCoinRate: Number(settings['economy.diamondCoinRate'] || 0.55),
       withdrawTargetDiamonds: Number(
         settings['economy.withdrawTargetDiamonds'] ||
@@ -1662,10 +1682,23 @@ export class AdminService {
       hostInviteDiamonds: HOST_ROOM_INVITE_REWARD.diamonds,
       hostInviteDwellSeconds: HOST_ROOM_INVITE_REWARD.dwellSeconds,
       hostInviteMaxPerDay: HOST_ROOM_INVITE_REWARD.maxRewardsPerHostPerDay,
-      platformShare: Number(settings['economy.platform_share'] || settings['gift_platform_share'] || 0.4),
-      agencyShare: Number(settings['economy.agency_share'] || settings['gift_agency_share'] || 0.15),
-      hostShareWithAgency: Number(settings['economy.host_share_agency'] || 0.45),
-      hostShareSolo: Number(settings['economy.host_share_solo'] || 0.6),
+      // CLEAN ECONOMY: all split fractions derive from the single live ECONOMY
+      // source (no stale app_settings). payout = receiver's share of gift value;
+      // platform keeps the rest (margin taken at the coin→diamond mint).
+      ...(() => {
+        const payout = Math.min(
+          1,
+          Math.max(0, ECONOMY.giftDiamondRatio * ECONOMY.diamondUsd * ECONOMY.coinsPerUsd),
+        );
+        const ownerFrac = ECONOMY.defaultGiftSplit.agencyOwnerPercent / 100;
+        const hostFrac = ECONOMY.defaultGiftSplit.hostPercent / 100;
+        return {
+          platformShare: Number((1 - payout).toFixed(4)),
+          agencyShare: Number((payout * ownerFrac).toFixed(4)),
+          hostShareWithAgency: Number((payout * hostFrac).toFixed(4)),
+          hostShareSolo: Number(payout.toFixed(4)),
+        };
+      })(),
     };
 
     const paymentFlags = {
@@ -1837,6 +1870,31 @@ export class AdminService {
         }
         clean.version = prevVer + 1;
         clean.updatedAt = new Date().toISOString();
+        nextValue = JSON.stringify(clean);
+      } catch {
+        // keep original
+      }
+    }
+    if (key === 'seat_stickers') {
+      try {
+        const {
+          sanitizeSeatStickersConfig,
+          rememberSeatStickersCache,
+        } = await import('../config/seat-stickers.util');
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        const clean = sanitizeSeatStickersConfig(parsed);
+        const prev = await this.settingsRepo.findOne({ where: { key } });
+        let prevVer = 0;
+        if (prev?.value) {
+          try {
+            prevVer = Math.max(0, Number(JSON.parse(prev.value)?.version) || 0);
+          } catch {
+            prevVer = 0;
+          }
+        }
+        clean.version = prevVer + 1;
+        clean.updatedAt = new Date().toISOString();
+        rememberSeatStickersCache(clean);
         nextValue = JSON.stringify(clean);
       } catch {
         // keep original
@@ -2227,7 +2285,7 @@ export class AdminService {
       .where('r.status = :s', { s: RechargeStatus.COMPLETED })
       .groupBy('r.provider')
       .getRawMany();
-    const byProvider = (providerRows || [])
+    const byProviderRaw = (providerRows || [])
       .map((row: any) => ({
         provider: String(row.provider || 'other'),
         label: this.providerRevenueLabel(String(row.provider || 'other')),
@@ -2236,10 +2294,23 @@ export class AdminService {
       }))
       .filter((r) => r.total > 0 || r.count > 0)
       .sort((a, b) => b.total - a.total);
+    const chartRawTotal = byProviderRaw.reduce((s, r) => s + Number(r.total || 0), 0);
+    const chartBaselineRow = await this.settingsRepo.findOne({
+      where: { key: 'dashboard_revenue_baseline_fiat' },
+    });
+    const chartBaseline = Math.max(0, Number(chartBaselineRow?.value || 0) || 0);
+    const chartNet = Math.max(0, chartRawTotal - chartBaseline);
+    const chartScale = chartRawTotal > 0 ? chartNet / chartRawTotal : 0;
+    const byProvider = byProviderRaw.map((r) => ({
+      ...r,
+      total: Math.round(Number(r.total || 0) * chartScale * 100) / 100,
+    })).filter((r) => r.total > 0 || (chartNet <= 0 && r.count > 0));
     // Doughnut = real fiat revenue by payment channel (Play / card / USDT / …).
-    const revLabels = byProvider.map((r) => r.label);
-    const revValues = byProvider.map((r) => r.total);
-    if (revLabels.length === 0) {
+    const revLabels = byProvider.length ? byProvider.map((r) => r.label) : ['—'];
+    const revValues = byProvider.length ? byProvider.map((r) => r.total) : [0];
+    if (chartNet <= 0) {
+      revLabels.length = 0;
+      revValues.length = 0;
       revLabels.push('—');
       revValues.push(0);
     }
@@ -2255,7 +2326,7 @@ export class AdminService {
         labels: revLabels,
         values: revValues,
         data: revValues,
-        byProvider,
+        byProvider: chartNet <= 0 ? [] : byProvider,
         // Keep coin totals for mini-stats (not revenue).
         coinVolume: {
           labels: ['Recharge', 'Gifts', 'VIP'],
@@ -2777,9 +2848,6 @@ export class AdminService {
         throw new ConflictException('Applicant already owns or belongs to an agency, or name is taken');
       }
 
-      const commissionRow = await manager.findOne(AppSetting, {
-        where: { key: 'agency_default_commission_percent' },
-      });
       let activationCode = generateActivationCode();
       for (let attempt = 0; attempt < 12; attempt++) {
         const clash = await manager.findOne(Agency, {
@@ -2789,6 +2857,7 @@ export class AdminService {
         if (!clash) break;
         activationCode = generateActivationCode();
       }
+      const { ECONOMY } = require('../../common/economy-config') as typeof import('../../common/economy-config');
       const agency = await manager.save(
         manager.create(Agency, {
           name: application.proposedName,
@@ -2797,7 +2866,7 @@ export class AdminService {
           status: AgencyStatus.ACTIVE,
           memberCount: 1,
           totalDiamonds: 0,
-          commissionPercent: Number(commissionRow?.value || 20),
+          commissionPercent: ECONOMY.defaultGiftSplit.agencyOwnerPercent,
           activationCode,
           notificationStyle: 'welcome',
         }),
@@ -3080,6 +3149,12 @@ export class AdminService {
         ? String(dto.exclusiveFrameUrl).trim()
         : null;
     }
+    if (dto.exclusiveFrameCode !== undefined && agency.exclusiveFrameCode) {
+      const preview = await this.cosmeticsService.resolvePreviewUrl(
+        agency.exclusiveFrameCode,
+      );
+      if (preview) agency.exclusiveFrameUrl = preview;
+    }
 
     return this.agencyRepo.save(agency);
   }
@@ -3121,6 +3196,10 @@ export class AdminService {
 
     if (frameCode) agency.exclusiveFrameCode = frameCode;
     if (roomCardCode) agency.exclusiveRoomCardCode = roomCardCode;
+    if (frameCode) {
+      const preview = await this.cosmeticsService.resolvePreviewUrl(frameCode);
+      if (preview) agency.exclusiveFrameUrl = preview;
+    }
     await this.agencyRepo.save(agency);
 
     const roles: AgencyRole[] = [AgencyRole.OWNER];

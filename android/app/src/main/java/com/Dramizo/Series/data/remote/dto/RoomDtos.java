@@ -63,6 +63,8 @@ public final class RoomDtos {
         @SerializedName("agencyLogoUrl") public String agencyLogoUrl;
         @SerializedName("agencyLevel") public int agencyLevel;
         @SerializedName("agencyTotalDiamonds") public long agencyTotalDiamonds;
+        /** Official dashboard verification for the agency (show badge next to وكالة). */
+        @SerializedName("agencyIsVerified") public boolean agencyIsVerified;
     }
 
     public static class ModeratorPermissionDto {

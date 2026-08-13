@@ -77,6 +77,10 @@ public class RequestListFragment extends Fragment {
         if (c != null) load();
     }
 
+    void reload() {
+        load();
+    }
+
     private boolean loadsAcceptedRelations() {
         return !"follow".equals(type);
     }

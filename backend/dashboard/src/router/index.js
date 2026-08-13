@@ -63,6 +63,12 @@ const routes = [
         meta: { titleKey: 'nav.navIcons' },
       },
       {
+        path: 'seat-stickers',
+        name: 'seat-stickers',
+        component: () => import('@/views/SeatStickersView.vue'),
+        meta: { titleKey: 'nav.seatStickers' },
+      },
+      {
         path: 'coins',
         name: 'coins',
         component: () => import('@/views/CoinPackagesView.vue'),

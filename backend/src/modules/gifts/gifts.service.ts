@@ -16,6 +16,7 @@ import { randomInt } from 'crypto';
 import { Gift, GiftType } from '../../database/entities/gift.entity';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
+import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -28,7 +29,6 @@ import {
   AgencyMember,
   AgencyMemberStatus,
 } from '../../database/entities/agency-member.entity';
-import { independentAgencyGiftSplit } from '../agencies/agency-gift-split';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
 import { SendGiftDto, SendAllMicGiftDto } from './dto/gifts.dto';
@@ -44,11 +44,10 @@ import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { resolvePlayableGiftAnimation } from './gift-media.resolve';
 import { effectiveVipLevel } from '../../common/vip-progress';
 import {
-  GIFT_DIAMOND_RATIO,
-  LUCKY_GIFT_DIAMOND_RATIO,
-  LUCKY_GIFT_MAX_MULTIPLIER,
   mintDiamondsPerUnit,
+  recommendedGiftDiamonds,
 } from '../../common/pricing-catalog';
+import { ECONOMY } from '../../common/economy-config';
 
 type LuckyRoll = {
   luckyMultiplier: number | null;
@@ -64,6 +63,8 @@ export class GiftsService implements OnModuleInit {
     @InjectRepository(GiftCategory)
     private readonly categoriesRepo: Repository<GiftCategory>,
     @InjectRepository(GiftSend) private readonly sendsRepo: Repository<GiftSend>,
+    @InjectRepository(Cosmetic)
+    private readonly cosmeticsRepo: Repository<Cosmetic>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(WalletTransaction)
     private readonly txRepo: Repository<WalletTransaction>,
@@ -91,10 +92,12 @@ export class GiftsService implements OnModuleInit {
     await this.ensureDefaultGiftCategories();
     // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
     await this.healZeroDiamondCatalog();
+    // Gift-first economy: diamondValue per gift, nice panel tabs, drop catalog junk.
+    await this.normalizeGiftEconomyCatalog();
     // Always rewrite competitor brand text in gift titles/descriptions for app UI.
     await this.ensureJehoPublicBranding();
     if (!bootCatalogSeedEnabled()) {
-      this.log.log('Gifts catalog: DB authoritative (no boot seed)');
+      this.log.log('Gifts catalog: DB authoritative (economy normalize always runs)');
       return;
     }
     await this.ensureDefaultLuckyGift();
@@ -166,7 +169,7 @@ export class GiftsService implements OnModuleInit {
         const next = mintDiamondsPerUnit(
           Number(row.coinPrice) || 0,
           0,
-          isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO,
+          isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio,
         );
         if (next <= 0) continue;
         await this.giftsRepo.update({ id: row.id }, { diamondValue: next });
@@ -219,49 +222,251 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
-  /** Seed defaults only when the table is empty — never re-create admin deletions. */
+  /**
+   * Categories are 100% owned by the dashboard. Nothing is auto-seeded here.
+   * Kept as a no-op so existing call sites don’t break.
+   */
   private async ensureDefaultGiftCategories() {
+    /* no-op — admin panel is the source of truth */
+  }
+
+  /**
+   * Gift-first economy pass (safe on every boot, no product wipe):
+   * 1) diamondValue mint + live absolute cap from ECONOMY.maxDiamondsPerUnit
+   * 2) NEVER reassign gift.category — that column is dashboard-owned
+   * 3) hard-deactivate duplicates (same art / same name)
+   *
+   * If `forceFromRatio` is true, the stored diamondValue is IGNORED and
+   * every gift is re-minted purely from `coinPrice × ratio` (still capped).
+   * This is used when the admin lowers the ratio/cap and wants the whole
+   * board recomputed. Called by the admin economy-settings endpoint.
+   */
+  async normalizeGiftEconomyCatalog(opts: { forceFromRatio?: boolean } = {}) {
     try {
-      const count = await this.categoriesRepo.count();
-      if (count > 0) return;
+      const gifts = await this.giftsRepo.find();
+      if (!gifts.length) return { diamondFixed: 0, deactivated: 0 };
+
+      let diamondFixed = 0;
+      let deactivated = 0;
+
+      for (const g of gifts) {
+        if (!g.isActive) continue;
+        const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
+        if (price <= 0) {
+          g.isActive = false;
+          await this.giftsRepo.save(g);
+          deactivated++;
+          continue;
+        }
+        const isLucky = g.type === GiftType.LUCKY;
+        const ratio = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
+        const catalogSeed = opts.forceFromRatio
+          ? 0 // ignore stored value → recompute purely from ratio
+          : Number(g.diamondValue) > 0
+            ? Number(g.diamondValue)
+            : recommendedGiftDiamonds(price, isLucky);
+        const nextDiamonds = mintDiamondsPerUnit(price, catalogSeed, ratio);
+        if (Math.max(0, Math.floor(Number(g.diamondValue) || 0)) !== nextDiamonds) {
+          g.diamondValue = nextDiamonds;
+          diamondFixed++;
+          await this.giftsRepo.save(g);
+        }
+      }
+
+      // --- deactivate lucky-box catalog junk ---
+      for (const g of gifts) {
+        if (!g.isActive) continue;
+        if (this.isLuckyBoxCatalogGift(g) || /عملة الحظ|صندوق حظ/i.test(String(g.name || ''))) {
+          if (!/^حظ\s/.test(String(g.name || '').trim())) {
+            g.isActive = false;
+            await this.giftsRepo.save(g);
+            deactivated++;
+          }
+        }
+      }
+
+      deactivated += await this.deactivateDuplicateGiftsHard();
+
+      this.log.log(
+        `Gift economy normalize: diamondValue~${diamondFixed}, deactivated~${deactivated}, max♦=${ECONOMY.maxDiamondsPerUnit}, ratio=${ECONOMY.giftDiamondRatio}, force=${!!opts.forceFromRatio}`,
+      );
+      return { diamondFixed, deactivated };
     } catch (err) {
       this.log.warn(
-        `ensureDefaultGiftCategories count: ${
+        `normalizeGiftEconomyCatalog: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
+      return { diamondFixed: 0, deactivated: 0 };
     }
-    const defaults: Array<{
-      key: string;
-      labelAr: string;
-      labelEn: string;
-      sortOrder: number;
-    }> = [
-      { key: 'normal', labelAr: 'عادي', labelEn: 'Normal', sortOrder: 0 },
-      { key: 'lucky', labelAr: 'حظ', labelEn: 'Lucky', sortOrder: 1 },
-      { key: 'combo', labelAr: 'كومبو', labelEn: 'Combo', sortOrder: 2 },
-      { key: 'premium', labelAr: 'مميز', labelEn: 'Premium', sortOrder: 3 },
-      { key: 'country', labelAr: 'دول', labelEn: 'Country', sortOrder: 4 },
-    ];
-    for (const d of defaults) {
-      try {
-        await this.categoriesRepo.save(
-          this.categoriesRepo.create({
-            key: d.key,
-            labelAr: d.labelAr,
-            labelEn: d.labelEn,
-            sortOrder: d.sortOrder,
-            isActive: true,
-          }),
-        );
-      } catch (err) {
-        this.log.warn(
-          `ensureDefaultGiftCategories ${d.key}: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        );
+  }
+
+  /** Strip query/hash; keep last path segment (file name) lowercased. */
+  private giftMediaFileKey(url: string | null | undefined): string {
+    const raw = String(url || '')
+      .trim()
+      .toLowerCase()
+      .split('#')[0]
+      .split('?')[0]
+      .replace(/\\/g, '/');
+    if (!raw) return '';
+    const base = raw.split('/').filter(Boolean).pop() || raw;
+    // Placeholder shared by almost every visual-system gift — never a dedupe key.
+    if (
+      !base ||
+      base === 'runtime.html' ||
+      base === 'placeholder.png' ||
+      base === 'placeholder.webp' ||
+      base === 'default.png' ||
+      base === 'default.webp' ||
+      base.endsWith('.html')
+    ) {
+      return '';
+    }
+    // Normalize common size suffixes: gift_heart_2.png ≈ gift_heart.png for clutter
+    return base.replace(/(@2x|@3x|_\d{2,4}x\d{2,4}|-copy|_copy|\s+)/g, '');
+  }
+
+  private giftNameKey(name: string | null | undefined): string {
+    return String(name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[‏‎\u200f\u200e]/g, '');
+  }
+
+  /**
+   * Keep one gift per group; deactivate the rest.
+   * Winner: real video > real anim > icon > diamondValue > sortOrder.
+   * Shared runtime.html does NOT count as animation.
+   */
+  private pickGiftWinner<
+    T extends {
+      id: string;
+      coinPrice?: number;
+      diamondValue?: number;
+      sortOrder?: number;
+      animationUrl?: string | null;
+      iconUrl?: string | null;
+      type?: GiftType;
+    },
+  >(arr: T[]): T {
+    const score = (g: T) => {
+      const anim = String(g.animationUrl || '').toLowerCase();
+      const isHtmlPlaceholder =
+        !anim || anim.includes('runtime.html') || anim.endsWith('.html');
+      const isVideo =
+        !isHtmlPlaceholder &&
+        (/\.(mp4|webm|mov)(\?|$)/.test(anim) ||
+          anim.includes('.mp4?') ||
+          anim.includes('.webm?'));
+      const hasRealAnim = !isHtmlPlaceholder && anim.length > 0 ? 1 : 0;
+      const hasIcon = String(g.iconUrl || '').trim() ? 1 : 0;
+      const diamonds = Math.max(0, Math.floor(Number(g.diamondValue) || 0));
+      const sort = Math.max(0, Math.floor(Number(g.sortOrder) || 0));
+      const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
+      return (
+        (isVideo ? 1_000_000_000 : 0) +
+        hasRealAnim * 100_000_000 +
+        hasIcon * 10_000_000 +
+        diamonds * 1_000 +
+        sort * 10 +
+        (price > 0 ? 5 : 0)
+      );
+    };
+    return [...arr].sort((a, b) => {
+      const d = score(b) - score(a);
+      if (d !== 0) return d;
+      return String(a.id).localeCompare(String(b.id));
+    })[0];
+  }
+
+  /**
+   * Hard panel cleanup: NO repeated gifts on the board.
+   * Groups (all active paid gifts):
+   *  A) same name + price
+   *  B) same display name
+   *  C) same icon file / same art stem (gift-rose.png ≈ rose.webp)
+   *  D) same real animation asset
+   * Never re-activate the whole dead table (that reintroduced dual catalogs).
+   */
+  private async deactivateDuplicateGiftsHard(): Promise<number> {
+    let deactivated = 0;
+
+    const deactivateRest = async (
+      arr: Array<{ id: string; isActive?: boolean; type?: GiftType; name?: string | null }>,
+      winnerId: string,
+    ) => {
+      for (const g of arr) {
+        if (String(g.id) === String(winnerId)) continue;
+        if (g.isActive === false) continue;
+        g.isActive = false;
+        await this.giftsRepo.save(g as any);
+        deactivated++;
       }
-    }
+    };
+
+    const runPass = async (keyFn: (g: any) => string) => {
+      const active = await this.giftsRepo.find({ where: { isActive: true } });
+      const groups = new Map<string, typeof active>();
+      for (const g of active) {
+        const key = keyFn(g);
+        if (!key) continue;
+        const arr = groups.get(key) || [];
+        arr.push(g);
+        groups.set(key, arr);
+      }
+      for (const [, arr] of groups) {
+        if (arr.length < 2) continue;
+        const winner = this.pickGiftWinner(arr);
+        await deactivateRest(arr, winner.id);
+      }
+    };
+
+    // 1) same name+price
+    await runPass(
+      (g) =>
+        `${this.giftNameKey(g.name)}|${Math.floor(Number(g.coinPrice) || 0)}`,
+    );
+
+    // 2) same display name (any price) — one “وردة” only
+    await runPass((g) => {
+      const nk = this.giftNameKey(g.name);
+      return nk ? `name:${nk}` : '';
+    });
+
+    // 3) same icon file basename
+    await runPass((g) => {
+      const icon = this.giftMediaFileKey(g.iconUrl);
+      return icon ? `icon:${icon}` : '';
+    });
+
+    // 4) same art stem (gift-rose / rose / gift_rose)
+    await runPass((g) => {
+      const stem = this.giftArtStem(g.iconUrl);
+      return stem ? `stem:${stem}` : '';
+    });
+
+    // 5) same real motion asset
+    await runPass((g) => {
+      const anim = this.giftMediaFileKey(g.animationUrl);
+      if (!anim || !/\.(mp4|webm|mov|gif|webp)$/i.test(anim)) return '';
+      return `anim:${anim}`;
+    });
+
+    return deactivated;
+  }
+
+  /** gift-rose.png / gift_rose.webp / rose.png → rose */
+  private giftArtStem(url: string | null | undefined): string {
+    const file = this.giftMediaFileKey(url);
+    if (!file) return '';
+    return file
+      .replace(/\.(png|webp|jpe?g|gif|svg|mp4|webm)$/i, '')
+      .replace(/^bg_/i, '')
+      .replace(/^gift[-_]?/i, '')
+      .replace(/[-_\s]+/g, '')
+      .toLowerCase();
   }
 
   /** صندوق الحظ العائم في الغرفة — ليس هدية محظوظ. */
@@ -287,7 +492,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/bg_lucky_gift_low_100.webp',
           coinPrice: 100,
           sortOrder: 1,
-          category: 'lucky',
+          category: 'basic',
         },
         {
           name: 'حظ فضي',
@@ -295,7 +500,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/bg_lucky_gift_low_500.webp',
           coinPrice: 500,
           sortOrder: 2,
-          category: 'lucky',
+          category: 'fancy',
         },
         {
           name: 'حظ ذهبي',
@@ -303,7 +508,7 @@ export class GiftsService implements OnModuleInit {
           iconUrl: '/assets/gifts/mikoo/bg_lucky_gift_low_1000.webp',
           coinPrice: 1000,
           sortOrder: 3,
-          category: 'lucky',
+          category: 'luxury',
         },
       ];
 
@@ -326,7 +531,7 @@ export class GiftsService implements OnModuleInit {
         const minMul = Number(g.luckyConfig?.minMultiplier) || 0;
         const needsSync =
           !g.luckyConfig ||
-          maxMul > LUCKY_GIFT_MAX_MULTIPLIER ||
+          maxMul > ECONOMY.luckyGiftMaxMultiplier ||
           maxMul < 3 ||
           minMul > 1 ||
           win < 0.3 ||
@@ -344,7 +549,7 @@ export class GiftsService implements OnModuleInit {
             this.giftsRepo.create({
               ...seed,
               animationUrl: null,
-              diamondValue: Math.floor(seed.coinPrice * LUCKY_GIFT_DIAMOND_RATIO),
+              diamondValue: Math.floor(seed.coinPrice * ECONOMY.luckyGiftDiamondRatio),
               type: GiftType.LUCKY,
               isActive: true,
               luckyConfig,
@@ -368,8 +573,8 @@ export class GiftsService implements OnModuleInit {
           existing.iconUrl = seed.iconUrl;
           dirty = true;
         }
-        if ((existing as any).category !== 'lucky') {
-          (existing as any).category = 'lucky';
+        if ((existing as any).category !== seed.category) {
+          (existing as any).category = seed.category;
           dirty = true;
         }
         // No looping JSON pulse — lucky FX is native (center → scatter).
@@ -415,15 +620,10 @@ export class GiftsService implements OnModuleInit {
    */
   private async ensureMikooGiftTabs() {
     try {
-      // Backfill category from type for existing rows.
+      // Backfill empty categories only — bands forced later by normalizeGiftEconomyCatalog.
       await this.dataSource.query(
-        `UPDATE gifts SET category = 'lucky' WHERE type::text = 'lucky' AND (category IS NULL OR category = '' OR category = 'normal')`,
-      );
-      await this.dataSource.query(
-        `UPDATE gifts SET category = 'premium' WHERE type::text = 'premium' AND (category IS NULL OR category = '' OR category = 'normal')`,
-      );
-      await this.dataSource.query(
-        `UPDATE gifts SET category = COALESCE(NULLIF(category, ''), 'normal') WHERE category IS NULL OR category = ''`,
+        `UPDATE gifts SET category = 'basic'
+         WHERE category IS NULL OR category = '' OR category = 'normal'`,
       );
 
       const tabSeeds: Array<{
@@ -528,7 +728,7 @@ export class GiftsService implements OnModuleInit {
         let existing = await this.giftsRepo.findOne({ where: { name: seed.name } });
         const diamondValue = Math.floor(
           seed.coinPrice *
-            (seed.type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO),
+            (seed.type === GiftType.LUCKY ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio),
         );
         if (!existing) {
           await this.giftsRepo.save(
@@ -734,7 +934,7 @@ export class GiftsService implements OnModuleInit {
           existing.diamondValue = mintDiamondsPerUnit(
             price,
             0,
-            type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO,
+            type === GiftType.LUCKY ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio,
           );
           dirty = true;
         }
@@ -753,7 +953,7 @@ export class GiftsService implements OnModuleInit {
           animationUrl,
           coinPrice,
           diamondValue: Math.floor(
-            coinPrice * (type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO),
+            coinPrice * (type === GiftType.LUCKY ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio),
           ),
           type,
           category,
@@ -817,7 +1017,7 @@ export class GiftsService implements OnModuleInit {
             iconUrl,
             animationUrl: animationUrl || iconUrl,
             coinPrice,
-            diamondValue: Math.floor(coinPrice * GIFT_DIAMOND_RATIO),
+            diamondValue: Math.floor(coinPrice * ECONOMY.giftDiamondRatio),
             type: GiftType.NORMAL,
             category: 'country',
             isActive: true,
@@ -863,7 +1063,7 @@ export class GiftsService implements OnModuleInit {
             iconUrl,
             animationUrl: animationUrl || iconUrl,
             coinPrice,
-            diamondValue: Math.floor(coinPrice * GIFT_DIAMOND_RATIO),
+            diamondValue: Math.floor(coinPrice * ECONOMY.giftDiamondRatio),
             type: GiftType.PREMIUM,
             category: 'premium',
             isActive: true,
@@ -904,6 +1104,221 @@ export class GiftsService implements OnModuleInit {
     return { flags: flagsN, premium: premiumN };
   }
 
+  /**
+   * Clone mall entry effects (الدخولية) into the gift panel as sendable video gifts.
+   * Reuses same preview/animation URLs — plays via the gift effect queue in-room.
+   * Idempotent: tagged by description `entry_code:<code>`.
+   */
+  async importEntryEffectsAsGifts(): Promise<{
+    created: number;
+    updated: number;
+    total: number;
+    source: 'db' | 'catalog_json' | 'empty';
+  }> {
+    // Ensure premium tab exists.
+    let cat = await this.categoriesRepo.findOne({ where: { key: 'premium' } });
+    if (!cat) {
+      const createdCat = this.categoriesRepo.create({
+        key: 'premium',
+        labelAr: 'مميز',
+        labelEn: 'Premium',
+        sortOrder: 3,
+        isActive: true,
+      });
+      cat = (await this.categoriesRepo.save(createdCat)) as GiftCategory;
+    } else if (!cat.isActive) {
+      cat.isActive = true;
+      await this.categoriesRepo.save(cat);
+    }
+
+    type EntrySeed = {
+      code: string;
+      name: string;
+      previewUrl: string;
+      animationUrl: string | null;
+      coinPrice: number;
+      sortOrder: number;
+    };
+
+    let seeds: EntrySeed[] = [];
+    let source: 'db' | 'catalog_json' | 'empty' = 'empty';
+
+    try {
+      const rows = await this.cosmeticsRepo.find({
+        where: { type: CosmeticType.ENTRY_EFFECT },
+        order: { sortOrder: 'ASC' },
+      });
+      for (const row of rows) {
+        if (!row?.code || !row?.previewUrl) continue;
+        if (row.isActive === false) continue;
+        seeds.push({
+          code: String(row.code).slice(0, 64),
+          name: String(row.name || row.code).trim(),
+          previewUrl: String(row.previewUrl).trim(),
+          animationUrl: row.animationUrl ? String(row.animationUrl).trim() : null,
+          coinPrice: Math.max(0, Number(row.coinPrice) || 0),
+          sortOrder: Number(row.sortOrder) || 0,
+        });
+      }
+      if (seeds.length) source = 'db';
+    } catch (err) {
+      this.log.warn(
+        `importEntryEffectsAsGifts DB read: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    if (!seeds.length) {
+      const catalogPath = join(
+        process.cwd(),
+        'public',
+        'assets',
+        'cosmetics',
+        'catalog.json',
+      );
+      if (existsSync(catalogPath)) {
+        try {
+          const raw = JSON.parse(readFileSync(catalogPath, 'utf8'));
+          const items = Array.isArray(raw?.items) ? raw.items : [];
+          for (const it of items) {
+            if (String(it?.type || '') !== 'entry_effect') continue;
+            const code = String(it?.code || '').trim();
+            const previewUrl = String(it?.previewUrl || '').trim();
+            if (!code || !previewUrl) continue;
+            seeds.push({
+              code: code.slice(0, 64),
+              name: String(it?.name || code).trim(),
+              previewUrl,
+              animationUrl: it?.animationUrl
+                ? String(it.animationUrl).trim()
+                : null,
+              coinPrice: Math.max(0, Number(it?.coinPrice) || 0),
+              sortOrder: Number(it?.sortOrder) || 0,
+            });
+          }
+          if (seeds.length) source = 'catalog_json';
+        } catch (err) {
+          this.log.warn(
+            `importEntryEffectsAsGifts catalog: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          );
+        }
+      }
+    }
+
+    if (!seeds.length) {
+      return { created: 0, updated: 0, total: 0, source };
+    }
+
+    // Load all gifts once for matching by tag / animation.
+    const allGifts = await this.giftsRepo.find();
+    const byTag = new Map<string, Gift>();
+    const byAnim = new Map<string, Gift>();
+    for (const g of allGifts) {
+      const desc = String(g.description || '');
+      const m = /entry_code:([a-zA-Z0-9_\-]+)/.exec(desc);
+      if (m?.[1]) byTag.set(m[1], g);
+      const anim = String(g.animationUrl || g.iconUrl || '')
+        .split('?')[0]
+        .trim();
+      if (anim) byAnim.set(anim, g);
+    }
+
+    let created = 0;
+    let updated = 0;
+    let i = 0;
+    for (const seed of seeds) {
+      i += 1;
+      const animRaw = (seed.animationUrl || seed.previewUrl || '').trim();
+      if (!animRaw) continue;
+      const preview = seed.previewUrl || animRaw;
+      // Gift label: drop Arabic "دخول " prefix so the panel reads like a gift product.
+      let giftName = seed.name
+        .replace(/^دخول\s*[·•\-]?\s*/i, '')
+        .replace(/^entry\s+/i, '')
+        .trim();
+      if (!giftName) giftName = seed.code;
+      giftName = giftName.slice(0, 64);
+
+      const coinPrice = Math.max(
+        99,
+        Math.min(999999, seed.coinPrice > 0 ? seed.coinPrice : 999),
+      );
+      const diamondValue = mintDiamondsPerUnit(
+        coinPrice,
+        recommendedGiftDiamonds(coinPrice, false),
+        ECONOMY.giftDiamondRatio,
+      );
+      const tag = `entry_code:${seed.code}`;
+      const desc = `هدية دخولية · ${tag}`.slice(0, 255);
+      const animKey = animRaw.split('?')[0].trim();
+
+      let existing = byTag.get(seed.code) || byAnim.get(animKey) || null;
+      if (!existing) {
+        const createdGift = this.giftsRepo.create({
+          name: giftName,
+          description: desc,
+          iconUrl: preview,
+          animationUrl: animRaw,
+          coinPrice,
+          diamondValue,
+          type: GiftType.PREMIUM,
+          category: 'premium',
+          isActive: true,
+          sortOrder: 5000 + (seed.sortOrder || i),
+        } as Partial<Gift>);
+        const row = (await this.giftsRepo.save(createdGift)) as Gift;
+        byTag.set(seed.code, row);
+        byAnim.set(animKey, row);
+        created += 1;
+        continue;
+      }
+
+      let dirty = false;
+      if (existing.iconUrl !== preview) {
+        existing.iconUrl = preview;
+        dirty = true;
+      }
+      if (existing.animationUrl !== animRaw) {
+        existing.animationUrl = animRaw;
+        dirty = true;
+      }
+      // Keep admin-edited prices; only fill if zero/missing.
+      if (!existing.coinPrice || existing.coinPrice <= 0) {
+        existing.coinPrice = coinPrice;
+        existing.diamondValue = diamondValue;
+        dirty = true;
+      }
+      if ((existing as any).category !== 'premium') {
+        (existing as any).category = 'premium';
+        dirty = true;
+      }
+      if (existing.type !== GiftType.PREMIUM) {
+        existing.type = GiftType.PREMIUM;
+        dirty = true;
+      }
+      if (!String(existing.description || '').includes(tag)) {
+        existing.description = desc;
+        dirty = true;
+      }
+      if (!existing.isActive) {
+        existing.isActive = true;
+        dirty = true;
+      }
+      if (dirty) {
+        await this.giftsRepo.save(existing);
+        updated += 1;
+      }
+    }
+
+    this.log.log(
+      `Entry effects → gifts: created=${created} updated=${updated} total=${seeds.length} source=${source}`,
+    );
+    return { created, updated, total: seeds.length, source };
+  }
+
   /** Public Mikoo country flags → gift tab "دولة" (does not need listV3 ticket). */
   private async importMikooCountryGiftsFile() {
     const countriesPath = join(
@@ -940,7 +1355,7 @@ export class GiftsService implements OnModuleInit {
             iconUrl,
             animationUrl: '/visual-system/runtime.html',
             coinPrice,
-            diamondValue: Math.floor(coinPrice * GIFT_DIAMOND_RATIO),
+            diamondValue: Math.floor(coinPrice * ECONOMY.giftDiamondRatio),
             type: GiftType.NORMAL,
             category: 'country',
             isActive: true,
@@ -1007,7 +1422,7 @@ export class GiftsService implements OnModuleInit {
             animationUrl: item.animationUrl || '/visual-system/runtime.html',
             coinPrice,
             diamondValue: Math.floor(
-              coinPrice * (type === GiftType.LUCKY ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO),
+              coinPrice * (type === GiftType.LUCKY ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio),
             ),
             type,
             category,
@@ -1079,7 +1494,7 @@ export class GiftsService implements OnModuleInit {
       maxMultiplier?: number;
     } | null,
   ): LuckyRoll {
-    const hardMax = Math.max(1, Number(LUCKY_GIFT_MAX_MULTIPLIER) || 5);
+    const hardMax = Math.max(1, Number(ECONOMY.luckyGiftMaxMultiplier) || 5);
     const maxMul = Math.min(
       hardMax,
       Math.max(3, Number(cfg?.maxMultiplier) || hardMax),
@@ -1109,24 +1524,54 @@ export class GiftsService implements OnModuleInit {
       where: { isActive: true },
       order: { sortOrder: 'ASC', coinPrice: 'ASC' },
     });
-    return gifts.filter((g) => !this.isLuckyBoxCatalogGift(g));
+    // Final client-facing dedupe so the app never sees dual rows of the same art.
+    // Also masks diamondValue when ECONOMY.showDiamondValueInApp is false so the
+    // Play-Store build shows only the coin price under each gift. Diamonds are
+    // still minted server-side on every send — this is a display mask only.
+    const seen = new Set<string>();
+    const out: typeof gifts = [];
+    const showDiamonds = !!ECONOMY.showDiamondValueInApp;
+    for (const g of gifts) {
+      if (this.isLuckyBoxCatalogGift(g)) continue;
+      const stem = this.giftArtStem(g.iconUrl) || this.giftNameKey(g.name);
+      const key = stem || String(g.id);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const price = Math.max(0, Math.floor(Number(g.coinPrice) || 0));
+      // Category is dashboard-owned — do NOT overwrite.
+      const isLucky = g.type === GiftType.LUCKY;
+      const mintedDiamonds = mintDiamondsPerUnit(
+        price,
+        g.diamondValue,
+        isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio,
+      );
+      // Return a lightweight clone so mutating diamondValue on the response
+      // never triggers an implicit repo save.
+      const view: any = { ...g };
+      view.diamondValue = showDiamonds ? mintedDiamonds : 0;
+      out.push(view);
+    }
+    return out;
   }
 
-  /** Active gift sheet tabs for the client (keys match gift.category). */
+  /**
+   * Active gift sheet tabs for the client — DB only (dashboard add/edit/deactivate).
+   * If the admin panel has no active tabs, the client returns an empty list.
+   */
   async listCategories() {
-    await this.ensureDefaultGiftCategories();
     const rows = await this.categoriesRepo.find({
       where: { isActive: true },
       order: { sortOrder: 'ASC', createdAt: 'ASC' },
     });
-    if (rows.length > 0) return rows;
-    // Hard fallback if DB table empty / migrations lag.
-    return [
-      { key: 'normal', labelAr: 'عادي', labelEn: 'Normal', sortOrder: 0, isActive: true },
-      { key: 'lucky', labelAr: 'حظ', labelEn: 'Lucky', sortOrder: 1, isActive: true },
-      { key: 'combo', labelAr: 'كومبو', labelEn: 'Combo', sortOrder: 2, isActive: true },
-      { key: 'premium', labelAr: 'مميز', labelEn: 'Premium', sortOrder: 3, isActive: true },
-    ];
+    return rows.map((r) => ({
+      id: r.id,
+      key: r.key,
+      labelAr: r.labelAr,
+      labelEn: r.labelEn,
+      sortOrder: r.sortOrder,
+      isActive: r.isActive,
+      iconUrl: (r as any).iconUrl ?? null,
+    }));
   }
 
   async listCategoriesAdmin() {
@@ -1263,7 +1708,7 @@ export class GiftsService implements OnModuleInit {
       : Math.max(1, Math.min(99, Math.floor(Number(dto.comboCount) || 1)));
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty;
-    const ratioCap = isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO;
+    const ratioCap = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
     // Never use Math.min(catalog=0, …) — that wiped diamonds on unpaid catalog rows.
     const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
     // Receiver diamonds stay base (no multiplier). Lucky jackpot returns coins to sender.
@@ -1310,15 +1755,16 @@ export class GiftsService implements OnModuleInit {
         }),
       );
 
-      // Gift diamond split — TWO SEPARATE WALLET POOLS:
-      // - Personal room (no agency room / no matching agency membership):
-      //     platform / host → wallet.diamonds  (personal withdraw to platform)
-      // - Agency room (room.agencyId + active agency member of THAT agency):
-      //     platform / agency owner / host → wallet.agencyDiamonds for both owner commission + host share
-      // Agency commission never mixes with personal-room balances.
+      // ── CLEAN ECONOMY: ONE diamond pool (wallet.diamonds) ──────────────
+      // `diamondsAwarded` = the diamonds this gift mints for the receiver side.
+      //   Personal room → host keeps 100%.
+      //   Agency room   → host keeps (100 − ownerPct)%, agency owner earns
+      //                   ownerPct% commission. BOTH land in wallet.diamonds.
+      // No separate platform cut here: platform margin is the gap between the
+      // coins the sender paid and the diamonds handed out (taken at mint).
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
-      let platformCut = 0;
+      const platformCut = 0;
       let agencyId: string | null = null;
       let earningsStream: 'personal' | 'agency' = 'personal';
 
@@ -1343,92 +1789,61 @@ export class GiftsService implements OnModuleInit {
         });
       }
 
-      let platformPct = 40;
-      const cutRow = await manager.findOne(AppSetting, {
-        where: { key: 'agency_platform_cut_percent' },
-      });
-      if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
-        platformPct = Math.min(100, Math.max(0, Number(cutRow.value)));
-      }
-      let hostSharePct = 45;
-      const hostShareRow = await manager.findOne(AppSetting, {
-        where: { key: 'agency_host_share_percent' },
-      });
-      if (hostShareRow?.value && Number.isFinite(Number(hostShareRow.value))) {
-        hostSharePct = Math.min(100, Math.max(0, Number(hostShareRow.value)));
-      }
-
       if (membership && roomAgencyId) {
-        const agency = await manager.findOne(Agency, { where: { id: membership.agencyId } });
+        const agency = await manager.findOne(Agency, { where: { id: roomAgencyId } });
         if (agency?.status === AgencyStatus.ACTIVE) {
           agencyId = agency.id;
           earningsStream = 'agency';
-          const agencyPct = Math.min(100, Math.max(0, Number(agency.commissionPercent) || 15));
-          const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
-          const split = independentAgencyGiftSplit(
-            diamondsAwarded,
-            hostSharePct,
-            agencyPct,
-            platformPct,
-            { ownerIsReceiver: receiverIsOwner },
+          // Owner commission %: per-agency override, else dashboard default.
+          const ownerPct = Math.min(
+            100,
+            Math.max(
+              0,
+              Number(agency.commissionPercent) > 0
+                ? Number(agency.commissionPercent)
+                : ECONOMY.defaultGiftSplit.agencyOwnerPercent,
+            ),
           );
-          agentShare = split.agentShare;
-          platformCut = split.platformCut;
-          hostDiamonds = split.hostDiamonds;
+          const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
+          if (receiverIsOwner) {
+            // Owner is also the host → keeps everything, no separate commission.
+            agentShare = 0;
+            hostDiamonds = diamondsAwarded;
+          } else {
+            agentShare = Math.floor((diamondsAwarded * ownerPct) / 100);
+            hostDiamonds = Math.max(0, diamondsAwarded - agentShare);
+          }
           if (agentShare > 0 && agency.ownerId) {
-              let agentWallet = await manager.findOne(Wallet, {
-                where: { userId: agency.ownerId },
-                lock: { mode: 'pessimistic_write' },
-              });
-              if (!agentWallet) {
-                agentWallet = manager.create(Wallet, { userId: agency.ownerId });
-              }
-              (agentWallet as any).agencyDiamonds =
-                Number((agentWallet as any).agencyDiamonds || 0) + agentShare;
-              await manager.save(agentWallet);
-              await manager.save(
-                manager.create(WalletTransaction, {
-                  userId: agency.ownerId,
-                  type: TransactionType.GIFT_RECEIVE,
-                  currency: CurrencyType.DIAMONDS,
-                  amount: agentShare,
-                  balanceAfter: Number((agentWallet as any).agencyDiamonds || 0),
-                  referenceType: 'agency_commission',
-                  referenceId: send.id,
-                  description: `عمولة وكالة (روم وكالة) — ${gift.name}`,
-                  metadata: {
-                    agencyId: agency.id,
-                    giftSendId: send.id,
-                    stream: 'agency',
-                    roomId: dto.roomId || null,
-                  },
-                }),
-              );
+            let agentWallet = await manager.findOne(Wallet, {
+              where: { userId: agency.ownerId },
+              lock: { mode: 'pessimistic_write' },
+            });
+            if (!agentWallet) {
+              agentWallet = manager.create(Wallet, { userId: agency.ownerId });
+            }
+            agentWallet.diamonds = Number(agentWallet.diamonds || 0) + agentShare;
+            await manager.save(agentWallet);
+            await manager.save(
+              manager.create(WalletTransaction, {
+                userId: agency.ownerId,
+                type: TransactionType.GIFT_RECEIVE,
+                currency: CurrencyType.DIAMONDS,
+                amount: agentShare,
+                balanceAfter: Number(agentWallet.diamonds || 0),
+                referenceType: 'agency_commission',
+                referenceId: send.id,
+                description: `عمولة وكالة — ${gift.name}`,
+                metadata: {
+                  agencyId: agency.id,
+                  giftSendId: send.id,
+                  stream: 'agency',
+                  roomId: dto.roomId || null,
+                },
+              }),
+            );
           }
           await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', diamondsAwarded);
         }
-      }
-
-      if (earningsStream === 'personal') {
-        platformCut = Math.floor((diamondsAwarded * platformPct) / 100);
-        hostDiamonds = Math.max(0, diamondsAwarded - platformCut);
-        agentShare = 0;
-        agencyId = null;
-      }
-
-      if (platformCut > 0) {
-        let rev = await manager.findOne(AppSetting, {
-          where: { key: 'platform_gift_revenue_diamonds' },
-        });
-        if (!rev) {
-          rev = manager.create(AppSetting, {
-            key: 'platform_gift_revenue_diamonds',
-            value: '0',
-            description: 'Cumulative platform cut from gifts (diamonds)',
-          });
-        }
-        rev.value = String(Number(rev.value || 0) + platformCut);
-        await manager.save(rev);
       }
 
       let recvWallet: Wallet = wallet;
@@ -1439,12 +1854,7 @@ export class GiftsService implements OnModuleInit {
         });
         recvWallet = found ?? manager.create(Wallet, { userId: dto.receiverId });
       }
-      if (earningsStream === 'agency') {
-        (recvWallet as any).agencyDiamonds =
-          Number((recvWallet as any).agencyDiamonds || 0) + hostDiamonds;
-      } else {
-        recvWallet.diamonds = Number(recvWallet.diamonds) + hostDiamonds;
-      }
+      recvWallet.diamonds = Number(recvWallet.diamonds) + hostDiamonds;
       await manager.save(recvWallet);
 
       await manager.save(
@@ -1487,10 +1897,7 @@ export class GiftsService implements OnModuleInit {
           type: TransactionType.GIFT_RECEIVE,
           currency: CurrencyType.DIAMONDS,
           amount: hostDiamonds,
-          balanceAfter:
-            earningsStream === 'agency'
-              ? Number((recvWallet as any).agencyDiamonds || 0)
-              : Number(recvWallet.diamonds),
+          balanceAfter: Number(recvWallet.diamonds),
           referenceType:
             earningsStream === 'agency' ? 'gift_receive_agency' : 'gift_receive',
           referenceId: send.id,
@@ -1500,7 +1907,6 @@ export class GiftsService implements OnModuleInit {
               : `هدية روم شخصي ${qty}x ${gift.name}`,
           metadata: {
             ...(luckyMultiplier ? { luckyMultiplier } : {}),
-            platformCut,
             hostDiamonds,
             stream: earningsStream,
             ...(agencyId ? { agencyId, agentShare } : {}),
@@ -1531,10 +1937,7 @@ export class GiftsService implements OnModuleInit {
         agentShare,
         stream: earningsStream,
         senderBalance: Number(wallet.coins),
-        receiverDiamonds:
-          earningsStream === 'agency'
-            ? Number((recvWallet as any).agencyDiamonds || 0)
-            : Number(recvWallet.diamonds),
+        receiverDiamonds: Number(recvWallet.diamonds),
         success: true,
         coinsSpent: totalCoins,
         // Transparent Mikoo-style breakdown for client UI.
@@ -1550,8 +1953,8 @@ export class GiftsService implements OnModuleInit {
         },
         wallet: {
           coins: Number(wallet.coins),
-          diamonds: Number(recvWallet.diamonds || 0),
-          agencyDiamonds: Number((recvWallet as any).agencyDiamonds || 0),
+          diamonds: Number(wallet.diamonds || 0),
+          agencyDiamonds: 0,
           silverCoins: Number(wallet.silverCoins || 0),
           gamePoints: Number(wallet.gamePoints || 0),
         },
@@ -1574,15 +1977,33 @@ export class GiftsService implements OnModuleInit {
           })
           .catch(() => undefined);
         const spentCoins = gift.coinPrice * qty;
-        const diamondProgress = Number(result.hostDiamonds ?? result.send?.diamondsAwarded ?? 0);
+        // Diamonds progress = the receiver's ACTUAL share after platform/agency split.
+        const hostDiamondShare = Number(result.hostDiamonds ?? 0);
+        const diamondProgress = hostDiamondShare > 0
+          ? hostDiamondShare
+          : Number(result.send?.diamondsAwarded ?? 0);
+        // Coins progress = proportional to the receiver's diamond share.
+        // Old behaviour credited the FULL sticker price to the receiver even when
+        // the platform (40%) and agency owner (15%) already skimmed most of it,
+        // which let a single 1 000 000-coin gift jump five host-target stages in
+        // one shot. Now we scale by the actual host cut, matching sendAllMic.
+        const diamondPool = Math.max(
+          1,
+          Number(result.breakdown?.diamondPool ?? hostDiamondShare ?? 0),
+        );
+        const hostCoinsShare = Math.max(
+          0,
+          Math.floor((spentCoins * hostDiamondShare) / diamondPool),
+        );
+        void hostCoinsShare;
         const hostTarget = this.hostTarget;
         if (hostTarget) {
           void hostTarget
             .getConfig()
             .then((cfg) => {
               if (!cfg?.enabled) return null;
-              const amount =
-                cfg.currency === 'gift_coins' ? spentCoins : diamondProgress;
+              // CLEAN ECONOMY: host target counts DIAMONDS the host actually earned.
+              const amount = diamondProgress;
               if (amount <= 0) return null;
               return hostTarget.recordHostProgress(
                 result.send.receiverId,
@@ -1885,7 +2306,7 @@ export class GiftsService implements OnModuleInit {
     const personCount = receiverIds.length;
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty * personCount;
-    const ratioCap = isLucky ? LUCKY_GIFT_DIAMOND_RATIO : GIFT_DIAMOND_RATIO;
+    const ratioCap = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
     const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
     const diamondPool = cappedPerUnit * qty * personCount;
 
@@ -1897,15 +2318,10 @@ export class GiftsService implements OnModuleInit {
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
-    let platformPct = 40;
-    const cutRow = await this.settingsRepo.findOne({
-      where: { key: 'agency_platform_cut_percent' },
-    });
-    if (cutRow?.value && Number.isFinite(Number(cutRow.value))) {
-      platformPct = Math.min(50, Math.max(0, Number(cutRow.value)));
-    }
-    const platformCut = Math.floor((diamondPool * platformPct) / 100);
-    const rem = Math.max(0, diamondPool - platformCut);
+    // CLEAN ECONOMY: no platform cut on all-mic. Room host takes half, the
+    // remaining half is split across the seated mics. All → wallet.diamonds.
+    const platformCut = 0;
+    const rem = diamondPool;
     const hostDiamonds = Math.floor(rem / 2);
     const micsPool = rem - hostDiamonds;
     const baseMic = Math.floor(micsPool / personCount);
@@ -2009,41 +2425,20 @@ export class GiftsService implements OnModuleInit {
         );
       }
 
-      // Credit each mic their share (self-target share stays with platform).
-      // Agency rooms → agencyDiamonds; personal rooms → diamonds (never mixed).
+      // CLEAN ECONOMY: each mic's share → their single wallet.diamonds pool.
+      // A self-target share (sender seated on a mic) is simply not paid out.
       const roomAgencyId = room.agencyId || null;
-      let selfMicReturned = 0;
       for (let i = 0; i < receiverIds.length; i++) {
         const rid = receiverIds[i];
         const share = micShares.get(rid) || 0;
         if (share <= 0) continue;
-        if (rid === senderId) {
-          selfMicReturned += share;
-          continue;
-        }
+        if (rid === senderId) continue;
         let rw = await manager.findOne(Wallet, {
           where: { userId: rid },
           lock: { mode: 'pessimistic_write' },
         });
         if (!rw) rw = manager.create(Wallet, { userId: rid });
-        let toAgencyPool = false;
-        if (roomAgencyId) {
-          const mem = await manager.findOne(AgencyMember, {
-            where: {
-              userId: rid,
-              agencyId: roomAgencyId,
-              isActive: true,
-              status: AgencyMemberStatus.ACTIVE,
-            },
-          });
-          toAgencyPool = !!mem;
-        }
-        if (toAgencyPool) {
-          (rw as any).agencyDiamonds =
-            Number((rw as any).agencyDiamonds || 0) + share;
-        } else {
-          rw.diamonds = Number(rw.diamonds) + share;
-        }
+        rw.diamonds = Number(rw.diamonds) + share;
         await manager.save(rw);
         await manager.save(
           manager.create(WalletTransaction, {
@@ -2051,21 +2446,14 @@ export class GiftsService implements OnModuleInit {
             type: TransactionType.GIFT_RECEIVE,
             currency: CurrencyType.DIAMONDS,
             amount: share,
-            balanceAfter: toAgencyPool
-              ? Number((rw as any).agencyDiamonds || 0)
-              : Number(rw.diamonds),
-            referenceType: toAgencyPool
-              ? 'gift_receive_mic_agency'
-              : 'gift_receive_mic',
+            balanceAfter: Number(rw.diamonds),
+            referenceType: 'gift_receive_mic',
             referenceId: sends[i].id,
-            description: toAgencyPool
-              ? `حصة مايك (روم وكالة) ${qty}x ${gift.name}`
-              : `All-mic share ${qty}x ${gift.name}`,
+            description: `All-mic share ${qty}x ${gift.name}`,
             metadata: {
               allMic: true,
               personCount,
-              platformCut,
-              stream: toAgencyPool ? 'agency' : 'personal',
+              stream: roomAgencyId ? 'agency' : 'personal',
               ...(roomAgencyId ? { agencyId: roomAgencyId } : {}),
             },
           }),
@@ -2077,46 +2465,15 @@ export class GiftsService implements OnModuleInit {
           share,
         );
       }
-      if (selfMicReturned > 0) {
-        let rev = await manager.findOne(AppSetting, {
-          where: { key: 'platform_gift_revenue_diamonds' },
-        });
-        if (!rev) {
-          rev = manager.create(AppSetting, {
-            key: 'platform_gift_revenue_diamonds',
-            value: '0',
-            description: 'Cumulative platform cut from gifts (diamonds)',
-          });
-        }
-        rev.value = String(Number(rev.value || 0) + selfMicReturned);
-        await manager.save(rev);
-      }
 
-      // Host half (on top of mic share if host is seated).
+      // Host half (on top of mic share if host is seated) → wallet.diamonds.
       if (hostDiamonds > 0) {
         let hw = await manager.findOne(Wallet, {
           where: { userId: roomHostId },
           lock: { mode: 'pessimistic_write' },
         });
         if (!hw) hw = manager.create(Wallet, { userId: roomHostId });
-        let hostToAgency = false;
-        if (roomAgencyId) {
-          const hostMem = await manager.findOne(AgencyMember, {
-            where: {
-              userId: roomHostId,
-              agencyId: roomAgencyId,
-              isActive: true,
-              status: AgencyMemberStatus.ACTIVE,
-            },
-          });
-          hostToAgency = !!hostMem;
-        }
-        if (hostToAgency) {
-          (hw as any).agencyDiamonds =
-            Number((hw as any).agencyDiamonds || 0) + hostDiamonds;
-        } else {
-          hw.diamonds = Number(hw.diamonds) + hostDiamonds;
-        }
+        hw.diamonds = Number(hw.diamonds) + hostDiamonds;
         await manager.save(hw);
         await manager.save(
           manager.create(WalletTransaction, {
@@ -2124,22 +2481,15 @@ export class GiftsService implements OnModuleInit {
             type: TransactionType.GIFT_RECEIVE,
             currency: CurrencyType.DIAMONDS,
             amount: hostDiamonds,
-            balanceAfter: hostToAgency
-              ? Number((hw as any).agencyDiamonds || 0)
-              : Number(hw.diamonds),
-            referenceType: hostToAgency
-              ? 'gift_receive_host_agency'
-              : 'gift_receive_host',
+            balanceAfter: Number(hw.diamonds),
+            referenceType: 'gift_receive_host',
             referenceId: primary.id,
-            description: hostToAgency
-              ? `حصة المضيف 50% (روم وكالة) ${gift.name}`
-              : `All-mic host 50% from ${gift.name}`,
+            description: `All-mic host 50% from ${gift.name}`,
             metadata: {
               allMic: true,
               personCount,
-              platformCut,
               micsPool,
-              stream: hostToAgency ? 'agency' : 'personal',
+              stream: roomAgencyId ? 'agency' : 'personal',
               ...(roomAgencyId ? { agencyId: roomAgencyId } : {}),
             },
           }),
@@ -2197,11 +2547,7 @@ export class GiftsService implements OnModuleInit {
         wallet: {
           coins: Number(wallet.coins),
           diamonds: Number(senderWalletOut?.diamonds || wallet.diamonds || 0),
-          agencyDiamonds: Number(
-            (senderWalletOut as any)?.agencyDiamonds ||
-              (wallet as any).agencyDiamonds ||
-              0,
-          ),
+          agencyDiamonds: 0,
           silverCoins: Number(wallet.silverCoins || 0),
           gamePoints: Number(wallet.gamePoints || 0),
         },
@@ -2228,12 +2574,13 @@ export class GiftsService implements OnModuleInit {
           1,
           Math.floor((Number(result.totalCoins || totalCoins) * hostDiamonds) / diamondPool),
         );
+        void hostCoinsShare;
         void ht
           .getConfig()
           .then((cfg) => {
             if (!cfg?.enabled) return null;
-            const amount =
-              cfg.currency === 'gift_coins' ? hostCoinsShare : hostDiamonds;
+            // CLEAN ECONOMY: host target counts DIAMONDS the host earned.
+            const amount = hostDiamonds;
             if (amount <= 0) return null;
             return ht.recordHostProgress(roomHostId, amount);
           })
@@ -2387,8 +2734,8 @@ export class GiftsService implements OnModuleInit {
     const giftLabel = (opts.giftName || '').trim();
     const title = soft ? 'مردود جزئي' : 'حظ سعيد!';
     const body = soft
-      ? `${name} أرسل ${giftLabel || 'هدية حظ'} · مردود +${won}`
-      : `${name} أرسل ${giftLabel || 'هدية حظ'} للفوز بـ ${won} عملة. (${times} مرة)`;
+      ? `مبروك ${name} حصل على ${won} · مردود جزئي`
+      : `مبروك ${name} حصل على ${won}${times >= 2 ? ` · ×${times}` : ''}`;
     this.realtime.emitToAll('celebration:toast', {
       kind: 'lucky_hit',
       id: `lucky:${opts.senderId}:${Date.now()}`,

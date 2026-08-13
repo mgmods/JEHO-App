@@ -93,7 +93,10 @@ public class AuraLiveApp extends Application {
             container.getIoExecutor().execute(() -> {
                 ZegoEngineManager.getInstance().fetchAndApplyRemote(this, container.getConfigApi());
                 AppFeatures.refresh(container);
+                com.Dramizo.Series.util.RemoteNavIcons.hydrateFromCache(container);
+                com.Dramizo.Series.util.RemoteSeatStickers.hydrateFromCache(container);
                 com.Dramizo.Series.util.RemoteNavIcons.refreshBlocking(container);
+                com.Dramizo.Series.util.RemoteSeatStickers.refreshBlocking(container);
             });
         } catch (Exception ignored) {
         }

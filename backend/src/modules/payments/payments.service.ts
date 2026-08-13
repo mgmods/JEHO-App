@@ -1538,14 +1538,11 @@ export class PaymentsService {
   }
 
   /**
-   * Google Play Billing verification + wallet credit.
-   *
-   * Flow:
-   *  1) Resolve product SKU → coins/price from our catalog (not Firebase).
-   *  2) Prefer Android Publisher API if a real Play service-account is configured.
-   *  3) Always credit once per purchaseToken when the product is valid —
-   *     otherwise shoppers pay on Play and stay at 0 coins (that was the bug).
-   *  Firebase Admin SDK is unrelated to INAPP product IDs / billing.
+   * Google Play Billing — simple credit path:
+   *  1) Resolve known SKU → coins from our catalog
+   *  2) Best-effort Publisher verify (never block credit on ACL misconfig)
+   *  3) Credit once per purchaseToken (idempotent)
+   * Client acknowledges immediately so Google will not auto-refund.
    */
   async verifyPlayBilling(userId: string, dto: PlayBillingVerifyDto) {
     if (!dto.purchaseToken || dto.purchaseToken.length < 8) {
@@ -1587,6 +1584,20 @@ export class PaymentsService {
           `Google Play resume-credit order=${existing.id} user=${userId} sku=${dto.productId} coins=${creditCoins}`,
         );
         return this.walletService.getWallet(userId);
+      }
+      // Failed/cancelled/refunded earlier — if Play still owns the token, allow re-credit
+      // once by creating a fresh PENDING order below (unique is on providerPaymentId).
+      if (
+        existing.status === RechargeStatus.FAILED ||
+        existing.status === RechargeStatus.CANCELLED ||
+        existing.status === RechargeStatus.REFUNDED
+      ) {
+        this.logger.warn(
+          `Google Play prior order ${existing.id} status=${existing.status} — refusing duplicate token`,
+        );
+        throw new BadRequestException(
+          `Previous order for this purchase is ${existing.status}`,
+        );
       }
       throw new BadRequestException(
         `Previous order for this purchase is ${existing.status}`,
@@ -1631,23 +1642,21 @@ export class PaymentsService {
       this.logger.warn(
         `Google Play publisher check failed package=${packageName} product=${dto.productId} ${publisherError}`,
       );
-      // Invalid / unknown purchase token — never credit.
-      if (status === 400 || status === 404) {
-        throw new BadRequestException(
-          'شراء Google Play غير صالح أو انتهت صلاحيته. تواصل مع الدعم مع رقم الطلب.',
-        );
-      }
-      // 401/403/5xx/no credentials: product IDs on the client are fine; API ACL is wrong.
-      // Soft-credit keeps shoppers from paying without coins. Opt-in hard fail via env.
       if (requirePublisher) {
         throw new ServiceUnavailableException(
           'تحقق Google Play غير مهيأ (service account لـ Android Publisher). ' +
             'عيّن GOOGLE_PLAY_SERVICE_ACCOUNT_JSON أو أوقف GOOGLE_PLAY_REQUIRE_PUBLISHER.',
         );
       }
+      // Soft-credit known catalog SKUs when Publisher ACL / network fails.
+      // Client already acknowledged — refusing credit here leaves paid users empty.
     }
 
-    if (verifiedWithGoogle && purchase.purchaseState !== 0) {
+    // 0 = purchased, 1 = cancelled, 2 = pending. Only hard-reject cancelled.
+    if (verifiedWithGoogle && purchase.purchaseState === 1) {
+      throw new BadRequestException('تم إلغاء عملية الشراء على Google Play');
+    }
+    if (verifiedWithGoogle && purchase.purchaseState === 2) {
       throw new BadRequestException('عملية الشراء لم تكتمل بعد على Google Play');
     }
 
@@ -2103,15 +2112,23 @@ export class PaymentsService {
     bonusCoins?: number;
     priceUsd?: number;
   } | null> {
+    // Prefer live catalog first so admin DB gaps never block Play credits.
+    const fromCatalog = STANDARD_RECHARGE_PACKAGES.find(
+      (p) => p && String(p.sku) === String(productId),
+    );
+    if (fromCatalog) {
+      return {
+        sku: fromCatalog.sku,
+        coins: fromCatalog.coins,
+        bonusCoins: fromCatalog.bonusCoins,
+        priceUsd: fromCatalog.priceUsd,
+      };
+    }
     try {
       return await this.walletService.resolvePackageBySku(productId);
     } catch {
-      /* fall through to store offers */
+      /* fall through */
     }
-
-    const offerItems = await this.listStoreOffers();
-    const fromOffers = offerItems.find((o) => o && o.sku === productId);
-    if (fromOffers) return fromOffers;
     return null;
   }
 

@@ -104,41 +104,18 @@
         <div class="widget-grid mb-3">
           <article v-for="(p, idx) in packages" :key="p.id || idx" class="widget-card">
             <div class="widget-card-body">
-              <div class="d-flex gap-3 mb-2">
-                <img v-if="packageIcon(p)" :src="packageIcon(p)" alt="" class="pkg-thumb rounded" />
-                <div class="flex-grow-1 min-w-0">
-                  <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div>
-                      <div class="widget-card-title">{{ p.label || formatNumber(p.coins) }}</div>
-                      <div class="widget-card-meta">{{ p.sku }}</div>
-                    </div>
-                    <span v-if="p.popular" class="badge text-bg-warning">{{ t('common.popular') }}</span>
-                  </div>
-                  <div class="mb-2"><strong class="text-white">{{ formatNumber(p.coins) }}</strong> {{ t('common.coins') }}
-                    <span v-if="p.bonusCoins" class="text-success small"> +{{ formatNumber(p.bonusCoins) }}</span>
-                  </div>
-                  <div class="mb-2"><span class="neo-price">${{ Number(p.priceUsd || 0).toFixed(2) }}</span></div>
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <div class="widget-card-title">{{ p.label || formatNumber(p.coins) }}</div>
+                  <div class="widget-card-meta">{{ p.sku }}</div>
                 </div>
+                <span v-if="p.popular" class="badge text-bg-warning">{{ t('common.popular') }}</span>
               </div>
               <div class="mb-2">
-                <label class="form-label mb-1 small">{{ t('coinPackages.coinImage') }}</label>
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                  <input
-                    type="file"
-                    accept="image/*,.webp"
-                    class="form-control form-control-sm"
-                    @change="(e) => uploadPackageImage(e, p)"
-                  />
-                  <button
-                    v-if="p.imageUrl || p.iconUrl"
-                    class="btn btn-sm btn-outline-danger"
-                    type="button"
-                    @click="clearPackageImage(p)"
-                  >
-                    {{ t('theme.clearAsset') }}
-                  </button>
-                </div>
+                <strong class="text-warning">{{ formatNumber(p.coins) }}</strong> {{ t('common.coins') }}
+                <span v-if="p.bonusCoins" class="text-success small"> +{{ formatNumber(p.bonusCoins) }}</span>
               </div>
+              <div class="mb-3"><span class="neo-price">${{ Number(p.priceUsd || 0).toFixed(2) }}</span></div>
               <div class="row g-2 small">
                 <div class="col-6">
                   <label class="form-label mb-1">{{ t('common.coins') }}</label>
@@ -158,7 +135,7 @@
                 </div>
                 <div class="col-8">
                   <label class="form-label mb-1">{{ t('common.sku') }}</label>
-                  <input v-model="p.sku" class="form-control form-control-sm" />
+                  <input v-model="p.sku" class="form-control form-control-sm" dir="ltr" />
                 </div>
                 <div class="col-4 d-flex align-items-end">
                   <div class="form-check">
@@ -422,9 +399,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { settingsApi, walletApi, uploadsApi } from '@/api'
+import { settingsApi, walletApi } from '@/api'
 import { extractList, formatNumber, formatMoney, formatDate } from '@/composables/useUtils'
-import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
 import { useBulkSelection } from '@/composables/useBulkSelection'
@@ -684,31 +660,6 @@ function addWithdrawPackage() {
     diamonds: Math.max(1, Math.floor(Number(economy.minWithdrawDiamonds) || 10000)),
     label: `$${usd}`,
   })
-}
-
-function packageIcon(p) {
-  const url = p?.imageUrl || p?.iconUrl
-  return url ? resolveAsset(url) : ''
-}
-
-function clearPackageImage(p) {
-  p.imageUrl = ''
-  p.iconUrl = ''
-}
-
-async function uploadPackageImage(e, p) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  const { data, error: err } = await uploadsApi.upload(file)
-  if (err) {
-    error.value = err.message
-    return
-  }
-  const url = data?.url || data?.data?.url || ''
-  const resolved = url.startsWith('http') ? url : resolveAsset(url)
-  p.imageUrl = resolved
-  p.iconUrl = resolved
-  e.target.value = ''
 }
 
 async function load() {
@@ -972,12 +923,5 @@ onMounted(() => {
   background: rgba(251, 191, 36, 0.16);
   color: #fde68a;
   border: 1px solid rgba(251, 191, 36, 0.4);
-}
-.pkg-thumb {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  background: var(--input-bg);
-  border: 1px solid var(--border-color);
 }
 </style>

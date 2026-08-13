@@ -58,6 +58,9 @@ import { IdentityVerificationService } from '../users/identity-verification.serv
 import { GenderVerificationStatus } from '../../database/entities/female-identity-verification.entity';
 import { SecurityShieldService } from '../../common/security/security-shield.service';
 import { AbuseSeverity } from '../../database/entities/abuse-log.entity';
+import { EconomySettingsService } from '../economy/economy-settings.service';
+import { GameOddsSettingsService } from '../games/game-odds-settings.service';
+import { GiftsService } from '../gifts/gifts.service';
 
 class ResolveReportDto {
   @IsEnum(ReportStatus)
@@ -117,7 +120,99 @@ export class AdminController {
     private readonly gameAdsService: GameAdsService,
     private readonly identityVerification: IdentityVerificationService,
     private readonly shield: SecurityShieldService,
+    private readonly economySettings: EconomySettingsService,
+    private readonly gameOddsSettings: GameOddsSettingsService,
+    private readonly giftsService: GiftsService,
   ) {}
+
+  // ─── Economy settings (dashboard-owned live config) ─────────────
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('economy/settings')
+  @ApiOperation({ summary: 'Get live economy settings (ratios, cap, splits)' })
+  async getEconomySettings() {
+    return {
+      current: this.economySettings.get(),
+      defaults: this.economySettings.defaults(),
+    };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('economy/settings')
+  @ApiOperation({
+    summary:
+      'Update live economy settings. Takes effect immediately across the API — no restart.',
+  })
+  async patchEconomySettings(
+    @Body() body: Record<string, unknown>,
+    @Query('renormalize') renormalize?: string,
+  ) {
+    const patch = this.parseEconomyPatch(body);
+    const current = await this.economySettings.update(patch);
+    // When admins change ratios or the cap, they usually want the whole
+    // catalog re-minted from those new numbers so the app shows the spread.
+    const force = String(renormalize || '').toLowerCase() === 'force';
+    if (renormalize) {
+      const result = await this.giftsService.normalizeGiftEconomyCatalog({
+        forceFromRatio: force,
+      });
+      return { current, renormalize: result };
+    }
+    return { current };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('economy/settings/reset')
+  @ApiOperation({ summary: 'Reset economy settings to safe defaults' })
+  async resetEconomySettings() {
+    const current = await this.economySettings.reset();
+    return { current };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('economy/renormalize-gifts')
+  @ApiOperation({
+    summary:
+      'Re-mint every gift’s diamondValue from the current live ratio + cap. Use "force" to overwrite admin-set values.',
+  })
+  async renormalizeGifts(@Query('mode') mode?: string) {
+    const force = String(mode || '').toLowerCase() === 'force';
+    const result = await this.giftsService.normalizeGiftEconomyCatalog({
+      forceFromRatio: force,
+    });
+    return { ok: true, mode: force ? 'force' : 'preserve-admin', ...result };
+  }
+
+  private parseEconomyPatch(body: Record<string, unknown>) {
+    const patch: Record<string, unknown> = {};
+    const num = (v: unknown) => (v === undefined || v === null || v === '' ? undefined : Number(v));
+    if (body.coinsPerUsd !== undefined) patch.coinsPerUsd = num(body.coinsPerUsd);
+    if (body.diamondUsd !== undefined) patch.diamondUsd = num(body.diamondUsd);
+    if (body.giftDiamondRatio !== undefined) patch.giftDiamondRatio = num(body.giftDiamondRatio);
+    if (body.luckyGiftDiamondRatio !== undefined)
+      patch.luckyGiftDiamondRatio = num(body.luckyGiftDiamondRatio);
+    if (body.maxDiamondsPerUnit !== undefined) patch.maxDiamondsPerUnit = num(body.maxDiamondsPerUnit);
+    if (body.luckyGiftMaxMultiplier !== undefined)
+      patch.luckyGiftMaxMultiplier = num(body.luckyGiftMaxMultiplier);
+    if (body.luckyGiftTargetEv !== undefined) patch.luckyGiftTargetEv = num(body.luckyGiftTargetEv);
+    if (body.minWithdrawDiamonds !== undefined)
+      patch.minWithdrawDiamonds = num(body.minWithdrawDiamonds);
+    if (body.showDiamondValueInApp !== undefined) {
+      patch.showDiamondValueInApp = !!body.showDiamondValueInApp;
+    }
+    const split = body.defaultGiftSplit as Record<string, unknown> | undefined;
+    if (split && typeof split === 'object') {
+      patch.defaultGiftSplit = {
+        platformPercent: 0,
+        hostPercent: num(split.hostPercent),
+        agencyOwnerPercent: num(split.agencyOwnerPercent),
+      };
+    }
+    return patch;
+  }
 
   // ─── Auth (public) ─────────────────────────────────────────
   @Public()
@@ -507,6 +602,17 @@ export class AdminController {
   })
   importJehoGiftPack() {
     return this.adminService.importJehoDesignedGifts();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('gifts/import-entry-effects')
+  @ApiOperation({
+    summary:
+      'Clone mall entry effects (الدخولية) into sendable gifts (same MP4/preview URLs)',
+  })
+  importEntryEffectsAsGifts() {
+    return this.adminService.importEntryEffectsAsGifts();
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -1566,6 +1672,29 @@ export class AdminController {
       category as RankingCategory,
       limit ? parseInt(limit, 10) : 50,
     );
+  }
+
+  // ─── Game house odds (all coin games) ──────────────────────
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('games/odds')
+  @ApiOperation({
+    summary:
+      'Live house odds / RTP for all coin games. Player RTP is hard-capped so the app stays profitable.',
+  })
+  getGameOdds() {
+    return this.gameOddsSettings.getAdmin();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('games/odds')
+  @ApiOperation({
+    summary:
+      'Update house odds. Pass fields or { preset: "conservative"|"balanced"|"generous" }. Takes effect immediately.',
+  })
+  patchGameOdds(@Body() body: Record<string, unknown>) {
+    return this.gameOddsSettings.patchAdmin(body || {});
   }
 
   // ─── Game AdMob ────────────────────────────────────────────

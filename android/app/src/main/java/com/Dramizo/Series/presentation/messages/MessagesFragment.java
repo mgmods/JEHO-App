@@ -30,7 +30,6 @@ import com.Dramizo.Series.presentation.chat.ChatPreviewAdapter;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.friends.FriendsActivity;
-import com.Dramizo.Series.presentation.friends.RequestsActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
@@ -115,16 +114,25 @@ public class MessagesFragment extends Fragment {
             loadOfficialNewsPreview();
         });
 
-        View.OnClickListener openFriends = v -> openFriendsTab(0);
+        View.OnClickListener openHub = v -> {
+            int tab = 0;
+            if (binding.tvRequestBadge != null
+                    && binding.tvRequestBadge.getVisibility() == View.VISIBLE) {
+                tab = FriendsActivity.TAB_REQ_FRIEND;
+            }
+            openFriendsTab(tab);
+        };
         if (binding.btnFriends != null) {
-            binding.btnFriends.setOnClickListener(openFriends);
+            binding.btnFriends.setOnClickListener(openHub);
         }
         if (binding.btnMsgMenu != null) {
-            binding.btnMsgMenu.setOnClickListener(openFriends);
+            binding.btnMsgMenu.setOnClickListener(openHub);
         }
         if (binding.btnRequests != null) {
-            binding.btnRequests.setOnClickListener(v ->
-                    startActivity(new Intent(requireContext(), RequestsActivity.class)));
+            binding.btnRequests.setOnClickListener(openHub);
+        }
+        if (binding.tvRequestBadge != null) {
+            binding.tvRequestBadge.setOnClickListener(openHub);
         }
 
         loadPendingRequestBadge();
@@ -211,7 +219,8 @@ public class MessagesFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        if (viewModel != null) viewModel.load(true);
+        // Soft reload: keep list visible; force only via pull-to-refresh.
+        if (viewModel != null) viewModel.load(false);
         loadPendingRequestBadge();
         loadOfficialNewsPreview();
         registerOfficialNewsReceiver();
@@ -247,12 +256,14 @@ public class MessagesFragment extends Fragment {
         c.getIoExecutor().execute(() -> {
             int total = 0;
             try {
-                for (String type : new String[]{"friend", "follow", "relation"}) {
+                // Friend requests first (what users expect from the badge).
+                Result<java.util.List<MiscDtos.SocialRequestDto>> friend =
+                        ApiCall.execute(c.getUserApi().requests("friend"));
+                if (friend.success && friend.data != null) total += friend.data.size();
+                for (String type : new String[]{"follow", "relation"}) {
                     Result<java.util.List<MiscDtos.SocialRequestDto>> r =
                             ApiCall.execute(c.getUserApi().requests(type));
-                    if (r.success && r.data != null) {
-                        total += r.data.size();
-                    }
+                    if (r.success && r.data != null) total += r.data.size();
                 }
             } catch (Exception ignored) {
             }

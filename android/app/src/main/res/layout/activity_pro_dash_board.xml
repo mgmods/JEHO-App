@@ -2,6 +2,7 @@
 <!-- Shared professional dashboard shell for host + agency owner boards -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -112,12 +113,93 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnWithdraw"
-                    style="@style/Widget.AuraLive.Button"
+                    style="@style/Widget.AuraLive.Button.Green"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:layout_marginTop="12dp"
                     android:text="@string/dash_withdraw_balance"
                     android:textAllCaps="false" />
+
+                <!-- Host salary target ladder (visible on host dashboard only) -->
+                <LinearLayout
+                    android:id="@+id/sectionHostTarget"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_host_target_card"
+                    android:orientation="vertical"
+                    android:padding="14dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvHostTargetMonth"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        tools:text="أغسطس 2026 · دورة 1" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/host_target_section_title"
+                        android:textColor="@color/text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvHostTargetProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp"
+                        tools:text="التقدّم 120,000 / 150,000" />
+
+                    <ProgressBar
+                        android:id="@+id/progressHostTarget"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="10dp"
+                        android:layout_marginTop="8dp"
+                        android:max="100"
+                        android:progress="0"
+                        android:progressBackgroundTint="#1A000000"
+                        android:progressTint="#E8C36A" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/host_target_stages_label"
+                        android:textColor="@color/text_primary"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/hostTargetStagesRow"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+
+                    <TextView
+                        android:id="@+id/tvHostTargetWithdrawHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="@string/host_target_withdraw_hint"
+                        android:textColor="#FFB45309"
+                        android:textSize="11sp" />
+                </LinearLayout>
 
                 <!-- KPI row -->
                 <LinearLayout
@@ -399,7 +481,7 @@
                         android:layout_height="wrap_content"
                         android:padding="6dp"
                         android:text="@string/dash_see_all"
-                        android:textColor="#FF7C3AED"
+                        android:textColor="@color/hiyoo_dark_green"
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>

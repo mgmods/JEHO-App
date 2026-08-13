@@ -810,6 +810,16 @@
                 android:text="كتم"
                 android:textColor="#FBBF24"
                 android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/actForceLeaveSeat"
+                style="@style/Widget.AuraLive.UserCardAction"
+                android:layout_width="0dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="إنزال"
+                android:textColor="#FCA5A5"
+                android:visibility="gone" />
         </LinearLayout>
 
         <LinearLayout

@@ -1,6 +1,5 @@
 package com.Dramizo.Series.presentation.friends;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,11 +32,15 @@ import java.util.List;
 /** One swipe page: friends (0), following (1), or fans (2). */
 public class FriendsListFragment extends Fragment {
     private static final String ARG_MODE = "mode";
+    private static final long MIN_RELOAD_MS = 12_000L;
 
     private int mode;
     private FragmentFriendsListBinding binding;
     private FriendAdapter adapter;
     private String myId;
+    private boolean loading;
+    private long lastLoadAtMs;
+    private boolean loadedOnce;
 
     public static FriendsListFragment newInstance(int mode) {
         FriendsListFragment f = new FriendsListFragment();
@@ -76,8 +79,10 @@ public class FriendsListFragment extends Fragment {
         });
         binding.recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.recycler.setAdapter(adapter);
+        binding.recycler.setHasFixedSize(true);
+        binding.recycler.setItemAnimator(null);
         if (binding.swipe != null) {
-            binding.swipe.setOnRefreshListener(this::load);
+            binding.swipe.setOnRefreshListener(() -> load(true));
             binding.swipe.setColorSchemeResources(R.color.aurora_mint, R.color.aurora_gold);
         }
         if (binding.tvEmptyText != null) {
@@ -87,39 +92,53 @@ public class FriendsListFragment extends Fragment {
         }
 
         AppContainer c = ContainerProvider.from(requireActivity());
-        c.getIoExecutor().execute(() -> {
-            Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
-            if (me.success && me.data != null) myId = me.data.id;
-            if (isAdded()) requireActivity().runOnUiThread(this::load);
-        });
+        myId = c.getSessionManager().getUserId();
+        if (myId == null || myId.isEmpty()) {
+            c.getIoExecutor().execute(() -> {
+                Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
+                if (me.success && me.data != null) myId = me.data.id;
+                if (isAdded()) requireActivity().runOnUiThread(() -> load(false));
+            });
+        } else {
+            load(false);
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        if (myId != null) load();
+        if (myId != null && loadedOnce) load(false);
     }
 
     void reload() {
-        load();
+        load(true);
     }
 
-    private void load() {
-        if (myId == null || binding == null || !isAdded()) return;
+    private void load(boolean force) {
+        if (myId == null || binding == null || !isAdded() || loading) return;
+        long now = System.currentTimeMillis();
+        if (!force && loadedOnce && now - lastLoadAtMs < MIN_RELOAD_MS) return;
+        loading = true;
+        lastLoadAtMs = now;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.ListResult<AuthDtos.UserDto>> r;
             if (mode == 0) r = ApiCall.execute(c.getUserApi().friends(1));
             else if (mode == 2) r = ApiCall.execute(c.getUserApi().followers(myId, 1));
             else r = ApiCall.execute(c.getUserApi().following(myId, 1));
-            if (!isAdded()) return;
+            if (!isAdded()) {
+                loading = false;
+                return;
+            }
             requireActivity().runOnUiThread(() -> {
+                loading = false;
                 if (binding == null) return;
                 if (binding.swipe != null) binding.swipe.setRefreshing(false);
                 if (r.success && r.data != null && r.data.items != null) {
                     adapter.submit(r.data.items);
+                    loadedOnce = true;
                 } else {
-                    adapter.submit(new ArrayList<>());
+                    if (!loadedOnce) adapter.submit(new ArrayList<>());
                     if (r.error != null) {
                         Toast.makeText(requireContext(), r.error, Toast.LENGTH_SHORT).show();
                     }

@@ -44,7 +44,7 @@ public class WalletBillsActivity extends ThemedActivity {
         bindRow(binding.rowCoins.getRoot(), R.drawable.icon_bills_charge,
                 R.string.bill_coins_record,
                 v -> openBagTab(0));
-        bindRow(binding.rowRechargeAgent.getRoot(), R.drawable.icon_bills_charge,
+        bindRow(binding.rowRechargeAgent.getRoot(), R.drawable.ic_recharge_agent,
                 R.string.recharge_agent,
                 v -> startActivity(new Intent(this, RechargeAgentActivity.class)));
     }

@@ -225,6 +225,16 @@ export class RoomsController {
     return this.roomsService.leaveSeat(id, userId);
   }
 
+  @Post(':id/seats/force-leave')
+  @ApiOperation({ summary: 'Host/moderator: remove a user from mic (stay in room)' })
+  forceLeaveSeat(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: KickBanDto,
+  ) {
+    return this.roomsService.forceLeaveSeatByModerator(id, userId, dto.userId, dto.reason);
+  }
+
   @Post(':id/cohost')
   setCohost(
     @Param('id', ParseUUIDPipe) id: string,

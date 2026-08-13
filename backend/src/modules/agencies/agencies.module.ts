@@ -14,6 +14,7 @@ import { RoomModerator } from '../../database/entities/room-moderator.entity';
 import { User } from '../../database/entities/user.entity';
 import { AgencyApplication } from '../../database/entities/agency-application.entity';
 import { AgencyPayoutRequest } from '../../database/entities/agency-payout-request.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { RoomsModule } from '../rooms/rooms.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
@@ -32,6 +33,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       RoomSeat,
       RoomModerator,
       User,
+      Cosmetic,
     ]),
     forwardRef(() => RoomsModule),
     NotificationsModule,

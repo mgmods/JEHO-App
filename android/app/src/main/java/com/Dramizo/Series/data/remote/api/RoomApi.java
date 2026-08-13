@@ -148,6 +148,9 @@ public interface RoomApi {
     @POST("rooms/{id}/seats/leave")
     Call<ApiResponse<RoomDtos.RoomDto>> leaveSeat(@Path("id") String id);
 
+    @POST("rooms/{id}/seats/force-leave")
+    Call<ApiResponse<Object>> forceLeaveSeat(@Path("id") String id, @Body Map<String, Object> body);
+
     @POST("rooms/{id}/seats/lock")
     Call<ApiResponse<RoomDtos.RoomDto>> lockSeat(@Path("id") String id, @Body Map<String, Object> body);
 

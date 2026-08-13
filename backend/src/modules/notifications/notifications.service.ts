@@ -471,20 +471,23 @@ function plainTextPreview(body?: string | null, html?: string | null): string | 
 }
 
 /**
- * Lightweight allowlist sanitizer for admin Official News HTML.
- * Blocks script/style and inline handlers — keeps common formatting + links + images.
+ * Sanitizer for admin Official News HTML (rendered in app WebView).
+ * Keeps full layout + CSS (<style>, classes, divs) so branded offer cards match dashboard preview.
+ * Blocks scripts / remote forms / inline handlers / javascript: URLs.
  */
 function sanitizeOfficialHtml(raw: string): string {
   let html = String(raw || '').trim();
   if (!html) return '';
-  if (html.length > 50_000) html = html.slice(0, 50_000);
+  // Full offer pages (~5–15kb) need headroom; hard-capped for abuse.
+  if (html.length > 120_000) html = html.slice(0, 120_000);
   html = html
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
-    .replace(/<\/?(iframe|object|embed|form|input|button|meta|link|base)[^>]*>/gi, '')
+    .replace(/<\/?(iframe|object|embed|form|input|meta|link|base)[^>]*>/gi, '')
+    // Drop event handlers but keep <button> / layout structure for CTAs.
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/javascript:/gi, '')
-    .replace(/data:text\/html/gi, '');
+    .replace(/data:text\/html/gi, '')
+    .replace(/expression\s*\(/gi, '');
   return html.trim();
 }
 

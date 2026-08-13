@@ -88,7 +88,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_voice_seat_circle"
-                            android:backgroundTint="#14FE2C55" />
+                            android:backgroundTint="#1410B981" />
 
                         <ImageView
                             android:id="@+id/imgAgencyLogo"
@@ -108,7 +108,7 @@
                         android:letterSpacing="0.06"
                         android:text="@string/agency_manage_legend_badge"
                         android:textAllCaps="true"
-                        android:textColor="@color/md_theme_light_primary"
+                        android:textColor="@color/hiyoo_dark_green"
                         android:textSize="11sp"
                         android:textStyle="bold" />
 
@@ -150,7 +150,7 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="center_horizontal"
                     android:layout_marginTop="12dp"
-                    android:indeterminateTint="@color/md_theme_light_primary"
+                    android:indeterminateTint="@color/hiyoo_dark_green"
                     android:visibility="gone" />
 
                 <TextView

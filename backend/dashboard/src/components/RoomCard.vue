@@ -1,71 +1,70 @@
 <template>
-  <div class="room-card glass widget-card overflow-hidden" :class="{ 'is-selected': selected }">
+  <article class="rc glass widget-card" :class="{ 'is-selected': selected, 'rc--busy': isBusy, 'rc--live': room.isLive }">
     <BulkCheck :checked="selected" @toggle="$emit('toggle-select', room)" />
-    <div class="room-card__hero" :style="heroStyle">
-      <div class="room-card__scrim" />
-      <div class="room-card__halo"></div>
-      <div class="room-card__wings" aria-hidden="true"></div>
-      <div class="room-card__top">
-        <span class="neo-pill" :class="room.isLive ? 'neo-pill--live' : 'neo-pill--talk'">
-          <i class="bi" :class="room.isLive ? 'bi-broadcast' : 'bi-mic-fill'"></i>
-          {{ room.isLive ? 'LIVE' : (room.status || 'active') }}
+
+    <div class="rc__main">
+      <div class="rc__avatar-wrap" aria-hidden="true">
+        <img
+          v-if="hostAvatar"
+          :src="hostAvatar"
+          class="rc__avatar"
+          alt=""
+          @error="avatarError = true"
+        />
+        <div v-else class="rc__avatar rc__avatar--fallback">{{ hostInitial }}</div>
+        <span v-if="hostFrameUrl" class="rc__frame">
+          <SvgaPreview v-if="isSvgaFrame" class="rc__frame-media" :src="hostFrameUrl" />
+          <video
+            v-else-if="isVideoFrame"
+            class="rc__frame-media"
+            :src="hostFrameUrl"
+            muted
+            loop
+            autoplay
+            playsinline
+          />
+          <img v-else class="rc__frame-media" :src="hostFrameUrl" alt="" />
         </span>
-        <span class="room-card__viewers">
-          <i class="bi bi-people-fill me-1"></i>
-          {{ formatNumber(room.membersCount ?? room.memberCount ?? room.onlineCount ?? room.viewerCount ?? 0) }}
-        </span>
+        <span v-if="isBusy" class="rc__pulse" />
       </div>
-      <div class="room-card__center">
-        <div class="room-card__host-wear">
-          <div class="room-card__host-frame">
-            <img
-              v-if="hostAvatar"
-              :src="hostAvatar"
-              class="room-card__host-avatar"
-              alt=""
-              @error="avatarError = true"
-            />
-            <div v-else class="room-card__host-avatarFallback">{{ hostInitial }}</div>
-          </div>
-          <!-- Equipped head frame / VIP badge (static or SVGA) -->
-          <div v-if="hostFrameUrl" class="room-card__frame-layer" aria-hidden="true">
-            <SvgaPreview v-if="isSvgaFrame" class="room-card__frame-media" :src="hostFrameUrl" />
-            <video
-              v-else-if="isVideoFrame"
-              class="room-card__frame-media"
-              :src="hostFrameUrl"
-              muted
-              loop
-              autoplay
-              playsinline
-            />
-            <img v-else class="room-card__frame-media" :src="hostFrameUrl" alt="" />
-          </div>
+
+      <div class="rc__body">
+        <div class="rc__row-top">
+          <span class="rc__status" :class="room.isLive ? 'rc__status--live' : 'rc__status--idle'">
+            <i class="bi" :class="room.isLive ? 'bi-broadcast' : 'bi-mic-fill'"></i>
+            {{ room.isLive ? 'LIVE' : (room.status || 'active') }}
+          </span>
+          <span class="rc__occupancy" :class="{ 'rc__occupancy--on': isBusy }">
+            <span
+              class="rc-wave"
+              :class="{ 'rc-wave--on': isBusy }"
+              aria-hidden="true"
+            >
+              <i /><i /><i /><i /><i />
+            </span>
+            <span class="rc__count">{{ formatNumber(peopleCount) }}</span>
+          </span>
         </div>
-      </div>
-      <div class="room-card__bottom">
-        <div class="room-card__title">{{ room.name || room.title || t('common.untitled') }}</div>
-        <div class="room-card__host-name">{{ hostName }}</div>
-        <div class="room-card__access small mt-1">
-          <span class="neo-pill neo-pill--heat">
-            <i class="bi bi-fire"></i>
-            {{ accessLabel }}
+
+        <h3 class="rc__title">{{ room.name || room.title || t('common.untitled') }}</h3>
+        <p class="rc__host">{{ hostName }}</p>
+
+        <div class="rc__meta">
+          <span class="rc__chip">{{ accessLabel }}</span>
+          <span v-if="isSupport" class="rc__chip rc__chip--ok">خدمة عملاء</span>
+          <span v-else-if="isAgency" class="rc__chip rc__chip--info">{{ t('rooms.agency') }}</span>
+          <span v-else class="rc__chip rc__chip--muted">شخصي</span>
+          <span v-if="entryFee > 0" class="rc__chip rc__chip--coin">
+            {{ formatNumber(entryFee) }} {{ t('common.coins') }}
           </span>
-          <span v-if="isSupport" class="badge bg-success ms-1">
-            خدمة عملاء
-          </span>
-          <span v-else-if="isAgency" class="badge bg-info ms-1">
-            {{ t('rooms.agency') }}
-          </span>
-          <span v-else class="badge bg-secondary ms-1">شخصي</span>
-          <span v-if="entryFee > 0" class="text-warning ms-1">{{ formatNumber(entryFee) }} {{ t('common.coins') }}</span>
+          <span v-if="roomPublicId" class="rc__chip rc__chip--id">ID {{ roomPublicId }}</span>
         </div>
-        <div v-if="roomPublicId" class="small text-warning mt-1">ID: {{ roomPublicId }}</div>
       </div>
     </div>
-    <div class="room-card__actions">
-      <span class="small text-muted">{{ formatDate(room.createdAt) }}</span>
-      <div class="action-btns">
+
+    <div class="rc__actions">
+      <span class="rc__date">{{ formatDate(room.createdAt) }}</span>
+      <div class="rc__btns">
         <button
           v-if="!isAgency"
           class="btn btn-sm"
@@ -83,11 +82,7 @@
         >
           إنهاء المباشر
         </button>
-        <button
-          class="btn btn-sm btn-outline-info"
-          type="button"
-          @click="$emit('edit', room)"
-        >
+        <button class="btn btn-sm btn-outline-info" type="button" @click="$emit('edit', room)">
           {{ t('rooms.access') }}
         </button>
         <button
@@ -98,16 +93,12 @@
         >
           {{ t('app.close') }}
         </button>
-        <button
-          class="btn btn-sm btn-outline-danger"
-          type="button"
-          @click="$emit('delete', room)"
-        >
+        <button class="btn btn-sm btn-outline-danger" type="button" @click="$emit('delete', room)">
           {{ t('app.delete') }}
         </button>
       </div>
     </div>
-  </div>
+  </article>
 </template>
 
 <script setup>
@@ -130,13 +121,11 @@ const avatarError = ref(false)
 const isSupport = computed(
   () => props.room.roomKind === 'support' || props.room.isSupport === true,
 )
-/** True agency rooms only — do NOT use isPersistent (support rooms are persistent too). */
 const isAgency = computed(() => {
   if (isSupport.value) return false
   const kind = String(props.room.roomKind || '').toLowerCase()
   if (kind === 'agency') return true
   if (kind === 'standard' || kind === 'support' || kind === 'personal') return false
-  // Fallback only when roomKind is missing (legacy rows).
   return !!(props.room.agencyId)
 })
 
@@ -202,196 +191,236 @@ const accessLabel = computed(() => {
 })
 
 const entryFee = computed(() => Number(props.room.entryFeeCoins || 0))
+const hostInitial = computed(() => (hostName.value || 'R').charAt(0).toUpperCase())
 
-const hostInitial = computed(() => {
-  const name = hostName.value || 'R'
-  return name.charAt(0).toUpperCase()
-})
+const peopleCount = computed(() =>
+  Number(
+    props.room.membersCount
+    ?? props.room.memberCount
+    ?? props.room.onlineCount
+    ?? props.room.viewerCount
+    ?? 0,
+  ) || 0,
+)
 
-const heroStyle = computed(() => {
-  if (hostAvatar.value) {
-    return { backgroundImage: `url(${hostAvatar.value})` }
-  }
-  return {
-    backgroundImage: 'linear-gradient(145deg, #1a0b3a 0%, #0e0b1f 45%, #2a1458 100%)',
-  }
-})
+/** Animate waves when room has people or is live. */
+const isBusy = computed(() => peopleCount.value > 0 || !!props.room.isLive)
 </script>
 
 <style scoped>
-.room-card {
+.rc {
   position: relative;
-  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(18, 20, 28, 0.72);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.room-card.is-selected {
-  outline: 2px solid rgba(167, 139, 250, 0.8);
+.rc.is-selected {
+  outline: 2px solid rgba(45, 212, 191, 0.7);
   outline-offset: 1px;
-  box-shadow: 0 0 32px rgba(139, 92, 246, 0.35);
+}
+.rc--busy {
+  border-color: rgba(45, 212, 191, 0.28);
+}
+.rc--live {
+  border-color: rgba(248, 113, 113, 0.35);
 }
 
-.room-card__hero {
-  position: relative;
-  min-height: 240px;
-  background-size: cover;
-  background-position: center top;
-  isolation: isolate;
-}
-
-.room-card__scrim {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(14, 11, 31, 0.2) 0%, rgba(14, 11, 31, 0.55) 40%, rgba(14, 11, 31, 0.96) 100%),
-    radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.25), transparent 55%);
-}
-
-.room-card__halo {
-  position: absolute;
-  inset: 16px;
-  border-radius: 28px;
-  border: 1px solid rgba(167, 139, 250, 0.35);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 36px rgba(139, 92, 246, 0.2);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.room-card__wings {
-  display: none;
-}
-
-.room-card__top,
-.room-card__center,
-.room-card__bottom {
-  position: relative;
-  z-index: 1;
-}
-
-.room-card__top {
+.rc__main {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 14px 0;
+  gap: 14px;
+  padding: 16px 16px 12px;
+  align-items: flex-start;
 }
 
-.room-card__viewers {
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(167, 139, 250, 0.35);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.78rem;
-  color: #fff;
-  backdrop-filter: blur(8px);
-}
-
-.room-card__center {
-  display: flex;
-  justify-content: center;
-  margin-top: 18px;
-}
-
-.room-card__host-wear {
+.rc__avatar-wrap {
   position: relative;
-  width: 110px;
-  height: 110px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
 }
-
-.room-card__host-frame {
-  width: 78px;
-  height: 78px;
-  border-radius: 50%;
-  padding: 2px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #a78bfa, #22d3ee, #f472b6);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18), 0 0 28px rgba(139, 92, 246, 0.45);
-  position: relative;
-  z-index: 1;
-}
-
-.room-card__host-avatar,
-.room-card__host-avatarFallback {
-  width: 100%;
-  height: 100%;
+.rc__avatar {
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #0e0b1f;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  display: block;
 }
-
-.room-card__host-avatarFallback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
+.rc__avatar--fallback {
+  display: grid;
+  place-items: center;
   font-weight: 800;
-  font-size: 1.4rem;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  font-size: 1.25rem;
+  color: #fff;
+  background: linear-gradient(145deg, #334155, #1e293b);
 }
-
-.room-card__frame-layer {
+.rc__frame {
   position: absolute;
-  inset: 0;
-  z-index: 2;
+  inset: -10px;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
 }
-
-.room-card__frame-media {
-  width: 110px !important;
-  height: 110px !important;
+.rc__frame-media {
+  width: 84px !important;
+  height: 84px !important;
   object-fit: contain;
   background: transparent !important;
 }
-
-.room-card__bottom {
-  padding: 14px 16px 16px;
-  text-align: center;
+.rc__pulse {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid rgba(45, 212, 191, 0.55);
+  animation: rc-pulse 1.6s ease-out infinite;
+  pointer-events: none;
+}
+.rc--live .rc__pulse {
+  border-color: rgba(248, 113, 113, 0.65);
 }
 
-.room-card__title {
-  font-weight: 800;
-  font-size: 1.12rem;
-  color: #fff;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
+.rc__body {
+  flex: 1;
+  min-width: 0;
 }
-
-.room-card__host-name {
-  margin-top: 0.25rem;
-  font-size: 0.85rem;
-  color: #c4b5fd;
-  font-weight: 600;
-}
-
-.room-card__access {
-  margin-top: 0.55rem !important;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  justify-content: center;
-  align-items: center;
-}
-
-.room-card__actions {
+.rc__row-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-top: 1px solid rgba(139, 92, 246, 0.15);
-  background: rgba(14, 11, 31, 0.65);
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rc__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+}
+.rc__status--live {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+.rc__occupancy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.rc__occupancy--on {
+  color: #5eead4;
+  border-color: rgba(45, 212, 191, 0.35);
+  background: rgba(13, 148, 136, 0.15);
 }
 
-.action-btns {
+.rc-wave {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  height: 14px;
+  min-width: 16px;
+  opacity: 0.4;
+}
+.rc-wave i {
+  display: block;
+  width: 2.5px;
+  height: 4px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: bottom center;
+}
+.rc-wave--on {
+  opacity: 1;
+}
+.rc-wave--on i {
+  animation: rc-bar 0.85s ease-in-out infinite;
+}
+.rc-wave--on i:nth-child(1) { animation-delay: 0s; height: 5px; }
+.rc-wave--on i:nth-child(2) { animation-delay: 0.12s; height: 10px; }
+.rc-wave--on i:nth-child(3) { animation-delay: 0.24s; height: 14px; }
+.rc-wave--on i:nth-child(4) { animation-delay: 0.36s; height: 9px; }
+.rc-wave--on i:nth-child(5) { animation-delay: 0.48s; height: 6px; }
+
+.rc__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #f8fafc;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rc__host {
+  margin: 2px 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.rc__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.rc__chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+}
+.rc__chip--ok { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+.rc__chip--info { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; }
+.rc__chip--muted { background: rgba(100, 116, 139, 0.25); color: #cbd5e1; }
+.rc__chip--coin { background: rgba(234, 179, 8, 0.16); color: #fde68a; }
+.rc__chip--id { font-family: ui-monospace, monospace; color: #fcd34d; }
+
+.rc__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.2);
+}
+.rc__date {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+.rc__btns {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   justify-content: flex-end;
+}
+
+@keyframes rc-bar {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.65; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes rc-pulse {
+  0% { transform: scale(1); opacity: 0.85; }
+  100% { transform: scale(1.18); opacity: 0; }
 }
 </style>

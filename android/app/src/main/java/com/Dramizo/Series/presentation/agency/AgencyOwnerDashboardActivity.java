@@ -152,11 +152,13 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                     return;
                 }
                 if (e.diamondUsdRate > 0) diamondUsdRate = e.diamondUsdRate;
+                // CLEAN ECONOMY: one diamond pool. Owner commission now lives in
+                // the single wallet balance (available.personalDiamonds / wallet.diamonds).
                 if (e.available != null) {
-                    agencyDiamonds = Math.max(0L, e.available.agencyDiamonds);
+                    agencyDiamonds = Math.max(0L, e.available.personalDiamonds);
                 }
                 if (wallet.success && wallet.data != null) {
-                    agencyDiamonds = Math.max(0L, wallet.data.agencyDiamonds);
+                    agencyDiamonds = Math.max(0L, wallet.data.diamonds);
                     if (wallet.data.diamondUsdRate > 0) diamondUsdRate = wallet.data.diamondUsdRate;
                 }
                 if (econ.success && econ.data != null) {
@@ -166,8 +168,8 @@ public class AgencyOwnerDashboardActivity extends ThemedActivity {
                     }
                 }
 
-                double availUsd = e.available != null && e.available.agencyUsd > 0
-                        ? e.available.agencyUsd
+                double availUsd = e.available != null && e.available.personalUsd > 0
+                        ? e.available.personalUsd
                         : agencyDiamonds * diamondUsdRate;
                 setT(tvBalanceUsd, formatUsd(availUsd));
                 setT(tvBalanceDiamonds, formatLong(agencyDiamonds) + " ◆");

@@ -19,21 +19,78 @@
     </div>
 
     <div class="glass p-3 mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <h3 class="h6 mb-1">{{ t('games.dailyBoss') }}</h3>
-          <div class="small text-muted">{{ t('games.bossHint') }}</div>
+          <h3 class="h6 mb-1">{{ t('games.oddsTitle') }}</h3>
+          <div class="small text-muted">{{ t('games.oddsHint') }}</div>
         </div>
-        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingBoss" @click="saveBoss">
-          {{ t('games.saveBoss') }}
-        </button>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <span class="badge bg-success-subtle text-success-emphasis">
+            {{ t('games.houseEdge') }}: {{ houseEdgePct }}%
+          </span>
+          <span class="badge bg-info-subtle text-info-emphasis">
+            {{ t('games.playerRtp') }}: {{ playerRtpPct }}%
+          </span>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('conservative')">
+            {{ t('games.presetConservative') }}
+          </button>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('balanced')">
+            {{ t('games.presetBalanced') }}
+          </button>
+          <button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="applyOddsPreset('generous')">
+            {{ t('games.presetGenerous') }}
+          </button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">
+            {{ t('games.saveOdds') }}
+          </button>
+        </div>
       </div>
       <div class="row g-2">
-        <div class="col-md"><label class="form-label small">HP</label><input v-model.number="boss.maxHp" type="number" min="100" class="form-control" /></div>
-        <div class="col-md"><label class="form-label small">{{ t('games.attempts') }}</label><input v-model.number="boss.maxAttacks" type="number" min="1" class="form-control" /></div>
-        <div class="col-md"><label class="form-label small">{{ t('games.minDamage') }}</label><input v-model.number="boss.minDamage" type="number" min="1" class="form-control" /></div>
-        <div class="col-md"><label class="form-label small">{{ t('games.maxDamage') }}</label><input v-model.number="boss.maxDamage" type="number" min="1" class="form-control" /></div>
-        <div class="col-md"><label class="form-label small">{{ t('games.coinReward') }}</label><input v-model.number="boss.rewardCoins" type="number" min="1" class="form-control" /></div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.playerRtp') }} (0.55–0.82)</label>
+          <input v-model.number="odds.playerRtp" type="number" min="0.55" max="0.82" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.spinHitRate') }}</label>
+          <input v-model.number="odds.spinHitRate" type="number" min="0.05" max="0.22" step="0.005" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.fishingHitRate') }}</label>
+          <input v-model.number="odds.fishingHitRate" type="number" min="0.04" max="0.18" step="0.005" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.crashCashoutRake') }}</label>
+          <input v-model.number="odds.crashCashoutRake" type="number" min="0.9" max="0.99" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.hiloPayoutMult') }}</label>
+          <input v-model.number="odds.hiloPayoutMult" type="number" min="1.15" max="1.7" step="0.05" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.royalBattlePayGate') }}</label>
+          <input v-model.number="odds.royalBattlePayGate" type="number" min="0.2" max="0.55" step="0.01" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxBet') }}</label>
+          <input v-model.number="odds.maxBet" type="number" min="100" max="50000" step="100" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxWinMult') }}</label>
+          <input v-model.number="odds.maxWinMult" type="number" min="3" max="25" step="1" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxWinAbsolute') }}</label>
+          <input v-model.number="odds.maxWinAbsolute" type="number" min="1000" max="500000" step="1000" class="form-control" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{{ t('games.maxCrashRatio') }}</label>
+          <input v-model.number="odds.maxCrashRatio" type="number" min="3" max="20" step="1" class="form-control" />
+        </div>
+      </div>
+      <div class="small text-muted mt-2">{{ t('games.oddsSafety') }}</div>
+      <div class="small mt-2">
+        <span class="text-muted">{{ t('games.oddsCoverage', { count: coveredCount }) }}</span>
+        <span class="ms-1">{{ coveredGamesLabel }}</span>
       </div>
     </div>
 
@@ -194,9 +251,9 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { settingsApi, gameStoreApi, uploadsApi } from '@/api'
+import { settingsApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -211,19 +268,89 @@ const loading = ref(false)
 const loadingStore = ref(false)
 const saving = ref(false)
 const savingStore = ref(false)
-const savingBoss = ref(false)
+const savingOdds = ref(false)
 const error = ref('')
 const success = ref('')
 const coverBroken = reactive({})
 const editIdx = ref(null)
 const editDraft = ref(null)
-const boss = reactive({
-  maxHp: 5000,
-  maxAttacks: 20,
-  minDamage: 8,
-  maxDamage: 18,
-  rewardCoins: 1000,
+const odds = reactive({
+  playerRtp: 0.7,
+  spinHitRate: 0.115,
+  fishingHitRate: 0.09,
+  crashCashoutRake: 0.97,
+  hiloPayoutMult: 1.4,
+  royalBattlePayGate: 0.36,
+  maxBet: 10000,
+  maxWinMult: 12,
+  maxWinAbsolute: 80000,
+  maxCrashRatio: 8,
 })
+const coveredGames = ref([])
+const coveredCount = computed(() => coveredGames.value.length || 22)
+const coveredGamesLabel = computed(() =>
+  coveredGames.value.length ? coveredGames.value.join(' · ') : t('games.oddsCoverageAll'),
+)
+const playerRtpPct = computed(() => Math.round((Number(odds.playerRtp) || 0) * 1000) / 10)
+const houseEdgePct = computed(() => Math.round((1 - (Number(odds.playerRtp) || 0)) * 1000) / 10)
+
+function applyOddsPayload(data) {
+  if (!data || typeof data !== 'object') return
+  ;[
+    'playerRtp',
+    'spinHitRate',
+    'fishingHitRate',
+    'crashCashoutRake',
+    'hiloPayoutMult',
+    'royalBattlePayGate',
+    'maxBet',
+    'maxWinMult',
+    'maxWinAbsolute',
+    'maxCrashRatio',
+  ].forEach((k) => {
+    if (data[k] != null && Number.isFinite(Number(data[k]))) odds[k] = Number(data[k])
+  })
+  if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
+}
+
+async function loadOdds() {
+  const { data, error: err } = await gameOddsApi.get()
+  if (err) {
+    error.value = err.message
+    return
+  }
+  applyOddsPayload(data?.data ?? data)
+}
+
+async function saveOdds() {
+  savingOdds.value = true
+  error.value = ''
+  const { data, error: err } = await gameOddsApi.update({ ...odds })
+  savingOdds.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyOddsPayload(data?.data ?? data)
+  success.value = t('games.oddsSaved')
+  toast().success(success.value)
+}
+
+async function applyOddsPreset(preset) {
+  savingOdds.value = true
+  error.value = ''
+  const { data, error: err } = await gameOddsApi.applyPreset(preset)
+  savingOdds.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  applyOddsPayload(data?.data ?? data)
+  success.value = t('games.oddsSaved')
+  toast().success(success.value)
+}
 
 const ORIGIN = 'https://api.adnova.bbs.tr'
 const MIKOO = [
@@ -398,15 +525,6 @@ async function load() {
     return
   }
   const rows = Array.isArray(data) ? data : (data?.data || data || [])
-  const setting = (key, fallback) => {
-    const value = Number(Array.isArray(rows) ? rows.find((r) => r.key === key)?.value : NaN)
-    return Number.isFinite(value) ? value : fallback
-  }
-  boss.maxHp = setting('games.boss.maxHp', boss.maxHp)
-  boss.maxAttacks = setting('games.boss.maxAttacks', boss.maxAttacks)
-  boss.minDamage = setting('games.boss.minDamage', boss.minDamage)
-  boss.maxDamage = setting('games.boss.maxDamage', boss.maxDamage)
-  boss.rewardCoins = setting('games.boss.rewardCoins', boss.rewardCoins)
   let found = null
   if (Array.isArray(rows)) found = rows.find((r) => r.key === 'app_games')
   if (found?.value) {
@@ -482,28 +600,10 @@ async function save() {
   }
 }
 
-async function saveBoss() {
-  savingBoss.value = true
-  const { error: err } = await settingsApi.update({
-    'games.boss.maxHp': String(Math.floor(boss.maxHp)),
-    'games.boss.maxAttacks': String(Math.floor(boss.maxAttacks)),
-    'games.boss.minDamage': String(Math.floor(boss.minDamage)),
-    'games.boss.maxDamage': String(Math.floor(boss.maxDamage)),
-    'games.boss.rewardCoins': String(Math.floor(boss.rewardCoins)),
-  })
-  savingBoss.value = false
-  if (err) {
-    error.value = err.message
-    toast().danger(err.message)
-  } else {
-    success.value = t('games.bossSaved')
-    toast().success(success.value)
-  }
-}
-
 onMounted(() => {
   load()
   loadStore()
+  loadOdds()
 })
 </script>
 

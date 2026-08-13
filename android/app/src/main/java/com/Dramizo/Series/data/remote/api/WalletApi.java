@@ -80,6 +80,9 @@ public interface WalletApi {
     @GET("recharge-agents/me")
     Call<ApiResponse<Map<String, Object>>> rechargeAgentMe();
 
+    @POST("recharge-agents/apply")
+    Call<ApiResponse<Map<String, Object>>> applyRechargeAgent(@Body Map<String, Object> body);
+
     @GET("recharge-agents/resolve-user")
     Call<ApiResponse<Map<String, Object>>> resolveRechargeRecipient(
             @Query("query") String query);

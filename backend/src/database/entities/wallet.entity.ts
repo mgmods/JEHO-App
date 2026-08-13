@@ -28,15 +28,16 @@ export class Wallet {
   diamonds: number;
 
   /**
-   * Diamonds earned from agency-room gifts (host share + owner commission).
-   * Separate from personal-room `diamonds` — own withdraw/payout path.
+   * @deprecated CLEAN ECONOMY: retired. All gift earnings (host share + agency
+   * owner commission) now land in the single `diamonds` pool. Column kept at 0
+   * for DB-sync safety and historical rows only. Do not write to it.
    */
   @Column({ type: 'bigint', default: 0 })
   agencyDiamonds: number;
 
   /**
-   * Diamonds received from host↔host trades (التاجر).
-   * Separate from withdrawable `diamonds` so swaps accumulate as trader collection.
+   * @deprecated CLEAN ECONOMY: retired. Host↔host trades fold into `diamonds`.
+   * Column kept at 0 for DB-sync safety only. Do not write to it.
    */
   @Column({ type: 'bigint', default: 0 })
   traderDiamonds: number;

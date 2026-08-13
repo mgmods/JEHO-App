@@ -2,6 +2,15 @@
   <div>
     <PageHeader :title="t('gifts.title')" :subtitle="t('gifts.subtitle')">
       <template #actions>
+        <button
+          class="btn btn-ghost btn-sm me-2"
+          type="button"
+          :disabled="importingEntries"
+          @click="importEntryEffects"
+        >
+          <i class="bi bi-car-front me-1"></i>
+          {{ importingEntries ? '…' : 'استيراد الدخوليات كهدايا' }}
+        </button>
         <button class="btn btn-ghost btn-sm me-2" type="button" @click="openCategoryCreate">
           <i class="bi bi-folder-plus me-1"></i> {{ t('gifts.newCategory') }}
         </button>
@@ -188,17 +197,19 @@
                 <div class="col-md-6">
                   <label class="form-label">{{ t('gifts.icon') }}</label>
                   <input type="file" accept="image/*,.gif,.webp" class="form-control" @change="onFile" />
-                  <div class="form-text">اختر ملف الأيقونة (صورة)</div>
+                  <div class="form-text">أيقونة الهدية في القائمة (صورة ثابتة أو GIF)</div>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">{{ t('gifts.animation') }}</label>
+                  <label class="form-label">{{ t('gifts.animation') }} · فيديو التأثير</label>
                   <input
                     type="file"
                     accept="image/*,video/*,.gif,.webp,.png,.jpg,.jpeg,.mp4,.webm,.mov"
                     class="form-control"
                     @change="onAnimFile"
                   />
-                  <div class="form-text">صورة · متحركة (GIF/WebP) · فيديو — التطبيق يعرض حسب نوع الملف</div>
+                  <div class="form-text">
+                    مهم: ارفع فيديو الهدية هنا (MP4) ليشتغل ملء الشاشة مثل الدخوليات — ليس في حقل الأيقونة فقط
+                  </div>
                 </div>
                 <div class="col-6" v-if="form.iconUrl">
                   <div class="small text-muted mb-1">أيقونة</div>
@@ -323,6 +334,7 @@ const editingId = ref(null)
 const catEditingId = ref(null)
 const bulkBusy = ref(false)
 const pendingCategory = ref(null)
+const importingEntries = ref(false)
 
 const CORE_KEYS = new Set(['normal', 'lucky', 'combo', 'premium', 'country'])
 function isCoreCategory(key) {
@@ -417,7 +429,7 @@ async function load() {
   loading.value = true
   error.value = ''
   const [gRes, cRes] = await Promise.all([
-    giftsApi.list({ limit: 200 }),
+    giftsApi.list({ limit: 500 }),
     giftsApi.categories(),
   ])
   loading.value = false
@@ -430,6 +442,26 @@ async function load() {
   if (!cRes.error) {
     categories.value = extractList(cRes.data)
   }
+}
+
+/** One-click: clone mall entry effects into sendable gifts (premium tab). */
+async function importEntryEffects() {
+  if (importingEntries.value) return
+  importingEntries.value = true
+  error.value = ''
+  success.value = ''
+  const res = await giftsApi.importEntryEffects()
+  importingEntries.value = false
+  if (res.error) {
+    error.value = res.error.message
+    toast.error(res.error.message)
+    return
+  }
+  const d = res.data || {}
+  const msg = `استيراد الدخوليات: جديد ${d.created ?? 0} · محدَّث ${d.updated ?? 0} · إجمالي ${d.total ?? 0} (${d.source || '—'})`
+  success.value = msg
+  toast.success(msg)
+  await load()
 }
 
 function categoryLabel(key) {
@@ -553,7 +585,9 @@ async function save() {
   const payload = {
     name: form.name,
     iconUrl: form.iconUrl,
-    animationUrl: form.animationUrl || null,
+    // If admin uploaded MP4 as icon only, still treat it as the play media.
+    animationUrl: form.animationUrl
+      || (isVideo(form.iconUrl) ? form.iconUrl : null),
     coinPrice: Number(form.coinPrice) || 1,
     diamondValue: Number(form.diamondValue) || 1,
     type: form.type || 'normal',

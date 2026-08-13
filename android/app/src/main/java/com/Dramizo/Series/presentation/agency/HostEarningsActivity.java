@@ -18,11 +18,13 @@ import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.HostTargetStagesUi;
 import com.google.android.material.button.MaterialButton;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Professional host dashboard — balance, month KPIs, performance, withdraw log.
@@ -42,6 +44,8 @@ public class HostEarningsActivity extends ThemedActivity {
     private TextView tvPerf3Value;
     private TextView tvPerf4Value;
     private TextView tvWithdrawEmpty;
+    private View sectionHostTarget;
+    private TextView tvHostTargetWithdrawHint;
     private final ProDashWithdrawAdapter withdrawAdapter = new ProDashWithdrawAdapter();
 
     private long agencyDiamonds;
@@ -82,6 +86,8 @@ public class HostEarningsActivity extends ThemedActivity {
         tvPerf3Value = findViewById(R.id.tvPerf3Value);
         tvPerf4Value = findViewById(R.id.tvPerf4Value);
         tvWithdrawEmpty = findViewById(R.id.tvWithdrawEmpty);
+        sectionHostTarget = findViewById(R.id.sectionHostTarget);
+        tvHostTargetWithdrawHint = findViewById(R.id.tvHostTargetWithdrawHint);
 
         RecyclerView recycler = findViewById(R.id.recyclerWithdraws);
         if (recycler != null) {
@@ -127,6 +133,8 @@ public class HostEarningsActivity extends ThemedActivity {
                     ApiCall.execute(ContainerProvider.from(this).getWalletApi().getWallet());
             Result<WalletDtos.WithdrawList> withdraws =
                     ApiCall.execute(ContainerProvider.from(this).getWalletApi().withdraws());
+            Result<Map<String, Object>> hostTarget =
+                    ApiCall.execute(ContainerProvider.from(this).getUserApi().hostTargetMe());
             runOnUiThread(() -> {
                 if (progress != null) progress.setVisibility(View.GONE);
                 if (isFinishing() || isDestroyed()) return;
@@ -146,9 +154,10 @@ public class HostEarningsActivity extends ThemedActivity {
                     return;
                 }
                 if (d.diamondUsdRate > 0) diamondUsdRate = d.diamondUsdRate;
-                agencyDiamonds = Math.max(0L, d.agencyDiamonds);
+                // CLEAN ECONOMY: one diamond pool — host earnings sit in wallet.diamonds.
+                agencyDiamonds = Math.max(0L, d.walletDiamonds);
                 if (wallet.success && wallet.data != null) {
-                    agencyDiamonds = Math.max(0L, wallet.data.agencyDiamonds);
+                    agencyDiamonds = Math.max(0L, wallet.data.diamonds);
                     if (wallet.data.diamondUsdRate > 0) diamondUsdRate = wallet.data.diamondUsdRate;
                 }
                 if (econ.success && econ.data != null) {
@@ -158,7 +167,7 @@ public class HostEarningsActivity extends ThemedActivity {
                     }
                 }
 
-                double availUsd = d.agencyUsd > 0 ? d.agencyUsd : agencyDiamonds * diamondUsdRate;
+                double availUsd = d.walletUsd > 0 ? d.walletUsd : agencyDiamonds * diamondUsdRate;
                 setT(tvBalanceUsd, formatUsd(availUsd));
                 setT(tvBalanceDiamonds, formatLong(agencyDiamonds) + " ◆");
 
@@ -194,8 +203,59 @@ public class HostEarningsActivity extends ThemedActivity {
                 if (tvWithdrawEmpty != null) {
                     tvWithdrawEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
                 }
+                bindHostTarget(hostTarget);
             });
         });
+    }
+
+    private void bindHostTarget(Result<Map<String, Object>> hostTarget) {
+        if (hostTarget == null || !hostTarget.success || hostTarget.data == null) {
+            if (sectionHostTarget != null) sectionHostTarget.setVisibility(View.GONE);
+            return;
+        }
+        HostTargetStagesUi.bindSection(
+                this,
+                sectionHostTarget,
+                findViewById(R.id.tvHostTargetMonth),
+                findViewById(R.id.tvHostTargetProgress),
+                findViewById(R.id.progressHostTarget),
+                findViewById(R.id.hostTargetStagesRow),
+                hostTarget.data);
+        if (tvHostTargetWithdrawHint != null && Boolean.TRUE.equals(hostTarget.data.get("enabled"))) {
+            Object stagesObj = hostTarget.data.get("stages");
+            if (stagesObj instanceof List) {
+                for (Object row : (List<?>) stagesObj) {
+                    if (!(row instanceof Map)) continue;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> s = (Map<String, Object>) row;
+                    if (!"current".equals(String.valueOf(s.get("status")))) continue;
+                    boolean reached = Boolean.TRUE.equals(s.get("reached"));
+                    long remaining = toLong(s.get("threshold")) - toLong(hostTarget.data.get("progress"));
+                    if (remaining < 0) remaining = 0;
+                    if (reached) {
+                        tvHostTargetWithdrawHint.setText(R.string.host_target_stage_ready_withdraw);
+                    } else {
+                        tvHostTargetWithdrawHint.setText(getString(
+                                R.string.agency_withdraw_stage_progress_blocked,
+                                (int) toLong(s.get("index")),
+                                toLong(s.get("threshold")),
+                                toLong(hostTarget.data.get("progress")),
+                                remaining));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    private static long toLong(@Nullable Object o) {
+        if (o instanceof Number) return ((Number) o).longValue();
+        if (o == null) return 0L;
+        try {
+            return Long.parseLong(String.valueOf(o).replace(",", "").trim());
+        } catch (Exception e) {
+            return 0L;
+        }
     }
 
     private void openWithdraw() {

@@ -20,7 +20,7 @@ public class MessagesViewModel extends ViewModel {
             new MutableLiveData<>(Collections.emptyList());
     private final MutableLiveData<String> error = new MutableLiveData<>();
     private long lastLoadAtMs = 0L;
-    private static final long MIN_RELOAD_MS = 25_000L;
+    private static final long MIN_RELOAD_MS = 8_000L;
     private final RealtimeClient.UserListener presenceListener = new RealtimeClient.UserListener() {
         @Override
         public void onPresenceOnline(String userId, String username) {

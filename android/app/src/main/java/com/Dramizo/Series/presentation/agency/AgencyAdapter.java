@@ -54,7 +54,13 @@ public class AgencyAdapter extends RecyclerView.Adapter<AgencyAdapter.VH> {
     public void onBindViewHolder(@NonNull VH holder, int position) {
         MiscDtos.AgencyDto agency = items.get(position);
         holder.b.tvName.setText(agency.name != null ? agency.name : "");
-        AgencyVerifiedBadge.bind(holder.b.tvName, null, agency);
+        holder.b.tvName.setSelected(true);
+        // Prefer dedicated ImageView so marquee never clips the blue badge.
+        if (holder.b.imgAgencyVerified != null) {
+            AgencyVerifiedBadge.bind(null, holder.b.imgAgencyVerified, agency);
+        } else {
+            AgencyVerifiedBadge.bind(holder.b.tvName, null, agency);
+        }
         holder.b.tvDesc.setText(agency.description != null ? agency.description : "");
 
         boolean live = agency.isLive;

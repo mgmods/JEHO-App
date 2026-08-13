@@ -763,11 +763,45 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         y: finite(incoming.y),
       };
     } else if (data.event === 'room:reaction') {
-      const emojiKey = String(incoming.emojiKey || '').toLowerCase();
-      if (!/^e(0[1-9]|[1-6]\d|7[0-4])$/.test(emojiKey)) {
-        return { error: 'Invalid reaction' };
+      const emojiKey = String(incoming.emojiKey || '').toLowerCase().trim();
+      let stickerUrl = '';
+      try {
+        const {
+          getCachedSeatStickers,
+          sanitizeSeatStickersConfig,
+          defaultSeatStickersConfig,
+          resolveActiveStickerUrl,
+          rememberSeatStickersCache,
+        } = await import('../config/seat-stickers.util');
+        let cfg = getCachedSeatStickers();
+        if (!cfg) {
+          const row = await this.settingsRepo.findOne({ where: { key: 'seat_stickers' } });
+          if (row?.value) {
+            try {
+              cfg = sanitizeSeatStickersConfig(JSON.parse(row.value));
+            } catch {
+              cfg = sanitizeSeatStickersConfig(row.value);
+            }
+          } else {
+            cfg = defaultSeatStickersConfig();
+          }
+          rememberSeatStickersCache(cfg);
+        }
+        stickerUrl = resolveActiveStickerUrl(cfg, emojiKey) || '';
+      } catch {
+        stickerUrl = '';
       }
-      payload = { userId: client.userId, emojiKey };
+      if (!stickerUrl) {
+        // Legacy fallback while catalog migrates.
+        if (!/^e(0[1-9]|[1-6]\d|7[0-4])$/.test(emojiKey)) {
+          return { error: 'Invalid reaction' };
+        }
+      }
+      payload = {
+        userId: client.userId,
+        emojiKey,
+        ...(stickerUrl ? { url: stickerUrl } : {}),
+      };
     } else if (data.event === 'lucky:opened') {
       payload = {
         userId: client.userId,

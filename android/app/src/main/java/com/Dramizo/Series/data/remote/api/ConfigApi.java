@@ -22,6 +22,9 @@ public interface ConfigApi {
     @GET("config/nav-icons")
     Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons();
 
+    @GET("config/seat-stickers")
+    Call<ApiResponse<MiscDtos.SeatStickersDto>> seatStickers();
+
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 

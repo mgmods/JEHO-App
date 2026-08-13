@@ -126,10 +126,29 @@ public class ChatViewModel extends ViewModel {
         attach(conversationId);
         currentPage = 1;
         totalPages = 1;
-        if (switched) {
-            messages.postValue(Collections.emptyList());
-        }
         c.getIoExecutor().execute(() -> {
+            // Paint Room cache immediately so conversation opens without blank wait.
+            if (switched) {
+                try {
+                    List<ChatDtos.MessageDto> cached =
+                            c.getChatRepository().getCachedMessages(conversationId);
+                    if (cached != null && !cached.isEmpty()) {
+                        List<ChatDtos.MessageDto> painted = new ArrayList<>();
+                        for (ChatDtos.MessageDto m : cached) {
+                            if (m == null || m.id == null) continue;
+                            if (isDismissed(m.id)) continue;
+                            normalizeMine(m);
+                            m.localPending = false;
+                            painted.add(m);
+                        }
+                        if (!painted.isEmpty()) messages.postValue(painted);
+                    } else {
+                        messages.postValue(Collections.emptyList());
+                    }
+                } catch (Exception ignored) {
+                    messages.postValue(Collections.emptyList());
+                }
+            }
             Result<ChatDtos.MessageList> r = c.getMessagesUseCase.execute(conversationId, 1);
             if (r.success && r.data != null && r.data.items != null) {
                 if (r.data.meta != null) {
@@ -152,7 +171,12 @@ public class ChatViewModel extends ViewModel {
                 } else {
                     mergeLoadedMessages(r.data.items);
                 }
-            } else error.postValue(r.error);
+            } else if (switched) {
+                List<ChatDtos.MessageDto> cur = messages.getValue();
+                if (cur == null || cur.isEmpty()) error.postValue(r.error);
+            } else {
+                error.postValue(r.error);
+            }
         });
     }
 

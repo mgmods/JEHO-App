@@ -4,8 +4,9 @@ import { randomUUID } from 'crypto';
 import { DataSource } from 'typeorm';
 import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service';
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
-import { spinPayout } from './mikoo-house-edge.util';
-import { clampBetAmount, clampGamePayout, GAME_PAYOUT } from '../game-payout-guard';
+import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
+import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
+import { getGameOdds } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -366,7 +367,7 @@ export class BaishunWsHandler {
             if (!Number.isFinite(betAmount) || betAmount <= 0) {
               betAmount = SLOT_CHIP_LIST[0];
             }
-            if (betAmount > 10_000) {
+            if (betAmount > gamePayoutLimits().maxBet) {
               this.replyJson(ws, msgId === 'Bet' ? 'Bet' : 'Spin', {
                 Code: 1,
                 ErrorTips: 'Bet too high',
@@ -829,7 +830,7 @@ export class BaishunWsHandler {
             if (req.chipMultiple > 0) chipMultiple = req.chipMultiple;
             if (req.chipIdx >= 0) chipIdx = req.chipIdx;
             const betAmount = Math.max(50, Math.floor(chipMultiple || CHIP_LIST[0]));
-            if (betAmount > 10_000) {
+            if (betAmount > gamePayoutLimits().maxBet) {
               this.sendBin(
                 ws,
                 packMessage(
@@ -1041,17 +1042,8 @@ export class BaishunWsHandler {
       snapshotGreedyPattern();
 
       const p = pIn || (await ensurePlayer());
-      const weights = GREEDY_LION_ODDS.map((o) => 1 / Math.max(1, o));
-      const sumW = weights.reduce((a, b) => a + b, 0);
-      let roll = Math.random() * sumW;
-      let winner = 0;
-      for (let i = 0; i < weights.length; i++) {
-        roll -= weights[i]!;
-        if (roll <= 0) {
-          winner = i;
-          break;
-        }
-      }
+      // Same house RTP as other multi-area boards (dashboard playerRtp).
+      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameOdds().playerRtp);
       const odds = GREEDY_LION_ODDS[winner] || 2;
       const stakeOnWin = greedyAreaBets[winner] || 0;
       let win = Math.floor(stakeOnWin * odds);
@@ -1143,7 +1135,7 @@ export class BaishunWsHandler {
     ): Promise<{ ok: boolean; bal: number }> => {
       const chip = Math.max(
         1,
-        Math.min(10_000, Math.floor(Number(greedyChips[chipIdx] ?? 50))),
+        Math.min(gamePayoutLimits().maxBet, Math.floor(Number(greedyChips[chipIdx] ?? 50))),
       );
       const stake = chip * Math.max(1, count);
       try {
@@ -1344,7 +1336,7 @@ export class BaishunWsHandler {
             if (isRoyal) {
               const chip = Math.max(
                 10,
-                Math.min(10_000, Math.floor(Number(fields[2] ?? fields[1] ?? 100))),
+                Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[2] ?? fields[1] ?? 100))),
               );
               try {
                 const bal = await this.debit(p.userId, chip, gameSlug);
@@ -1389,9 +1381,10 @@ export class BaishunWsHandler {
                     const areaOdds = [0, 1.85, 1.85, 6, 4, 4];
                     const odds = areaOdds[winner] || 1.85;
                     const stake = royalMyBet || chip;
-                    // Pay gate ~38% → RTP on 1.85 side ≈ 70%.
+                    // Pay gate from dashboard → keeps royal house-positive on ~1.85 sides.
+                    const payGate = getGameOdds().royalBattlePayGate;
                     const win = Math.floor(
-                      stake * odds * (Math.random() > 0.62 ? 1 : 0),
+                      stake * odds * (Math.random() < payGate ? 1 : 0),
                     );
                     let nb = await this.sessions.refreshBalance(p);
                     if (win > 0) nb = await this.credit(p.userId, win, gameSlug, stake);
@@ -1465,7 +1458,7 @@ export class BaishunWsHandler {
             // Hilo: field1 = amount
             const betAmount = Math.max(
               10,
-              Math.min(10_000, Math.floor(Number(fields[1] ?? 100))),
+              Math.min(gamePayoutLimits().maxBet, Math.floor(Number(fields[1] ?? 100))),
             );
             try {
               const afterBet = await this.debit(p.userId, betAmount, gameSlug);
@@ -1532,8 +1525,8 @@ export class BaishunWsHandler {
             let bal = p ? await this.sessions.refreshBalance(p) : 0;
             if (won && p && hiloBet > 0) {
               // Single-step settlement — full credit ends the pot (no compound leak).
-              // P(win)~50% × 1.45 ≈ RTP 72.5%.
-              const payout = Math.floor(hiloBet * 1.45);
+              // P(win)~50% × hiloPayoutMult ≈ configured RTP.
+              const payout = Math.floor(hiloBet * getGameOdds().hiloPayoutMult);
               bal = await this.credit(p.userId, payout, gameSlug, hiloBet);
               p.balance = bal;
               showBet = payout;
@@ -1985,8 +1978,8 @@ export class BaishunWsHandler {
         });
         return;
       }
-      // Slightly lower RTP than lobby slots (~10% hit on spin table).
-      const { win } = spinPayout(stake, { hitRate: 0.1 });
+      // Fishing hit rate from dashboard (harder than lobby slots by default).
+      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
         bal = await this.credit(player.userId, win, gameSlug, stake);
@@ -2129,7 +2122,7 @@ export class BaishunWsHandler {
   }
 
   private async debit(userId: string, amount: number, gameId: string) {
-    amount = clampBetAmount(amount, GAME_PAYOUT.maxBet);
+    amount = clampBetAmount(amount, gamePayoutLimits().maxBet);
     if (amount < 1) throw new Error('INVALID_BET');
     return this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {

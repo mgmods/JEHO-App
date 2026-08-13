@@ -638,19 +638,26 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     Gravity.CENTER);
             addView(visual, lp);
-            // Appear from center (image gifts behave like video stage).
-            try {
-                visual.setScaleX(0.28f);
-                visual.setScaleY(0.28f);
-                visual.setAlpha(0f);
-                ObjectAnimator pop = ObjectAnimator.ofPropertyValuesHolder(visual,
-                        PropertyValuesHolder.ofFloat(View.SCALE_X, 0.28f, 1f),
-                        PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.28f, 1f),
-                        PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
-                pop.setDuration(420);
-                pop.setInterpolator(new DecelerateInterpolator(1.4f));
-                pop.start();
-            } catch (Exception ignored) {
+            // VAP AnimView must stay 1.0 scale/alpha (same as entry ride). Pop hurts VAP decode.
+            boolean vapAnim = visual instanceof AnimView;
+            if (!vapAnim) {
+                try {
+                    visual.setScaleX(0.28f);
+                    visual.setScaleY(0.28f);
+                    visual.setAlpha(0f);
+                    ObjectAnimator pop = ObjectAnimator.ofPropertyValuesHolder(visual,
+                            PropertyValuesHolder.ofFloat(View.SCALE_X, 0.28f, 1f),
+                            PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.28f, 1f),
+                            PropertyValuesHolder.ofFloat(View.ALPHA, 0f, 1f));
+                    pop.setDuration(420);
+                    pop.setInterpolator(new DecelerateInterpolator(1.4f));
+                    pop.start();
+                } catch (Exception ignored) {
+                }
+            } else {
+                visual.setScaleX(1f);
+                visual.setScaleY(1f);
+                visual.setAlpha(1f);
             }
             if (fullscreenMedia) {
                 try {
@@ -682,10 +689,19 @@ public final class NativeRoomEffectsView extends FrameLayout {
     }
 
     /**
-     * Entry rides: same player as Mikoo — Tencent AnimView (VAP RGB|alpha + sound).
+     * Entry rides: Tencent AnimView (VAP RGB|alpha + sizes from embedded vapc JSON).
      */
     @Nullable
     private View createEntryRideVisual(String url, int width, int height) {
+        return createVapAnimVisual(url, /* forGift */ false);
+    }
+
+    /**
+     * Same VAP pipeline as room entry — entry-effect MP4s are dual-plate (RGB | alpha).
+     * Playing them with ExoPlayer shows "half video + half black".
+     */
+    @Nullable
+    private View createVapAnimVisual(@Nullable String url, boolean forGift) {
         String abs = AssetCatalog.absoluteUrl(url);
         if (abs == null || abs.isEmpty()) return null;
         CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
@@ -696,11 +712,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 kind = CosmeticMedia.Kind.VIDEO;
             }
         }
-        if (kind != CosmeticMedia.Kind.VIDEO) {
-            if (kind != CosmeticMedia.Kind.GIF) {
-                android.util.Log.w("NativeRoomEffects", "skip static entry ride: " + abs);
-                return null;
-            }
+        if (kind == CosmeticMedia.Kind.GIF) {
             ImageView image = new ImageView(getContext());
             image.setScaleType(ImageView.ScaleType.FIT_CENTER);
             image.setBackgroundColor(Color.TRANSPARENT);
@@ -710,8 +722,14 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 return null;
             }
             image.setLayoutParams(new LayoutParams(
-                    Math.max(1, width), Math.max(1, height), Gravity.CENTER));
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER));
             return image;
+        }
+        if (kind != CosmeticMedia.Kind.VIDEO) {
+            android.util.Log.w("NativeRoomEffects", "skip static vap media: " + abs);
+            return null;
         }
 
         releaseGiftPlayer();
@@ -721,27 +739,63 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 Gravity.CENTER));
         anim.setBackgroundColor(Color.TRANSPARENT);
+        // Same as Mikoo entry: center-crop full stage; vapc inside MP4 controls RGB size.
         anim.setScaleType(ScaleType.CENTER_CROP);
         anim.setLoop(1);
-        anim.setMute(true);
-        entryAnimView = anim;
+        // Entry gifts: play gift/MP4 audio. Room-join entry rides stay muted
+        // so a wave of joins does not drown mic chat.
+        anim.setMute(!forGift);
+        if (forGift) {
+            giftAnimView = anim;
+        } else {
+            entryAnimView = anim;
+        }
         bindAnimFinish(anim);
 
         final String mediaUrl = abs;
-        // Start download immediately — don't wait for attach (realtime).
+        final boolean giftMode = forGift;
         new Thread(() -> {
             File file = cacheEntryMp4(mediaUrl);
-            if (file == null || !file.exists()) {
-                android.util.Log.w("NativeRoomEffects", "entry cache miss: " + mediaUrl);
+            if (file == null || !file.exists() || file.length() <= 8_192) {
+                android.util.Log.w("NativeRoomEffects", "vap cache miss: " + mediaUrl);
                 post(() -> {
-                    if (entryAnimView == anim) finishActive();
+                    if (giftMode) {
+                        if (giftAnimView == anim) finishActive();
+                    } else if (entryAnimView == anim) {
+                        finishActive();
+                    }
+                });
+                return;
+            }
+            // Gift path: plain MP4 (no vapc) → Exo fullscreen. Entry rides stay on AnimView.
+            if (giftMode && !localFileHasVapc(file)) {
+                android.util.Log.i("NativeRoomEffects",
+                        "gift mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
+                post(() -> {
+                    if (giftAnimView != anim) return;
+                    try {
+                        removeView(anim);
+                    } catch (Exception ignored) {
+                    }
+                    giftAnimView = null;
+                    View streamed = createGiftVideoStream(mediaUrl, null, null);
+                    if (streamed != null) {
+                        addView(streamed, new LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                Gravity.CENTER));
+                    } else {
+                        finishActive();
+                    }
                 });
                 return;
             }
             post(() -> {
-                if (entryAnimView != anim) return;
+                AnimView current = giftMode ? giftAnimView : entryAnimView;
+                if (current != anim) return;
                 Runnable start = () -> {
-                    if (entryAnimView != anim || anim.getParent() == null) return;
+                    AnimView still = giftMode ? giftAnimView : entryAnimView;
+                    if (still != anim || anim.getParent() == null) return;
                     try {
                         anim.startPlay(file);
                     } catch (Exception e) {
@@ -761,14 +815,65 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     });
                 }
             });
-        }, "entry-vap").start();
+        }, giftMode ? "gift-vap" : "entry-vap").start();
         return anim;
+    }
+
+    /** Entry-effect / Mikoo car packs — dual-plate VAP (sizes from vapc JSON in the MP4). */
+    private static boolean looksLikeEntryVapMedia(@Nullable String absUrl) {
+        if (absUrl == null || absUrl.isEmpty()) return false;
+        String u = absUrl.toLowerCase(Locale.US);
+        if (u.contains("/cosmetics/entries/")
+                || u.contains("/entries/entry_")
+                || u.contains("entry_mikoo")
+                || u.contains("mikoo_gift_car")
+                || u.contains("/entry_effect")
+                || u.contains("visual-system/entry")
+                || u.contains("دخولية")
+                || u.contains("entry_gift")
+                || u.contains("gift_entry")
+                || u.contains("/gifts/")
+                || u.contains("/uploads/")
+                || u.contains("vap")
+                || u.contains("_vap")) {
+            return true;
+        }
+        // Common CDN for Mikoo entry cars reused as gifts.
+        if (u.contains("echoliveapp.com/video/") || u.contains("res.echoliveapp.com/video/")) {
+            return true;
+        }
+        return false;
+    }
+
+    /** Detect embedded {@code vapc} metadata in a cached MP4 without full decode. */
+    private static boolean localFileHasVapc(@Nullable File file) {
+        if (file == null || !file.exists() || file.length() < 64) return false;
+        try {
+            byte[] head = new byte[(int) Math.min(file.length(), 262_144L)];
+            try (java.io.FileInputStream in = new java.io.FileInputStream(file)) {
+                int off = 0;
+                while (off < head.length) {
+                    int n = in.read(head, off, head.length - off);
+                    if (n <= 0) break;
+                    off += n;
+                }
+                if (off < head.length) {
+                    byte[] trim = new byte[off];
+                    System.arraycopy(head, 0, trim, 0, off);
+                    head = trim;
+                }
+            }
+            return VapLayout.parse(head) != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
      * Gift video: download (or use warm cache) then play local file — never leave the user
      * staring at a static icon because TextureView was INVISIBLE / stream never painted.
      * Never re-stream a URL that already failed download (404/403) — try mapped fallback instead.
+     * Entry/VAP packs re-route to {@link #createVapAnimVisual} (same as room entry).
      */
     @Nullable
     private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
@@ -846,18 +951,19 @@ public final class NativeRoomEffectsView extends FrameLayout {
         final int token = generation;
         final String finalUrl = playUrl;
         final String altUrl = fallbackAbs;
-        File warm = peekGiftMp4Cache(getContext(), finalUrl);
-        if (warm == null && altUrl != null) {
-            warm = peekGiftMp4Cache(getContext(), altUrl);
-            if (warm != null) {
-                bindGiftExoPlayer(stage, playerView, placeholder, warm, altUrl, iconUrl,
-                        token, true, null);
-                return stage;
-            }
+        File warmPrimary = peekGiftMp4Cache(getContext(), finalUrl);
+        File warmAlt = altUrl != null ? peekGiftMp4Cache(getContext(), altUrl) : null;
+        File warm = warmPrimary != null ? warmPrimary : warmAlt;
+        String warmUrl = warmPrimary != null ? finalUrl : (warmAlt != null ? altUrl : null);
+        // Cached file is a VAP entry pack → AnimView (same as room join), not Exo.
+        if (warm != null && warmUrl != null && localFileHasVapc(warm)) {
+            View vap = createVapAnimVisual(warmUrl, true);
+            if (vap != null) return vap;
         }
         if (warm != null) {
-            bindGiftExoPlayer(stage, playerView, placeholder, warm, finalUrl, iconUrl,
-                    token, true, altUrl);
+            bindGiftExoPlayer(stage, playerView, placeholder, warm, warmUrl != null ? warmUrl : finalUrl,
+                    iconUrl, token, true,
+                    warmPrimary != null ? altUrl : null);
         } else {
             android.util.Log.i("NativeRoomEffects", "gift video downloading url=" + finalUrl
                     + (altUrl != null ? (" alt=" + altUrl) : ""));
@@ -879,15 +985,27 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 post(() -> {
                     if (token != generation) return;
                     if (playFile != null && playFile.exists() && playFile.length() > 8_192) {
+                        if (localFileHasVapc(playFile)) {
+                            try {
+                                removeView(stage);
+                            } catch (Exception ignored) {
+                            }
+                            View vap = createVapAnimVisual(playChosen, true);
+                            if (vap != null) {
+                                addView(vap, new LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        Gravity.CENTER));
+                                return;
+                            }
+                        }
                         bindGiftExoPlayer(stage, playerView, placeholder, playFile,
                                 playChosen, iconUrl, token, true,
                                 playChosen.equals(altUrl) ? null : altUrl);
                     } else if (altUrl != null) {
-                        // Primary already failed download — stream fallback only, never dead URL.
                         bindGiftExoPlayer(stage, playerView, placeholder, null,
                                 altUrl, iconUrl, token, false, null);
                     } else {
-                        // Both missing: keep icon, don't ExoPlayer-404 the same URL again.
                         android.util.Log.w("NativeRoomEffects",
                                 "gift video missing after download, skip stream url=" + finalUrl);
                         releaseGiftPlayer();
@@ -946,9 +1064,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         playerView.setPlayer(player);
         player.setRepeatMode(Player.REPEAT_MODE_OFF);
         try {
-            // Mute gift video audio — voice room (Zego/LiveKit) must keep the mic track.
-            // SFX for lucky/mardood is a separate short SoundPool path.
-            player.setVolume(0f);
+            // Gift MP4 audio (including entry-effect gifts). handleAudioFocus=false so
+            // Zego/LiveKit room voice is not paused while the effect plays.
+            player.setVolume(1f);
             player.setAudioAttributes(
                     new androidx.media3.common.AudioAttributes.Builder()
                             .setUsage(androidx.media3.common.C.USAGE_MEDIA)
@@ -956,7 +1074,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                             .build(),
                     /* handleAudioFocus= */ false);
         } catch (Exception ignored) {
-            try { player.setVolume(0f); } catch (Exception ignored2) {}
+            try { player.setVolume(1f); } catch (Exception ignored2) {}
         }
 
         final Runnable reveal = () -> {
@@ -1231,10 +1349,8 @@ public final class NativeRoomEffectsView extends FrameLayout {
         String abs = pick == null || pick.isEmpty() ? "" : AssetCatalog.absoluteUrl(pick);
         CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
 
-        // Gift videos: always ExoPlayer with audio (TikTok-style). Never muted AnimView/VAP —
-        // AnimView expects VAP alpha packs and was muting/failing normal MP4 gift uploads.
+    
         if (kind == CosmeticMedia.Kind.VIDEO) {
-            // No silent name-remap fallback when the URL is a real admin upload.
             String fallback = GiftMediaResolver.isTrustedUpload(abs)
                     ? null
                     : GiftMediaResolver.resolveMappedFallback(

@@ -1314,17 +1314,20 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     GiftAudioFx.playLuckyCoins(sfxCtx, softFinal ? 3 : 4);
                 }
                 if (hostAct != null && !hostAct.isFinishing()) {
-                    String body = softFinal
-                            ? ("مردود +" + wonCoins)
-                            : ("ضرب حظه ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
                     hostAct.getWindow().getDecorView().post(() ->
                             com.Dramizo.Series.util.GlobalCelebrationToast.show(
                                     hostAct,
                                     softFinal ? "مردود جزئي" : "حظ سعيد!",
-                                    body,
+                                    null,
                                     null,
                                     icon,
-                                    "lucky-local:" + System.currentTimeMillis()));
+                                    "lucky-local:" + System.currentTimeMillis(),
+                                    28,
+                                    softFinal ? 0 : Math.max(1, mulFinal),
+                                    wonCoins,
+                                    null,
+                                    "lucky_hit",
+                                    null));
                 }
             }
             // Empty roll outside room: silent — never show lose dialog.
