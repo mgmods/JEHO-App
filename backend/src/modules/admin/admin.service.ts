@@ -3591,6 +3591,7 @@ export class AdminService {
     olderThanDays?: number;
     unresolvedOnly?: boolean;
     resolvedOnly?: boolean;
+    serverJunk?: boolean;
   } = {}) {
     const days = Math.max(0, Math.floor(Number(opts.olderThanDays ?? 0)));
     const where: Record<string, unknown> = {};
@@ -3607,20 +3608,31 @@ export class AdminService {
 
     // Guard: wiping everything requires explicit empty filter + olderThanDays 0
     // (allowed — admin confirmed from UI)
+    let deleted = 0;
     if (Object.keys(where).length === 0) {
       const result = await this.abuseRepo
         .createQueryBuilder()
         .delete()
         .from(AbuseLog)
         .execute();
-      const deleted = Number(result.affected || 0);
-      const remaining = await this.abuseRepo.count();
-      return { deleted, remaining, olderThanDays: null };
+      deleted = Number(result.affected || 0);
+    } else {
+      const result = await this.abuseRepo.delete(where as any);
+      deleted = Number(result.affected || 0);
+    }
+    const remaining = await this.abuseRepo.count();
+
+    let server: { actions: string[]; freedBytes: number; stoppedPm2: string[] } | null = null;
+    if (opts.serverJunk) {
+      const { cleanupServerJunk } = await import('./server-junk-cleanup');
+      server = await cleanupServerJunk();
     }
 
-    const result = await this.abuseRepo.delete(where as any);
-    const deleted = Number(result.affected || 0);
-    const remaining = await this.abuseRepo.count();
-    return { deleted, remaining, olderThanDays: days || null };
+    return {
+      deleted,
+      remaining,
+      olderThanDays: days || null,
+      server,
+    };
   }
 }

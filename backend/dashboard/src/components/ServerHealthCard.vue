@@ -91,12 +91,12 @@
           <div class="srv-log-ic is-all"><i class="bi bi-collection"></i></div>
           <div class="flex-grow-1 min-w-0">
             <div class="srv-log-title">{{ t('system.allLogs') }}</div>
-            <div class="srv-log-sub">{{ formatNumber(logsTotal) }} {{ t('system.records') }}</div>
+            <div class="srv-log-sub">{{ t('system.cleanAllHint') }}</div>
           </div>
           <button
             class="btn btn-sm btn-outline-danger"
             type="button"
-            :disabled="cleaning || !logsTotal"
+            :disabled="cleaning"
             @click="$emit('clean', { mode: 'all' })"
           >
             {{ t('system.cleanAll') }}

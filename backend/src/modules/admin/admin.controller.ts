@@ -1473,6 +1473,7 @@ export class AdminController {
       olderThanDays?: number;
       unresolvedOnly?: boolean;
       resolvedOnly?: boolean;
+      serverJunk?: boolean;
     },
   ) {
     return this.adminService.cleanupLogs(body || {});

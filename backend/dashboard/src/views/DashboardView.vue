@@ -402,7 +402,7 @@ async function onCleanLogs(payload) {
   let body = {}
   let confirmMsg = t('system.confirmCleanOld')
   if (mode === 'all') {
-    body = { olderThanDays: 0 }
+    body = { olderThanDays: 0, serverJunk: true }
     confirmMsg = t('system.confirmCleanAll')
   } else if (mode === 'days') {
     body = { olderThanDays: Number(payload.days) || 30 }
@@ -420,7 +420,9 @@ async function onCleanLogs(payload) {
     return
   }
   const deleted = data?.deleted ?? 0
-  toast().success(t('system.cleaned', { count: deleted }))
+  const freed = Number(data?.server?.freedBytes || 0)
+  const mb = freed > 0 ? Math.max(1, Math.round(freed / (1024 * 1024))) : 0
+  toast().success(mb ? t('system.cleanedServer', { count: deleted, mb }) : t('system.cleaned', { count: deleted }))
   await loadHealth()
 }
 
