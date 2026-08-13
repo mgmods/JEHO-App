@@ -5,21 +5,6 @@ import { promisify } from 'util';
 
 const execFileAsync = promisify(execFile);
 
-/** Live JEHO / Adastra sites — never delete these document roots. */
-const KEEP_WWWROOT = new Set([
-  'api.adnova.bbs.tr',
-  'chats.adnova.bbs.tr',
-  'cloud.adastra.bbs.tr',
-  'Voice.adastra.bbs.tr',
-  'voice.adastra.bbs.tr',
-  'java_node_ssl',
-  'server-landing',
-  'default',
-]);
-
-/** PM2 apps that must stay running. */
-const KEEP_PM2 = new Set(['auralive-api', 'lyvo-cloud']);
-
 export type JunkCleanupResult = {
   actions: string[];
   freedBytes: number;
@@ -132,7 +117,7 @@ async function deleteRotatedLogs(root: string): Promise<number> {
 
 /**
  * Safe host junk cleanup: recycle bin, OS/PM2 logs, caches.
- * Never touches live site roots, PostgreSQL/MySQL data, or keep-listed PM2 apps.
+ * Never deletes websites, databases, or PM2 apps — including ones added later.
  */
 export async function cleanupServerJunk(): Promise<JunkCleanupResult> {
   const actions: string[] = [];
@@ -185,41 +170,6 @@ export async function cleanupServerJunk(): Promise<JunkCleanupResult> {
   }
   await fs.rm('/root/.npm/_logs', { recursive: true, force: true }).catch(() => undefined);
   await fs.rm('/root/.cache/pip', { recursive: true, force: true }).catch(() => undefined);
-
-  // Extra wwwroot folders only — never the keep list.
-  try {
-    const sites = await fs.readdir('/www/wwwroot', { withFileTypes: true });
-    for (const s of sites) {
-      if (!s.isDirectory()) continue;
-      if (KEEP_WWWROOT.has(s.name)) continue;
-      const full = path.join('/www/wwwroot', s.name);
-      const sz = await dirSize(full);
-      await fs.rm(full, { recursive: true, force: true });
-      freedBytes += sz;
-      actions.push(`removed_wwwroot:${s.name}`);
-    }
-  } catch {
-    /* ignore */
-  }
-
-  const pm2 = await run('pm2', ['jlist'], 20_000);
-  if (pm2.code === 0 && pm2.stdout.trim()) {
-    try {
-      const list = JSON.parse(pm2.stdout) as Array<{ name?: string }>;
-      for (const app of list) {
-        const name = String(app?.name || '').trim();
-        if (!name || KEEP_PM2.has(name)) continue;
-        await run('pm2', ['delete', name], 20_000);
-        stoppedPm2.push(name);
-      }
-      if (stoppedPm2.length) {
-        await run('pm2', ['save', '--force'], 15_000);
-        actions.push('pm2_extras_stopped');
-      }
-    } catch {
-      /* ignore malformed jlist */
-    }
-  }
 
   return { actions, freedBytes, stoppedPm2 };
 }
