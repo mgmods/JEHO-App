@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pUjD4ZbV1OLns6QJ7vp9r96KQP30ajW9mX4OSauClQrixM9Oiz0SKETmMcn4KqI
+\restrict xRbOqoW1VyVsYzhOdr6jCPXF0WA9TLxGDRSN9G0h5RAYKYvaSATGMBWIDg2J5dz
 
 -- Dumped from database version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)
@@ -18,6 +18,8 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+ALTER TABLE IF EXISTS ONLY public.agency_follows DROP CONSTRAINT IF EXISTS "agency_follows_userId_fkey";
+ALTER TABLE IF EXISTS ONLY public.agency_follows DROP CONSTRAINT IF EXISTS "agency_follows_agencyId_fkey";
 ALTER TABLE IF EXISTS ONLY public.chat_participants DROP CONSTRAINT IF EXISTS "FK_ffa48c8c78e4c4d0cb29bd6d123";
 ALTER TABLE IF EXISTS ONLY public.room_host_follows DROP CONSTRAINT IF EXISTS "FK_febd82d58a786b258d29c209523";
 ALTER TABLE IF EXISTS ONLY public.follows DROP CONSTRAINT IF EXISTS "FK_fdb91868b03a2040db408a53331";
@@ -84,6 +86,7 @@ DROP INDEX IF EXISTS public.idx_withdraw_requests_agent;
 DROP INDEX IF EXISTS public.idx_users_public_id;
 DROP INDEX IF EXISTS public."IDX_room_chat_penalties_room_user";
 DROP INDEX IF EXISTS public."IDX_lucky_open_user_box_day";
+DROP INDEX IF EXISTS public."IDX_gifts_brandAgencyId";
 DROP INDEX IF EXISTS public."IDX_ffa48c8c78e4c4d0cb29bd6d12";
 DROP INDEX IF EXISTS public."IDX_febd82d58a786b258d29c20952";
 DROP INDEX IF EXISTS public."IDX_fe7931b7501576746f27f25d50";
@@ -126,8 +129,12 @@ DROP INDEX IF EXISTS public."IDX_b7e5d981a2a0843c6a5721dc12";
 DROP INDEX IF EXISTS public."IDX_b412281aebf17aeeff410e4579";
 DROP INDEX IF EXISTS public."IDX_b35f7142e39a576ae2aa83764e";
 DROP INDEX IF EXISTS public."IDX_b11f59fb7752d74ef9df35d090";
+DROP INDEX IF EXISTS public."IDX_agency_follows_userId";
+DROP INDEX IF EXISTS public."IDX_agency_follows_agencyId";
+DROP INDEX IF EXISTS public."IDX_agencies_publicId";
 DROP INDEX IF EXISTS public."IDX_a8f03d80e42da1162e25591dc4";
 DROP INDEX IF EXISTS public."IDX_a6bb192fadb7310808004f5753";
+DROP INDEX IF EXISTS public."IDX_a64905cd550435773e95786a31";
 DROP INDEX IF EXISTS public."IDX_a45d7aca30d67970c093fa4eed";
 DROP INDEX IF EXISTS public."IDX_a4297dabb6418274a1591c5592";
 DROP INDEX IF EXISTS public."IDX_a2f99b56f95944955ff3ff26c4";
@@ -148,12 +155,14 @@ DROP INDEX IF EXISTS public."IDX_8abdc3af0797198cc1edb6de94";
 DROP INDEX IF EXISTS public."IDX_891986e15af0e6c9936d3d25f9";
 DROP INDEX IF EXISTS public."IDX_87fdb064cf16b6ae164eb4862c";
 DROP INDEX IF EXISTS public."IDX_8256f8fefaf42f4fdb204f58f4";
+DROP INDEX IF EXISTS public."IDX_813db5e5b2b63149563d601d27";
 DROP INDEX IF EXISTS public."IDX_7e7cbcfb689216ad5d9700657b";
 DROP INDEX IF EXISTS public."IDX_7d6d35ff9fc2fd3f8ef1a47fe1";
 DROP INDEX IF EXISTS public."IDX_7b92071328fdd5212b978ad248";
 DROP INDEX IF EXISTS public."IDX_7ac096a8bfe8bad3810cf3b01b";
 DROP INDEX IF EXISTS public."IDX_776c4d82b2a8bdf328bc3f51cc";
 DROP INDEX IF EXISTS public."IDX_773d65d80dbc2f556c2b8b5804";
+DROP INDEX IF EXISTS public."IDX_75e48a17f75ab2cb3104254145";
 DROP INDEX IF EXISTS public."IDX_70fe713ef5463e7aa66bbcb321";
 DROP INDEX IF EXISTS public."IDX_6e2c115bfdba758d450a5dc684";
 DROP INDEX IF EXISTS public."IDX_6c939085068c5539bad393be6b";
@@ -208,6 +217,9 @@ ALTER TABLE IF EXISTS ONLY public.room_music_tracks DROP CONSTRAINT IF EXISTS ro
 ALTER TABLE IF EXISTS ONLY public.recharge_agent_contacts DROP CONSTRAINT IF EXISTS recharge_agent_contacts_pkey;
 ALTER TABLE IF EXISTS ONLY public.profile_visits DROP CONSTRAINT IF EXISTS profile_visits_pkey;
 ALTER TABLE IF EXISTS ONLY public.host_target_claims DROP CONSTRAINT IF EXISTS host_target_claims_pkey;
+ALTER TABLE IF EXISTS ONLY public.gift_categories DROP CONSTRAINT IF EXISTS gift_categories_pkey;
+ALTER TABLE IF EXISTS ONLY public.agency_follows DROP CONSTRAINT IF EXISTS agency_follows_pkey;
+ALTER TABLE IF EXISTS ONLY public.agency_follows DROP CONSTRAINT IF EXISTS "agency_follows_agencyId_userId_key";
 ALTER TABLE IF EXISTS ONLY public.agency_applications DROP CONSTRAINT IF EXISTS agency_applications_pkey;
 ALTER TABLE IF EXISTS ONLY public.recharge_orders DROP CONSTRAINT IF EXISTS "UQ_recharge_provider_payment";
 ALTER TABLE IF EXISTS ONLY public.recharge_orders DROP CONSTRAINT IF EXISTS "UQ_recharge_provider_order";
@@ -331,6 +343,7 @@ DROP TABLE IF EXISTS public.host_target_claims;
 DROP TABLE IF EXISTS public.host_monthly_progress;
 DROP TABLE IF EXISTS public.gifts;
 DROP TABLE IF EXISTS public.gift_sends;
+DROP TABLE IF EXISTS public.gift_categories;
 DROP TABLE IF EXISTS public.follows;
 DROP TABLE IF EXISTS public.female_identity_verifications;
 DROP TABLE IF EXISTS public.drama_series;
@@ -347,6 +360,7 @@ DROP TABLE IF EXISTS public.blocks;
 DROP TABLE IF EXISTS public.app_settings;
 DROP TABLE IF EXISTS public.agent_recharges;
 DROP TABLE IF EXISTS public.agency_members;
+DROP TABLE IF EXISTS public.agency_follows;
 DROP TABLE IF EXISTS public.agency_applications;
 DROP TABLE IF EXISTS public.agencies;
 DROP TABLE IF EXISTS public.admin_users;
@@ -945,7 +959,13 @@ CREATE TABLE public.agencies (
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
     "activationCode" character varying(16),
-    "notificationStyle" character varying(32) DEFAULT 'welcome'::character varying NOT NULL
+    "notificationStyle" character varying(32) DEFAULT 'welcome'::character varying NOT NULL,
+    "publicId" character varying(16),
+    "isVerified" boolean DEFAULT false NOT NULL,
+    "verifiedAt" timestamp with time zone,
+    "exclusiveFrameCode" character varying(64),
+    "exclusiveRoomCardCode" character varying(64),
+    "exclusiveFrameUrl" character varying(512)
 );
 
 
@@ -977,6 +997,18 @@ CREATE TABLE public.agency_applications (
     "paidCoins" bigint DEFAULT '0'::bigint NOT NULL,
     "paymentReferenceId" character varying(128),
     "paymentRefunded" boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: agency_follows; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agency_follows (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    "agencyId" uuid NOT NULL,
+    "userId" uuid NOT NULL,
+    "createdAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1265,6 +1297,23 @@ CREATE TABLE public.follows (
 
 
 --
+-- Name: gift_categories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gift_categories (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    key character varying(32) NOT NULL,
+    "labelAr" character varying(64) NOT NULL,
+    "labelEn" character varying(64),
+    "sortOrder" integer DEFAULT 0 NOT NULL,
+    "isActive" boolean DEFAULT true NOT NULL,
+    "iconUrl" character varying(512),
+    "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+    "updatedAt" timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: gift_sends; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1304,7 +1353,8 @@ CREATE TABLE public.gifts (
     "luckyConfig" text,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-    category character varying(32) DEFAULT 'normal'::character varying NOT NULL
+    category character varying(32) DEFAULT 'normal'::character varying NOT NULL,
+    "brandAgencyId" uuid
 );
 
 
@@ -1320,7 +1370,8 @@ CREATE TABLE public.host_monthly_progress (
     "claimedStageIds" text DEFAULT '[]'::text NOT NULL,
     "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
-    "cyclesCompleted" integer DEFAULT 0 NOT NULL
+    "cyclesCompleted" integer DEFAULT 0 NOT NULL,
+    "withdrawnStageIds" text DEFAULT '[]'::text
 );
 
 
@@ -1836,7 +1887,10 @@ CREATE TABLE public.rooms (
     "micInteractEnabled" boolean DEFAULT true NOT NULL,
     "entryEffectsEnabled" boolean DEFAULT true NOT NULL,
     "lowGiftEffectsEnabled" boolean DEFAULT true NOT NULL,
-    "cupBadgeSeason" character varying(32)
+    "cupBadgeSeason" character varying(32),
+    "emptySince" timestamp with time zone,
+    "chatClearedAt" timestamp with time zone,
+    "chatAutoClearMinutes" integer DEFAULT 0 NOT NULL
 );
 
 
@@ -2017,7 +2071,9 @@ CREATE TABLE public.users (
     "publicId" character varying(16),
     "genderVerified" boolean DEFAULT false NOT NULL,
     "invitedByUserId" uuid,
-    "inviteBoundAt" timestamp with time zone
+    "inviteBoundAt" timestamp with time zone,
+    "staffRole" character varying(16),
+    "dashboardPermissions" jsonb
 );
 
 
@@ -2092,7 +2148,8 @@ CREATE TABLE public.wallets (
     "updatedAt" timestamp with time zone DEFAULT now() NOT NULL,
     "silverCoins" bigint DEFAULT '0'::bigint NOT NULL,
     "gamePoints" bigint DEFAULT '0'::bigint NOT NULL,
-    "traderDiamonds" bigint DEFAULT '0'::bigint NOT NULL
+    "traderDiamonds" bigint DEFAULT '0'::bigint NOT NULL,
+    "agencyDiamonds" bigint DEFAULT '0'::bigint NOT NULL
 );
 
 
@@ -2750,6 +2807,30 @@ ALTER TABLE ONLY public.agency_applications
 
 
 --
+-- Name: agency_follows agency_follows_agencyId_userId_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agency_follows
+    ADD CONSTRAINT "agency_follows_agencyId_userId_key" UNIQUE ("agencyId", "userId");
+
+
+--
+-- Name: agency_follows agency_follows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agency_follows
+    ADD CONSTRAINT agency_follows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: gift_categories gift_categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.gift_categories
+    ADD CONSTRAINT gift_categories_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: host_target_claims host_target_claims_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3137,6 +3218,13 @@ CREATE INDEX "IDX_70fe713ef5463e7aa66bbcb321" ON public.gift_sends USING btree (
 
 
 --
+-- Name: IDX_75e48a17f75ab2cb3104254145; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_75e48a17f75ab2cb3104254145" ON public.gifts USING btree ("brandAgencyId");
+
+
+--
 -- Name: IDX_773d65d80dbc2f556c2b8b5804; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3176,6 +3264,13 @@ CREATE UNIQUE INDEX "IDX_7d6d35ff9fc2fd3f8ef1a47fe1" ON public.agencies USING bt
 --
 
 CREATE INDEX "IDX_7e7cbcfb689216ad5d9700657b" ON public.room_chat_penalties USING btree ("roomId");
+
+
+--
+-- Name: IDX_813db5e5b2b63149563d601d27; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "IDX_813db5e5b2b63149563d601d27" ON public.agencies USING btree ("publicId");
 
 
 --
@@ -3319,6 +3414,13 @@ CREATE INDEX "IDX_a45d7aca30d67970c093fa4eed" ON public.room_access USING btree 
 
 
 --
+-- Name: IDX_a64905cd550435773e95786a31; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "IDX_a64905cd550435773e95786a31" ON public.gift_categories USING btree (key);
+
+
+--
 -- Name: IDX_a6bb192fadb7310808004f5753; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3330,6 +3432,27 @@ CREATE INDEX "IDX_a6bb192fadb7310808004f5753" ON public.agency_members USING btr
 --
 
 CREATE INDEX "IDX_a8f03d80e42da1162e25591dc4" ON public.withdraw_requests USING btree ("userId");
+
+
+--
+-- Name: IDX_agencies_publicId; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX "IDX_agencies_publicId" ON public.agencies USING btree ("publicId") WHERE ("publicId" IS NOT NULL);
+
+
+--
+-- Name: IDX_agency_follows_agencyId; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_agency_follows_agencyId" ON public.agency_follows USING btree ("agencyId");
+
+
+--
+-- Name: IDX_agency_follows_userId; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_agency_follows_userId" ON public.agency_follows USING btree ("userId");
 
 
 --
@@ -3624,6 +3747,13 @@ CREATE INDEX "IDX_febd82d58a786b258d29c20952" ON public.room_host_follows USING 
 --
 
 CREATE INDEX "IDX_ffa48c8c78e4c4d0cb29bd6d12" ON public.chat_participants USING btree ("conversationId");
+
+
+--
+-- Name: IDX_gifts_brandAgencyId; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX "IDX_gifts_brandAgencyId" ON public.gifts USING btree ("brandAgencyId") WHERE ("brandAgencyId" IS NOT NULL);
 
 
 --
@@ -4148,8 +4278,24 @@ ALTER TABLE ONLY public.chat_participants
 
 
 --
+-- Name: agency_follows agency_follows_agencyId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agency_follows
+    ADD CONSTRAINT "agency_follows_agencyId_fkey" FOREIGN KEY ("agencyId") REFERENCES public.agencies(id) ON DELETE CASCADE;
+
+
+--
+-- Name: agency_follows agency_follows_userId_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agency_follows
+    ADD CONSTRAINT "agency_follows_userId_fkey" FOREIGN KEY ("userId") REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pUjD4ZbV1OLns6QJ7vp9r96KQP30ajW9mX4OSauClQrixM9Oiz0SKETmMcn4KqI
+\unrestrict xRbOqoW1VyVsYzhOdr6jCPXF0WA9TLxGDRSN9G0h5RAYKYvaSATGMBWIDg2J5dz
 
