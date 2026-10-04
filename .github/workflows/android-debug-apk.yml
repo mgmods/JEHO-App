@@ -31,8 +31,11 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Verify Android SDK tools
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-not-set}}"
+          command -v sdkmanager
+          sdkmanager --version
 
       - name: Install Android SDK 36
         run: |
