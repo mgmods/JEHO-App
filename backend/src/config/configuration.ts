@@ -135,9 +135,8 @@ export default registerAs('app', () => {
   google: {
     // Web client ID from Firebase google-services.json (client_type 3).
     // Must match Android requestIdToken(default_web_client_id).
-    clientId:
-      process.env.GOOGLE_CLIENT_ID ||
-      '1085967276199-c58dro18a44qocpeme8868sudnqv8kte.apps.googleusercontent.com',
+    // Intentionally no legacy-project fallback; configure a JEHO-OWN OAuth client explicitly.
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
     // Optional comma-separated extra audiences (Android OAuth clients).
     clientIds: process.env.GOOGLE_CLIENT_IDS || '',
   },
