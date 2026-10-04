@@ -23,13 +23,19 @@ function loadEnvFile(filePath: string) {
 }
 
 loadEnvFile(resolve(process.cwd(), '.env'));
-loadEnvFile(resolve(process.cwd(), '.env.example'));
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
 ) as Function[];
 
 async function seed() {
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminUsername = process.env.ADMIN_USERNAME?.trim();
+  if (!adminEmail || !adminPassword || adminPassword.length < 16 || !adminUsername) {
+    throw new Error('Set ADMIN_EMAIL, ADMIN_USERNAME, and a unique ADMIN_PASSWORD of at least 16 characters in backend/.env before seeding.');
+  }
+
   const ds = new DataSource({
     type: 'postgres',
     host: process.env.DB_HOST || 'localhost',
@@ -291,10 +297,6 @@ async function seed() {
   // mark end of cosmetics — continue admin seed
   const _cosmeticsDone = true;
   void _cosmeticsDone;
-
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@auralive.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin@AuraLive2024';
-  const adminUsername = process.env.ADMIN_USERNAME || 'auralive_admin';
 
   let adminUser = await userRepo.findOne({ where: { email: adminEmail } });
   if (!adminUser) {
