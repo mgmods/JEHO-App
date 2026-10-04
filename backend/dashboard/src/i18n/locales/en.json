@@ -651,8 +651,8 @@
   },
   "voiceRtc": {
     "title": "Voice engine (ZEGO ↔ LiveKit switch)",
-    "hint": "LiveKit is free open-source media on your VPS. ZEGO remains the paid cloud path. Use Show keys to copy URL / API Key / Secret for other apps.",
-    "free": "free",
+    "hint": "LiveKit is open-source software you can self-host; server and hosting costs depend on your setup and usage. ZEGO is the paid cloud option. Switching applies to rooms after the app is updated. Use Show keys to view connection settings.",
+    "free": "open source",
     "saveKeys": "Save LiveKit keys",
     "showKeys": "Show keys",
     "hideKeys": "Hide keys",
@@ -660,7 +660,7 @@
     "active": "Active now",
     "ready": "Ready",
     "notReady": "Not fully configured",
-    "switchedLiveKit": "Switched to LiveKit (free)",
+    "switchedLiveKit": "Switched to LiveKit",
     "switchedZego": "Switched to ZEGO"
   },
   "commonStatus": {
