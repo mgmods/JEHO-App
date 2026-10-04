@@ -274,6 +274,13 @@ const baishunModuleMap: Record<string, string> = {
     }
   }
 
+  // Simple deployment health probe (does not expose configuration or secrets).
+  expressApp.get('/healthz', (_req: unknown, res: {
+    status: (n: number) => { json: (body: unknown) => void };
+  }) => {
+    res.status(200).json({ ok: true, service: 'jeho-own-api' });
+  });
+
   await app.listen(port);
   const gateway = app.get(MikooGatewayService);
   gateway.attach(app.getHttpServer());
