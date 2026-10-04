@@ -22,7 +22,8 @@ export class UploadsService {
   ) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
-    this.supabaseUrl = process.env.SUPABASE_URL?.replace(/\\/$/, '') || '';
+    const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || '';
+    this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
     this.storageKey = process.env.SUPABASE_STORAGE_KEY || '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     if (!existsSync(this.uploadDir)) {
@@ -75,7 +76,7 @@ export class UploadsService {
   }
 
   private assertSafeFilename(filename: string) {
-    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\\\')) {
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes(String.fromCharCode(92))) {
       throw new BadRequestException('Invalid filename');
     }
   }
