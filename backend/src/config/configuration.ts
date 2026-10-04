@@ -20,7 +20,7 @@ export default registerAs('app', () => {
     if (!databaseUrl && (!databasePassword || databasePassword.length < 16)) {
       throw new Error('Set DATABASE_URL or a DB_PASSWORD of at least 16 characters in production');
     }
-    if (databaseUrl && !/^postgres(ql)?:\\/\\//i.test(databaseUrl)) {
+    if (databaseUrl && !['postgres://', 'postgresql://'].some((prefix) => databaseUrl.toLowerCase().startsWith(prefix))) {
       throw new Error('DATABASE_URL must be a PostgreSQL connection URL');
     }
     if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
