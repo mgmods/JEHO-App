@@ -1943,7 +1943,9 @@ export class AdminService {
     const user = await this.usersRepo
       .createQueryBuilder('u')
       .addSelect('u.passwordHash')
-      .where('LOWER(u.email) = :email', { email: email.toLowerCase() })
+      .where('(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)', {
+        identifier: String(email || '').trim().toLowerCase(),
+      })
       .getOne();
     if (!user || !user.passwordHash) {
       throw new UnauthorizedException('Invalid admin credentials');
