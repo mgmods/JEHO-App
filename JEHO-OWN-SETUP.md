@@ -34,7 +34,7 @@ Use your computer's LAN IP instead of `10.0.2.2` when testing on a physical phon
 
 ## Backend environment
 
-Start from `backend/.env.example`, generate new random JWT secrets, and configure new PostgreSQL/Redis credentials and new voice-provider credentials in the hosting provider's secret store. Never copy values from old production files. Do not run migrations or seed scripts against the previous database.
+Copy `backend/.env.example` to an untracked `backend/.env` and replace every placeholder before running the backend. The seed script reads only `backend/.env` and refuses to run unless you explicitly set the target database fields plus a unique admin email/username and an admin password of at least 16 characters. Generate new random JWT secrets, and configure new PostgreSQL/Redis credentials and new voice-provider credentials in the hosting provider's secret store. Never use the sample values as production credentials. Do not run migrations or seed scripts against the previous database.
 
 ## Deployment checklist
 
