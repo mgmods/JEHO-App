@@ -129,7 +129,7 @@ async function bootstrap() {
     if (
       req.method === 'GET' &&
       (pathName === '/admin' || pathName.startsWith('/admin/')) &&
-      !/\\.[^/]+$/.test(pathName)
+      !/\.[^/]+$/.test(pathName)
     ) {
       readFile(join(process.cwd(), 'public', 'admin', 'index.html'), 'utf8', (err, html) => {
         if (err || !html) return next();
