@@ -839,7 +839,9 @@ export class AgenciesService implements OnModuleInit {
       .take(Math.min(query.limit || 10, 10));
     const [items, total] = await qb.getManyAndCount();
     const liveByAgency = await this.loadLiveAgencyRooms(items.map((a) => a.id));
-    const safe = items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id)));
+    const safe = await Promise.all(
+      items.map((a) => this.publicAgencyCard(a, liveByAgency.get(a.id))),
+    );
     return paginate(safe, total, query.page || 1, query.limit || 10);
   }
 
@@ -922,7 +924,7 @@ export class AgenciesService implements OnModuleInit {
     return map;
   }
 
-  private publicAgencyCard(
+  private async publicAgencyCard(
     agency: Agency,
     live?: {
       id: string;
