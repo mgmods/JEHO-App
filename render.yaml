@@ -1,0 +1,65 @@
+# JEHO-OWN isolated Render deployment.
+# Review the estimated monthly cost before clicking "Deploy Blueprint" in Render.
+# No existing Render resources are modified by committing this file.
+services:
+  - type: web
+    name: jeho-own-api
+    runtime: docker
+    plan: 0.5c-512mb
+    region: frankfurt
+    branch: jeho-own
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    initialDeployHook: node dist/database/seed.js
+    disk:
+      name: jeho-own-uploads
+      mountPath: /app/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api/v1
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SYNCHRONIZE
+        value: "false"
+      - key: DB_LOGGING
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jeho-own-db
+          property: connectionString
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: jeho-own-db
+          property: password
+      - key: DB_USERNAME
+        fromDatabase:
+          name: jeho-own-db
+          property: user
+      - key: DB_DATABASE
+        fromDatabase:
+          name: jeho-own-db
+          property: database
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: jeho-own-db
+    databaseName: jeho_own
+    user: jeho_own_app
+    plan: 0.1c-256mb
+    diskSizeGB: 1
+    region: frankfurt
+    ipAllowList: []
