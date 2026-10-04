@@ -52,7 +52,7 @@ async function seed() {
     (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.password) : '') ||
     process.env.DB_PASSWORD;
   const dbDatabase =
-    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.pathname.replace(/^\\//, '')) : '') ||
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.pathname.replace(/^\//, '')) : '') ||
     process.env.DB_DATABASE?.trim();
   const dbPort = Number(parsedDatabaseUrl?.port || process.env.DB_PORT || 5432);
   if (!dbHost || !dbUsername || !dbPassword || !dbDatabase) {
