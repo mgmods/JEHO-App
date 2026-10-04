@@ -33,6 +33,9 @@ export default registerAs('app', () => {
     pipedInstances: process.env.PIPED_API_INSTANCES || '',
   },
   database: {
+    // Render provides a private DATABASE_URL. Individual DB_* values remain for local development.
+    url: process.env.DATABASE_URL || '',
+    ssl: process.env.DB_SSL === 'true',
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),
     username: process.env.DB_USERNAME || 'auralive',
