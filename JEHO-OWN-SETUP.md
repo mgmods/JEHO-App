@@ -36,6 +36,30 @@ The database seed runs once after the service's first successful deploy. It init
 
 Google sign-in and voice are not considered ready merely because the API deploys: configure a new JEHO-OWN Google OAuth client and fresh ZEGO or LiveKit-provider credentials separately. Do not reuse credentials from the old service. Android Firebase configuration must also be replaced before the independent app can be called fully isolated.
 
+## Lowest-cost free beta: Supabase + Render Free
+
+The active `render.yaml` describes a **free Render Docker web service only**; it does not create a Render database or persistent disk. It does not create a Supabase project automatically. The API can use a separate Supabase project's PostgreSQL and private Storage bucket.
+
+### Supabase project isolation
+- Create a separate project named `JEHO-OWN` in the selected Supabase organization. Do not reuse the existing `JEHOO` project or any other existing project.
+- Use Supabase's **Session pooler** connection string (IPv4 compatible) from Project → Connect → Session pooler. Keep the connection string secret; set `DB_SSL=true` and `DATABASE_URL` in Render. The connection URL contains the database password, so do not commit it or paste it into chat.
+- Create a **private** Storage bucket named `jeho-own-uploads`. Set `SUPABASE_URL` and the project's server-side `service_role` key in Render as `SUPABASE_STORAGE_KEY`. Never put this key in the Android app, dashboard JavaScript, or a public client variable.
+- Uploaded objects are kept in the private bucket; the API proxies reads via `/uploads/:filename` so the free Render filesystem is not relied on for persistence.
+- Keep `DATABASE_URL`, `SUPABASE_STORAGE_KEY`, `ADMIN_EMAIL`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` as secrets. Do not put real values in GitHub commits.
+
+### Free-tier limits and beta suitability
+- Supabase project creation is currently estimated at **$0/month** for the account's Free organization. Free projects have limited database/storage/egress quotas and may pause after inactivity; verify the current quota and any warnings in the dashboard before creating the project.
+- Render Free web services sleep after 15 minutes without inbound traffic, can take about a minute to wake, and have an ephemeral filesystem. This setup uses Supabase Storage to avoid losing uploaded files when the service sleeps or redeploys. It is a test beta, not suitable for guaranteed always-on voice rooms or production SLAs.
+- The current backend includes Redis-backed application features. The Socket.IO adapter can fall back to single-process mode when Redis is unavailable, but Redis-backed features may still log errors or fail. We must test those paths and either provide a safe beta fallback or decide which features can be disabled before inviting users.
+- The APK must be built with `JEHO_OWN_API_URL=https://YOUR-RENDER-SERVICE.onrender.com/api/v1` only after Render returns the real service URL.
+
+### Provisioning sequence (no paid resources)
+1. Confirm the Supabase organization for the new project.
+2. Create the new Supabase project only after confirming its displayed cost; do not modify the existing `JEHOO` project.
+3. Create the private Storage bucket and place its server-side key in Render secrets.
+4. Create the Render service from this repository/branch using the free plan and the new Supabase connection string.
+5. Check health, seed/schema initialization, upload/download, login, rooms, chat and realtime. Do not call the voice system production-ready until two real devices pass the audio test.
+
 ## Dashboard and API connection
 
 The preferred JEHO-OWN beta deployment serves the Vue dashboard and NestJS API from the same backend origin:
