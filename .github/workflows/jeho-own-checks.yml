@@ -10,7 +10,7 @@ on:
     branches: [jeho-own]
     paths:
       - "backend/**"
-      - ".github/workflows/jeho-own-checks.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
