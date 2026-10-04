@@ -12,6 +12,30 @@ This branch is the isolated development track for a JEHO-branded test deployment
 - Firebase configuration still points to the previous Firebase project and must be replaced with a new project's configuration before claiming full service isolation.
 - A new backend, PostgreSQL database, Redis instance, voice credentials, and dashboard deployment have not been created or connected yet.
 
+## Render deployment (Docker + independent PostgreSQL)
+
+A Render Blueprint is prepared in the repository root at `render.yaml`. It targets only branch `jeho-own` and defines:
+- One Docker web service for the NestJS API and Vue dashboard.
+- One separate PostgreSQL database restricted to Render's private network.
+- A 1 GB persistent disk for user uploads.
+- Generated JWT secrets and a first-deploy database seed hook.
+- No Redis service at first; the API's Socket.IO adapter falls back to single-process mode if Redis is unavailable. Add Redis only when multi-instance realtime is required.
+
+**Estimated paid beta cost (USD/month, before usage overages):**
+- API Docker web service, 0.5 CPU / 512 MB: about $7.
+- PostgreSQL, 0.1 CPU / 256 MB: about $6.
+- PostgreSQL storage, configured 1 GB: about $0.30.
+- Persistent upload disk, 1 GB: about $0.25.
+- **Estimated base total: about $13.55/month.** This excludes outbound bandwidth beyond the workspace allowance, extra build minutes, voice-provider fees, taxes, and any optional domain.
+
+The free tier is suitable only for a disposable preview: free web services can sleep after inactivity, and free PostgreSQL databases expire after 30 days. Do not use a free database for real users' long-lived profiles or wallet data.
+
+No Render service has been created by adding this file. Before provisioning, open Render → New → Blueprint, select this repository and branch `jeho-own`, review the resource and cost summary, and only then confirm creation. The first Blueprint setup will ask for a unique admin email, username, and password; use a strong password of at least 16 characters. Never send these credentials in chat.
+
+The database seed runs once after the service's first successful deploy. It initializes the schema and baseline catalog on the new database only. Runtime TypeORM synchronization remains disabled. The dashboard and API share the same HTTPS origin; the app API base will be `https://YOUR-RENDER-SERVICE.onrender.com/api/v1` and the dashboard `https://YOUR-RENDER-SERVICE.onrender.com/admin/`.
+
+Google sign-in and voice are not considered ready merely because the API deploys: configure a new JEHO-OWN Google OAuth client and fresh ZEGO or LiveKit-provider credentials separately. Do not reuse credentials from the old service. Android Firebase configuration must also be replaced before the independent app can be called fully isolated.
+
 ## Dashboard and API connection
 
 The preferred JEHO-OWN beta deployment serves the Vue dashboard and NestJS API from the same backend origin:
