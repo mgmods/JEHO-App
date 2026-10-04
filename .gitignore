@@ -1,4 +1,4 @@
-# === caches / build (not source) ===
+# Build output and caches
 **/.gradle/
 **/.gradle-home/
 **/build/
@@ -13,29 +13,13 @@
 **/.cxx/
 **/captures/
 **/local.properties
-
-# === backend build artifacts ===
 backend/dist/
-backend/dashboard/node_modules/
 backend/dashboard/dist/
 backend/dashboard/dist-hams/
-# Vite/admin compiled bundle (source lives in backend/dashboard/)
 backend/admin/
 backend/public/admin/
 
-# Archives / packaged dumps — never commit (source already in tree)
-**/*.zip
-**/*.7z
-**/*.rar
-backend/public/games/*.zip
-backend/public/games/**/*.zip
-backend/public/.visual-system.zip
-backend/public/games/mikoo-games.zip
-backend/public/games/backend-dist.zip
-
-# Android build outputs / packages — rebuild with Gradle
-android/app/build/
-android/**/build/
+# Android packages and temporary build output
 android/app/release/
 android/app/debug/
 **/outputs/
@@ -43,51 +27,38 @@ android/app/debug/
 *.aab
 **/*.apk
 **/*.aab
-app-debug.apk
-app-release.apk
 
-# === junk / upload leftovers ===
-**/.visual-system.zip.cursor-upload-*
-**/admin.bak.*/
-tmp_*.py
-tmp_*.jpg
-android/tmp_*.jpg
-android/arm64-v8a/
-android/armeabi-v7a/
-android/libZegoExpressEngine.so
+# Environment files: commit only explicit example templates
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+!**/.*.env.example
 
-# Keep signing + secrets intentionally for private restore backup
-# (do NOT ignore: *.jks, keystore.properties, google-services.json, .env)
+# Signing materials, service-account keys, and private credentials
+**/*.jks
+**/*.keystore
+**/keystore.properties
+**/*service-account*.json
+**/*service_account*.json
+**/*credentials*.json
+**/*secret*.json
+**/*.pem
+**/*.p12
+**/*.pfx
+scripts/deploy.local.env
 
-# Production mirror / extracted dumps — local only
+# Database exports and local production mirrors
+database/*prod*.sql
+database/auralive_*.sql
 server-snapshot/
 EXTRACTED_GAMES/
 _aab_extract/
 _agent_logs/
-_*.py
-_*.xml
-tmp_*.py
-tmp_*.jpg
-.tmp_*/
-.tmp_*
-*.vscdb
-logs/
-screen_*.png
-scripts/_mikoo_catalogs/
-scripts/__pycache__/
-# Local SSH deploy password — never commit
-scripts/deploy.local.env
-
-# Production DB dumps / local mirrors � never commit
-database/auralive_*.sql
-database/*_prod_*.sql
+_extract/
 **/__pycache__/
 **/*.cursor-upload-*
-scripts/_target_table_zoom.png
-
-# Local extract dumps
-_extract/
-
-
-docs/refs/
-
+*.vscdb
+logs/
