@@ -73,7 +73,8 @@ class ResolveReportDto {
 
 class AdminLoginDto {
   @ApiProperty()
-  @IsEmail()
+  @IsString()
+  @MinLength(3)
   email!: string;
 
   @ApiProperty()
