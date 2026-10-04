@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { ZegoSettingsService } from '../zego/zego-settings.service';
 import {
   decryptSecret,
   encryptSecret,
@@ -60,6 +61,7 @@ export class LiveKitSettingsService {
     private readonly configService: ConfigService,
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
+    private readonly zegoSettings: ZegoSettingsService,
   ) {}
 
   async getProvider(): Promise<VoiceRtcProvider> {
@@ -99,6 +101,15 @@ export class LiveKitSettingsService {
       if (!resolved.url || !resolved.apiKey || !resolved.apiSecret) {
         throw new BadRequestException(
           'LiveKit URL / API key / secret must be configured before switching',
+        );
+      }
+    } else {
+      // Never switch production room traffic to ZEGO until the server-side
+      // AppID and token-auth ServerSecret are both configured.
+      const zego = await this.zegoSettings.getMaskedSettings();
+      if (!zego.appIdConfigured || !zego.serverSecretConfigured) {
+        throw new BadRequestException(
+          'ZEGO AppID and ServerSecret must be configured before switching',
         );
       }
     }
