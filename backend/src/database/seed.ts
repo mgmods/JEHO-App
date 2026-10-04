@@ -59,8 +59,8 @@ async function seed() {
     throw new Error('Set DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE before seeding.');
   }
 
-  const ds = new DataSource({
-    type: 'postgres',
+  const connectionOptions = {
+    type: 'postgres' as const,
     ...(databaseUrl
       ? { url: databaseUrl }
       : {
@@ -71,6 +71,25 @@ async function seed() {
           database: dbDatabase,
         }),
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+  };
+
+  // Prepare only the dedicated JEHO-OWN schema; never create or sync tables in public.
+  const bootstrap = new DataSource({
+    ...connectionOptions,
+    entities: [],
+    synchronize: false,
+  });
+  await bootstrap.initialize();
+  try {
+    await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+  } finally {
+    await bootstrap.destroy();
+  }
+
+  const ds = new DataSource({
+    ...connectionOptions,
+    schema: 'jeho_own',
+    extra: { options: '-c search_path=jeho_own' },
     entities: entityList,
     synchronize: true,
   });
