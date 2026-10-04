@@ -38,4 +38,7 @@ USER node
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# JEHO-OWN keeps its database isolated in the "jeho_own" schema.
+# Seed first so TypeORM creates/updates all tables and default settings
+# before Nest starts serving requests. The compiled seed is in dist/.
+CMD ["sh", "-c", "node dist/database/seed.js && node dist/main.js"]
