@@ -71,11 +71,18 @@ const entityList = Object.values(entities).filter(
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
-        host: config.get('app.database.host'),
-        port: config.get('app.database.port'),
-        username: config.get('app.database.username'),
-        password: config.get('app.database.password'),
-        database: config.get('app.database.database'),
+        ...(config.get<string>('app.database.url')
+          ? { url: config.get<string>('app.database.url') }
+          : {
+              host: config.get('app.database.host'),
+              port: config.get('app.database.port'),
+              username: config.get('app.database.username'),
+              password: config.get('app.database.password'),
+              database: config.get('app.database.database'),
+            }),
+        ssl: config.get<boolean>('app.database.ssl')
+          ? { rejectUnauthorized: false }
+          : undefined,
         entities: entityList,
         synchronize: config.get('app.database.synchronize'),
         logging: config.get('app.database.logging'),
