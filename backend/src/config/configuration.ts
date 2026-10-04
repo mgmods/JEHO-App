@@ -6,7 +6,6 @@ export default registerAs('app', () => {
       ['JWT_SECRET', process.env.JWT_SECRET],
       ['JWT_REFRESH_SECRET', process.env.JWT_REFRESH_SECRET],
       ['ADMIN_PASSWORD', process.env.ADMIN_PASSWORD],
-      ['DB_PASSWORD', process.env.DB_PASSWORD],
     ] as const;
     const missing = required
       .filter(([, value]) => !value || value.length < 16)
@@ -15,6 +14,14 @@ export default registerAs('app', () => {
       throw new Error(
         `Production secrets are missing or too short: ${missing.join(', ')}`,
       );
+    }
+    const databaseUrl = process.env.DATABASE_URL?.trim();
+    const databasePassword = process.env.DB_PASSWORD;
+    if (!databaseUrl && (!databasePassword || databasePassword.length < 16)) {
+      throw new Error('Set DATABASE_URL or a DB_PASSWORD of at least 16 characters in production');
+    }
+    if (databaseUrl && !/^postgres(ql)?:\\/\\//i.test(databaseUrl)) {
+      throw new Error('DATABASE_URL must be a PostgreSQL connection URL');
     }
     if (process.env.JWT_SECRET === process.env.JWT_REFRESH_SECRET) {
       throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be different');
