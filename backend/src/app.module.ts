@@ -74,18 +74,18 @@ const entityList = Object.values(entities).filter(
         ...(config.get<string>('app.database.url')
           ? { url: config.get<string>('app.database.url') }
           : {
-              host: config.get('app.database.host'),
-              port: config.get('app.database.port'),
-              username: config.get('app.database.username'),
-              password: config.get('app.database.password'),
-              database: config.get('app.database.database'),
+              host: config.get<string>('app.database.host'),
+              port: config.get<number>('app.database.port'),
+              username: config.get<string>('app.database.username'),
+              password: config.get<string>('app.database.password'),
+              database: config.get<string>('app.database.database'),
             }),
         ssl: config.get<boolean>('app.database.ssl')
           ? { rejectUnauthorized: false }
           : undefined,
         entities: entityList,
-        synchronize: config.get('app.database.synchronize'),
-        logging: config.get('app.database.logging'),
+        synchronize: config.get<boolean>('app.database.synchronize'),
+        logging: config.get<boolean>('app.database.logging'),
       }),
     }),
     TypeOrmModule.forFeature([User]),
