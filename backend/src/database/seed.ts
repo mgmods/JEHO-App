@@ -81,6 +81,11 @@ async function seed() {
   });
   await bootstrap.initialize();
   try {
+    // TypeORM's PostgreSQL UUID columns use uuid_generate_v4() by default.
+    // Supabase projects do not always have uuid-ossp enabled, so enable it
+    // before schema synchronization. This is scoped to the current database
+    // and does not touch any application tables outside JEHO-OWN.
+    await bootstrap.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
     await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
   } finally {
     await bootstrap.destroy();
