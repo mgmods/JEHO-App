@@ -14,6 +14,13 @@ def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
     localPropertiesFile.withInputStream { localProperties.load(it) }
 }
+// CI can supply -PJEHO_OWN_API_URL; local builds may use android/local.properties.
+// Keep the API URL in BuildConfig so both debug and release variants use the same backend.
+def configuredApi = (
+    project.findProperty('JEHO_OWN_API_URL') ?:
+    System.getenv('JEHO_OWN_API_URL') ?:
+    localProperties.getProperty('API_BASE_URL', '')
+).toString().trim()
 android {
     namespace 'com.Dramizo.Series'
     compileSdk 36
@@ -30,7 +37,7 @@ android {
         buildConfigField "long", "ZEGO_APP_ID", "0L"
         buildConfigField "String", "ZEGO_APP_SIGN", "\"\""
         // Production always uses ApiOrigin. Debug may override via local.properties.
-        buildConfigField "String", "API_BASE_URL", "\"\""
+        buildConfigField "String", "API_BASE_URL", "\"${configuredApi}\""
         ndk {
             // Real phones: 32-bit + 64-bit ARM.
             // Play App Bundle (abi split) still delivers only the matching ABI per device.
@@ -83,11 +90,7 @@ android {
         }
         debug {
             minifyEnabled false
-            // Optional local API override for developers only (never release).
-            def debugApi = localProperties.getProperty('API_BASE_URL', '')
-            if (debugApi != null && !debugApi.isEmpty()) {
-                buildConfigField "String", "API_BASE_URL", "\"${debugApi}\""
-            }
+            // API_BASE_URL is shared with defaultConfig for this build.
             // Debug uses Android debug keystore (release jks may be corrupt locally).
         }
     }
