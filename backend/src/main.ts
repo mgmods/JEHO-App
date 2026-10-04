@@ -119,6 +119,29 @@ async function bootstrap() {
     next();
   });
 
+  // Serve the Vue admin dashboard from the same origin as the API.
+  // Static files (including /admin/assets/*) continue through to static middleware below.
+  expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
+    setHeader: (k: string, v: string) => void;
+    status: (n: number) => { send: (body: string) => void };
+  }, next: () => void) => {
+    const pathName = String(req.path || req.url || '').split('?')[0];
+    if (
+      req.method === 'GET' &&
+      (pathName === '/admin' || pathName.startsWith('/admin/')) &&
+      !/\\.[^/]+$/.test(pathName)
+    ) {
+      readFile(join(process.cwd(), 'public', 'admin', 'index.html'), 'utf8', (err, html) => {
+        if (err || !html) return next();
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        noStoreHeaders(res);
+        res.status(200).send(html);
+      });
+      return;
+    }
+    next();
+  });
+
   app.useStaticAssets(join(process.cwd(), 'public'), {
     prefix: '/',
     etag: false,
