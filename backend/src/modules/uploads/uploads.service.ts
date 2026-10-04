@@ -12,6 +12,9 @@ import { ContentModerationService } from '../moderation/content-moderation.servi
 export class UploadsService {
   private readonly uploadDir: string;
   private readonly maxSizeMb: number;
+  private readonly supabaseUrl: string;
+  private readonly storageKey: string;
+  private readonly storageBucket: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -19,6 +22,9 @@ export class UploadsService {
   ) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
+    this.supabaseUrl = process.env.SUPABASE_URL?.replace(/\\/$/, '') || '';
+    this.storageKey = process.env.SUPABASE_STORAGE_KEY || '';
+    this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true });
     }
@@ -46,6 +52,34 @@ export class UploadsService {
     return `/uploads/${filename}`;
   }
 
+  private storageEnabled() {
+    return Boolean(this.supabaseUrl && this.storageKey);
+  }
+
+  private storageObjectUrl(filename: string) {
+    return `${this.supabaseUrl}/storage/v1/object/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
+  }
+
+  async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+    if (!this.storageEnabled()) return null;
+    this.assertSafeFilename(filename);
+    const response = await fetch(this.storageObjectUrl(filename), {
+      headers: { apikey: this.storageKey, Authorization: `Bearer ${this.storageKey}` },
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
+    return {
+      buffer: Buffer.from(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type') || 'application/octet-stream',
+    };
+  }
+
+  private assertSafeFilename(filename: string) {
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\\\')) {
+      throw new BadRequestException('Invalid filename');
+    }
+  }
+
   async processUploaded(file: Express.Multer.File, userId?: string) {
     if (!file) throw new BadRequestException('No file uploaded');
     const ext = extname(file.originalname).toLowerCase();
@@ -70,14 +104,41 @@ export class UploadsService {
       }
       throw err;
     }
+    if (this.storageEnabled()) {
+      const upload = await fetch(this.storageObjectUrl(storedName), {
+        method: 'POST',
+        headers: {
+          apikey: this.storageKey,
+          Authorization: `Bearer ${this.storageKey}`,
+          'Content-Type': file.mimetype || 'application/octet-stream',
+          'x-upsert': 'true',
+        },
+        body: readFileSync(storedPath),
+      });
+      if (!upload.ok) {
+        throw new BadRequestException(`Supabase Storage upload failed (${upload.status})`);
+      }
+      if (existsSync(storedPath)) unlinkSync(storedPath);
+    }
     return {
       originalName: file.originalname,
       filename: storedName,
       mimeType: file.mimetype,
       size: file.size,
       url: this.buildPublicPath(storedName),
-      path: storedPath,
+      path: this.storageEnabled() ? this.buildPublicPath(storedName) : storedPath,
     };
+  }
+
+  private async deleteStoredFile(filename: string) {
+    const response = await fetch(this.storageObjectUrl(filename), {
+      method: 'DELETE',
+      headers: { apikey: this.storageKey, Authorization: `Bearer ${this.storageKey}` },
+    });
+    if (!response.ok && response.status !== 404) {
+      throw new BadRequestException(`Supabase Storage delete failed (${response.status})`);
+    }
+    return { deleted: response.ok };
   }
 
   private hasAudioSignature(path: string, ext: string) {
@@ -127,6 +188,11 @@ export class UploadsService {
       filename.includes('\\')
     ) {
       throw new BadRequestException('Invalid filename');
+    }
+    this.assertSafeFilename(filename);
+    if (this.storageEnabled()) {
+      // Supabase Storage accepts DELETE on a single object path.
+      return this.deleteStoredFile(filename);
     }
     const filePath = join(this.uploadDir, filename);
     if (!existsSync(filePath)) {
