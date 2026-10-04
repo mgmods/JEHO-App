@@ -369,8 +369,11 @@ async function seed() {
       walletRepo.create({ userId: adminUser.id, coins: 100000, diamonds: 100000 }),
     );
     console.log(`  Admin user ${adminEmail} created`);
-  } else if (!adminUser.isAdmin) {
+  } else {
+    adminUser.passwordHash = await bcrypt.hash(adminPassword, 12);
+    adminUser.username = adminUsername;
     adminUser.isAdmin = true;
+    adminUser.emailVerified = true;
     await userRepo.save(adminUser);
   }
 
@@ -387,6 +390,14 @@ async function seed() {
       }),
     );
     console.log('  AdminUser record created');
+  } else {
+    adminRecord.username = adminUsername;
+    adminRecord.passwordHash = await bcrypt.hash(adminPassword, 12);
+    adminRecord.role = AdminRole.SUPER;
+    adminRecord.linkedUserId = adminUser.id;
+    adminRecord.isActive = true;
+    await adminRepo.save(adminRecord);
+    console.log('  AdminUser record synchronized');
   }
 
   const defaults: Array<[string, string, string]> = [
