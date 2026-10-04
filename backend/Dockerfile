@@ -29,8 +29,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=dashboard-builder /dashboard/dist ./public/admin
-COPY .env.example ./.env.example
 
 RUN mkdir -p uploads && chown -R node:node /app
 
