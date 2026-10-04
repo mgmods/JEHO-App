@@ -23,8 +23,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: jeho-own
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
