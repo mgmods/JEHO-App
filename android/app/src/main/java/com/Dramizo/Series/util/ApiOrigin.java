@@ -1,37 +1,39 @@
 package com.Dramizo.Series.util;
 
+import com.Dramizo.Series.BuildConfig;
+
 /**
- * Runtime host resolution — avoids a single plain "https://api..." string in BuildConfig.
- * This is obfuscation of the constant only; real security is JWT + server checks.
+ * Resolves the API URL for this build.
+ *
+ * Configure API_BASE_URL through the Android build configuration for the
+ * independent JEHO-OWN backend. There is deliberately no fallback to the
+ * previous production server.
  */
 public final class ApiOrigin {
-    private static final int K = 0x5A;
-
-    // XOR-encoded "https://api.adnova.bbs.tr"
-    private static final byte[] ORIGIN = new byte[] {
-            0x32, 0x2e, 0x2e, 0x2a, 0x29, 0x60, 0x75, 0x75,
-            0x3b, 0x2a, 0x33, 0x74, 0x3b, 0x3e, 0x34, 0x35,
-            0x2c, 0x3b, 0x74, 0x38, 0x38, 0x29, 0x74, 0x2e,
-            0x28
-    };
+    private static final String UNCONFIGURED_API = "https://YOUR-JEHO-OWN-API-HOST";
 
     private ApiOrigin() {}
 
-    private static String decode(byte[] enc) {
-        char[] out = new char[enc.length];
-        for (int i = 0; i < enc.length; i++) {
-            out[i] = (char) ((enc[i] & 0xff) ^ K);
-        }
-        return new String(out);
-    }
-
-    /** https://api.adnova.bbs.tr */
     public static String origin() {
-        return decode(ORIGIN);
+        String configured = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
+        String value = configured.isEmpty() ? UNCONFIGURED_API : configured;
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        if (value.endsWith("/api/v1")) {
+            value = value.substring(0, value.length() - "/api/v1".length());
+        }
+        return value;
     }
 
-    /** https://api.adnova.bbs.tr/api/v1/ */
     public static String apiV1() {
-        return origin() + "/api/v1/";
+        String configured = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
+        if (!configured.isEmpty()) {
+            while (configured.endsWith("/")) {
+                configured = configured.substring(0, configured.length() - 1);
+            }
+            return configured.endsWith("/api/v1") ? configured + "/" : configured + "/api/v1/";
+        }
+        return UNCONFIGURED_API + "/api/v1/";
     }
 }
