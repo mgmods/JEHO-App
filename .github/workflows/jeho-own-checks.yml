@@ -62,7 +62,7 @@ jobs:
         run: npm ci
       - name: Build dashboard
         env:
-          VITE_API_URL: https://api.example.invalid/api/v1
+          VITE_API_URL: /api/v1
           VITE_BASE: /admin/
         run: npm run build
 
