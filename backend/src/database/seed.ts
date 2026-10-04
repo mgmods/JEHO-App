@@ -94,7 +94,7 @@ async function seed() {
   const ds = new DataSource({
     ...connectionOptions,
     schema: 'jeho_own',
-    extra: { options: '-c search_path=jeho_own' },
+    extra: { options: '-c search_path=jeho_own,public' },
     entities: entityList,
     synchronize: true,
   });
