@@ -5,7 +5,7 @@ on:
     branches: [jeho-own]
     paths:
       - "backend/**"
-      - ".github/workflows/jeho-own-checks.yml"
+      - ".github/workflows/**"
   pull_request:
     branches: [jeho-own]
     paths:
