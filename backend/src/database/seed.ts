@@ -334,7 +334,7 @@ async function seed() {
         email: adminEmail,
         username: adminUsername,
         passwordHash,
-        displayName: 'JEHO CHAT Admin',
+        displayName: 'JEHO-OWN Admin',
         isAdmin: true,
         emailVerified: true,
         level: 50,
@@ -366,7 +366,7 @@ async function seed() {
   }
 
   const defaults: Array<[string, string, string]> = [
-    ['brand_name', 'JEHO CHAT', 'Product brand name'],
+    ['brand_name', 'JEHO-OWN', 'Product brand name'],
     ['coin_to_diamond_rate', '0.35', 'Legacy note: gift diamond capped at coin×0.35; actual mint is gift.diamondValue'],
     ['diamond_to_fiat', '0.00005', 'Withdraw conversion USD per diamond'],
     ['min_withdraw_diamonds', '10000', 'Minimum withdraw amount'],
