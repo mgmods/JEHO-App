@@ -59,15 +59,6 @@
                 <data android:scheme="hamslive" android:host="invite" />
                 <data android:scheme="jehochat" android:host="invite" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="api.adnova.bbs.tr"
-                    android:pathPrefix="/open/invite" />
-            </intent-filter>
         </activity>
 
         <activity android:name=".presentation.auth.LoginActivity" android:exported="false"
