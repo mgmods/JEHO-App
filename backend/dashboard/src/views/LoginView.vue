@@ -82,10 +82,10 @@
               <input
                 id="admin-email"
                 v-model="form.email"
-                type="email"
+                type="text"
                 class="login-input"
                 required
-                :placeholder="PRIMARY_ADMIN_EMAIL"
+                placeholder="البريد الإلكتروني أو اسم المستخدم"
                 autocomplete="username"
                 dir="ltr"
               />
@@ -162,7 +162,7 @@ const logoUrl = brandLogo
 const showPassword = ref(false)
 
 const form = reactive({
-  email: PRIMARY_ADMIN_EMAIL,
+  email: '',
   password: '',
 })
 
