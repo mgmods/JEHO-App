@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import configuration from './config/configuration';
@@ -70,7 +71,7 @@ const entityList = Object.values(entities).filter(
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        type: 'postgres',
+        type: 'postgres' as const,
         ...(config.get<string>('app.database.url')
           ? { url: config.get<string>('app.database.url') }
           : {
@@ -83,10 +84,35 @@ const entityList = Object.values(entities).filter(
         ssl: config.get<boolean>('app.database.ssl')
           ? { rejectUnauthorized: false }
           : undefined,
+        schema: 'jeho_own',
+        extra: { options: '-c search_path=jeho_own' },
         entities: entityList,
         synchronize: config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
       }),
+      dataSourceFactory: async (options) => {
+        if (!options || options.type !== 'postgres') {
+          throw new Error('JEHO-OWN requires a PostgreSQL database connection.');
+        }
+
+        // Create the isolated schema before TypeORM initializes entities.
+        // The bootstrap connection never synchronizes tables.
+        const bootstrap = new DataSource({
+          ...options,
+          schema: 'public',
+          entities: [],
+          synchronize: false,
+          extra: {},
+        } as any);
+        await bootstrap.initialize();
+        try {
+          await bootstrap.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+        } finally {
+          await bootstrap.destroy();
+        }
+
+        return new DataSource(options).initialize();
+      },
     }),
     TypeOrmModule.forFeature([User]),
     RedisModule,
