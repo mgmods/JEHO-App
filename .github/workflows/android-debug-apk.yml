@@ -2,7 +2,7 @@ name: Android Debug APK
 
 on:
   push:
-    branches: [main, jeho-own]
+    branches: [jeho-own]
     paths:
       - ".github/workflows/android-debug-apk.yml"
       - "android/**"
@@ -12,7 +12,15 @@ permissions:
   contents: read
 
 jobs:
+  api-url-required:
+    if: ${{ vars.JEHO_OWN_API_URL == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain required configuration
+        run: echo '::notice::APK build is intentionally skipped until the repository variable JEHO_OWN_API_URL points to the deployed JEHO-OWN API ending in /api/v1.'
+
   build-debug-apk:
+    if: ${{ vars.JEHO_OWN_API_URL != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Android project only
@@ -58,9 +66,21 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Validate independent API URL
+        env:
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+        shell: bash
+        run: |
+          if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
+            echo "::error::Set JEHO_OWN_API_URL to the HTTPS JEHO-OWN backend URL ending in /api/v1."
+            exit 1
+          fi
+
       - name: Build debug APK
         working-directory: android
-        run: gradle --no-daemon assembleDebug
+        env:
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+        run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
