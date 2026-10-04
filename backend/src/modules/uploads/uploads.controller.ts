@@ -1,9 +1,11 @@
 import {
   Controller,
   Delete,
+  Get,
   Param,
   Post,
   Req,
+  Res,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -89,6 +91,20 @@ export class UploadsController {
   )
   uploadMany(@UploadedFiles() files: Express.Multer.File[], @Req() req: any) {
     return this.uploadsService.processMany(files, this.userIdFrom(req));
+  }
+
+  @Get(':filename')
+  @ApiOperation({ summary: 'Serve a file stored in Supabase Storage for ephemeral deployments' })
+  async serveStoredFile(@Param('filename') filename: string, @Res() res: any) {
+    try {
+      const stored = await this.uploadsService.getStoredFile(filename);
+      if (!stored) return res.status(404).send('File not found');
+      res.setHeader('Content-Type', stored.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(stored.buffer);
+    } catch {
+      return res.status(502).send('Storage unavailable');
+    }
   }
 
   @Delete(':filename')
