@@ -10,7 +10,7 @@ services:
     branch: jeho-own
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     healthCheckPath: /healthz
     initialDeployHook: node dist/database/seed.js
     disk:
