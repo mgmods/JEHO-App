@@ -35,14 +35,21 @@ async function seed() {
   if (!adminEmail || !adminPassword || adminPassword.length < 16 || !adminUsername) {
     throw new Error('Set ADMIN_EMAIL, ADMIN_USERNAME, and a unique ADMIN_PASSWORD of at least 16 characters in backend/.env before seeding.');
   }
+  const dbHost = process.env.DB_HOST?.trim();
+  const dbUsername = process.env.DB_USERNAME?.trim();
+  const dbPassword = process.env.DB_PASSWORD;
+  const dbDatabase = process.env.DB_DATABASE?.trim();
+  if (!dbHost || !dbUsername || !dbPassword || !dbDatabase) {
+    throw new Error('Set DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE explicitly in backend/.env before seeding.');
+  }
 
   const ds = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST || 'localhost',
+    host: dbHost,
     port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: process.env.DB_USERNAME || 'auralive',
-    password: process.env.DB_PASSWORD || 'auralive_secret',
-    database: process.env.DB_DATABASE || 'auralive',
+    username: dbUsername,
+    password: dbPassword,
+    database: dbDatabase,
     entities: entityList,
     synchronize: true,
   });
