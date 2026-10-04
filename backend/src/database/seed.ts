@@ -35,27 +35,48 @@ async function seed() {
   if (!adminEmail || !adminPassword || adminPassword.length < 16 || !adminUsername) {
     throw new Error('Set ADMIN_EMAIL, ADMIN_USERNAME, and a unique ADMIN_PASSWORD of at least 16 characters in backend/.env before seeding.');
   }
-  const dbHost = process.env.DB_HOST?.trim();
-  const dbUsername = process.env.DB_USERNAME?.trim();
-  const dbPassword = process.env.DB_PASSWORD;
-  const dbDatabase = process.env.DB_DATABASE?.trim();
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  let parsedDatabaseUrl: URL | undefined;
+  if (databaseUrl) {
+    try {
+      parsedDatabaseUrl = new URL(databaseUrl);
+    } catch {
+      throw new Error('DATABASE_URL must be a valid PostgreSQL connection URL.');
+    }
+  }
+  const dbHost = parsedDatabaseUrl?.hostname || process.env.DB_HOST?.trim();
+  const dbUsername =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.username) : '') ||
+    process.env.DB_USERNAME?.trim();
+  const dbPassword =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.password) : '') ||
+    process.env.DB_PASSWORD;
+  const dbDatabase =
+    (parsedDatabaseUrl ? decodeURIComponent(parsedDatabaseUrl.pathname.replace(/^\\//, '')) : '') ||
+    process.env.DB_DATABASE?.trim();
+  const dbPort = Number(parsedDatabaseUrl?.port || process.env.DB_PORT || 5432);
   if (!dbHost || !dbUsername || !dbPassword || !dbDatabase) {
-    throw new Error('Set DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE explicitly in backend/.env before seeding.');
+    throw new Error('Set DATABASE_URL or DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE before seeding.');
   }
 
   const ds = new DataSource({
     type: 'postgres',
-    host: dbHost,
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    username: dbUsername,
-    password: dbPassword,
-    database: dbDatabase,
+    ...(databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: dbHost,
+          port: dbPort,
+          username: dbUsername,
+          password: dbPassword,
+          database: dbDatabase,
+        }),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
     entities: entityList,
     synchronize: true,
   });
 
   await ds.initialize();
-  console.log('Connected — seeding JEHO CHAT…');
+  console.log('Connected — seeding JEHO-OWN…');
 
   const vipRepo = ds.getRepository(entities.VipPlan);
   const cosmeticRepo = ds.getRepository(entities.Cosmetic);
@@ -367,7 +388,7 @@ async function seed() {
   }
 
   await ds.destroy();
-  console.log('JEHO CHAT seed complete.');
+  console.log('JEHO-OWN seed complete.');
 }
 
 seed().catch((err) => {
