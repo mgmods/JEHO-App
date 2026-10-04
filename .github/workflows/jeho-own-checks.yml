@@ -26,8 +26,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: jeho-own
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -50,8 +48,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: jeho-own
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -73,7 +69,5 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: jeho-own
       - name: Build Docker image
         run: docker build --tag jeho-own-api:ci ./backend
