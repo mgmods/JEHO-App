@@ -234,14 +234,38 @@ const baishunModuleMap: Record<string, string> = {
     '1098': 'slot777',
     '1183': 'swimsuit-party',
   };
-  const apiOrigin = (process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '');
-  const wsOrigin = apiOrigin.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
-  const baishunGetAddr = (req: { query: Record<string, string | undefined> }, res: {
+  const configuredPublicApiOrigin = (process.env.PUBLIC_API_ORIGIN || '').replace(/\/$/, '');
+  const baishunGetAddr = (req: {
+    query: Record<string, string | undefined>;
+    protocol?: string;
+    headers?: Record<string, string | string[] | undefined>;
+  }, res: {
     setHeader: (k: string, v: string) => void;
     json: (body: unknown) => void;
+    status: (n: number) => { json: (body: unknown) => void };
   }) => {
     const rawId = String(req.query?.game_id || '1107').trim().toLowerCase();
     const slug = baishunModuleMap[rawId] || rawId;
+    const hostHeader = req.headers?.['x-forwarded-host'] || req.headers?.host || '';
+    const host = String(Array.isArray(hostHeader) ? hostHeader[0] : hostHeader)
+      .split(',')[0]
+      .trim();
+    const protoHeader = req.headers?.['x-forwarded-proto'] || req.protocol || 'https';
+    const protocol = String(Array.isArray(protoHeader) ? protoHeader[0] : protoHeader)
+      .split(',')[0]
+      .trim()
+      .toLowerCase();
+    const requestOrigin =
+      host && /^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(host) && ['http', 'https'].includes(protocol)
+        ? `${protocol}://${host}`
+        : '';
+    const apiOrigin = configuredPublicApiOrigin || requestOrigin;
+    if (!apiOrigin) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(503).json({ code: 503, message: 'Public API origin is not configured' });
+      return;
+    }
+    const wsOrigin = apiOrigin.replace(/^https:\/\//i, 'wss://').replace(/^http:\/\//i, 'ws://');
     res.setHeader('Cache-Control', 'no-store');
     res.json({
       code: 200,
