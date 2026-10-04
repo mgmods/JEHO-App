@@ -18,14 +18,47 @@ permissions:
 
 jobs:
   validate:
-    name: Validate Render Blueprint
+    name: Validate Render Blueprint schema
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: jeho-own
-      - name: Install Render CLI
-        run: curl -fsSL https://raw.githubusercontent.com/render-oss/cli/main/bin/install.sh | sh
-      - name: Validate render.yaml
-        run: render blueprints validate render.yaml
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install YAML and JSON Schema validators
+        run: python -m pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Validate render.yaml against Render's public schema
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+          import yaml
+          from jsonschema import Draft7Validator
+
+          with open("render.yaml", "r", encoding="utf-8") as handle:
+              blueprint = yaml.safe_load(handle)
+
+          schema_url = "https://render.com/schema/render.yaml.json"
+          with urllib.request.urlopen(schema_url, timeout=20) as response:
+              schema = json.load(response)
+
+          validator = Draft7Validator(schema)
+          errors = sorted(validator.iter_errors(blueprint), key=lambda e: list(e.path))
+          if errors:
+              for error in errors:
+                  print(f"ERROR at {'/'.join(map(str, error.path)) or '<root>'}: {error.message}")
+              raise SystemExit(1)
+
+          db_names = {db.get("name") for db in blueprint.get("databases", [])}
+          for service in blueprint.get("services", []):
+              for env in service.get("envVars", []):
+                  ref = env.get("fromDatabase")
+                  if ref and ref.get("name") not in db_names:
+                      raise SystemExit(f"ERROR: {env.get('key')} references undefined database {ref.get('name')}")
+
+          print("render.yaml passes Render's public JSON schema and database-reference checks.")
+          PY
