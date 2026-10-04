@@ -33,7 +33,7 @@
                   'voice-wave--ready': voice.provider === 'livekit' && voice.ready,
                 }"
                 aria-hidden="true"
-                title="LiveKit مجاني"
+                title="LiveKit مفتوح المصدر"
               >
                 <i /><i /><i /><i /><i />
               </span>
