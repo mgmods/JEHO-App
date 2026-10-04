@@ -1,0 +1,31 @@
+name: Render Blueprint validation
+
+on:
+  push:
+    branches: [jeho-own]
+    paths:
+      - "render.yaml"
+      - ".github/workflows/render-blueprint-check.yml"
+  pull_request:
+    branches: [jeho-own]
+    paths:
+      - "render.yaml"
+      - ".github/workflows/render-blueprint-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Render Blueprint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: jeho-own
+      - name: Install Render CLI
+        run: curl -fsSL https://raw.githubusercontent.com/render-oss/cli/main/bin/install.sh | sh
+      - name: Validate render.yaml
+        run: render blueprints validate render.yaml
