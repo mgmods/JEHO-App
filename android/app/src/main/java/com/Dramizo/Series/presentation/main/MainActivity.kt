@@ -135,10 +135,12 @@ class MainActivity : ThemedActivity() {
         applyNavIcons()
         RemoteNavIcons.hydrateFromCache(container)
         applyNavIcons()
+        applyDynamicBottomNavigation()
         container.ioExecutor.execute {
             RemoteNavIcons.refreshBlocking(container)
             runOnUiThread {
                 if (binding == null) return@runOnUiThread
+                applyDynamicBottomNavigation()
                 highlightPage(currentPage)
             }
         }
@@ -454,6 +456,75 @@ class MainActivity : ThemedActivity() {
             AssetIcons.TAB_ME_NORMAL, AssetIcons.TAB_ME_SELECTED,
         )
         clearNavIconTint(b.tabCreateRoom)
+    }
+
+    /**
+     * Dashboard-driven bottom navigation.
+     *
+     * The visual chrome stays native/consistent, while the server controls
+     * label, icon, order, visibility and destination. Unknown/legacy config
+     * safely falls back to the three core tabs.
+     */
+    private fun applyDynamicBottomNavigation() {
+        val b = binding ?: return
+        val cfg = RemoteNavIcons.get() ?: return
+        val entries = listOf(
+            "party" to b.tabPartyWrap,
+            "drama" to b.tabDramaWrap,
+            "games" to b.tabGamesWrap,
+            "chat" to b.tabChatWrap,
+            "me" to b.tabMeWrap,
+        )
+        fun pair(key: String): MiscDtos.NavIconPairDto? = when (key) {
+            "party" -> cfg.party
+            "drama" -> cfg.drama
+            "games" -> cfg.games
+            "chat" -> cfg.chat
+            "me" -> cfg.me
+            else -> null
+        }
+        fun destination(route: String?): Int = when (route?.lowercase()) {
+            "home", "party", "main" -> R.id.nav_home
+            "messages", "chat" -> R.id.nav_messages
+            "profile", "me", "account" -> R.id.nav_profile
+            "drama" -> R.id.nav_drama
+            "games", "game" -> R.id.nav_games
+            else -> R.id.nav_home
+        }
+
+        val visible = entries
+            .map { (key, view) -> Triple(key, view, pair(key)) }
+            .filter { (_, _, p) -> p?.enabled != false }
+            .sortedBy { (_, _, p) -> p?.sortOrder ?: 99 }
+
+        // Keep only configured tabs in the bottom chrome; hidden tabs remain
+        // available through their existing routes if another feature opens them.
+        for ((_, view) in entries) {
+            view.visibility = View.GONE
+            b.customBottomBar.removeView(view)
+        }
+        for ((key, view, p) in visible) {
+            view.visibility = View.VISIBLE
+            b.customBottomBar.addView(view)
+            val label = when {
+                !p?.label.isNullOrBlank() -> p?.label
+                key == "party" -> getString(R.string.tab_party)
+                key == "chat" -> getString(R.string.nav_messages)
+                key == "me" -> getString(R.string.nav_profile)
+                else -> view.contentDescription
+            }
+            when (key) {
+                "party" -> b.labelParty.text = label
+                "drama" -> b.labelDrama.text = label
+                "games" -> b.labelGames.text = label
+                "chat" -> b.labelChat.text = label
+                "me" -> b.labelMe.text = label
+            }
+            val dest = destination(p?.route)
+            view.setOnClickListener { go(dest) }
+            view.findViewById<View>(view.id)?.setOnClickListener { go(dest) }
+        }
+        b.customBottomBar.requestLayout()
     }
 
     private fun clearNavIconTint(icon: ImageView?) {
