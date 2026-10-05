@@ -389,7 +389,11 @@
           </template>
 
           <!-- ECONOMY -->
-          <template v-else-if="settingsTab === 'economy'">
+          <template v-else-if="settingsTab === 'operations'">
+          <OperationalSettingsPanel />
+        </template>
+
+        <template v-else-if="settingsTab === 'economy'">
             <EconomyPanel class="mb-3" />
             <section class="settings-card mb-3">
               <h3 class="settings-card-title">{{ t('settings.economyExplainerTitle') }}</h3>
@@ -631,6 +635,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import EconomyPanel from '@/components/settings/EconomyPanel.vue'
+import OperationalSettingsPanel from '@/components/settings/OperationalSettingsPanel.vue'
 import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue'
 import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
 import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'
@@ -654,6 +659,7 @@ const settingTabs = computed(() => {
   const tabs = [
     { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
+    { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected' },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
     { id: 'splash', label: 'Splash Screen', icon: 'bi-images' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
