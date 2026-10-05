@@ -48,6 +48,7 @@ public class SplashActivity extends ThemedActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
     private long splashDurationMs = SPLASH_FALLBACK_MS;
+    private AppContainer appContainer;
 
     @Override
     protected boolean wantsEdgeToEdgeWallpaper() {
@@ -124,6 +125,11 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
+    private AppContainer getAppContainer() {
+        if (appContainer == null) appContainer = new AppContainer(this);
+        return appContainer;
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
@@ -136,7 +142,7 @@ public class SplashActivity extends ThemedActivity {
 
     private void refreshRemoteSplashFromServer(ActivitySplashBinding binding) {
         try {
-            AppContainer c = ContainerProvider.from(this);
+            AppContainer c = getAppContainer();
             c.getIoExecutor().execute(() -> {
                 try {
                     com.Dramizo.Series.util.RemoteTheme.refreshFromApi(this, c.getConfigApi());
@@ -320,7 +326,7 @@ public class SplashActivity extends ThemedActivity {
 
     private void prepareSession() {
         try {
-            AppContainer c = ContainerProvider.from(this);
+            AppContainer c = getAppContainer();
             c.getIoExecutor().execute(() -> {
                 try {
                     AppFeatures.refresh(c);
@@ -342,7 +348,7 @@ public class SplashActivity extends ThemedActivity {
 
     private boolean tryResumeLoggedInSession() {
         try {
-            AppContainer c = ContainerProvider.from(this);
+            AppContainer c = getAppContainer();
             if (!c.getSessionManager().isLoggedIn()) return false;
             routeLoggedIn(c, c.getSessionManager().getUser());
             refreshSessionInBackground(c);
@@ -355,7 +361,7 @@ public class SplashActivity extends ThemedActivity {
     private void forceLeaveSplash() {
         if (navigated || isFinishing()) return;
         try {
-            AppContainer c = ContainerProvider.from(this);
+            AppContainer c = getAppContainer();
             if (c.getSessionManager().isLoggedIn()) {
                 routeLoggedIn(c, c.getSessionManager().getUser());
             } else {
