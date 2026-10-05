@@ -205,6 +205,33 @@ public class AppContainer {
                             .build();
                     return chain.proceed(req);
                 })
+                // Render's free service can briefly sleep/restart and mobile networks
+                // can drop an idle TCP connection. Retry only safe reads so a transient
+                // disconnect does not blank the app or force the user to retry manually.
+                .addInterceptor(chain -> {
+                    okhttp3.Request request = chain.request();
+                    if (!request.method().equalsIgnoreCase("GET")
+                            && !request.method().equalsIgnoreCase("HEAD")) {
+                        return chain.proceed(request);
+                    }
+                    java.io.IOException last = null;
+                    for (int attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            return chain.proceed(request);
+                        } catch (java.io.IOException error) {
+                            last = error;
+                            if (attempt < 2) {
+                                try {
+                                    Thread.sleep(attempt == 0 ? 350L : 900L);
+                                } catch (InterruptedException interrupted) {
+                                    Thread.currentThread().interrupt();
+                                    throw error;
+                                }
+                            }
+                        }
+                    }
+                    throw last;
+                })
                 .addInterceptor(new AuthInterceptor(sessionManager))
                 .authenticator(new TokenAuthenticator(sessionManager, apiBase))
                 .addInterceptor(logging)
