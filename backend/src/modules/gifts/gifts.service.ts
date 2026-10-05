@@ -1767,6 +1767,10 @@ export class GiftsService implements OnModuleInit {
       luckyCoinsWon = rolled.luckyCoinsWon;
     }
 
+    // Platform margin is already applied to the mint ratio; no second
+    // diamond deduction is applied to the receiver/agency pool.
+    const platformCut = 0;
+
     return this.dataSource.transaction(async (manager) => {
       const wallet = await manager.findOne(Wallet, {
         where: { userId: senderId },
@@ -1810,9 +1814,6 @@ export class GiftsService implements OnModuleInit {
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       const distributableDiamonds = diamondsAwarded;
-      // Platform margin is already applied to the mint ratio above; there is
-      // no second diamond deduction from the receiver/agency pool.
-      const platformCut = 0;
       let agencyId: string | null = null;
       let earningsStream: 'personal' | 'agency' = 'personal';
 
