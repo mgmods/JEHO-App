@@ -86,6 +86,8 @@ async function bootstrap() {
     setHeaders: noStoreHeaders,
   });
 
+  const expressAppEarly = app.getHttpAdapter().getInstance();
+
   // Backward-compatible public upload URL. New uploads are stored in Supabase and the
   // upload service removes the ephemeral local copy, so /uploads/:filename must fall
   // through to Storage instead of returning the local static 404. This also keeps old
@@ -108,7 +110,6 @@ async function bootstrap() {
   });
 
   // BaiShun HTML: inject JEHO host rewrite before static serve (no jieyou/sruner/zkruner).
-  const expressAppEarly = app.getHttpAdapter().getInstance();
   const forceLocalTag =
     '<script src="/games/mikoo/_jeho/jeho-force-local.js"></script>';
   expressAppEarly.use((req: { method?: string; path?: string; url?: string }, res: {
