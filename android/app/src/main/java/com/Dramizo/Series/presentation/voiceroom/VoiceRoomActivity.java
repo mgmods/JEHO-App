@@ -11079,12 +11079,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     // Socket/join blip must NEVER eject — looks like "تم إغلاق التطبيق".
                     // Keep the HTTP/Zego room open and retry quietly.
                     realtimeJoinAttempts++;
-                    boolean quiet = resumedFromActiveSession
-                            || ActiveRoomSession.get().canResumeUi(roomId)
-                            || pendingSession != null;
-                    if (!quiet && (realtimeJoinAttempts <= 1 || realtimeJoinAttempts % 3 == 0)) {
-                        Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
-                    }
+                    // Realtime reconnects are background recovery only. Never interrupt
+                    // the room UI with a repeating "connection slow" toast.
                     long delay = Math.min(12_000L, 1_500L * Math.max(1, realtimeJoinAttempts));
                     scheduleRealtimeJoinRetry(delay);
                 }));
