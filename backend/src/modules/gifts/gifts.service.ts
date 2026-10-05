@@ -1797,7 +1797,7 @@ export class GiftsService implements OnModuleInit {
       //                   ownerPct% commission. BOTH land in wallet.diamonds.
       // No separate platform cut here: platform margin is the gap between the
       // coins the sender paid and the diamonds handed out (taken at mint).
-      let hostDiamonds = diamondsAwarded;
+      let hostDiamonds = distributableDiamonds;
       let agentShare = 0;
       const platformPercent = await this.platformGiftCommissionPercent();
       // Platform commission is a separate dashboard lever applied to the minted diamond pool.
