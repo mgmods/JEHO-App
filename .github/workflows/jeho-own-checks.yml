@@ -22,10 +22,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: npm
@@ -34,6 +34,10 @@ jobs:
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Backend dependency audit
+        working-directory: backend
+        run: npm audit --audit-level=high || true
 
       - name: Backend TypeScript check
         working-directory: backend
@@ -46,6 +50,10 @@ jobs:
       - name: Install dashboard dependencies
         working-directory: backend/dashboard
         run: npm ci
+
+      - name: Dashboard dependency audit
+        working-directory: backend/dashboard
+        run: npm audit --audit-level=high || true
 
       - name: Build dashboard
         working-directory: backend/dashboard
