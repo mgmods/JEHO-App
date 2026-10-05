@@ -913,7 +913,7 @@ function normalizeAppName(raw) {
 function splashAbsUrl(url) {
   const value = String(url || '').trim()
   if (!value) return ''
-  if (/^https?:\\/\\//i.test(value)) return value
+  if (/^https?:\/\//i.test(value)) return value
   return value.startsWith('/') ? value : '/' + value
 }
 
