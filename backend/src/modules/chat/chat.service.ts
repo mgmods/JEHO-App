@@ -665,6 +665,72 @@ export class ChatService {
     return mapped;
   }
 
+  private async refundPaidMessageIfEligible(
+    manager: any,
+    message: ChatMessage,
+    userId: string,
+  ) {
+    if (message.senderId !== userId) return 0;
+
+    const paidTx = await manager.findOne(WalletTransaction, {
+      where: {
+        userId,
+        referenceType: 'paid_message',
+        referenceId: message.id,
+      },
+    });
+    if (!paidTx || Number(paidTx.amount) >= 0) return 0;
+
+    const refundWindowHours = Math.max(
+      0,
+      Number((paidTx.metadata as any)?.refundWindowHours || 0),
+    );
+    if (refundWindowHours <= 0) return 0;
+
+    const createdAt = new Date(message.createdAt).getTime();
+    const ageMs = Date.now() - createdAt;
+    if (ageMs < 0 || ageMs > refundWindowHours * 60 * 60 * 1000) return 0;
+
+    const refundReferenceType = 'paid_message_refund';
+    const existingRefund = await manager.findOne(WalletTransaction, {
+      where: {
+        userId,
+        referenceType: refundReferenceType,
+        referenceId: message.id,
+      },
+    });
+    if (existingRefund) return 0;
+
+    const refundCoins = Math.abs(Number(paidTx.amount));
+    if (!refundCoins) return 0;
+
+    const wallet = await manager.findOne(Wallet, {
+      where: { userId },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!wallet) return 0;
+
+    wallet.coins = Number(wallet.coins || 0) + refundCoins;
+    await manager.save(wallet);
+    await manager.save(
+      manager.create(WalletTransaction, {
+        userId,
+        type: TransactionType.REFUND,
+        currency: CurrencyType.COINS,
+        amount: refundCoins,
+        balanceAfter: Number(wallet.coins),
+        referenceType: refundReferenceType,
+        referenceId: message.id,
+        description: 'استرداد رسالة مدفوعة',
+        metadata: {
+          paidTransactionId: paidTx.id,
+          refundWindowHours,
+        },
+      }),
+    );
+    return refundCoins;
+  }
+
   async unsend(messageId: string, userId: string) {
     const existing = await this.msgRepo.findOne({
       where: { id: messageId },
@@ -685,6 +751,8 @@ export class ChatService {
 
       const msg = await msgRepo.findOne({ where: { id: messageId } });
       if (!msg || msg.isUnsent) return;
+
+      await this.refundPaidMessageIfEligible(em, msg, userId);
 
       msg.isUnsent = true;
       msg.content = null;
