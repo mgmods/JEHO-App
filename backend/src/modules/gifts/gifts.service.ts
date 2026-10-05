@@ -1810,6 +1810,9 @@ export class GiftsService implements OnModuleInit {
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
       const distributableDiamonds = diamondsAwarded;
+      // Platform margin is already applied to the mint ratio above; there is
+      // no second diamond deduction from the receiver/agency pool.
+      const platformCut = 0;
       let agencyId: string | null = null;
       let earningsStream: 'personal' | 'agency' = 'personal';
 
