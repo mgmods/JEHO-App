@@ -46,14 +46,29 @@ export class RedisService implements OnModuleDestroy {
     {
       provide: REDIS_CLIENT,
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => new Redis({
-        host: config.get<string>('app.redis.host') || 'localhost',
-        port: config.get<number>('app.redis.port') || 6379,
-        password: config.get<string>('app.redis.password') || undefined,
-        lazyConnect: true,
-        maxRetriesPerRequest: 1,
-        enableOfflineQueue: false,
-      }),
+      useFactory: (config: ConfigService) => {
+        const client = new Redis({
+          host: config.get<string>('app.redis.host') || 'localhost',
+          port: config.get<number>('app.redis.port') || 6379,
+          password: config.get<string>('app.redis.password') || undefined,
+          lazyConnect: true,
+          maxRetriesPerRequest: 1,
+          enableOfflineQueue: false,
+          retryStrategy: () => null,
+        });
+        // Redis is optional on single-instance deployments. Always consume
+        // connection errors so an unavailable optional Redis never becomes an
+        // unhandled ioredis error in the Nest process.
+        client.on('error', (error) => {
+          const message = error instanceof Error ? error.message : String(error);
+          if (!message.includes('ECONNREFUSED')) {
+            // Keep non-connection Redis errors visible without crashing the app.
+            // eslint-disable-next-line no-console
+            console.warn(`[Redis] ${message}`);
+          }
+        });
+        return client;
+      },
     },
     RedisService,
   ],
