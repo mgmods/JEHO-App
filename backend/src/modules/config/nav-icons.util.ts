@@ -52,6 +52,12 @@ function cleanPair(raw: any): NavIconPair | undefined {
   const selected = cleanUrl(raw.selected ?? raw.on ?? raw.active);
   const icon = cleanUrl(raw.icon ?? raw.url ?? raw.imageUrl);
   const pair: NavIconPair = {};
+  const label = String(raw.label ?? '').trim();
+  const route = String(raw.route ?? '').trim().toLowerCase();
+  if (label) pair.label = label;
+  if (route) pair.route = route;
+  if (raw.enabled !== undefined) pair.enabled = raw.enabled !== false;
+  if (Number.isFinite(Number(raw.sortOrder))) pair.sortOrder = Math.floor(Number(raw.sortOrder));
   if (normal) pair.normal = normal;
   if (selected) pair.selected = selected;
   if (icon) pair.icon = icon;
