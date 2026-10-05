@@ -26,7 +26,11 @@ export class UploadsService {
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
     // Server-only Storage credential. Prefer the explicit service-role variable,
     // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.
-    this.storageKey =\n      process.env.SUPABASE_SECRET_KEY?.trim() ||\n      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||\n      process.env.SUPABASE_STORAGE_KEY?.trim() ||\n      '';
+    this.storageKey =
+      process.env.SUPABASE_SECRET_KEY?.trim() ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+      process.env.SUPABASE_STORAGE_KEY?.trim() ||
+      '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true });
