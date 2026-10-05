@@ -94,3 +94,5 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
+
+# Re-run CI to capture the debug signing SHA-1 for Google OAuth.
