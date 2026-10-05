@@ -10837,7 +10837,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 for (RoomDtos.SeatDto seat : currentSeats) {
                     if (seat == null) continue;
                     String uid = seat.userId != null ? normalizeUserId(seat.userId) : "";
-                    if (!uid.isEmpty()) memberFingerprintBuilder.append('|').append(uid).append(':').append(seat.index);
+                    if (!uid.isEmpty()) memberFingerprintBuilder.append('|').append(uid).append(':').append(seat.seatIndex);
                 }
                 String memberFingerprint = memberFingerprintBuilder.toString();
                 if (Objects.equals(lastRoomMembersFingerprint, memberFingerprint)) return;
