@@ -371,6 +371,7 @@ export class ConfigController {
       },
       backgrounds: {},
       assets: {},
+      splash: { enabled: true, skipEnabled: true, items: [] },
     };
     if (!row?.value) return defaults;
     try {
