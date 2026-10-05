@@ -290,7 +290,8 @@ public class ProfileSetupActivity extends ThemedActivity {
                         binding.btnPickAvatar.setEnabled(true);
                     });
                 } else {
-                    throw new IllegalStateException("فشل رفع الصورة");
+                    throw new IllegalStateException(
+                            UploadApi.errorMessage(response, "فشل رفع الصورة"));
                 }
             } catch (Exception e) {
                 runOnUiThread(() -> {
