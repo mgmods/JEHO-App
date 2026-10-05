@@ -782,6 +782,13 @@ export class WalletService implements OnModuleInit {
 
   async requestWithdraw(userId: string, dto: WithdrawDto) {
     const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
+    const withdrawalMarginPercent = await this.numberSetting(
+      'economy.withdrawal_margin_percent',
+      0,
+      0,
+      100,
+    );
+    const netFiatRate = fiatRate * (1 - withdrawalMarginPercent / 100);
     const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
     const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
@@ -878,7 +885,7 @@ export class WalletService implements OnModuleInit {
       wallet.diamonds = bal - dto.diamonds;
       await manager.save(wallet);
 
-      const amountFiat = Number((dto.diamonds * fiatRate).toFixed(2));
+      const amountFiat = Number((dto.diamonds * netFiatRate).toFixed(2));
       const stream = isAgencySource ? 'agency' : 'personal';
       const agencyKind =
         sourceRaw === 'agency_host' || sourceRaw === 'host'
