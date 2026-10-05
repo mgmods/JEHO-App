@@ -255,9 +255,7 @@ export const uploadsApi = {
     safeRequest(() => {
       const fd = new FormData()
       fd.append('file', file)
-      return api.post('/uploads', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      return api.post('/uploads', fd)
     }),
   remove: (filename) =>
     safeRequest(() => api.delete(`/uploads/${encodeURIComponent(filename)}`)),
