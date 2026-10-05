@@ -40,6 +40,7 @@ public class SplashActivity extends ThemedActivity {
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
+    private final Runnable sessionStart = this::prepareSession;
     private long splashDurationMs = SPLASH_FALLBACK_MS;
 
     @Override
@@ -93,11 +94,48 @@ public class SplashActivity extends ThemedActivity {
             }
 
             if (binding.btnSplashSkip != null) {
-                boolean skipEnabled = remoteTheme != null && remoteTheme.splash != null && remoteTheme.splash.skipEnabled;
+                boolean skipEnabled = remoteTheme == null
+                        || remoteTheme.splash == null
+                        || remoteTheme.splash.skipEnabled;
                 binding.btnSplashSkip.setVisibility(skipEnabled ? android.view.View.VISIBLE : android.view.View.GONE);
                 binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
             }
-            mainHandler.postDelayed(this::prepareSession, splashDurationMs);
+
+            // Fresh installs have no cached theme. Load the dashboard splash before
+            // the timeout so the configured image can actually appear on first launch.
+            final AppContainer splashContainer = ContainerProvider.from(this);
+            splashContainer.getIoExecutor().execute(() -> {
+                try {
+                    com.Dramizo.Series.util.RemoteTheme.refreshFromApi(
+                            this, splashContainer.getConfigApi());
+                    com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto remoteItem =
+                            com.Dramizo.Series.util.RemoteTheme.nextSplash(this);
+                    if (remoteItem == null || remoteItem.url == null || remoteItem.url.trim().isEmpty()) return;
+                    runOnUiThread(() -> {
+                        if (isFinishing() || navigated) return;
+                        splashDurationMs =
+                                com.Dramizo.Series.util.RemoteTheme.splashDurationMs(remoteItem);
+                        applyRemoteSplash(binding, remoteItem);
+                        if (binding.btnSplashSkip != null) {
+                            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto fresh =
+                                    com.Dramizo.Series.util.RemoteTheme.getCached(this);
+                            boolean enabled = fresh == null
+                                    || fresh.splash == null
+                                    || fresh.splash.skipEnabled;
+                            binding.btnSplashSkip.setVisibility(
+                                    enabled ? android.view.View.VISIBLE : android.view.View.GONE);
+                        }
+                        mainHandler.removeCallbacks(sessionStart);
+                        mainHandler.removeCallbacks(hardTimeout);
+                        mainHandler.postDelayed(sessionStart, splashDurationMs);
+                        mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
+                    });
+                } catch (Throwable t) {
+                    Log.w(TAG, "Remote splash refresh skipped", t);
+                }
+            });
+
+            mainHandler.postDelayed(sessionStart, splashDurationMs);
             mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
         } catch (Throwable t) {
             Log.e(TAG, "Splash failed", t);
