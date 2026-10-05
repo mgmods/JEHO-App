@@ -398,7 +398,14 @@ export class ChatService {
     const paidConfig = await this.paidMessageConfig();
     const priorBillableMessages =
       type !== MessageType.GIFT && type !== MessageType.SYSTEM
-        ? await this.msgRepo.count({ where: { conversationId, senderId } })
+        ? await this.msgRepo
+            .createQueryBuilder('m')
+            .where('m.conversationId = :conversationId', { conversationId })
+            .andWhere('m.senderId = :senderId', { senderId })
+            .andWhere('m.type NOT IN (:...excludedTypes)', {
+              excludedTypes: [MessageType.GIFT, MessageType.SYSTEM],
+            })
+            .getCount()
         : 0;
     const isPaidMessage =
       paidConfig.enabled &&
