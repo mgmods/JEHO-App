@@ -5,7 +5,7 @@
 
     <section class="settings-card mb-3">
       <h3 class="settings-card-title mb-1">اقتصاد المنصة والسحب</h3>
-      <p class="form-text mb-3">إعدادات تشغيلية إضافية محفوظة في app_settings. هذه القيم لا تغيّر منطق Economy الحالي تلقائياً.</p>
+      <p class="form-text mb-3">إعدادات تشغيلية إضافية محفوظة في app_settings ومتصلة بمنطق السحب والهدايا والرسائل وOTP.</p>
       <div class="row g-3">
         <div class="col-md-4">
           <label class="form-label">نسبة المنصة (%)</label>
@@ -99,7 +99,7 @@
           </label>
         </div>
       </div>
-      <div class="alert alert-warning mt-3 mb-0 small">تنبيه: هذه المرحلة تضيف لوحة الإعدادات والتخزين. تشغيل إرسال OTP فعلياً يحتاج ربط خدمة Twilio في Backend.</div>
+      <div class="alert alert-info mt-3 mb-0 small">عند تفعيل الخيارين وإكمال بيانات Twilio، يستخدم Backend خدمة Verify لإرسال SMS والتحقق من الرمز. اختبر الإعدادات قبل تفعيلها للإنتاج.</div>
     </section>
 
     <section class="settings-card mb-3">
@@ -150,7 +150,7 @@
           <input v-model.number="form.settlementCycleHours" type="number" min="1" step="1" class="form-control" />
         </div>
       </div>
-      <div class="alert alert-info mt-3 mb-0 small">إعدادات التسوية تُحفظ الآن كإعدادات تشغيلية، وسيتم ربطها بمنطق التسوية الفعلي في خطوة Backend التالية.</div>
+      <div class="alert alert-secondary mt-3 mb-0 small">هذه القيم تحفظ كسياسة تشغيلية للتسوية. لا يوجد حالياً محرك تسوية مستقل في Backend، لذلك تفعيلها لا ينشئ تحويلات مالية تلقائياً.</div>
     </section>
 
     <div class="d-flex justify-content-end gap-2">
