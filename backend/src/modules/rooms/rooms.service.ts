@@ -1626,7 +1626,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return paginate(enriched, total, query.page || 1, query.limit || 20);
   }
 
-  async getRoom(id: string) {
+  async getRoom(id: string, options?: { fast?: boolean }) {
     const room = await this.roomsRepo.findOne({
       where: { id },
       relations: [
@@ -1683,6 +1683,24 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const giftCoins = await this.roomGiftCoinTotals([id]);
+
+    // Room entry is latency-sensitive. The normal room-details path decorates every
+    // seat with multiple cosmetic/ownership queries, which can turn a simple join
+    // into dozens of DB round-trips. For the initial join response, return the same
+    // relational room graph without those optional decorations; the UI can hydrate
+    // cosmetics from the realtime/detail refresh after it is visible.
+    if (options?.fast) {
+      const { passwordHash: _passwordHash, ...safeRoom } = room as any;
+      return {
+        ...safeRoom,
+        seatCount: desiredSeatCount,
+        roomLevel: this.computeRoomLevel(
+          giftCoins.get(id) || 0,
+          room.viewerCount || 0,
+        ),
+      };
+    }
+
     const decorated = await this.decorateRoom(room);
     return {
       ...decorated,
@@ -1832,7 +1850,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       this.notifyRoomUpdated(roomId);
     }
 
-    const full = await this.getRoom(roomId);
+    const full = await this.getRoom(roomId, { fast: true });
     const canPublish =
       full.hostId === userId ||
       full.activeHostId === userId ||
