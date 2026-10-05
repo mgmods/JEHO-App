@@ -24,7 +24,7 @@ export class UploadsService {
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
     const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || '';
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
-    // Server-only Storage credential. Prefer the explicit service-role variable,\n    // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.\n    this.storageKey =\n      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||\n      process.env.SUPABASE_STORAGE_KEY?.trim() ||\n      '';
+    // Server-only Storage credential. Prefer the explicit service-role variable,\n    // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.\n    this.storageKey =\n      process.env.SUPABASE_SECRET_KEY?.trim() ||\n      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||\n      process.env.SUPABASE_STORAGE_KEY?.trim() ||\n      '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true });
@@ -142,7 +142,7 @@ export class UploadsService {
     return { deleted: response.ok };
   }
 
-  private hasAudioSignature(path: string, ext: string) {
+  private async safeResponseText(response: Response): Promise<string> {\n    try {\n      const text = (await response.text()).replace(/\\s+/g, ' ').trim();\n      return text ? text.slice(0, 500) : 'no response body';\n    } catch {\n      return 'no response body';\n    }\n  }\n\n  private hasAudioSignature(path: string, ext: string) {
     try {
       const bytes = readFileSync(path).subarray(0, 16);
       if (ext === '.wav') {
