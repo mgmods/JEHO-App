@@ -686,6 +686,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setClipChildren(false);
         binding.recyclerSeats.setClipToPadding(false);
         binding.recyclerSeats.setNestedScrollingEnabled(false);
+        binding.recyclerSeats.setHasFixedSize(true);
+        binding.recyclerSeats.setItemAnimator(null);
         binding.recyclerSeats.setOverScrollMode(View.OVER_SCROLL_NEVER);
         binding.recyclerSeats.setItemViewCacheSize(16);
         if (binding.recyclerSeats.getParent() instanceof ViewGroup) {
@@ -11699,7 +11701,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
             if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
-            requestRoomRefresh(true);
+            requestRoomRefresh(false);
         } else if ("room:seat_rejected".equals(event)) {
             String rejectedId = memberStr(payload, "userId");
             if (myUserId != null && sameUser(myUserId, rejectedId)) {
@@ -11737,7 +11739,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             appendChatLine("النظام",
                     forced ? "تم إنزال مستخدم من المايك" : "مستخدم نزل من المايك",
                     0, 1);
-            requestRoomRefresh(true);
+            requestRoomRefresh(false);
         } else if ("room:staff_updated".equals(event)
                 || "room:seat_locked".equals(event)
                 || "room:seats_resized".equals(event)
