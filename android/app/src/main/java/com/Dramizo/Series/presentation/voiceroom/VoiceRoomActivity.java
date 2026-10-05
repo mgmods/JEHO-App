@@ -223,6 +223,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private Runnable pendingAudioRouteReapply;
     private boolean hoppingRoom;
     private boolean realtimeJoined;
+    /** Fingerprint of the last realtime member snapshot already rendered. */
+    private String lastRoomMembersFingerprint;
     private boolean realtimeJoinInFlight;
     /** Mikoo-style white chat composer overlay is visible. */
     private boolean roomComposerOpen;
@@ -10813,6 +10815,33 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomMembers(String rid, com.google.gson.JsonArray members) {
                 if (rid == null || roomId == null || !roomId.equals(rid)) return;
+                // Realtime may repeat the same member snapshot several times while the socket
+                // settles. Avoid rebuilding the audience list and rebinding its RecyclerView when
+                // nothing visible actually changed.
+                List<String> memberKeys = new ArrayList<>();
+                if (members != null) {
+                    for (int i = 0; i < members.size(); i++) {
+                        if (!members.get(i).isJsonObject()) continue;
+                        JsonObject member = members.get(i).getAsJsonObject();
+                        String uid = normalizeUserId(memberStr(member, "userId"));
+                        if (uid.isEmpty()) continue;
+                        memberKeys.add(uid);
+                    }
+                }
+                Collections.sort(memberKeys);
+                StringBuilder memberFingerprintBuilder = new StringBuilder();
+                for (String uid : memberKeys) {
+                    memberFingerprintBuilder.append(uid).append(',');
+                }
+                memberFingerprintBuilder.append('|').append(roomHostId).append('|').append(roomCohostId);
+                for (RoomDtos.SeatDto seat : currentSeats) {
+                    if (seat == null) continue;
+                    String uid = seat.userId != null ? normalizeUserId(seat.userId) : "";
+                    if (!uid.isEmpty()) memberFingerprintBuilder.append('|').append(uid).append(':').append(seat.index);
+                }
+                String memberFingerprint = memberFingerprintBuilder.toString();
+                if (Objects.equals(lastRoomMembersFingerprint, memberFingerprint)) return;
+                lastRoomMembersFingerprint = memberFingerprint;
                 handler.post(() -> {
                     roomAudience.clear();
                     roomMembersAll.clear();
