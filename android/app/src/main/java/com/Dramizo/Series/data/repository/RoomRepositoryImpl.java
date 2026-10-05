@@ -48,6 +48,12 @@ public class RoomRepositoryImpl implements RoomRepository {
     }
 
     @Override
+    public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit, String tag, String country) {
+        int safe = Math.max(1, Math.min(100, limit));
+        return ApiCall.execute(api.list(page, safe, tag, country));
+    }
+
+    @Override
     public Result<RoomDtos.JoinRoomResult> create(RoomDtos.CreateRoomRequest request) {
         return ApiCall.execute(api.create(request));
     }
