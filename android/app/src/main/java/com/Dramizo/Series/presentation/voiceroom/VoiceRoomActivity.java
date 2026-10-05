@@ -709,6 +709,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.recyclerRecentJoiners.setAdapter(audienceAdapter);
         binding.recyclerRecentJoiners.setNestedScrollingEnabled(false);
+        binding.recyclerRecentJoiners.setHasFixedSize(true);
+        binding.recyclerRecentJoiners.setItemAnimator(null);
+        binding.recyclerRecentJoiners.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        binding.recyclerRecentJoiners.setItemViewCacheSize(8);
 
         binding.btnClose.setVisibility(View.VISIBLE);
         binding.btnClose.setOnClickListener(v -> confirmExit());
@@ -2098,8 +2102,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     name, text, vipLevel, userLevel, frameUrl, userId, avatarUrl, giftIconUrl,
                     wealthScore, charmScore));
         }
-        // Soft memory safety only (very high); still never auto-wipe mid-session intentionally.
-        while (binding.chatLog.getChildCount() > 800) {
+        // Keep the live chat responsive on mid-range phones. Older lines remain in
+        // RoomChatMemory for the current session, while the view only keeps the
+        // latest visible window mounted.
+        while (binding.chatLog.getChildCount() > 300) {
             binding.chatLog.removeViewAt(0);
         }
         // TikTok-style: always stick to latest comments.
