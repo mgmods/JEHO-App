@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import {
   ChatConversation,
   ConversationType,
@@ -30,6 +30,12 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
+import { Wallet } from '../../database/entities/wallet.entity';
+import {
+  WalletTransaction,
+  TransactionType,
+  CurrencyType,
+} from '../../database/entities/wallet-transaction.entity';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
@@ -51,6 +57,7 @@ export class ChatService {
     private readonly profilesRepo: Repository<UserProfile>,
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
+    private readonly dataSource: DataSource,
     private readonly mediaCleanup: MediaCleanupService,
     private readonly moderation: ContentModerationService,
     @Optional() private readonly realtime?: RealtimeGateway,
@@ -60,6 +67,22 @@ export class ChatService {
 
   private directKey(a: string, b: string) {
     return [a, b].sort().join(':');
+  }
+
+  private async paidMessageConfig() {
+    const [enabledRow, freeRow, priceRow, discountRow, refundRow] = await Promise.all([
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.enabled' } }),
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.free_count' } }),
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.price_coins' } }),
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.discount_percent' } }),
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.refund_window_hours' } }),
+    ]);
+    const enabled = ['true', '1', 'yes', 'on'].includes(String(enabledRow?.value || '').toLowerCase());
+    const freeCount = Math.min(1000, Math.max(0, Math.floor(Number(freeRow?.value) || 0)));
+    const basePrice = Math.min(10_000_000, Math.max(0, Math.floor(Number(priceRow?.value) || 0)));
+    const discountPercent = Math.min(100, Math.max(0, Number(discountRow?.value) || 0));
+    const refundWindowHours = Math.min(168, Math.max(0, Number(refundRow?.value) || 0));
+    return { enabled, freeCount, basePrice, discountPercent, refundWindowHours };
   }
 
   private async isGlobalDmGiftGateEnabled() {
@@ -372,21 +395,70 @@ export class ChatService {
       await this.assertDmGiftGate(conversationId, senderId, type);
     }
 
-    const message = await this.msgRepo.save(
-      this.msgRepo.create({
-        conversationId,
-        senderId,
-        type,
-        content,
-        media,
-        replyToId: dto.replyToId || null,
-        forwardedFromId,
-      }),
-    );
+    const paidConfig = await this.paidMessageConfig();
+    const priorBillableMessages =
+      type !== MessageType.GIFT && type !== MessageType.SYSTEM
+        ? await this.msgRepo.count({ where: { conversationId, senderId } })
+        : 0;
+    const isPaidMessage =
+      paidConfig.enabled &&
+      type !== MessageType.GIFT &&
+      type !== MessageType.SYSTEM &&
+      priorBillableMessages >= paidConfig.freeCount &&
+      paidConfig.basePrice > 0;
+    const paidCoins = isPaidMessage
+      ? Math.max(0, Math.round(paidConfig.basePrice * (1 - paidConfig.discountPercent / 100)))
+      : 0;
 
-    await this.convRepo.update(conversationId, {
-      lastMessageId: message.id,
-      lastMessageAt: message.createdAt,
+    const message = await this.dataSource.transaction(async (manager) => {
+      const saved = await manager.save(
+        manager.create(ChatMessage, {
+          conversationId,
+          senderId,
+          type,
+          content,
+          media,
+          replyToId: dto.replyToId || null,
+          forwardedFromId,
+        }),
+      );
+
+      if (paidCoins > 0) {
+        const wallet = await manager.findOne(Wallet, {
+          where: { userId: senderId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!wallet || Number(wallet.coins || 0) < paidCoins) {
+          throw new BadRequestException('تحتاج إلى ' + paidCoins + ' عملة لإرسال هذه الرسالة المدفوعة');
+        }
+        wallet.coins = Number(wallet.coins || 0) - paidCoins;
+        await manager.save(wallet);
+        await manager.save(
+          manager.create(WalletTransaction, {
+            userId: senderId,
+            type: TransactionType.EXCHANGE,
+            currency: CurrencyType.COINS,
+            amount: -paidCoins,
+            balanceAfter: Number(wallet.coins),
+            referenceType: 'paid_message',
+            referenceId: saved.id,
+            description: 'رسالة مدفوعة',
+            metadata: {
+              conversationId,
+              freeMessagesCount: paidConfig.freeCount,
+              basePriceCoins: paidConfig.basePrice,
+              discountPercent: paidConfig.discountPercent,
+              refundWindowHours: paidConfig.refundWindowHours,
+            },
+          }),
+        );
+      }
+
+      await manager.update(ChatConversation, conversationId, {
+        lastMessageId: saved.id,
+        lastMessageAt: saved.createdAt,
+      });
+      return saved;
     });
 
     const full = await this.msgRepo.findOne({
