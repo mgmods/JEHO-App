@@ -522,7 +522,13 @@ class MainActivity : ThemedActivity() {
             }
             val dest = destination(p?.route)
             view.setOnClickListener { go(dest) }
-            view.findViewById<View>(view.id)?.setOnClickListener { go(dest) }
+            when (key) {
+                "party" -> b.tabParty.setOnClickListener { go(dest) }
+                "drama" -> b.tabDrama.setOnClickListener { go(dest) }
+                "games" -> b.tabGames.setOnClickListener { go(dest) }
+                "chat" -> b.tabChat.setOnClickListener { go(dest) }
+                "me" -> b.tabMe.setOnClickListener { go(dest) }
+            }
         }
         b.customBottomBar.requestLayout()
     }
