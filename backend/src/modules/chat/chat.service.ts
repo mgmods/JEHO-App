@@ -396,28 +396,43 @@ export class ChatService {
     }
 
     const paidConfig = await this.paidMessageConfig();
-    const priorBillableMessages =
-      type !== MessageType.GIFT && type !== MessageType.SYSTEM
-        ? await this.msgRepo
-            .createQueryBuilder('m')
-            .where('m.conversationId = :conversationId', { conversationId })
-            .andWhere('m.senderId = :senderId', { senderId })
-            .andWhere('m.type NOT IN (:...excludedTypes)', {
-              excludedTypes: [MessageType.GIFT, MessageType.SYSTEM],
-            })
-            .getCount()
-        : 0;
-    const isPaidMessage =
-      paidConfig.enabled &&
-      type !== MessageType.GIFT &&
-      type !== MessageType.SYSTEM &&
-      priorBillableMessages >= paidConfig.freeCount &&
-      paidConfig.basePrice > 0;
-    const paidCoins = isPaidMessage
-      ? Math.max(0, Math.round(paidConfig.basePrice * (1 - paidConfig.discountPercent / 100)))
-      : 0;
 
+    // Serialize sends per conversation so concurrent messages cannot both
+    // observe the same free-message quota and bypass the paid-message charge.
     const message = await this.dataSource.transaction(async (manager) => {
+      const conversation = await manager.findOne(ChatConversation, {
+        where: { id: conversationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!conversation) throw new NotFoundException('Conversation not found');
+
+      const priorBillableMessages =
+        type !== MessageType.GIFT && type !== MessageType.SYSTEM
+          ? await manager
+              .getRepository(ChatMessage)
+              .createQueryBuilder('m')
+              .where('m.conversationId = :conversationId', { conversationId })
+              .andWhere('m.senderId = :senderId', { senderId })
+              .andWhere('m.type NOT IN (:...excludedTypes)', {
+                excludedTypes: [MessageType.GIFT, MessageType.SYSTEM],
+              })
+              .getCount()
+          : 0;
+      const isPaidMessage =
+        paidConfig.enabled &&
+        type !== MessageType.GIFT &&
+        type !== MessageType.SYSTEM &&
+        priorBillableMessages >= paidConfig.freeCount &&
+        paidConfig.basePrice > 0;
+      const paidCoins = isPaidMessage
+        ? Math.max(
+            0,
+            Math.round(
+              paidConfig.basePrice * (1 - paidConfig.discountPercent / 100),
+            ),
+          )
+        : 0;
+
       const saved = await manager.save(
         manager.create(ChatMessage, {
           conversationId,
