@@ -173,8 +173,30 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     }
 
     public void submit(List<ChatDtos.MessageDto> data) {
+        // Chat updates are frequent. Avoid clearing/rebinding the whole RecyclerView on
+        // every realtime message; that causes visible flicker and dropped frames while typing.
+        List<ChatDtos.MessageDto> next = data != null ? data : Collections.emptyList();
+        int oldSize = items.size();
+        boolean samePrefix = next.size() >= oldSize;
+        if (samePrefix) {
+            for (int i = 0; i < oldSize; i++) {
+                ChatDtos.MessageDto a = items.get(i);
+                ChatDtos.MessageDto b = next.get(i);
+                String aid = a != null ? a.id : null;
+                String bid = b != null ? b.id : null;
+                if (aid == null ? bid != null : !aid.equals(bid)) {
+                    samePrefix = false;
+                    break;
+                }
+            }
+        }
+        if (samePrefix && next.size() > oldSize) {
+            items.addAll(next.subList(oldSize, next.size()));
+            notifyItemRangeInserted(oldSize, next.size() - oldSize);
+            return;
+        }
         items.clear();
-        if (data != null) items.addAll(data);
+        items.addAll(next);
         notifyDataSetChanged();
     }
 
