@@ -76,6 +76,14 @@ jobs:
             exit 1
           fi
 
+      # Keep one stable debug signing certificate across ephemeral GitHub runners.
+      # Google OAuth Android clients are tied to the package name + signing SHA-1.
+      - name: Restore stable CI debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/.android/debug.keystore
+          key: jeho-own-android-debug-keystore-v1
+
       - name: Create temporary Android debug keystore
         shell: bash
         run: |
@@ -114,4 +122,4 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-# Re-run CI to capture the debug signing SHA-1 for Google OAuth.
+# The stable debug keystore is cached across runs so the Google OAuth SHA-1 does not change.
