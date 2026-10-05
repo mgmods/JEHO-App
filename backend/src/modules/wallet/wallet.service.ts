@@ -1074,6 +1074,12 @@ export class WalletService implements OnModuleInit {
     return this.dataSource.transaction(async (manager) => {
       const day = new Date().toISOString().slice(0, 10);
       const dayPrefix = `game_ad:${day}:`;
+      // Serialize reward claims for the same user/day. Without this lock,
+      // concurrent requests can calculate the same claimIndex and collide
+      // with uq_wallet_tx_user_reference.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `game-ad:${userId}:${day}`,
+      ]);
       const claimedToday = await manager
         .createQueryBuilder(WalletTransaction, 't')
         .where('t.userId = :userId', { userId })
@@ -1137,6 +1143,11 @@ export class WalletService implements OnModuleInit {
       return { credited: false, coins: 0, alreadyClaimed: false, balance: 0 };
     }
     return this.dataSource.transaction(async (manager) => {
+      // Serialize the same user/episode claim so two simultaneous requests
+      // cannot both pass the existence check before the unique insert.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `drama-watch:${userId}:${String(episodeId)}`,
+      ]);
       const existing = await manager.findOne(WalletTransaction, {
         where: {
           userId,
