@@ -65,7 +65,7 @@ public class SplashActivity extends ThemedActivity {
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto remoteTheme =
                     com.Dramizo.Series.util.RemoteTheme.getCached(this);
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto splashItem =
-                    com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this).isEmpty() ? null : com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this).get(0);
+                    resolveSplashItem(remoteTheme);
             splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(splashItem);
             applyRemoteSplash(binding, splashItem);
             if (getWindow() != null) {
@@ -135,7 +135,7 @@ public class SplashActivity extends ThemedActivity {
                 try {
                     com.Dramizo.Series.util.RemoteTheme.refreshFromApi(this, c.getConfigApi());
                     com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto latest =
-                            com.Dramizo.Series.util.RemoteTheme.nextSplash(this);
+                            resolveSplashItem(com.Dramizo.Series.util.RemoteTheme.getCached(this));
                     runOnUiThread(() -> {
                         if (navigated || isFinishing()) return;
                         splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(latest);
@@ -156,6 +156,25 @@ public class SplashActivity extends ThemedActivity {
         } catch (Throwable t) {
             Log.w(TAG, "Remote splash setup skipped", t);
         }
+    }
+
+    /** Prefer dashboard-managed splash items, then fall back to the dashboard brand splash URL. */
+    private com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto resolveSplashItem(
+            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
+        java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto> items =
+                com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this);
+        if (!items.isEmpty()) return items.get(0);
+        if (theme != null && theme.splash != null && theme.splash.enabled
+                && theme.brand != null && theme.brand.splashUrl != null
+                && !theme.brand.splashUrl.trim().isEmpty()) {
+            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
+                    new com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto();
+            fallback.url = theme.brand.splashUrl;
+            fallback.durationSeconds = 5;
+            fallback.active = true;
+            return fallback;
+        }
+        return null;
     }
 
     private void applyRemoteSplash(ActivitySplashBinding binding,
