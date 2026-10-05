@@ -6,6 +6,14 @@
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
 
 export type NavIconPair = {
+  /** Label shown below the tab icon. */
+  label?: string;
+  /** Client route: home | messages | profile | drama | games. */
+  route?: string;
+  /** Whether the tab is visible. */
+  enabled?: boolean;
+  /** Lower values appear first. */
+  sortOrder?: number;
   /** Default / unselected icon URL (png/jpg). */
   normal?: string;
   /** Selected / active icon URL (png/jpg). Falls back to normal. */
@@ -66,11 +74,11 @@ export function defaultNavIconsConfig(
   });
   return {
     version: 1,
-    party: pair('party'),
-    drama: pair('drama'),
-    games: pair('game'),
-    chat: pair('chat'),
-    me: pair('me'),
+    party: { ...pair('party'), label: 'الرئيسية', route: 'home', enabled: true, sortOrder: 1 },
+    drama: { ...pair('drama'), label: 'دراما', route: 'drama', enabled: false, sortOrder: 4 },
+    games: { ...pair('game'), label: 'ألعاب', route: 'games', enabled: false, sortOrder: 5 },
+    chat: { ...pair('chat'), label: 'الرسائل', route: 'messages', enabled: true, sortOrder: 2 },
+    me: { ...pair('me'), label: 'أنا', route: 'profile', enabled: true, sortOrder: 3 },
   };
 }
 
