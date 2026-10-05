@@ -32,6 +32,7 @@ public class LoginActivity extends ThemedActivity {
     private ActivityLoginBinding binding;
     private AuthViewModel viewModel;
     private GoogleSignInClient googleClient;
+    private boolean registerMode = false;
 
     @Override
     protected boolean wantsContentSystemPadding() {
@@ -116,7 +117,11 @@ public class LoginActivity extends ThemedActivity {
             googleClient.signOut().addOnCompleteListener(t ->
                     googleLauncher.launch(googleClient.getSignInIntent()));
         });
-        // Email / create-account / phone / guest stay hidden — Google only.
+
+        // Working backend-backed email/username + password authentication.
+        binding.btnAuthSubmit.setOnClickListener(v -> submitPasswordAuth());
+        binding.btnAuthMode.setOnClickListener(v -> setRegisterMode(!registerMode));
+        setRegisterMode(false);
 
         viewModel.getLoading().observe(this, loading ->
                 binding.progress.setVisibility(Boolean.TRUE.equals(loading) ? View.VISIBLE : View.GONE));
@@ -156,6 +161,59 @@ public class LoginActivity extends ThemedActivity {
             startActivity(next);
             finish();
         });
+    }
+
+    private void setRegisterMode(boolean register) {
+        registerMode = register;
+        binding.emailLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.usernameLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.displayNameLayout.setVisibility(register ? View.VISIBLE : View.GONE);
+        binding.identifierLayout.setVisibility(register ? View.GONE : View.VISIBLE);
+        binding.btnAuthSubmit.setText(register ? R.string.register : R.string.login);
+        binding.btnAuthMode.setText(register ? R.string.login : R.string.create_account);
+        binding.tvLoginHint.setText(register
+                ? R.string.login_google_or_password_hint
+                : R.string.login_google_or_password_hint);
+    }
+
+    private void submitPasswordAuth() {
+        String password = binding.etAuthPassword.getText() == null
+                ? "" : binding.etAuthPassword.getText().toString().trim();
+        if (password.length() < 6) {
+            binding.etAuthPassword.setError(getString(R.string.password_min_length));
+            binding.etAuthPassword.requestFocus();
+            return;
+        }
+        if (!registerMode) {
+            String identifier = binding.etAuthIdentifier.getText() == null
+                    ? "" : binding.etAuthIdentifier.getText().toString().trim();
+            if (identifier.isEmpty()) {
+                binding.etAuthIdentifier.setError(getString(R.string.required_field));
+                binding.etAuthIdentifier.requestFocus();
+                return;
+            }
+            viewModel.login(identifier, password);
+            return;
+        }
+
+        String email = binding.etAuthEmail.getText() == null
+                ? "" : binding.etAuthEmail.getText().toString().trim();
+        String username = binding.etAuthUsername.getText() == null
+                ? "" : binding.etAuthUsername.getText().toString().trim();
+        String displayName = binding.etAuthDisplayName.getText() == null
+                ? "" : binding.etAuthDisplayName.getText().toString().trim();
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            binding.etAuthEmail.setError(getString(R.string.valid_email_required));
+            binding.etAuthEmail.requestFocus();
+            return;
+        }
+        if (username.length() < 3 || !username.matches("[A-Za-z0-9_]{3,48}")) {
+            binding.etAuthUsername.setError(getString(R.string.username_rules));
+            binding.etAuthUsername.requestFocus();
+            return;
+        }
+        if (displayName.isEmpty()) displayName = username;
+        viewModel.register(email, password, username, displayName);
     }
 
     static void copyPendingDeepLink(Intent from, Intent to) {
