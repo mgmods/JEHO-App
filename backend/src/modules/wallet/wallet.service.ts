@@ -772,6 +772,14 @@ export class WalletService implements OnModuleInit {
     return { items: normalized };
   }
 
+  /** Read a boolean withdrawal policy from dashboard settings. Existing installs default to enabled. */
+  private async withdrawalSetting(key: string): Promise<boolean> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    if (!row || row.value == null || row.value === '') return true;
+    const value = String(row.value).trim().toLowerCase();
+    return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+  }
+
   async requestWithdraw(userId: string, dto: WithdrawDto) {
     const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
     const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
@@ -788,6 +796,23 @@ export class WalletService implements OnModuleInit {
       sourceRaw === 'agency' ||
       sourceRaw === 'agency_room' ||
       sourceRaw === 'agency_earnings';
+    // Dashboard controls the withdrawal channels. The general wallet switch
+    // gates all withdrawals; host/agency switches then gate their stream.
+    if (!(await this.withdrawalSetting('withdrawal.wallet_enabled'))) {
+      throw new ForbiddenException('السحب من المحفظة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.agency_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح الوكالة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      !isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.host_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح المضيف معطّل حاليًا من إعدادات المنصة');
+    }
     const stageIdRaw = String(
       (dto.payoutDetails as any)?.stageId ||
         (dto.payoutDetails as any)?.targetStageId ||
