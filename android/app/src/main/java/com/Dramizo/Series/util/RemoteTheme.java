@@ -148,23 +148,29 @@ public final class RemoteTheme {
         return seconds * 1000L;
     }
 
-    /** Brand artwork ships in the APK; remote brand URLs are ignored. */
+    /** Returns the dashboard-configured brand logo, when present. */
     @Nullable
     public static String brandLogoUrl(Context context) {
-        return null;
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.logoUrl)
+                ? theme.brand.logoUrl : null;
     }
 
-    /** Splash artwork ships in the APK; remote splash URLs are ignored. */
+    /** Returns the dashboard-configured brand splash, when present. */
     @Nullable
     public static String brandSplashUrl(Context context) {
-        return null;
+        MiscDtos.ThemeDto theme = getCached(context);
+        return theme != null && theme.brand != null && notEmpty(theme.brand.splashUrl)
+                ? theme.brand.splashUrl : null;
     }
 
-  /** Wallpapers ship in the APK; remote theme URLs are ignored. */
-  @Nullable
-  public static String backgroundUrl(Context context, String screenKey) {
-        return null;
-  }
+    /** Returns a dashboard-configured wallpaper, with the bundled layout as fallback. */
+    @Nullable
+    public static String backgroundUrl(Context context, String screenKey) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null) return null;
+        return backgroundField(theme.backgrounds, screenKey);
+    }
 
     @Nullable
     private static String backgroundField(MiscDtos.ThemeBackgrounds bg, String screenKey) {
@@ -451,10 +457,17 @@ public final class RemoteTheme {
     }
 
     /**
-     * UI icons and wallpapers ship in the APK. Remote theme URLs are ignored.
+     * Apply only explicitly configured server assets. Existing XML drawables remain
+     * the safe fallback when a dashboard asset is absent or fails to load.
      */
     public static void applyMappedAssets(@Nullable View root) {
-        // no-op: keep layout/local drawables
+        if (root == null) return;
+        String logo = brandLogoUrl(root.getContext());
+        if (notEmpty(logo)) {
+            loadMappedUrl(root, "imgLogo", logo);
+            loadMappedUrl(root, "imgAppLogo", logo);
+            loadMappedUrl(root, "imgBrandLogo", logo);
+        }
     }
 
     private static void loadMappedUrl(View root, String idName, @Nullable String url) {
@@ -560,18 +573,27 @@ public final class RemoteTheme {
     }
 
     /**
-     * Keep {@code android:src} from XML layouts. Do not override icons in code —
-     * change drawables under res/drawable* to update UI art.
+     * Load a named dashboard theme asset when configured; otherwise keep the
+     * existing XML drawable untouched.
      */
     public static void loadAsset(ImageView view, String key, int fallbackRes) {
         if (view == null) return;
         view.setVisibility(View.VISIBLE);
-        // XML src is the source of truth.
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, fallbackRes);
+        } else if (view.getDrawable() == null && fallbackRes != 0) {
+            view.setImageResource(fallbackRes);
+        }
     }
 
-    /** Keep XML icon visible — remote theme icons are disabled. */
+    /** Same as loadAsset, but preserves the existing view visibility. */
     public static void loadAssetOrGone(ImageView view, String key) {
-        if (view != null) view.setVisibility(View.VISIBLE);
+        if (view == null) return;
+        String url = assetUrl(view.getContext(), key);
+        if (notEmpty(url)) {
+            loadInto(view, url, 0);
+        }
     }
 
     private static boolean notEmpty(@Nullable String s) {
