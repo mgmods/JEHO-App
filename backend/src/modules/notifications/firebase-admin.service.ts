@@ -37,13 +37,31 @@ export class FirebaseAdminService implements OnModuleInit {
       ].filter(Boolean);
 
       const file = candidates.find((p) => p && fs.existsSync(p));
-      if (!file) {
+      const rawJson = (this.config.get<string>('FIREBASE_SERVICE_ACCOUNT_JSON') ||
+        process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+        '').trim();
+
+      // Render/server deployments can keep the Firebase Admin key as a secret
+      // environment variable instead of mounting a credentials file.
+      let serviceAccount: Record<string, unknown> | null = null;
+      if (rawJson) {
+        try {
+          serviceAccount = JSON.parse(rawJson) as Record<string, unknown>;
+        } catch {
+          this.logger.warn('Firebase service-account JSON is invalid — push disabled');
+          return;
+        }
+      } else if (file) {
+        serviceAccount = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+      }
+
+      if (!serviceAccount) {
         this.logger.warn('Firebase credentials not found — push disabled');
         return;
       }
-      const serviceAccount = JSON.parse(fs.readFileSync(file, 'utf8'));
+
       this.admin.initializeApp({
-        credential: this.admin.credential.cert(serviceAccount),
+        credential: this.admin.credential.cert(serviceAccount as any),
       });
       this.ready = true;
       this.logger.log(`Firebase Admin ready (${serviceAccount.project_id})`);
