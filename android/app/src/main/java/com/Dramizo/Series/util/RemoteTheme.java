@@ -112,6 +112,42 @@ public final class RemoteTheme {
         return notEmpty(value) ? value : null;
     }
 
+    /** Returns active server splash items sorted by dashboard order. */
+    public static java.util.List<MiscDtos.SplashItemDto> activeSplashItems(Context context) {
+        MiscDtos.ThemeDto theme = getCached(context);
+        java.util.ArrayList<MiscDtos.SplashItemDto> out = new java.util.ArrayList<>();
+        if (theme == null || theme.splash == null || !theme.splash.enabled || theme.splash.items == null) return out;
+        for (MiscDtos.SplashItemDto item : theme.splash.items) {
+            if (item == null || !item.active || !notEmpty(item.url)) continue;
+            out.add(item);
+        }
+        java.util.Collections.sort(out, (x, y) -> Integer.compare(x.sortOrder, y.sortOrder));
+        return out;
+    }
+
+    /** Selects the next configured splash once per launcher process start. */
+    public static MiscDtos.SplashItemDto nextSplash(Context context) {
+        java.util.List<MiscDtos.SplashItemDto> items = activeSplashItems(context);
+        if (items.isEmpty()) return null;
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null) return items.get(0);
+            android.content.SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            int index = prefs.getInt("splash_index", 0);
+            int selected = Math.floorMod(index, items.size());
+            prefs.edit().putInt("splash_index", selected + 1).apply();
+            return items.get(selected);
+        } catch (Throwable ignored) {
+            return items.get(0);
+        }
+    }
+
+    public static long splashDurationMs(@Nullable MiscDtos.SplashItemDto item) {
+        if (item == null) return 5000L;
+        int seconds = Math.max(1, Math.min(120, item.durationSeconds));
+        return seconds * 1000L;
+    }
+
     /** Brand artwork ships in the APK; remote brand URLs are ignored. */
     @Nullable
     public static String brandLogoUrl(Context context) {
