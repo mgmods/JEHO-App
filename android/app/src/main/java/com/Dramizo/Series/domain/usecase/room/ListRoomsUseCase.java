@@ -19,4 +19,8 @@ public class ListRoomsUseCase {
     public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> execute(int page, int limit) {
         return repository.list(page, limit);
     }
+
+    public Result<MiscDtos.ListResult<RoomDtos.RoomDto>> execute(int page, int limit, String tag, String country) {
+        return repository.list(page, limit, tag, country);
+    }
 }
