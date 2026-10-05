@@ -92,18 +92,7 @@
                 app:strokeColor="#22FE2C55"
                 app:strokeWidth="1dp" />
         
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnSplashSkip"
-        android:layout_width="wrap_content"
-        android:layout_height="46dp"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="28dp"
-        android:minWidth="104dp"
-        android:text="تخطي"
-        android:textAllCaps="false"
-        android:textColor="@color/text_primary"
-        android:backgroundTint="#CCFFFFFF"
-        android:visibility="gone" />
+
 </FrameLayout>
 
         <TextView
@@ -154,4 +143,17 @@
             android:textColor="@color/text_hint"
             android:textSize="12sp" />
     </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSplashSkip"
+        android:layout_width="wrap_content"
+        android:layout_height="46dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="28dp"
+        android:minWidth="104dp"
+        android:text="تخطي"
+        android:textAllCaps="false"
+        android:textColor="@color/text_primary"
+        android:backgroundTint="#CCFFFFFF"
+        android:visibility="gone" />
 </FrameLayout>
