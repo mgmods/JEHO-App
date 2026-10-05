@@ -30,6 +30,14 @@ export class RedisIoAdapter extends IoAdapter {
     };
     this.pubClient = new Redis(options);
     this.subClient = this.pubClient.duplicate();
+    const onRedisError = (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes('ECONNREFUSED')) {
+        this.logger.warn(`Socket.IO Redis error: ${message}`);
+      }
+    };
+    this.pubClient.on('error', onRedisError);
+    this.subClient.on('error', onRedisError);
     try {
       await Promise.all([this.pubClient.connect(), this.subClient.connect()]);
       this.adapterConstructor = createAdapter(this.pubClient, this.subClient);
