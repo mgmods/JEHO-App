@@ -993,7 +993,7 @@ async function addSplashFiles(event) {
 }
 
 function uploadedFilename(url) {
-  const m = String(url || '').match(/\\/uploads\\/([^/?#]+)$/i)
+  const m = String(url || '').match(/\/uploads\/([^/?#]+)$/i)
   return m ? m[1] : ''
 }
 
