@@ -76,6 +76,25 @@ jobs:
             exit 1
           fi
 
+      - name: Create temporary Android debug keystore
+        shell: bash
+        run: |
+          KEYSTORE="$HOME/.config/.android/debug.keystore"
+          mkdir -p "$(dirname "$KEYSTORE")"
+          if [[ ! -f "$KEYSTORE" ]]; then
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE" \
+              -storepass android \
+              -alias AndroidDebugKey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          test -s "$KEYSTORE"
+          echo "Temporary CI debug keystore is ready."
+
       - name: Print Android signing fingerprints
         working-directory: android
         run: |
