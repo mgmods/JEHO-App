@@ -45,6 +45,17 @@ android {
             abiFilters 'armeabi-v7a', 'arm64-v8a'
         }
     }
+    // Build separate APKs per CPU architecture to reduce each download size.
+    // This preserves app features and both 32-bit and 64-bit device support.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk false
+        }
+    }
+
     signingConfigs {
         release {
             // Prefer project-local keystore (android/app/keystore/Dramizo.jks).
