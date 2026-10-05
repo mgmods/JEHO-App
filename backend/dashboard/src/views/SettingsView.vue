@@ -45,6 +45,72 @@
           <ShamCashPaymentPanel />
         </template>
 
+        <template v-else-if="settingsTab === 'splash'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">Splash Screen ديناميكي</h3>
+            <p class="form-text mb-3">الصور والمدة والترتيب تُحفظ على السيرفر وتُستخدم عند التشغيل القادم بدون تحديث APK.</p>
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label">النظام مفعّل</label>
+                <select v-model="splashForm.enabled" class="form-select">
+                  <option :value="true">مفعّل</option>
+                  <option :value="false">متوقف</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">زر التخطي</label>
+                <select v-model="splashForm.skipEnabled" class="form-select">
+                  <option :value="true">ظاهر</option>
+                  <option :value="false">مخفي</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">إضافة صورة</label>
+                <input type="file" accept="image/*" multiple class="form-control" :disabled="splashUploading" @change="addSplashFiles" />
+              </div>
+            </div>
+
+            <div v-if="!splashItems.length" class="alert alert-info">لا توجد صور Splash مضافة حالياً.</div>
+            <div v-for="(item, idx) in splashItems" :key="item.id || idx" class="border rounded-3 p-3 mb-3">
+              <div class="row g-3 align-items-start">
+                <div class="col-md-4">
+                  <img :src="splashAbsUrl(item.url)" alt="" style="width:100%;max-height:220px;object-fit:contain;background:#fff;border-radius:12px;border:1px solid #e5e7eb" />
+                  <input type="file" accept="image/*" class="form-control form-control-sm mt-2" :disabled="splashUploading" @change="(e) => replaceSplashFile(e, item)" />
+                </div>
+                <div class="col-md-8">
+                  <div class="row g-3">
+                    <div class="col-sm-6">
+                      <label class="form-label">مدة العرض (ثانية)</label>
+                      <input v-model.number="item.durationSeconds" type="number" min="1" max="120" class="form-control" />
+                    </div>
+                    <div class="col-sm-6">
+                      <label class="form-label">الترتيب</label>
+                      <input v-model.number="item.sortOrder" type="number" min="0" class="form-control" />
+                    </div>
+                    <div class="col-sm-6">
+                      <label class="form-label">الحالة</label>
+                      <select v-model="item.active" class="form-select">
+                        <option :value="true">فعّالة</option>
+                        <option :value="false">معطّلة</option>
+                      </select>
+                    </div>
+                    <div class="col-sm-6 d-flex align-items-end">
+                      <button class="btn btn-outline-danger w-100" type="button" @click="removeSplashItem(idx)">حذف الصورة</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-aurora" type="button" :disabled="splashSaving || splashUploading" @click="saveSplash">
+                <span v-if="splashSaving" class="spinner-border spinner-border-sm me-1" /> حفظ إعدادات الـSplash
+              </button>
+              <button class="btn btn-ghost" type="button" :disabled="splashSaving || splashUploading" @click="loadSplash">إعادة تحميل</button>
+            </div>
+          </section>
+        </template>
+
         <template v-else-if="settingsTab === 'zego'">
           <ZegoSettingsPanel />
         </template>
@@ -559,7 +625,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi, authApi, operatorsApi } from '@/api'
+import { settingsApi, authApi, operatorsApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -589,6 +655,7 @@ const settingTabs = computed(() => {
     { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
+    { id: 'splash', label: 'Splash Screen', icon: 'bi-images' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
     { id: 'zego', label: t('settings.tabZego'), icon: 'bi-broadcast-pin' },
@@ -718,6 +785,11 @@ const saving = ref(false)
 const accountSaving = ref(false)
 const error = ref('')
 const success = ref('')
+const splashLoading = ref(false)
+const splashSaving = ref(false)
+const splashUploading = ref(false)
+const splashForm = reactive({ enabled: true, skipEnabled: true })
+const splashItems = ref([])
 
 const accountForm = reactive({
   email: '',
@@ -838,11 +910,174 @@ function normalizeAppName(raw) {
   return name
 }
 
+function splashAbsUrl(url) {
+  const value = String(url || '').trim()
+  if (!value) return ''
+  if (/^https?:\\/\\//i.test(value)) return value
+  return value.startsWith('/') ? value : '/' + value
+}
+
+function parseAppTheme(raw) {
+  if (!raw) return { splash: { enabled: true, skipEnabled: true, items: [] } }
+  try {
+    const parsed = JSON.parse(String(raw))
+    const splash = parsed?.splash || {}
+    const items = Array.isArray(splash.items) ? splash.items : []
+    return {
+      ...parsed,
+      splash: {
+        enabled: splash.enabled !== false,
+        skipEnabled: splash.skipEnabled !== false,
+        items: items.map((item, index) => ({
+          id: String(item?.id || 'splash-' + Date.now() + '-' + index),
+          url: splashAbsUrl(item?.url),
+          durationSeconds: Math.max(1, Math.min(120, Number(item?.durationSeconds) || 5)),
+          active: item?.active !== false,
+          sortOrder: Number.isFinite(Number(item?.sortOrder)) ? Number(item.sortOrder) : index,
+        })).filter((item) => item.url),
+      },
+    }
+  } catch {
+    return { splash: { enabled: true, skipEnabled: true, items: [] } }
+  }
+}
+
+async function loadSplash() {
+  splashLoading.value = true
+  const { data, error: err } = await settingsApi.get()
+  splashLoading.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const raw = data?.settings || data?.data || data || []
+  let value = ''
+  if (Array.isArray(raw)) value = raw.find((x) => x?.key === 'app_theme')?.value || ''
+  else value = raw?.app_theme || ''
+  const theme = parseAppTheme(value)
+  splashForm.enabled = theme.splash.enabled
+  splashForm.skipEnabled = theme.splash.skipEnabled
+  splashItems.value = theme.splash.items
+}
+
+function newSplashItem(url, index) {
+  return {
+    id: 'splash-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    url: splashAbsUrl(url),
+    durationSeconds: 5,
+    active: true,
+    sortOrder: index,
+  }
+}
+
+async function addSplashFiles(event) {
+  const files = Array.from(event?.target?.files || [])
+  if (!files.length) return
+  splashUploading.value = true
+  try {
+    for (const file of files) {
+      const { data, error: err } = await uploadsApi.upload(file)
+      if (err) throw err
+      const url = data?.url || data?.data?.url || ''
+      if (url) splashItems.value.push(newSplashItem(url, splashItems.value.length))
+    }
+    toast().success('تم رفع صور الـSplash')
+  } catch (err) {
+    error.value = err?.message || 'فشل رفع الصورة'
+    toast().danger(error.value)
+  } finally {
+    splashUploading.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
+function uploadedFilename(url) {
+  const m = String(url || '').match(/\\/uploads\\/([^/?#]+)$/i)
+  return m ? m[1] : ''
+}
+
+async function replaceSplashFile(event, item) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  splashUploading.value = true
+  const oldFile = uploadedFilename(item.url)
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw err
+    const url = data?.url || data?.data?.url || ''
+    if (!url) throw new Error('لم يرجع السيرفر رابط الصورة')
+    item.url = splashAbsUrl(url)
+    if (oldFile) await uploadsApi.remove(oldFile)
+    toast().success('تم استبدال الصورة')
+  } catch (err) {
+    error.value = err?.message || 'فشل استبدال الصورة'
+    toast().danger(error.value)
+  } finally {
+    splashUploading.value = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
+async function removeSplashItem(index) {
+  const item = splashItems.value[index]
+  if (!item) return
+  if (!confirm('حذف صورة الـSplash؟')) return
+  splashItems.value.splice(index, 1)
+  const filename = uploadedFilename(item.url)
+  if (filename) await uploadsApi.remove(filename)
+}
+
+async function saveSplash() {
+  if (!auth.can('settings', 'write')) {
+    error.value = t('settings.readOnly')
+    toast().danger(error.value)
+    return
+  }
+  splashSaving.value = true
+  error.value = ''
+  try {
+    const current = await settingsApi.get()
+    const raw = current.data?.settings || current.data?.data || current.data || []
+    let theme = {}
+    let oldValue = ''
+    if (Array.isArray(raw)) oldValue = raw.find((x) => x?.key === 'app_theme')?.value || ''
+    else oldValue = raw?.app_theme || ''
+    try { theme = oldValue ? JSON.parse(String(oldValue)) : {} } catch { theme = {} }
+    theme.version = Math.max(1, Number(theme.version) || 1) + 1
+    theme.updatedAt = new Date().toISOString()
+    theme.splash = {
+      enabled: !!splashForm.enabled,
+      skipEnabled: !!splashForm.skipEnabled,
+      items: splashItems.value
+        .filter((item) => item?.url)
+        .map((item, index) => ({
+          id: String(item.id || 'splash-' + index),
+          url: splashAbsUrl(item.url),
+          durationSeconds: Math.max(1, Math.min(120, Number(item.durationSeconds) || 5)),
+          active: item.active !== false,
+          sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index,
+        }))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }
+    const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(theme) })
+    if (err) throw err
+    success.value = 'تم حفظ إعدادات الـSplash'
+    toast().success(success.value)
+  } catch (err) {
+    error.value = err?.message || 'فشل حفظ إعدادات الـSplash'
+    toast().danger(error.value)
+  } finally {
+    splashSaving.value = false
+  }
+}
+
 function selectTab(id) {
   settingsTab.value = id
   router.replace({ name: 'settings', query: { tab: id } })
   if (id === 'account') fillAccountFromAuth()
   if (id === 'admins') loadOperators()
+  if (id === 'splash') loadSplash()
 }
 
 function syncTabFromRoute() {
@@ -851,6 +1086,7 @@ function syncTabFromRoute() {
   settingsTab.value = allowed.has(raw) ? raw : 'general'
   if (settingsTab.value === 'account') fillAccountFromAuth()
   if (settingsTab.value === 'admins') loadOperators()
+  if (settingsTab.value === 'splash') loadSplash()
 }
 
 watch(() => route.query.tab, syncTabFromRoute)
@@ -956,6 +1192,7 @@ async function load() {
 
 function reloadActive() {
   if (isCoreTab.value) load()
+  else if (settingsTab.value === 'splash') loadSplash()
 }
 
 async function save() {
