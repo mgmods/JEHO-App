@@ -324,8 +324,9 @@ class MainActivity : ThemedActivity() {
         // Bottom tabs are tap-only. Home sub-tabs (حار / دولة / نشاطات) are also tap-only
         // — see HomeFragment.pagerFeed.setUserInputEnabled(false).
         pager.isUserInputEnabled = false
-        // Keep only neighbors warm — avoids freeze on first install.
-        pager.offscreenPageLimit = 1
+        // Keep all primary sections warm so tab switches do not recreate heavy fragments,
+        // rebind lists, or restart image loading.
+        pager.offscreenPageLimit = 4
         pager.adapter = object : FragmentStateAdapter(this) {
             override fun createFragment(position: Int): Fragment = when (position) {
                 1 -> DramaFragment()
