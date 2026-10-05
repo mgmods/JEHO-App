@@ -2,7 +2,7 @@ name: JEHO-OWN Backend and Dashboard Checks
 
 on:
   push:
-    branches: [jeho-own]
+    branches: [jeho-own, jeho-own-working-2026-10-05]
     paths:
       - "backend/**"
       - ".github/workflows/**"
