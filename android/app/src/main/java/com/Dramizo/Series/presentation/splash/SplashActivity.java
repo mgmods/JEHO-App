@@ -15,6 +15,10 @@ import android.view.ViewGroup;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
@@ -184,14 +188,37 @@ public class SplashActivity extends ThemedActivity {
             String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url);
             if (resolved == null || resolved.trim().isEmpty()) return;
             binding.imgSplashRemote.setVisibility(android.view.View.VISIBLE);
+            binding.imgSplashRemote.setImageDrawable(null);
             binding.imgSplashLogo.setVisibility(android.view.View.GONE);
             binding.tvSplashBrand.setVisibility(android.view.View.GONE);
             binding.tvSplashTagline.setVisibility(android.view.View.GONE);
             binding.splashProgress.setVisibility(android.view.View.GONE);
-            Glide.with(this).load(resolved).dontAnimate().centerCrop().into(binding.imgSplashRemote);
+            Glide.with(this).load(resolved).dontAnimate().centerCrop()
+                    .listener(new RequestListener<android.graphics.drawable.Drawable>() {
+                        @Override
+                        public boolean onLoadFailed(GlideException e, Object model, Target<android.graphics.drawable.Drawable> target, boolean isFirstResource) {
+                            runOnUiThread(() -> restoreBundledSplash(binding));
+                            return false;
+                        }
+                        @Override
+                        public boolean onResourceReady(android.graphics.drawable.Drawable resource, Object model, Target<android.graphics.drawable.Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                            return false;
+                        }
+                    })
+                    .into(binding.imgSplashRemote);
         } catch (Throwable ignored) {
             // Bundled splash remains the safe fallback.
         }
+    }
+
+    private void restoreBundledSplash(ActivitySplashBinding binding) {
+        if (binding == null || isFinishing() || navigated) return;
+        binding.imgSplashRemote.setImageDrawable(null);
+        binding.imgSplashRemote.setVisibility(android.view.View.GONE);
+        binding.imgSplashLogo.setVisibility(android.view.View.VISIBLE);
+        binding.tvSplashBrand.setVisibility(android.view.View.VISIBLE);
+        binding.tvSplashTagline.setVisibility(android.view.View.VISIBLE);
+        binding.splashProgress.setVisibility(android.view.View.VISIBLE);
     }
 
     @Override
