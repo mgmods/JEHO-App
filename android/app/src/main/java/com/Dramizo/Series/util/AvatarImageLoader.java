@@ -1,6 +1,8 @@
 package com.Dramizo.Series.util;
 
 import android.content.ContentResolver;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Outline;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -138,21 +140,82 @@ public final class AvatarImageLoader {
      * Build multipart upload preserving GIF/PNG/WebP mime + extension
      * (do not force JPEG — that breaks animated avatars).
      */
+    private static final int MAX_DIMENSION = 2048;
+    private static final int MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
+
     public static MultipartBody.Part multipartFromUri(
             ContentResolver resolver, Uri uri, String baseName) throws Exception {
-        byte[] bytes;
+        if (uri == null) throw new IllegalArgumentException("اختر صورة أولاً");
+
+        String sourceMime = resolver.getType(uri);
+        if (sourceMime != null) sourceMime = sourceMime.toLowerCase(Locale.US);
+
+        boolean animated = sourceMime != null
+                && (sourceMime.contains("gif") || sourceMime.contains("webp"));
+        if (animated) {
+            byte[] bytes;
+            try (InputStream in = resolver.openInputStream(uri)) {
+                if (in == null) throw new IllegalStateException("تعذر قراءة الصورة");
+                bytes = readAll(in);
+            }
+            if (bytes.length > MAX_UPLOAD_BYTES) {
+                throw new IllegalArgumentException("الصورة المتحركة كبيرة جداً (الحد 6MB)");
+            }
+            String mime = sourceMime.contains("gif") ? "image/gif" : "image/webp";
+            String ext = extensionForMime(mime);
+            String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ext;
+            return MultipartBody.Part.createFormData(
+                    "file", name, RequestBody.create(bytes, MediaType.parse(mime)));
+        }
+
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
         try (InputStream in = resolver.openInputStream(uri)) {
-            if (in == null) throw new IllegalStateException("cannot open image");
-            bytes = readAll(in);
+            if (in == null) throw new IllegalArgumentException("تعذر قراءة الصورة");
+            BitmapFactory.decodeStream(in, null, bounds);
         }
-        String mime = resolver.getType(uri);
-        if (mime == null || !mime.toLowerCase(Locale.US).startsWith("image/")) {
-            mime = sniffImageMime(bytes);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw new IllegalArgumentException(
+                    "صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WebP أو GIF");
         }
-        String ext = extensionForMime(mime);
-        String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ext;
-        RequestBody body = RequestBody.create(bytes, MediaType.parse(mime));
-        return MultipartBody.Part.createFormData("file", name, body);
+
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, MAX_DIMENSION);
+        opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        Bitmap bitmap;
+        try (InputStream in = resolver.openInputStream(uri)) {
+            if (in == null) throw new IllegalStateException("تعذر قراءة الصورة");
+            bitmap = BitmapFactory.decodeStream(in, null, opts);
+        }
+        if (bitmap == null) {
+            throw new IllegalArgumentException(
+                    "تعذر تجهيز الصورة. استخدم JPG أو PNG أو WebP أو GIF");
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int quality = 88;
+        boolean wrote = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
+        while (wrote && out.size() > MAX_UPLOAD_BYTES && quality > 65) {
+            out.reset();
+            quality -= 8;
+            wrote = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out);
+        }
+        bitmap.recycle();
+        if (!wrote || out.size() == 0) throw new IllegalStateException("تعذر ضغط الصورة");
+        if (out.size() > MAX_UPLOAD_BYTES) {
+            throw new IllegalArgumentException("الصورة كبيرة جداً بعد الضغط (الحد 6MB)");
+        }
+
+        byte[] bytes = out.toByteArray();
+        String name = (baseName != null && !baseName.isEmpty() ? baseName : "avatar") + ".jpg";
+        return MultipartBody.Part.createFormData(
+                "file", name, RequestBody.create(bytes, MediaType.parse("image/jpeg")));
+    }
+
+    private static int sampleSize(int width, int height, int maxDimension) {
+        int sample = 1;
+        while (width / sample > maxDimension || height / sample > maxDimension) sample *= 2;
+        return Math.max(1, sample);
     }
 
     public static String sniffImageMime(byte[] bytes) {
