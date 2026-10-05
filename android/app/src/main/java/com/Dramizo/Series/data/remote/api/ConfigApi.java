@@ -34,6 +34,9 @@ public interface ConfigApi {
     @GET("config/zego")
     Call<ApiResponse<MiscDtos.ZegoConfigDto>> zego();
 
+    @GET("config/theme")
+    Call<ApiResponse<MiscDtos.ThemeDto>> theme();
+
     @GET("config/support")
     Call<ApiResponse<MiscDtos.SupportConfigDto>> support();
 
