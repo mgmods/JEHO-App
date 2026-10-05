@@ -397,7 +397,7 @@ public class EditProfileActivity extends ThemedActivity {
                 } else {
                     runOnUiThread(() -> {
                         binding.progress.setVisibility(View.GONE);
-                        Toast.makeText(this, "فشل رفع الصورة", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, UploadApi.errorMessage(resp, "فشل رفع الصورة"), Toast.LENGTH_LONG).show();
                     });
                 }
             } catch (Exception e) {
