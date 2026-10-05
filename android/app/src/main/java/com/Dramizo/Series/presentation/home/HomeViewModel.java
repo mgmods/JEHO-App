@@ -43,6 +43,8 @@ public class HomeViewModel extends ViewModel {
     private int roomsPage = 1;
     private boolean roomsHasMore = true;
     private boolean roomsLoadingMore;
+    private volatile String roomTagFilter = "";
+    private volatile String roomCountryFilter = "";
 
     public HomeViewModel(AppContainer c) {
         this.c = c;
@@ -100,6 +102,13 @@ public class HomeViewModel extends ViewModel {
         loadRooms(false, true);
     }
 
+    /** Load the real server room feed for a home category. */
+    public void loadRoomsForCategory(String tag, String country) {
+        roomTagFilter = tag == null ? "" : tag.trim();
+        roomCountryFilter = country == null ? "" : country.trim();
+        loadRooms(false, true);
+    }
+
     /**
      * Quiet poll: refresh Hot order from server (live viewers / gifts move rooms up)
      * while keeping pages beyond 1 in place.
@@ -107,7 +116,7 @@ public class HomeViewModel extends ViewModel {
     public void refreshRoomsQuietly() {
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(1, PAGE_SIZE);
+                    c.listRoomsUseCase.execute(1, PAGE_SIZE, roomTagFilter, roomCountryFilter);
             if (!r.success || r.data == null || r.data.items == null) return;
             List<RoomDtos.RoomDto> pageItems = dedupeRooms(r.data.items);
             List<RoomDtos.RoomDto> cur = rooms.getValue();
@@ -259,7 +268,7 @@ public class HomeViewModel extends ViewModel {
         final int page = reset ? 1 : roomsPage + 1;
         c.getIoExecutor().execute(() -> {
             Result<MiscDtos.ListResult<RoomDtos.RoomDto>> r =
-                    c.listRoomsUseCase.execute(page, PAGE_SIZE);
+                    c.listRoomsUseCase.execute(page, PAGE_SIZE, roomTagFilter, roomCountryFilter);
             roomsLoadingMore = false;
             loadingMore.postValue(false);
             if (!quiet && reset) loading.postValue(false);
