@@ -177,6 +177,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String welcomePostedForRoomId;
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
+    /** True while the user is moving directly from one seat to another. */
+    private boolean seatSwitchPending;
+    private int pendingSeatIndex = -1;
     private String myUserId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -618,6 +621,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 try {
                     if (canHop) {
+                        // A seat hop is one atomic server operation: the API clears the old
+                        // seat and occupies the new one. Keep the local voice state alive while
+                        // the realtime seat_left/seat_taken events arrive out of order.
+                        seatSwitchPending = isOnSeat(currentSeats);
+                        pendingSeatIndex = seat.seatIndex;
                         optimisticTakeSeat(seat.seatIndex);
                         viewModel.takeSeat(roomId, seat.seatIndex);
                     } else {
@@ -11651,6 +11659,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
             }
             if (myUserId != null && sameUser(myUserId, approvedId)) {
+                if ("room:seat_taken".equals(event)) {
+                    // Server confirmed the new seat. Clear the hop guard before refreshing so
+                    // a following seat_left event cannot be interpreted as a forced removal.
+                    seatSwitchPending = false;
+                    pendingSeatIndex = -1;
+                }
                 if ("room:seat_approved".equals(event)) {
                     Toast.makeText(this, R.string.mic_request_approved, Toast.LENGTH_SHORT).show();
                 }
@@ -11677,6 +11691,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && !payload.get("forced").isJsonNull()
                     && payload.get("forced").getAsBoolean();
             if (myUserId != null && sameUser(myUserId, leftId)) {
+                // During a seat hop, leaving the old seat is an intermediate state, not a
+                // real removal. Do not kill the mic or show the "you were lowered" message.
+                if (seatSwitchPending) {
+                    if (pendingSeatIndex >= 0) {
+                        optimisticTakeSeat(pendingSeatIndex);
+                    }
+                    return;
+                }
                 micOn = false;
                 userChoseMute = false;
                 RoomRtcEngine.getInstance().setMicEnabled(false);
