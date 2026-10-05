@@ -12898,7 +12898,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!resp.isSuccessful() || resp.body() == null || !resp.body().success
                         || resp.body().data == null || resp.body().data.url == null
                         || resp.body().data.url.isEmpty()) {
-                    throw new IllegalStateException(getString(R.string.room_photo_upload_failed));
+                    throw new IllegalStateException(
+                            com.Dramizo.Series.data.remote.api.UploadApi.errorMessage(
+                                    resp, getString(R.string.room_photo_upload_failed)));
                 }
                 String url = AssetCatalog.absoluteUrl(resp.body().data.url);
                 runOnUiThread(() -> {
