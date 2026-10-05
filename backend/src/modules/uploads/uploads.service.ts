@@ -117,7 +117,11 @@ export class UploadsService {
         body: readFileSync(storedPath),
       });
       if (!upload.ok) {
-        throw new BadRequestException(`Supabase Storage upload failed (${upload.status})`);
+        const detail = await this.safeResponseText(upload);
+        if (existsSync(storedPath)) unlinkSync(storedPath);
+        throw new BadRequestException(
+          `Supabase Storage upload failed (${upload.status}): ${detail}`,
+        );
       }
       if (existsSync(storedPath)) unlinkSync(storedPath);
     }
@@ -137,12 +141,24 @@ export class UploadsService {
       headers: { apikey: this.storageKey, Authorization: `Bearer ${this.storageKey}` },
     });
     if (!response.ok && response.status !== 404) {
-      throw new BadRequestException(`Supabase Storage delete failed (${response.status})`);
+      const detail = await this.safeResponseText(response);
+      throw new BadRequestException(
+        `Supabase Storage delete failed (${response.status}): ${detail}`,
+      );
     }
     return { deleted: response.ok };
   }
 
-  private async safeResponseText(response: Response): Promise<string> {\n    try {\n      const text = (await response.text()).replace(/\\s+/g, ' ').trim();\n      return text ? text.slice(0, 500) : 'no response body';\n    } catch {\n      return 'no response body';\n    }\n  }\n\n  private hasAudioSignature(path: string, ext: string) {
+  private async safeResponseText(response: Response): Promise<string> {
+    try {
+      const text = (await response.text()).replace(/\s+/g, ' ').trim();
+      return text ? text.slice(0, 500) : 'no response body';
+    } catch {
+      return 'no response body';
+    }
+  }
+
+  private hasAudioSignature(path: string, ext: string) {
     try {
       const bytes = readFileSync(path).subarray(0, 16);
       if (ext === '.wav') {
