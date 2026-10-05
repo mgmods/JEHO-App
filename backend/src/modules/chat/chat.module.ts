@@ -14,6 +14,8 @@ import { TasksModule } from '../tasks/tasks.module';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { Wallet } from '../../database/entities/wallet.entity';
+import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -27,6 +29,8 @@ import { ModerationModule } from '../moderation/moderation.module';
       GiftSend,
       UserProfile,
       AppSetting,
+      Wallet,
+      WalletTransaction,
     ]),
     RealtimeModule,
     NotificationsModule,
