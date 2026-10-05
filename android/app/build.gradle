@@ -38,12 +38,7 @@ android {
         buildConfigField "String", "ZEGO_APP_SIGN", "\"\""
         // Production always uses ApiOrigin. Debug may override via local.properties.
         buildConfigField "String", "API_BASE_URL", "\"${configuredApi}\""
-        ndk {
-            // Real phones: 32-bit + 64-bit ARM.
-            // Play App Bundle (abi split) still delivers only the matching ABI per device.
-            // Universal sideload APK includes both (~larger) so older phones install too.
-            abiFilters 'armeabi-v7a', 'arm64-v8a'
-        }
+        // ABI selection is configured once in android.splits.abi below.
     }
     // Build separate APKs per CPU architecture to reduce each download size.
     // This preserves app features and both 32-bit and 64-bit device support.
