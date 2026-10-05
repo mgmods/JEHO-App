@@ -1,0 +1,126 @@
+name: Android Release Size Audit
+
+on:
+  push:
+    branches: [jeho-own]
+    paths:
+      - ".github/workflows/android-release-size-audit.yml"
+      - "android/app/build.gradle"
+      - "android/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-size-audit:
+    if: ${{ vars.JEHO_OWN_API_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Android project only
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            android/**
+            !android/app/keystore.properties
+            !android/app/keystore/**
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Locate Android SDK tools
+        shell: bash
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          if [[ -z "$SDK_ROOT" || ! -d "$SDK_ROOT/cmdline-tools" ]]; then
+            echo "::error::Android SDK command-line tools were not found."
+            exit 1
+          fi
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo "::error::sdkmanager was not found."
+            exit 1
+          fi
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          echo "$SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+
+      - name: Install Android SDK 36
+        run: |
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Validate API URL
+        env:
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+        shell: bash
+        run: |
+          if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
+            echo "::error::Set JEHO_OWN_API_URL to the HTTPS backend URL ending in /api/v1."
+            exit 1
+          fi
+
+      - name: Create temporary audit signing key
+        shell: bash
+        working-directory: android/app
+        run: |
+          mkdir -p "$RUNNER_TEMP/jeho-release-audit"
+          keytool -genkeypair -noprompt \
+            -keystore "$RUNNER_TEMP/jeho-release-audit/audit.jks" \
+            -storepass audit-only-password \
+            -alias dramizo \
+            -keypass audit-only-password \
+            -keyalg RSA -keysize 2048 -validity 2 \
+            -dname "CN=JEHO Release Size Audit, O=Temporary CI, C=US"
+          cat > keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/jeho-release-audit/audit.jks
+          storePassword=audit-only-password
+          keyAlias=dramizo
+          keyPassword=audit-only-password
+          EOF
+          echo "::notice::Temporary key is only for measuring a release build. Do not distribute this APK."
+
+      - name: Build release APKs for size measurement only
+        working-directory: android
+        env:
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+        run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleRelease
+
+      - name: Report APK sizes
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(android/app/build/outputs/apk/release/*.apk)
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No release APKs were produced."
+            exit 1
+          fi
+          {
+            echo "## Release size audit (temporary signing key; do not distribute)"
+            echo
+            echo "| APK | Size (MiB) |"
+            echo "|---|---:|"
+            for f in "${files[@]}"; do
+              size=$(stat -c '%s' "$f")
+              mib=$(awk -v n="$size" 'BEGIN { printf "%.2f", n/1048576 }')
+              echo "| $(basename "$f") | $mib |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+          du -h "${files[@]}"
+
+      - name: Upload release size audit APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: JEHO-App-release-size-audit-NOT-FOR-DISTRIBUTION
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 3
