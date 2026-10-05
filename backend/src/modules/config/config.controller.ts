@@ -382,7 +382,7 @@ export class ConfigController {
       const cacheBust = encodeURIComponent(String(version) + '-' + String(updatedAt));
       const bust = (value: unknown) => {
         const url = String(value || '').trim();
-        if (!url || !/^https?:\/\//i.test(url) && !url.startsWith('/')) return value;
+        const isHttpUrl = /^https?:\/\//i.test(url);\n        const isRelativeUrl = url.startsWith('/');\n        if (!url || (!isHttpUrl && !isRelativeUrl)) return value;
         return url + (url.includes('?') ? '&' : '?') + 'v=' + cacheBust;
       };
       const next = {
