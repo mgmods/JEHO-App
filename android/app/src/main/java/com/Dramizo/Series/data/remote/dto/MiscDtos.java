@@ -392,6 +392,7 @@ public final class MiscDtos {
         @SerializedName("colors") public ThemeColors colors;
         @SerializedName("backgrounds") public ThemeBackgrounds backgrounds;
         @SerializedName("assets") public Map<String, String> assets;
+        @SerializedName("splash") public SplashConfigDto splash;
 
         public static ThemeDto defaults() {
             ThemeDto t = new ThemeDto();
@@ -412,8 +413,24 @@ public final class MiscDtos {
             t.backgrounds = new ThemeBackgrounds();
             // Empty — wallpapers/icons ship inside the APK.
             t.assets = new java.util.HashMap<>();
+            t.splash = new SplashConfigDto();
+            t.splash.items = new java.util.ArrayList<>();
             return t;
         }
+    }
+
+    public static class SplashConfigDto {
+        @SerializedName("enabled") public boolean enabled = true;
+        @SerializedName("skipEnabled") public boolean skipEnabled = true;
+        @SerializedName("items") public List<SplashItemDto> items;
+    }
+
+    public static class SplashItemDto {
+        @SerializedName("id") public String id;
+        @SerializedName("url") public String url;
+        @SerializedName("durationSeconds") public int durationSeconds = 5;
+        @SerializedName("active") public boolean active = true;
+        @SerializedName("sortOrder") public int sortOrder = 0;
     }
 
     public static class ThemeBrand {
