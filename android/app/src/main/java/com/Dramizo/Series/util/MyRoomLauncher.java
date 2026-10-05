@@ -36,11 +36,6 @@ public final class MyRoomLauncher {
             Toast.makeText(activity, "أكمل اسمك في الملف الشخصي أولاً", Toast.LENGTH_LONG).show();
             return;
         }
-        if (avatar == null || avatar.trim().isEmpty()) {
-            Toast.makeText(activity, "أضف صورة شخصية أولاً", Toast.LENGTH_LONG).show();
-            return;
-        }
-
         c.getIoExecutor().execute(() -> {
             // Prefer existing PERSONAL owned room — never open agency room from "My room".
             Result<com.Dramizo.Series.data.remote.dto.MiscDtos.ListResult<RoomDtos.RoomDto>> listed =
