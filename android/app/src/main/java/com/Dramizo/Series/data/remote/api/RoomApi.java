@@ -31,6 +31,13 @@ public interface RoomApi {
     @GET("rooms")
     Call<ApiResponse<MiscDtos.ListResult<RoomDtos.RoomDto>>> list(
             @Query("page") int page,
+            @Query("limit") int limit,
+            @Query("tag") String tag,
+            @Query("country") String country);
+
+    @GET("rooms")
+    Call<ApiResponse<MiscDtos.ListResult<RoomDtos.RoomDto>>> list(
+            @Query("page") int page,
             @Query("search") String search);
 
     @GET("rooms")
