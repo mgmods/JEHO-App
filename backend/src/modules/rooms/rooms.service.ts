@@ -673,10 +673,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (!displayName) {
       throw new BadRequestException('Profile name is required before opening a room');
     }
-    const hostAvatar = (host.avatarUrl || '').trim();
-    if (!hostAvatar) {
-      throw new BadRequestException('Profile photo is required before opening a room');
-    }
 
     const membership = await this.agencyMembersRepo.findOne({
       where: {
