@@ -36,6 +36,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.util.ErrorToasts;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.util.RoomOpenChooser;
 import com.Dramizo.Series.presentation.offers.OffersBottomSheet;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.presentation.vip.VipActivity;
@@ -187,10 +188,11 @@ public class HomeFragment extends Fragment {
         onLogicalTabSelected(activeTab);
         // Home header icons from assets/icons by original file name.
         AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
-        AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
+        binding.imgFilterIcon.setImageResource(R.drawable.icon_voice_room);
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
-        binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
+        binding.btnFilter.setOnClickListener(v -> RoomOpenChooser.open(requireActivity()));
+        binding.btnFilter.setContentDescription(getString(R.string.voice_room));
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
         View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
