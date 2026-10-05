@@ -347,6 +347,47 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('theme')
+  @ApiOperation({ summary: 'Remote app theme/assets managed from server settings' })
+  async theme() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'app_theme' } });
+    const defaults = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      brand: {
+        appName: 'JEHO CHAT',
+        logoUrl: '',
+        splashUrl: '',
+        faviconUrl: '',
+      },
+      colors: {
+        primary: '#FE2C55',
+        secondary: '#22D3EE',
+        background: '#FFFFFF',
+        surface: '#FFFFFF',
+        onPrimary: '#FFFFFF',
+        danger: '#F0435B',
+        gold: '#F5C542',
+      },
+      backgrounds: {},
+      assets: {},
+    };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      if (!parsed || typeof parsed !== 'object') return defaults;
+      return {
+        ...defaults,
+        ...parsed,
+        version: Number(parsed.version) || defaults.version,
+        updatedAt: parsed.updatedAt || new Date().toISOString(),
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  @Public()
   @Get('support')
   @ApiOperation({ summary: 'Customer support channels for the app (managed from dashboard)' })
   async support() {
