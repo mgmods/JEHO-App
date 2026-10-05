@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import com.bumptech.glide.Glide;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
@@ -32,15 +33,14 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends ThemedActivity {
     private static final String TAG = "SplashActivity";
-    /** Keep splash short — never wait on network gates. */
-    private static final long SPLASH_MIN_MS = 350L;
-    private static final long SPLASH_MAX_MS = 1800L;
+    private static final long SPLASH_FALLBACK_MS = 5000L;
 
     private boolean navigated;
     private String pendingRoomId;
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
+    private long splashDurationMs = SPLASH_FALLBACK_MS;
 
     @Override
     protected boolean wantsEdgeToEdgeWallpaper() {
@@ -59,14 +59,22 @@ public class SplashActivity extends ThemedActivity {
             EdgeToEdgeHelper.apply(this);
             EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
             EdgeToEdgeHelper.padBottom(binding.splashContent);
+            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto remoteTheme =
+                    com.Dramizo.Series.util.RemoteTheme.getCached(this);
+            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto splashItem =
+                    com.Dramizo.Series.util.RemoteTheme.nextSplash(this);
+            splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(splashItem);
+            applyRemoteSplash(binding, splashItem);
             if (getWindow() != null) {
                 getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
                 getWindow().setNavigationBarColor(
                         androidx.core.content.ContextCompat.getColor(this, R.color.bg_light));
             }
 
-            android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, SPLASH_MIN_MS);
-            binding.imgSplashLogo.startAnimation(logoIn);
+            if (splashItem == null) {
+                android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, 500L);
+                binding.imgSplashLogo.startAnimation(logoIn);
+            }
 
             // Stagger brand text + tagline for a calmer premiere.
             if (binding.tvSplashBrand != null) {
@@ -84,11 +92,33 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
-            mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
-            mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
+            if (binding.btnSplashSkip != null) {
+                boolean skipEnabled = remoteTheme != null && remoteTheme.splash != null && remoteTheme.splash.skipEnabled;
+                binding.btnSplashSkip.setVisibility(skipEnabled ? android.view.View.VISIBLE : android.view.View.GONE);
+                binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
+            }
+            mainHandler.postDelayed(this::prepareSession, splashDurationMs);
+            mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
         } catch (Throwable t) {
             Log.e(TAG, "Splash failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
+        }
+    }
+
+    private void applyRemoteSplash(ActivitySplashBinding binding,
+            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item) {
+        if (binding == null || item == null || item.url == null || item.url.trim().isEmpty()) return;
+        try {
+            String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url);
+            if (resolved == null || resolved.trim().isEmpty()) return;
+            binding.imgSplashRemote.setVisibility(android.view.View.VISIBLE);
+            binding.imgSplashLogo.setVisibility(android.view.View.GONE);
+            binding.tvSplashBrand.setVisibility(android.view.View.GONE);
+            binding.tvSplashTagline.setVisibility(android.view.View.GONE);
+            binding.splashProgress.setVisibility(android.view.View.GONE);
+            Glide.with(this).load(resolved).dontAnimate().fitCenter().into(binding.imgSplashRemote);
+        } catch (Throwable ignored) {
+            // Bundled splash remains the safe fallback.
         }
     }
 
