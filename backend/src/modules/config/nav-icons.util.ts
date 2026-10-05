@@ -109,6 +109,11 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
   for (const key of NAV_TAB_KEYS) {
     const pair = cleanPair(src[key]);
     if (pair && (pair.normal || pair.selected || pair.icon)) {
+      const fallback = (defaults as any)[key] || {};
+      (pair as any).label = pair.label || fallback.label || '';
+      (pair as any).route = pair.route || fallback.route || '';
+      if (pair.enabled === undefined) (pair as any).enabled = fallback.enabled !== false;
+      if (pair.sortOrder === undefined) (pair as any).sortOrder = fallback.sortOrder || 99;
       (out as any)[key] = pair;
     } else {
       (out as any)[key] = (defaults as any)[key] || {};
