@@ -1553,8 +1553,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const tag = (query.tag || '').trim().toLowerCase();
     if (tag) {
       qb.andWhere(
-        ':tag = ANY(string_to_array(LOWER(COALESCE(room.tags, '')), ','))',
-        { tag },
+        '        'LOWER(room.tags) LIKE :tagLike',
+        { tagLike: `%${tag}%` },
       );
     }
     const country = (query.country || '').trim();
