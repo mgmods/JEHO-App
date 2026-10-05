@@ -11,6 +11,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 import { MikooGatewayService } from './modules/games/mikoo-gateway/mikoo-gateway.service';
+import { UploadsService } from './modules/uploads/uploads.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -83,6 +84,27 @@ async function bootstrap() {
     etag: false,
     lastModified: false,
     setHeaders: noStoreHeaders,
+  });
+
+  // Backward-compatible public upload URL. New uploads are stored in Supabase and the
+  // upload service removes the ephemeral local copy, so /uploads/:filename must fall
+  // through to Storage instead of returning the local static 404. This also keeps old
+  // profile/room/splash URLs working without requiring an APK update.
+  const uploadsService = app.get(UploadsService);
+  expressAppEarly.get('/uploads/:filename', async (req: { params: { filename?: string } }, res: {
+    setHeader: (k: string, v: string) => void;
+    status: (n: number) => { send: (body: string | Buffer) => void };
+  }) => {
+    try {
+      const filename = String(req.params?.filename || '');
+      const stored = await uploadsService.getStoredFile(filename);
+      if (!stored) return res.status(404).send('File not found');
+      res.setHeader('Content-Type', stored.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.status(200).send(stored.buffer);
+    } catch {
+      return res.status(502).send('Storage unavailable');
+    }
   });
 
   // BaiShun HTML: inject JEHO host rewrite before static serve (no jieyou/sruner/zkruner).
