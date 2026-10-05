@@ -428,6 +428,17 @@
             </section>
 
             <section class="settings-card">
+              <h3 class="settings-card-title">دعم النفس وإرسال الهدية للنفس</h3>
+              <label class="settings-switch">
+                <div>
+                  <div class="settings-switch-title">السماح للمستخدم بدعم نفسه</div>
+                  <div class="settings-switch-hint">عند التفعيل يستطيع المستخدم إرسال هدية إلى حسابه. عند الإيقاف يتم منع دعم النفس من السيرفر.</div>
+                </div>
+                <input v-model="form.selfGiftAllowed" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+            </section>
+
+            <section class="settings-card">
               <h3 class="settings-card-title">{{ t('settings.roomEconomy') }}</h3>
               <div class="row g-3">
                 <div class="col-md-4">
@@ -876,6 +887,7 @@ const form = reactive({
   supporterMinCoins: 10000,
   legendaryMinCoins: 50000,
   gameWinRewardCoins: 100,
+  selfGiftAllowed: false,
   luckyBoxEnabled: true,
   femaleOnlyVoiceHosts: false,
   genderVerificationAutoAccept: true,
@@ -1149,6 +1161,10 @@ async function load() {
       map['games.win_reward_coins'] ?? map['game.win_reward_coins'] ?? map.gameWinRewardCoins,
       form.gameWinRewardCoins,
     ),
+    selfGiftAllowed: !bool(
+      map['economy.self_gift_blocked'],
+      !form.selfGiftAllowed,
+    ),
     luckyBoxEnabled: bool(map['lucky_box.enabled'] ?? map.luckyBoxEnabled, form.luckyBoxEnabled),
     femaleOnlyVoiceHosts: bool(
       map['features.female_only_voice_hosts'] ?? map.femaleOnlyVoiceHosts,
@@ -1228,6 +1244,7 @@ async function save() {
     'room.supporter_min_coins': String(form.supporterMinCoins ?? 10000),
     'room.legendary_min_coins': String(form.legendaryMinCoins ?? 50000),
     'games.win_reward_coins': String(form.gameWinRewardCoins ?? 100),
+    'economy.self_gift_blocked': String(!form.selfGiftAllowed),
     'lucky_box.enabled': String(!!form.luckyBoxEnabled),
     'features.female_only_voice_hosts': String(!!form.femaleOnlyVoiceHosts),
     'gender_verification.auto_accept': String(!!form.genderVerificationAutoAccept),
