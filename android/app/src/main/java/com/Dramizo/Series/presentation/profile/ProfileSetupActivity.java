@@ -132,9 +132,9 @@ public class ProfileSetupActivity extends ThemedActivity {
 
     public static boolean isProfileComplete(AuthDtos.UserDto user) {
         if (user == null || user.isGuest) return true;
-        // Returning users with a photo already onboarded — do not force setup after re-login.
-        if (nonEmpty(user.avatarUrl)) return true;
-        // Brand-new accounts without photo still need gender + country once.
+        // Profile photos are optional. Do not force a personal photo just to
+        // finish onboarding or to open a voice room; the backend supplies a
+        // neutral/default avatar when avatarUrl is empty.
         return nonEmpty(user.country)
                 && nonEmpty(user.gender)
                 && !"unspecified".equalsIgnoreCase(user.gender);
