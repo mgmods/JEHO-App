@@ -146,7 +146,7 @@ export class AuthService implements OnModuleInit {
     return ['true', '1', 'yes', 'on'].includes(enabled) && ['true', '1', 'yes', 'on'].includes(otp);
   }
 
-  private normalizeOtpPhone(phone: string): string {
+  private async normalizeOtpPhone(phone: string): Promise<string> {
     const raw = String(phone || '').trim();
     if (raw.startsWith('+')) return raw.replace(/[^+\\d]/g, '');
     const country = String(this.configService.get('app.defaultCountryCode') || '').trim().replace(/[^\\d]/g, '');
@@ -182,7 +182,7 @@ export class AuthService implements OnModuleInit {
   }
 
   async sendOtp(dto: SendOtpDto) {
-    const phone = this.normalizeOtpPhone(dto.phone);
+    const phone = await this.normalizeOtpPhone(dto.phone);
     if (await this.twilioOtpEnabled()) {
       await this.twilioRequest('/Verifications', { To: phone, Channel: 'sms' });
       return { sent: true, expiresIn: 600, provider: 'twilio' };
@@ -213,7 +213,7 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const phone = this.normalizeOtpPhone(dto.phone);
+    const phone = await this.normalizeOtpPhone(dto.phone);
     if (await this.twilioOtpEnabled()) {
       const result = await this.twilioRequest('/VerificationCheck', {
         To: phone,
