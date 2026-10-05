@@ -1437,8 +1437,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomJoinLoadingDismissed) return;
         if (roomJoinLoading != null && roomJoinLoading.isShowing()) return;
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
-        // Longer on weak networks — user should see loading, not a sudden eject.
-        handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
+        // Never keep a full-screen loading dialog over the room. The room UI
+        // must become usable immediately while HTTP/RTC finishes in background.
+        handler.postDelayed(this::dismissRoomJoinLoading, 900L);
     }
 
     private void ensureMusicUiReady() {
