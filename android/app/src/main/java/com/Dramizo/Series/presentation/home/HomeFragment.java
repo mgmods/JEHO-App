@@ -694,13 +694,13 @@ public class HomeFragment extends Fragment {
             binding.homeActBanners.getRoot().setVisibility(
                     tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
         }
-        // Country filter: always available as Hot filter; long-press or filter icon.
-        // Country tab itself opens the picker (see selectLogicalTab).
+        // The top-left action is always the existing room launcher.
+        // Country filtering is now handled by the home category chips.
         if (binding.btnFilter != null) {
-            binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
+            binding.btnFilter.setVisibility(View.VISIBLE);
         }
         if (binding.imgFilterIcon != null) {
-            AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
+            binding.imgFilterIcon.setImageResource(R.drawable.icon_voice_room);
         }
         refreshLocationTabChrome();
     }
