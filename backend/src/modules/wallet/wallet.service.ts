@@ -789,7 +789,13 @@ export class WalletService implements OnModuleInit {
       100,
     );
     const netFiatRate = fiatRate * (1 - withdrawalMarginPercent / 100);
-    const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
+    const configuredMinWithdraw = await this.numberSetting(
+      'economy.min_withdraw_diamonds',
+      Number(ECONOMY.minWithdrawDiamonds || 200000),
+      1,
+      1_000_000_000,
+    );
+    const minWithdraw = Math.floor(configuredMinWithdraw);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
     const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
 
