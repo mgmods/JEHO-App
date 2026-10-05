@@ -32,6 +32,17 @@ export class UploadsService {
       process.env.SUPABASE_STORAGE_KEY?.trim() ||
       '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
+    const keySource =
+      process.env.SUPABASE_SECRET_KEY?.trim()
+        ? 'secret'
+        : process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+          ? 'service_role'
+          : process.env.SUPABASE_STORAGE_KEY?.trim()
+            ? 'storage_key'
+            : 'missing';
+    console.log(
+      `[Uploads] Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; bucket=${this.storageBucket}; key=${keySource}`,
+    );
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true });
     }
@@ -116,13 +127,27 @@ export class UploadsService {
         apikey: this.storageKey,
         Authorization: 'Bearer ' + this.storageKey,
         'Content-Type': file.mimetype || 'application/octet-stream',
+        'Content-Length': String(file.size || 0),
+        'Cache-Control': '3600',
         'x-upsert': 'true',
       };
+      const fileBuffer = readFileSync(storedPath);
       let upload = await fetch(this.storageObjectUrl(storedName), {
         method: 'POST',
         headers: uploadHeaders,
-        body: readFileSync(storedPath),
+        body: fileBuffer,
       });
+
+      // Supabase accepts POST for standard uploads. Some Storage gateway
+      // versions are stricter about overwrite requests, so retry once with
+      // PUT before treating a 400/409 as a failed upload.
+      if (!upload.ok && (upload.status === 400 || upload.status === 409)) {
+        upload = await fetch(this.storageObjectUrl(storedName), {
+          method: 'PUT',
+          headers: uploadHeaders,
+          body: fileBuffer,
+        });
+      }
 
       // A fresh deployment may not have the configured bucket yet. Create it
       // once and retry instead of making profile/room image uploads fail.
@@ -131,7 +156,7 @@ export class UploadsService {
         upload = await fetch(this.storageObjectUrl(storedName), {
           method: 'POST',
           headers: uploadHeaders,
-          body: readFileSync(storedPath),
+          body: fileBuffer,
         });
       }
 
@@ -149,8 +174,12 @@ export class UploadsService {
       filename: storedName,
       mimeType: file.mimetype,
       size: file.size,
-      url: this.buildPublicPath(storedName),
-      path: this.storageEnabled() ? this.buildPublicPath(storedName) : storedPath,
+      url: this.storageEnabled()
+        ? `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(storedName)}`
+        : this.buildPublicPath(storedName),
+      path: this.storageEnabled()
+        ? `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(storedName)}`
+        : storedPath,
     };
   }
 
