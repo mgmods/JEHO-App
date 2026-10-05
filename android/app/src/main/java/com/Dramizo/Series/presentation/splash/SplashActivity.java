@@ -1,4 +1,5 @@
 package com.Dramizo.Series.presentation.splash;
+
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
@@ -28,7 +29,6 @@ import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.auth.LoginActivity;
-import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
@@ -66,12 +66,14 @@ public class SplashActivity extends ThemedActivity {
             EdgeToEdgeHelper.apply(this);
             EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
             EdgeToEdgeHelper.padBottom(binding.splashContent);
+
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto remoteTheme =
                     com.Dramizo.Series.util.RemoteTheme.getCached(this);
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto splashItem =
                     resolveSplashItem(remoteTheme);
             splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(splashItem);
             applyRemoteSplash(binding, splashItem);
+
             if (getWindow() != null) {
                 getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
                 getWindow().setNavigationBarColor(
@@ -83,7 +85,6 @@ public class SplashActivity extends ThemedActivity {
                 binding.imgSplashLogo.startAnimation(logoIn);
             }
 
-            // Stagger brand text + tagline for a calmer premiere.
             if (binding.tvSplashBrand != null) {
                 AlphaAnimation brandFade = new AlphaAnimation(0f, 1f);
                 brandFade.setDuration(420L);
@@ -99,9 +100,9 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
+            // Skip is always available and is positioned below the Android status bar.
             if (binding.btnSplashSkip != null) {
-                boolean skipEnabled = remoteTheme != null && remoteTheme.splash != null && remoteTheme.splash.skipEnabled;
-                binding.btnSplashSkip.setVisibility(skipEnabled ? android.view.View.VISIBLE : android.view.View.GONE);
+                binding.btnSplashSkip.setVisibility(android.view.View.VISIBLE);
                 binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
                 ViewCompat.setOnApplyWindowInsetsListener(binding.btnSplashSkip, (view, insets) -> {
                     androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
@@ -114,6 +115,7 @@ public class SplashActivity extends ThemedActivity {
                 });
                 ViewCompat.requestApplyInsets(binding.btnSplashSkip);
             }
+
             scheduleSplashNavigation();
             refreshRemoteSplashFromServer(binding);
         } catch (Throwable t) {
@@ -144,12 +146,9 @@ public class SplashActivity extends ThemedActivity {
                         if (navigated || isFinishing()) return;
                         splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(latest);
                         applyRemoteSplash(binding, latest);
-                        com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto latestTheme =
-                                com.Dramizo.Series.util.RemoteTheme.getCached(this);
                         if (binding.btnSplashSkip != null) {
-                            boolean enabled = latestTheme != null && latestTheme.splash != null
-                                    && latestTheme.splash.skipEnabled;
-                            binding.btnSplashSkip.setVisibility(enabled ? android.view.View.VISIBLE : android.view.View.GONE);
+                            // Keep skip visible even when dashboard has not enabled the flag.
+                            binding.btnSplashSkip.setVisibility(android.view.View.VISIBLE);
                         }
                         scheduleSplashNavigation();
                     });
@@ -181,33 +180,67 @@ public class SplashActivity extends ThemedActivity {
         return null;
     }
 
+    /**
+     * Load the dashboard image without hiding the bundled splash first.
+     * The remote image becomes visible only after Glide has decoded it.
+     * This prevents the full-screen white placeholder from flashing/showing on
+     * slow connections or when the dashboard asset is temporarily unavailable.
+     */
     private void applyRemoteSplash(ActivitySplashBinding binding,
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item) {
         if (binding == null || item == null || item.url == null || item.url.trim().isEmpty()) return;
         try {
             String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url);
-            if (resolved == null || resolved.trim().isEmpty()) return;
-            binding.imgSplashRemote.setVisibility(android.view.View.VISIBLE);
+            if (resolved == null || resolved.trim().isEmpty()) {
+                restoreBundledSplash(binding);
+                return;
+            }
+
+            // Keep bundled artwork visible while the network image is loading.
+            binding.imgSplashRemote.setVisibility(android.view.View.GONE);
             binding.imgSplashRemote.setImageDrawable(null);
-            binding.imgSplashLogo.setVisibility(android.view.View.GONE);
-            binding.tvSplashBrand.setVisibility(android.view.View.GONE);
-            binding.tvSplashTagline.setVisibility(android.view.View.GONE);
-            binding.splashProgress.setVisibility(android.view.View.GONE);
-            Glide.with(this).load(resolved).dontAnimate().centerCrop()
+            binding.imgSplashLogo.setVisibility(android.view.View.VISIBLE);
+            binding.tvSplashBrand.setVisibility(android.view.View.VISIBLE);
+            binding.tvSplashTagline.setVisibility(android.view.View.VISIBLE);
+            binding.splashProgress.setVisibility(android.view.View.VISIBLE);
+
+            Glide.with(this)
+                    .load(resolved)
+                    .dontAnimate()
+                    .centerCrop()
                     .listener(new RequestListener<android.graphics.drawable.Drawable>() {
                         @Override
-                        public boolean onLoadFailed(GlideException e, Object model, Target<android.graphics.drawable.Drawable> target, boolean isFirstResource) {
+                        public boolean onLoadFailed(
+                                GlideException e,
+                                Object model,
+                                Target<android.graphics.drawable.Drawable> target,
+                                boolean isFirstResource) {
                             runOnUiThread(() -> restoreBundledSplash(binding));
                             return false;
                         }
+
                         @Override
-                        public boolean onResourceReady(android.graphics.drawable.Drawable resource, Object model, Target<android.graphics.drawable.Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                        public boolean onResourceReady(
+                                android.graphics.drawable.Drawable resource,
+                                Object model,
+                                Target<android.graphics.drawable.Drawable> target,
+                                DataSource dataSource,
+                                boolean isFirstResource) {
+                            runOnUiThread(() -> {
+                                if (navigated || isFinishing()) return;
+                                binding.imgSplashRemote.setVisibility(android.view.View.VISIBLE);
+                                binding.imgSplashLogo.setVisibility(android.view.View.GONE);
+                                binding.tvSplashBrand.setVisibility(android.view.View.GONE);
+                                binding.tvSplashTagline.setVisibility(android.view.View.GONE);
+                                binding.splashProgress.setVisibility(android.view.View.GONE);
+                            });
                             return false;
                         }
                     })
                     .into(binding.imgSplashRemote);
-        } catch (Throwable ignored) {
-            // Bundled splash remains the safe fallback.
+        } catch (Throwable t) {
+            Log.w(TAG, "Remote splash load failed; using bundled splash", t);
+            restoreBundledSplash(binding);
         }
     }
 
@@ -288,7 +321,6 @@ public class SplashActivity extends ThemedActivity {
     private void prepareSession() {
         try {
             AppContainer c = ContainerProvider.from(this);
-            // Features + catalogs on IO — never block splash/main paint.
             c.getIoExecutor().execute(() -> {
                 try {
                     AppFeatures.refresh(c);
@@ -308,7 +340,6 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
-    /** Resume main flow when splash UI fails but tokens are still on disk. */
     private boolean tryResumeLoggedInSession() {
         try {
             AppContainer c = ContainerProvider.from(this);
@@ -351,7 +382,6 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
-    /** Refresh tokens + profile without holding the splash. */
     private void refreshSessionInBackground(AppContainer c) {
         c.getIoExecutor().execute(() -> {
             try {
@@ -373,7 +403,6 @@ public class SplashActivity extends ThemedActivity {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
-        // Resume voice room after process death / launcher reopen when still in a room.
         String activeRoom = null;
         try {
             activeRoom = com.Dramizo.Series.service.VoiceRoomForegroundService.activeRoomId(this);
