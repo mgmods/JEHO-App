@@ -127,23 +127,21 @@ export class UploadsService {
         apikey: this.storageKey,
         Authorization: 'Bearer ' + this.storageKey,
         'Content-Type': file.mimetype || 'application/octet-stream',
-        'Content-Length': String(file.size || 0),
         'Cache-Control': '3600',
         'x-upsert': 'true',
       };
       const fileBuffer = readFileSync(storedPath);
+      // PUT is the most reliable path for an explicitly unique object key;
+      // POST remains the fallback for Storage gateways that prefer POST.
       let upload = await fetch(this.storageObjectUrl(storedName), {
-        method: 'POST',
+        method: 'PUT',
         headers: uploadHeaders,
         body: fileBuffer,
       });
 
-      // Supabase accepts POST for standard uploads. Some Storage gateway
-      // versions are stricter about overwrite requests, so retry once with
-      // PUT before treating a 400/409 as a failed upload.
       if (!upload.ok && (upload.status === 400 || upload.status === 409)) {
         upload = await fetch(this.storageObjectUrl(storedName), {
-          method: 'PUT',
+          method: 'POST',
           headers: uploadHeaders,
           body: fileBuffer,
         });
@@ -162,6 +160,9 @@ export class UploadsService {
 
       if (!upload.ok) {
         const detail = await this.safeResponseText(upload);
+        console.error(
+          `[Uploads] Supabase object upload failed status=${upload.status} bucket=${this.storageBucket} file=${storedName} detail=${detail}`,
+        );
         if (existsSync(storedPath)) unlinkSync(storedPath);
         throw new BadRequestException(
           `Supabase Storage upload failed (${upload.status}): ${detail}`,
