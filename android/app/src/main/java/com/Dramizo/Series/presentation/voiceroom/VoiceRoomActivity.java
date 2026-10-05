@@ -688,7 +688,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setClipChildren(false);
         binding.recyclerSeats.setClipToPadding(false);
         binding.recyclerSeats.setNestedScrollingEnabled(false);
-        binding.recyclerSeats.setHasFixedSize(true);
         binding.recyclerSeats.setItemAnimator(null);
         binding.recyclerSeats.setOverScrollMode(View.OVER_SCROLL_NEVER);
         binding.recyclerSeats.setItemViewCacheSize(16);
@@ -711,7 +710,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.recyclerRecentJoiners.setAdapter(audienceAdapter);
         binding.recyclerRecentJoiners.setNestedScrollingEnabled(false);
-        binding.recyclerRecentJoiners.setHasFixedSize(true);
         binding.recyclerRecentJoiners.setItemAnimator(null);
         binding.recyclerRecentJoiners.setOverScrollMode(View.OVER_SCROLL_NEVER);
         binding.recyclerRecentJoiners.setItemViewCacheSize(8);
