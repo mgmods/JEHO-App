@@ -6,6 +6,8 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
+  private readonly enabled = Boolean(process.env.REDIS_HOST);
+
   constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
 
   getClient(): Redis {
@@ -13,10 +15,12 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
+    if (!this.enabled) return null;
     try { return await this.client.get(key); } catch { return null; }
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (!this.enabled) return;
     try {
       if (ttlSeconds) await this.client.set(key, value, 'EX', ttlSeconds);
       else await this.client.set(key, value);
@@ -24,14 +28,17 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async del(key: string): Promise<void> {
+    if (!this.enabled) return;
     try { await this.client.del(key); } catch {}
   }
 
   async incr(key: string): Promise<number> {
+    if (!this.enabled) return 1;
     try { return await this.client.incr(key); } catch { return 1; }
   }
 
   async expire(key: string, ttlSeconds: number): Promise<void> {
+    if (!this.enabled) return;
     try { await this.client.expire(key, ttlSeconds); } catch {}
   }
 
