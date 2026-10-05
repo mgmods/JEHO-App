@@ -61,7 +61,7 @@ public class LoginActivity extends ThemedActivity {
                 } catch (ApiException e) {
                     binding.progress.setVisibility(View.GONE);
                     String detail = e.getStatusCode() == 10
-                            ? "SHA-1 غير مطابق في Firebase (رمز 10)"
+                            ? "إعداد Google OAuth غير مطابق: راجع SHA-1 للـAPK واسم الحزمة في Google Cloud (رمز 10)"
                             : ("رمز " + e.getStatusCode());
                     Toast.makeText(this, "فشل تسجيل Google: " + detail, Toast.LENGTH_LONG).show();
                 }
