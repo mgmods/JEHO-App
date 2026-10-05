@@ -19,6 +19,13 @@ export class RedisIoAdapter extends IoAdapter {
   }
 
   async connect(): Promise<boolean> {
+    // Redis is optional for the single-instance Render deployment. Do not
+    // probe localhost when no Redis service was explicitly configured.
+    if (!process.env.REDIS_HOST) {
+      this.logger.log('Socket.IO Redis not configured; using single-process adapter');
+      return false;
+    }
+
     const options = {
       host: this.config.get<string>('app.redis.host') || 'localhost',
       port: this.config.get<number>('app.redis.port') || 6379,
@@ -45,9 +52,7 @@ export class RedisIoAdapter extends IoAdapter {
       return true;
     } catch (error) {
       this.logger.warn(
-        `Redis adapter unavailable; using single-process Socket.IO: ${
-          (error as Error).message
-        }`,
+        `Redis adapter unavailable; using single-process Socket.IO: ${(error as Error).message}`,
       );
       this.pubClient.disconnect();
       this.subClient.disconnect();
