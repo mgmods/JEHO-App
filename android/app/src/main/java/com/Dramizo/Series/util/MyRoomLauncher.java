@@ -17,7 +17,7 @@ import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 
 /**
  * One-tap "My Room": enter/create a <b>personal</b> STANDARD room using
- * profile name + avatar. Agency live is a separate flow ({@link AgencyRoomLauncher}).
+ * profile name + optional avatar. Agency live is a separate flow ({@link AgencyRoomLauncher}).
  */
 public final class MyRoomLauncher {
     private MyRoomLauncher() {}
