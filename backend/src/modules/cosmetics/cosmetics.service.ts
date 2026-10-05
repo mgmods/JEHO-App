@@ -295,7 +295,7 @@ export class CosmeticsService implements OnModuleInit {
             CosmeticType.ROOM_CARD,
           ],
         })
-        .andWhere(`COALESCE((c.meta::jsonb)->>'aristocracy', 'false') != 'true'`)
+        .andWhere(`COALESCE(c.meta, '') NOT LIKE '%"aristocracy":true%'`)
         .andWhere(`c.code NOT ILIKE '%_vip_%'`)
         .andWhere(`c.code NOT ILIKE 'vip%'`)
         .orderBy('c.sortOrder', 'ASC')
@@ -1077,7 +1077,7 @@ export class CosmeticsService implements OnModuleInit {
           AND (
             c.code LIKE 'vip_tou_fixed_%'
             OR COALESCE(c."previewUrl", '') LIKE '%ud_vip_tou_%'
-            OR COALESCE((c.meta::jsonb)->>'fixedVipFrame', '') = 'true'
+            OR COALESCE(c.meta, '') LIKE '%"fixedVipFrame":true%'
           )`,
     );
     // 3) Re-attach wear from any other equipped vip_badge (mall/SVGA).
@@ -1095,7 +1095,7 @@ export class CosmeticsService implements OnModuleInit {
               AND c."isActive" = true
               AND (uc."expiresAt" IS NULL OR uc."expiresAt" > NOW())
               AND COALESCE(c."previewUrl", '') NOT LIKE '%ud_vip_tou_%'
-              AND COALESCE((c.meta::jsonb)->>'fixedVipFrame', '') <> 'true'
+              AND COALESCE(c.meta, '') NOT LIKE '%"fixedVipFrame":true%'
               AND c.code NOT LIKE 'vip_tou_fixed_%'
             ORDER BY uc."userId", uc."updatedAt" DESC NULLS LAST
          ) sub
