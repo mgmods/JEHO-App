@@ -19,36 +19,7 @@
     <LoadingSpinner v-if="loading" />
     <div v-else class="nav-icons-grid">
       <article v-for="tab in tabs" :key="tab.key" class="glass p-3 nav-icon-card">
-        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-          <h3 class="h6 mb-0">{{ tab.label }}</h3>
-          <span class="badge text-bg-secondary">#{form[tab.key].sortOrder}</span>
-        </div>
-        <div class="row g-2 mb-3">
-          <div class="col-md-4">
-            <label class="form-label small">الاسم الظاهر</label>
-            <input v-model="form[tab.key].label" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">الترتيب</label>
-            <input v-model.number="form[tab.key].sortOrder" type="number" min="1" max="20" class="form-control form-control-sm" />
-          </div>
-          <div class="col-md-3">
-            <label class="form-label small">الصفحة</label>
-            <select v-model="form[tab.key].route" class="form-select form-select-sm">
-              <option value="home">الرئيسية</option>
-              <option value="messages">الرسائل</option>
-              <option value="profile">أنا</option>
-              <option value="drama">دراما</option>
-              <option value="games">ألعاب</option>
-            </select>
-          </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <label class="form-check form-switch mb-1">
-              <input v-model="form[tab.key].enabled" class="form-check-input" type="checkbox" />
-              <span class="form-check-label small">مفعّل</span>
-            </label>
-          </div>
-        </div>
+        <h3 class="h6 mb-2">{{ tab.label }}</h3>
         <div class="d-flex gap-3 flex-wrap">
           <div class="icon-slot">
             <div class="icon-preview">

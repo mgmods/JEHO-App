@@ -24,7 +24,13 @@ export class UploadsService {
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
     const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || '';
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
-    // Server-only Storage credential. Prefer the explicit service-role variable,\n    // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.\n    this.storageKey =\n      process.env.SUPABASE_SECRET_KEY?.trim() ||\n      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||\n      process.env.SUPABASE_STORAGE_KEY?.trim() ||\n      '';
+    // Server-only Storage credential. Prefer the explicit service-role variable,
+    // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.
+    this.storageKey =
+      process.env.SUPABASE_SECRET_KEY?.trim() ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+      process.env.SUPABASE_STORAGE_KEY?.trim() ||
+      '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     if (!existsSync(this.uploadDir)) {
       mkdirSync(this.uploadDir, { recursive: true });
@@ -106,16 +112,29 @@ export class UploadsService {
       throw err;
     }
     if (this.storageEnabled()) {
-      const upload = await fetch(this.storageObjectUrl(storedName), {
+      const uploadHeaders = {
+        apikey: this.storageKey,
+        Authorization: 'Bearer ' + this.storageKey,
+        'Content-Type': file.mimetype || 'application/octet-stream',
+        'x-upsert': 'true',
+      };
+      let upload = await fetch(this.storageObjectUrl(storedName), {
         method: 'POST',
-        headers: {
-          apikey: this.storageKey,
-          Authorization: `Bearer ${this.storageKey}`,
-          'Content-Type': file.mimetype || 'application/octet-stream',
-          'x-upsert': 'true',
-        },
+        headers: uploadHeaders,
         body: readFileSync(storedPath),
       });
+
+      // A fresh deployment may not have the configured bucket yet. Create it
+      // once and retry instead of making profile/room image uploads fail.
+      if (!upload.ok && (upload.status === 400 || upload.status === 404)) {
+        await this.ensureStorageBucket();
+        upload = await fetch(this.storageObjectUrl(storedName), {
+          method: 'POST',
+          headers: uploadHeaders,
+          body: readFileSync(storedPath),
+        });
+      }
+
       if (!upload.ok) {
         const detail = await this.safeResponseText(upload);
         if (existsSync(storedPath)) unlinkSync(storedPath);
@@ -135,6 +154,28 @@ export class UploadsService {
     };
   }
 
+  private async ensureStorageBucket() {
+    const response = await fetch(this.supabaseUrl + '/storage/v1/bucket', {
+      method: 'POST',
+      headers: {
+        apikey: this.storageKey,
+        Authorization: 'Bearer ' + this.storageKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        id: this.storageBucket,
+        name: this.storageBucket,
+        public: false,
+      }),
+    });
+    // 409 means another request/deployment created it concurrently.
+    if (!response.ok && response.status !== 409) {
+      const detail = await this.safeResponseText(response);
+      throw new BadRequestException(
+        `Supabase Storage bucket setup failed (${response.status}): ${detail}`,
+      );
+    }
+  }
   private async deleteStoredFile(filename: string) {
     const response = await fetch(this.storageObjectUrl(filename), {
       method: 'DELETE',

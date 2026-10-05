@@ -365,10 +365,6 @@ public final class MiscDtos {
     }
 
     public static class NavIconPairDto {
-        @SerializedName("label") public String label;
-        @SerializedName("route") public String route;
-        @SerializedName("enabled") public Boolean enabled;
-        @SerializedName("sortOrder") public int sortOrder = 99;
         @SerializedName("normal") public String normal;
         @SerializedName("selected") public String selected;
         @SerializedName("icon") public String icon;

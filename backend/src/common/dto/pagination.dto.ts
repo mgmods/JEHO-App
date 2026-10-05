@@ -40,16 +40,6 @@ export class PaginationDto {
   @IsString()
   type?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  tag?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  country?: string;
-
   get skip(): number {
     return ((this.page || 1) - 1) * (this.limit || 20);
   }

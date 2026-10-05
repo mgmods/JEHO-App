@@ -18,6 +18,7 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { OtpCode, OtpPurpose } from '../../database/entities/otp-code.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import {
   RegisterDto,
   LoginDto,
@@ -38,6 +39,7 @@ export class AuthService implements OnModuleInit {
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(OtpCode) private readonly otpRepo: Repository<OtpCode>,
     @InjectRepository(UserVip) private readonly userVipsRepo: Repository<UserVip>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -133,14 +135,66 @@ export class AuthService implements OnModuleInit {
     return { ok: true };
   }
 
+  private async settingValue(key: string, fallback = ''): Promise<string> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    return row?.value == null ? fallback : String(row.value);
+  }
+
+  private async twilioOtpEnabled(): Promise<boolean> {
+    const enabled = (await this.settingValue('twilio.verify.enabled', 'false')).trim().toLowerCase();
+    const otp = (await this.settingValue('twilio.otp.enabled', 'false')).trim().toLowerCase();
+    return ['true', '1', 'yes', 'on'].includes(enabled) && ['true', '1', 'yes', 'on'].includes(otp);
+  }
+
+  private async normalizeOtpPhone(phone: string): Promise<string> {
+    const raw = String(phone || '').trim();
+    if (raw.startsWith('+')) return raw.replace(/[^+\\d]/g, '');
+    const country = String(this.configService.get('app.defaultCountryCode') || '').trim().replace(/[^\\d]/g, '');
+    return country ? `+${country}${raw.replace(/\\D/g, '')}` : raw.replace(/[^\\d]/g, '');
+  }
+
+  private async twilioRequest(path: string, params: Record<string, string>) {
+    const accountSid = (await this.settingValue('twilio.account_sid')).trim();
+    const authToken = await this.settingValue('twilio.auth_token');
+    const serviceSid = (await this.settingValue('twilio.verify_service_sid')).trim();
+    if (!accountSid || !authToken || !serviceSid) {
+      throw new BadRequestException('إعدادات Twilio Verify غير مكتملة في لوحة التحكم');
+    }
+    const body = new URLSearchParams(params);
+    const response = await fetch(
+      `https://verify.twilio.com/v2/Services/${encodeURIComponent(serviceSid)}${path}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      },
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = String((data as any)?.message || 'Twilio Verify request failed');
+      this.logger.error(`Twilio Verify error ${response.status}: ${message}`);
+      throw new BadRequestException('تعذر إرسال/تحقق رمز الهاتف عبر Twilio');
+    }
+    return data as any;
+  }
+
   async sendOtp(dto: SendOtpDto) {
+    const phone = await this.normalizeOtpPhone(dto.phone);
+    if (await this.twilioOtpEnabled()) {
+      await this.twilioRequest('/Verifications', { To: phone, Channel: 'sms' });
+      return { sent: true, expiresIn: 600, provider: 'twilio' };
+    }
+
     const code = String(randomInt(100000, 999999));
     const codeHash = this.hashOtp(code);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await this.otpRepo.save(
       this.otpRepo.create({
-        target: dto.phone,
+        target: phone,
         channel: 'sms',
         purpose: OtpPurpose.LOGIN,
         codeHash,
@@ -148,8 +202,8 @@ export class AuthService implements OnModuleInit {
       }),
     );
 
-    // In production integrate SMS provider. Dev/log for visibility.
-    this.logger.log(`OTP for ${dto.phone}: ${code}`);
+    // Local/dev fallback when Twilio Verify is disabled.
+    this.logger.log(`OTP for ${phone}: ${code}`);
 
     return {
       sent: true,
@@ -159,34 +213,45 @@ export class AuthService implements OnModuleInit {
   }
 
   async verifyOtp(dto: VerifyOtpDto) {
-    const otp = await this.otpRepo.findOne({
-      where: { target: dto.phone, used: false, purpose: OtpPurpose.LOGIN },
-      order: { createdAt: 'DESC' },
-    });
-    if (!otp || otp.expiresAt < new Date()) {
-      throw new BadRequestException('OTP expired or not found');
-    }
-    if (otp.attempts >= 5) {
-      throw new BadRequestException('Too many OTP attempts');
-    }
+    const phone = await this.normalizeOtpPhone(dto.phone);
+    if (await this.twilioOtpEnabled()) {
+      const result = await this.twilioRequest('/VerificationCheck', {
+        To: phone,
+        Code: String(dto.code).trim(),
+      });
+      if (String(result?.status || '').toLowerCase() !== 'approved') {
+        throw new BadRequestException('رمز التحقق غير صحيح أو منتهي');
+      }
+    } else {
+      const otp = await this.otpRepo.findOne({
+        where: { target: phone, used: false, purpose: OtpPurpose.LOGIN },
+        order: { createdAt: 'DESC' },
+      });
+      if (!otp || otp.expiresAt < new Date()) {
+        throw new BadRequestException('OTP expired or not found');
+      }
+      if (otp.attempts >= 5) {
+        throw new BadRequestException('Too many OTP attempts');
+      }
 
-    otp.attempts += 1;
-    const valid = this.hashOtp(dto.code) === otp.codeHash;
-    if (!valid) {
+      otp.attempts += 1;
+      const valid = this.hashOtp(dto.code) === otp.codeHash;
+      if (!valid) {
+        await this.otpRepo.save(otp);
+        throw new BadRequestException('Invalid OTP');
+      }
+
+      otp.used = true;
       await this.otpRepo.save(otp);
-      throw new BadRequestException('Invalid OTP');
     }
 
-    otp.used = true;
-    await this.otpRepo.save(otp);
-
-    let user = await this.usersRepo.findOne({ where: { phone: dto.phone } });
+    let user = await this.usersRepo.findOne({ where: { phone } });
     if (!user) {
       const username =
         dto.username?.toLowerCase() ||
-        `user_${dto.phone.replace(/\D/g, '').slice(-8)}_${randomInt(100, 999)}`;
+        `user_${phone.replace(/\\D/g, '').slice(-8)}_${randomInt(100, 999)}`;
       user = this.usersRepo.create({
-        phone: dto.phone,
+        phone,
         username,
         publicId: await this.allocatePublicId(),
         displayName: username,

@@ -11,7 +11,6 @@ public interface RoomRepository {
 
     Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page);
     Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit);
-    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> list(int page, int limit, String tag, String country);
     Result<RoomDtos.JoinRoomResult> create(RoomDtos.CreateRoomRequest request);
     Result<RoomDtos.RoomDto> get(String id);
     Result<RoomDtos.SupportersResult> supporters(String id);

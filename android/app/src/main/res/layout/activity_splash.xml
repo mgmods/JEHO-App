@@ -38,7 +38,7 @@
         android:layout_height="match_parent"
         android:background="@color/white"
         android:contentDescription="@null"
-        android:scaleType="centerInside"
+        android:scaleType="centerCrop"
         android:visibility="gone" />
 
     <!-- Theme hook (kept for binding compatibility) -->
@@ -91,9 +91,7 @@
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
                 app:strokeColor="#22FE2C55"
                 app:strokeWidth="1dp" />
-        
-
-</FrameLayout>
+        </FrameLayout>
 
         <TextView
             android:id="@+id/tvSplashBrand"
@@ -144,16 +142,22 @@
             android:textSize="12sp" />
     </LinearLayout>
 
+    <!-- Skip is anchored below the Android status bar, always at the top-left. -->
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnSplashSkip"
         android:layout_width="wrap_content"
-        android:layout_height="46dp"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="28dp"
-        android:minWidth="104dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="8dp"
+        android:minWidth="92dp"
+        android:minHeight="44dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
         android:text="تخطي"
         android:textAllCaps="false"
         android:textColor="@color/text_primary"
-        android:backgroundTint="#CCFFFFFF"
+        android:textSize="14sp"
+        android:backgroundTint="#E6FFFFFF"
         android:visibility="gone" />
 </FrameLayout>

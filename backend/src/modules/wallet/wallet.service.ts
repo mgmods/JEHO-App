@@ -223,16 +223,17 @@ export class WalletService implements OnModuleInit {
     const economy = await this.economyConfig();
     const target = economy.withdrawTargetDiamonds;
     const fiatRate = economy.diamondUsdRate;
+    const netFiatRate = economy.withdrawalNetUsdRate;
     return {
       ...wallet,
       coins: Number(wallet.coins),
       /** The one and only diamond balance. */
       diamonds,
       personalDiamonds: diamonds,
-      personalUsd: Number((diamonds * fiatRate).toFixed(4)),
+      personalUsd: Number((diamonds * netFiatRate).toFixed(4)),
       agencyDiamonds: 0,
       agencyUsd: 0,
-      diamondsUsd: Number((diamonds * fiatRate).toFixed(4)),
+      diamondsUsd: Number((diamonds * netFiatRate).toFixed(4)),
       traderDiamonds: 0,
       silverCoins: 0,
       gamePoints: 0,
@@ -241,6 +242,8 @@ export class WalletService implements OnModuleInit {
       canWithdraw: diamonds >= target,
       canWithdrawAgency: diamonds >= target,
       diamondUsdRate: fiatRate,
+      withdrawalNetUsdRate: netFiatRate,
+      withdrawalMarginPercent: economy.withdrawalMarginPercent,
     };
   }
 
@@ -254,10 +257,20 @@ export class WalletService implements OnModuleInit {
       1,
     );
     const rate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
+    const withdrawalMarginPercent = await this.numberSetting(
+      'economy.withdrawal_margin_percent',
+      0,
+      0,
+      100,
+    );
+    const withdrawalNetUsdRate =
+      rate * (1 - withdrawalMarginPercent / 100);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / rate));
     const target = Math.max(minFromUsd, Math.floor(ECONOMY.minWithdrawDiamonds || 200000));
     return {
       diamondUsdRate: rate,
+      withdrawalNetUsdRate,
+      withdrawalMarginPercent,
       diamondCoinRate: coinRate,
       /** التارجت = الحد الأدنى للسحب بالألماس القابل للسحب */
       minWithdrawDiamonds: target,
@@ -275,6 +288,7 @@ export class WalletService implements OnModuleInit {
   async listWithdrawPackages() {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
+    const netRate = Number(economy.withdrawalNetUsdRate) || rate;
     const min = Math.max(
       Math.round(MIN_WITHDRAW_USD / rate),
       Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
@@ -297,7 +311,7 @@ export class WalletService implements OnModuleInit {
         : defaultsUsd.map((usd, i) => ({
             id: String(i + 1),
             usd,
-            diamonds: Math.max(min, Math.round(usd / rate)),
+            diamonds: Math.max(min, Math.round(usd / netRate)),
             label: `$${usd % 1 === 0 ? usd.toFixed(0) : usd.toFixed(2)}`,
           }));
     let items = source
@@ -306,13 +320,13 @@ export class WalletService implements OnModuleInit {
           Number(row.usd) > 0
             ? Number(row.usd)
             : Number(row.diamonds) > 0
-              ? Number((Number(row.diamonds) * rate).toFixed(2))
+              ? Number((Number(row.diamonds) * netRate).toFixed(2))
               : 0;
         const diamonds =
           Number(row.diamonds) > 0
             ? Math.floor(Number(row.diamonds))
             : usd > 0
-              ? Math.max(min, Math.round(usd / rate))
+              ? Math.max(min, Math.round(usd / netRate))
               : 0;
         if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
@@ -340,6 +354,8 @@ export class WalletService implements OnModuleInit {
     return {
       items,
       diamondUsdRate: rate,
+      withdrawalNetUsdRate: netRate,
+      withdrawalMarginPercent: Number(economy.withdrawalMarginPercent) || 0,
       minWithdrawDiamonds: min,
       minWithdrawUsd: MIN_WITHDRAW_USD,
       currency: 'USD',
@@ -350,6 +366,7 @@ export class WalletService implements OnModuleInit {
   async saveWithdrawPackages(items: Array<Record<string, unknown>>) {
     const economy = await this.economyConfig();
     const rate = Number(economy.diamondUsdRate) || DIAMOND_TO_FIAT;
+    const netRate = Number(economy.withdrawalNetUsdRate) || rate;
     const min = Math.max(
       Math.round(MIN_WITHDRAW_USD / rate),
       Math.floor(Number(economy.minWithdrawDiamonds) || 200000),
@@ -359,7 +376,7 @@ export class WalletService implements OnModuleInit {
         const usd = Number(row?.usd) || 0;
         let diamonds = Math.floor(Number(row?.diamonds) || 0);
         if (usd > 0 && diamonds <= 0) {
-          diamonds = Math.max(min, Math.round(usd / rate));
+          diamonds = Math.max(min, Math.round(usd / netRate));
         }
         if (usd < MIN_WITHDRAW_USD - 0.001 || diamonds < min) return null;
         const label =
@@ -772,9 +789,30 @@ export class WalletService implements OnModuleInit {
     return { items: normalized };
   }
 
+  /** Read a boolean withdrawal policy from dashboard settings. Existing installs default to enabled. */
+  private async withdrawalSetting(key: string): Promise<boolean> {
+    const row = await this.settingsRepo.findOne({ where: { key } });
+    if (!row || row.value == null || row.value === '') return true;
+    const value = String(row.value).trim().toLowerCase();
+    return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+  }
+
   async requestWithdraw(userId: string, dto: WithdrawDto) {
     const fiatRate = Number(ECONOMY.diamondUsd) || DIAMOND_TO_FIAT;
-    const minWithdraw = Math.floor(ECONOMY.minWithdrawDiamonds || 200000);
+    const withdrawalMarginPercent = await this.numberSetting(
+      'economy.withdrawal_margin_percent',
+      0,
+      0,
+      100,
+    );
+    const netFiatRate = fiatRate * (1 - withdrawalMarginPercent / 100);
+    const configuredMinWithdraw = await this.numberSetting(
+      'economy.min_withdraw_diamonds',
+      Number(ECONOMY.minWithdrawDiamonds || 200000),
+      1,
+      1_000_000_000,
+    );
+    const minWithdraw = Math.floor(configuredMinWithdraw);
     const minFromUsd = Math.max(1, Math.round(MIN_WITHDRAW_USD / (Number(fiatRate) || DIAMOND_TO_FIAT)));
     const minW = Math.max(minFromUsd, Math.floor(minWithdraw));
 
@@ -788,6 +826,23 @@ export class WalletService implements OnModuleInit {
       sourceRaw === 'agency' ||
       sourceRaw === 'agency_room' ||
       sourceRaw === 'agency_earnings';
+    // Dashboard controls the withdrawal channels. The general wallet switch
+    // gates all withdrawals; host/agency switches then gate their stream.
+    if (!(await this.withdrawalSetting('withdrawal.wallet_enabled'))) {
+      throw new ForbiddenException('السحب من المحفظة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.agency_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح الوكالة معطّل حاليًا من إعدادات المنصة');
+    }
+    if (
+      !isAgencySource &&
+      !(await this.withdrawalSetting('withdrawal.host_enabled'))
+    ) {
+      throw new ForbiddenException('سحب أرباح المضيف معطّل حاليًا من إعدادات المنصة');
+    }
     const stageIdRaw = String(
       (dto.payoutDetails as any)?.stageId ||
         (dto.payoutDetails as any)?.targetStageId ||
@@ -853,7 +908,7 @@ export class WalletService implements OnModuleInit {
       wallet.diamonds = bal - dto.diamonds;
       await manager.save(wallet);
 
-      const amountFiat = Number((dto.diamonds * fiatRate).toFixed(2));
+      const amountFiat = Number((dto.diamonds * netFiatRate).toFixed(2));
       const stream = isAgencySource ? 'agency' : 'personal';
       const agencyKind =
         sourceRaw === 'agency_host' || sourceRaw === 'host'
@@ -899,7 +954,14 @@ export class WalletService implements OnModuleInit {
               ? `سحب أرباح مضيفة (روم وكالة) ${dto.diamonds} ماسة`
               : `سحب عمولة وكالة ${dto.diamonds} ماسة`
             : `سحب أرباح روم شخصي ${dto.diamonds} ماسة`,
-          metadata: { stream, source: sourceTag, method: dto.method },
+          metadata: {
+            stream,
+            source: sourceTag,
+            method: dto.method,
+            grossDiamondUsdRate: fiatRate,
+            withdrawalMarginPercent,
+            netDiamondUsdRate: netFiatRate,
+          },
         }),
       );
       return { request: created, agencyKind };

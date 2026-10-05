@@ -9,10 +9,11 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { OtpCode } from '../../database/entities/otp-code.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, UserProfile, Wallet, OtpCode, UserVip]),
+    TypeOrmModule.forFeature([User, UserProfile, Wallet, OtpCode, UserVip, AppSetting]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

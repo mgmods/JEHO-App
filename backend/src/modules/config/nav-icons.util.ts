@@ -6,14 +6,6 @@
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
 
 export type NavIconPair = {
-  /** Label shown below the tab icon. */
-  label?: string;
-  /** Client route: home | messages | profile | drama | games. */
-  route?: string;
-  /** Whether the tab is visible. */
-  enabled?: boolean;
-  /** Lower values appear first. */
-  sortOrder?: number;
   /** Default / unselected icon URL (png/jpg). */
   normal?: string;
   /** Selected / active icon URL (png/jpg). Falls back to normal. */
@@ -52,12 +44,6 @@ function cleanPair(raw: any): NavIconPair | undefined {
   const selected = cleanUrl(raw.selected ?? raw.on ?? raw.active);
   const icon = cleanUrl(raw.icon ?? raw.url ?? raw.imageUrl);
   const pair: NavIconPair = {};
-  const label = String(raw.label ?? '').trim();
-  const route = String(raw.route ?? '').trim().toLowerCase();
-  if (label) pair.label = label;
-  if (route) pair.route = route;
-  if (raw.enabled !== undefined) pair.enabled = raw.enabled !== false;
-  if (Number.isFinite(Number(raw.sortOrder))) pair.sortOrder = Math.floor(Number(raw.sortOrder));
   if (normal) pair.normal = normal;
   if (selected) pair.selected = selected;
   if (icon) pair.icon = icon;
@@ -80,11 +66,11 @@ export function defaultNavIconsConfig(
   });
   return {
     version: 1,
-    party: { ...pair('party'), label: 'الرئيسية', route: 'home', enabled: true, sortOrder: 1 },
-    drama: { ...pair('drama'), label: 'دراما', route: 'drama', enabled: false, sortOrder: 4 },
-    games: { ...pair('game'), label: 'ألعاب', route: 'games', enabled: false, sortOrder: 5 },
-    chat: { ...pair('chat'), label: 'الرسائل', route: 'messages', enabled: true, sortOrder: 2 },
-    me: { ...pair('me'), label: 'أنا', route: 'profile', enabled: true, sortOrder: 3 },
+    party: pair('party'),
+    drama: pair('drama'),
+    games: pair('game'),
+    chat: pair('chat'),
+    me: pair('me'),
   };
 }
 
@@ -109,11 +95,6 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
   for (const key of NAV_TAB_KEYS) {
     const pair = cleanPair(src[key]);
     if (pair && (pair.normal || pair.selected || pair.icon)) {
-      const fallback = (defaults as any)[key] || {};
-      (pair as any).label = pair.label || fallback.label || '';
-      (pair as any).route = pair.route || fallback.route || '';
-      if (pair.enabled === undefined) (pair as any).enabled = fallback.enabled !== false;
-      if (pair.sortOrder === undefined) (pair as any).sortOrder = fallback.sortOrder || 99;
       (out as any)[key] = pair;
     } else {
       (out as any)[key] = (defaults as any)[key] || {};

@@ -36,7 +36,6 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.util.ErrorToasts;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
-import com.Dramizo.Series.util.RoomOpenChooser;
 import com.Dramizo.Series.presentation.offers.OffersBottomSheet;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.presentation.vip.VipActivity;
@@ -188,17 +187,10 @@ public class HomeFragment extends Fragment {
         onLogicalTabSelected(activeTab);
         // Home header icons from assets/icons by original file name.
         AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
-        binding.imgFilterIcon.setImageResource(R.drawable.icon_voice_room);
+        AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
-        binding.btnFilter.setOnClickListener(v -> RoomOpenChooser.open(requireActivity()));
-        binding.btnFilter.setContentDescription(getString(R.string.voice_room));
-        binding.categoryPopular.setOnClickListener(v -> selectHomeCategory("", ""));
-        binding.categorySyria.setOnClickListener(v -> selectHomeCategory("", "Syria"));
-        binding.categoryGame.setOnClickListener(v -> selectHomeCategory("game", ""));
-        binding.categoryVideo.setOnClickListener(v -> selectHomeCategory("video", ""));
-        binding.categoryMusic.setOnClickListener(v -> selectHomeCategory("music", ""));
-        selectHomeCategory("", "");
+        binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
         View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
@@ -307,27 +299,6 @@ public class HomeFragment extends Fragment {
         viewModel.loadHomeRankings();
         viewModel.loadOffers();
         loadWalletBalance();
-    }
-
-    private void selectHomeCategory(String tag, String country) {
-        if (binding == null || viewModel == null) return;
-        View[] chips = {
-                binding.categoryPopular,
-                binding.categorySyria,
-                binding.categoryGame,
-                binding.categoryVideo,
-                binding.categoryMusic
-        };
-        String key = tag + "|" + country;
-        for (View chip : chips) chip.setAlpha(0.55f);
-        View selected = binding.categoryPopular;
-        if ("Syria".equalsIgnoreCase(country)) selected = binding.categorySyria;
-        else if ("game".equalsIgnoreCase(tag)) selected = binding.categoryGame;
-        else if ("video".equalsIgnoreCase(tag)) selected = binding.categoryVideo;
-        else if ("music".equalsIgnoreCase(tag)) selected = binding.categoryMusic;
-        selected.setAlpha(1f);
-        viewModel.loadRoomsForCategory(tag, country);
-        selectLogicalTab(TAB_HOT);
     }
 
     private void setupOffersFloatingWidget() {
@@ -694,13 +665,13 @@ public class HomeFragment extends Fragment {
             binding.homeActBanners.getRoot().setVisibility(
                     tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
         }
-        // The top-left action is always the existing room launcher.
-        // Country filtering is now handled by the home category chips.
+        // Country filter: always available as Hot filter; long-press or filter icon.
+        // Country tab itself opens the picker (see selectLogicalTab).
         if (binding.btnFilter != null) {
-            binding.btnFilter.setVisibility(View.VISIBLE);
+            binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
         }
         if (binding.imgFilterIcon != null) {
-            binding.imgFilterIcon.setImageResource(R.drawable.icon_voice_room);
+            AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         }
         refreshLocationTabChrome();
     }
