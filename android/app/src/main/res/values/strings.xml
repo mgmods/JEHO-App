@@ -6,7 +6,12 @@
 <string name="login_title">Welcome to JEHO</string>
 <string name="login_subtitle">Join voice rooms, parties, and friends around you</string>
 <string name="continue_with_google">Continue with Google</string>
-<string name="login_google_only_hint">One tap · Secure Google sign-in</string>
+<string name="login_google_only_hint">Google or email and password</string>
+<string name="login_google_or_password_hint">Google or email and password</string>
+<string name="required_field">This field is required</string>
+<string name="password_min_length">Password must be at least 6 characters</string>
+<string name="valid_email_required">Enter a valid email address</string>
+<string name="username_rules">Use 3–48 letters, numbers, or underscores</string>
 <string name="email_or_username">Email or username</string>
 <string name="password">Password</string>
 <string name="login">Login</string>
