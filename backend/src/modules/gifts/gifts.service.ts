@@ -1669,6 +1669,22 @@ export class GiftsService implements OnModuleInit {
   }
 
   /** Dashboard-controlled self-gifting policy. Defaults to blocked for safety. */
+  /** Read the optional platform gift commission from dashboard settings. */
+  private async platformGiftCommissionPercent(): Promise<number> {
+    try {
+      const row = await this.settingsRepo.findOne({ where: { key: 'economy.platform_commission_percent' } });
+      const value = Number(row?.value);
+      if (!Number.isFinite(value)) return 0;
+      return Math.min(100, Math.max(0, value));
+    } catch (err) {
+      this.log.warn(
+        'Platform gift commission read failed; defaulting to 0%: ' +
+          (err instanceof Error ? err.message : String(err)),
+      );
+      return 0;
+    }
+  }
+
   private async isSelfGiftBlocked(): Promise<boolean> {
     try {
       const row = await this.settingsRepo.findOne({
@@ -1783,7 +1799,11 @@ export class GiftsService implements OnModuleInit {
       // coins the sender paid and the diamonds handed out (taken at mint).
       let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
-      const platformCut = 0;
+      const platformPercent = await this.platformGiftCommissionPercent();
+      // Platform commission is a separate dashboard lever applied to the minted diamond pool.
+      // The remaining pool is then split between host and agency owner.
+      const platformCut = Math.floor((diamondsAwarded * platformPercent) / 100);
+      const distributableDiamonds = Math.max(0, diamondsAwarded - platformCut);
       let agencyId: string | null = null;
       let earningsStream: 'personal' | 'agency' = 'personal';
 
@@ -1825,12 +1845,12 @@ export class GiftsService implements OnModuleInit {
           );
           const receiverIsOwner = String(agency.ownerId) === String(dto.receiverId);
           if (receiverIsOwner) {
-            // Owner is also the host → keeps everything, no separate commission.
+            // Owner is also the host → keeps the full distributable pool.
             agentShare = 0;
-            hostDiamonds = diamondsAwarded;
+            hostDiamonds = distributableDiamonds;
           } else {
-            agentShare = Math.floor((diamondsAwarded * ownerPct) / 100);
-            hostDiamonds = Math.max(0, diamondsAwarded - agentShare);
+            agentShare = Math.floor((distributableDiamonds * ownerPct) / 100);
+            hostDiamonds = Math.max(0, distributableDiamonds - agentShare);
           }
           if (agentShare > 0 && agency.ownerId) {
             let agentWallet = await manager.findOne(Wallet, {
