@@ -1539,7 +1539,15 @@ export class AdminService {
   }
 
   async getSettings() {
-    return this.settingsRepo.find({ order: { key: 'ASC' } });
+    const rows = await this.settingsRepo.find({ order: { key: 'ASC' } });
+    // Never return Twilio Auth Token plaintext through the generic settings API.
+    // The dashboard keeps the masked value when it has not been explicitly changed.
+    return rows.map((row) => {
+      if (row.key === 'twilio.auth_token' && String(row.value || '').trim()) {
+        return { ...row, value: '••••••••••••' };
+      }
+      return row;
+    });
   }
 
   /**
