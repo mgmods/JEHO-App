@@ -92,7 +92,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
-                android:text="@string/tab_party"
+                android:text="الرئيسية"
                 android:textColor="@color/bottom_chrome_label"
                 android:textSize="12.5sp"
                 android:textStyle="bold" />
@@ -160,7 +160,7 @@
             android:layout_weight="1"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:visibility="gone">
+            android:visibility="gone"
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -216,7 +216,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
-                android:text="@string/nav_messages"
+                android:text="الرسائل"
                 android:textColor="@color/bottom_chrome_label"
                 android:textSize="12.5sp" />
         </LinearLayout>
@@ -243,7 +243,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:includeFontPadding="false"
-                android:text="@string/nav_profile"
+                android:text="أنا"
                 android:textColor="@color/bottom_chrome_label"
                 android:textSize="12.5sp" />
         </LinearLayout>
