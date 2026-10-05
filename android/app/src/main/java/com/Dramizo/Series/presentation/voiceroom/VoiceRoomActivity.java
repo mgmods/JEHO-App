@@ -269,10 +269,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     };
     private final Runnable retryHttpJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
-        // Never force a full rejoin while the live session is still in-process.
+        // Retry the join silently. The room UI is allowed to render from the room GET
+        // while the session/RTC join catches up; never put a blocking loading overlay
+        // back on screen for a transient network failure.
         if (ActiveRoomSession.get().canResumeUi(roomId) || resumedFromActiveSession) return;
-        roomJoinLoadingDismissed = false;
-        showRoomJoinLoading();
         String pass = getIntent() != null ? getIntent().getStringExtra(EXTRA_PASSWORD) : null;
         viewModel.join(roomId, pass);
     };
@@ -929,10 +929,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         || ActiveRoomSession.get().canResumeUi(roomId)) {
                     return;
                 }
-                Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
+                // Network errors must not trap the user behind a repeating
+                // "connection slow" message. Render the public room immediately
+                // from GET /rooms/:id and retry the paid/session join silently.
                 if (!exiting && roomId != null && !roomId.isEmpty()) {
+                    viewModel.refresh(roomId);
                     handler.removeCallbacks(retryHttpJoinRunnable);
-                    handler.postDelayed(retryHttpJoinRunnable, 2_500L);
+                    handler.postDelayed(retryHttpJoinRunnable, 1_200L);
                 }
             }
         });
@@ -1189,6 +1192,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         viewModel.getSession().observe(this, session -> {
             if (session == null) return;
             pendingSession = session;
+            handler.removeCallbacks(retryHttpJoinRunnable);
+            roomJoinLoadingDismissed = true;
             hoppingRoom = false;
             switchingRoom = false;
             ActiveRoomSession.get().capture(
