@@ -9,7 +9,7 @@
 <string name="login_google_only_hint">Google or email and password</string>
 <string name="login_google_or_password_hint">Google or email and password</string>
 <string name="required_field">This field is required</string>
-<string name="password_min_length">Password must be at least 6 characters</string>
+
 <string name="valid_email_required">Enter a valid email address</string>
 <string name="username_rules">Use 3–48 letters, numbers, or underscores</string>
 <string name="email_or_username">Email or username</string>
