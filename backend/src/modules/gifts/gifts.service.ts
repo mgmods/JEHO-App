@@ -1669,10 +1669,11 @@ export class GiftsService implements OnModuleInit {
   }
 
   /** Dashboard-controlled self-gifting policy. Defaults to blocked for safety. */
-  /** Read the optional platform gift commission from dashboard settings. */
   private async platformGiftCommissionPercent(): Promise<number> {
     try {
-      const row = await this.settingsRepo.findOne({ where: { key: 'economy.platform_commission_percent' } });
+      const row = await this.settingsRepo.findOne({
+        where: { key: 'economy.platform_commission_percent' },
+      });
       const value = Number(row?.value);
       if (!Number.isFinite(value)) return 0;
       return Math.min(100, Math.max(0, value));
@@ -1744,9 +1745,18 @@ export class GiftsService implements OnModuleInit {
     const coinPrice = Math.max(0, Number(gift.coinPrice) || 0);
     const totalCoins = coinPrice * qty;
     const ratioCap = isLucky ? ECONOMY.luckyGiftDiamondRatio : ECONOMY.giftDiamondRatio;
+    // The optional dashboard platform percentage adjusts the mint ratio itself.
+    // It must not be deducted a second time from the already-minted diamond pool:
+    // the clean economy model takes platform margin at coin → diamond mint.
+    const platformPercent = await this.platformGiftCommissionPercent();
+    const effectiveRatioCap = Math.max(0, ratioCap * (1 - platformPercent / 100));
     // Never use Math.min(catalog=0, …) — that wiped diamonds on unpaid catalog rows.
-    const cappedPerUnit = mintDiamondsPerUnit(coinPrice, gift.diamondValue, ratioCap);
-    // Receiver diamonds stay base (no multiplier). Lucky jackpot returns coins to sender.
+    const cappedPerUnit = mintDiamondsPerUnit(
+      coinPrice,
+      gift.diamondValue,
+      effectiveRatioCap,
+    );
+    // Receiver diamonds are the final distributable pool. Lucky jackpot returns coins to sender.
     const diamondsAwarded = cappedPerUnit * qty;
     let luckyMultiplier: number | null = null;
     let luckyCoinsWon = 0;
@@ -1797,13 +1807,9 @@ export class GiftsService implements OnModuleInit {
       //                   ownerPct% commission. BOTH land in wallet.diamonds.
       // No separate platform cut here: platform margin is the gap between the
       // coins the sender paid and the diamonds handed out (taken at mint).
-      let hostDiamonds = distributableDiamonds;
+      let hostDiamonds = diamondsAwarded;
       let agentShare = 0;
-      const platformPercent = await this.platformGiftCommissionPercent();
-      // Platform commission is a separate dashboard lever applied to the minted diamond pool.
-      // The remaining pool is then split between host and agency owner.
-      const platformCut = Math.floor((diamondsAwarded * platformPercent) / 100);
-      const distributableDiamonds = Math.max(0, diamondsAwarded - platformCut);
+      const distributableDiamonds = diamondsAwarded;
       let agencyId: string | null = null;
       let earningsStream: 'personal' | 'agency' = 'personal';
 
@@ -1881,7 +1887,7 @@ export class GiftsService implements OnModuleInit {
               }),
             );
           }
-          await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', diamondsAwarded);
+          await manager.increment(Agency, { id: agency.id }, 'totalDiamonds', distributableDiamonds);
         }
       }
 
