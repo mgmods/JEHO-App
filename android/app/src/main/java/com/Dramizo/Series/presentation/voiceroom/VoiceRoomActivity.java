@@ -179,7 +179,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomChatZoneVisible = true;
     /** True while the user is moving directly from one seat to another. */
     private boolean seatSwitchPending;
+    private boolean seatSwitchConfirmed;
     private int pendingSeatIndex = -1;
+    private final Runnable clearSeatSwitchGuard = () -> {
+        seatSwitchPending = false;
+        seatSwitchConfirmed = false;
+        pendingSeatIndex = -1;
+    };
     private String myUserId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -624,7 +630,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         // A seat hop is one atomic server operation: the API clears the old
                         // seat and occupies the new one. Keep the local voice state alive while
                         // the realtime seat_left/seat_taken events arrive out of order.
+                        handler.removeCallbacks(clearSeatSwitchGuard);
                         seatSwitchPending = isOnSeat(currentSeats);
+                        seatSwitchConfirmed = false;
                         pendingSeatIndex = seat.seatIndex;
                         optimisticTakeSeat(seat.seatIndex);
                         viewModel.takeSeat(roomId, seat.seatIndex);
@@ -859,6 +867,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         viewModel.getError().observe(this, e -> {
             if (e == null) return;
+            // A seat hop is a room action, not a failed room join. Never show the
+            // full "connection slow" flow or start another /join while switching seats.
+            if (seatSwitchPending) {
+                seatSwitchPending = false;
+                seatSwitchConfirmed = false;
+                pendingSeatIndex = -1;
+                dismissRoomJoinLoading();
+                if (roomId != null && !roomId.isEmpty()) requestRoomRefresh(true);
+                Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
+                return;
+            }
             String msg = e.toLowerCase(java.util.Locale.US);
             if (msg.contains("password") || msg.contains("كلمة المرور")
                     || msg.contains("room password") || msg.contains("invalid password")) {
@@ -11660,10 +11679,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (myUserId != null && sameUser(myUserId, approvedId)) {
                 if ("room:seat_taken".equals(event)) {
-                    // Server confirmed the new seat. Clear the hop guard before refreshing so
-                    // a following seat_left event cannot be interpreted as a forced removal.
-                    seatSwitchPending = false;
-                    pendingSeatIndex = -1;
+                    // Keep the hop guard alive: realtime can deliver the old seat_left
+                    // after the new seat_taken. Clearing here used to make that old event
+                    // look like a forced removal and could mute/stop publishing the user.
+                    seatSwitchConfirmed = true;
+                    handler.removeCallbacks(clearSeatSwitchGuard);
+                    handler.postDelayed(clearSeatSwitchGuard, 2_000L);
                 }
                 if ("room:seat_approved".equals(event)) {
                     Toast.makeText(this, R.string.mic_request_approved, Toast.LENGTH_SHORT).show();
@@ -11696,6 +11717,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (seatSwitchPending) {
                     if (pendingSeatIndex >= 0) {
                         optimisticTakeSeat(pendingSeatIndex);
+                    }
+                    if (seatSwitchConfirmed) {
+                        handler.removeCallbacks(clearSeatSwitchGuard);
+                        handler.postDelayed(clearSeatSwitchGuard, 700L);
                     }
                     return;
                 }
