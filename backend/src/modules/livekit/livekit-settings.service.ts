@@ -72,9 +72,21 @@ export class LiveKitSettingsService {
     if (row?.value) {
       try {
         const parsed = JSON.parse(row.value) as StoredVoiceRtcConfig;
-        if (parsed.provider === 'livekit' || parsed.provider === 'zego') {
-          this.providerCache = parsed.provider;
-          return parsed.provider;
+        if (parsed.provider === 'livekit') {
+          this.providerCache = 'livekit';
+          return 'livekit';
+        }
+        if (parsed.provider === 'zego') {
+          // If ZEGO was selected but its server credentials are missing, prefer a
+          // fully configured LiveKit stack instead of handing the mobile client a
+          // zero-AppID token that can never connect.
+          if (await this.liveKitReadyWhenZegoUnavailable()) {
+            this.providerCache = 'livekit';
+            this.logger.warn('ZEGO is selected but not configured; falling back to configured LiveKit');
+            return 'livekit';
+          }
+          this.providerCache = 'zego';
+          return 'zego';
         }
       } catch {
         /* fall through */
@@ -87,9 +99,24 @@ export class LiveKitSettingsService {
     )
       .trim()
       .toLowerCase();
-    const provider: VoiceRtcProvider = env === 'livekit' ? 'livekit' : 'zego';
+    let provider: VoiceRtcProvider = env === 'livekit' ? 'livekit' : 'zego';
+    if (provider === 'zego' && await this.liveKitReadyWhenZegoUnavailable()) {
+      provider = 'livekit';
+      this.logger.warn('ZEGO is selected but not configured; using configured LiveKit for room voice');
+    }
     this.providerCache = provider;
     return provider;
+  }
+
+  private async liveKitReadyWhenZegoUnavailable(): Promise<boolean> {
+    try {
+      const zego = await this.zegoSettings.getMaskedSettings();
+      if (zego.appIdConfigured && zego.serverSecretConfigured) return false;
+      const livekit = await this.resolveConfig();
+      return Boolean(livekit.url && livekit.apiKey && livekit.apiSecret);
+    } catch {
+      return false;
+    }
   }
 
   async setProvider(provider: VoiceRtcProvider): Promise<VoiceRtcProvider> {
