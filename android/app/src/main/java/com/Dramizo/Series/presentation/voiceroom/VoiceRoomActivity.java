@@ -334,6 +334,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
     /** HTTP join kicked off at start of onCreate (parallel with UI setup). */
     private boolean earlyJoinStarted;
+    /** True only while the initial/switch HTTP room join is actually in flight. */
+    private boolean httpJoinInFlight;
     private boolean musicUiReady;
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
@@ -441,7 +443,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         viewModel.restoreLocalSession(session, session.room);
                     } else if (err != null && !err.isEmpty()) {
                         // Fall through to normal join if prefetch failed soft.
-                        viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
+                        startHttpJoin(getIntent().getStringExtra(EXTRA_PASSWORD));
                     } else {
                         viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
                     }
@@ -449,7 +451,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else {
                 String pass0 = getIntent().getStringExtra(EXTRA_PASSWORD);
                 // No home prefetch (deep link / rare path) — start join here once.
-                viewModel.join(roomId, pass0);
+                startHttpJoin(pass0);
             }
         }
         registerAudioRouteReceiver();
@@ -871,6 +873,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         syncMicUi();
         updateAdminControls();
 
+        viewModel.getSession().observe(this, session -> {
+            if (session != null) httpJoinInFlight = false;
+        });
+
         viewModel.getError().observe(this, e -> {
             if (e == null) return;
             // A seat hop is a room action, not a failed room join. Never show the
@@ -891,7 +897,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 promptRoomPassword(pwd -> {
                     roomJoinLoadingDismissed = false;
                     showRoomJoinLoading();
-                    viewModel.join(roomId, pwd);
+                    startHttpJoin(pwd);
                 });
             } else if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(e)
                     || msg.contains("room entry")) {
@@ -920,7 +926,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     finish();
                 }
             } else {
-                // Stay in the room screen and soft-retry HTTP join.
+                // Only a real room join failure should trigger the slow-connection retry.
+                // Refresh/seat/music errors must never trap the user in a join loop.
+                if (!httpJoinInFlight) return;
+                httpJoinInFlight = false;
                 dismissRoomJoinLoading();
                 hoppingRoom = false;
                 switchingRoom = false;
@@ -1244,7 +1253,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (!earlyJoinStarted) {
                 String pass = getIntent().getStringExtra(EXTRA_PASSWORD);
-                viewModel.join(joinRoomId, pass);
+                startHttpJoin(pass);
                 earlyJoinStarted = true;
             }
         });
@@ -1469,6 +1478,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 isAgencyRoom,
                 micOn,
                 roomSpeakerMuted);
+    }
+
+    private void startHttpJoin(@Nullable String password) {
+        if (roomId == null || roomId.isEmpty() || exiting || isFinishing()) return;
+        httpJoinInFlight = true;
+        viewModel.join(roomId, password);
     }
 
     private void showRoomJoinLoading() {
@@ -10527,7 +10542,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
-        viewModel.join(targetRoomId, password);
+        startHttpJoin(password);
         // hoppingRoom stays true until the new session arrives (see session observer).
     }
 
