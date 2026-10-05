@@ -1550,6 +1550,20 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       .andWhere('(room.agencyId IS NULL OR agency.status = :agencyActive)', {
         agencyActive: AgencyStatus.ACTIVE,
       });
+    const tag = (query.tag || '').trim().toLowerCase();
+    if (tag) {
+      qb.andWhere(
+        ':tag = ANY(string_to_array(LOWER(COALESCE(room.tags, '')), ','))',
+        { tag },
+      );
+    }
+    const country = (query.country || '').trim();
+    if (country) {
+      qb.leftJoin('room.host', 'filterHost')
+        .leftJoin('filterHost.profile', 'filterHostProfile')
+        .andWhere('LOWER(filterHostProfile.country) = LOWER(:country)', { country });
+    }
+
     // Live presence is already gated by activeHostId (except support rooms pinned by admin).
     const q = (query.search || '').trim();
     if (q) {
