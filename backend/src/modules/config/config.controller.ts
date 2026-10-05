@@ -377,12 +377,33 @@ export class ConfigController {
     try {
       const parsed = JSON.parse(row.value);
       if (!parsed || typeof parsed !== 'object') return defaults;
-      return {
+      const version = Number(parsed.version) || defaults.version;
+      const updatedAt = parsed.updatedAt || new Date().toISOString();
+      const cacheBust = encodeURIComponent(String(version) + '-' + String(updatedAt));
+      const bust = (value: unknown) => {
+        const url = String(value || '').trim();
+        if (!url || !/^https?:\\/\\//i.test(url) && !url.startsWith('/')) return value;
+        return url + (url.includes('?') ? '&' : '?') + 'v=' + cacheBust;
+      };
+      const next = {
         ...defaults,
         ...parsed,
-        version: Number(parsed.version) || defaults.version,
-        updatedAt: parsed.updatedAt || new Date().toISOString(),
+        version,
+        updatedAt,
       };
+      if (next.brand?.splashUrl) {
+        next.brand = { ...next.brand, splashUrl: bust(next.brand.splashUrl) };
+      }
+      if (next.splash?.items && Array.isArray(next.splash.items)) {
+        next.splash = {
+          ...next.splash,
+          items: next.splash.items.map((item: any) => ({
+            ...item,
+            url: bust(item?.url),
+          })),
+        };
+      }
+      return next;
     } catch {
       return defaults;
     }
