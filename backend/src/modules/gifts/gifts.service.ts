@@ -1668,12 +1668,31 @@ export class GiftsService implements OnModuleInit {
     return { ok: true, reassignedTo: fallback };
   }
 
+  /** Dashboard-controlled self-gifting policy. Defaults to blocked for safety. */
+  private async isSelfGiftBlocked(): Promise<boolean> {
+    try {
+      const row = await this.settingsRepo.findOne({
+        where: { key: 'economy.self_gift_blocked' },
+      });
+      if (!row || row.value == null || row.value === '') return true;
+      const value = String(row.value).trim().toLowerCase();
+      return value === 'true' || value === '1' || value === 'yes' || value === 'on';
+    } catch (err) {
+      // Fail closed: a settings/database read failure must not enable self-gifting.
+      this.log.warn(
+        'Self-gift policy read failed; keeping self-gifting blocked: ' +
+          (err instanceof Error ? err.message : String(err)),
+      );
+      return true;
+    }
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
-    const selfGift = senderId === dto.receiverId;
-    // Room owner / host / anyone: never gift yourself (no self-support).
-    if (selfGift) {
+    const selfGift = String(senderId) === String(dto.receiverId);
+    const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
+    if (selfGiftBlocked) {
       throw new BadRequestException(
-        'الدعم الذاتي غير مسموح — لا يمكن إرسال هدية لنفسك',
+        'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة',
       );
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
@@ -2256,16 +2275,23 @@ export class GiftsService implements OnModuleInit {
    */
   async sendAllMic(senderId: string, dto: SendAllMicGiftDto) {
     const rawIds = Array.isArray(dto.receiverIds) ? dto.receiverIds : [];
+    const selfGiftBlocked = await this.isSelfGiftBlocked();
     const receiverIds = [
       ...new Set(
         rawIds
           .map((id) => String(id || '').trim())
-          .filter((id) => id.length > 0 && id !== senderId),
+          .filter(
+            (id) =>
+              id.length > 0 &&
+              (!selfGiftBlocked || id !== String(senderId)),
+          ),
       ),
     ].slice(0, 20);
     if (receiverIds.length === 0) {
       throw new BadRequestException(
-        'الدعم الذاتي غير مسموح — اختر مستلمين آخرين على المايك',
+        selfGiftBlocked
+          ? 'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة'
+          : 'اختر مستلمًا صالحًا على المايك',
       );
     }
     if (receiverIds.length === 1) {
