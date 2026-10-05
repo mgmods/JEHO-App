@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.bumptech.glide.Glide;
+import com.google.gson.Gson;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
@@ -30,27 +31,61 @@ public final class RemoteTheme {
 
     private RemoteTheme() {}
 
+    private static final String PREFS = "remote_theme";
+    private static final String KEY_JSON = "theme_json";
+    private static final Gson GSON = new Gson();
+
     public static MiscDtos.ThemeDto getCached(Context context) {
         MiscDtos.ThemeDto mem = cached;
         if (mem != null) return mem;
-        // App visuals ship only in the APK — never hydrate from dashboard/remote theme.
+        MiscDtos.ThemeDto disk = readDisk(context);
+        if (disk != null) {
+            cached = disk;
+            return disk;
+        }
         MiscDtos.ThemeDto defaults = MiscDtos.ThemeDto.defaults();
         cached = defaults;
         return defaults;
     }
 
-    /** Remote theme download disabled — UI assets live in res/. */
+    /** Downloads the dashboard-controlled theme once per app start; failures keep the last cache. */
     public static void refreshFromApi(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
-        // no-op
+        if (context == null || api == null) return;
+        try {
+            com.Dramizo.Series.domain.model.Result<MiscDtos.ThemeDto> result =
+                    ApiCall.execute(api.theme());
+            if (!result.success || result.data == null) return;
+            cached = result.data;
+            writeDisk(context, result.data);
+        } catch (Throwable ignored) {
+            // Remote configuration must never prevent the app from opening.
+        }
     }
 
     private static void writeDisk(Context context, MiscDtos.ThemeDto theme) {
-        // no-op — do not persist remote theme
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null || theme == null) return;
+            storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(KEY_JSON, GSON.toJson(theme))
+                    .apply();
+        } catch (Throwable ignored) {
+        }
     }
 
     @Nullable
     private static MiscDtos.ThemeDto readDisk(Context context) {
-        return null;
+        try {
+            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+            if (storage == null) return null;
+            String json = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getString(KEY_JSON, "");
+            if (json == null || json.trim().isEmpty()) return null;
+            return GSON.fromJson(json, MiscDtos.ThemeDto.class);
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     public static int getCachedVersion(Context context) {
