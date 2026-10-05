@@ -270,6 +270,9 @@ async function save() {
   const payload = {}
   for (const field of Object.keys(keys)) {
     const value = form[field]
+    // The backend masks the stored Twilio Auth Token. Do not write the mask back
+    // over the real secret unless the admin explicitly enters a new token.
+    if (field === 'twilioAuthToken' && String(value || '').startsWith('••••')) continue
     payload[keys[field]] = typeof value === 'boolean' ? String(value) : String(value ?? '')
   }
   const { error: err } = await settingsApi.update(payload)
