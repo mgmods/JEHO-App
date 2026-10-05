@@ -227,10 +227,7 @@ public class ProfileSetupActivity extends ThemedActivity {
                     Toast.LENGTH_LONG).show();
             return;
         }
-        if (!nonEmpty(avatarUrl)) {
-            Toast.makeText(this, "اختر صورة البروفايل", Toast.LENGTH_SHORT).show();
-            return;
-        }
+        // Profile photos are optional. A failed upload must never block account setup.
         if (birthday.isEmpty()) {
             Toast.makeText(this, "اختر تاريخ الميلاد", Toast.LENGTH_SHORT).show();
             return;
@@ -261,7 +258,8 @@ public class ProfileSetupActivity extends ThemedActivity {
         }
 
         MiscDtos.UpdateProfileRequest request = new MiscDtos.UpdateProfileRequest();
-        request.avatarUrl = avatarUrl;
+        // Leave avatarUrl unset when no photo was uploaded; backend keeps the default avatar.
+        if (nonEmpty(avatarUrl)) request.avatarUrl = avatarUrl;
         request.bio = bio;
         request.gender = GENDER_VALUES[genderIndex];
         request.birthday = birthday;
