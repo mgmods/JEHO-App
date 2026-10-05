@@ -426,6 +426,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        // Load the public room snapshot immediately in parallel with the authenticated join.
+        // This keeps the room UI from waiting on POST /rooms/:id/join when Render/mobile network is slow.
+        if (roomId != null && !roomId.isEmpty() && !"demo-room-1".equals(roomId)) {
+            viewModel.refresh(roomId);
+        }
         // Critical path: HTTP join overlaps layout inflate.
         // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
         boolean canResume = roomId != null && !roomId.isEmpty()
