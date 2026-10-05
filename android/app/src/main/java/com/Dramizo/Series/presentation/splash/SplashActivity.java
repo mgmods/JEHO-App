@@ -11,6 +11,9 @@ import android.util.Log;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import android.view.ViewGroup;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.bumptech.glide.Glide;
 
 import androidx.appcompat.app.AppCompatDelegate;
@@ -62,7 +65,7 @@ public class SplashActivity extends ThemedActivity {
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto remoteTheme =
                     com.Dramizo.Series.util.RemoteTheme.getCached(this);
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto splashItem =
-                    com.Dramizo.Series.util.RemoteTheme.nextSplash(this);
+                    com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this).isEmpty() ? null : com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this).get(0);
             splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(splashItem);
             applyRemoteSplash(binding, splashItem);
             if (getWindow() != null) {
@@ -96,12 +99,62 @@ public class SplashActivity extends ThemedActivity {
                 boolean skipEnabled = remoteTheme != null && remoteTheme.splash != null && remoteTheme.splash.skipEnabled;
                 binding.btnSplashSkip.setVisibility(skipEnabled ? android.view.View.VISIBLE : android.view.View.GONE);
                 binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
+                ViewCompat.setOnApplyWindowInsetsListener(binding.btnSplashSkip, (view, insets) -> {
+                    androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
+                    ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
+                    lp.topMargin = bars.top + dp(8);
+                    lp.leftMargin = dp(12);
+                    lp.rightMargin = dp(12);
+                    view.setLayoutParams(lp);
+                    return insets;
+                });
+                ViewCompat.requestApplyInsets(binding.btnSplashSkip);
             }
-            mainHandler.postDelayed(this::prepareSession, splashDurationMs);
-            mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
+            scheduleSplashNavigation();
+            refreshRemoteSplashFromServer(binding);
         } catch (Throwable t) {
             Log.e(TAG, "Splash failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void scheduleSplashNavigation() {
+        mainHandler.removeCallbacksAndMessages(null);
+        mainHandler.postDelayed(this::prepareSession, splashDurationMs);
+        mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
+    }
+
+    private void refreshRemoteSplashFromServer(ActivitySplashBinding binding) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                try {
+                    com.Dramizo.Series.util.RemoteTheme.refreshFromApi(this, c.getConfigApi());
+                    com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto latest =
+                            com.Dramizo.Series.util.RemoteTheme.nextSplash(this);
+                    runOnUiThread(() -> {
+                        if (navigated || isFinishing()) return;
+                        splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(latest);
+                        applyRemoteSplash(binding, latest);
+                        com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto latestTheme =
+                                com.Dramizo.Series.util.RemoteTheme.getCached(this);
+                        if (binding.btnSplashSkip != null) {
+                            boolean enabled = latestTheme != null && latestTheme.splash != null
+                                    && latestTheme.splash.skipEnabled;
+                            binding.btnSplashSkip.setVisibility(enabled ? android.view.View.VISIBLE : android.view.View.GONE);
+                        }
+                        scheduleSplashNavigation();
+                    });
+                } catch (Throwable t) {
+                    Log.w(TAG, "Remote splash refresh skipped", t);
+                }
+            });
+        } catch (Throwable t) {
+            Log.w(TAG, "Remote splash setup skipped", t);
         }
     }
 
@@ -116,7 +169,7 @@ public class SplashActivity extends ThemedActivity {
             binding.tvSplashBrand.setVisibility(android.view.View.GONE);
             binding.tvSplashTagline.setVisibility(android.view.View.GONE);
             binding.splashProgress.setVisibility(android.view.View.GONE);
-            Glide.with(this).load(resolved).dontAnimate().fitCenter().into(binding.imgSplashRemote);
+            Glide.with(this).load(resolved).dontAnimate().centerCrop().into(binding.imgSplashRemote);
         } catch (Throwable ignored) {
             // Bundled splash remains the safe fallback.
         }
