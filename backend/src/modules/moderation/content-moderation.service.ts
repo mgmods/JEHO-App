@@ -347,15 +347,13 @@ export class ContentModerationService implements OnModuleInit {
     const threshold = await this.numSetting('live_nsfw_confidence', 0.72);
     const score = await this.estimateNsfwScore(storedPath, ext);
     if (score == null) {
-      try {
-        unlinkSync(storedPath);
-      } catch {
-        /* ignore */
-      }
-      throw new BadRequestException({
-        code: 'NSFW_SCAN_UNAVAILABLE',
-        message: 'تعذر فحص الصورة — ارفع JPG أو PNG',
-      });
+      // Upload availability must not depend on an optional NSFW scanner.
+      // JPEG/PNG use the built-in scanner; GIF/WebP need an external scanner.
+      // If a scanner is unavailable, keep the image and let the upload succeed.
+      this.log.warn(
+        `NSFW scan unavailable for ${ext || 'unknown image type'}; allowing upload`,
+      );
+      return;
     }
     if (score < threshold) return;
 
