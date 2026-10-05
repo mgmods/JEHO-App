@@ -155,19 +155,36 @@ export class UploadsService {
   }
 
   private async ensureStorageBucket() {
+    const headers = {
+      apikey: this.storageKey,
+      Authorization: 'Bearer ' + this.storageKey,
+    };
+    const bucketUrl =
+      this.supabaseUrl + '/storage/v1/bucket/' + encodeURIComponent(this.storageBucket);
+
+    // Do not blindly POST-create the bucket on every failed upload. Supabase
+    // returns a 400 for some existing/misconfigured bucket states, which used
+    // to turn an otherwise valid upload into "bucket setup failed".
+    const existing = await fetch(bucketUrl, { headers });
+    if (existing.ok) return;
+
+    if (existing.status !== 404) {
+      const detail = await this.safeResponseText(existing);
+      throw new BadRequestException(
+        `Supabase Storage bucket check failed (${existing.status}): ${detail}`,
+      );
+    }
+
     const response = await fetch(this.supabaseUrl + '/storage/v1/bucket', {
       method: 'POST',
-      headers: {
-        apikey: this.storageKey,
-        Authorization: 'Bearer ' + this.storageKey,
-        'Content-Type': 'application/json',
-      },
+      headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: this.storageBucket,
         name: this.storageBucket,
         public: false,
       }),
     });
+
     // 409 means another request/deployment created it concurrently.
     if (!response.ok && response.status !== 409) {
       const detail = await this.safeResponseText(response);
