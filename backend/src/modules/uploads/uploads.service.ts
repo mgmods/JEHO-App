@@ -175,12 +175,7 @@ export class UploadsService {
       filename: storedName,
       mimeType: file.mimetype,
       size: file.size,
-      url: this.storageEnabled()
-        ? `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(storedName)}`
-        : this.buildPublicPath(storedName),
-      path: this.storageEnabled()
-        ? `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(storedName)}`
-        : storedPath,
+      // Serve uploads through our API because the configured Supabase bucket is private.\n      // This keeps dashboard previews and Android clients working without /object/public.\n      url: this.buildPublicPath(storedName),\n      path: this.buildPublicPath(storedName),
     };
   }
 
