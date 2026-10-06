@@ -285,7 +285,7 @@ export class UploadsService {
       path: string;
     }> = [];
     for (const f of files || []) {
-      out.push(await this.processUploaded(f, userId));
+      out.push(await this.processUploaded(f as Express.Multer.File, userId));
     }
     return out;
   }
