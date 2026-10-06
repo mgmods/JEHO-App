@@ -74,6 +74,24 @@ export class UploadsService {
     return Boolean(this.supabaseUrl && this.storageKey);
   }
 
+  /**
+   * Supabase now supports both legacy JWT service-role keys and the newer
+   * sb_secret_* server keys. The latter are API keys, not JWTs, so sending
+   * them as "Authorization: Bearer ..." makes Storage return:
+   * "Invalid Compact JWS". Always send apikey; only send Bearer for a JWT key.
+   */
+  private storageHeaders(extra: Record<string, string> = {}) {
+    const headers: Record<string, string> = {
+      apikey: this.storageKey,
+      ...extra,
+    };
+    const parts = this.storageKey.split('.');
+    if (parts.length === 3 && parts.every((part) => part.length > 0)) {
+      headers.Authorization = 'Bearer ' + this.storageKey;
+    }
+    return headers;
+  }
+
   private storageObjectUrl(filename: string) {
     return `${this.supabaseUrl}/storage/v1/object/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
   }
@@ -82,7 +100,7 @@ export class UploadsService {
     if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
     const response = await fetch(this.storageObjectUrl(filename), {
-      headers: { apikey: this.storageKey, Authorization: `Bearer ${this.storageKey}` },
+      headers: this.storageHeaders(),
     });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
@@ -130,13 +148,11 @@ export class UploadsService {
       throw err;
     }
     if (this.storageEnabled()) {
-      const uploadHeaders = {
-        apikey: this.storageKey,
-        Authorization: 'Bearer ' + this.storageKey,
+      const uploadHeaders = this.storageHeaders({
         'Content-Type': file.mimetype || 'application/octet-stream',
         'Cache-Control': '3600',
         'x-upsert': 'true',
-      };
+      });
       const fileBuffer = readFileSync(storedPath);
       // PUT is the most reliable path for an explicitly unique object key;
       // POST remains the fallback for Storage gateways that prefer POST.
@@ -190,10 +206,7 @@ export class UploadsService {
   }
 
   private async ensureStorageBucket() {
-    const headers = {
-      apikey: this.storageKey,
-      Authorization: 'Bearer ' + this.storageKey,
-    };
+    const headers = this.storageHeaders();
     const base = this.supabaseUrl + '/storage/v1/bucket';
 
     // Prefer the bucket list: it is more reliable across Storage gateway
@@ -252,7 +265,7 @@ export class UploadsService {
   private async deleteStoredFile(filename: string) {
     const response = await fetch(this.storageObjectUrl(filename), {
       method: 'DELETE',
-      headers: { apikey: this.storageKey, Authorization: `Bearer ${this.storageKey}` },
+      headers: this.storageHeaders(),
     });
     if (!response.ok && response.status !== 404) {
       const detail = await this.safeResponseText(response);
