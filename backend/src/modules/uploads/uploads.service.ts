@@ -98,7 +98,14 @@ export class UploadsService {
     }
   }
 
-  async processUploaded(file: Express.Multer.File, userId?: string) {
+  async processUploaded(file: Express.Multer.File, userId?: string): Promise<{
+    originalName: string;
+    filename: string;
+    mimeType: string;
+    size: number;
+    url: string;
+    path: string;
+  }> {
     if (!file) throw new BadRequestException('No file uploaded');
     const ext = extname(file.originalname).toLowerCase();
     const storedName = file.filename || `${uuidv4()}${ext}`;
