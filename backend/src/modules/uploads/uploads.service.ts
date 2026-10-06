@@ -27,9 +27,11 @@ export class UploadsService {
     // Server-only Storage credential. Prefer the explicit service-role variable,
     // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.
     this.storageKey =
-      process.env.SUPABASE_SECRET_KEY?.trim() ||
+      // Prefer the legacy service-role credential when it is configured because
+      // Supabase Storage admin endpoints still support it directly.
       process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
       process.env.SUPABASE_STORAGE_KEY?.trim() ||
+      process.env.SUPABASE_SECRET_KEY?.trim() ||
       '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     const keySource =
@@ -183,7 +185,7 @@ export class UploadsService {
 
       // Only create/check the bucket when Storage explicitly says it is
       // missing, then retry once with the same PUT request.
-      if (!upload.ok && (upload.status === 400 || upload.status === 404)) {
+      if (!upload.ok && upload.status === 404) {
         await this.ensureStorageBucket();
         upload = await this.storageFetch(this.storageObjectUrl(storedName), {
           method: 'PUT',
@@ -223,23 +225,6 @@ export class UploadsService {
     // Prefer the bucket list: it is more reliable across Storage gateway
     // versions than treating a 400/404 from getBucket as proof that the
     // bucket does not exist.
-    const listed = await this.storageFetch(base, { headers });
-    if (listed.ok) {
-      try {
-        const buckets = await listed.json();
-        if (
-          Array.isArray(buckets) &&
-          buckets.some((bucket: { id?: string; name?: string }) =>
-            String(bucket?.id || bucket?.name || '') === this.storageBucket,
-          )
-        ) {
-          return;
-        }
-      } catch {
-        // Fall through to the direct bucket check.
-      }
-    }
-
     const bucketUrl = base + '/' + encodeURIComponent(this.storageBucket);
     const existing = await this.storageFetch(bucketUrl, { headers });
     if (existing.ok) return;
