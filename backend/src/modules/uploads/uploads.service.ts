@@ -71,15 +71,12 @@ export class UploadsService {
   }
 
   private storageHeaders(extra: Record<string, string> = {}) {
+    // Supabase Storage requires Authorization even when apikey is present.
     const headers: Record<string, string> = {
       apikey: this.storageKey,
+      Authorization: 'Bearer ' + this.storageKey,
       ...extra,
     };
-    const isLegacyJwt = this.storageKey.split('.').length === 3;
-    const isNewServerKey = this.storageKey.startsWith('sb_secret_');
-    if (isLegacyJwt || isNewServerKey) {
-      headers.Authorization = 'Bearer ' + this.storageKey;
-    }
     return headers;
   }
 
