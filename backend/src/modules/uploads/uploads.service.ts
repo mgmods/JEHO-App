@@ -183,16 +183,12 @@ export class UploadsService {
         body: fileBuffer,
       });
 
-      // Only create/check the bucket when Storage explicitly says it is
-      // missing, then retry once with the same PUT request.
-      if (!upload.ok && upload.status === 404) {
-        await this.ensureStorageBucket();
-        upload = await this.storageFetch(this.storageObjectUrl(storedName), {
-          method: 'PUT',
-          headers: uploadHeaders,
-          body: fileBuffer,
-        });
-      }
+      // The production bucket is provisioned in Supabase and must not be
+      // checked/created through the Storage admin API during every upload.
+      // That admin endpoint requires a different authorization flow and was
+      // the source of the misleading "headers must have required property
+      // authorization" error. A missing bucket is a deployment/config error,
+      // not something to repair inside a user upload request.
 
       if (!upload.ok) {
         const detail = await this.safeResponseText(upload);
@@ -218,46 +214,6 @@ export class UploadsService {
     };
   }
 
-  private async ensureStorageBucket() {
-    const headers = this.storageHeaders();
-    const base = this.supabaseUrl + '/storage/v1/bucket';
-
-    // Prefer the bucket list: it is more reliable across Storage gateway
-    // versions than treating a 400/404 from getBucket as proof that the
-    // bucket does not exist.
-    const bucketUrl = base + '/' + encodeURIComponent(this.storageBucket);
-    const existing = await this.storageFetch(bucketUrl, { headers });
-    if (existing.ok) return;
-
-    const existingDetail = await this.safeResponseText(existing);
-    const missing =
-      existing.status === 404 ||
-      existing.status === 400 &&
-        /NoSuchBucket|Bucket not found/i.test(existingDetail);
-
-    if (!missing) {
-      throw new BadRequestException(
-        `Supabase Storage bucket check failed (${existing.status}): ${existingDetail}`,
-      );
-    }
-
-    const response = await this.storageFetch(base, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: this.storageBucket,
-        name: this.storageBucket,
-        public: true,
-      }),
-    });
-
-    if (!response.ok && response.status !== 409) {
-      const detail = await this.safeResponseText(response);
-      throw new BadRequestException(
-        `Supabase Storage bucket setup failed (${response.status}): ${detail}`,
-      );
-    }
-  }
   private async deleteStoredFile(filename: string) {
     const response = await this.storageFetch(this.storageObjectUrl(filename), {
       method: 'DELETE',
