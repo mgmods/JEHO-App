@@ -383,7 +383,7 @@ export class ConfigController {
       const bust = (value: unknown) => {
         const url = String(value || '').trim();
         if (!url) return value;
-        const isAbsolute = /^https?:\/\//i.test(url) || url.charAt(0) === '/';
+        const isAbsolute = url.startsWith('http://') || url.startsWith('https://') || url.charAt(0) === '/';
         if (!isAbsolute) return value;
         return url + (url.includes('?') ? '&' : '?') + 'v=' + cacheBust;
       };
