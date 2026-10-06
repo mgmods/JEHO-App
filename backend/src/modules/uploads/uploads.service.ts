@@ -96,10 +96,29 @@ export class UploadsService {
     return `${this.supabaseUrl}/storage/v1/object/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
   }
 
+  private async storageFetch(
+    url: string,
+    init: RequestInit,
+    timeoutMs = 20_000,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...init, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted) {
+        throw new BadRequestException('Supabase Storage timed out while uploading the image');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
-    const response = await fetch(this.storageObjectUrl(filename), {
+    const response = await this.storageFetch(this.storageObjectUrl(filename), {
       headers: this.storageHeaders(),
     });
     if (response.status === 404) return null;
@@ -154,28 +173,20 @@ export class UploadsService {
         'x-upsert': 'true',
       });
       const fileBuffer = readFileSync(storedPath);
-      // PUT is the most reliable path for an explicitly unique object key;
-      // POST remains the fallback for Storage gateways that prefer POST.
-      let upload = await fetch(this.storageObjectUrl(storedName), {
+      // Use one bounded PUT. The old PUT→POST→bucket-check→POST chain could
+      // keep a dashboard upload open until Render returned 502.
+      let upload = await this.storageFetch(this.storageObjectUrl(storedName), {
         method: 'PUT',
         headers: uploadHeaders,
         body: fileBuffer,
       });
 
-      if (!upload.ok && (upload.status === 400 || upload.status === 409)) {
-        upload = await fetch(this.storageObjectUrl(storedName), {
-          method: 'POST',
-          headers: uploadHeaders,
-          body: fileBuffer,
-        });
-      }
-
-      // A fresh deployment may not have the configured bucket yet. Create it
-      // once and retry instead of making profile/room image uploads fail.
+      // Only create/check the bucket when Storage explicitly says it is
+      // missing, then retry once with the same PUT request.
       if (!upload.ok && (upload.status === 400 || upload.status === 404)) {
         await this.ensureStorageBucket();
-        upload = await fetch(this.storageObjectUrl(storedName), {
-          method: 'POST',
+        upload = await this.storageFetch(this.storageObjectUrl(storedName), {
+          method: 'PUT',
           headers: uploadHeaders,
           body: fileBuffer,
         });
@@ -212,7 +223,7 @@ export class UploadsService {
     // Prefer the bucket list: it is more reliable across Storage gateway
     // versions than treating a 400/404 from getBucket as proof that the
     // bucket does not exist.
-    const listed = await fetch(base, { headers });
+    const listed = await this.storageFetch(base, { headers });
     if (listed.ok) {
       try {
         const buckets = await listed.json();
@@ -230,7 +241,7 @@ export class UploadsService {
     }
 
     const bucketUrl = base + '/' + encodeURIComponent(this.storageBucket);
-    const existing = await fetch(bucketUrl, { headers });
+    const existing = await this.storageFetch(bucketUrl, { headers });
     if (existing.ok) return;
 
     const existingDetail = await this.safeResponseText(existing);
@@ -245,7 +256,7 @@ export class UploadsService {
       );
     }
 
-    const response = await fetch(base, {
+    const response = await this.storageFetch(base, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -263,7 +274,7 @@ export class UploadsService {
     }
   }
   private async deleteStoredFile(filename: string) {
-    const response = await fetch(this.storageObjectUrl(filename), {
+    const response = await this.storageFetch(this.storageObjectUrl(filename), {
       method: 'DELETE',
       headers: this.storageHeaders(),
     });
