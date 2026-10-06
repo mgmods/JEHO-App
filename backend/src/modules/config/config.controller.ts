@@ -381,11 +381,24 @@ export class ConfigController {
       const updatedAt = parsed.updatedAt || new Date().toISOString();
       const cacheBust = encodeURIComponent(String(version) + '-' + String(updatedAt));
       const bust = (value: unknown) => {
-        const url = String(value || '').trim();
-        if (!url) return value;
+        const raw = String(value || '').trim();
+        if (!raw) return value;
+
+        // Dashboard uploads are served by this API. Convert relative upload
+        // paths into absolute URLs so mobile clients and Glide can load them.
+        const apiBase = String(
+          process.env.PUBLIC_API_URL ||
+            process.env.API_PUBLIC_URL ||
+            'https://jeho-own-api.onrender.com',
+        ).replace(/\/$/, '');
+        const url =
+          raw.startsWith('/uploads/') && !raw.startsWith('//')
+            ? apiBase + raw
+            : raw;
+
         const isHttp = url.startsWith('http://') || url.startsWith('https://');
-        const isAbsolute = isHttp || url.charAt(0) === '/';
-        if (!isAbsolute) return value;
+        if (!isHttp) return value;
+
         const separator = url.includes('?') ? '&' : '?';
         return url + separator + 'v=' + cacheBust;
       };
