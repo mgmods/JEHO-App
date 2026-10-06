@@ -22,7 +22,7 @@ export class UploadsService {
   ) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
-    const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || '';
+    const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || 'https://nxptedmacsdqnehcatpi.supabase.co';
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
     // Server-only Storage credential. Prefer the explicit service-role variable,
     // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.
@@ -194,33 +194,54 @@ export class UploadsService {
       apikey: this.storageKey,
       Authorization: 'Bearer ' + this.storageKey,
     };
-    const bucketUrl =
-      this.supabaseUrl + '/storage/v1/bucket/' + encodeURIComponent(this.storageBucket);
+    const base = this.supabaseUrl + '/storage/v1/bucket';
 
-    // Do not blindly POST-create the bucket on every failed upload. Supabase
-    // returns a 400 for some existing/misconfigured bucket states, which used
-    // to turn an otherwise valid upload into "bucket setup failed".
+    // Prefer the bucket list: it is more reliable across Storage gateway
+    // versions than treating a 400/404 from getBucket as proof that the
+    // bucket does not exist.
+    const listed = await fetch(base, { headers });
+    if (listed.ok) {
+      try {
+        const buckets = await listed.json();
+        if (
+          Array.isArray(buckets) &&
+          buckets.some((bucket: { id?: string; name?: string }) =>
+            String(bucket?.id || bucket?.name || '') === this.storageBucket,
+          )
+        ) {
+          return;
+        }
+      } catch {
+        // Fall through to the direct bucket check.
+      }
+    }
+
+    const bucketUrl = base + '/' + encodeURIComponent(this.storageBucket);
     const existing = await fetch(bucketUrl, { headers });
     if (existing.ok) return;
 
-    if (existing.status !== 404) {
-      const detail = await this.safeResponseText(existing);
+    const existingDetail = await this.safeResponseText(existing);
+    const missing =
+      existing.status === 404 ||
+      existing.status === 400 &&
+        /NoSuchBucket|Bucket not found/i.test(existingDetail);
+
+    if (!missing) {
       throw new BadRequestException(
-        `Supabase Storage bucket check failed (${existing.status}): ${detail}`,
+        `Supabase Storage bucket check failed (${existing.status}): ${existingDetail}`,
       );
     }
 
-    const response = await fetch(this.supabaseUrl + '/storage/v1/bucket', {
+    const response = await fetch(base, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: this.storageBucket,
         name: this.storageBucket,
-        public: false,
+        public: true,
       }),
     });
 
-    // 409 means another request/deployment created it concurrently.
     if (!response.ok && response.status !== 409) {
       const detail = await this.safeResponseText(response);
       throw new BadRequestException(
