@@ -24,30 +24,24 @@ export class UploadsService {
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
     const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || 'https://nxptedmacsdqnehcatpi.supabase.co';
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
-    // Server-only Storage credential. Prefer the explicit service-role variable,
-    // while keeping the existing SUPABASE_STORAGE_KEY name for compatibility.
     this.storageKey =
-      // Prefer the legacy service-role credential when it is configured because
-      // Supabase Storage admin endpoints still support it directly.
       process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
       process.env.SUPABASE_STORAGE_KEY?.trim() ||
       process.env.SUPABASE_SECRET_KEY?.trim() ||
       '';
     this.storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'jeho-own-uploads';
     const keySource =
-      process.env.SUPABASE_SECRET_KEY?.trim()
-        ? 'secret'
-        : process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-          ? 'service_role'
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+        ? 'service_role'
+        : process.env.SUPABASE_SECRET_KEY?.trim()
+          ? 'secret'
           : process.env.SUPABASE_STORAGE_KEY?.trim()
             ? 'storage_key'
             : 'missing';
     console.log(
       `[Uploads] Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; bucket=${this.storageBucket}; key=${keySource}`,
     );
-    if (!existsSync(this.uploadDir)) {
-      mkdirSync(this.uploadDir, { recursive: true });
-    }
+    if (!existsSync(this.uploadDir)) mkdirSync(this.uploadDir, { recursive: true });
   }
 
   getMulterOptions() {
@@ -76,19 +70,14 @@ export class UploadsService {
     return Boolean(this.supabaseUrl && this.storageKey);
   }
 
-  /**
-   * Supabase now supports both legacy JWT service-role keys and the newer
-   * sb_secret_* server keys. The latter are API keys, not JWTs, so sending
-   * them as "Authorization: Bearer ..." makes Storage return:
-   * "Invalid Compact JWS". Always send apikey; only send Bearer for a JWT key.
-   */
   private storageHeaders(extra: Record<string, string> = {}) {
     const headers: Record<string, string> = {
       apikey: this.storageKey,
       ...extra,
     };
-    const parts = this.storageKey.split('.');
-    if (parts.length === 3 && parts.every((part) => part.length > 0)) {
+    const isLegacyJwt = this.storageKey.split('.').length === 3;
+    const isNewServerKey = this.storageKey.startsWith('sb_secret_');
+    if (isLegacyJwt || isNewServerKey) {
       headers.Authorization = 'Bearer ' + this.storageKey;
     }
     return headers;
@@ -98,11 +87,7 @@ export class UploadsService {
     return `${this.supabaseUrl}/storage/v1/object/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
   }
 
-  private async storageFetch(
-    url: string,
-    init: RequestInit,
-    timeoutMs = 20_000,
-  ): Promise<Response> {
+  private async storageFetch(url: string, init: RequestInit, timeoutMs = 20_000): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -120,9 +105,6 @@ export class UploadsService {
   async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
-    // The production upload bucket is public, so reads must use the
-    // public object endpoint. This avoids requiring a user/service
-    // Authorization header just to display an uploaded image.
     const publicUrl =
       `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
     const response = await this.storageFetch(publicUrl, {
@@ -167,9 +149,7 @@ export class UploadsService {
       if (userId) {
         try {
           await this.moderation.recordNsfwStrike(userId);
-        } catch {
-          /* ignore strike errors */
-        }
+        } catch {}
       }
       throw err;
     }
@@ -180,21 +160,11 @@ export class UploadsService {
         'x-upsert': 'true',
       });
       const fileBuffer = readFileSync(storedPath);
-      // Use one bounded PUT. The old PUT→POST→bucket-check→POST chain could
-      // keep a dashboard upload open until Render returned 502.
-      let upload = await this.storageFetch(this.storageObjectUrl(storedName), {
+      const upload = await this.storageFetch(this.storageObjectUrl(storedName), {
         method: 'PUT',
         headers: uploadHeaders,
         body: fileBuffer,
       });
-
-      // The production bucket is provisioned in Supabase and must not be
-      // checked/created through the Storage admin API during every upload.
-      // That admin endpoint requires a different authorization flow and was
-      // the source of the misleading "headers must have required property
-      // authorization" error. A missing bucket is a deployment/config error,
-      // not something to repair inside a user upload request.
-
       if (!upload.ok) {
         const detail = await this.safeResponseText(upload);
         console.error(
@@ -212,8 +182,6 @@ export class UploadsService {
       filename: storedName,
       mimeType: file.mimetype,
       size: file.size,
-      // Serve uploads through our API because the configured Supabase bucket is private.
-      // This keeps dashboard previews and Android clients working without /object/public.
       url: this.buildPublicPath(storedName),
       path: this.buildPublicPath(storedName),
     };
@@ -251,12 +219,8 @@ export class UploadsService {
           bytes.subarray(8, 12).toString('ascii') === 'WAVE'
         );
       }
-      if (ext === '.m4a') {
-        return bytes.subarray(4, 8).toString('ascii') === 'ftyp';
-      }
-      if (ext === '.aac') {
-        return bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xf6) === 0xf0;
-      }
+      if (ext === '.m4a') return bytes.subarray(4, 8).toString('ascii') === 'ftyp';
+      if (ext === '.aac') return bytes.length >= 2 && (bytes[0] === 0xff) && (bytes[1] & 0xf6) === 0xf0;
       return (
         bytes.subarray(0, 3).toString('ascii') === 'ID3' ||
         (bytes.length >= 2 && bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)
@@ -275,30 +239,18 @@ export class UploadsService {
       url: string;
       path: string;
     }> = [];
-    for (const f of files || []) {
-      out.push(await this.processUploaded(f as Express.Multer.File, userId));
-    }
+    for (const f of files || []) out.push(await this.processUploaded(f as Express.Multer.File, userId));
     return out;
   }
 
   deleteFilename(filename: string) {
-    if (
-      !filename ||
-      filename.includes('..') ||
-      filename.includes('/') ||
-      filename.includes('\\')
-    ) {
+    if (!filename || filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
       throw new BadRequestException('Invalid filename');
     }
     this.assertSafeFilename(filename);
-    if (this.storageEnabled()) {
-      // Supabase Storage accepts DELETE on a single object path.
-      return this.deleteStoredFile(filename);
-    }
+    if (this.storageEnabled()) return this.deleteStoredFile(filename);
     const filePath = join(this.uploadDir, filename);
-    if (!existsSync(filePath)) {
-      return { deleted: false };
-    }
+    if (!existsSync(filePath)) return { deleted: false };
     unlinkSync(filePath);
     return { deleted: true };
   }
