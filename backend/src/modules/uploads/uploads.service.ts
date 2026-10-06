@@ -71,12 +71,16 @@ export class UploadsService {
   }
 
   private storageHeaders(extra: Record<string, string> = {}) {
-    // Supabase Storage requires Authorization even when apikey is present.
+    // Legacy service-role JWTs must be sent as Bearer tokens. New Supabase
+    // secret keys (sb_secret_...) are API keys, not JWTs, so sending them as
+    // Authorization: Bearer causes Storage to reject them with "Invalid Compact JWS".
     const headers: Record<string, string> = {
       apikey: this.storageKey,
-      Authorization: 'Bearer ' + this.storageKey,
       ...extra,
     };
+    if (this.storageKey.startsWith('eyJ')) {
+      headers.Authorization = 'Bearer ' + this.storageKey;
+    }
     return headers;
   }
 
