@@ -175,7 +175,10 @@ export class UploadsService {
       filename: storedName,
       mimeType: file.mimetype,
       size: file.size,
-      // Serve uploads through our API because the configured Supabase bucket is private.\n      // This keeps dashboard previews and Android clients working without /object/public.\n      url: this.buildPublicPath(storedName),\n      path: this.buildPublicPath(storedName),
+      // Serve uploads through our API because the configured Supabase bucket is private.
+      // This keeps dashboard previews and Android clients working without /object/public.
+      url: this.buildPublicPath(storedName),
+      path: this.buildPublicPath(storedName),
     };
   }
 
