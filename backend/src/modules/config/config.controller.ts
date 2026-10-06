@@ -383,9 +383,11 @@ export class ConfigController {
       const bust = (value: unknown) => {
         const url = String(value || '').trim();
         if (!url) return value;
-        const isAbsolute = url.startsWith('http://') || url.startsWith('https://') || url.charAt(0) === '/';
+        const isHttp = url.startsWith('http://') || url.startsWith('https://');
+        const isAbsolute = isHttp || url.charAt(0) === '/';
         if (!isAbsolute) return value;
-        return url + (url.includes('?') ? '&' : '?') + 'v=' + cacheBust;
+        const separator = url.includes('?') ? '&' : '?';
+        return url + separator + 'v=' + cacheBust;
       };
       const next = {
         ...defaults,
