@@ -18,6 +18,14 @@ api.interceptors.request.use((config) => {
   if (auth.token) {
     config.headers.Authorization = `Bearer ${auth.token}`
   }
+
+  // Browser FormData must set its own multipart boundary. The global
+  // application/json header prevents Multer from seeing the uploaded file.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type']
+    delete config.headers['content-type']
+  }
+
   return config
 })
 
