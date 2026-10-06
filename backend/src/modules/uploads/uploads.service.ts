@@ -120,8 +120,13 @@ export class UploadsService {
   async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
-    const response = await this.storageFetch(this.storageObjectUrl(filename), {
-      headers: this.storageHeaders(),
+    // The production upload bucket is public, so reads must use the
+    // public object endpoint. This avoids requiring a user/service
+    // Authorization header just to display an uploaded image.
+    const publicUrl =
+      `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
+    const response = await this.storageFetch(publicUrl, {
+      headers: { Accept: 'application/octet-stream' },
     });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
