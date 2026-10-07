@@ -2,7 +2,8 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/bg_light">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -10,7 +11,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/bg_mikoo_page" />
+        android:src="@drawable/bg_mikoo_page"
+        android:visibility="gone" />
 
     <!-- Always-visible pencil: open edit profile (top-end corner). -->
     <ImageView
