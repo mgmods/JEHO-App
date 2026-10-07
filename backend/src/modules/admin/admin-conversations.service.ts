@@ -66,9 +66,10 @@ export class AdminConversationsService {
         .getRawMany<{ conversationId: string; unreadCount: string }>(),
     ]);
 
-    const lastById = new Map(lastMessages.map((m) => [m.id, m]));
-    const countById = new Map(counts.map((r) => [r.conversationId, Number(r.count || 0)]));
-    const unreadById = new Map(unread.map((r) => [r.conversationId, Number(r.unreadCount || 0)]));
+    const typedLastMessages = lastMessages as ChatMessage[];
+    const lastById = new Map<string, ChatMessage>(typedLastMessages.map((m) => [m.id, m]));
+    const countById = new Map<string, number>(counts.map((r) => [r.conversationId, Number(r.count || 0)]));
+    const unreadById = new Map<string, number>(unread.map((r) => [r.conversationId, Number(r.unreadCount || 0)]));
 
     return paginate(rows.map((c) => {
       const participants = (c.participants || []).map((p) => ({
