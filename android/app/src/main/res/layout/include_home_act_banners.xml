@@ -4,14 +4,16 @@
     android:id="@+id/actBannerLayout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="15dp"
-    android:layout_marginBottom="12dp"
-    android:orientation="horizontal">
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginBottom="10dp"
+    android:orientation="horizontal"
+    android:layoutDirection="ltr">
 
     <ViewFlipper
         android:id="@+id/rankBannerFlip"
-        android:layout_width="100dp"
+        android:layout_width="0dp"
         android:layout_height="64dp"
+        android:layout_weight="1.7"
         android:autoStart="true"
         android:flipInterval="3000"
         android:inAnimation="@android:anim/fade_in"
@@ -23,8 +25,9 @@
 
     <FrameLayout
         android:id="@+id/cpBannerCard"
-        android:layout_width="100dp"
+        android:layout_width="0dp"
         android:layout_height="64dp"
+        android:layout_weight="1"
         android:background="@drawable/home_bg_cp"
         android:clickable="true"
         android:focusable="true"
@@ -82,7 +85,7 @@
     <FrameLayout
         android:id="@+id/activityBannerCard"
         android:layout_width="0dp"
-        android:layout_height="63dp"
+        android:layout_height="64dp"
         android:layout_weight="1"
         android:background="@drawable/home_top_invite_bg"
         android:clickable="true"
