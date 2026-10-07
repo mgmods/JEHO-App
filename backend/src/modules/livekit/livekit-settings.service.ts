@@ -7,7 +7,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
-import { ZegoSettingsService } from '../zego/zego-settings.service';
 import {
   decryptSecret,
   encryptSecret,
@@ -61,7 +60,6 @@ export class LiveKitSettingsService {
     private readonly configService: ConfigService,
     @InjectRepository(AppSetting)
     private readonly settingsRepo: Repository<AppSetting>,
-    private readonly zegoSettings: ZegoSettingsService,
   ) {}
 
   async getProvider(): Promise<VoiceRtcProvider> {
@@ -72,21 +70,9 @@ export class LiveKitSettingsService {
     if (row?.value) {
       try {
         const parsed = JSON.parse(row.value) as StoredVoiceRtcConfig;
-        if (parsed.provider === 'livekit') {
-          this.providerCache = 'livekit';
-          return 'livekit';
-        }
-        if (parsed.provider === 'zego') {
-          // If ZEGO was selected but its server credentials are missing, prefer a
-          // fully configured LiveKit stack instead of handing the mobile client a
-          // zero-AppID token that can never connect.
-          if (await this.liveKitReadyWhenZegoUnavailable()) {
-            this.providerCache = 'livekit';
-            this.logger.warn('ZEGO is selected but not configured; falling back to configured LiveKit');
-            return 'livekit';
-          }
-          this.providerCache = 'zego';
-          return 'zego';
+        if (parsed.provider === 'livekit' || parsed.provider === 'zego') {
+          this.providerCache = parsed.provider;
+          return parsed.provider;
         }
       } catch {
         /* fall through */
@@ -99,24 +85,9 @@ export class LiveKitSettingsService {
     )
       .trim()
       .toLowerCase();
-    let provider: VoiceRtcProvider = env === 'livekit' ? 'livekit' : 'zego';
-    if (provider === 'zego' && await this.liveKitReadyWhenZegoUnavailable()) {
-      provider = 'livekit';
-      this.logger.warn('ZEGO is selected but not configured; using configured LiveKit for room voice');
-    }
+    const provider: VoiceRtcProvider = env === 'livekit' ? 'livekit' : 'zego';
     this.providerCache = provider;
     return provider;
-  }
-
-  private async liveKitReadyWhenZegoUnavailable(): Promise<boolean> {
-    try {
-      const zego = await this.zegoSettings.getMaskedSettings();
-      if (zego.appIdConfigured && zego.serverSecretConfigured) return false;
-      const livekit = await this.resolveConfig();
-      return Boolean(livekit.url && livekit.apiKey && livekit.apiSecret);
-    } catch {
-      return false;
-    }
   }
 
   async setProvider(provider: VoiceRtcProvider): Promise<VoiceRtcProvider> {
@@ -128,15 +99,6 @@ export class LiveKitSettingsService {
       if (!resolved.url || !resolved.apiKey || !resolved.apiSecret) {
         throw new BadRequestException(
           'LiveKit URL / API key / secret must be configured before switching',
-        );
-      }
-    } else {
-      // Never switch production room traffic to ZEGO until the server-side
-      // AppID and token-auth ServerSecret are both configured.
-      const zego = await this.zegoSettings.getMaskedSettings();
-      if (!zego.appIdConfigured || !zego.serverSecretConfigured) {
-        throw new BadRequestException(
-          'ZEGO AppID and ServerSecret must be configured before switching',
         );
       }
     }

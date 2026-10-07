@@ -33,7 +33,7 @@
                   'voice-wave--ready': voice.provider === 'livekit' && voice.ready,
                 }"
                 aria-hidden="true"
-                title="LiveKit مفتوح المصدر"
+                title="LiveKit مجاني"
               >
                 <i /><i /><i /><i /><i />
               </span>
@@ -50,7 +50,7 @@
               >
                 <i /><i /><i /><i /><i />
               </span>
-              {{ voice.ready ? 'LiveKit مُهيأ — التكلفة تعتمد على الاستضافة والاستخدام' : 'LiveKit محدّد — راجع URL وAPI Key وAPI Secret' }}
+              {{ voice.ready ? 'إشارة مجانية نشطة' : 'LiveKit محدّد — راجع المفاتيح' }}
             </span>
           </div>
           <div class="d-flex justify-content-between align-items-center mb-2">
@@ -106,7 +106,7 @@
               <span class="small text-secondary">
                 {{ t('voiceRtc.active') }}:
                 <strong>{{ voice.provider === 'livekit' ? 'LiveKit' : 'ZEGO' }}</strong>
-                · {{ voice.provider === 'livekit' ? (voice.ready ? t('voiceRtc.ready') : t('voiceRtc.notReady')) : (masked.appIdConfigured && masked.serverSecretConfigured ? 'ZEGO مُهيأ' : 'ZEGO يحتاج AppID وServerSecret') }}
+                · {{ voice.ready ? t('voiceRtc.ready') : t('voiceRtc.notReady') }}
                 <span v-if="voice.configSource && voice.configSource !== 'none'" class="ms-1">
                   · {{ t('zegoSettings.source') }}: {{ voice.configSource }}
                 </span>

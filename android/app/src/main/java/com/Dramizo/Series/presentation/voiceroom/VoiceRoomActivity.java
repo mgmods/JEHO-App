@@ -177,15 +177,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String welcomePostedForRoomId;
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
-    /** True while the user is moving directly from one seat to another. */
-    private boolean seatSwitchPending;
-    private boolean seatSwitchConfirmed;
-    private int pendingSeatIndex = -1;
-    private final Runnable clearSeatSwitchGuard = () -> {
-        seatSwitchPending = false;
-        seatSwitchConfirmed = false;
-        pendingSeatIndex = -1;
-    };
     private String myUserId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -223,8 +214,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private Runnable pendingAudioRouteReapply;
     private boolean hoppingRoom;
     private boolean realtimeJoined;
-    /** Fingerprint of the last realtime member snapshot already rendered. */
-    private String lastRoomMembersFingerprint;
     private boolean realtimeJoinInFlight;
     /** Mikoo-style white chat composer overlay is visible. */
     private boolean roomComposerOpen;
@@ -269,10 +258,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     };
     private final Runnable retryHttpJoinRunnable = () -> {
         if (exiting || isFinishing() || roomId == null) return;
-        // Retry the join silently. The room UI is allowed to render from the room GET
-        // while the session/RTC join catches up; never put a blocking loading overlay
-        // back on screen for a transient network failure.
+        // Never force a full rejoin while the live session is still in-process.
         if (ActiveRoomSession.get().canResumeUi(roomId) || resumedFromActiveSession) return;
+        roomJoinLoadingDismissed = false;
+        showRoomJoinLoading();
         String pass = getIntent() != null ? getIntent().getStringExtra(EXTRA_PASSWORD) : null;
         viewModel.join(roomId, pass);
     };
@@ -334,8 +323,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private androidx.media3.ui.PlayerView musicFloatPlayerView;
     /** HTTP join kicked off at start of onCreate (parallel with UI setup). */
     private boolean earlyJoinStarted;
-    /** True only while the initial/switch HTTP room join is actually in flight. */
-    private boolean httpJoinInFlight;
     private boolean musicUiReady;
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
@@ -426,11 +413,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
-        // Load the public room snapshot immediately in parallel with the authenticated join.
-        // This keeps the room UI from waiting on POST /rooms/:id/join when Render/mobile network is slow.
-        if (roomId != null && !roomId.isEmpty() && !"demo-room-1".equals(roomId)) {
-            viewModel.refresh(roomId);
-        }
         // Critical path: HTTP join overlaps layout inflate.
         // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
         boolean canResume = roomId != null && !roomId.isEmpty()
@@ -448,7 +430,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         viewModel.restoreLocalSession(session, session.room);
                     } else if (err != null && !err.isEmpty()) {
                         // Fall through to normal join if prefetch failed soft.
-                        startHttpJoin(getIntent().getStringExtra(EXTRA_PASSWORD));
+                        viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
                     } else {
                         viewModel.join(roomId, getIntent().getStringExtra(EXTRA_PASSWORD));
                     }
@@ -456,7 +438,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } else {
                 String pass0 = getIntent().getStringExtra(EXTRA_PASSWORD);
                 // No home prefetch (deep link / rare path) — start join here once.
-                startHttpJoin(pass0);
+                viewModel.join(roomId, pass0);
             }
         }
         registerAudioRouteReceiver();
@@ -636,13 +618,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 try {
                     if (canHop) {
-                        // A seat hop is one atomic server operation: the API clears the old
-                        // seat and occupies the new one. Keep the local voice state alive while
-                        // the realtime seat_left/seat_taken events arrive out of order.
-                        handler.removeCallbacks(clearSeatSwitchGuard);
-                        seatSwitchPending = isOnSeat(currentSeats);
-                        seatSwitchConfirmed = false;
-                        pendingSeatIndex = seat.seatIndex;
                         optimisticTakeSeat(seat.seatIndex);
                         viewModel.takeSeat(roomId, seat.seatIndex);
                     } else {
@@ -695,7 +670,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setClipChildren(false);
         binding.recyclerSeats.setClipToPadding(false);
         binding.recyclerSeats.setNestedScrollingEnabled(false);
-        binding.recyclerSeats.setItemAnimator(null);
         binding.recyclerSeats.setOverScrollMode(View.OVER_SCROLL_NEVER);
         binding.recyclerSeats.setItemViewCacheSize(16);
         if (binding.recyclerSeats.getParent() instanceof ViewGroup) {
@@ -717,9 +691,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         binding.recyclerRecentJoiners.setAdapter(audienceAdapter);
         binding.recyclerRecentJoiners.setNestedScrollingEnabled(false);
-        binding.recyclerRecentJoiners.setItemAnimator(null);
-        binding.recyclerRecentJoiners.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        binding.recyclerRecentJoiners.setItemViewCacheSize(8);
 
         binding.btnClose.setVisibility(View.VISIBLE);
         binding.btnClose.setOnClickListener(v -> confirmExit());
@@ -878,23 +849,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         syncMicUi();
         updateAdminControls();
 
-        viewModel.getSession().observe(this, session -> {
-            if (session != null) httpJoinInFlight = false;
-        });
-
         viewModel.getError().observe(this, e -> {
             if (e == null) return;
-            // A seat hop is a room action, not a failed room join. Never show the
-            // full "connection slow" flow or start another /join while switching seats.
-            if (seatSwitchPending) {
-                seatSwitchPending = false;
-                seatSwitchConfirmed = false;
-                pendingSeatIndex = -1;
-                dismissRoomJoinLoading();
-                if (roomId != null && !roomId.isEmpty()) requestRoomRefresh(true);
-                Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
-                return;
-            }
             String msg = e.toLowerCase(java.util.Locale.US);
             if (msg.contains("password") || msg.contains("كلمة المرور")
                     || msg.contains("room password") || msg.contains("invalid password")) {
@@ -902,7 +858,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 promptRoomPassword(pwd -> {
                     roomJoinLoadingDismissed = false;
                     showRoomJoinLoading();
-                    startHttpJoin(pwd);
+                    viewModel.join(roomId, pwd);
                 });
             } else if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(e)
                     || msg.contains("room entry")) {
@@ -931,10 +887,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     finish();
                 }
             } else {
-                // Only a real room join failure should trigger the slow-connection retry.
-                // Refresh/seat/music errors must never trap the user in a join loop.
-                if (!httpJoinInFlight) return;
-                httpJoinInFlight = false;
+                // Stay in the room screen and soft-retry HTTP join.
                 dismissRoomJoinLoading();
                 hoppingRoom = false;
                 switchingRoom = false;
@@ -943,13 +896,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         || ActiveRoomSession.get().canResumeUi(roomId)) {
                     return;
                 }
-                // Network errors must not trap the user behind a repeating
-                // "connection slow" message. Render the public room immediately
-                // from GET /rooms/:id and retry the paid/session join silently.
+                Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
                 if (!exiting && roomId != null && !roomId.isEmpty()) {
-                    viewModel.refresh(roomId);
                     handler.removeCallbacks(retryHttpJoinRunnable);
-                    handler.postDelayed(retryHttpJoinRunnable, 1_200L);
+                    handler.postDelayed(retryHttpJoinRunnable, 2_500L);
                 }
             }
         });
@@ -1206,8 +1156,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         viewModel.getSession().observe(this, session -> {
             if (session == null) return;
             pendingSession = session;
-            handler.removeCallbacks(retryHttpJoinRunnable);
-            roomJoinLoadingDismissed = true;
             hoppingRoom = false;
             switchingRoom = false;
             ActiveRoomSession.get().capture(
@@ -1258,7 +1206,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             if (!earlyJoinStarted) {
                 String pass = getIntent().getStringExtra(EXTRA_PASSWORD);
-                startHttpJoin(pass);
+                viewModel.join(joinRoomId, pass);
                 earlyJoinStarted = true;
             }
         });
@@ -1485,19 +1433,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 roomSpeakerMuted);
     }
 
-    private void startHttpJoin(@Nullable String password) {
-        if (roomId == null || roomId.isEmpty() || exiting || isFinishing()) return;
-        httpJoinInFlight = true;
-        viewModel.join(roomId, password);
-    }
-
     private void showRoomJoinLoading() {
         if (roomJoinLoadingDismissed) return;
         if (roomJoinLoading != null && roomJoinLoading.isShowing()) return;
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
-        // Never keep a full-screen loading dialog over the room. The room UI
-        // must become usable immediately while HTTP/RTC finishes in background.
-        handler.postDelayed(this::dismissRoomJoinLoading, 900L);
+        // Longer on weak networks — user should see loading, not a sudden eject.
+        handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
     }
 
     private void ensureMusicUiReady() {
@@ -2127,10 +2068,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     name, text, vipLevel, userLevel, frameUrl, userId, avatarUrl, giftIconUrl,
                     wealthScore, charmScore));
         }
-        // Keep the live chat responsive on mid-range phones. Older lines remain in
-        // RoomChatMemory for the current session, while the view only keeps the
-        // latest visible window mounted.
-        while (binding.chatLog.getChildCount() > 300) {
+        // Soft memory safety only (very high); still never auto-wipe mid-session intentionally.
+        while (binding.chatLog.getChildCount() > 800) {
             binding.chatLog.removeViewAt(0);
         }
         // TikTok-style: always stick to latest comments.
@@ -10547,7 +10486,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         roomJoinLoadingDismissed = false;
         showRoomJoinLoading();
-        startHttpJoin(password);
+        viewModel.join(targetRoomId, password);
         // hoppingRoom stays true until the new session arrives (see session observer).
     }
 
@@ -10838,33 +10777,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             @Override
             public void onRoomMembers(String rid, com.google.gson.JsonArray members) {
                 if (rid == null || roomId == null || !roomId.equals(rid)) return;
-                // Realtime may repeat the same member snapshot several times while the socket
-                // settles. Avoid rebuilding the audience list and rebinding its RecyclerView when
-                // nothing visible actually changed.
-                List<String> memberKeys = new ArrayList<>();
-                if (members != null) {
-                    for (int i = 0; i < members.size(); i++) {
-                        if (!members.get(i).isJsonObject()) continue;
-                        JsonObject member = members.get(i).getAsJsonObject();
-                        String uid = normalizeUserId(memberStr(member, "userId"));
-                        if (uid.isEmpty()) continue;
-                        memberKeys.add(uid);
-                    }
-                }
-                Collections.sort(memberKeys);
-                StringBuilder memberFingerprintBuilder = new StringBuilder();
-                for (String uid : memberKeys) {
-                    memberFingerprintBuilder.append(uid).append(',');
-                }
-                memberFingerprintBuilder.append('|').append(roomHostId).append('|').append(roomCohostId);
-                for (RoomDtos.SeatDto seat : currentSeats) {
-                    if (seat == null) continue;
-                    String uid = seat.userId != null ? normalizeUserId(seat.userId) : "";
-                    if (!uid.isEmpty()) memberFingerprintBuilder.append('|').append(uid).append(':').append(seat.seatIndex);
-                }
-                String memberFingerprint = memberFingerprintBuilder.toString();
-                if (Objects.equals(lastRoomMembersFingerprint, memberFingerprint)) return;
-                lastRoomMembersFingerprint = memberFingerprint;
                 handler.post(() -> {
                     roomAudience.clear();
                     roomMembersAll.clear();
@@ -11084,8 +10996,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     // Socket/join blip must NEVER eject — looks like "تم إغلاق التطبيق".
                     // Keep the HTTP/Zego room open and retry quietly.
                     realtimeJoinAttempts++;
-                    // Realtime reconnects are background recovery only. Never interrupt
-                    // the room UI with a repeating "connection slow" toast.
+                    boolean quiet = resumedFromActiveSession
+                            || ActiveRoomSession.get().canResumeUi(roomId)
+                            || pendingSession != null;
+                    if (!quiet && (realtimeJoinAttempts <= 1 || realtimeJoinAttempts % 3 == 0)) {
+                        Toast.makeText(this, R.string.connection_slow_retrying, Toast.LENGTH_SHORT).show();
+                    }
                     long delay = Math.min(12_000L, 1_500L * Math.max(1, realtimeJoinAttempts));
                     scheduleRealtimeJoinRetry(delay);
                 }));
@@ -11734,14 +11650,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 appendChatLine("النظام", approvedName + " صعد إلى المايك 🎤", 0, 1);
             }
             if (myUserId != null && sameUser(myUserId, approvedId)) {
-                if ("room:seat_taken".equals(event)) {
-                    // Keep the hop guard alive: realtime can deliver the old seat_left
-                    // after the new seat_taken. Clearing here used to make that old event
-                    // look like a forced removal and could mute/stop publishing the user.
-                    seatSwitchConfirmed = true;
-                    handler.removeCallbacks(clearSeatSwitchGuard);
-                    handler.postDelayed(clearSeatSwitchGuard, 2_000L);
-                }
                 if ("room:seat_approved".equals(event)) {
                     Toast.makeText(this, R.string.mic_request_approved, Toast.LENGTH_SHORT).show();
                 }
@@ -11755,7 +11663,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 handler.postDelayed(() -> activateSeatAudio(currentSeats), 400);
             }
             if (canInviteMic && roomId != null) viewModel.loadSeatRequests(roomId);
-            requestRoomRefresh(false);
+            requestRoomRefresh(true);
         } else if ("room:seat_rejected".equals(event)) {
             String rejectedId = memberStr(payload, "userId");
             if (myUserId != null && sameUser(myUserId, rejectedId)) {
@@ -11768,18 +11676,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && !payload.get("forced").isJsonNull()
                     && payload.get("forced").getAsBoolean();
             if (myUserId != null && sameUser(myUserId, leftId)) {
-                // During a seat hop, leaving the old seat is an intermediate state, not a
-                // real removal. Do not kill the mic or show the "you were lowered" message.
-                if (seatSwitchPending) {
-                    if (pendingSeatIndex >= 0) {
-                        optimisticTakeSeat(pendingSeatIndex);
-                    }
-                    if (seatSwitchConfirmed) {
-                        handler.removeCallbacks(clearSeatSwitchGuard);
-                        handler.postDelayed(clearSeatSwitchGuard, 700L);
-                    }
-                    return;
-                }
                 micOn = false;
                 userChoseMute = false;
                 RoomRtcEngine.getInstance().setMicEnabled(false);
@@ -11793,7 +11689,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             appendChatLine("النظام",
                     forced ? "تم إنزال مستخدم من المايك" : "مستخدم نزل من المايك",
                     0, 1);
-            requestRoomRefresh(false);
+            requestRoomRefresh(true);
         } else if ("room:staff_updated".equals(event)
                 || "room:seat_locked".equals(event)
                 || "room:seats_resized".equals(event)
@@ -13002,9 +12898,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (!resp.isSuccessful() || resp.body() == null || !resp.body().success
                         || resp.body().data == null || resp.body().data.url == null
                         || resp.body().data.url.isEmpty()) {
-                    throw new IllegalStateException(
-                            com.Dramizo.Series.data.remote.api.UploadApi.errorMessage(
-                                    resp, getString(R.string.room_photo_upload_failed)));
+                    throw new IllegalStateException(getString(R.string.room_photo_upload_failed));
                 }
                 String url = AssetCatalog.absoluteUrl(resp.body().data.url);
                 runOnUiThread(() -> {

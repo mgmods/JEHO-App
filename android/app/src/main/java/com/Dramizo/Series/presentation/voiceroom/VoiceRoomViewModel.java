@@ -21,8 +21,6 @@ public class VoiceRoomViewModel extends ViewModel {
             new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<RoomDtos.SupportersResult> supporters = new MutableLiveData<>();
     private final MutableLiveData<String> info = new MutableLiveData<>();
-    /** Prevent duplicate /join requests when the initial room snapshot fails independently. */
-    private volatile String joinInFlightRoomId;
 
     public VoiceRoomViewModel(AppContainer c) { this.c = c; }
 
@@ -39,25 +37,12 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void join(String roomId, String password) {
-        if (roomId == null || roomId.isEmpty()) return;
-        synchronized (this) {
-            if (roomId.equals(joinInFlightRoomId)) return;
-            joinInFlightRoomId = roomId;
-        }
         c.getIoExecutor().execute(() -> {
-            try {
-                Result<RoomDtos.JoinRoomResult> r = c.joinRoomUseCase.execute(roomId, password);
-                if (r.success) {
-                    session.postValue(r.data);
-                    if (r.data != null && r.data.room != null) room.postValue(r.data.room);
-                } else {
-                    error.postValue(r.error);
-                }
-            } finally {
-                synchronized (this) {
-                    if (roomId.equals(joinInFlightRoomId)) joinInFlightRoomId = null;
-                }
-            }
+            Result<RoomDtos.JoinRoomResult> r = c.joinRoomUseCase.execute(roomId, password);
+            if (r.success) {
+                session.postValue(r.data);
+                if (r.data != null && r.data.room != null) room.postValue(r.data.room);
+            } else error.postValue(r.error);
         });
     }
 
@@ -73,9 +58,7 @@ public class VoiceRoomViewModel extends ViewModel {
         c.getIoExecutor().execute(() -> {
             Result<RoomDtos.RoomDto> r = c.getRoomUseCase.execute(roomId);
             if (r.success) room.postValue(r.data);
-            // A snapshot refresh is best-effort. Never surface its network failure
-            // through the join error channel: doing so can cancel the real /join,
-            // show "connection slow", and start a duplicate join request.
+            else error.postValue(r.error);
         });
     }
 
