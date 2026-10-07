@@ -726,8 +726,9 @@ public class HomeFragment extends Fragment {
         tv.setTypeface(null, selected ? android.graphics.Typeface.BOLD
                 : android.graphics.Typeface.NORMAL);
         if (dot != null) {
-            // Mikoo uses size/weight/color, not a under-dot — keep dots subtle & hidden.
-            dot.setVisibility(View.GONE);
+            // Reference UI uses a short rounded gold underline under the selected tab.
+            dot.setVisibility(selected ? View.VISIBLE : View.INVISIBLE);
+            dot.setAlpha(selected ? 1f : 0f);
         }
     }
 
