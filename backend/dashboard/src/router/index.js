@@ -21,6 +21,12 @@ const routes = [
         meta: { titleKey: 'routes.dashboard' },
       },
       {
+        path: 'conversations',
+        name: 'conversations',
+        component: () => import('@/views/UserConversationsView.vue'),
+        meta: { title: 'جميع المحادثات', titleKey: 'routes.conversations' },
+      },
+      {
         path: 'users',
         name: 'users',
         component: () => import('@/views/UsersView.vue'),
