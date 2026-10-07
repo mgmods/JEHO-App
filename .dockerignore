@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+.github
+
+# Dependencies
+**/node_modules
+**/.pnpm-store
+**/.npm
+**/.yarn
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build output
+**/dist
+**/build
+**/.vite
+**/.expo
+**/.gradle
+**/android/.gradle
+**/android/app/build
+
+# Logs / runtime data
+**/*.log
+**/logs
+**/uploads
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
