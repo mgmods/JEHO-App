@@ -24,7 +24,7 @@ const routes = [
         path: 'conversations',
         name: 'conversations',
         component: () => import('@/views/UserConversationsView.vue'),
-        meta: { title: 'جميع المحادثات' },
+        meta: { titleKey: 'routes.conversations' },
       },
       {
         path: 'users',
