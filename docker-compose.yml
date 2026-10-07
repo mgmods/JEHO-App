@@ -44,6 +44,9 @@ services:
       DB_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      DB_USERNAME: ${DB_USERNAME:-auralive}
+      DB_PASSWORD: ${DB_PASSWORD:-auralive_secret}
+      DB_DATABASE: ${DB_DATABASE:-auralive}
       UPLOAD_DIR: /app/uploads
     ports:
       - "${API_PORT:-3000}:3000"
