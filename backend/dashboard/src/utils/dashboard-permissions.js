@@ -2,6 +2,7 @@
 
 export const ROUTE_MODULE = {
   dashboard: 'dashboard',
+  conversations: 'conversations',
   users: 'users',
   'user-detail': 'users',
   agencies: 'agencies',
@@ -38,6 +39,7 @@ export const ROUTE_MODULE = {
 
 export const DASHBOARD_MODULES = [
   'dashboard',
+  'conversations',
   'users',
   'agencies',
   'rooms',
