@@ -694,9 +694,9 @@
 <string name="agency_host_kpi_earned">أرباح المضيفة (دولار)</string>
 <string name="agency_host_kpi_gifts">حجم الهدايا</string>
 <string name="agency_host_period_breakdown">أرباحك بالدولار</string>
-<string name="agency_host_wallet_format">المتاح: %,d ماسة ≈ $%,.2f</string>
+<string name="agency_host_wallet_format">المتاح: %1$,d ماسة ≈ $%2$,.2f</string>
 <string name="agency_available_balance_line">المتاح: %1$,d ماسة · %2$s</string>
-<string name="agency_earn_usd_diamonds_sub">%,d ماسة · $%,.2f</string>
+<string name="agency_earn_usd_diamonds_sub">%1$,d ماسة · $%2$,.2f</string>
 <string name="agency_payout_requests">طلبات السحب القديمة</string>
 <string name="agency_host_request_payout">سحب أرباح روم الوكالة</string>
 <string name="agency_host_request_payout_title">طلب سحب أرباح روم الوكالة</string>
@@ -747,7 +747,7 @@
 <string name="agency_earn_hosts">تقدير المضيفين</string>
 <string name="agency_earn_platform">تقدير التطبيق</string>
 <string name="agency_earn_agent">تقدير الوكيل</string>
-<string name="agency_earn_percents_format">عمولتك %.0f%% · حصة المضيف ≈ %.0f%%</string>
+<string name="agency_earn_percents_format">عمولتك %1$.0f%% · حصة المضيف ≈ %2$.0f%%</string>
 <string name="agency_earn_owner_only">لوحة العمولة لصاحب الوكالة / المدير فقط</string>
 <string name="agency_host_earnings_help">أرباح روم الوكالة تظهر كماس ودولار. اسحبي الماس مباشرةً إلى إدارة المنصة (زر سحب أرباح روم الوكالة). لا تحتاجين موافقة الوكالة، ولا تستخدمين مول وكلاء الشحن لهذا الرصيد.</string>
 <string name="agency_host_view_earnings">سجل الأرباح</string>
