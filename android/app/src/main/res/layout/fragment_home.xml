@@ -165,7 +165,7 @@
                             android:visibility="invisible" />
                     </LinearLayout>
 
-                    </LinearLayout>                </LinearLayout>
+                    </LinearLayout>
             </HorizontalScrollView>
 
             <FrameLayout
