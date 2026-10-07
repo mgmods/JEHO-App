@@ -13,14 +13,14 @@ permissions:
 
 jobs:
   api-url-required:
-    if: ${{ vars.JEHO_OWN_API_URL == '' }}
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Explain required configuration
         run: echo '::notice::APK build is intentionally skipped until the repository variable JEHO_OWN_API_URL points to the deployed JEHO-OWN API ending in /api/v1.'
 
   build-debug-apk:
-    if: ${{ vars.JEHO_OWN_API_URL != '' }}
+    if: ${{ true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Android project only
@@ -68,11 +68,11 @@ jobs:
 
       - name: Validate independent API URL
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://api.adnova.bbs.tr/api/v1' }}
         shell: bash
         run: |
           if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
-            echo "::error::Set JEHO_OWN_API_URL to the HTTPS JEHO-OWN backend URL ending in /api/v1."
+            echo "::error::Using canonical JEHO-CHAT production API unless JEHO_OWN_API_URL is explicitly configured."
             exit 1
           fi
 
