@@ -14,7 +14,7 @@ export class AdminConversationsController {
   @Get()
   @ApiOperation({ summary: 'List all user conversations, read-only' })
   list(@Query() query: PaginationDto, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.service.list({ ...query, from, to });
+    return this.service.list(Object.assign(query, { from, to }));
   }
   @Get(':id')
   @ApiOperation({ summary: 'Get one conversation, read-only' })
