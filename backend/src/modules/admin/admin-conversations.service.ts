@@ -54,8 +54,11 @@ export class AdminConversationsService {
     const ids = rows.map((c) => c.id);
     const lastIds = rows.map((c) => c.lastMessageId).filter(Boolean) as string[];
 
-    const [lastMessages, counts, unread] = await Promise.all([
-      lastIds.length ? this.messages.find({ where: lastIds.map((id) => ({ id })), relations: ['sender'] }) : [],
+    const lastMessages: ChatMessage[] = lastIds.length
+      ? await this.messages.find({ where: lastIds.map((id) => ({ id })), relations: ['sender'] })
+      : [];
+
+    const [counts, unread] = await Promise.all([
       this.messages.createQueryBuilder('m')
         .select('m.conversationId', 'conversationId').addSelect('COUNT(*)', 'count')
         .where('m.conversationId IN (:...ids)', { ids }).andWhere('m.isUnsent = false')
@@ -66,9 +69,8 @@ export class AdminConversationsService {
         .getRawMany<{ conversationId: string; unreadCount: string }>(),
     ]);
 
-    const typedLastMessages = lastMessages as ChatMessage[];
     const lastById = new Map<string, ChatMessage>();
-    for (const m of typedLastMessages) lastById.set(m.id, m);
+    for (const m of lastMessages) lastById.set(m.id, m);
     const countById = new Map<string, number>();
     for (const r of counts) countById.set(r.conversationId, Number(r.count || 0));
     const unreadById = new Map<string, number>();
