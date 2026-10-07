@@ -4,7 +4,12 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { AdminConversationsController } from './admin-conversations.controller';
+import { AdminConversationsService } from './admin-conversations.service';
 import { User } from '../../database/entities/user.entity';
+import { ChatConversation } from '../../database/entities/chat-conversation.entity';
+import { ChatParticipant } from '../../database/entities/chat-participant.entity';
+import { ChatMessage } from '../../database/entities/chat-message.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
 import { Room } from '../../database/entities/room.entity';
 import { Gift } from '../../database/entities/gift.entity';
@@ -66,6 +71,9 @@ import { GiftsModule } from '../gifts/gifts.module';
       AgencyApplication,
       RoomSeat,
       Notification,
+      ChatConversation,
+      ChatParticipant,
+      ChatMessage,
     ]),
     WalletModule,
     PaymentsModule,
@@ -95,8 +103,8 @@ import { GiftsModule } from '../gifts/gifts.module';
       }),
     }),
   ],
-  controllers: [AdminController],
-  providers: [AdminService],
+  controllers: [AdminController, AdminConversationsController],
+  providers: [AdminService, AdminConversationsService],
   exports: [AdminService],
 })
 export class AdminModule {}
