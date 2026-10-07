@@ -136,6 +136,8 @@
                             android:layout_height="3dp"
                             android:layout_marginTop="5dp"
                             android:background="@drawable/bg_tab_dot_active" />
+                    </LinearLayout>
+
 <LinearLayout
                         android:id="@+id/tabActivitiesWrap"
                         android:layout_width="wrap_content"
