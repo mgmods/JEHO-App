@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   release-size-audit:
-    if: ${{ vars.JEHO_OWN_API_URL != '' }}
+    if: ${{ true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Android project only
@@ -61,11 +61,11 @@ jobs:
 
       - name: Validate API URL
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://api.adnova.bbs.tr/api/v1' }}
         shell: bash
         run: |
           if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
-            echo "::error::Set JEHO_OWN_API_URL to the HTTPS backend URL ending in /api/v1."
+            echo "::error::Using canonical JEHO-CHAT production API unless JEHO_OWN_API_URL is explicitly configured."
             exit 1
           fi
 
