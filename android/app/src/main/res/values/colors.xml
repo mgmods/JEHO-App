@@ -31,9 +31,9 @@
     <color name="divider_color">#EEEEEE</color>
 
     <!-- Bottom tabs — white chrome -->
-    <color name="bottom_chrome">#FFFFFF</color>
-    <color name="bottom_chrome_label">#222222</color>
-    <color name="bottom_chrome_label_muted">#9F9F9F</color>
+    <color name="bottom_chrome">#FFF3D8</color>
+    <color name="bottom_chrome_label">#4B3426</color>
+    <color name="bottom_chrome_label_muted">#6E6574</color>
     <color name="ios_separator">#EEEEEE</color>
     <color name="ios_secondary_label">#595959</color>
     <color name="ios_grouped_fill">#F7F7F7</color>
