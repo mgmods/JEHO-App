@@ -67,9 +67,12 @@ export class AdminConversationsService {
     ]);
 
     const typedLastMessages = lastMessages as ChatMessage[];
-    const lastById = new Map<string, ChatMessage>(typedLastMessages.map((m) => [m.id, m]));
-    const countById = new Map<string, number>(counts.map((r) => [r.conversationId, Number(r.count || 0)]));
-    const unreadById = new Map<string, number>(unread.map((r) => [r.conversationId, Number(r.unreadCount || 0)]));
+    const lastById = new Map<string, ChatMessage>();
+    for (const m of typedLastMessages) lastById.set(m.id, m);
+    const countById = new Map<string, number>();
+    for (const r of counts) countById.set(r.conversationId, Number(r.count || 0));
+    const unreadById = new Map<string, number>();
+    for (const r of unread) unreadById.set(r.conversationId, Number(r.unreadCount || 0));
 
     return paginate(rows.map((c) => {
       const participants = (c.participants || []).map((p) => ({
