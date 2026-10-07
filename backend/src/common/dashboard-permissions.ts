@@ -5,6 +5,7 @@
 
 export const DASHBOARD_MODULES = [
   'dashboard',
+  'conversations',
   'users',
   'agencies',
   'rooms',
@@ -50,6 +51,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   auth: 'self',
   operators: 'super-only',
   dashboard: 'dashboard',
+  conversations: 'conversations',
   'policy-brochure': 'policyBrochure',
   users: 'users',
   agencies: 'agencies',
