@@ -3,20 +3,20 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * Resolves the API URL for this build.
- *
- * Configure API_BASE_URL through the Android build configuration for the
- * independent JEHO-OWN backend. There is deliberately no fallback to the
- * previous production server.
+ * JEHO-OWN uses the same production API/server as the canonical JEHO-CHAT source.
+ * A build-time override is still supported for development, but production falls
+ * back to the canonical server instead of the isolated Render/Supabase instance.
  */
 public final class ApiOrigin {
-    private static final String UNCONFIGURED_API = "https://YOUR-JEHO-OWN-API-HOST";
+    private static final String CANONICAL_API = "https://api.adnova.bbs.tr";
 
     private ApiOrigin() {}
 
     public static String origin() {
         String configured = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
-        String value = configured.isEmpty() ? UNCONFIGURED_API : configured;
+        String value = configured.isEmpty() || configured.contains("YOUR-JEHO-OWN-API-HOST")
+                ? CANONICAL_API
+                : configured;
         while (value.endsWith("/")) {
             value = value.substring(0, value.length() - 1);
         }
@@ -27,13 +27,6 @@ public final class ApiOrigin {
     }
 
     public static String apiV1() {
-        String configured = BuildConfig.API_BASE_URL == null ? "" : BuildConfig.API_BASE_URL.trim();
-        if (!configured.isEmpty()) {
-            while (configured.endsWith("/")) {
-                configured = configured.substring(0, configured.length() - 1);
-            }
-            return configured.endsWith("/api/v1") ? configured + "/" : configured + "/api/v1/";
-        }
-        return UNCONFIGURED_API + "/api/v1/";
+        return origin() + "/api/v1/";
     }
 }
