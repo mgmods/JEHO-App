@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF3D8">
+    android:background="#FFFDFB">
 
     <ImageView
         android:id="@+id/imgHomeBg"
@@ -11,7 +11,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@drawable/home_page_bg" />
+        android:src="@drawable/home_page_bg"
+        android:visibility="gone" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -25,9 +26,9 @@
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
             android:orientation="horizontal"
-            android:paddingHorizontal="14dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="6dp">
+            android:paddingHorizontal="18dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="8dp">
 
             <HorizontalScrollView
                 android:layout_width="0dp"
@@ -170,10 +171,10 @@
 
             <FrameLayout
                 android:id="@+id/btnFilter"
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp"
+                android:layout_width="64dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="5dp"
+                android:layout_marginEnd="5dp"
                 android:background="@drawable/bg_home_filter_pill"
                 android:clickable="true"
                 android:focusable="true">
@@ -196,8 +197,8 @@
 
                 <ImageView
                     android:id="@+id/btnSearch"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/search"
                     android:scaleType="fitCenter" />
@@ -233,9 +234,9 @@
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="12dp"
-                    android:layout_marginTop="3dp"
-                    android:layout_marginBottom="8dp">
+                    android:layout_marginHorizontal="18dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="14dp">
 
                     <androidx.viewpager2.widget.ViewPager2
                         android:id="@+id/pagerBanners"
