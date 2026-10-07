@@ -429,23 +429,10 @@ public class HomeFragment extends Fragment {
         var act = binding.homeActBanners;
         // Keep the third banner filled — tasks when enabled, store otherwise (no empty gap).
         act.activityBannerCard.setVisibility(View.VISIBLE);
-        if (act.tvActivityBannerTitle != null) {
-            act.tvActivityBannerTitle.setText(on ? R.string.task_center : R.string.store_title);
-        }
-        if (act.tvActivityBannerHint != null) {
-            act.tvActivityBannerHint.setText(on
-                    ? "مهام يومية · مكافآت"
-                    : "إطارات · دخوليات · خلفيات");
-        }
-        act.activityBannerCard.setOnClickListener(v -> {
-            if (on) {
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.profile.TaskCenterActivity.class));
-            } else {
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.profile.StoreHubActivity.class));
-            }
-        });
+        if (act.tvActivityBannerTitle != null) act.tvActivityBannerTitle.setVisibility(View.GONE);
+        if (act.tvActivityBannerHint != null) act.tvActivityBannerHint.setVisibility(View.GONE);
+        // Reference home design: the third promo tile is the Charm ranking card.
+        act.activityBannerCard.setOnClickListener(v -> openRanking("popular"));
     }
 
     private void bindRankFlipPage(int pageIndex, List<MiscDtos.RankingEntryDto> list) {
