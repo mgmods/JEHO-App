@@ -15,6 +15,7 @@ import { MikooGatewayService } from './modules/games/mikoo-gateway/mikoo-gateway
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
+    abortOnError: false,
   });
 
   const configService = app.get(ConfigService);
@@ -260,4 +261,11 @@ const baishunModuleMap: Record<string, string> = {
   console.log(`Swagger docs at http://localhost:${port}/api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  const details =
+    error instanceof Error ? error.stack || error.message : String(error);
+  process.stderr.write(
+    `[JEHO-OWN] Fatal backend startup error:\n${details}\n`,
+    () => process.exit(1),
+  );
+});
