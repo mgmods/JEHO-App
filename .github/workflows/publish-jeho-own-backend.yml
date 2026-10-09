@@ -1,0 +1,45 @@
+name: Publish JEHO-OWN backend image
+
+on:
+  push:
+    branches:
+      - jeho-own
+    paths:
+      - "backend/**"
+      - ".github/workflows/publish-jeho-own-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-jeho-own-backend
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out JEHO-OWN branch
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/mgmods/jeho-own-backend:jeho-own
+            ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
