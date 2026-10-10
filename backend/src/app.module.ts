@@ -111,7 +111,21 @@ const entityList = Object.values(entities).filter(
           await bootstrap.destroy();
         }
 
-        return new DataSource(options).initialize();
+        const appDataSource = await new DataSource(options).initialize();
+
+        // Safe startup diagnostics: identify the connected database/schema without logging credentials.
+        const [connectionInfo] = await appDataSource.query(
+          'SELECT current_database() AS database_name, current_schema() AS schema_name, current_setting(\'search_path\') AS search_path',
+        );
+        const [{ table_count: tableCount }] = await appDataSource.query(
+          'SELECT COUNT(*)::int AS table_count FROM information_schema.tables WHERE table_schema = $1',
+          ['jeho_own'],
+        );
+        console.log(
+          `[JEHO-OWN DB] database=${connectionInfo.database_name} schema=${connectionInfo.schema_name} search_path=${connectionInfo.search_path} tables=${tableCount}`,
+        );
+
+        return appDataSource;
       },
     }),
     TypeOrmModule.forFeature([User]),
