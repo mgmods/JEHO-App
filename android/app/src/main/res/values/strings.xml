@@ -52,7 +52,7 @@
 <string name="activity_contests">Contests</string>
 <string name="activity_tasks">Daily tasks</string>
 <string name="activity_ranking">Ranking</string>
-<string name="activity_official_news">Official News</string>
+<string name="activity_official_news">Admin Messages</string>
 <string name="activity_plaza">Event plaza</string>
 <string name="event_square">Event Square</string>
 <string name="my_events">My Events</string>
@@ -532,10 +532,10 @@
 <string name="fans">Fans</string>
 <string name="allow_list">Allow List</string>
 <string name="message_request">Message Request</string>
-<string name="official_news">Official News</string>
-<string name="official_news_hint">App updates and important notices</string>
-<string name="official_news_readonly">You can only read messages here</string>
-<string name="official_news_empty">No official news yet</string>
+<string name="official_news">Admin Messages</string>
+<string name="official_news_hint">Super Admin messages and notices appear here in chat</string>
+<string name="official_news_readonly">Admin messages are read-only</string>
+<string name="official_news_empty">No messages from administration yet</string>
     <string name="official_news_open_link">Open link</string>
     <string name="official_news_view_page">View full page</string>
 <string name="official_news_link_hint">Tap links to open · long-press to copy</string>
