@@ -43,6 +43,15 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("rooms", "إدارة الرومات", "عرض الرومات وإغلاق روم عند الحاجة", "🏠"),
         Module("streams", "البث المباشر", "عرض البث وإنهاؤه من الخادم", "📡"),
         Module("agencies", "الوكالات", "عرض الوكالات وتعليق وكالة", "🏢"),
+        Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات أو رفضها", "📨"),
+        Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة طلبات الوكلاء", "💳"),
+        Module("rechargeAgents", "وكلاء الشحن", "تفعيل الوكلاء أو إيقافهم", "💰"),
+        Module("operators", "المديرون والصلاحيات", "إدارة مديري لوحة التحكم المحدودين", "🛡️"),
+        Module("reports", "البلاغات", "مراجعة البلاغات وحسمها", "🚩"),
+        Module("withdrawals", "طلبات السحب", "مراجعة طلبات السحب", "🏦"),
+        Module("recharges", "طلبات الشحن", "إتمام أو إلغاء طلب شحن", "🪙"),
+        Module("walletTransactions", "حركة المحفظة", "عرض معاملات المحفظة", "📒"),
+        Module("cosmetics", "الإطارات والدخوليات", "تفعيل أو تعطيل المقتنيات", "✨"),
         Module("gifts", "الهدايا والمميزات", "عرض كتالوج الهدايا الحالي", "🎁"),
         Module("vip", "العضويات VIP", "مراجعة العضويات ومنح VIP", "👑"),
         Module("notifications", "الإشعارات", "مراجعة الإشعارات وإرسال إشعار", "🔔"),
@@ -191,6 +200,18 @@ class AdminConsoleActivity : ThemedActivity() {
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
             "streams" -> load(api.streams(1, 40)) { renderItems(it, "streams") }
             "agencies" -> load(api.agencies(1, 40)) { renderItems(it, "agencies") }
+            "agencyApplications" -> load(api.agencyApplications(1, 40)) { renderItems(it, "agencyApplications") }
+            "rechargeApplications" -> load(api.rechargeAgentApplications()) { renderItems(it, "rechargeApplications") }
+            "rechargeAgents" -> load(api.rechargeAgents()) { renderItems(it, "rechargeAgents") }
+            "operators" -> {
+                body.addView(button("＋ إضافة مدير محدود") { showCreateOperatorDialog() })
+                load(api.operators()) { renderItems(it, "operators") }
+            }
+            "reports" -> load(api.reports(1, 40)) { renderItems(it, "reports") }
+            "withdrawals" -> load(api.withdrawals(1, 40)) { renderItems(it, "withdrawals") }
+            "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") }
+            "walletTransactions" -> load(api.walletTransactions(1, 50)) { renderItems(it, "walletTransactions") }
+            "cosmetics" -> load(api.cosmetics()) { renderItems(it, "cosmetics") }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
@@ -284,9 +305,170 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 })
+                "agencyApplications" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("قبول الطلب") {
+                        confirm("تأكيد قبول طلب الوكالة؟") {
+                            load(api.approveAgencyApplication(id, mapOf("reviewNote" to "تمت الموافقة من تطبيق JEHO"))) {
+                                toast("تمت معالجة طلب الوكالة"); openModule("agencyApplications")
+                            }
+                        }
+                    })
+                    card.addView(button("رفض الطلب") {
+                        confirm("تأكيد رفض طلب الوكالة؟") {
+                            load(api.rejectAgencyApplication(id, mapOf("reviewNote" to "لم يستوفِ الطلب شروط القبول"))) {
+                                toast("تمت معالجة طلب الوكالة"); openModule("agencyApplications")
+                            }
+                        }
+                    })
+                }
+                "rechargeApplications" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("قبول وكيل الشحن") { showApproveRechargeAgentDialog(id) })
+                    card.addView(button("رفض الطلب") {
+                        confirm("رفض طلب وكيل الشحن؟") {
+                            load(api.rejectRechargeAgentApplication(id, mapOf("note" to "لم يستوفِ الطلب شروط القبول"))) {
+                                toast("تمت معالجة طلب وكيل الشحن"); openModule("rechargeApplications")
+                            }
+                        }
+                    })
+                }
+                "rechargeAgents" -> if (!id.isNullOrBlank()) {
+                    val active = status?.contains("active", true) == true
+                    card.addView(button(if (active) "إيقاف الوكيل" else "تفعيل الوكيل") {
+                        confirm("تأكيد تغيير حالة وكيل الشحن؟") {
+                            load(api.updateRechargeAgent(id, mapOf("status" to if (active) "suspended" else "active"))) {
+                                toast("تم تحديث حالة الوكيل"); openModule("rechargeAgents")
+                            }
+                        }
+                    })
+                }
+                "operators" -> if (!id.isNullOrBlank()) {
+                    val active = status?.contains("suspended", true) != true && status?.contains("inactive", true) != true
+                    card.addView(button(if (active) "تعطيل المدير" else "تفعيل المدير") {
+                        confirm("تغيير صلاحية دخول هذا المدير؟") {
+                            load(api.updateOperator(id, mapOf("active" to !active))) {
+                                toast("تم تحديث المدير"); openModule("operators")
+                            }
+                        }
+                    })
+                    card.addView(button("إزالة المدير") {
+                        confirm("سيتم سحب صلاحية لوحة التحكم من هذا المدير. متابعة؟") {
+                            load(api.deleteOperator(id)) { toast("تمت إزالة المدير"); openModule("operators") }
+                        }
+                    })
+                }
+                "reports" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("حسم البلاغ") {
+                        confirm("تأكيد وضع البلاغ كمحلول؟") {
+                            load(api.resolveReport(id, mapOf("adminNote" to "تمت المراجعة من تطبيق JEHO"))) {
+                                toast("تم تحديث البلاغ"); openModule("reports")
+                            }
+                        }
+                    })
+                    card.addView(button("رفض البلاغ") {
+                        confirm("تأكيد رفض البلاغ؟") {
+                            load(api.dismissReport(id, mapOf("adminNote" to "تمت المراجعة ولا يلزم إجراء"))) {
+                                toast("تم تحديث البلاغ"); openModule("reports")
+                            }
+                        }
+                    })
+                }
+                "withdrawals" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("اعتماد السحب") {
+                        confirm("اعتماد طلب السحب؟ تحقق من الدفع فعلياً قبل الاعتماد.") {
+                            load(api.approveWithdrawal(id)) { toast("استجاب الخادم لطلب اعتماد السحب"); openModule("withdrawals") }
+                        }
+                    })
+                    card.addView(button("رفض السحب") {
+                        confirm("رفض طلب السحب؟") {
+                            load(api.rejectWithdrawal(id, mapOf("adminNote" to "تم الرفض من تطبيق JEHO"))) {
+                                toast("تمت معالجة طلب السحب"); openModule("withdrawals")
+                            }
+                        }
+                    })
+                }
+                "recharges" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("إتمام طلب الشحن") {
+                        confirm("لا تعتمد إلا بعد التحقق من الدفع. متابعة؟") {
+                            load(api.completeRecharge(id, mapOf("note" to "تم التحقق يدوياً من تطبيق JEHO"))) {
+                                toast("استجاب الخادم لطلب إتمام الشحن"); openModule("recharges")
+                            }
+                        }
+                    })
+                    card.addView(button("إلغاء طلب الشحن") {
+                        confirm("تأكيد إلغاء طلب الشحن؟") {
+                            load(api.cancelRecharge(id)) { toast("تمت معالجة طلب الشحن"); openModule("recharges") }
+                        }
+                    })
+                }
+                "cosmetics" -> if (!id.isNullOrBlank()) {
+                    val active = status?.contains("true", true) == true || status?.contains("active", true) == true
+                    card.addView(button(if (active) "تعطيل الميزة" else "تفعيل الميزة") {
+                        confirm("تغيير حالة الميزة؟") {
+                            load(api.updateCosmetic(id, mapOf("isActive" to !active))) {
+                                toast("تم تحديث الميزة"); openModule("cosmetics")
+                            }
+                        }
+                    })
+                }
             }
             body.addView(card)
         }
+    }
+
+    private fun showCreateOperatorDialog() {
+        val form = formFields(listOf("اسم المدير", "البريد الإلكتروني", "كلمة المرور (8 أحرف على الأقل)"))
+        AlertDialog.Builder(this).setTitle("إضافة مدير محدود").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("إنشاء", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val displayName = form.second[0].text.toString().trim()
+                        val email = form.second[1].text.toString().trim()
+                        val password = form.second[2].text.toString()
+                        if (email.isBlank() || password.length < 8) {
+                            toast("أدخل البريد وكلمة مرور من 8 أحرف على الأقل")
+                            return@setOnClickListener
+                        }
+                        confirm("سيُنشأ مدير محدود بصلاحية قراءة المستخدمين والرومات فقط. متابعة؟") {
+                            load(api.createOperator(mapOf(
+                                "displayName" to displayName, "email" to email, "password" to password,
+                                "permissions" to mapOf("users" to "read", "rooms" to "read")
+                            ))) {
+                                dialog.dismiss()
+                                toast("تم إرسال طلب إنشاء المدير للخادم")
+                                openModule("operators")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showApproveRechargeAgentDialog(id: String) {
+        val form = formFields(listOf("رصيد الشحن الأولي بالعملات", "ملاحظة (اختياري)"))
+        AlertDialog.Builder(this).setTitle("قبول وكيل الشحن").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم قبول", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val coins = form.second[0].text.toString().trim().toLongOrNull()
+                        if (coins == null || coins < 0) {
+                            toast("أدخل رصيداً صحيحاً (صفر أو أكثر)")
+                            return@setOnClickListener
+                        }
+                        val note = form.second[1].text.toString().trim()
+                        confirm("تأكيد قبول الوكيل برصيد أولي $coins عملة؟") {
+                            load(api.approveRechargeAgentApplication(id, mapOf("floatCoins" to coins, "note" to note))) {
+                                dialog.dismiss()
+                                toast("تمت معالجة طلب وكيل الشحن")
+                                openModule("rechargeApplications")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun showAssignVipDialog() {
