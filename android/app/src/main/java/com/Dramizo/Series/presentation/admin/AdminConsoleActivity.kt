@@ -52,6 +52,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("withdrawals", "طلبات السحب", "مراجعة طلبات السحب", "🏦"),
         Module("recharges", "طلبات الشحن", "إتمام أو إلغاء طلب شحن", "🪙"),
         Module("walletTransactions", "حركة المحفظة", "عرض معاملات المحفظة", "📒"),
+        Module("walletAdjust", "تعديل رصيد مستخدم", "إضافة أو خصم رصيد مع سبب وسجل مراجعة", "🧮"),
         Module("cosmetics", "الإطارات والدخوليات", "تفعيل أو تعطيل المقتنيات", "✨"),
         Module("grantCosmetics", "إهداء المميزات", "منح إطار أو دخولية بمدة محددة أو دائمة", "🎁"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة أو بشكل دائم", "🔢"),
@@ -215,6 +216,10 @@ class AdminConsoleActivity : ThemedActivity() {
             "withdrawals" -> load(api.withdrawals(1, 40)) { renderItems(it, "withdrawals") }
             "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") }
             "walletTransactions" -> load(api.walletTransactions(1, 50)) { renderItems(it, "walletTransactions") }
+            "walletAdjust" -> {
+                body.addView(button("＋ تعديل رصيد مستخدم") { showAdjustWalletDialog() })
+                addText(body, "كل تعديل يحتاج معرّف المستخدم وسبباً واضحاً وتأكيداً قبل الإرسال.", 13f, false, MUTED)
+            }
             "cosmetics" -> load(api.cosmetics()) { renderItems(it, "cosmetics") }
             "grantCosmetics" -> load(api.cosmetics()) { renderItems(it, "grantCosmetics") }
             "vanityIds" -> {
@@ -343,6 +348,16 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 })
+                "vip" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("سحب عضوية VIP") {
+                        confirm("سحب عضوية VIP من المستخدم؟") {
+                            load(api.revokeVip(id)) {
+                                toast("استجاب الخادم لطلب سحب VIP")
+                                openModule("vip")
+                            }
+                        }
+                    })
+                }
                 "agencyApplications" -> if (!id.isNullOrBlank()) {
                     card.addView(button("قبول الطلب") {
                         confirm("تأكيد قبول طلب الوكالة؟") {
@@ -502,6 +517,51 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             body.addView(card)
         }
+    }
+
+    private fun showAdjustWalletDialog() {
+        val form = formFields(listOf(
+            "معرّف المستخدم (UUID)",
+            "تغيير العملات (+ إضافة / - خصم)",
+            "تغيير الألماس (+ إضافة / - خصم)",
+            "تغيير العملات الفضية (اختياري)",
+            "تغيير نقاط اللعب (اختياري)",
+            "السبب / ملاحظة إلزامية"
+        ))
+        AlertDialog.Builder(this).setTitle("تعديل محفظة المستخدم").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم تنفيذ", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val userId = form.second[0].text.toString().trim()
+                        val coins = form.second[1].text.toString().trim().toIntOrNull() ?: 0
+                        val diamonds = form.second[2].text.toString().trim().toIntOrNull() ?: 0
+                        val silver = form.second[3].text.toString().trim().toIntOrNull() ?: 0
+                        val points = form.second[4].text.toString().trim().toIntOrNull() ?: 0
+                        val note = form.second[5].text.toString().trim()
+                        if (userId.isBlank() || note.isBlank() ||
+                            (coins == 0 && diamonds == 0 && silver == 0 && points == 0)) {
+                            toast("أدخل معرّف المستخدم وتغييراً غير صفري وسبباً واضحاً")
+                            return@setOnClickListener
+                        }
+                        val payload = mapOf(
+                            "coinsDelta" to coins, "diamondsDelta" to diamonds,
+                            "silverCoinsDelta" to silver, "gamePointsDelta" to points,
+                            "note" to note, "reason" to note
+                        )
+                        confirm("تأكيد تعديل رصيد المستخدم؟ العملات: " + coins +
+                            "، الألماس: " + diamonds + "، الفضية: " + silver +
+                            "، النقاط: " + points + ". لا يمكن تجاهل أثر العملية.") {
+                            load(api.adjustWallet(userId, payload)) {
+                                dialog.dismiss()
+                                toast("استجاب الخادم لطلب تعديل المحفظة")
+                                openModule("walletTransactions")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
