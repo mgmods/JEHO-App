@@ -425,7 +425,7 @@
 <string name="activity_contests">المسابقات</string>
 <string name="activity_tasks">المهام اليومية</string>
 <string name="activity_ranking">الترتيب</string>
-<string name="activity_official_news">رسالة الإدارة</string>
+<string name="activity_official_news">أخبار رسمية</string>
 <string name="activity_plaza">ساحات الفعاليات</string>
 <string name="event_square">ساحة الفعاليات</string>
 <string name="my_events">فعالياتي</string>
@@ -524,8 +524,8 @@
 <string name="fans">المعجبون</string>
 <string name="allow_list">قائمة السماح</string>
 <string name="message_request">طلب رسالة</string>
-<string name="official_news">رسالة الإدارة</string>
-<string name="official_news_hint">رسائل وتنبيهات السوبر أدمن — تصل هنا داخل الدردشة</string>
+<string name="official_news">أخبار رسمية</string>
+<string name="official_news_hint">الأخبار والإعلانات الرسمية المرسلة من لوحة التحكم</string>
 <string name="official_news_readonly">رسائل الإدارة للقراءة فقط</string>
 <string name="official_news_empty">لا توجد رسائل من الإدارة حتى الآن</string>
     <string name="official_news_open_link">فتح الرابط</string>
@@ -1279,7 +1279,7 @@
 <string name="lang_name_zh" translatable="false">简体中文</string>
 
 <string name="admin_messages">رسائل الإدارة</string>
-<string name="admin_messages_hint">رسائل خاصة وجماعية من السوبر أدمن</string>
+<string name="admin_messages_hint">لا توجد رسائل جديدة</string>
 <string name="admin_messages_readonly">رسائل مرسلة من السوبر أدمن</string>
 <string name="admin_messages_empty">لا توجد رسائل إدارية حتى الآن</string>
 <string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
