@@ -51,6 +51,7 @@ public class MessagesFragment extends Fragment {
         @Override
         public void onReceive(Context context, Intent intent) {
             loadOfficialNewsPreview();
+            loadAdminMessagesPreview();
         }
     };
 
@@ -112,6 +113,7 @@ public class MessagesFragment extends Fragment {
         binding.swipe.setOnRefreshListener(() -> {
             viewModel.load(true);
             loadOfficialNewsPreview();
+            loadAdminMessagesPreview();
         });
 
         View.OnClickListener openHub = v -> {
@@ -141,6 +143,13 @@ public class MessagesFragment extends Fragment {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), OfficialNewsActivity.class)));
             loadOfficialNewsPreview();
+        }
+
+        if (binding.adminMessagesCardMsg != null) {
+            binding.adminMessagesCardMsg.getRoot().setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(),
+                            com.Dramizo.Series.presentation.notifications.AdminMessagesActivity.class)));
+            loadAdminMessagesPreview();
         }
 
         viewModel.getConversations().observe(getViewLifecycleOwner(), list -> {
@@ -202,6 +211,39 @@ public class MessagesFragment extends Fragment {
         binding.officialNewsCardMsg.tvOfficialLast.setText(preview);
     }
 
+    private void loadAdminMessagesPreview() {
+        if (binding == null || binding.adminMessagesCardMsg == null || !isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.OfficialNewsPreviewDto> r =
+                    ApiCall.execute(c.getNotificationApi().adminMessagesPreview());
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> applyAdminMessagesPreview(
+                    r.success ? r.data : null));
+        });
+    }
+
+    private void applyAdminMessagesPreview(@Nullable MiscDtos.OfficialNewsPreviewDto p) {
+        if (binding == null || binding.adminMessagesCardMsg == null) return;
+        String preview = getString(R.string.admin_messages_hint);
+        if (p != null) {
+            if (p.lastBody != null && !p.lastBody.isEmpty()) preview = p.lastBody;
+            else if (p.lastTitle != null && !p.lastTitle.isEmpty()) preview = p.lastTitle;
+            binding.adminMessagesCardMsg.tvAdminTime.setText(formatPreviewTime(p.lastAt));
+            if (p.unread > 0) {
+                binding.adminMessagesCardMsg.tvAdminUnread.setVisibility(View.VISIBLE);
+                binding.adminMessagesCardMsg.tvAdminUnread.setText(
+                        p.unread > 99 ? "99+" : String.valueOf(p.unread));
+            } else {
+                binding.adminMessagesCardMsg.tvAdminUnread.setVisibility(View.GONE);
+            }
+        } else {
+            binding.adminMessagesCardMsg.tvAdminTime.setText("");
+            binding.adminMessagesCardMsg.tvAdminUnread.setVisibility(View.GONE);
+        }
+        binding.adminMessagesCardMsg.tvAdminLast.setText(preview);
+    }
+
     private static String formatPreviewTime(@Nullable String raw) {
         if (raw == null || raw.isEmpty()) return "";
         try {
@@ -223,6 +265,7 @@ public class MessagesFragment extends Fragment {
         if (viewModel != null) viewModel.load(false);
         loadPendingRequestBadge();
         loadOfficialNewsPreview();
+        loadAdminMessagesPreview();
         registerOfficialNewsReceiver();
     }
 
