@@ -1,6 +1,8 @@
 package com.Dramizo.Series.presentation.common;
 
 import com.Dramizo.Series.util.StaffRoleHelper;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -97,6 +99,7 @@ public final class UserProfileCardSheet {
         ImageView imgVipMedal = sheet.findViewById(R.id.imgVipMedal);
         ImageView imgEntryRide = sheet.findViewById(R.id.imgEntryRide);
         ImageView img = sheet.findViewById(R.id.imgUserAvatar);
+        View superAdminFrame = sheet.findViewById(R.id.superAdminAvatarFrame);
         ImageView frame = sheet.findViewById(R.id.imgUserFrame);
         ImageView vipHead = sheet.findViewById(R.id.imgVipHead);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
@@ -204,6 +207,18 @@ public final class UserProfileCardSheet {
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
                 if (tvName != null) {
                     String displayName = displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0];
+                    if (superAdminFrame != null) {
+                        boolean isSuperAdmin = StaffRoleHelper.isSuper(u);
+                        superAdminFrame.setVisibility(isSuperAdmin ? View.VISIBLE : View.GONE);
+                        if (isSuperAdmin) {
+                            GradientDrawable ring = new GradientDrawable();
+                            ring.setShape(GradientDrawable.OVAL);
+                            ring.setColor(Color.TRANSPARENT);
+                            ring.setStroke(Math.max(2, Math.round(activity.getResources().getDisplayMetrics().density * 3)),
+                                    Color.rgb(255, 194, 64));
+                            superAdminFrame.setBackground(ring);
+                        }
+                    }
                     String staffBadge = StaffRoleHelper.badgeAr(u);
                     tvName.setText(staffBadge.isEmpty() ? displayName : displayName + "\n" + staffBadge);
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
