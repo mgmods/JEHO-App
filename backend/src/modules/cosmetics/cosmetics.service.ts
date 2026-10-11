@@ -275,7 +275,7 @@ export class CosmeticsService implements OnModuleInit {
     userId: string,
     cosmeticCode: string,
     days: number,
-    opts?: { forceTimed?: boolean },
+    opts?: { forceTimed?: boolean; permanent?: boolean },
   ) {
     const daysSafe = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
     let cosmetic =
@@ -314,8 +314,10 @@ export class CosmeticsService implements OnModuleInit {
         userId,
         cosmeticId: cosmetic.id,
         equipped: false,
-        expiresAt: new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
+        expiresAt: opts?.permanent ? null : new Date(now.getTime() + daysSafe * 24 * 60 * 60 * 1000),
       });
+    } else if (opts?.permanent) {
+      owned.expiresAt = null;
     } else if (owned.expiresAt == null && !opts?.forceTimed) {
       // Already permanent — keep permanent, still try equip.
     } else {
