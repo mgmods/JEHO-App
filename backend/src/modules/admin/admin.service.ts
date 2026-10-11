@@ -510,6 +510,7 @@ export class AdminService {
       isAdmin: superAdmin || staffRole === 'operator',
       isSuperAdmin: superAdmin,
       staffRole,
+      status: user.status,
       role: 'admin',
       permissions,
       modules: [...DASHBOARD_MODULES],
