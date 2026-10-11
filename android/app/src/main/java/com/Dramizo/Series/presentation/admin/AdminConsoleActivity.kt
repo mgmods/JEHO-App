@@ -153,28 +153,47 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(card)
             }
         }
-        modules.forEach { module ->
-            val card = card()
-            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-            val icon = TextView(this).apply {
-                text = module.icon
-                textSize = 25f
-                gravity = Gravity.CENTER
-                setBackground(roundRect(0xFFF0ECFB.toInt(), 16))
-                layoutParams = LinearLayout.LayoutParams(dp(54), dp(54))
+        addText(body, "أدوات الإدارة", 16f, true, TEXT)
+        val rows = modules.chunked(2)
+        rows.forEach { pair ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.TOP
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
             }
-            val texts = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), 0, dp(8), 0)
+            pair.forEachIndexed { index, module ->
+                val tile = card().apply {
+                    setPadding(dp(12), dp(13), dp(12), dp(13))
+                    isClickable = true
+                    isFocusable = true
+                    foreground = android.util.TypedValue().let {
+                        val out = android.util.TypedValue()
+                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+                    }
+                    setOnClickListener { openModule(module.key) }
+                }
+                val icon = TextView(this).apply {
+                    text = module.icon
+                    textSize = 23f
+                    gravity = Gravity.CENTER
+                    setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
+                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
+                }
+                tile.addView(icon)
+                addText(tile, module.title, 14f, true, TEXT)
+                addText(tile, module.subtitle, 11f, false, MUTED)
+                addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                    bottomMargin = dp(10)
+                    if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
+                }
+                row.addView(tile, lp)
             }
-            addText(texts, module.title, 15f, true, TEXT)
-            addText(texts, module.subtitle, 12f, false, MUTED)
-            row.addView(icon)
-            row.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
-            val open = button("فتح") { openModule(module.key) }
-            row.addView(open)
-            card.addView(row)
-            body.addView(card)
+            if (pair.size == 1) {
+                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+            }
+            body.addView(row)
         }
     }
 
