@@ -363,7 +363,7 @@ export class VanityIdsController {
     const publicId = String(body?.publicId || '').trim();
     const permanent = body?.permanent === true;
     const days = Number(body?.days || 7);
-    if (!userId || !/^\\d{3,12}$/.test(publicId)) {
+    if (!userId || !/^[0-9]{3,12}$/.test(publicId)) {
       throw new BadRequestException('userId is required and publicId must contain 3–12 digits');
     }
     if (!permanent && ![7, 15, 30].includes(days)) {
