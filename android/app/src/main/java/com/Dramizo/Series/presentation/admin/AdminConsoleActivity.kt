@@ -954,7 +954,7 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showDirectMessageDialog() {
-        val form = formFields(listOf("معرّف المستخدم (UUID)", "نص الرسالة"))
+        val form = formFields(listOf("معرّف المستخدم (ID العام أو UUID)", "نص الرسالة"))
         AlertDialog.Builder(this)
             .setTitle("رسالة دردشة مباشرة")
             .setView(form.first)
@@ -963,9 +963,9 @@ class AdminConsoleActivity : ThemedActivity() {
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val userId = form.second[0].text.toString().trim()
+                        val userLookup = form.second[0].text.toString().trim()
                         val message = form.second[1].text.toString().trim()
-                        if (userId.isBlank() || message.isBlank()) {
+                        if (userLookup.isBlank() || message.isBlank()) {
                             toast("معرّف المستخدم ونص الرسالة مطلوبان")
                             return@setOnClickListener
                         }
@@ -973,53 +973,82 @@ class AdminConsoleActivity : ThemedActivity() {
                             toast("الرسالة أطول من الحد المسموح (4000 حرف)")
                             return@setOnClickListener
                         }
-                        confirm("ستُرسل رسالة دردشة من حساب السوبر أدمن إلى المستخدم المحدد. تأكيد؟") {
+                        confirm("سيُبحث عن المستخدم بالـ ID ثم تُرسل رسالة دردشة من حساب السوبر أدمن. تأكيد؟") {
                             progress.visibility = View.VISIBLE
-                            api.startDirectConversation(mapOf("peerId" to userId))
-                                .enqueue(object : Callback<ApiResponse<Any>> {
-                                    override fun onResponse(
-                                        call: Call<ApiResponse<Any>>,
-                                        response: Response<ApiResponse<Any>>
-                                    ) {
-                                        if (!response.isSuccessful || response.body()?.success != true) {
-                                            progress.visibility = View.GONE
-                                            showError(response.body()?.message ?: "تعذر فتح المحادثة (HTTP ${response.code()})")
-                                            return
-                                        }
-                                        val data = response.body()?.data
-                                        val conversationId = (data as? Map<*, *>)?.get("id")?.toString()
-                                        if (conversationId.isNullOrBlank()) {
-                                            progress.visibility = View.GONE
-                                            showError("استجابة المحادثة لا تحتوي على معرّف صالح")
-                                            return
-                                        }
-                                        api.sendDirectMessage(
-                                            conversationId,
-                                            mapOf("type" to "text", "content" to message)
-                                        ).enqueue(object : Callback<ApiResponse<Any>> {
+                            api.users(1, 40, userLookup).enqueue(object : Callback<ApiResponse<Any>> {
+                                override fun onResponse(
+                                    call: Call<ApiResponse<Any>>,
+                                    response: Response<ApiResponse<Any>>
+                                ) {
+                                    if (!response.isSuccessful || response.body()?.success != true) {
+                                        progress.visibility = View.GONE
+                                        showError(response.body()?.message ?: "تعذر البحث عن المستخدم (HTTP ${response.code()})")
+                                        return
+                                    }
+                                    val page = response.body()?.data as? Map<*, *>
+                                    val users = page?.get("items") as? List<*> ?: emptyList<Any>()
+                                    val matched = users.firstOrNull { item ->
+                                        val row = item as? Map<*, *>
+                                        row != null && (row["id"]?.toString() == userLookup ||
+                                            row["publicId"]?.toString() == userLookup)
+                                    } as? Map<*, *>
+                                    val peerUuid = matched?.get("id")?.toString()
+                                    if (peerUuid.isNullOrBlank()) {
+                                        progress.visibility = View.GONE
+                                        showError("لم يُعثر على مستخدم مطابق تمامًا لهذا الـ ID")
+                                        return
+                                    }
+                                    api.startDirectConversation(mapOf("peerId" to peerUuid))
+                                        .enqueue(object : Callback<ApiResponse<Any>> {
                                             override fun onResponse(
                                                 call: Call<ApiResponse<Any>>,
                                                 response: Response<ApiResponse<Any>>
                                             ) {
-                                                progress.visibility = View.GONE
-                                                if (response.isSuccessful && response.body()?.success == true) {
-                                                    dialog.dismiss()
-                                                    toast("تم إرسال رسالة الدردشة")
-                                                } else {
-                                                    showError(response.body()?.message ?: "فشل إرسال الرسالة (HTTP ${response.code()})")
+                                                if (!response.isSuccessful || response.body()?.success != true) {
+                                                    progress.visibility = View.GONE
+                                                    showError(response.body()?.message ?: "تعذر فتح المحادثة (HTTP ${response.code()})")
+                                                    return
                                                 }
+                                                val data = response.body()?.data
+                                                val conversationId = (data as? Map<*, *>)?.get("id")?.toString()
+                                                if (conversationId.isNullOrBlank()) {
+                                                    progress.visibility = View.GONE
+                                                    showError("استجابة المحادثة لا تحتوي على معرّف صالح")
+                                                    return
+                                                }
+                                                api.sendDirectMessage(
+                                                    conversationId,
+                                                    mapOf("type" to "text", "content" to message)
+                                                ).enqueue(object : Callback<ApiResponse<Any>> {
+                                                    override fun onResponse(
+                                                        call: Call<ApiResponse<Any>>,
+                                                        response: Response<ApiResponse<Any>>
+                                                    ) {
+                                                        progress.visibility = View.GONE
+                                                        if (response.isSuccessful && response.body()?.success == true) {
+                                                            dialog.dismiss()
+                                                            toast("تم إرسال رسالة الدردشة")
+                                                        } else {
+                                                            showError(response.body()?.message ?: "فشل إرسال الرسالة (HTTP ${response.code()})")
+                                                        }
+                                                    }
+                                                    override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
+                                                        progress.visibility = View.GONE
+                                                        showError(error.message ?: "تعذر الاتصال بالخادم")
+                                                    }
+                                                })
                                             }
                                             override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
                                                 progress.visibility = View.GONE
                                                 showError(error.message ?: "تعذر الاتصال بالخادم")
                                             }
                                         })
-                                    }
-                                    override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
-                                        progress.visibility = View.GONE
-                                        showError(error.message ?: "تعذر الاتصال بالخادم")
-                                    }
-                                })
+                                }
+                                override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
+                                    progress.visibility = View.GONE
+                                    showError(error.message ?: "تعذر الاتصال بالخادم")
+                                }
+                            })
                         }
                     }
                 }
