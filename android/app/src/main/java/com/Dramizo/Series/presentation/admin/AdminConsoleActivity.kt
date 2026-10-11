@@ -165,8 +165,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 retryButton.visibility = View.GONE
                 statusPanel.visibility = View.VISIBLE
                 webView.visibility = View.GONE
-                statusPanel.visibility = View.VISIBLE
-        webView.loadUrl(DASHBOARD_URL)
+                webView.loadUrl(DASHBOARD_URL)
             }
         }
         statusPanel.addView(retryButton, LinearLayout.LayoutParams(
