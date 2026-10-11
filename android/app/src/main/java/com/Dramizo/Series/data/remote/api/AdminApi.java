@@ -72,8 +72,14 @@ public interface AdminApi {
     @GET("admin/vip/plans")
     Call<ApiResponse<Object>> vipPlans();
 
+    @POST("admin/vip/plans")
+    Call<ApiResponse<Object>> createVipPlan(@Body Map<String, Object> body);
+
+    @PATCH("admin/vip/plans/{id}")
+    Call<ApiResponse<Object>> updateVipPlan(@Path("id") String id, @Body Map<String, Object> body);
+
     @POST("admin/vip/assign")
-    Call<ApiResponse<Object>> assignVip(@Body Map<String, String> body);
+    Call<ApiResponse<Object>> assignVip(@Body Map<String, Object> body);
 
     @GET("admin/notifications")
     Call<ApiResponse<Object>> notifications(@Query("page") int page, @Query("limit") int limit);
