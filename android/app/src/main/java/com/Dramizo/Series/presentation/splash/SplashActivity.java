@@ -168,7 +168,9 @@ public class SplashActivity extends ThemedActivity {
     private void applySkipVisibility(ActivitySplashBinding binding,
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
         if (binding == null || binding.btnSplashSkip == null) return;
-        boolean enabled = theme == null || theme.splash == null || theme.splash.skipEnabled;
+        // Fail closed until the server/cached dashboard setting is known. This
+        // prevents the default Skip button from flashing on when the dashboard hid it.
+        boolean enabled = theme != null && theme.splash != null && theme.splash.skipEnabled;
         binding.btnSplashSkip.setVisibility(
                 enabled ? android.view.View.VISIBLE : android.view.View.GONE);
     }
@@ -210,9 +212,16 @@ public class SplashActivity extends ThemedActivity {
      */
     private void applyRemoteSplash(ActivitySplashBinding binding,
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item) {
-        if (binding == null || item == null || item.url == null || item.url.trim().isEmpty()) return;
+        if (binding == null) return;
+        if (item == null || item.url == null || item.url.trim().isEmpty()) {
+            // A dashboard disable/removal must also clear a previously loaded remote image.
+            restoreBundledSplash(binding);
+            return;
+        }
         try {
-            String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url);
+            String rawUrl = item.url.trim();
+            if (rawUrl.startsWith("//")) rawUrl = "https:" + rawUrl;
+            String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl);
             if (resolved == null || resolved.trim().isEmpty()) {
                 restoreBundledSplash(binding);
                 return;
