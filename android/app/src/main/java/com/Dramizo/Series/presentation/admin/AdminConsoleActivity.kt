@@ -48,6 +48,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("rechargeAgents", "وكلاء الشحن", "تفعيل الوكلاء أو إيقافهم", "💰"),
         Module("operators", "المديرون والصلاحيات", "إدارة مديري لوحة التحكم المحدودين", "🛡️"),
         Module("reports", "البلاغات", "مراجعة البلاغات وحسمها", "🚩"),
+        Module("genderVerifications", "توثيق الجنس", "مراجعة طلبات التوثيق وقبولها أو رفضها", "🪪"),
         Module("withdrawals", "طلبات السحب", "مراجعة طلبات السحب", "🏦"),
         Module("recharges", "طلبات الشحن", "إتمام أو إلغاء طلب شحن", "🪙"),
         Module("walletTransactions", "حركة المحفظة", "عرض معاملات المحفظة", "📒"),
@@ -210,6 +211,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 load(api.operators()) { renderItems(it, "operators") }
             }
             "reports" -> load(api.reports(1, 40)) { renderItems(it, "reports") }
+            "genderVerifications" -> load(api.genderVerifications("pending")) { renderItems(it, "genderVerifications") }
             "withdrawals" -> load(api.withdrawals(1, 40)) { renderItems(it, "withdrawals") }
             "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") }
             "walletTransactions" -> load(api.walletTransactions(1, 50)) { renderItems(it, "walletTransactions") }
@@ -279,6 +281,9 @@ class AdminConsoleActivity : ThemedActivity() {
             val role = value(item, "staffRole", "role")
             val code = value(item, "code")
             val publicId = value(item, "publicId")
+            val roomTitle = value(item, "title", "name", "roomName") ?: ""
+            val accessMode = value(item, "accessMode") ?: "public"
+            val entryFee = value(item, "entryFeeCoins") ?: "0"
             addText(card, primary, 15f, true, TEXT)
             if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
             if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
@@ -307,16 +312,30 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                 }
-                "rooms" -> if (!id.isNullOrBlank()) card.addView(button("إغلاق الروم") {
-                    confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
-                        load(api.closeRoom(id)) { toast("استجاب الخادم لطلب إغلاق الروم"); openModule("rooms") }
-                    }
-                })
-                "streams" -> if (!id.isNullOrBlank()) card.addView(button("إنهاء البث") {
-                    confirm("سيتم إنهاء البث على الخادم. هل تريد المتابعة؟") {
-                        load(api.endStream(id)) { toast("استجاب الخادم لطلب إنهاء البث"); openModule("streams") }
-                    }
-                })
+                "rooms" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("تعديل إعدادات الروم") {
+                        showEditRoomDialog(id, roomTitle, accessMode, entryFee)
+                    })
+                    card.addView(button("إغلاق الروم") {
+                        confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
+                            load(api.closeRoom(id)) { toast("استجاب الخادم لطلب إغلاق الروم"); openModule("rooms") }
+                        }
+                    })
+                }
+                "streams" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("إنهاء البث") {
+                        confirm("سيتم إنهاء البث على الخادم. هل تريد المتابعة؟") {
+                            load(api.endStream(id)) { toast("استجاب الخادم لطلب إنهاء البث"); openModule("streams") }
+                        }
+                    })
+                    card.addView(button("إنهاء قسري للبث") {
+                        confirm("استخدم الإنهاء القسري فقط إذا فشل الإنهاء العادي. متابعة؟") {
+                            load(api.forceEndStream(id, mapOf("reason" to "super_admin_force_end"))) {
+                                toast("استجاب الخادم لطلب الإنهاء القسري"); openModule("streams")
+                            }
+                        }
+                    })
+                }
                 "agencies" -> if (!id.isNullOrBlank()) card.addView(button("تعليق الوكالة") {
                     confirm("تعليق الوكالة قد يؤثر على أعضائها. هل تريد المتابعة؟") {
                         load(api.suspendAgency(id, mapOf("reason" to "تم التعليق من تطبيق JEHO"))) {
@@ -359,9 +378,27 @@ class AdminConsoleActivity : ThemedActivity() {
                             }
                         }
                     })
+                    card.addView(button("تعديل رصيد الوكيل") { showAdjustFloatDialog(id) })
+                }
+                "genderVerifications" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("قبول التوثيق") {
+                        confirm("تأكيد قبول طلب التوثيق؟") {
+                            load(api.approveGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) {
+                                toast("تمت معالجة طلب التوثيق"); openModule("genderVerifications")
+                            }
+                        }
+                    })
+                    card.addView(button("رفض التوثيق") {
+                        confirm("تأكيد رفض طلب التوثيق؟") {
+                            load(api.rejectGenderVerification(id, mapOf("note" to "تمت المراجعة من تطبيق JEHO"))) {
+                                toast("تمت معالجة طلب التوثيق"); openModule("genderVerifications")
+                            }
+                        }
+                    })
                 }
                 "operators" -> if (!id.isNullOrBlank()) {
                     val active = status?.contains("suspended", true) != true && status?.contains("inactive", true) != true
+                    card.addView(button("تعديل صلاحيات المدير") { showEditOperatorDialog(id, item) })
                     card.addView(button(if (active) "تعطيل المدير" else "تفعيل المدير") {
                         confirm("تغيير صلاحية دخول هذا المدير؟") {
                             load(api.updateOperator(id, mapOf("active" to !active))) {
@@ -465,6 +502,111 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             body.addView(card)
         }
+    }
+
+    private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
+        val form = formFields(listOf("اسم الروم", "وضع الدخول: public أو password أو paid", "رسوم الدخول بالعملات"))
+        form.second[0].setText(title)
+        form.second[1].setText(accessMode)
+        form.second[2].setText(entryFee)
+        AlertDialog.Builder(this).setTitle("تعديل الروم").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val newTitle = form.second[0].text.toString().trim()
+                        val mode = form.second[1].text.toString().trim().lowercase()
+                        val fee = form.second[2].text.toString().trim().toLongOrNull()
+                        if (newTitle.isBlank() || mode !in setOf("public", "password", "paid") || fee == null || fee < 0) {
+                            toast("تحقق من الاسم ووضع الدخول والرسوم")
+                            return@setOnClickListener
+                        }
+                        confirm("حفظ إعدادات الروم؟") {
+                            load(api.updateRoom(id, mapOf("title" to newTitle, "accessMode" to mode, "entryFeeCoins" to fee))) {
+                                dialog.dismiss()
+                                toast("تم تحديث إعدادات الروم")
+                                openModule("rooms")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showAdjustFloatDialog(id: String) {
+        val form = formFields(listOf("مقدار التغيير بالعملات (+ إضافة / - خصم)", "ملاحظة إلزامية"))
+        AlertDialog.Builder(this).setTitle("تعديل رصيد وكيل الشحن").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم تعديل", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val amount = form.second[0].text.toString().trim().toLongOrNull()
+                        val note = form.second[1].text.toString().trim()
+                        if (amount == null || amount == 0L || note.isBlank()) {
+                            toast("أدخل مقداراً غير صفري وملاحظة")
+                            return@setOnClickListener
+                        }
+                        confirm("تأكيد تغيير رصيد الوكيل بمقدار " + amount + " عملة؟") {
+                            load(api.adjustRechargeAgentFloat(id, mapOf("amount" to amount, "note" to note))) {
+                                dialog.dismiss()
+                                toast("تمت معالجة تعديل رصيد الوكيل")
+                                openModule("rechargeAgents")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showEditOperatorDialog(id: String, item: Any) {
+        val map = item as? Map<*, *>
+        val currentName = map?.get("displayName")?.toString() ?: ""
+        val currentPermissions = (map?.get("permissions") as? Map<*, *>)
+            ?.entries?.joinToString(",") { it.key.toString() + ":" + it.value.toString() }
+            ?: "users:read,rooms:read"
+        val form = formFields(listOf("اسم المدير", "كلمة مرور جديدة (اتركها فارغة للإبقاء)", "الصلاحيات: users:read,rooms:write"))
+        form.second[0].setText(currentName)
+        form.second[2].setText(currentPermissions)
+        AlertDialog.Builder(this).setTitle("تعديل صلاحيات المدير").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val name = form.second[0].text.toString().trim()
+                        val password = form.second[1].text.toString()
+                        val rawPermissions = form.second[2].text.toString().trim()
+                        val permissions = mutableMapOf<String, String>()
+                        rawPermissions.split(",").map { it.trim() }.filter { it.isNotBlank() }.forEach { pair ->
+                            val bits = pair.split(":")
+                            if (bits.size == 2 && bits[1].trim().lowercase() in setOf("read", "write")) {
+                                permissions[bits[0].trim()] = bits[1].trim().lowercase()
+                            }
+                        }
+                        if (permissions.isEmpty()) {
+                            toast("أدخل صلاحية واحدة على الأقل بصيغة users:read")
+                            return@setOnClickListener
+                        }
+                        confirm("سيتم استبدال صلاحيات هذا المدير بالقائمة الجديدة. متابعة؟") {
+                            val payload = mutableMapOf<String, Any>("displayName" to name, "permissions" to permissions)
+                            if (password.isNotBlank()) {
+                                if (password.length < 8) {
+                                    toast("كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل")
+                                    return@confirm
+                                }
+                                payload["password"] = password
+                            }
+                            load(api.updateOperator(id, payload)) {
+                                dialog.dismiss()
+                                toast("تم تحديث صلاحيات المدير")
+                                openModule("operators")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
