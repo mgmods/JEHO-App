@@ -347,7 +347,7 @@ export class NotificationsService {
             audience,
             channel,
             officialNews: isOfficial,
-            adminMessage: type === NotificationType.CHAT,
+            ...(type === NotificationType.CHAT ? { adminMessage: true } : {}),
             source: 'admin',
             targetUserId: userId,
             ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
