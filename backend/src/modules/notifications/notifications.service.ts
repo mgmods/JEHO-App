@@ -184,6 +184,43 @@ export class NotificationsService {
     return paginate(items, total, query.page || 1, query.limit || 20);
   }
 
+  /** Super-admin messages are stored separately from dashboard Official News. */
+  async listAdminMessages(userId: string, query: PaginationDto) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT },
+      order: { createdAt: 'DESC' },
+    });
+    const messages = rows.filter((n) => (n.data as any)?.adminMessage === true);
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(200, Math.max(1, query.limit || 80));
+    const chronological = messages.slice((page - 1) * limit, page * limit).reverse();
+    return paginate(chronological, messages.length, page, limit);
+  }
+
+  async adminMessagesPreview(userId: string) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT },
+      order: { createdAt: 'DESC' },
+    });
+    const messages = rows.filter((n) => (n.data as any)?.adminMessage === true);
+    const latest = messages[0];
+    return {
+      unread: messages.filter((n) => !n.isRead).length,
+      lastTitle: latest?.title || null,
+      lastBody: latest?.body || null,
+      lastAt: latest?.createdAt || null,
+    };
+  }
+
+  async markAllAdminMessagesRead(userId: string) {
+    const rows = await this.notifRepo.find({
+      where: { userId, type: NotificationType.CHAT, isRead: false },
+    });
+    const ids = rows.filter((n) => (n.data as any)?.adminMessage === true).map((n) => n.id);
+    if (ids.length) await this.notifRepo.update({ id: In(ids), userId }, { isRead: true });
+    return { success: true, updated: ids.length };
+  }
+
   /** Official News feed (system / agency / wallet / vip) — chat-style inbox. */
   async listOfficial(userId: string, query: PaginationDto) {
     const take = Math.min(query.limit || 80, 200);
@@ -310,6 +347,7 @@ export class NotificationsService {
             audience,
             channel,
             officialNews: isOfficial,
+            adminMessage: type === NotificationType.CHAT,
             source: 'admin',
             targetUserId: userId,
             ...(richHtml ? { html: richHtml, bodyHtml: richHtml } : {}),
