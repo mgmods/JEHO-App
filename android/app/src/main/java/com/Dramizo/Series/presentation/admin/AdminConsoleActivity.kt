@@ -1080,7 +1080,7 @@ class AdminConsoleActivity : ThemedActivity() {
             "محتوى الرسالة",
             "معرّف المستخدم (فارغ = إرسال جماعي)",
             "رابط صورة HTTPS (اختياري)",
-            "رابط أو مسار داخل التطبيق HTTPS (اختياري)"
+            "رابط HTTPS أو معرّف روم لفتحه داخل التطبيق (اختياري)"
         ))
         AlertDialog.Builder(this)
             .setTitle("إرسال رسالة الإدارة")
@@ -1094,7 +1094,10 @@ class AdminConsoleActivity : ThemedActivity() {
                         val message = form.second[1].text.toString().trim()
                         val userId = form.second[2].text.toString().trim()
                         val imageUrl = form.second[3].text.toString().trim()
-                        val link = form.second[4].text.toString().trim()
+                        val rawLink = form.second[4].text.toString().trim()
+                        val link = if (rawLink.matches(Regex("\\d+"))) {
+                            "https://jeho-own-backend.mgs.blitz.cloud/open/room/$rawLink"
+                        } else rawLink
                         if (title.isBlank() || message.isBlank()) {
                             toast("عنوان الرسالة ونصها مطلوبان")
                             return@setOnClickListener
