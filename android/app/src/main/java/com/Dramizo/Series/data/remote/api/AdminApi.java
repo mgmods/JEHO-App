@@ -4,6 +4,8 @@ import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import java.util.Map;
 import retrofit2.Call;
 import retrofit2.http.Body;
+import retrofit2.http.PATCH;
+import retrofit2.http.DELETE;
 import retrofit2.http.GET;
 import retrofit2.http.POST;
 import retrofit2.http.Path;
@@ -60,6 +62,55 @@ public interface AdminApi {
 
     @POST("admin/notifications/send")
     Call<ApiResponse<Object>> sendNotification(@Body Map<String, String> body);
+
+    @GET("admin/operators")
+    Call<ApiResponse<Object>> operators();
+    @POST("admin/operators")
+    Call<ApiResponse<Object>> createOperator(@Body Map<String, Object> body);
+    @PATCH("admin/operators/{id}")
+    Call<ApiResponse<Object>> updateOperator(@Path("id") String id, @Body Map<String, Object> body);
+    @DELETE("admin/operators/{id}")
+    Call<ApiResponse<Object>> deleteOperator(@Path("id") String id);
+    @GET("admin/agencies/applications")
+    Call<ApiResponse<Object>> agencyApplications(@Query("page") int page, @Query("limit") int limit);
+    @POST("admin/agencies/applications/{id}/approve")
+    Call<ApiResponse<Object>> approveAgencyApplication(@Path("id") String id, @Body Map<String, Object> body);
+    @POST("admin/agencies/applications/{id}/reject")
+    Call<ApiResponse<Object>> rejectAgencyApplication(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/recharge-agents/applications")
+    Call<ApiResponse<Object>> rechargeAgentApplications();
+    @POST("admin/recharge-agents/applications/{id}/approve")
+    Call<ApiResponse<Object>> approveRechargeAgentApplication(@Path("id") String id, @Body Map<String, Object> body);
+    @POST("admin/recharge-agents/applications/{id}/reject")
+    Call<ApiResponse<Object>> rejectRechargeAgentApplication(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/recharge-agents")
+    Call<ApiResponse<Object>> rechargeAgents();
+    @PATCH("admin/recharge-agents/{id}")
+    Call<ApiResponse<Object>> updateRechargeAgent(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/reports")
+    Call<ApiResponse<Object>> reports(@Query("page") int page, @Query("limit") int limit);
+    @POST("admin/reports/{id}/resolve")
+    Call<ApiResponse<Object>> resolveReport(@Path("id") String id, @Body Map<String, Object> body);
+    @POST("admin/reports/{id}/dismiss")
+    Call<ApiResponse<Object>> dismissReport(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/cosmetics")
+    Call<ApiResponse<Object>> cosmetics();
+    @PATCH("admin/cosmetics/{id}")
+    Call<ApiResponse<Object>> updateCosmetic(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/wallet/transactions")
+    Call<ApiResponse<Object>> walletTransactions(@Query("page") int page, @Query("limit") int limit);
+    @GET("admin/wallet/withdraws")
+    Call<ApiResponse<Object>> withdrawals(@Query("page") int page, @Query("limit") int limit);
+    @POST("admin/wallet/withdraws/{id}/approve")
+    Call<ApiResponse<Object>> approveWithdrawal(@Path("id") String id);
+    @POST("admin/wallet/withdraws/{id}/reject")
+    Call<ApiResponse<Object>> rejectWithdrawal(@Path("id") String id, @Body Map<String, Object> body);
+    @GET("admin/wallet/recharges")
+    Call<ApiResponse<Object>> recharges(@Query("page") int page, @Query("limit") int limit);
+    @POST("admin/wallet/recharges/{id}/complete")
+    Call<ApiResponse<Object>> completeRecharge(@Path("id") String id, @Body Map<String, Object> body);
+    @POST("admin/wallet/recharges/{id}/cancel")
+    Call<ApiResponse<Object>> cancelRecharge(@Path("id") String id);
 
     @GET("admin/logs")
     Call<ApiResponse<Object>> logs(@Query("page") int page, @Query("limit") int limit);
