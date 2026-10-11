@@ -92,6 +92,9 @@ public interface AdminApi {
     @GET("admin/notifications")
     Call<ApiResponse<Object>> notifications(@Query("page") int page, @Query("limit") int limit);
 
+    @POST("notifications/admin-messages/send")
+    Call<ApiResponse<Object>> sendAdminMessage(@Body Map<String, String> body);
+
     @POST("admin/notifications/send")
     Call<ApiResponse<Object>> sendNotification(@Body Map<String, String> body);
 
