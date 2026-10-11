@@ -1079,7 +1079,7 @@ class AdminConsoleActivity : ThemedActivity() {
                                 payload["userId"] = userId
                                 payload["audience"] = "user"
                             } else payload["audience"] = "all"
-                            load(api.sendNotification(payload)) {
+                            load(api.sendAdminMessage(payload)) {
                                 dialog.dismiss()
                                 toast("تم قبول طلب الإرسال من الخادم؛ افحص وصول رسالة الإدارة للمستلم")
                                 openModule("notifications")
