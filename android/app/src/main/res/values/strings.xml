@@ -1283,4 +1283,10 @@
     <string name="room_side_summon">Summon</string>
     <string name="room_side_history">History</string>
     <string name="room_side_discover">Discover</string>
+
+<string name="admin_messages">رسائل الإدارة</string>
+<string name="admin_messages_hint">رسائل خاصة وجماعية من السوبر أدمن</string>
+<string name="admin_messages_readonly">رسائل مرسلة من السوبر أدمن</string>
+<string name="admin_messages_empty">لا توجد رسائل إدارية حتى الآن</string>
+<string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
 </resources>
