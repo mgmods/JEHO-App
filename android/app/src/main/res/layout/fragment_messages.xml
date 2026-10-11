@@ -97,6 +97,13 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <!-- Dedicated Super Admin inbox; intentionally below Official News. -->
+        <include
+            android:id="@+id/adminMessagesCardMsg"
+            layout="@layout/include_admin_messages_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/cardMyRoom"
             android:layout_width="0dp"
