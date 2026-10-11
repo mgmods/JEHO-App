@@ -27,6 +27,9 @@ public interface AdminApi {
     @POST("admin/users/{id}/unban")
     Call<ApiResponse<Object>> unbanUser(@Path("id") String id);
 
+    @DELETE("admin/users/{id}")
+    Call<ApiResponse<Object>> deleteUser(@Path("id") String id);
+
     @GET("admin/rooms")
     Call<ApiResponse<Object>> rooms(@Query("page") int page, @Query("limit") int limit);
 
@@ -47,6 +50,12 @@ public interface AdminApi {
 
     @GET("admin/gifts")
     Call<ApiResponse<Object>> gifts();
+
+    @PATCH("admin/gifts/{id}")
+    Call<ApiResponse<Object>> updateGift(@Path("id") String id, @Body Map<String, Object> body);
+
+    @DELETE("admin/gifts/{id}")
+    Call<ApiResponse<Object>> deleteGift(@Path("id") String id);
 
     @GET("admin/vip")
     Call<ApiResponse<Object>> vipMembers(@Query("page") int page, @Query("limit") int limit);
