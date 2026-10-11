@@ -102,6 +102,7 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AuraLive.Fullscreen" />
+        <activity android:name=".presentation.admin.AdminConsoleActivity" android:exported="false" />
         <activity android:name=".presentation.profile.ProfileActivity" android:exported="false"
             android:windowSoftInputMode="adjustResize" 
             android:screenOrientation="portrait" />
