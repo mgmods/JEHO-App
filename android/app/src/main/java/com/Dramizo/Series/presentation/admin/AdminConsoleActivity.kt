@@ -505,7 +505,7 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
-        val form = formFields(listOf("اسم الروم", "وضع الدخول: public أو password أو paid", "رسوم الدخول بالعملات"))
+        val form = formFields(listOf("اسم الروم", "وضع الدخول: free أو paid أو permanent", "رسوم الدخول بالعملات"))
         form.second[0].setText(title)
         form.second[1].setText(accessMode)
         form.second[2].setText(entryFee)
@@ -517,8 +517,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         val newTitle = form.second[0].text.toString().trim()
                         val mode = form.second[1].text.toString().trim().lowercase()
                         val fee = form.second[2].text.toString().trim().toLongOrNull()
-                        if (newTitle.isBlank() || mode !in setOf("public", "password", "paid") || fee == null || fee < 0) {
-                            toast("تحقق من الاسم ووضع الدخول والرسوم")
+                        if (newTitle.isBlank() || mode !in setOf("free", "paid", "permanent") || fee == null || fee < 0) {
+                            toast("تحقق من الاسم ووضع الدخول (free/paid/permanent) والرسوم")
                             return@setOnClickListener
                         }
                         confirm("حفظ إعدادات الروم؟") {
