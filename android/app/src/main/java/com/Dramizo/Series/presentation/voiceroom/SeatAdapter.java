@@ -3,6 +3,8 @@ package com.Dramizo.Series.presentation.voiceroom;
 import com.Dramizo.Series.util.ImagePlaceholder;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.LayoutInflater;
@@ -1073,6 +1075,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
     }
 
     private void bindStaffSeatBadge(VH holder, @Nullable com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
+        View superFrame = holder.itemView.findViewById(R.id.superAdminSeatFrame);
+        boolean isSuperAdmin = user != null && StaffRoleHelper.isSuper(user);
+        if (superFrame != null) {
+            superFrame.setVisibility(isSuperAdmin ? View.VISIBLE : View.GONE);
+            if (isSuperAdmin) {
+                GradientDrawable ring = new GradientDrawable();
+                ring.setShape(GradientDrawable.OVAL);
+                ring.setColor(Color.TRANSPARENT);
+                ring.setStroke(Math.max(2, Math.round(holder.itemView.getResources().getDisplayMetrics().density * 2)),
+                        Color.rgb(255, 194, 64));
+                superFrame.setBackground(ring);
+            }
+        }
         if (holder.b.tvStaffSeatBadge == null) return;
         if (user == null || !StaffRoleHelper.isStaff(user)) {
             holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
