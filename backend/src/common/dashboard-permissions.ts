@@ -217,6 +217,11 @@ export function resolveAdminRequest(
   const path = stripPath(url);
   // path: admin/users/xxx
   const parts = path.split('/').filter(Boolean);
+  // Vanity-ID admin routes live in the dedicated controller at
+  // /vanity-ids/admin/* rather than /admin/*; apply the same ACL module.
+  if (parts[0] === 'vanity-ids' && parts[1] === 'admin') {
+    parts.splice(0, 2, 'admin', 'vanity-ids');
+  }
   if (parts[0] !== 'admin') {
     return { kind: 'deny', message: 'Invalid admin route' };
   }
