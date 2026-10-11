@@ -12,6 +12,47 @@ function logDatabaseConfiguration() {
   }));
 }
 
+// Destructive reset is opt-in and runs only once. It drops only the app-owned
+// schema, never the PostgreSQL database, public schema, Redis, or voice config.
+// A marker inside the recreated schema prevents repeated resets on later restarts.
+async function resetSchemaOnceIfRequested() {
+  if (process.env.JEHO_OWN_RESET_ONCE !== 'true') return false;
+  if (!process.env.DATABASE_URL) {
+    throw new Error('JEHO_OWN_RESET_ONCE requires DATABASE_URL; refusing to guess which database to reset.');
+  }
+
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  try {
+    await client.connect();
+    const marker = await client.query(
+      "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='jeho_own' AND table_name='__reset_once_marker') AS done",
+    );
+    if (marker.rows[0]?.done) {
+      console.log('[JEHO-OWN startup] One-time schema reset already completed; preserving schema.');
+      return false;
+    }
+
+    console.warn('[JEHO-OWN startup] JEHO_OWN_RESET_ONCE=true: dropping only schema jeho_own before fresh seed.');
+    await client.query('DROP SCHEMA IF EXISTS "jeho_own" CASCADE');
+    return true;
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
+async function markResetCompleted() {
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  try {
+    await client.connect();
+    await client.query('CREATE SCHEMA IF NOT EXISTS "jeho_own"');
+    await client.query('CREATE TABLE IF NOT EXISTS "jeho_own"."__reset_once_marker" (id integer PRIMARY KEY)');
+    await client.query('INSERT INTO "jeho_own"."__reset_once_marker" (id) VALUES (1) ON CONFLICT (id) DO NOTHING');
+    console.log('[JEHO-OWN startup] One-time schema reset marked complete.');
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function databaseIsReady() {
   if (!process.env.DATABASE_URL) {
     console.log('[JEHO-OWN startup] DATABASE_URL is not set; skipping URL-based readiness check and allowing seed to use DB_* settings.');
@@ -63,7 +104,16 @@ async function runProcess(label, command, args) {
 async function main() {
   logDatabaseConfiguration();
 
-  if (await databaseIsReady()) {
+  const resetWasRequested = await resetSchemaOnceIfRequested();
+  if (resetWasRequested) {
+    const seedCode = await runProcess('fresh database seed', process.execPath, ['dist/database/seed.js']);
+    if (seedCode !== 0) {
+      console.error('[JEHO-OWN startup] Fresh seed failed; API will not start.');
+      process.exit(seedCode);
+    }
+    await markResetCompleted();
+    console.log('[JEHO-OWN startup] Fresh seed completed successfully.');
+  } else if (await databaseIsReady()) {
     console.log('[JEHO-OWN startup] Database ready — skipping seed.');
   } else {
     console.log('[JEHO-OWN startup] Database not initialized or URL check unavailable — running seed.');
