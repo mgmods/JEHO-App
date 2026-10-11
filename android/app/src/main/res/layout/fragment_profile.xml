@@ -434,6 +434,23 @@
                     android:text="استخدم: اضغط مطوّلاً على أي شخص داخل الغرفة لإدارة (كتم / طرد / حظر)."
                     android:textColor="@color/text_hint"
                     android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/btnOpenSuperAdminDashboard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_profile_edit_fab"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="12dp"
+                    android:text="فتح لوحة السوبر أدمن المركزية"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <!-- Wallet row — clear Mikoo-style card with live balances -->
