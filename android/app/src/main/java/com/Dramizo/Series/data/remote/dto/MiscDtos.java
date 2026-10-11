@@ -414,6 +414,8 @@ public final class MiscDtos {
             // Empty — wallpapers/icons ship inside the APK.
             t.assets = new java.util.HashMap<>();
             t.splash = new SplashConfigDto();
+            // Hide Skip until a cached/server dashboard preference explicitly enables it.
+            t.splash.skipEnabled = false;
             t.splash.items = new java.util.ArrayList<>();
             return t;
         }
