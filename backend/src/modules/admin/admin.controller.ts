@@ -1631,6 +1631,26 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('cosmetics/grant')
+  @ApiOperation({ summary: 'Grant an existing cosmetic to a user for 7, 15, 30 days or permanently' })
+  async grantCosmeticToUser(
+    @Body() body: { userId?: string; cosmeticCode?: string; days?: number; permanent?: boolean },
+  ) {
+    const userId = String(body?.userId || '').trim();
+    const cosmeticCode = String(body?.cosmeticCode || '').trim();
+    if (!userId || !cosmeticCode) {
+      throw new BadRequestException('userId and cosmeticCode are required');
+    }
+    const permanent = body?.permanent === true;
+    const days = Number(body?.days || 7);
+    if (!permanent && ![7, 15, 30].includes(days)) {
+      throw new BadRequestException('days must be 7, 15 or 30, or permanent=true');
+    }
+    return this.cosmeticsService.grantTemporary(userId, cosmeticCode, days, { permanent });
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('cosmetics')
   createCosmetic(@Body() body: Record<string, unknown>) {
     return this.cosmeticsService.adminCreate(body as any);
