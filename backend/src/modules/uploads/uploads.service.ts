@@ -106,10 +106,11 @@ export class UploadsService {
   async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
     if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
-    const publicUrl =
-      `${this.supabaseUrl}/storage/v1/object/public/${encodeURIComponent(this.storageBucket)}/${encodeURIComponent(filename)}`;
-    const response = await this.storageFetch(publicUrl, {
-      headers: { Accept: 'application/octet-stream' },
+    // Read through authenticated Storage API so uploaded files work even when
+    // the JEHO-OWN bucket is private; do not require public-bucket access.
+    const objectUrl = this.storageObjectUrl(filename);
+    const response = await this.storageFetch(objectUrl, {
+      headers: this.storageHeaders({ Accept: 'application/octet-stream' }),
     });
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
