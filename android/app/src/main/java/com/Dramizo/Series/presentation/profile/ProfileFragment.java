@@ -365,6 +365,15 @@ public class ProfileFragment extends Fragment {
                 binding.tvStaffBadge.setVisibility(View.GONE);
             }
         }
+        if (binding.btnOpenSuperAdminDashboard != null) {
+            boolean isSuper = StaffRoleHelper.isSuper(user);
+            binding.btnOpenSuperAdminDashboard.setVisibility(isSuper ? View.VISIBLE : View.GONE);
+            binding.btnOpenSuperAdminDashboard.setOnClickListener(v -> {
+                if (!StaffRoleHelper.isSuper(user) || !isAdded()) return;
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
+            });
+        }
         if (binding.panelStaffPowers != null) {
             if (isStaff) {
                 binding.panelStaffPowers.setVisibility(View.VISIBLE);
