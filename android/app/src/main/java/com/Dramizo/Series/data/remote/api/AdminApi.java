@@ -27,6 +27,9 @@ public interface AdminApi {
     @POST("admin/users/{id}/unban")
     Call<ApiResponse<Object>> unbanUser(@Path("id") String id);
 
+    @PATCH("admin/users/{id}")
+    Call<ApiResponse<Object>> updateUser(@Path("id") String id, @Body Map<String, Object> body);
+
     @DELETE("admin/users/{id}")
     Call<ApiResponse<Object>> deleteUser(@Path("id") String id);
 
