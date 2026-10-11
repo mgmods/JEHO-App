@@ -68,7 +68,7 @@ jobs:
 
       - name: Validate independent API URL
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1' }}
+          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
         shell: bash
         run: |
           if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
