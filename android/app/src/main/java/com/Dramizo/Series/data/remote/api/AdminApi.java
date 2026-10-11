@@ -81,6 +81,14 @@ public interface AdminApi {
     @POST("admin/vip/assign")
     Call<ApiResponse<Object>> assignVip(@Body Map<String, Object> body);
 
+    /** Direct messages use the existing authenticated chat API and preserve the admin sender identity. */
+    @POST("chat/conversations")
+    Call<ApiResponse<Object>> startDirectConversation(@Body Map<String, Object> body);
+
+    @POST("chat/conversations/{id}/messages")
+    Call<ApiResponse<Object>> sendDirectMessage(@Path("id") String conversationId,
+                                                @Body Map<String, Object> body);
+
     @GET("admin/notifications")
     Call<ApiResponse<Object>> notifications(@Query("page") int page, @Query("limit") int limit);
 
