@@ -351,7 +351,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     })
                 }
                 "rechargeAgents" -> if (!id.isNullOrBlank()) {
-                    val active = status?.contains("active", true) == true
+                    val active = status?.equals("active", true) == true
                     card.addView(button(if (active) "إيقاف الوكيل" else "تفعيل الوكيل") {
                         confirm("تأكيد تغيير حالة وكيل الشحن؟") {
                             load(api.updateRechargeAgent(id, mapOf("status" to if (active) "suspended" else "active"))) {
@@ -420,7 +420,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     })
                 }
                 "gifts" -> if (!id.isNullOrBlank()) {
-                    val active = status?.contains("true", true) == true || status?.contains("active", true) == true
+                    val active = status?.equals("true", true) == true || status?.equals("active", true) == true
                     card.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
                         confirm("تغيير حالة الهدية؟") {
                             load(api.updateGift(id, mapOf("isActive" to !active))) {
@@ -507,7 +507,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         val term = form.second[1].text.toString().trim().lowercase()
                         val permanent = term == "permanent" || term == "دائم"
                         val days = term.toIntOrNull()
-                        if (userId.isBlank() || (!permanent && days !in listOf(7, 15, 30))) {
+                        if (userId.isBlank() || (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
                             toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
                             return@setOnClickListener
                         }
