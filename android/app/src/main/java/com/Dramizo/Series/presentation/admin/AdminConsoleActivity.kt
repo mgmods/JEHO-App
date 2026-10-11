@@ -238,6 +238,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "notifications" -> {
                 body.addView(button("＋ إرسال إشعار") { showNotificationDialog() })
+                body.addView(button("✉ رسالة دردشة مباشرة لمستخدم") { showDirectMessageDialog() })
                 load(api.notifications(1, 40)) { renderItems(it, "notifications") }
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
@@ -945,6 +946,80 @@ class AdminConsoleActivity : ThemedActivity() {
                                 toast("استجاب الخادم لطلب منح VIP")
                                 openModule("vip")
                             }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showDirectMessageDialog() {
+        val form = formFields(listOf("معرّف المستخدم (UUID)", "نص الرسالة"))
+        AlertDialog.Builder(this)
+            .setTitle("رسالة دردشة مباشرة")
+            .setView(form.first)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("إرسال", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val userId = form.second[0].text.toString().trim()
+                        val message = form.second[1].text.toString().trim()
+                        if (userId.isBlank() || message.isBlank()) {
+                            toast("معرّف المستخدم ونص الرسالة مطلوبان")
+                            return@setOnClickListener
+                        }
+                        if (message.length > 4000) {
+                            toast("الرسالة أطول من الحد المسموح (4000 حرف)")
+                            return@setOnClickListener
+                        }
+                        confirm("ستُرسل رسالة دردشة من حساب السوبر أدمن إلى المستخدم المحدد. تأكيد؟") {
+                            progress.visibility = View.VISIBLE
+                            api.startDirectConversation(mapOf("peerId" to userId))
+                                .enqueue(object : Callback<ApiResponse<Any>> {
+                                    override fun onResponse(
+                                        call: Call<ApiResponse<Any>>,
+                                        response: Response<ApiResponse<Any>>
+                                    ) {
+                                        if (!response.isSuccessful || response.body()?.success != true) {
+                                            progress.visibility = View.GONE
+                                            showError(response.body()?.message ?: "تعذر فتح المحادثة (HTTP ${response.code()})")
+                                            return
+                                        }
+                                        val data = response.body()?.data
+                                        val conversationId = (data as? Map<*, *>)?.get("id")?.toString()
+                                        if (conversationId.isNullOrBlank()) {
+                                            progress.visibility = View.GONE
+                                            showError("استجابة المحادثة لا تحتوي على معرّف صالح")
+                                            return
+                                        }
+                                        api.sendDirectMessage(
+                                            conversationId,
+                                            mapOf("type" to "text", "content" to message)
+                                        ).enqueue(object : Callback<ApiResponse<Any>> {
+                                            override fun onResponse(
+                                                call: Call<ApiResponse<Any>>,
+                                                response: Response<ApiResponse<Any>>
+                                            ) {
+                                                progress.visibility = View.GONE
+                                                if (response.isSuccessful && response.body()?.success == true) {
+                                                    dialog.dismiss()
+                                                    toast("تم إرسال رسالة الدردشة")
+                                                } else {
+                                                    showError(response.body()?.message ?: "فشل إرسال الرسالة (HTTP ${response.code()})")
+                                                }
+                                            }
+                                            override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
+                                                progress.visibility = View.GONE
+                                                showError(error.message ?: "تعذر الاتصال بالخادم")
+                                            }
+                                        })
+                                    }
+                                    override fun onFailure(call: Call<ApiResponse<Any>>, error: Throwable) {
+                                        progress.visibility = View.GONE
+                                        showError(error.message ?: "تعذر الاتصال بالخادم")
+                                    }
+                                })
                         }
                     }
                 }
