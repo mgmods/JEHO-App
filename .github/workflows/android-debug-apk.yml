@@ -6,6 +6,9 @@ on:
     paths:
       - ".github/workflows/android-debug-apk.yml"
       - "android/**"
+      # Rebuild the APK when API configuration or upload contracts change.
+      - "backend/src/modules/config/**"
+      - "backend/src/modules/uploads/**"
   workflow_dispatch:
 
 permissions:
