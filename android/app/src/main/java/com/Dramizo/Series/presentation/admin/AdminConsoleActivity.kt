@@ -229,8 +229,9 @@ class AdminConsoleActivity : ThemedActivity() {
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
+                body.addView(button("＋ إنشاء خطة VIP") { showCreateVipPlanDialog() })
                 load(api.vipMembers(1, 40)) { renderItems(it, "vip") }
-                val plansButton = button("عرض خطط VIP") {
+                val plansButton = button("إدارة خطط VIP") {
                     load(api.vipPlans()) { renderItems(it, "vipPlans") }
                 }
                 body.addView(plansButton)
@@ -289,6 +290,8 @@ class AdminConsoleActivity : ThemedActivity() {
             val roomTitle = value(item, "title", "name", "roomName") ?: ""
             val accessMode = value(item, "accessMode") ?: "public"
             val entryFee = value(item, "entryFeeCoins") ?: "0"
+            val vipLevel = value(item, "level") ?: "1"
+            val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
             if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
             if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
@@ -348,6 +351,18 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     }
                 })
+                "vipPlans" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) })
+                    val active = status?.equals("true", true) == true
+                    card.addView(button(if (active) "تعطيل الخطة" else "تفعيل الخطة") {
+                        confirm("تغيير حالة خطة VIP؟") {
+                            load(api.updateVipPlan(id, mapOf("isActive" to !active))) {
+                                toast("تم تحديث خطة VIP")
+                                load(api.vipPlans()) { renderItems(it, "vipPlans") }
+                            }
+                        }
+                    })
+                }
                 "vip" -> if (!id.isNullOrBlank()) {
                     card.addView(button("سحب عضوية VIP") {
                         confirm("سحب عضوية VIP من المستخدم؟") {
@@ -844,8 +859,65 @@ class AdminConsoleActivity : ThemedActivity() {
             }
     }
 
+    private fun showCreateVipPlanDialog() {
+        val form = formFields(listOf("اسم الخطة", "مستوى VIP (1–10)", "السعر الشهري بالعملات"))
+        AlertDialog.Builder(this).setTitle("إنشاء خطة VIP").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("إنشاء", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val name = form.second[0].text.toString().trim()
+                        val level = form.second[1].text.toString().trim().toIntOrNull()
+                        val price = form.second[2].text.toString().trim().toIntOrNull()
+                        if (name.isBlank() || level == null || level !in 1..10 || price == null || price < 0) {
+                            toast("أدخل اسماً ومستوى من 1 إلى 10 وسعراً غير سالب")
+                            return@setOnClickListener
+                        }
+                        confirm("إنشاء خطة VIP بالمستوى " + level + " والسعر " + price + "؟") {
+                            load(api.createVipPlan(mapOf("name" to name, "level" to level, "price" to price, "isActive" to true))) {
+                                dialog.dismiss()
+                                toast("تم إنشاء خطة VIP")
+                                load(api.vipPlans()) { renderItems(it, "vipPlans") }
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showEditVipPlanDialog(id: String, currentName: String, currentLevel: String, currentPrice: String) {
+        val form = formFields(listOf("اسم الخطة", "مستوى VIP (1–10)", "السعر الشهري بالعملات"))
+        form.second[0].setText(currentName)
+        form.second[1].setText(currentLevel)
+        form.second[2].setText(currentPrice)
+        AlertDialog.Builder(this).setTitle("تعديل خطة VIP").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val name = form.second[0].text.toString().trim()
+                        val level = form.second[1].text.toString().trim().toIntOrNull()
+                        val price = form.second[2].text.toString().trim().toIntOrNull()
+                        if (name.isBlank() || level == null || level !in 1..10 || price == null || price < 0) {
+                            toast("أدخل اسماً ومستوى من 1 إلى 10 وسعراً غير سالب")
+                            return@setOnClickListener
+                        }
+                        confirm("حفظ تعديلات خطة VIP؟") {
+                            load(api.updateVipPlan(id, mapOf("name" to name, "level" to level, "price" to price))) {
+                                dialog.dismiss()
+                                toast("تم تحديث خطة VIP")
+                                load(api.vipPlans()) { renderItems(it, "vipPlans") }
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
     private fun showAssignVipDialog() {
-        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP"))
+        val form = formFields(listOf("معرّف المستخدم", "معرّف خطة VIP", "المدة: 7 أو 15 أو 30 أو permanent"))
         AlertDialog.Builder(this)
             .setTitle("منح عضوية VIP")
             .setView(form.first)
@@ -856,12 +928,17 @@ class AdminConsoleActivity : ThemedActivity() {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val userId = form.second[0].text.toString().trim()
                         val planId = form.second[1].text.toString().trim()
-                        if (userId.isBlank() || planId.isBlank()) {
-                            toast("أدخل معرّف المستخدم ومعرّف الخطة")
+                        val term = form.second[2].text.toString().trim().lowercase()
+                        val permanent = term == "permanent" || term == "دائم"
+                        val days = term.toIntOrNull()
+                        if (userId.isBlank() || planId.isBlank() ||
+                            (!permanent && (days == null || days !in listOf(7, 15, 30)))) {
+                            toast("أدخل معرّف المستخدم والخطة ومدة 7 أو 15 أو 30 أو permanent")
                             return@setOnClickListener
                         }
-                        confirm("تأكيد منح VIP للمستخدم المحدد؟") {
-                            load(api.assignVip(mapOf("userId" to userId, "planId" to planId))) {
+                        val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
+                        confirm("تأكيد منح VIP للمستخدم المحدد " + durationLabel + "؟") {
+                            load(api.assignVip(mapOf("userId" to userId, "planId" to planId, "days" to (days ?: 30), "permanent" to permanent))) {
                                 dialog.dismiss()
                                 toast("استجاب الخادم لطلب منح VIP")
                                 openModule("vip")
