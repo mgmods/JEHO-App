@@ -1277,4 +1277,10 @@
 <string name="lang_name_hi" translatable="false">हिन्दी</string>
 <string name="lang_name_ur" translatable="false">اردو</string>
 <string name="lang_name_zh" translatable="false">简体中文</string>
+
+<string name="admin_messages">رسائل الإدارة</string>
+<string name="admin_messages_hint">رسائل خاصة وجماعية من السوبر أدمن</string>
+<string name="admin_messages_readonly">رسائل مرسلة من السوبر أدمن</string>
+<string name="admin_messages_empty">لا توجد رسائل إدارية حتى الآن</string>
+<string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
 </resources>
