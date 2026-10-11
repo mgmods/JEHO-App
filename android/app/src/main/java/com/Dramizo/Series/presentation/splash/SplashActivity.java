@@ -103,7 +103,9 @@ public class SplashActivity extends ThemedActivity {
 
             // The dashboard owns Skip visibility; honor its cached setting immediately.
             if (binding.btnSplashSkip != null) {
-                applySkipVisibility(binding, remoteTheme);
+                // Do not flash a stale cached Skip setting while the current
+                // dashboard configuration is being refreshed.
+                binding.btnSplashSkip.setVisibility(android.view.View.GONE);
                 binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
                 ViewCompat.setOnApplyWindowInsetsListener(binding.btnSplashSkip, (view, insets) -> {
                     androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
