@@ -3,12 +3,11 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO-OWN uses the same production API/server as the canonical JEHO-CHAT source.
- * A build-time override is still supported for development, but production falls
- * back to the canonical server instead of the isolated Render/Supabase instance.
+ * JEHO-OWN is isolated from the legacy JEHO-CHAT backend.
+ * A build-time override is supported, with production defaulting to the new Blitz API.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://api.adnova.bbs.tr";
+    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.blitz.cloud";
 
     private ApiOrigin() {}
 
