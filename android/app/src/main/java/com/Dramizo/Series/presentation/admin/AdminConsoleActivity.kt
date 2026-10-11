@@ -639,7 +639,9 @@ class AdminConsoleActivity : ThemedActivity() {
         val map = item as? Map<*, *>
         val currentName = map?.get("displayName")?.toString() ?: ""
         val currentPermissions = (map?.get("permissions") as? Map<*, *>)
-            ?.entries?.joinToString(",") { it.key.toString() + ":" + it.value.toString() }
+            ?.entries?.filter { it.value?.toString() in setOf("read", "write") }
+            ?.joinToString(",") { it.key.toString() + ":" + it.value.toString() }
+            ?.takeIf { it.isNotBlank() }
             ?: "users:read,rooms:read"
         val form = formFields(listOf("اسم المدير", "كلمة مرور جديدة (اتركها فارغة للإبقاء)", "الصلاحيات: users:read,rooms:write"))
         form.second[0].setText(currentName)
