@@ -5,7 +5,7 @@ import router from '@/router'
 const api = axios.create({
   // Set VITE_API_URL in the environment for the independent JEHO-OWN backend.
   // Never silently send dashboard requests to the previous production server.
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.adnova.bbs.tr/api/v1',
+  baseURL: import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
