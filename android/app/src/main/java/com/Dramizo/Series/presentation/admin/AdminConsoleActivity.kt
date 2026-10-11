@@ -52,6 +52,8 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("recharges", "طلبات الشحن", "إتمام أو إلغاء طلب شحن", "🪙"),
         Module("walletTransactions", "حركة المحفظة", "عرض معاملات المحفظة", "📒"),
         Module("cosmetics", "الإطارات والدخوليات", "تفعيل أو تعطيل المقتنيات", "✨"),
+        Module("grantCosmetics", "إهداء المميزات", "منح إطار أو دخولية بمدة محددة أو دائمة", "🎁"),
+        Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة أو بشكل دائم", "🔢"),
         Module("gifts", "الهدايا والمميزات", "عرض كتالوج الهدايا الحالي", "🎁"),
         Module("vip", "العضويات VIP", "مراجعة العضويات ومنح VIP", "👑"),
         Module("notifications", "الإشعارات", "مراجعة الإشعارات وإرسال إشعار", "🔔"),
@@ -212,6 +214,11 @@ class AdminConsoleActivity : ThemedActivity() {
             "recharges" -> load(api.recharges(1, 40)) { renderItems(it, "recharges") }
             "walletTransactions" -> load(api.walletTransactions(1, 50)) { renderItems(it, "walletTransactions") }
             "cosmetics" -> load(api.cosmetics()) { renderItems(it, "cosmetics") }
+            "grantCosmetics" -> load(api.cosmetics()) { renderItems(it, "grantCosmetics") }
+            "vanityIds" -> {
+                body.addView(button("＋ إضافة آي دي إلى الكتالوج") { showCreateVanityDialog() })
+                load(api.vanityIds()) { renderItems(it, "vanityIds") }
+            }
             "gifts" -> load(api.gifts()) { renderItems(it, "gifts") }
             "vip" -> {
                 body.addView(button("＋ منح عضوية VIP") { showAssignVipDialog() })
@@ -269,6 +276,9 @@ class AdminConsoleActivity : ThemedActivity() {
             val id = value(item, "id", "userId", "roomId", "agencyId", "streamId")
             val primary = value(item, "displayName", "name", "title", "username", "email", "roomName") ?: "عنصر بدون اسم"
             val status = value(item, "status", "state", "isActive", "type")
+            val role = value(item, "staffRole", "role")
+            val code = value(item, "code")
+            val publicId = value(item, "publicId")
             addText(card, primary, 15f, true, TEXT)
             if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
             if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
@@ -279,6 +289,7 @@ class AdminConsoleActivity : ThemedActivity() {
             when (type) {
                 "users" -> if (!id.isNullOrBlank()) {
                     val banned = status?.contains("banned", true) == true
+                    card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
                     card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
                         confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
                             load(if (banned) api.unbanUser(id) else api.banUser(id)) {
@@ -288,7 +299,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                     card.addView(button("حذف الحساب") {
-                        confirm("سيُطلب حذف الحساب بشكل غير قابل للتراجع من التطبيق. تأكد من هوية المستخدم قبل المتابعة.") {
+                        confirm("سيُطلب حذف الحساب. تأكد من الهوية والضرورة قبل المتابعة.") {
                             load(api.deleteUser(id)) {
                                 toast("استجاب الخادم لطلب حذف الحساب")
                                 openModule("users")
@@ -417,11 +428,29 @@ class AdminConsoleActivity : ThemedActivity() {
                             }
                         }
                     })
-                    card.addView(button("حذف الهدية") {
-                        confirm("حذف الهدية من الكتالوج؟ تأكد أنها غير مستخدمة في عروض أو سجلات قائمة.") {
-                            load(api.deleteGift(id)) { toast("استجاب الخادم لطلب حذف الهدية"); openModule("gifts") }
-                        }
-                    })
+                }
+                "grantCosmetics" -> if (!code.isNullOrBlank()) {
+                    card.addView(button("إهداء هذه الميزة لمستخدم") { showGrantCosmeticDialog(code) })
+                }
+                "vanityIds" -> if (!id.isNullOrBlank() && !publicId.isNullOrBlank()) {
+                    card.addView(button("إهداء الآي دي لمستخدم") { showGrantVanityDialog(publicId) })
+                    when (status?.lowercase()) {
+                        "owned", "reserved" -> card.addView(button("سحب الآي دي وإعادته للسوق") {
+                            confirm("سيُستعاد الآي دي السابق للمالك إن وجد، ثم يعود هذا الآي دي للسوق. متابعة؟") {
+                                load(api.revokeVanityId(id)) { toast("تمت معالجة طلب سحب الآي دي"); openModule("vanityIds") }
+                            }
+                        })
+                        "disabled" -> card.addView(button("إعادة تفعيل الآي دي") {
+                            confirm("إعادة الآي دي إلى السوق؟") {
+                                load(api.enableVanityId(id)) { toast("تم تفعيل الآي دي"); openModule("vanityIds") }
+                            }
+                        })
+                        else -> card.addView(button("تعطيل الآي دي") {
+                            confirm("إخفاء الآي دي من السوق؟ إذا كان مملوكاً سيُعاد الآي دي السابق لصاحبه.") {
+                                load(api.disableVanityId(id)) { toast("تم تعطيل الآي دي"); openModule("vanityIds") }
+                            }
+                        })
+                    }
                 }
                 "cosmetics" -> if (!id.isNullOrBlank()) {
                     val active = status?.contains("true", true) == true || status?.contains("active", true) == true
@@ -436,6 +465,125 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             body.addView(card)
         }
+    }
+
+    private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
+        val form = formFields(listOf("الدور: super أو manager أو none", "الحالة: active أو suspended أو banned"))
+        form.second[0].setText(currentRole ?: "none")
+        form.second[1].setText(currentStatus ?: "active")
+        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val role = form.second[0].text.toString().trim().lowercase()
+                        val status = form.second[1].text.toString().trim().lowercase()
+                        if (role !in setOf("super", "manager", "none") ||
+                            status !in setOf("active", "suspended", "banned")) {
+                            toast("القيم المسموحة: super/manager/none و active/suspended/banned")
+                            return@setOnClickListener
+                        }
+                        confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
+                            load(api.updateUser(id, mapOf("staffRole" to role, "status" to status))) {
+                                dialog.dismiss()
+                                toast("تم تحديث صلاحيات المستخدم")
+                                openModule("users")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showGrantCosmeticDialog(code: String) {
+        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        AlertDialog.Builder(this).setTitle("إهداء إطار أو دخولية").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val userId = form.second[0].text.toString().trim()
+                        val term = form.second[1].text.toString().trim().lowercase()
+                        val permanent = term == "permanent" || term == "دائم"
+                        val days = term.toIntOrNull()
+                        if (userId.isBlank() || (!permanent && days !in listOf(7, 15, 30))) {
+                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                            return@setOnClickListener
+                        }
+                        val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
+                        confirm("إهداء " + code + " إلى المستخدم المحدد " + durationLabel + "؟") {
+                            load(api.grantCosmetic(mapOf(
+                                "userId" to userId, "cosmeticCode" to code,
+                                "days" to (days ?: 7), "permanent" to permanent
+                            ))) {
+                                dialog.dismiss()
+                                toast("استجاب الخادم لطلب إهداء الميزة")
+                                openModule("grantCosmetics")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showGrantVanityDialog(publicId: String) {
+        val form = formFields(listOf("معرّف المستخدم", "المدة: 7 أو 15 أو 30 أو permanent"))
+        AlertDialog.Builder(this).setTitle("إهداء الآي دي " + publicId).setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("مراجعة ثم إهداء", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val userId = form.second[0].text.toString().trim()
+                        val term = form.second[1].text.toString().trim().lowercase()
+                        val permanent = term == "permanent" || term == "دائم"
+                        val days = term.toIntOrNull()
+                        if (userId.isBlank() || (!permanent && days !in listOf(7, 15, 30))) {
+                            toast("أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent")
+                            return@setOnClickListener
+                        }
+                        val durationLabel = if (permanent) "بشكل دائم" else "لمدة " + days + " يوم"
+                        confirm("إهداء الآي دي " + publicId + " إلى المستخدم المحدد " + durationLabel + "؟") {
+                            load(api.assignVanityId(mapOf(
+                                "userId" to userId, "publicId" to publicId,
+                                "days" to (days ?: 7), "permanent" to permanent
+                            ))) {
+                                dialog.dismiss()
+                                toast("استجاب الخادم لطلب إهداء الآي دي")
+                                openModule("vanityIds")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showCreateVanityDialog() {
+        val form = formFields(listOf("الآي دي الرقمي (3 إلى 12 خانة)", "السعر بالعملات"))
+        AlertDialog.Builder(this).setTitle("إضافة آي دي مميز").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("إضافة", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val publicId = form.second[0].text.toString().trim()
+                        val price = form.second[1].text.toString().trim().toLongOrNull() ?: 0L
+                        if (!publicId.matches(Regex("\\d{3,12}")) || price < 0) {
+                            toast("الآي دي يجب أن يكون 3 إلى 12 رقماً والسعر غير سالب")
+                            return@setOnClickListener
+                        }
+                        confirm("إضافة الآي دي " + publicId + " إلى الكتالوج؟") {
+                            load(api.createVanityId(mapOf("publicId" to publicId, "priceCoins" to price))) {
+                                dialog.dismiss()
+                                toast("تمت معالجة طلب إضافة الآي دي")
+                                openModule("vanityIds")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun showCreateOperatorDialog() {
