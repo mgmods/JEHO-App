@@ -40,6 +40,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.presentation.web.PromoWebActivity;
+import com.Dramizo.Series.presentation.splash.SplashActivity;
 import com.Dramizo.Series.util.AssetCatalog;
 import com.Dramizo.Series.util.BalanceRedirect;
 import com.bumptech.glide.Glide;
@@ -675,6 +676,17 @@ public class OfficialNewsAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         if (TextUtils.isEmpty(url)) return;
         String u = normalizeUrl(url);
         try {
+            Uri parsed = Uri.parse(u);
+            String host = parsed.getHost() != null ? parsed.getHost() : "";
+            String path = parsed.getPath() != null ? parsed.getPath() : "";
+            if ("jeho-own-backend.mgs.blitz.cloud".equalsIgnoreCase(host)
+                    && path.startsWith("/open/room/")) {
+                Intent deepLink = new Intent(ctx, SplashActivity.class);
+                deepLink.setData(parsed);
+                deepLink.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(deepLink);
+                return;
+            }
             if (u.startsWith("http://") || u.startsWith("https://")) {
                 Intent i = new Intent(ctx, PromoWebActivity.class);
                 i.putExtra(PromoWebActivity.EXTRA_URL, u);
