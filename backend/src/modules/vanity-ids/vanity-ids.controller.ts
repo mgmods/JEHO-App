@@ -384,8 +384,10 @@ export class VanityIdsController {
         status: VanityIdStatus.AVAILABLE,
       });
     }
+    if (target.ownerUserId && target.ownerUserId !== userId && target.status === VanityIdStatus.OWNED) {
+      throw new BadRequestException('This vanity ID is already owned; release it explicitly before reassigning');
+    }
     if (target.ownerUserId && target.ownerUserId !== userId) {
-      await this.restoreOwnerPublicId(target);
       this.clearLeaseFields(target);
       target.status = VanityIdStatus.AVAILABLE;
       await this.vanityRepo.save(target);
