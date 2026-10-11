@@ -58,7 +58,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة أو بشكل دائم", "🔢"),
         Module("gifts", "الهدايا والمميزات", "عرض كتالوج الهدايا الحالي", "🎁"),
         Module("vip", "العضويات VIP", "مراجعة العضويات ومنح VIP", "👑"),
-        Module("notifications", "الإشعارات", "مراجعة الإشعارات وإرسال إشعار", "🔔"),
+        Module("notifications", "رسائل وإشعارات الإدارة", "إرسال رسالة تظهر في قسم رسالة الإدارة داخل الدردشة مع إشعار للمستخدم", "🔔"),
         Module("logs", "سجل الإدارة", "مراجعة سجل عمليات الإدارة", "🧾")
     )
 
@@ -237,7 +237,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(plansButton)
             }
             "notifications" -> {
-                body.addView(button("＋ إرسال إشعار") { showNotificationDialog() })
+                body.addView(button("＋ رسالة إدارة (دردشة + إشعار)") { showNotificationDialog() })
                 body.addView(button("✉ رسالة دردشة مباشرة لمستخدم") { showDirectMessageDialog() })
                 load(api.notifications(1, 40)) { renderItems(it, "notifications") }
             }
@@ -1057,9 +1057,9 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showNotificationDialog() {
-        val form = formFields(listOf("عنوان الإشعار", "نص الإشعار", "معرّف مستخدم (اختياري)"))
+        val form = formFields(listOf("عنوان رسالة الإدارة", "نص الرسالة", "معرّف مستخدم (فارغ = للجميع)"))
         AlertDialog.Builder(this)
-            .setTitle("إرسال إشعار")
+            .setTitle("إرسال رسالة الإدارة")
             .setView(form.first)
             .setNegativeButton("إلغاء", null)
             .setPositiveButton("إرسال", null)
@@ -1070,10 +1070,10 @@ class AdminConsoleActivity : ThemedActivity() {
                         val message = form.second[1].text.toString().trim()
                         val userId = form.second[2].text.toString().trim()
                         if (title.isBlank() || message.isBlank()) {
-                            toast("العنوان ونص الإشعار مطلوبان")
+                            toast("عنوان الرسالة ونصها مطلوبان")
                             return@setOnClickListener
                         }
-                        confirm(if (userId.isBlank()) "سيُرسل الإشعار إلى الجمهور الافتراضي. تأكيد؟" else "إرسال الإشعار لهذا المستخدم؟") {
+                        confirm(if (userId.isBlank()) "ستصل رسالة الإدارة إلى جميع المستخدمين في قسم رسالة الإدارة داخل الدردشة، مع إشعار. تأكيد الإرسال؟" else "ستصل الرسالة إلى هذا المستخدم داخل قسم رسالة الإدارة في الدردشة، مع إشعار. تأكيد الإرسال؟") {
                             val payload = mutableMapOf("title" to title, "body" to message, "channel" to "both")
                             if (userId.isNotBlank()) {
                                 payload["userId"] = userId
@@ -1081,7 +1081,7 @@ class AdminConsoleActivity : ThemedActivity() {
                             } else payload["audience"] = "all"
                             load(api.sendNotification(payload)) {
                                 dialog.dismiss()
-                                toast("استجاب الخادم لطلب الإرسال")
+                                toast("تم قبول طلب الإرسال من الخادم؛ افحص وصول رسالة الإدارة للمستلم")
                                 openModule("notifications")
                             }
                         }
