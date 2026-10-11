@@ -40,8 +40,7 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private val modules = listOf(
         Module("users", "إدارة المستخدمين", "بحث، مراجعة الحالة والحظر", "👥"),
-        Module("rooms", "إدارة الرومات", "عرض الرومات وإغلاق روم عند الحاجة", "🏠"),
-        Module("streams", "البث المباشر", "عرض البث وإنهاؤه من الخادم", "📡"),
+        Module("rooms", "إدارة الرومات", "عرض الرومات وتعديل إعداداتها", "🏠"),
         Module("agencies", "الوكالات", "عرض الوكالات وتعليق وكالة", "🏢"),
         Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات أو رفضها", "📨"),
         Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة طلبات الوكلاء", "💳"),
