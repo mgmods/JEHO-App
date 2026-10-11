@@ -205,7 +205,7 @@ public final class UserProfileCardSheet {
                 if (tvName != null) {
                     String displayName = displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0];
                     String staffBadge = StaffRoleHelper.badgeAr(u);
-                    tvName.setText(staffBadge.isEmpty() ? displayName : displayName + "\\n" + staffBadge);
+                    tvName.setText(staffBadge.isEmpty() ? displayName : displayName + "\n" + staffBadge);
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
                 }
                 bindGenderIcon(imgGender, u.gender);
