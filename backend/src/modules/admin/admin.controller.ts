@@ -1016,7 +1016,7 @@ export class AdminController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Post('vip/assign')
-  assignVip(@Body() body: { userId: string; planId: string }) {
+  assignVip(@Body() body: { userId: string; planId: string; days?: number; permanent?: boolean }) {
     return this.adminService.assignVip(body);
   }
 
