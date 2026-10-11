@@ -104,19 +104,44 @@ export class UploadsService {
   }
 
   async getStoredFile(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
-    if (!this.storageEnabled()) return null;
     this.assertSafeFilename(filename);
-    // Read through authenticated Storage API so uploaded files work even when
-    // the JEHO-OWN bucket is private; do not require public-bucket access.
-    const objectUrl = this.storageObjectUrl(filename);
-    const response = await this.storageFetch(objectUrl, {
-      headers: this.storageHeaders({ Accept: 'application/octet-stream' }),
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
+
+    // If Supabase Storage is configured, read from it first. This is the
+    // durable path used by ephemeral cloud deployments.
+    if (this.storageEnabled()) {
+      const objectUrl = this.storageObjectUrl(filename);
+      const response = await this.storageFetch(objectUrl, {
+        headers: this.storageHeaders({ Accept: 'application/octet-stream' }),
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
+      return {
+        buffer: Buffer.from(await response.arrayBuffer()),
+        contentType: response.headers.get('content-type') || 'application/octet-stream',
+      };
+    }
+
+    // Dashboard uploads still succeed without Supabase, but previously their
+    // /uploads/:filename URLs always returned 404 because this method only
+    // checked remote storage. Serve the existing local upload in that case.
+    const localPath = join(this.uploadDir, filename);
+    if (!existsSync(localPath)) return null;
+    const ext = extname(filename).toLowerCase();
+    const contentTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.svg': 'image/svg+xml',
+      '.mp4': 'video/mp4',
+      '.webm': 'video/webm',
+      '.pdf': 'application/pdf',
+      '.json': 'application/json',
+    };
     return {
-      buffer: Buffer.from(await response.arrayBuffer()),
-      contentType: response.headers.get('content-type') || 'application/octet-stream',
+      buffer: readFileSync(localPath),
+      contentType: contentTypes[ext] || 'application/octet-stream',
     };
   }
 
