@@ -50,8 +50,8 @@ public final class StaffRoleHelper {
     /** Short label under the display name. */
     public static String badgeAr(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
-        if (SUPER.equals(r)) return "سوبر أدمن";
-        if (MANAGER.equals(r)) return "مانجر";
+        if (SUPER.equals(r)) return "Super Admin";
+        if (MANAGER.equals(r)) return "Manager";
         return "";
     }
 
