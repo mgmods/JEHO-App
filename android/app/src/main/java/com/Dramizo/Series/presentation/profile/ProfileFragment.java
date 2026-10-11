@@ -376,12 +376,12 @@ public class ProfileFragment extends Fragment {
             adminEntry.setTextSize(14f);
             adminEntry.setGravity(android.view.Gravity.CENTER);
             adminEntry.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
-            adminEntry.setBackground(new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{0xFF5841A8, 0xFF7B5CD6}
-            ) {{
-                setCornerRadius(14 * getResources().getDisplayMetrics().density);
-            }});
+            android.graphics.drawable.GradientDrawable adminBackground =
+                    new android.graphics.drawable.GradientDrawable(
+                            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                            new int[]{0xFF5841A8, 0xFF7B5CD6});
+            adminBackground.setCornerRadius(14 * getResources().getDisplayMetrics().density);
+            adminEntry.setBackground(adminBackground);
             adminEntry.setElevation(2 * getResources().getDisplayMetrics().density);
             adminEntry.setVisibility(isSuper ? View.VISIBLE : View.GONE);
             adminEntry.setOnClickListener(v -> {
