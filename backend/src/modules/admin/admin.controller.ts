@@ -1641,6 +1641,10 @@ export class AdminController {
     if (!userId || !cosmeticCode) {
       throw new BadRequestException('userId and cosmeticCode are required');
     }
+    const catalog = await this.cosmeticsService.adminList();
+    if (!catalog.some((item) => item.code === cosmeticCode && item.isActive)) {
+      throw new BadRequestException('Active cosmetic code not found');
+    }
     const permanent = body?.permanent === true;
     const days = Number(body?.days || 7);
     if (!permanent && ![7, 15, 30].includes(days)) {
