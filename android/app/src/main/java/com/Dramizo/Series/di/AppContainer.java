@@ -11,6 +11,7 @@ import com.Dramizo.Series.data.local.prefs.EncryptedFeatureCache;
 import com.Dramizo.Series.data.local.prefs.SessionManager;
 import com.Dramizo.Series.data.remote.api.AgencyApi;
 import com.Dramizo.Series.data.remote.api.AuthApi;
+import com.Dramizo.Series.data.remote.api.AdminApi;
 import com.Dramizo.Series.data.remote.api.ChatApi;
 import com.Dramizo.Series.data.remote.api.ConfigApi;
 import com.Dramizo.Series.data.remote.api.ContestsApi;
@@ -142,6 +143,7 @@ public class AppContainer {
     private final DramaApi dramaApi;
     private final GameAdsApi gameAdsApi;
     private final NotificationApi notificationApi;
+    private final AdminApi adminApi;
 
     public final LoginUseCase loginUseCase;
     public final RegisterUseCase registerUseCase;
@@ -276,6 +278,7 @@ public class AppContainer {
         this.dramaApi = retrofit.create(DramaApi.class);
         this.gameAdsApi = retrofit.create(GameAdsApi.class);
         this.notificationApi = notificationApi;
+        this.adminApi = retrofit.create(AdminApi.class);
 
         authRepository = new AuthRepositoryImpl(authApi, sessionManager, database.userDao(), ioExecutor);
         userRepository = new UserRepositoryImpl(userApi, database.userDao(), ioExecutor, sessionManager);
@@ -366,5 +369,6 @@ public class AppContainer {
     public DramaApi getDramaApi() { return dramaApi; }
     public GameAdsApi getGameAdsApi() { return gameAdsApi; }
     public NotificationApi getNotificationApi() { return notificationApi; }
+    public AdminApi getAdminApi() { return adminApi; }
 }
 
