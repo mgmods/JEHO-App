@@ -74,6 +74,14 @@
             android:contentDescription="@null"
             android:scaleType="fitCenter"
             android:visibility="gone" />
+
+        <View
+            android:id="@+id/superAdminAvatarFrame"
+            android:layout_width="98dp"
+            android:layout_height="98dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
