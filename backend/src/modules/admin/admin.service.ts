@@ -2718,14 +2718,22 @@ export class AdminService {
     return { deleted: true, id };
   }
 
-  async assignVip(body: { userId: string; planId: string }) {
+  async assignVip(body: { userId: string; planId: string; days?: number; permanent?: boolean }) {
     const plan = await this.vipRepo.findOne({ where: { id: body.planId } });
     if (!plan) throw new NotFoundException('VIP plan not found');
     const user = await this.usersRepo.findOne({ where: { id: body.userId } });
     if (!user) throw new NotFoundException('User not found');
+    const permanent = body.permanent === true;
+    const days = Number(body.days ?? 30);
+    if (!permanent && ![7, 15, 30].includes(days)) {
+      throw new BadRequestException('VIP duration must be 7, 15 or 30 days, or permanent=true');
+    }
     await this.userVipRepo.update({ userId: body.userId, isActive: true }, { isActive: false });
     const startsAt = new Date();
-    const expiresAt = new Date(startsAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+    // UserVip.expiresAt is non-null in the existing schema; year 9999 represents permanent VIP without a migration.
+    const expiresAt = permanent
+      ? new Date('9999-12-31T23:59:59.999Z')
+      : new Date(startsAt.getTime() + days * 24 * 60 * 60 * 1000);
     return this.userVipRepo.save(
       this.userVipRepo.create({
         userId: body.userId,
