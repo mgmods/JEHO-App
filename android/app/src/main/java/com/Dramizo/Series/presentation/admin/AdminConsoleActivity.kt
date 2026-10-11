@@ -177,7 +177,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 val search = EditText(this).apply {
                     hint = "ابحث بالاسم أو المعرّف"
                     textSize = 14f
-                    singleLine = true
+                    setSingleLine(true)
                     setTextColor(TEXT)
                     setHintTextColor(MUTED)
                     background = roundRect(Color.WHITE, 12)
