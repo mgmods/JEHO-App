@@ -54,9 +54,6 @@ public interface AdminApi {
     @PATCH("admin/gifts/{id}")
     Call<ApiResponse<Object>> updateGift(@Path("id") String id, @Body Map<String, Object> body);
 
-    @DELETE("admin/gifts/{id}")
-    Call<ApiResponse<Object>> deleteGift(@Path("id") String id);
-
     @GET("admin/vip")
     Call<ApiResponse<Object>> vipMembers(@Query("page") int page, @Query("limit") int limit);
 
@@ -104,6 +101,27 @@ public interface AdminApi {
     Call<ApiResponse<Object>> dismissReport(@Path("id") String id, @Body Map<String, Object> body);
     @GET("admin/cosmetics")
     Call<ApiResponse<Object>> cosmetics();
+
+    @POST("admin/cosmetics/grant")
+    Call<ApiResponse<Object>> grantCosmetic(@Body Map<String, Object> body);
+
+    @GET("vanity-ids/admin/all")
+    Call<ApiResponse<Object>> vanityIds();
+
+    @POST("vanity-ids/admin")
+    Call<ApiResponse<Object>> createVanityId(@Body Map<String, Object> body);
+
+    @POST("vanity-ids/admin/assign")
+    Call<ApiResponse<Object>> assignVanityId(@Body Map<String, Object> body);
+
+    @POST("vanity-ids/admin/{id}/revoke")
+    Call<ApiResponse<Object>> revokeVanityId(@Path("id") String id);
+
+    @POST("vanity-ids/admin/{id}/enable")
+    Call<ApiResponse<Object>> enableVanityId(@Path("id") String id);
+
+    @POST("vanity-ids/admin/{id}/disable")
+    Call<ApiResponse<Object>> disableVanityId(@Path("id") String id);
     @PATCH("admin/cosmetics/{id}")
     Call<ApiResponse<Object>> updateCosmetic(@Path("id") String id, @Body Map<String, Object> body);
     @GET("admin/wallet/transactions")
