@@ -386,11 +386,16 @@ export class ConfigController {
 
         // Dashboard uploads are served by this API. Convert relative upload
         // paths into absolute URLs so mobile clients and Glide can load them.
+        // Uploads are served at the root path (/uploads/:filename), not under
+        // the Nest API prefix. Normalize env values that may include /api/v1.
         const apiBase = String(
           process.env.PUBLIC_API_URL ||
             process.env.API_PUBLIC_URL ||
             'https://jeho-own-backend.mgs.blitz.cloud',
-        ).replace(/\/$/, '');
+        )
+          .trim()
+          .replace(/\/+$/, '')
+          .replace(/\/api\/v\d+$/i, '');
         const url =
           raw.startsWith('/uploads/') && !raw.startsWith('//')
             ? apiBase + raw
