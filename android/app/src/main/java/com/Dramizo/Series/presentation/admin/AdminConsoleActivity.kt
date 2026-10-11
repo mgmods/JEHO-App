@@ -287,6 +287,14 @@ class AdminConsoleActivity : ThemedActivity() {
                             }
                         }
                     })
+                    card.addView(button("حذف الحساب") {
+                        confirm("سيُطلب حذف الحساب بشكل غير قابل للتراجع من التطبيق. تأكد من هوية المستخدم قبل المتابعة.") {
+                            load(api.deleteUser(id)) {
+                                toast("استجاب الخادم لطلب حذف الحساب")
+                                openModule("users")
+                            }
+                        }
+                    })
                 }
                 "rooms" -> if (!id.isNullOrBlank()) card.addView(button("إغلاق الروم") {
                     confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
@@ -397,6 +405,21 @@ class AdminConsoleActivity : ThemedActivity() {
                     card.addView(button("إلغاء طلب الشحن") {
                         confirm("تأكيد إلغاء طلب الشحن؟") {
                             load(api.cancelRecharge(id)) { toast("تمت معالجة طلب الشحن"); openModule("recharges") }
+                        }
+                    })
+                }
+                "gifts" -> if (!id.isNullOrBlank()) {
+                    val active = status?.contains("true", true) == true || status?.contains("active", true) == true
+                    card.addView(button(if (active) "تعطيل الهدية" else "تفعيل الهدية") {
+                        confirm("تغيير حالة الهدية؟") {
+                            load(api.updateGift(id, mapOf("isActive" to !active))) {
+                                toast("تم تحديث الهدية"); openModule("gifts")
+                            }
+                        }
+                    })
+                    card.addView(button("حذف الهدية") {
+                        confirm("حذف الهدية من الكتالوج؟ تأكد أنها غير مستخدمة في عروض أو سجلات قائمة.") {
+                            load(api.deleteGift(id)) { toast("استجاب الخادم لطلب حذف الهدية"); openModule("gifts") }
                         }
                     })
                 }
