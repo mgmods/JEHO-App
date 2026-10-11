@@ -389,7 +389,7 @@ export class ConfigController {
         const apiBase = String(
           process.env.PUBLIC_API_URL ||
             process.env.API_PUBLIC_URL ||
-            'https://jeho-own-api.onrender.com',
+            'https://jeho-own-backend.mgs.blitz.cloud',
         ).replace(/\/$/, '');
         const url =
           raw.startsWith('/uploads/') && !raw.startsWith('//')
