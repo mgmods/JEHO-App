@@ -11,9 +11,11 @@ import {
   Delete,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { NotificationType } from '../../database/entities/notification.entity';
 import {
   NotificationsService,
   CreateNotificationDto,
+  AdminPushDto,
 } from './notifications.service';
 import { CurrentUser } from '../../common/decorators';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -62,6 +64,28 @@ export class NotificationsController {
   @Get()
   list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.notificationsService.list(userId, query);
+  }
+
+  @Get('admin-messages')
+  @ApiOperation({ summary: 'Super-admin messages inbox, separate from Official News' })
+  listAdminMessages(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
+    return this.notificationsService.listAdminMessages(userId, query);
+  }
+
+  @Get('admin-messages/preview')
+  adminMessagesPreview(@CurrentUser('sub') userId: string) {
+    return this.notificationsService.adminMessagesPreview(userId);
+  }
+
+  @Post('admin-messages/read-all')
+  markAllAdminMessagesRead(@CurrentUser('sub') userId: string) {
+    return this.notificationsService.markAllAdminMessagesRead(userId);
+  }
+
+  @Post('admin-messages/send')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  sendAdminMessage(@Body() dto: AdminPushDto) {
+    return this.notificationsService.adminSend({ ...dto, type: NotificationType.CHAT, channel: 'both' });
   }
 
   @Get('official')
