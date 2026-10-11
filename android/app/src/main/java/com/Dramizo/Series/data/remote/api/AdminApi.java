@@ -148,6 +148,12 @@ public interface AdminApi {
     Call<ApiResponse<Object>> disableVanityId(@Path("id") String id);
     @PATCH("admin/cosmetics/{id}")
     Call<ApiResponse<Object>> updateCosmetic(@Path("id") String id, @Body Map<String, Object> body);
+    @POST("admin/wallet/{userId}/adjust")
+    Call<ApiResponse<Object>> adjustWallet(@Path("userId") String userId, @Body Map<String, Object> body);
+
+    @POST("admin/vip/{id}/revoke")
+    Call<ApiResponse<Object>> revokeVip(@Path("id") String id);
+
     @GET("admin/wallet/transactions")
     Call<ApiResponse<Object>> walletTransactions(@Query("page") int page, @Query("limit") int limit);
     @GET("admin/wallet/withdraws")
