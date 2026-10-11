@@ -16,6 +16,15 @@ public interface NotificationApi {
     @GET("notifications")
     Call<ApiResponse<MiscDtos.ListResult<MiscDtos.NotificationDto>>> list(@Query("page") int page);
 
+    @GET("notifications/admin-messages")
+    Call<ApiResponse<MiscDtos.ListResult<MiscDtos.NotificationDto>>> adminMessagesList(@Query("page") int page);
+
+    @GET("notifications/admin-messages/preview")
+    Call<ApiResponse<MiscDtos.OfficialNewsPreviewDto>> adminMessagesPreview();
+
+    @POST("notifications/admin-messages/read-all")
+    Call<ApiResponse<Object>> adminMessagesMarkAllRead();
+
     @GET("notifications/official")
     Call<ApiResponse<MiscDtos.ListResult<MiscDtos.NotificationDto>>> officialList(@Query("page") int page);
 
