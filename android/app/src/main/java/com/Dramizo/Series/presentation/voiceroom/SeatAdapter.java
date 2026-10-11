@@ -1081,7 +1081,7 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         }
         String role = StaffRoleHelper.normalize(user);
         // Compact seat label
-        String label = StaffRoleHelper.SUPER.equals(role) ? "سوبر" : "مانجر";
+        String label = StaffRoleHelper.SUPER.equals(role) ? "Super Admin" : "Manager";
         holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
         holder.b.tvStaffSeatBadge.setText(label);
         holder.b.tvStaffSeatBadge.setBackgroundResource(
