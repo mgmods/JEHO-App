@@ -367,8 +367,24 @@ public class ProfileFragment extends Fragment {
         }
         if (binding.btnOpenSuperAdminDashboard != null) {
             boolean isSuper = StaffRoleHelper.isSuper(user);
-            binding.btnOpenSuperAdminDashboard.setVisibility(isSuper ? View.VISIBLE : View.GONE);
-            binding.btnOpenSuperAdminDashboard.setOnClickListener(v -> {
+            android.widget.TextView adminEntry = binding.btnOpenSuperAdminDashboard;
+            int density = getResources().getDisplayMetrics().densityDpi;
+            int horizontalPadding = Math.round(16 * density / 160f);
+            int verticalPadding = Math.round(13 * density / 160f);
+            adminEntry.setText("✦  فتح مركز إدارة JEHO");
+            adminEntry.setTextColor(android.graphics.Color.WHITE);
+            adminEntry.setTextSize(14f);
+            adminEntry.setGravity(android.view.Gravity.CENTER);
+            adminEntry.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
+            adminEntry.setBackground(new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFF5841A8, 0xFF7B5CD6}
+            ) {{
+                setCornerRadius(14 * getResources().getDisplayMetrics().density);
+            }});
+            adminEntry.setElevation(2 * getResources().getDisplayMetrics().density);
+            adminEntry.setVisibility(isSuper ? View.VISIBLE : View.GONE);
+            adminEntry.setOnClickListener(v -> {
                 if (!StaffRoleHelper.isSuper(user) || !isAdded()) return;
                 startActivity(new Intent(requireContext(),
                         com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
