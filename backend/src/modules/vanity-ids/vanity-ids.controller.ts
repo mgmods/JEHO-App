@@ -352,6 +352,96 @@ export class VanityIdsController {
     return { ok: true, id };
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('admin/assign')
+  @ApiOperation({ summary: 'Grant a vanity ID to a user for 7, 15, 30 days or permanently' })
+  async adminAssign(
+    @Body() body: { userId?: string; publicId?: string; days?: number; permanent?: boolean },
+  ) {
+    const userId = String(body?.userId || '').trim();
+    const publicId = String(body?.publicId || '').trim();
+    const permanent = body?.permanent === true;
+    const days = Number(body?.days || 7);
+    if (!userId || !/^\\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException('userId is required and publicId must contain 3–12 digits');
+    }
+    if (!permanent && ![7, 15, 30].includes(days)) {
+      throw new BadRequestException('days must be 7, 15 or 30, or permanent=true');
+    }
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    const taken = await this.usersRepo.findOne({ where: { publicId } });
+    if (taken && taken.id !== userId) {
+      throw new BadRequestException('This public ID is already used by another account');
+    }
+
+    let target = await this.vanityRepo.findOne({ where: { publicId } });
+    if (!target) {
+      target = this.vanityRepo.create({
+        publicId,
+        priceCoins: 0,
+        status: VanityIdStatus.AVAILABLE,
+      });
+    }
+    if (target.ownerUserId && target.ownerUserId !== userId) {
+      await this.restoreOwnerPublicId(target);
+      this.clearLeaseFields(target);
+      target.status = VanityIdStatus.AVAILABLE;
+      await this.vanityRepo.save(target);
+    }
+
+    const current = await this.vanityRepo.findOne({
+      where: { ownerUserId: userId, status: VanityIdStatus.OWNED },
+    });
+    const now = new Date();
+    let previousPublicId = user.publicId;
+    let baseTime = now.getTime();
+    if (current && current.id === target.id) {
+      previousPublicId = current.previousPublicId || user.publicId;
+      if (!permanent && current.expiresAt && current.expiresAt > now) {
+        baseTime = current.expiresAt.getTime();
+      }
+    } else if (current) {
+      previousPublicId = current.previousPublicId || user.publicId;
+      await this.restoreOwnerPublicId(current);
+      this.clearLeaseFields(current);
+      current.status = VanityIdStatus.AVAILABLE;
+      await this.vanityRepo.save(current);
+      const refreshed = await this.usersRepo.findOne({ where: { id: userId } });
+      if (refreshed) user.publicId = refreshed.publicId;
+      previousPublicId = user.publicId;
+    }
+
+    if (!target.previousPublicId || target.ownerUserId !== userId) {
+      target.previousPublicId = previousPublicId && previousPublicId !== publicId
+        ? previousPublicId
+        : null;
+    }
+    user.publicId = publicId;
+    await this.usersRepo.save(user);
+    target.ownerUserId = userId;
+    target.status = VanityIdStatus.OWNED;
+    target.reservedUntil = null;
+    target.purchasedAt = now;
+    target.expiresAt = permanent ? null : new Date(baseTime + days * 24 * 60 * 60 * 1000);
+    const saved = await this.vanityRepo.save(target);
+    return { granted: true, item: saved, permanent, days: permanent ? null : days };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('admin/:id/revoke')
+  @ApiOperation({ summary: 'Revoke a granted vanity ID and restore the previous public ID' })
+  async adminRevoke(@Param('id') id: string) {
+    const row = await this.requireRow(id);
+    await this.restoreOwnerPublicId(row);
+    this.clearLeaseFields(row);
+    row.status = VanityIdStatus.AVAILABLE;
+    await this.vanityRepo.save(row);
+    return { revoked: true, id };
+  }
+
   // ─── helpers ──────────────────────────────────────────────────────
 
   private async requireRow(id: string): Promise<VanityId> {
