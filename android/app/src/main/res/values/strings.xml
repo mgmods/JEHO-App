@@ -52,7 +52,7 @@
 <string name="activity_contests">Contests</string>
 <string name="activity_tasks">Daily tasks</string>
 <string name="activity_ranking">Ranking</string>
-<string name="activity_official_news">Admin Messages</string>
+<string name="activity_official_news">Official News</string>
 <string name="activity_plaza">Event plaza</string>
 <string name="event_square">Event Square</string>
 <string name="my_events">My Events</string>
@@ -532,8 +532,8 @@
 <string name="fans">Fans</string>
 <string name="allow_list">Allow List</string>
 <string name="message_request">Message Request</string>
-<string name="official_news">Admin Messages</string>
-<string name="official_news_hint">Super Admin messages and notices appear here in chat</string>
+<string name="official_news">Official News</string>
+<string name="official_news_hint">Official news and announcements from the dashboard</string>
 <string name="official_news_readonly">Admin messages are read-only</string>
 <string name="official_news_empty">No messages from administration yet</string>
     <string name="official_news_open_link">Open link</string>
@@ -1285,7 +1285,7 @@
     <string name="room_side_discover">Discover</string>
 
 <string name="admin_messages">رسائل الإدارة</string>
-<string name="admin_messages_hint">رسائل خاصة وجماعية من السوبر أدمن</string>
+<string name="admin_messages_hint">لا توجد رسائل جديدة</string>
 <string name="admin_messages_readonly">رسائل مرسلة من السوبر أدمن</string>
 <string name="admin_messages_empty">لا توجد رسائل إدارية حتى الآن</string>
 <string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
