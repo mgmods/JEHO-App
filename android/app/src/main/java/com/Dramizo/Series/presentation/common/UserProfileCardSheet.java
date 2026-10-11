@@ -1,5 +1,6 @@
 package com.Dramizo.Series.presentation.common;
 
+import com.Dramizo.Series.util.StaffRoleHelper;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -202,8 +203,9 @@ public final class UserProfileCardSheet {
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
                 if (tvName != null) {
-                    tvName.setText(
-                            displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0]);
+                    String displayName = displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0];
+                    String staffBadge = StaffRoleHelper.badgeAr(u);
+                    tvName.setText(staffBadge.isEmpty() ? displayName : displayName + "\\n" + staffBadge);
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
                 }
                 bindGenderIcon(imgGender, u.gender);
