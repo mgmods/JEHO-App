@@ -320,7 +320,8 @@ import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
+const API_BASE = import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1'
+const ORIGIN = (import.meta.env.VITE_API_ORIGIN || new URL(API_BASE, window.location.origin).origin).replace(/\/$/, '')
 
 const gifts = ref([])
 const categories = ref([])
