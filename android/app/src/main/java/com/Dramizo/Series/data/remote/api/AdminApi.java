@@ -39,11 +39,20 @@ public interface AdminApi {
     @POST("admin/rooms/{id}/close")
     Call<ApiResponse<Object>> closeRoom(@Path("id") String id);
 
+    @PATCH("admin/rooms/{id}")
+    Call<ApiResponse<Object>> updateRoom(@Path("id") String id, @Body Map<String, Object> body);
+
+    @DELETE("admin/rooms/{id}")
+    Call<ApiResponse<Object>> deleteRoom(@Path("id") String id, @Query("force") String force);
+
     @GET("admin/streams")
     Call<ApiResponse<Object>> streams(@Query("page") int page, @Query("limit") int limit);
 
     @POST("admin/streams/{id}/end")
     Call<ApiResponse<Object>> endStream(@Path("id") String id);
+
+    @POST("admin/streams/{id}/force-end")
+    Call<ApiResponse<Object>> forceEndStream(@Path("id") String id, @Body Map<String, Object> body);
 
     @GET("admin/agencies")
     Call<ApiResponse<Object>> agencies(@Query("page") int page, @Query("limit") int limit);
@@ -94,6 +103,18 @@ public interface AdminApi {
     Call<ApiResponse<Object>> rejectRechargeAgentApplication(@Path("id") String id, @Body Map<String, Object> body);
     @GET("admin/recharge-agents")
     Call<ApiResponse<Object>> rechargeAgents();
+
+    @POST("admin/recharge-agents/{id}/float")
+    Call<ApiResponse<Object>> adjustRechargeAgentFloat(@Path("id") String id, @Body Map<String, Object> body);
+
+    @GET("admin/gender-verifications")
+    Call<ApiResponse<Object>> genderVerifications(@Query("status") String status);
+
+    @POST("admin/gender-verifications/{id}/approve")
+    Call<ApiResponse<Object>> approveGenderVerification(@Path("id") String id, @Body Map<String, Object> body);
+
+    @POST("admin/gender-verifications/{id}/reject")
+    Call<ApiResponse<Object>> rejectGenderVerification(@Path("id") String id, @Body Map<String, Object> body);
     @PATCH("admin/recharge-agents/{id}")
     Call<ApiResponse<Object>> updateRechargeAgent(@Path("id") String id, @Body Map<String, Object> body);
     @GET("admin/reports")
