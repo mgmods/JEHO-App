@@ -95,6 +95,14 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
+        <View
+            android:id="@+id/superAdminSeatFrame"
+            android:layout_width="62dp"
+            android:layout_height="62dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:visibility="gone" />
+
         <com.Dramizo.Series.util.HostSignalView
             android:id="@+id/seatHostSignal"
             android:layout_width="76dp"
