@@ -238,7 +238,6 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "notifications" -> {
                 body.addView(button("＋ رسالة إدارة (دردشة + إشعار)") { showNotificationDialog() })
-                body.addView(button("✉ رسالة دردشة مباشرة لمستخدم") { showDirectMessageDialog() })
                 load(api.notifications(1, 40)) { renderItems(it, "notifications") }
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
@@ -1057,7 +1056,13 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showNotificationDialog() {
-        val form = formFields(listOf("عنوان رسالة الإدارة", "نص الرسالة", "معرّف مستخدم (فارغ = للجميع)"))
+        val form = formFields(listOf(
+            "عنوان الرسالة",
+            "محتوى الرسالة",
+            "معرّف المستخدم (فارغ = إرسال جماعي)",
+            "رابط صورة HTTPS (اختياري)",
+            "رابط أو مسار داخل التطبيق HTTPS (اختياري)"
+        ))
         AlertDialog.Builder(this)
             .setTitle("إرسال رسالة الإدارة")
             .setView(form.first)
@@ -1069,12 +1074,16 @@ class AdminConsoleActivity : ThemedActivity() {
                         val title = form.second[0].text.toString().trim()
                         val message = form.second[1].text.toString().trim()
                         val userId = form.second[2].text.toString().trim()
+                        val imageUrl = form.second[3].text.toString().trim()
+                        val link = form.second[4].text.toString().trim()
                         if (title.isBlank() || message.isBlank()) {
                             toast("عنوان الرسالة ونصها مطلوبان")
                             return@setOnClickListener
                         }
                         confirm(if (userId.isBlank()) "ستصل رسالة الإدارة إلى جميع المستخدمين في قسم رسالة الإدارة داخل الدردشة، مع إشعار. تأكيد الإرسال؟" else "ستصل الرسالة إلى هذا المستخدم داخل قسم رسالة الإدارة في الدردشة، مع إشعار. تأكيد الإرسال؟") {
                             val payload = mutableMapOf("title" to title, "body" to message, "channel" to "both")
+                            if (imageUrl.isNotBlank()) payload["imageUrl"] = imageUrl
+                            if (link.isNotBlank()) payload["link"] = link
                             if (userId.isNotBlank()) {
                                 payload["userId"] = userId
                                 payload["audience"] = "user"
@@ -1100,13 +1109,13 @@ class AdminConsoleActivity : ThemedActivity() {
             val input = EditText(this).apply {
                 hint = label
                 textSize = 14f
-                setSingleLine(label != "نص الإشعار")
+                setSingleLine(label != "نص الإشعار" && label != "محتوى الرسالة")
                 setTextColor(TEXT)
                 setHintTextColor(MUTED)
                 background = roundRect(0xFFF5F4FA.toInt(), 10)
                 setPadding(dp(12), dp(10), dp(12), dp(10))
             }
-            layout.addView(input, LinearLayout.LayoutParams(-1, if (label == "نص الإشعار") dp(90) else dp(52)).apply {
+            layout.addView(input, LinearLayout.LayoutParams(-1, if (label == "نص الإشعار" || label == "محتوى الرسالة") dp(100) else dp(52)).apply {
                 bottomMargin = dp(8)
             })
             input
