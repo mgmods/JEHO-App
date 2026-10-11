@@ -101,9 +101,9 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
-            // Skip is always available and is positioned below the Android status bar.
+            // The dashboard owns Skip visibility; honor its cached setting immediately.
             if (binding.btnSplashSkip != null) {
-                binding.btnSplashSkip.setVisibility(android.view.View.VISIBLE);
+                applySkipVisibility(binding, remoteTheme);
                 binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
                 ViewCompat.setOnApplyWindowInsetsListener(binding.btnSplashSkip, (view, insets) -> {
                     androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
@@ -152,10 +152,8 @@ public class SplashActivity extends ThemedActivity {
                         if (navigated || isFinishing()) return;
                         splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(latest);
                         applyRemoteSplash(binding, latest);
-                        if (binding.btnSplashSkip != null) {
-                            // Keep skip visible even when dashboard has not enabled the flag.
-                            binding.btnSplashSkip.setVisibility(android.view.View.VISIBLE);
-                        }
+                        applySkipVisibility(binding,
+                                com.Dramizo.Series.util.RemoteTheme.getCached(this));
                         scheduleSplashNavigation();
                     });
                 } catch (Throwable t) {
@@ -167,11 +165,29 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
-    /** Prefer dashboard-managed splash items, then fall back to the dashboard brand splash URL. */
+    private void applySkipVisibility(ActivitySplashBinding binding,
+            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
+        if (binding == null || binding.btnSplashSkip == null) return;
+        boolean enabled = theme == null || theme.splash == null || theme.splash.skipEnabled;
+        binding.btnSplashSkip.setVisibility(
+                enabled ? android.view.View.VISIBLE : android.view.View.GONE);
+    }
+
+    /** Resolve from the exact theme response/cache used by this splash render. */
     private com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto resolveSplashItem(
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
         java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto> items =
-                com.Dramizo.Series.util.RemoteTheme.activeSplashItems(this);
+                new java.util.ArrayList<>();
+        if (theme != null && theme.splash != null && theme.splash.enabled
+                && theme.splash.items != null) {
+            for (com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item : theme.splash.items) {
+                if (item != null && item.active && item.url != null && !item.url.trim().isEmpty()) {
+                    items.add(item);
+                }
+            }
+            java.util.Collections.sort(items, (left, right) ->
+                    Integer.compare(left.sortOrder, right.sortOrder));
+        }
         if (!items.isEmpty()) return items.get(0);
         if (theme != null && theme.splash != null && theme.splash.enabled
                 && theme.brand != null && theme.brand.splashUrl != null
@@ -210,6 +226,7 @@ public class SplashActivity extends ThemedActivity {
             binding.tvSplashTagline.setVisibility(android.view.View.VISIBLE);
             binding.splashProgress.setVisibility(android.view.View.VISIBLE);
 
+            Log.d(TAG, "Loading dashboard splash image: " + resolved);
             Glide.with(this)
                     .load(resolved)
                     .dontAnimate()
@@ -221,6 +238,7 @@ public class SplashActivity extends ThemedActivity {
                                 Object model,
                                 Target<android.graphics.drawable.Drawable> target,
                                 boolean isFirstResource) {
+                            Log.e(TAG, "Dashboard splash image failed: " + resolved, e);
                             runOnUiThread(() -> restoreBundledSplash(binding));
                             return false;
                         }
