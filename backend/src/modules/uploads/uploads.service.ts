@@ -22,7 +22,7 @@ export class UploadsService {
   ) {
     this.uploadDir = this.configService.get<string>('app.uploadDir') || './uploads';
     this.maxSizeMb = this.configService.get<number>('app.uploadMaxSizeMb') || 40;
-    const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || 'https://nxptedmacsdqnehcatpi.supabase.co';
+    const rawSupabaseUrl = process.env.SUPABASE_URL?.trim() || ''; // Never fall back to the legacy JEHOO CHAT storage project.
     this.supabaseUrl = rawSupabaseUrl.endsWith('/') ? rawSupabaseUrl.slice(0, -1) : rawSupabaseUrl;
     this.storageKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
