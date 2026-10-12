@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Optional,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -39,7 +41,21 @@ import {
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
-export class ChatService {
+export class ChatService implements OnModuleInit, OnModuleDestroy {
+  private paidRefundTimer?: ReturnType<typeof setInterval>;
+
+  onModuleInit() {
+    // Recover expired paid-message refunds after startup and continue periodically.
+    void this.processExpiredPaidMessageRefunds();
+    this.paidRefundTimer = setInterval(() => {
+      void this.processExpiredPaidMessageRefunds();
+    }, 60_000);
+    this.paidRefundTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.paidRefundTimer) clearInterval(this.paidRefundTimer);
+  }
   constructor(
     @InjectRepository(ChatConversation)
     private readonly convRepo: Repository<ChatConversation>,
@@ -685,6 +701,90 @@ export class ChatService {
       }
     }
     return mapped;
+  }
+
+  /** Automatically refund paid messages that received no reply before the configured deadline. */
+  private async processExpiredPaidMessageRefunds() {
+    try {
+      const now = Date.now();
+      const candidates = await this.dataSource.getRepository(WalletTransaction)
+        .createQueryBuilder('tx')
+        .where('tx.referenceType = :referenceType', { referenceType: 'paid_message' })
+        .andWhere('tx.amount < 0')
+        .andWhere('tx.createdAt < :cutoff', { cutoff: new Date(now - 60_000) })
+        .orderBy('tx.createdAt', 'ASC')
+        .take(200)
+        .getMany();
+
+      for (const candidate of candidates) {
+        try {
+          await this.dataSource.transaction(async (manager) => {
+            // Lock the original debit so overlapping app instances cannot refund it twice.
+            const paidTx = await manager.findOne(WalletTransaction, {
+              where: { id: candidate.id },
+              lock: { mode: 'pessimistic_write' },
+            });
+            if (!paidTx || paidTx.referenceType !== 'paid_message' || Number(paidTx.amount) >= 0) return;
+            const alreadyRefunded = await manager.findOne(WalletTransaction, {
+              where: { userId: paidTx.userId, referenceType: 'paid_message_refund', referenceId: paidTx.referenceId },
+            });
+            if (alreadyRefunded) return;
+
+            const message = await manager.findOne(ChatMessage, { where: { id: paidTx.referenceId } });
+            if (!message) return;
+            const metadata = (paidTx.metadata || {}) as Record<string, unknown>;
+            const configuredMinutes = metadata.refundWindowMinutes !== undefined
+              ? Number(metadata.refundWindowMinutes)
+              : metadata.refundWindowHours !== undefined
+                ? Number(metadata.refundWindowHours) * 60
+                : 30;
+            const windowMinutes = Math.min(10080, Math.max(0, Number.isFinite(configuredMinutes) ? configuredMinutes : 30));
+            if (windowMinutes <= 0) return;
+            const deadline = new Date(new Date(message.createdAt).getTime() + windowMinutes * 60_000);
+            if (now < deadline.getTime()) return;
+
+            const participants = await manager.find(ChatParticipant, { where: { conversationId: message.conversationId } });
+            const receiver = participants.find((participant) => participant.userId !== message.senderId);
+            if (!receiver) return;
+            const reply = await manager.getRepository(ChatMessage)
+              .createQueryBuilder('reply')
+              .where('reply.conversationId = :conversationId', { conversationId: message.conversationId })
+              .andWhere('reply.senderId = :receiverId', { receiverId: receiver.userId })
+              .andWhere('reply.createdAt > :messageCreatedAt', { messageCreatedAt: message.createdAt })
+              .andWhere('reply.createdAt <= :deadline', { deadline })
+              .andWhere('reply.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.SYSTEM, MessageType.GIFT] })
+              .getOne();
+            if (reply) return;
+
+            const refundCoins = Math.abs(Number(paidTx.amount));
+            if (!Number.isFinite(refundCoins) || refundCoins <= 0) return;
+            const wallet = await manager.findOne(Wallet, {
+              where: { userId: paidTx.userId },
+              lock: { mode: 'pessimistic_write' },
+            });
+            if (!wallet) return;
+            wallet.coins = Number(wallet.coins || 0) + refundCoins;
+            await manager.save(wallet);
+            await manager.save(manager.create(WalletTransaction, {
+              userId: paidTx.userId,
+              type: TransactionType.REFUND,
+              currency: CurrencyType.COINS,
+              amount: refundCoins,
+              balanceAfter: Number(wallet.coins),
+              referenceType: 'paid_message_refund',
+              referenceId: message.id,
+              description: 'استرداد تلقائي لرسالة لم يتم الرد عليها',
+              metadata: { paidTransactionId: paidTx.id, refundWindowMinutes: windowMinutes, reason: 'no_reply_before_deadline' },
+            }));
+          });
+        } catch (error) {
+          // A single malformed row must not stop refunds for other messages.
+          console.error('[paid-messages] automatic refund failed', candidate.id, error);
+        }
+      }
+    } catch (error) {
+      console.error('[paid-messages] refund sweep failed', error);
+    }
   }
 
   private async refundPaidMessageIfEligible(
