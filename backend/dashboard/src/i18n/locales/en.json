@@ -131,7 +131,8 @@
     "reports": "Reports",
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
-    "settings": "Settings",
+    "cpSettings": "CP Relationship Settings",
+  "settings": "Settings",
     "logs": "Logs",
     "policyBrochure": "Platform policy PDF"
   },
