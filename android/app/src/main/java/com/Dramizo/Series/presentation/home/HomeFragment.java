@@ -1218,9 +1218,10 @@ public class HomeFragment extends Fragment {
         if (binding == null || binding.imgHomeBg == null) return;
         String url = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(requireContext(), "home");
         if (url == null || url.isEmpty()) {
-            binding.imgHomeBg.setImageResource(R.drawable.home_page_bg);
+            binding.imgHomeBg.setVisibility(View.GONE);
             return;
         }
+        binding.imgHomeBg.setVisibility(View.VISIBLE);
         com.Dramizo.Series.util.RemoteTheme.loadInto(
                 binding.imgHomeBg, url, R.drawable.home_page_bg);
     }
