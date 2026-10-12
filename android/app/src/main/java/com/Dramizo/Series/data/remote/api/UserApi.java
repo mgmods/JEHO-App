@@ -106,6 +106,9 @@ public interface UserApi {
     @DELETE("users/{id}/bond")
     Call<ApiResponse<Object>> endBond(@Path("id") String id, @Query("type") String type);
 
+    @GET("cp/catalog")
+    Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
+
     @GET("cp/discover")
     Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
 
