@@ -263,7 +263,9 @@ public class CpDiscoveryActivity extends ThemedActivity {
     private ImageView avatar(String url) {
         ImageView image = new ImageView(this);
         image.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        image.setBackground(round(Color.rgb(255, 231, 195), dp(32)));
+        GradientDrawable avatarFrame = round(Color.rgb(255, 231, 195), dp(32));
+        avatarFrame.setStroke(dp(2), Color.rgb(214, 160, 69));
+        image.setBackground(avatarFrame);
         image.setClipToOutline(true);
         AvatarImageLoader.load(image, url);
         return image;
