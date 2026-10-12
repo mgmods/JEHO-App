@@ -221,6 +221,12 @@ const routes = [
         meta: { titleKey: 'routes.notifications' },
       },
       {
+        path: 'cp-settings',
+        name: 'cp-settings',
+        component: () => import('@/views/CpSettingsView.vue'),
+        meta: { title: 'إعدادات علاقات CP' },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
