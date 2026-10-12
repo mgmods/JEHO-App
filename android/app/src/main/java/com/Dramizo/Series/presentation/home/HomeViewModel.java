@@ -43,6 +43,11 @@ public class HomeViewModel extends ViewModel {
     private int roomsPage = 1;
     private boolean roomsHasMore = true;
     private boolean roomsLoadingMore;
+    // Avoid duplicate following-room scans when the user switches tabs or resumes the app.
+    private volatile boolean followingLoading;
+    private volatile boolean followingLoaded;
+    private volatile long lastFollowingLoadAt;
+    private static final long FOLLOWING_CACHE_MS = 30_000L;
 
     public HomeViewModel(AppContainer c) {
         this.c = c;
@@ -335,43 +340,76 @@ public class HomeViewModel extends ViewModel {
     }
 
     private void loadFollowingRooms(boolean quiet) {
+        final long now = System.currentTimeMillis();
+        synchronized (this) {
+            if (followingLoading) return;
+            if (followingLoaded && now - lastFollowingLoadAt < FOLLOWING_CACHE_MS) return;
+            followingLoading = true;
+            lastFollowingLoadAt = now;
+        }
         if (!quiet) loading.postValue(true);
-        c.getIoExecutor().execute(() -> {
-            String myId = c.getSessionManager().getUserId();
-            java.util.Set<String> followingIds = new java.util.HashSet<>();
-            if (myId != null && !myId.isEmpty()) {
-                Result<MiscDtos.ListResult<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto>> following =
-                        ApiCall.execute(c.getUserApi().following(myId, 1));
-                if (following.success && following.data != null && following.data.items != null) {
-                    for (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user : following.data.items) {
-                        if (user != null && user.id != null) followingIds.add(user.id);
+        try {
+            c.getIoExecutor().execute(() -> {
+                boolean gotValidRoomPage = false;
+                try {
+                    String myId = c.getSessionManager().getUserId();
+                    java.util.Set<String> followingIds = new java.util.HashSet<>();
+                    if (myId != null && !myId.isEmpty()) {
+                        Result<MiscDtos.ListResult<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto>> following =
+                                ApiCall.execute(c.getUserApi().following(myId, 1));
+                        if (following.success && following.data != null && following.data.items != null) {
+                            for (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user : following.data.items) {
+                                if (user != null && user.id != null) followingIds.add(user.id);
+                            }
+                        }
                     }
+
+                    // Publish each page as it arrives so the UI needn't wait for the full scan.
+                    List<RoomDtos.RoomDto> matched = new ArrayList<>();
+                    int page = 1;
+                    while (page <= 10) {
+                        Result<MiscDtos.ListResult<RoomDtos.RoomDto>> roomResult =
+                                c.listRoomsUseCase.execute(page, PAGE_SIZE);
+                        if (!roomResult.success || roomResult.data == null || roomResult.data.items == null) {
+                            break;
+                        }
+                        gotValidRoomPage = true;
+                        List<RoomDtos.RoomDto> batch = dedupeRooms(roomResult.data.items);
+                        if (batch.isEmpty()) {
+                            followingRooms.postValue(new ArrayList<>(matched));
+                            break;
+                        }
+                        for (RoomDtos.RoomDto room : batch) {
+                            if (room == null) continue;
+                            if (!com.Dramizo.Series.util.RoomBrowseFilter.isBrowsablePersonal(room)) continue;
+                            String hostId = room.hostId;
+                            if (hostId == null && room.host != null) hostId = room.host.id;
+                            if (hostId != null && followingIds.contains(hostId)) matched.add(room);
+                        }
+                        followingRooms.postValue(new ArrayList<>(matched));
+                        if (batch.size() < PAGE_SIZE) break;
+                        page++;
+                    }
+                } catch (Throwable ignored) {
+                    // Keep the last visible results if a background refresh fails.
+                } finally {
+                    synchronized (HomeViewModel.this) {
+                        followingLoading = false;
+                        followingLoaded = gotValidRoomPage;
+                        // Brief retry backoff on failure; successful results are cached for 30s.
+                        lastFollowingLoadAt = System.currentTimeMillis()
+                                - (gotValidRoomPage ? 0L : FOLLOWING_CACHE_MS - 5_000L);
+                    }
+                    if (!quiet) loading.postValue(false);
                 }
-            }
-            // Paginate like Hot so «أنا» scales (not only first 20).
-            List<RoomDtos.RoomDto> matched = new ArrayList<>();
-            int page = 1;
-            while (page <= 10) {
-                Result<MiscDtos.ListResult<RoomDtos.RoomDto>> roomResult =
-                        c.listRoomsUseCase.execute(page, PAGE_SIZE);
-                if (!roomResult.success || roomResult.data == null || roomResult.data.items == null) {
-                    break;
-                }
-                List<RoomDtos.RoomDto> batch = dedupeRooms(roomResult.data.items);
-                if (batch.isEmpty()) break;
-                for (RoomDtos.RoomDto room : batch) {
-                    if (room == null) continue;
-                    if (!com.Dramizo.Series.util.RoomBrowseFilter.isBrowsablePersonal(room)) continue;
-                    String hostId = room.hostId;
-                    if (hostId == null && room.host != null) hostId = room.host.id;
-                    if (hostId != null && followingIds.contains(hostId)) matched.add(room);
-                }
-                if (batch.size() < PAGE_SIZE) break;
-                page++;
+            });
+        } catch (RuntimeException rejected) {
+            synchronized (this) {
+                followingLoading = false;
+                lastFollowingLoadAt = System.currentTimeMillis() - FOLLOWING_CACHE_MS + 5_000L;
             }
             if (!quiet) loading.postValue(false);
-            followingRooms.postValue(matched);
-        });
+        }
     }
 
     public void createRoom() {
