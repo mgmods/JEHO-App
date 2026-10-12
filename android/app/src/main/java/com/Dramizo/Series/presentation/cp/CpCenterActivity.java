@@ -247,7 +247,7 @@ public class CpCenterActivity extends ThemedActivity {
                         if (senderName.isEmpty()) senderName = valueOf(sender.get("username"));
                     }
                     labels[i] = senderName + " — " + cpLabel(valueOf(row.get("type")))
-                            + " · " + valueOf(row.get("priceCoins")) + " عملة";
+                            + " · " + valueOf(row.get("giftName")) + " · " + valueOf(row.get("priceCoins")) + " عملة";
                 }
                 new androidx.appcompat.app.AlertDialog.Builder(this)
                         .setTitle("طلبات علاقات CP")
