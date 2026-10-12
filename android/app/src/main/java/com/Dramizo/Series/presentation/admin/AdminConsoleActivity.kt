@@ -1,6 +1,9 @@
 package com.Dramizo.Series.presentation.admin
 
+import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.net.Uri
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -15,6 +18,9 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import okhttp3.MediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
@@ -36,6 +42,10 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var titleView: TextView
     private lateinit var backButton: TextView
     private var currentSection = "home"
+    private var notificationImageUrl: String? = null
+    private var notificationImageStatus: TextView? = null
+    private var notificationImageUploadInProgress = false
+    private val notificationImageRequestCode = 7042
 
     private data class Module(val key: String, val title: String, val subtitle: String, val icon: String)
 
@@ -1086,51 +1096,133 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showNotificationDialog() {
+        notificationImageUrl = null
+        notificationImageUploadInProgress = false
         val form = formFields(listOf(
-            "عنوان الرسالة",
-            "محتوى الرسالة",
-            "معرّف المستخدم (فارغ = إرسال جماعي)",
-            "رابط صورة HTTPS (اختياري)",
-            "رابط HTTPS أو معرّف روم لفتحه داخل التطبيق (اختياري)"
+            "عنوان الرسالة", "محتوى الرسالة",
+            "معرّف المستخدم أو Public ID (فارغ = إرسال جماعي)",
+            "رابط إضافي HTTPS أو رقم الروم (اختياري)",
+            "عنوان الزر الأول (اختياري)", "رابط الزر الأول",
+            "عنوان الزر الثاني (اختياري)", "رابط الزر الثاني"
         ))
-        AlertDialog.Builder(this)
-            .setTitle("إرسال رسالة الإدارة")
-            .setView(form.first)
-            .setNegativeButton("إلغاء", null)
-            .setPositiveButton("إرسال", null)
+        form.second[1].setSingleLine(false)
+        form.second[1].minLines = 3
+        form.second[1].minHeight = dp(92)
+        val imageRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        imageRow.addView(button("＋ رفع صورة من الجهاز") {
+            val pick = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
+            startActivityForResult(Intent.createChooser(pick, "اختيار صورة الرسالة"), notificationImageRequestCode)
+        })
+        notificationImageStatus = TextView(this).apply {
+            text = "لا توجد صورة مرفقة"; textSize = 12f; setTextColor(MUTED)
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        imageRow.addView(notificationImageStatus)
+        form.first.addView(imageRow, 2)
+        AlertDialog.Builder(this).setTitle("إرسال رسالة الإدارة").setView(form.first)
+            .setNegativeButton("إلغاء", null).setPositiveButton("معاينة وإرسال", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val title = form.second[0].text.toString().trim()
                         val message = form.second[1].text.toString().trim()
                         val userId = form.second[2].text.toString().trim()
-                        val imageUrl = form.second[3].text.toString().trim()
-                        val rawLink = form.second[4].text.toString().trim()
-                        val link = if (rawLink.matches(Regex("\\d+"))) {
-                            "https://jeho-own-backend.mgs.blitz.cloud/open/room/$rawLink"
-                        } else rawLink
-                        if (title.isBlank() || message.isBlank()) {
-                            toast("عنوان الرسالة ونصها مطلوبان")
-                            return@setOnClickListener
+                        val rawLink = form.second[3].text.toString().trim()
+                        val b1t = form.second[4].text.toString().trim()
+                        val b1u = form.second[5].text.toString().trim()
+                        val b2t = form.second[6].text.toString().trim()
+                        val b2u = form.second[7].text.toString().trim()
+                        val link = if (rawLink.matches(Regex("\\d+"))) "https://jeho-own-backend.mgs.blitz.cloud/open/room/" + rawLink else rawLink
+                        if (title.isBlank() || message.isBlank()) { toast("عنوان الرسالة ونصها مطلوبان"); return@setOnClickListener }
+                        if (notificationImageUploadInProgress) { toast("انتظر حتى يكتمل رفع الصورة"); return@setOnClickListener }
+                        if ((b1t.isBlank() != b1u.isBlank()) || (b2t.isBlank() != b2u.isBlank())) {
+                            toast("أدخل عنوان ورابط كل زر معًا"); return@setOnClickListener
                         }
-                        confirm(if (userId.isBlank()) "ستصل رسالة الإدارة إلى جميع المستخدمين في قسم رسالة الإدارة داخل الدردشة، مع إشعار. تأكيد الإرسال؟" else "ستصل الرسالة إلى هذا المستخدم داخل قسم رسالة الإدارة في الدردشة، مع إشعار. تأكيد الإرسال؟") {
-                            val payload = mutableMapOf("title" to title, "body" to message, "channel" to "both")
-                            if (imageUrl.isNotBlank()) payload["imageUrl"] = imageUrl
+                        if (listOf(link, b1u, b2u).any { it.isNotBlank() && !isSafeMessageLink(it) }) {
+                            toast("تحقق من الروابط؛ يجب أن تكون HTTPS أو رابط تطبيق مدعوم"); return@setOnClickListener
+                        }
+                        val image = notificationImageUrl.orEmpty()
+                        val html = buildAdminMessageHtml(message, image, listOf(b1t to b1u, b2t to b2u).filter { it.first.isNotBlank() && it.second.isNotBlank() })
+                        val targetText = if (userId.isBlank()) "جميع المستخدمين" else "المستخدم المحدد"
+                        confirm("سيتم إرسال الرسالة إلى " + targetText + " مع الصورة والأزرار. تأكيد؟") {
+                            val payload = mutableMapOf("title" to title, "body" to message, "type" to "chat", "channel" to "both", "bodyHtml" to html)
+                            if (image.isNotBlank()) payload["imageUrl"] = image
                             if (link.isNotBlank()) payload["link"] = link
-                            if (userId.isNotBlank()) {
-                                payload["userId"] = userId
-                                payload["audience"] = "user"
-                            } else payload["audience"] = "all"
+                            if (userId.isNotBlank()) { payload["userId"] = userId; payload["audience"] = "user" }
+                            else payload["audience"] = "all"
                             load(api.sendAdminMessage(payload)) {
-                                dialog.dismiss()
-                                toast("تم قبول طلب الإرسال من الخادم؛ افحص وصول رسالة الإدارة للمستلم")
-                                openModule("notifications")
+                                dialog.dismiss(); toast("تم قبول طلب الإرسال من الخادم؛ تحقّق من وصول الرسالة"); openModule("notifications")
                             }
                         }
                     }
                 }
                 dialog.show()
             }
+    }
+
+    private fun isSafeMessageLink(value: String): Boolean {
+        val link = value.trim().lowercase()
+        return link.startsWith("https://") || link.startsWith("http://") || link.startsWith("/") ||
+            link.startsWith("jeho://") || link.startsWith("auralive://") || link.startsWith("uploads/") || link.startsWith("assets/")
+    }
+
+    private fun escapeHtml(value: String): String = value.replace("&", "&amp;").replace("<", "&lt;")
+        .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
+
+    private fun buildAdminMessageHtml(message: String, imageUrl: String, buttons: List<Pair<String, String>>): String {
+        val image = if (imageUrl.isNotBlank()) "<img src=\"" + escapeHtml(imageUrl) + "\" alt=\"صورة الرسالة\" style=\"display:block;width:100%;height:auto;max-height:360px;object-fit:contain;border-radius:14px;margin:12px 0;\" />" else ""
+        val ctas = buttons.joinToString("") { pair ->
+            "<a href=\"" + escapeHtml(pair.second) + "\" style=\"display:inline-block;margin:6px 4px;padding:11px 16px;border-radius:10px;background:#6245A8;color:#ffffff;text-decoration:none;font-weight:700;\">" + escapeHtml(pair.first) + "</a>"
+        }
+        val bodyHtml = escapeHtml(message).replace("\n", "<br/>")
+        return "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head><body style=\"margin:0;padding:12px;background:#f5f3fb;color:#252744;font-family:sans-serif;direction:rtl;text-align:right;\"><div class=\"admin-message-card\" style=\"background:#ffffff;border:1px solid #e7e2f3;border-radius:16px;padding:14px;\"><div style=\"font-size:15px;line-height:1.7;white-space:pre-wrap;\">" + bodyHtml + "</div>" + image + "<div style=\"margin-top:8px;text-align:center;\">" + ctas + "</div></div></body></html>"
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != notificationImageRequestCode || resultCode != Activity.RESULT_OK) return
+        val uri = data?.data ?: return
+        uploadNotificationImage(uri)
+    }
+
+    private fun uploadNotificationImage(uri: Uri) {
+        notificationImageUploadInProgress = true
+        notificationImageStatus?.text = "جارٍ رفع الصورة..."
+        try {
+            val mime = contentResolver.getType(uri)?.takeIf { it.startsWith("image/") } ?: "image/jpeg"
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("تعذر قراءة الصورة")
+            if (bytes.isEmpty() || bytes.size > 20 * 1024 * 1024) throw IllegalArgumentException("حجم الصورة يجب ألا يتجاوز 20 ميغابايت")
+            val ext = when (mime.lowercase()) { "image/png" -> ".png"; "image/webp" -> ".webp"; "image/gif" -> ".gif"; else -> ".jpg" }
+            val part = MultipartBody.Part.createFormData("file", "admin-message-" + System.currentTimeMillis() + ext, RequestBody.create(MediaType.parse(mime), bytes))
+            ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
+                override fun onResponse(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>) {
+                    notificationImageUploadInProgress = false
+                    val result = response.body()?.data
+                    if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank()) {
+                        notificationImageUrl = result!!.url
+                        notificationImageStatus?.text = "✓ تم رفع الصورة بنجاح"
+                        notificationImageStatus?.setTextColor(0xFF23834B.toInt())
+                    } else {
+                        notificationImageUrl = null
+                        notificationImageStatus?.text = "فشل رفع الصورة؛ جرّب مرة أخرى"
+                        notificationImageStatus?.setTextColor(0xFFC0392B.toInt())
+                        toast("تعذر رفع الصورة (HTTP " + response.code() + ")")
+                    }
+                }
+                override fun onFailure(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, error: Throwable) {
+                    notificationImageUploadInProgress = false
+                    notificationImageUrl = null
+                    notificationImageStatus?.text = "فشل رفع الصورة؛ تحقق من الاتصال"
+                    toast("تعذر رفع الصورة: " + (error.message ?: "خطأ اتصال"))
+                }
+            })
+        } catch (error: Exception) {
+            notificationImageUploadInProgress = false
+            notificationImageUrl = null
+            notificationImageStatus?.text = "فشل تجهيز الصورة"
+            toast(error.message ?: "تعذر تجهيز الصورة")
+        }
     }
 
     private fun formFields(labels: List<String>): Pair<LinearLayout, List<EditText>> {
