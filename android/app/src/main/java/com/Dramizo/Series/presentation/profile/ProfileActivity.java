@@ -319,7 +319,8 @@ public class ProfileActivity extends ThemedActivity {
 
             // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
             String nobilityFrame = VipStyle.profileNobilityFrameUrl(vip, user.vipTouUrl);
-            String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+            String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
+                    ? user.vipBadgeUrl : nobilityFrame;
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
                     binding.imgAvatar,
