@@ -155,7 +155,25 @@ public class ContestsActivity extends ThemedActivity {
                     : "مجانية";
             String prize = c.prizeLabel != null ? c.prizeLabel
                     : String.format(Locale.US, "جائزة %,d", c.prizeCoins);
-            h.b.tvMeta.setText(fee + " · " + prize + " · " + c.entrantsCount + " مشارك");
+            String kind = "celebration".equals(c.kind) ? "احتفالية"
+                    : "event".equals(c.kind) ? "فعالية"
+                    : "challenge".equals(c.kind) ? "تحدّي" : "مسابقة";
+            String scoring = "diamonds".equals(c.scoringMode) ? "ألماسات"
+                    : "gifts".equals(c.scoringMode) ? "هدايا"
+                    : "points".equals(c.scoringMode) ? "نقاط" : "كوينز";
+            String goal = c.goalDiamonds > 0
+                    ? String.format(Locale.US, " · الهدف %,d %s", c.goalDiamonds, scoring) : "";
+            String teamScore = "";
+            if ("room_vs_room".equals(c.challengeType) || "agency_vs_agency".equals(c.challengeType)) {
+                String a = c.sideA != null ? (c.sideA.name != null ? c.sideA.name : "الفريق الأول") : "الفريق الأول";
+                String b = c.sideB != null ? (c.sideB.name != null ? c.sideB.name : "الفريق الثاني") : "الفريق الثاني";
+                long sa = c.sideA != null ? c.sideA.score : 0;
+                long sb = c.sideB != null ? c.sideB.score : 0;
+                teamScore = String.format(Locale.US, " · %s %,d - %,d %s", a, sa, sb, b);
+            }
+            String interactive = c.isInteractive ? " · تفاعلية داخل الروم" : "";
+            h.b.tvMeta.setText(kind + goal + teamScore + " · " + fee + " · " + prize
+                    + " · " + c.entrantsCount + " مشارك" + interactive);
             if (h.b.tvCountdown != null) {
                 h.b.tvCountdown.setText(formatCountdown(c));
             }
