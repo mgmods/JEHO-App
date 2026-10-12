@@ -40,7 +40,7 @@ export class CpAdminController {
     for (const type of Object.values(CpType)) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
       const price = Number(settings[`cp.price.${type}`]);
-      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1', [giftId]) : [];
+      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true', [giftId]) : [];
       types.push({
         type,
         priceCoins: Number.isSafeInteger(price) && price > 0 ? price : null,
