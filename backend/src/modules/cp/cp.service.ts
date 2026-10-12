@@ -249,6 +249,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
         return { id: requestId, status: 'rejected', refunded: true };
       }
+      const pairKey = [request.fromUserId, request.toUserId].sort().join(':') + ':' + request.type;
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const active = await manager.query(
         `SELECT id FROM cp_relationships WHERE status='active' AND type=$1
          AND (("userAId"=$2 AND "userBId"=$3) OR ("userAId"=$3 AND "userBId"=$2)) LIMIT 1 FOR UPDATE`,
