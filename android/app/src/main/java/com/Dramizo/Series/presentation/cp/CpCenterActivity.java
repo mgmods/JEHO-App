@@ -320,8 +320,12 @@ public class CpCenterActivity extends ThemedActivity {
             Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().cancelCpRequest(id));
             runOnUiThread(() -> {
                 if (isFinishing()) return;
-                Toast.makeText(this, result.success ? "تم إلغاء الطلب وإرجاع المبلغ" :
-                        (result.error != null ? result.error : "تعذر الإلغاء"), Toast.LENGTH_LONG).show();
+                String status = result.data == null ? "" : valueOf(result.data.get("status"));
+                String message = !result.success
+                        ? (result.error != null ? result.error : "تعذر الإلغاء")
+                        : "expired".equals(status) ? "انتهت مهلة الطلب وتم إرجاع المبلغ"
+                        : "تم إلغاء الطلب وإرجاع المبلغ";
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 if (result.success) loadPartner();
             });
         });
@@ -334,9 +338,12 @@ public class CpCenterActivity extends ThemedActivity {
             Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
             runOnUiThread(() -> {
                 if (isFinishing()) return;
-                Toast.makeText(this, result.success
-                        ? (accept ? "تم قبول الطلب وإنشاء العلاقة" : "تم رفض الطلب وإرجاع المبلغ")
-                        : (result.error != null ? result.error : "تعذرت معالجة الطلب"), Toast.LENGTH_LONG).show();
+                String status = result.data == null ? "" : valueOf(result.data.get("status"));
+                String message = !result.success
+                        ? (result.error != null ? result.error : "تعذرت معالجة الطلب")
+                        : "expired".equals(status) ? "انتهت مهلة الطلب وتم إرجاع المبلغ"
+                        : accept ? "تم قبول الطلب وإنشاء العلاقة" : "تم رفض الطلب وإرجاع المبلغ";
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 if (result.success) loadPartner();
             });
         });
