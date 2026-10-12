@@ -1,5 +1,6 @@
 package com.Dramizo.Series.presentation.home;
 
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -8,6 +9,9 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
 
@@ -19,6 +23,7 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.MyRoomCardBinder;
+import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RecentRoomsStore;
 import com.Dramizo.Series.util.RoomBrowseFilter;
 import com.Dramizo.Series.util.RoomOpenChooser;
@@ -52,6 +57,18 @@ public class HomeMeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        // Only the «أنا» landing screen uses this shared section wallpaper.
+        // If no image is configured, retain the bundled original gradient.
+        String sectionWallpaper = RemoteTheme.backgroundUrl(requireContext(), "profile");
+        if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
+            Glide.with(this).load(sectionWallpaper).into(new CustomTarget<Drawable>() {
+                @Override public void onResourceReady(@NonNull Drawable resource,
+                        @Nullable Transition<? super Drawable> transition) {
+                    if (binding != null) binding.getRoot().setBackground(resource);
+                }
+                @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+            });
+        }
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(HomeViewModel.class);
