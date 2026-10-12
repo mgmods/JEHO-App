@@ -7572,7 +7572,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!visible) return;
         for (int i = 0; i < Math.min(3, supporters.size()); i++) {
             RoomDtos.SupporterDto supporter = supporters.get(i);
-            bindTop(slots[i], images[i], frames[i], supporter.avatarUrl, null);
+            bindTop(slots[i], images[i], frames[i], supporter.avatarUrl, supporter.vipBadgeUrl);
             slots[i].setContentDescription(
                     "داعم الوكالة " + (i + 1) + " " + supporter.displayName);
             slots[i].setOnClickListener(v -> showUserCard(
@@ -7594,15 +7594,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         slot.setVisibility(View.VISIBLE);
-        // Top supporters: avatar only — no worn host frame.
-        if (frame != null) {
-            frame.setVisibility(View.GONE);
-            frame.setImageDrawable(null);
-        }
-        img.setPadding(0, 0, 0, 0);
-        img.setBackground(null);
-        AvatarImageLoader.applyCircularClip(img);
-        AvatarImageLoader.load(img, url);
+        // Keep the user's equipped frame visible on supporter avatars as well.
+        AvatarCosmetics.bindWear(img, frame, url, frameUrl);
     }
 
     private void clearTopSupportersUi() {
