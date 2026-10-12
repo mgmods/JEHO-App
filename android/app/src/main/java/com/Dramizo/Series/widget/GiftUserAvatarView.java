@@ -126,12 +126,11 @@ public class GiftUserAvatarView extends LinearLayout {
 
     @NonNull
     public List<GiftRecipient> getSelectMicAccounts() {
-        if (allMic) return new ArrayList<>(recipients);
         List<GiftRecipient> out = new ArrayList<>();
         if (adapter != null) {
-            String id = adapter.getSelectedUserId();
+            List<String> ids = adapter.getSelectedUserIds();
             for (GiftRecipient r : recipients) {
-                if (r != null && id != null && id.equals(r.userId)) out.add(r);
+                if (r != null && r.userId != null && ids.contains(r.userId)) out.add(r);
             }
         }
         return out;
