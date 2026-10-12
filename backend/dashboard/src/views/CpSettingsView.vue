@@ -181,7 +181,7 @@ async function load() {
   try {
     const [configResponse, giftsResponse] = await Promise.all([cpAdminApi.config(), giftsApi.list({ limit: 500 })])
     const config = payloadOf(configResponse)
-    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse)
+    gifts.value = extractList(giftsResponse?.data?.data ?? giftsResponse?.data ?? giftsResponse).filter(gift => gift && gift.isActive !== false)
     types.value = (config.types || []).map(item => ({
       ...item,
       priceInput: item.priceCoins == null ? '' : String(item.priceCoins),
