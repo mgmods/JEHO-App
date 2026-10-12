@@ -59,7 +59,8 @@ public class ProfileFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(binding.getRoot(), "profile");
+        // This profile screen intentionally uses the requested pure-white design.
+        binding.getRoot().setBackgroundColor(android.graphics.Color.WHITE);
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(ProfileViewModel.class);
 
@@ -118,8 +119,12 @@ public class ProfileFragment extends Fragment {
         bindRow(binding.btnNotifications, v ->
                 startActivity(new Intent(requireContext(), NotificationsActivity.class)));
 
-        binding.btnWallet.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), BagActivity.class)));
+        View.OnClickListener openWallet = v ->
+                startActivity(new Intent(requireContext(), BagActivity.class));
+        binding.btnWallet.setOnClickListener(openWallet);
+        if (binding.btnWalletDiamondsCard != null) {
+            binding.btnWalletDiamondsCard.setOnClickListener(openWallet);
+        }
         binding.rowGiftHistory.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), GiftHistoryActivity.class)));
         if (binding.rowMyEvents != null) {
