@@ -145,7 +145,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey" = $1 FOR UPDATE', [key]);
       if (existing.length) {
-        if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId) {
+        if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type || existing[0].roomId !== roomId) {
           throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
         }
         return existing[0];
