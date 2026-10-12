@@ -115,6 +115,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
         throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
       }
+      const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', ['cp.policy.request_expiry_minutes']);
+      const configuredExpiry = Number(expiryRow?.value);
+      const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
+        ? configuredExpiry : EXPIRY_MINUTES;
       const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.price.${type}`]);
       const price = Number(priceRow?.value);
       if (!Number.isSafeInteger(price) || price <= 0) {
@@ -129,7 +133,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [request] = await manager.query(
         `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","idempotencyKey","expiresAt","createdAt","updatedAt")
          VALUES ($1,$2,$3,'pending',$4,$5,$6,now() + ($7 || ' minutes')::interval,now(),now()) RETURNING *`,
-        [userId, recipientId, type, roomId, String(price), key, String(EXPIRY_MINUTES)],
+        [userId, recipientId, type, roomId, String(price), key, String(expiryMinutes)],
       );
       await manager.query('UPDATE wallets SET coins = coins - $1, "updatedAt" = now() WHERE "userId" = $2', [price, userId]);
       await manager.query(
