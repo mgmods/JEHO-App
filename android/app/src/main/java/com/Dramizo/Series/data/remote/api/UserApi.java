@@ -103,6 +103,24 @@ public interface UserApi {
     @DELETE("users/{id}/bond")
     Call<ApiResponse<Object>> endBond(@Path("id") String id, @Query("type") String type);
 
+    @GET("cp/discover")
+    Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
+
+    @GET("cp/me")
+    Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
+
+    @GET("cp/requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
+
+    @POST("cp/requests")
+    Call<ApiResponse<Map<String, Object>>> createCpRequest(@Body Map<String, String> body);
+
+    @POST("cp/requests/{id}/respond")
+    Call<ApiResponse<Map<String, Object>>> respondCpRequest(@Path("id") String id, @Body Map<String, Boolean> body);
+
+    @POST("cp/{id}/end")
+    Call<ApiResponse<Map<String, Object>>> endCpRelationship(@Path("id") String id);
+
     @GET("users/me/gender-verification")
     Call<ApiResponse<MiscDtos.GenderVerificationDto>> getGenderVerification();
 
