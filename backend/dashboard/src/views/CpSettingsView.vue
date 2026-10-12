@@ -45,6 +45,11 @@
             <input v-model.number="item.giftPoints" class="form-control" type="number" min="0" max="1000000000" step="1">
           </div>
           <div class="col-sm-6 col-xl-3">
+            <label class="form-label">نقاط كل هدية متبادلة بين الشريكين</label>
+            <input v-model.number="item.giftInteractionPoints" class="form-control" type="number" min="0" max="1000000000" step="1">
+            <div class="form-text">تُمنح بعد تسجيل الهدية بنجاح، وتُخصم مرة واحدة فقط لكل سجل هدية.</div>
+          </div>
+          <div class="col-sm-6 col-xl-3">
             <label class="form-label">الحد الأقصى للمستوى</label>
             <input v-model.number="item.maxLevel" class="form-control" type="number" min="1" max="1000" step="1" placeholder="حسب الجدول">
           </div>
@@ -182,6 +187,7 @@ async function load() {
       priceInput: item.priceCoins == null ? '' : String(item.priceCoins),
       giftId: item.giftId || item.gift?.id || '',
       giftPoints: Number(item.giftPoints || 0),
+      giftInteractionPoints: Number(item.giftInteractionPoints || 0),
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
