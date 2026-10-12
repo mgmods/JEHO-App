@@ -429,7 +429,7 @@ export class ConfigController {
       // (liveRoom, voiceRoom, createRoom) are deliberately left untouched.
       if (next.backgrounds && typeof next.backgrounds === 'object') {
         next.backgrounds = { ...next.backgrounds };
-        for (const key of ['home', 'profile', 'chat', 'games']) {
+        for (const key of ['allSections', 'home', 'profile', 'chat', 'games']) {
           if (next.backgrounds[key]) next.backgrounds[key] = bust(next.backgrounds[key]);
         }
       }
