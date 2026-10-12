@@ -312,6 +312,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
 
         bindReplyQuote(holder, msg);
         bindBody(holder, msg);
+        bindPaidMessageInfo(holder, msg);
 
         String time = DeviceTimeFormat.messageTime(holder.itemView.getContext(), msg.createdAt);
         if (msg.isEdited) time = time + " · معدّلة";
@@ -326,6 +327,43 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         };
         holder.itemView.setOnLongClickListener(longClick);
         holder.b.bubbleRoot.setOnLongClickListener(longClick);
+    }
+
+    private void bindPaidMessageInfo(@NonNull VH holder, @NonNull ChatDtos.MessageDto msg) {
+        TextView label = holder.b.tvPaidMessageInfo;
+        if (label == null) return;
+        if (msg.paidCoins <= 0 || msg.paidStatus == null || msg.paidStatus.isEmpty()) {
+            label.setVisibility(View.GONE);
+            label.setText("");
+            return;
+        }
+        String status;
+        switch (msg.paidStatus) {
+            case "replied":
+                status = "تم الرد";
+                break;
+            case "refunded":
+                status = "تم استرداد العملات";
+                break;
+            case "expired":
+                status = "انتهت المهلة بلا رد";
+                break;
+            default:
+                status = "بانتظار الرد";
+                if (msg.replyDeadlineAt != null) {
+                    long deadline = parseIsoMs(msg.replyDeadlineAt);
+                    if (deadline > 0) {
+                        long remaining = Math.max(0, deadline - System.currentTimeMillis());
+                        long minutes = (remaining + 59_999L) / 60_000L;
+                        status += " · " + (minutes / 60 > 0 ? (minutes / 60) + "س " : "") + (minutes % 60) + "د";
+                    }
+                }
+                break;
+        }
+        label.setText("💰 " + msg.paidCoins + " عملة · " + status);
+        label.setVisibility(View.VISIBLE);
+        label.setTextColor(msg.paidStatus.equals("refunded") || msg.paidStatus.equals("expired")
+                ? 0xFFB45309 : 0xFF667085);
     }
 
     private void bindDaySeparator(
@@ -1502,6 +1540,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         final ImageView imgRoomShareCover;
         final TextView tvRoomShareTitle;
         final TextView tvContent;
+        final TextView tvPaidMessageInfo;
         final TextView tvTranslateAction;
         final TextView tvTranslated;
         final View rowMetaFooter;
@@ -1551,6 +1590,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             imgRoomShareCover = root.findViewById(R.id.imgRoomShareCover);
             tvRoomShareTitle = root.findViewById(R.id.tvRoomShareTitle);
             tvContent = root.findViewById(R.id.tvContent);
+            tvPaidMessageInfo = root.findViewById(R.id.tvPaidMessageInfo);
             tvTranslateAction = root.findViewById(R.id.tvTranslateAction);
             tvTranslated = root.findViewById(R.id.tvTranslated);
             rowMetaFooter = root.findViewById(R.id.rowMetaFooter);
