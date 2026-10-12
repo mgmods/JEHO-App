@@ -39,6 +39,7 @@ public class HomeMeFragment extends Fragment {
     private HomeViewModel viewModel;
     private PartyRoomAdapter roomAdapter;
     private int subTab = SUB_RECENT;
+    private final Runnable wallpaperRefreshListener = this::applySectionWallpaper;
 
     public static HomeMeFragment newInstance() {
         return new HomeMeFragment();
@@ -91,6 +92,18 @@ public class HomeMeFragment extends Fragment {
         selectSub(SUB_RECENT);
         refreshMyRoom();
         viewModel.loadFollowingRooms();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        RemoteTheme.addRefreshListener(wallpaperRefreshListener);
+    }
+
+    @Override
+    public void onStop() {
+        RemoteTheme.removeRefreshListener(wallpaperRefreshListener);
+        super.onStop();
     }
 
     @Override
