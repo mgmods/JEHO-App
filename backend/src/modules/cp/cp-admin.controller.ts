@@ -36,7 +36,7 @@ export class CpAdminController {
     const settings = Object.fromEntries(rows.map((row: { key: string; value: string }) => {
       try { return [row.key, JSON.parse(row.value)]; } catch { return [row.key, row.value]; }
     }));
-    const types = [];
+    const types: Array<Record<string, unknown>> = [];
     for (const type of Object.values(CpType)) {
       const giftId = settings[`cp.gift.${type}`] ?? null;
       const price = Number(settings[`cp.price.${type}`]);
