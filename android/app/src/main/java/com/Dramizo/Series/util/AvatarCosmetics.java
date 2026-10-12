@@ -63,13 +63,18 @@ public final class AvatarCosmetics {
             // Cap decode size — frames never need 2K+ pixels on list rows.
             px = Math.min(Math.max(px, 64), 512);
             try {
-                Glide.with(view)
-                        .load(AssetCatalog.absoluteUrl(url))
-                        .override(px, px)
-                        .fitCenter()
-                        .dontAnimate()
-                        .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                        .into(view);
+                com.bumptech.glide.RequestBuilder<android.graphics.drawable.Drawable> request =
+                        Glide.with(view)
+                                .load(AssetCatalog.absoluteUrl(url))
+                                .override(px, px)
+                                .fitCenter()
+                                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC);
+                // Preserve native GIF / animated-WebP playback; only freeze still artwork.
+                String lower = url.toLowerCase(java.util.Locale.US);
+                boolean animatedImage = lower.matches("(?s).*\\.(gif|webp)(?:[?#].*)?$")
+                        || CosmeticMedia.isAnimatedWear(url);
+                if (!animatedImage) request.dontAnimate();
+                request.into(view);
             } catch (Exception ignored) {
                 // Destroyed activity / detached view — ignore.
             }
@@ -437,8 +442,68 @@ public final class AvatarCosmetics {
             @Nullable String hostBadgeUrl,
             @Nullable Map<String, ?> frameMeta,
             @Nullable Map<String, ?> hostBadgeMeta) {
+        String selectedUrl = hostBadgeUrl != null && !hostBadgeUrl.trim().isEmpty()
+                ? hostBadgeUrl : frameUrl;
+        Map<String, ?> selectedMeta = selectedUrl == hostBadgeUrl ? hostBadgeMeta : frameMeta;
+        if (isAnimatedWearMedia(selectedUrl)) {
+            HostSignalView signal = findOrCreateWearSignal(avatarView, frameView);
+            if (signal != null && bindHostLikeLive(
+                    signal, avatarView, frameView, avatarUrl, selectedUrl, selectedMeta, 1)) {
+                return;
+            }
+        } else {
+            HostSignalView existing = findWearSignal(avatarView, frameView);
+            if (existing != null) {
+                existing.setOnFrameReadyListener(null);
+                existing.clearSignal();
+            }
+        }
         bindAvatar(avatarView, avatarUrl);
         applyHostWear(frameView, null, avatarView, frameUrl, hostBadgeUrl, frameMeta, hostBadgeMeta);
+    }
+
+    private static boolean isAnimatedWearMedia(@Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return false;
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(url);
+        return kind == CosmeticMedia.Kind.GIF
+                || kind == CosmeticMedia.Kind.VIDEO
+                || kind == CosmeticMedia.Kind.SVGA
+                || CosmeticMedia.isAnimatedWear(url);
+    }
+
+    @Nullable
+    private static HostSignalView findWearSignal(
+            @Nullable ImageView avatarView, @Nullable ImageView frameView) {
+        android.view.View parent = avatarView != null ? (android.view.View) avatarView.getParent()
+                : frameView != null ? (android.view.View) frameView.getParent() : null;
+        if (parent instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) parent;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.view.View child = group.getChildAt(i);
+                if (child instanceof HostSignalView) return (HostSignalView) child;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static HostSignalView findOrCreateWearSignal(
+            @Nullable ImageView avatarView, @Nullable ImageView frameView) {
+        HostSignalView existing = findWearSignal(avatarView, frameView);
+        if (existing != null) return existing;
+        if (avatarView == null || frameView == null
+                || avatarView.getParent() != frameView.getParent()
+                || !(avatarView.getParent() instanceof android.widget.FrameLayout)) {
+            return null;
+        }
+        android.widget.FrameLayout parent = (android.widget.FrameLayout) avatarView.getParent();
+        HostSignalView signal = new HostSignalView(parent.getContext());
+        signal.setVisibility(View.GONE);
+        parent.addView(signal, new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        signal.bringToFront();
+        return signal;
     }
 
     /** Prefer this for lists / profile — VIP frame only (host signal is agency-room wear). */
