@@ -13,6 +13,7 @@ class CpTypeConfigDto {
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) priceCoins?: number;
   @IsOptional() @IsString() giftId?: string;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftPoints?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftInteractionPoints?: number;
   @IsOptional() @IsInt() @Min(1) @Max(1000) maxLevel?: number;
   @IsOptional() @IsArray() levels?: Array<{ level: number; pointsRequired: number; reward?: string }>;
   @IsOptional() @IsBoolean() enabled?: boolean;
@@ -41,6 +42,7 @@ export class CpAdminController {
         priceCoins: settings[`cp.price.${type}`] ?? null,
         giftId: settings[`cp.gift.${type}`] ?? null,
         giftPoints: settings[`cp.gift_points.${type}`] ?? null,
+        giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
         maxLevel: settings[`cp.max_level.${type}`] ?? null,
         levels: settings[`cp.levels.${type}`] ?? [],
         enabled: settings[`cp.enabled.${type}`] ?? false,
@@ -114,6 +116,7 @@ export class CpAdminController {
     if (body.priceCoins !== undefined) config[`cp.price.${type}`] = String(body.priceCoins);
     if (body.giftId !== undefined) config[`cp.gift.${type}`] = body.giftId;
     if (body.giftPoints !== undefined) config[`cp.gift_points.${type}`] = String(body.giftPoints);
+    if (body.giftInteractionPoints !== undefined) config[`cp.points.gift_send.${type}`] = String(body.giftInteractionPoints);
     if (body.maxLevel !== undefined) config[`cp.max_level.${type}`] = String(body.maxLevel);
     if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels);
     if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
