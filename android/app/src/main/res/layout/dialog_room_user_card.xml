@@ -774,6 +774,15 @@
                 android:text="صداقة" />
         </LinearLayout>
 
+        <TextView
+            android:id="@+id/actCpInitiate"
+            style="@style/Widget.AuraLive.UserCardAction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="إهداء بدء علاقة CP"
+            android:textColor="#FBBF24" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
