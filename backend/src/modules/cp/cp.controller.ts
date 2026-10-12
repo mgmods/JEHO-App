@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../../common/decorators';
+import { CurrentUser, Public } from '../../common/decorators';
+import { ParseUUIDPipe } from '@nestjs/common';
 import { CpService } from './cp.service';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 
@@ -9,6 +10,13 @@ import { CpType } from '../../database/entities/cp-relationship.entity';
 @Controller('cp')
 export class CpController {
   constructor(private readonly cp: CpService) {}
+
+  @Public()
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Public active CP relationships for a profile; no financial data' })
+  profileRelationships(@Param('id', ParseUUIDPipe) userId: string) {
+    return this.cp.profileRelationships(userId);
+  }
 
   @Get('discover')
   @ApiOperation({ summary: 'Real active CP relationships, ranked by points' })
