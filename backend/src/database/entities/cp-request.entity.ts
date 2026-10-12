@@ -35,6 +35,18 @@ export class CpRequest {
   @Column({ type: 'bigint' })
   priceCoins: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  giftId: string | null;
+
+  @Column({ type: 'varchar', length: 160, nullable: true })
+  giftName: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  giftIconUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  giftAnimationUrl: string | null;
+
   @Column({ type: 'varchar', length: 128 })
   idempotencyKey: string;
 
