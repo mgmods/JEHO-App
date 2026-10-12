@@ -203,6 +203,18 @@ public class SplashActivity extends ThemedActivity {
             fallback.active = true;
             return fallback;
         }
+        // Compatibility with dashboard versions that stored one splash image
+        // in backgrounds.splash rather than the newer splash.items collection.
+        if (theme != null && theme.splash != null && theme.splash.enabled
+                && theme.backgrounds != null && theme.backgrounds.splash != null
+                && !theme.backgrounds.splash.trim().isEmpty()) {
+            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
+                    new com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto();
+            fallback.url = theme.backgrounds.splash;
+            fallback.durationSeconds = 5;
+            fallback.active = true;
+            return fallback;
+        }
         return null;
     }
 
