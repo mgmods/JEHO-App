@@ -249,7 +249,7 @@ public class CpCenterActivity extends ThemedActivity {
                             String senderName = labels[which];
                             new androidx.appcompat.app.AlertDialog.Builder(this)
                                     .setTitle("طلب علاقة جديد")
-                                    .setMessage(senderName + "\\nبقبولك، ستُنشأ العلاقة. إذا رفضت أو انتهت المهلة يُعاد المبلغ كاملاً لصاحب الطلب.")
+                                    .setMessage(senderName + "\nبقبولك، ستُنشأ العلاقة. إذا رفضت أو انتهت المهلة يُعاد المبلغ كاملاً لصاحب الطلب.")
                                     .setPositiveButton("قبول", (d, w) -> respondCpRequest(id, true))
                                     .setNegativeButton("رفض وإرجاع المبلغ", (d, w) -> respondCpRequest(id, false))
                                     .setNeutralButton("لاحقاً", null).show();
