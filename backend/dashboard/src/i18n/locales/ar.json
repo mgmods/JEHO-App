@@ -132,7 +132,8 @@
     "reports": "البلاغات",
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
-    "settings": "الإعدادات",
+    "cpSettings": "إعدادات علاقات CP",
+  "settings": "الإعدادات",
     "logs": "السجلات",
     "policyBrochure": "سياسة المنصة PDF"
   },
