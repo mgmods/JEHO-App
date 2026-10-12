@@ -198,7 +198,8 @@ public class ProfileFragment extends Fragment {
             // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
             String nobilityFrame = VipStyle.profileNobilityFrameUrl(
                     Math.max(0, user.vipLevel), user.vipTouUrl);
-            String profileFrame = nobilityFrame != null ? nobilityFrame : user.vipBadgeUrl;
+            String profileFrame = user.vipBadgeUrl != null && !user.vipBadgeUrl.trim().isEmpty()
+                    ? user.vipBadgeUrl : nobilityFrame;
             HostSignalView.prefetchWear(requireContext(), profileFrame);
             AvatarCosmetics.bindProfileWear(
                     binding.webProfileHostSignal,
