@@ -18,6 +18,12 @@ export const operatorsApi = {
   remove: (id) => safeRequest(() => api.delete(`/admin/operators/${id}`)),
 }
 
+export const paidMessagesApi = {
+  settings: () => safeRequest(() => api.get('/admin/paid-messages/settings')),
+  updateSettings: (payload) => safeRequest(() => api.patch('/admin/paid-messages/settings', payload)),
+  stats: () => safeRequest(() => api.get('/admin/paid-messages/stats')),
+}
+
 export const dashboardApi = {
   overview: () => safeRequest(() => api.get('/admin/dashboard/overview')),
   charts: (params) => safeRequest(() => api.get('/admin/dashboard/charts', { params })),
