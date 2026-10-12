@@ -122,6 +122,7 @@ public final class UserProfileCardSheet {
         final String[] displayNameHold = {name != null ? name : ""};
         final String[] avatarHold = {avatarUrl != null ? avatarUrl : ""};
         final String[] vipFrameHold = {VipStyle.profileNobilityFrameUrl(vipLevel, null)};
+        HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
 
         if (tvName != null) {
             tvName.setText(displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0]);
