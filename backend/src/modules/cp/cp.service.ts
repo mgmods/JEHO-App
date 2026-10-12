@@ -141,6 +141,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
     return this.dataSource.transaction(async manager => {
+      const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey" = $1 FOR UPDATE', [key]);
       if (existing.length) {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId) {
@@ -315,13 +317,16 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (!wallet) throw new NotFoundException('محفظة صاحب الطلب غير موجودة');
     const balance = Number(wallet.coins);
     const amount = Number(request.priceCoins);
-    await manager.query('UPDATE wallets SET coins=coins+$1,"updatedAt"=now() WHERE "userId"=$2', [amount, request.fromUserId]);
-    await manager.query(
+    const inserted = await manager.query(
       `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
        VALUES ($1,'refund','coins',$2,$3,'cp_request_refund',$4,'استرداد هدية CP',$5::json,now())
-       ON CONFLICT ("userId","referenceType","referenceId") WHERE "referenceType" IS NOT NULL AND "referenceId" IS NOT NULL DO NOTHING`,
+       ON CONFLICT ("userId","referenceType","referenceId") WHERE "referenceType" IS NOT NULL AND "referenceId" IS NOT NULL DO NOTHING
+       RETURNING id`,
       [request.fromUserId, amount, balance + amount, request.id, JSON.stringify({ cpRequestId: request.id, reason: request.status })],
     );
+    if (inserted.length) {
+      await manager.query('UPDATE wallets SET coins=coins+$1,"updatedAt"=now() WHERE "userId"=$2', [amount, request.fromUserId]);
+    }
     await manager.query('UPDATE cp_requests SET "refundedAt"=now(),"updatedAt"=now() WHERE id=$1 AND "refundedAt" IS NULL', [request.id]);
   }
 }
