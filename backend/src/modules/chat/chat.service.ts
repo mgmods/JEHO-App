@@ -546,7 +546,16 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       relations: ['sender', 'sender.profile', 'replyTo'],
     });
     const senderVip = (await this.vipMapForUsers([senderId])).get(senderId) ?? 0;
-    const mapped = this.mapMessage(full || message, senderVip);
+    const mapped: any = this.mapMessage(full || message, senderVip);
+    const paidTransaction = await this.dataSource.getRepository(WalletTransaction).findOne({
+      where: { userId: senderId, referenceType: 'paid_message', referenceId: message.id },
+    });
+    if (paidTransaction) {
+      const paidMetadata = (paidTransaction.metadata || {}) as Record<string, unknown>;
+      mapped.paidCoins = Math.abs(Number(paidTransaction.amount) || 0);
+      mapped.paidStatus = 'pending';
+      mapped.replyDeadlineAt = new Date(new Date(message.createdAt).getTime() + Math.max(0, Number(paidMetadata.refundWindowMinutes ?? 30)) * 60_000).toISOString();
+    }
 
     const peers = await this.partRepo.find({
       where: { conversationId },
@@ -669,12 +678,44 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     await this.emitReadReceipt(conversationId, userId, readAt);
     const peers = await this.partRepo.find({ where: { conversationId } });
     const peerPart = peers.find((p) => p.userId !== userId);
-    const pageResult = paginate(
-      items.map((m) => this.mapMessage(m, vipByUser.get(m.senderId) ?? 0)),
-      total,
-      page,
-      limit,
-    );
+    const mappedItems: any[] = items.map((m) => this.mapMessage(m, vipByUser.get(m.senderId) ?? 0));
+    const paidIds = items.map((m) => m.id);
+    if (paidIds.length) {
+      const [paidRows, refundRows] = await Promise.all([
+        this.dataSource.getRepository(WalletTransaction).createQueryBuilder('tx')
+          .where('tx.referenceType = :type', { type: 'paid_message' })
+          .andWhere('tx.referenceId IN (:...ids)', { ids: paidIds }).getMany(),
+        this.dataSource.getRepository(WalletTransaction).createQueryBuilder('tx')
+          .where('tx.referenceType = :type', { type: 'paid_message_refund' })
+          .andWhere('tx.referenceId IN (:...ids)', { ids: paidIds }).getMany(),
+      ]);
+      const paidById = new Map(paidRows.map((tx) => [tx.referenceId, tx]));
+      const refunded = new Set(refundRows.map((tx) => tx.referenceId));
+      for (let i = 0; i < items.length; i++) {
+        const message = items[i];
+        const tx = paidById.get(message.id);
+        if (!tx) continue;
+        const meta = (tx.metadata || {}) as Record<string, unknown>;
+        const windowMinutes = Math.max(0, Number(meta.refundWindowMinutes ?? 30));
+        const deadline = new Date(new Date(message.createdAt).getTime() + windowMinutes * 60_000);
+        const peer = peers.find((p) => p.userId !== message.senderId);
+        let replied = false;
+        if (peer) {
+          replied = await this.msgRepo.createQueryBuilder('reply')
+            .where('reply.conversationId = :conversationId', { conversationId })
+            .andWhere('reply.senderId = :peerId', { peerId: peer.userId })
+            .andWhere('reply.createdAt > :createdAt', { createdAt: message.createdAt })
+            .andWhere('reply.createdAt <= :deadline', { deadline })
+            .andWhere('reply.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
+            .getExists();
+        }
+        mappedItems[i].paidCoins = Math.abs(Number(tx.amount) || 0);
+        mappedItems[i].replyDeadlineAt = deadline.toISOString();
+        mappedItems[i].paidStatus = refunded.has(message.id) ? 'refunded'
+          : replied ? 'replied' : Date.now() < deadline.getTime() ? 'pending' : 'expired';
+      }
+    }
+    const pageResult = paginate(mappedItems, total, page, limit);
     return {
       ...pageResult,
       peerLastReadAt: peerPart?.lastReadAt
