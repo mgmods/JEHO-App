@@ -36,6 +36,8 @@ public class CpCenterActivity extends ThemedActivity {
     @Nullable private AuthDtos.UserDto partner;
     private long bondScore;
     private int bondLevel;
+    private String activeRelationshipId;
+    private String activeRelationshipType;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -49,6 +51,7 @@ public class CpCenterActivity extends ThemedActivity {
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.btnDiscoverCp.setOnClickListener(v -> startActivity(new Intent(this, CpDiscoveryActivity.class)));
+        binding.btnCpRequests.setOnClickListener(v -> showCpRequestsDialog());
         binding.btnBecomeCp.setOnClickListener(v -> {
             if (partner != null) {
                 confirmEndCp();
