@@ -159,18 +159,36 @@ public class CpDiscoveryActivity extends ThemedActivity {
         TextView names = text(nameA + "  ♥  " + nameB, 15, Color.rgb(65, 47, 40), true);
         names.setGravity(Gravity.CENTER);
         card.addView(names);
-        TextView stats = text("المستوى " + level + "  ·  نقاط العلاقة " + points, 13, Color.rgb(126, 106, 91), false);
+        int days = numberOf(row.get("durationDays"), 0);
+        int nextLevel = numberOf(row.get("nextLevel"), 0);
+        double progress = Math.max(0, Math.min(100, doubleOf(row.get("progressPercent"), 0)));
+        TextView stats = text("المستوى " + level + "  ·  النقاط " + points + "  ·  " + days + " يوم", 13, Color.rgb(126, 106, 91), false);
         stats.setGravity(Gravity.CENTER);
         stats.setPadding(0, dp(7), 0, dp(2));
         card.addView(stats);
-        View line = new View(this);
-        line.setBackgroundColor(Color.rgb(244, 226, 202));
-        LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(-1, dp(4));
-        lineLp.setMargins(0, dp(12), 0, dp(2));
-        card.addView(line, lineLp);
+        TextView next = text(nextLevel > 0 ? "التقدم نحو المستوى " + nextLevel + " · " + Math.round(progress) + "%" : "وصلت العلاقة إلى آخر مستوى مضبوط", 12, Color.rgb(143, 105, 60), false);
+        next.setGravity(Gravity.CENTER);
+        next.setPadding(0, dp(6), 0, dp(5));
+        card.addView(next);
+        LinearLayout track = new LinearLayout(this);
+        track.setBackground(round(Color.rgb(244, 226, 202), dp(4)));
+        View fill = new View(this);
+        fill.setBackground(round(Color.rgb(214, 160, 69), dp(4)));
+        int available = Math.max(dp(40), getResources().getDisplayMetrics().widthPixels - dp(76));
+        track.addView(fill, new LinearLayout.LayoutParams(Math.max(dp(3), (int) (available * progress / 100.0)), dp(5)));
+        LinearLayout.LayoutParams trackLp = new LinearLayout.LayoutParams(-1, dp(5));
+        trackLp.setMargins(0, dp(2), 0, dp(2));
+        card.addView(track, trackLp);
+        String rewardText = "لا توجد مكافآت مفتوحة حالياً";
+        Object rewards = row.get("rewardsUnlocked");
+        if (rewards instanceof List && !((List<?>) rewards).isEmpty()) rewardText = "المكافآت المفتوحة: " + ((List<?>) rewards).size();
+        String detailText = nameA + " و " + nameB + "\nالنوع: " + typeLabel + "\nمدة العلاقة: " + days + " يوم"
+                + "\nالمستوى الحالي: " + level + "\nمجموع النقاط: " + points
+                + "\n" + (nextLevel > 0 ? "المستوى التالي: " + nextLevel + " (" + Math.round(progress) + "%)" : "لا يوجد مستوى تالٍ مضبوط")
+                + "\n" + rewardText;
         card.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle(typeLabel + " · مستوى " + level)
-                .setMessage(nameA + " و " + nameB + "\nالنقاط المسجلة: " + points + "\nتُعرض هنا البيانات المسجلة فعلياً من الخادم.")
+                .setMessage(detailText)
                 .setPositiveButton("حسناً", null).show());
     }
 
