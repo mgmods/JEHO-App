@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_light">
+    android:background="@color/white">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -49,10 +49,10 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="120dp"
+                android:layout_height="56dp"
                 android:contentDescription="@null"
                 android:scaleType="fitXY"
-                android:src="@drawable/me_bg" />
+                android:src="@color/white" />
 
             <!-- User row: single avatar left + info right (no top settings — Mikoo keeps settings in list) -->
             <LinearLayout
@@ -453,91 +453,114 @@
                     android:visibility="gone" />
             </LinearLayout>
 
-            <!-- Wallet row — clear Mikoo-style card with live balances -->
+            <!-- Separate, equally sized coin and diamond wallet cards. -->
             <LinearLayout
-                android:id="@+id/btnWallet"
+                android:id="@+id/walletBalancesRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="10dp"
-                android:background="@drawable/bg_wallet_section"
-                android:foreground="?attr/selectableItemBackground"
-                android:gravity="center_vertical"
-                android:minHeight="64dp"
+                android:layout_marginTop="12dp"
                 android:orientation="horizontal"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="12dp">
-
-                <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_asset_coin_gold" />
+                android:gravity="center"
+                android:baselineAligned="false">
 
                 <LinearLayout
+                    android:id="@+id/btnWallet"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
                     android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_wallet_section"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="94dp"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/my_bag"
-                        android:textColor="@color/text_primary"
-                        android:textSize="15sp"
-                        android:textStyle="bold" />
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_asset_coin_gold" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text="كوينز · ألماس · شحن"
-                        android:textColor="@color/text_hint"
-                        android:textSize="11sp" />
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="كوينز"
+                            android:textColor="@color/text_hint"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvWalletCoins"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="—"
+                            android:textColor="#B8860B"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_asset_coin_gold" />
-
-                <TextView
-                    android:id="@+id/tvWalletCoins"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:id="@+id/btnWalletDiamondsCard"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="—"
-                    android:textColor="#E4A300"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_profile_panel"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="94dp"
+                    android:orientation="horizontal"
+                    android:padding="12dp">
 
-                <ImageView
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="12dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_asset_diamond" />
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_asset_diamond" />
 
-                <TextView
-                    android:id="@+id/tvWalletDiamonds"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="—"
-                    android:textColor="#0E82E9"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="›"
-                    android:textColor="@color/text_hint"
-                    android:textSize="18sp" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="ألماس"
+                            android:textColor="@color/text_hint"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvWalletDiamonds"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:text="—"
+                            android:textColor="#8B5CF6"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
 
             <!-- Level + VIP cards (Mikoo art) -->
