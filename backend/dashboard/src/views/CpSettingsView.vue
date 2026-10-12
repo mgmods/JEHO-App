@@ -198,6 +198,8 @@ async function saveType(item) {
       const price = Number(item.priceInput)
       if (!Number.isSafeInteger(price) || price <= 0) throw new Error('السعر يجب أن يكون عدداً صحيحاً موجباً.')
       payload.priceCoins = price
+    } else if (item.priceCoins != null) {
+      payload.priceCoins = 0
     }
     await cpAdminApi.updateType(item.type, payload)
     success.value = 'تم حفظ إعدادات ' + label(item.type) + '.'
