@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   Optional,
+  OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
@@ -26,7 +27,7 @@ const CONTEST_BADGE_DAYS = 7;
 const FAT_PRIZE_CEILING = 10000;
 
 @Injectable()
-export class ContestsService {
+export class ContestsService implements OnModuleInit {
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
@@ -38,6 +39,25 @@ export class ContestsService {
     private readonly cosmetics: CosmeticsService,
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
+
+  async onModuleInit() {
+    // Additive migration only: retain existing contests and all user data.
+    await this.dataSource.query(`
+      ALTER TABLE "jeho_own"."contests"
+        ADD COLUMN IF NOT EXISTS "kind" varchar(24) NOT NULL DEFAULT 'challenge',
+        ADD COLUMN IF NOT EXISTS "bannerUrl" varchar(1024),
+        ADD COLUMN IF NOT EXISTS "goalDiamonds" integer NOT NULL DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS "scoringMode" varchar(24) NOT NULL DEFAULT 'coins',
+        ADD COLUMN IF NOT EXISTS "challengeType" varchar(24) NOT NULL DEFAULT 'individual',
+        ADD COLUMN IF NOT EXISTS "allowedGiftIds" jsonb,
+        ADD COLUMN IF NOT EXISTS "milestones" jsonb,
+        ADD COLUMN IF NOT EXISTS "prizes" jsonb,
+        ADD COLUMN IF NOT EXISTS "sideA" jsonb,
+        ADD COLUMN IF NOT EXISTS "sideB" jsonb,
+        ADD COLUMN IF NOT EXISTS "rules" jsonb,
+        ADD COLUMN IF NOT EXISTS "isInteractive" boolean NOT NULL DEFAULT false
+    `);
+  }
 
   async ensureDefaults() {
     // Never clamp live contest prizes after dashboard edits.
@@ -304,6 +324,18 @@ export class ContestsService {
     scope?: 'global' | 'room' | 'agency';
     roomId?: string;
     agencyId?: string;
+    kind?: 'celebration' | 'event' | 'challenge';
+    bannerUrl?: string;
+    goalDiamonds?: number;
+    scoringMode?: 'coins' | 'diamonds' | 'gifts' | 'points';
+    challengeType?: 'individual' | 'host' | 'room_vs_room' | 'agency_vs_agency';
+    allowedGiftIds?: string[];
+    milestones?: Record<string, unknown>[];
+    prizes?: Record<string, unknown>[];
+    sideA?: Record<string, unknown> | null;
+    sideB?: Record<string, unknown> | null;
+    rules?: Record<string, unknown> | null;
+    isInteractive?: boolean;
   }) {
     const now = new Date();
     const hoursRaw = dto.hours != null ? Number(dto.hours) : NaN;
@@ -348,6 +380,18 @@ export class ContestsService {
         scope,
         roomId: scope === 'room' ? dto.roomId : null,
         agencyId: scope === 'agency' ? dto.agencyId : null,
+        kind: ['celebration', 'event', 'challenge'].includes(String(dto.kind)) ? String(dto.kind) : 'challenge',
+        bannerUrl: dto.bannerUrl?.trim() || null,
+        goalDiamonds: Math.max(0, Math.floor(Number(dto.goalDiamonds || 0))),
+        scoringMode: ['coins', 'diamonds', 'gifts', 'points'].includes(String(dto.scoringMode)) ? String(dto.scoringMode) : 'coins',
+        challengeType: ['individual', 'host', 'room_vs_room', 'agency_vs_agency'].includes(String(dto.challengeType)) ? String(dto.challengeType) : 'individual',
+        allowedGiftIds: Array.isArray(dto.allowedGiftIds) ? dto.allowedGiftIds.map(String).filter(Boolean) : null,
+        milestones: Array.isArray(dto.milestones) ? dto.milestones : null,
+        prizes: Array.isArray(dto.prizes) ? dto.prizes : null,
+        sideA: dto.sideA && typeof dto.sideA === 'object' ? dto.sideA : null,
+        sideB: dto.sideB && typeof dto.sideB === 'object' ? dto.sideB : null,
+        rules: dto.rules && typeof dto.rules === 'object' ? dto.rules : null,
+        isInteractive: dto.isInteractive === true,
       }),
     );
     return row;
@@ -368,6 +412,18 @@ export class ContestsService {
       scope: 'global' | 'room' | 'agency';
       roomId: string;
       agencyId: string;
+      kind: 'celebration' | 'event' | 'challenge';
+      bannerUrl: string;
+      goalDiamonds: number;
+      scoringMode: 'coins' | 'diamonds' | 'gifts' | 'points';
+      challengeType: 'individual' | 'host' | 'room_vs_room' | 'agency_vs_agency';
+      allowedGiftIds: string[];
+      milestones: Record<string, unknown>[];
+      prizes: Record<string, unknown>[];
+      sideA: Record<string, unknown> | null;
+      sideB: Record<string, unknown> | null;
+      rules: Record<string, unknown> | null;
+      isInteractive: boolean;
     }>,
   ) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
@@ -388,6 +444,27 @@ export class ContestsService {
     if (dto.scope !== undefined) contest.scope = dto.scope;
     if (dto.roomId !== undefined) contest.roomId = dto.roomId || null;
     if (dto.agencyId !== undefined) contest.agencyId = dto.agencyId || null;
+    if (dto.kind !== undefined) {
+      if (!['celebration', 'event', 'challenge'].includes(dto.kind)) throw new BadRequestException('نوع الفعالية غير صالح');
+      contest.kind = dto.kind;
+    }
+    if (dto.bannerUrl !== undefined) contest.bannerUrl = dto.bannerUrl?.trim() || null;
+    if (dto.goalDiamonds !== undefined) contest.goalDiamonds = Math.max(0, Math.floor(Number(dto.goalDiamonds) || 0));
+    if (dto.scoringMode !== undefined) {
+      if (!['coins', 'diamonds', 'gifts', 'points'].includes(dto.scoringMode)) throw new BadRequestException('طريقة الاحتساب غير صالحة');
+      contest.scoringMode = dto.scoringMode;
+    }
+    if (dto.challengeType !== undefined) {
+      if (!['individual', 'host', 'room_vs_room', 'agency_vs_agency'].includes(dto.challengeType)) throw new BadRequestException('نوع التحدي غير صالح');
+      contest.challengeType = dto.challengeType;
+    }
+    if (dto.allowedGiftIds !== undefined) contest.allowedGiftIds = Array.isArray(dto.allowedGiftIds) ? dto.allowedGiftIds.map(String).filter(Boolean) : null;
+    if (dto.milestones !== undefined) contest.milestones = Array.isArray(dto.milestones) ? dto.milestones : null;
+    if (dto.prizes !== undefined) contest.prizes = Array.isArray(dto.prizes) ? dto.prizes : null;
+    if (dto.sideA !== undefined) contest.sideA = dto.sideA && typeof dto.sideA === 'object' ? dto.sideA : null;
+    if (dto.sideB !== undefined) contest.sideB = dto.sideB && typeof dto.sideB === 'object' ? dto.sideB : null;
+    if (dto.rules !== undefined) contest.rules = dto.rules && typeof dto.rules === 'object' ? dto.rules : null;
+    if (dto.isInteractive !== undefined) contest.isInteractive = dto.isInteractive === true;
     if (contest.scope === 'room' && !contest.roomId) {
       throw new BadRequestException('roomId مطلوب لمسابقات الروم');
     }
