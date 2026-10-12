@@ -36,6 +36,8 @@ public class CpDiscoveryActivity extends ThemedActivity {
     private AppContainer container;
     private LinearLayout list;
     private String selectedType;
+    private TextView titleView;
+    private final List<TextView> filterChips = new ArrayList<>();
     private int loadGeneration;
 
     @Override protected void onCreate(@Nullable Bundle state) {
@@ -55,9 +57,9 @@ public class CpDiscoveryActivity extends ThemedActivity {
         back.setGravity(Gravity.CENTER);
         header.addView(back, new LinearLayout.LayoutParams(dp(44), dp(48)));
         back.setOnClickListener(v -> finish());
-        TextView title = text(selectedType == null ? "اكتشف علاقات CP" : "قسم " + labelFor(selectedType), 20, Color.rgb(74, 46, 35), true);
-        title.setGravity(Gravity.CENTER);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
+        titleView = text(selectedType == null ? "اكتشف علاقات CP" : "قسم " + labelFor(selectedType), 20, Color.rgb(74, 46, 35), true);
+        titleView.setGravity(Gravity.CENTER);
+        header.addView(titleView, new LinearLayout.LayoutParams(0, dp(48), 1));
         root.addView(header);
 
         TextView intro = text("أجمل الروابط تُبنى بالتفاعل الحقيقي", 14, Color.rgb(125, 96, 78), false);
@@ -77,12 +79,15 @@ public class CpDiscoveryActivity extends ThemedActivity {
             TextView chip = text(tab[0], 13, Color.rgb(93, 61, 44), true);
             chip.setGravity(Gravity.CENTER);
             chip.setPadding(dp(14), 0, dp(14), 0);
+            chip.setTag(tab[1]);
             chip.setBackground(round(Color.rgb(255, 238, 210), dp(22)));
+            filterChips.add(chip);
             LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(40));
             cp.setMargins(dp(4), 0, dp(4), 0);
             filters.addView(chip, cp);
             chip.setOnClickListener(v -> {
                 selectedType = tab[1].isEmpty() ? null : tab[1];
+                refreshFilterState();
                 loadRelationships();
             });
         }
@@ -96,7 +101,18 @@ public class CpDiscoveryActivity extends ThemedActivity {
         body.addView(list);
         root.addView(body, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
+        refreshFilterState();
         loadRelationships();
+    }
+
+    private void refreshFilterState() {
+        if (titleView != null) titleView.setText(selectedType == null ? "اكتشف علاقات CP" : "قسم " + labelFor(selectedType));
+        for (TextView chip : filterChips) {
+            String type = String.valueOf(chip.getTag());
+            boolean active = selectedType == null ? type.isEmpty() : selectedType.equals(type);
+            chip.setBackground(round(active ? Color.rgb(214, 160, 69) : Color.rgb(255, 238, 210), dp(22)));
+            chip.setTextColor(active ? Color.WHITE : Color.rgb(93, 61, 44));
+        }
     }
 
     private void loadRelationships() {
