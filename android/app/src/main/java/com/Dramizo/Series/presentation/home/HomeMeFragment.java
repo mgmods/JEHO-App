@@ -57,18 +57,7 @@ public class HomeMeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        // Only the «أنا» landing screen uses this shared section wallpaper.
-        // If no image is configured, retain the bundled original gradient.
-        String sectionWallpaper = RemoteTheme.backgroundUrl(requireContext(), "profile");
-        if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
-            Glide.with(this).load(sectionWallpaper).into(new CustomTarget<Drawable>() {
-                @Override public void onResourceReady(@NonNull Drawable resource,
-                        @Nullable Transition<? super Drawable> transition) {
-                    if (binding != null) binding.getRoot().setBackground(resource);
-                }
-                @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
-            });
-        }
+        applySectionWallpaper();
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(HomeViewModel.class);
@@ -108,6 +97,7 @@ public class HomeMeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        applySectionWallpaper();
         refreshMyRoom();
         if (subTab == SUB_RECENT) bindList();
         else viewModel.loadFollowingRooms();
@@ -127,6 +117,22 @@ public class HomeMeFragment extends Fragment {
         binding.dotSubFollowing.setVisibility(recent ? View.INVISIBLE : View.VISIBLE);
         if (sub == SUB_FOLLOWING) viewModel.loadFollowingRooms();
         bindList();
+    }
+
+    private void applySectionWallpaper() {
+        if (binding == null || !isAdded()) return;
+        String sectionWallpaper = RemoteTheme.backgroundUrl(requireContext(), "profile");
+        if (sectionWallpaper == null || sectionWallpaper.trim().isEmpty()) {
+            binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
+            return;
+        }
+        Glide.with(this).load(sectionWallpaper).into(new CustomTarget<Drawable>() {
+            @Override public void onResourceReady(@NonNull Drawable resource,
+                    @Nullable Transition<? super Drawable> transition) {
+                if (binding != null) binding.getRoot().setBackground(resource);
+            }
+            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+        });
     }
 
     private void refreshMyRoom() {
