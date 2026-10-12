@@ -201,9 +201,9 @@ public final class UserProfileCardSheet {
                 if (u.displayName != null && !u.displayName.isEmpty()) {
                     displayNameHold[0] = u.displayName;
                 }
-                AvatarCosmetics.bindAvatar(img, avatarHold[0]);
-                AvatarCosmetics.applyHostWear(
-                        frame, hostBadge, img, vipFrameHold[0], null, null, null);
+                AvatarCosmetics.bindProfileWear(
+                        userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
+                        null, null, Math.max(1, liveVip));
                 bindVipHead(vipHead, liveVip,
                         u.vipHeadUrl != null ? u.vipHeadUrl : VipStyle.fixedHeadPath(liveVip));
                 // Head owns: ride entry + VIP medal (Mikoo property head).
