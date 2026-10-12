@@ -134,8 +134,9 @@ public final class UserProfileCardSheet {
         AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipMedal(imgVipMedal, vipLevel, null);
         bindVipHead(vipHead, vipLevel, null);
-        AvatarCosmetics.bindStacked(img, frame, avatarHold[0], vipFrameHold[0]);
-        AvatarCosmetics.applyHostWear(frame, hostBadge, img, vipFrameHold[0], null, null, null);
+        AvatarCosmetics.bindProfileWear(
+                userCardHostSignal, img, frame, avatarHold[0], vipFrameHold[0],
+                null, null, Math.max(1, vipLevel));
         if (rowAgency != null) rowAgency.setVisibility(View.GONE);
         if (rowHostTasks != null) rowHostTasks.setVisibility(View.GONE);
         if (btnHi != null) btnHi.setVisibility(View.GONE);
