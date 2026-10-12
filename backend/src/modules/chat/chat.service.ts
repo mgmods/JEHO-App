@@ -446,6 +446,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         ? await manager.getRepository(ChatMessage)
             .createQueryBuilder('m')
             .where('m.senderId = :senderId', { senderId })
+            .andWhere('m.conversationId = :conversationId', { conversationId })
             .andWhere('m.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
             .getCount()
         : 0;
