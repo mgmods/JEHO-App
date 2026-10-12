@@ -262,6 +262,28 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          VALUES ($1,$2,$3,'active',0,1,now(),now(),now()) RETURNING *`,
         [request.fromUserId, request.toUserId, request.type],
       );
+      const [giftPointsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift_points.${request.type}`]);
+      const initialPoints = Number(giftPointsSetting?.value);
+      if (Number.isSafeInteger(initialPoints) && initialPoints > 0) {
+        await manager.query(
+          `INSERT INTO cp_point_events ("relationshipId","eventType","referenceType","referenceId",points,metadata,"createdAt")
+           VALUES ($1,'initiation_gift','cp_request',$2,$3,$4::jsonb,now())
+           ON CONFLICT ("referenceType","referenceId") DO NOTHING`,
+          [relationship.id, request.id, String(initialPoints), JSON.stringify({ giftId: request.giftId, giftName: request.giftName })],
+        );
+        const [levelsSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${request.type}`]);
+        let computedLevel = 1;
+        try {
+          const levels = JSON.parse(levelsSetting?.value || '[]') as Array<{ level: number; pointsRequired: number }>;
+          for (const item of levels) if (Number(item.pointsRequired) <= initialPoints) computedLevel = Math.max(computedLevel, Number(item.level) || 1);
+        } catch { /* keep safe baseline level */ }
+        const [maxSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${request.type}`]);
+        const configuredMax = Number(maxSetting?.value);
+        if (Number.isInteger(configuredMax) && configuredMax > 0) computedLevel = Math.min(computedLevel, configuredMax);
+        await manager.query('UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3', [String(initialPoints), computedLevel, relationship.id]);
+        relationship.points = String(initialPoints);
+        relationship.level = computedLevel;
+      }
       await manager.query(`UPDATE cp_requests SET status='accepted',"respondedAt"=now(),"relationshipId"=$2,"updatedAt"=now() WHERE id=$1`, [requestId, relationship.id]);
       return { requestId, status: 'accepted', relationship };
     });
