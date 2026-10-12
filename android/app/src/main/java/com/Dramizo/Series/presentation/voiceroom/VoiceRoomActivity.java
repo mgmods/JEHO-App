@@ -6647,19 +6647,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipUserCardMedal(imgVipMedal, vipLevel, null);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
-        // In-room profile card: always fixed VIP nobility frame (ud_vip_tou_N) when VIP.
-        // Mall/SVGA wear stays on seat mics via wearFrameUrl — not here.
+        HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
+        // Show the actual equipped mall frame first; fixed VIP art is only the fallback.
         final String[] chatVipFrame = {
-                VipStyle.profileNobilityFrameUrl(vipLevel, null)
+                frameUrl != null && !frameUrl.trim().isEmpty()
+                        ? frameUrl : VipStyle.profileNobilityFrameUrl(vipLevel, null)
         };
         bindVipUserCardHead(vipHead, vipLevel, null);
-        AvatarCosmetics.bindStacked(img, frame, avatarUrl, chatVipFrame[0]);
-        // Agency room: host signal only as overlay; VIP frame still fixed ud_vip_tou.
-        if (isAgencyRoom) {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], hostBadgeUrl, null, null);
-        } else {
-            AvatarCosmetics.applyHostWear(frame, hostBadge, img, chatVipFrame[0], null, null, null);
-        }
+        AvatarCosmetics.bindProfileWear(
+                userCardHostSignal, img, frame, avatarUrl, chatVipFrame[0],
+                null, null, Math.max(1, vipLevel));
         if (rowAgency != null) rowAgency.setVisibility(View.GONE);
         if (btnCopyId != null) {
             btnCopyId.setOnClickListener(v -> {
@@ -6688,17 +6685,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 runOnUiThread(() -> {
                     if (!dialog.isShowing()) return;
                     int liveVip = Math.max(0, r.data.vipLevel);
-                    chatVipFrame[0] = VipStyle.profileNobilityFrameUrl(liveVip, r.data.vipTouUrl);
-                    AvatarCosmetics.bindAvatar(img,
-                            r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl);
-                    AvatarCosmetics.applyHostWear(
-                            frame,
-                            hostBadge,
-                            img,
-                            chatVipFrame[0],
-                            isAgencyRoom ? r.data.hostBadgeUrl : null,
-                            null,
-                            isAgencyRoom ? r.data.hostBadgeMeta : null);
+                    chatVipFrame[0] = r.data.vipBadgeUrl != null
+                            && !r.data.vipBadgeUrl.trim().isEmpty()
+                            ? r.data.vipBadgeUrl
+                            : (frameUrl != null && !frameUrl.trim().isEmpty()
+                                    ? frameUrl : VipStyle.profileNobilityFrameUrl(liveVip, r.data.vipTouUrl));
+                    AvatarCosmetics.bindProfileWear(
+                            userCardHostSignal, img, frame,
+                            r.data.avatarUrl != null ? r.data.avatarUrl : avatarUrl,
+                            chatVipFrame[0], null, null, Math.max(1, liveVip));
                     bindVipUserCardHead(vipHead, liveVip,
                             r.data.vipHeadUrl != null ? r.data.vipHeadUrl
                                     : VipStyle.fixedHeadPath(liveVip));
