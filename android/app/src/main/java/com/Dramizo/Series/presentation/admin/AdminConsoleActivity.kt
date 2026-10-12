@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -63,6 +64,17 @@ class AdminConsoleActivity : ThemedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // System/device Back should navigate out of the current admin section first.
+        // Only leave the admin console when already on its home screen.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (currentSection != "home") {
+                    showHome()
+                } else {
+                    finish()
+                }
+            }
+        })
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
         if (!StaffRoleHelper.isSuper(user)) {
             Toast.makeText(this, "هذه الصفحة مخصصة للسوبر أدمن فقط", Toast.LENGTH_LONG).show()
