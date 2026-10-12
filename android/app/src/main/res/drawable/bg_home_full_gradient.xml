@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
+    <!-- Home-only warm champagne header fading into the neutral content surface. -->
     <gradient
         android:angle="270"
-        android:startColor="#FFF9E8"
-        android:centerColor="#FFFFFF"
-        android:endColor="#FFFDFB"
+        android:startColor="#FFFFE4A6"
+        android:centerColor="#FFFFF0D1"
+        android:endColor="#FFF7F8FA"
         android:centerX="0.5"
         android:centerY="0.72"
         android:type="linear" />
