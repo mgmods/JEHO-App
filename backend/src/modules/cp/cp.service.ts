@@ -300,6 +300,29 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
 
+
+  /** Award configured points when a committed normal gift is exchanged by active CP partners. */
+  async recordGiftInteraction(senderId: string, receiverId: string, giftSendId: string, totalCoins: number) {
+    if (!senderId || !receiverId || !giftSendId || senderId === receiverId) return;
+    const relationships = await this.dataSource.query(
+      `SELECT id,type FROM cp_relationships WHERE status='active'
+       AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1))`,
+      [senderId, receiverId],
+    );
+    for (const relationship of relationships) {
+      const [setting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.points.gift_send.${relationship.type}`],
+      );
+      const points = Number(setting?.value);
+      if (!Number.isSafeInteger(points) || points <= 0) continue;
+      await this.recordPoints(
+        relationship.id, 'gift_send', 'gift_send', `${giftSendId}:${relationship.id}`, points,
+        { senderId, receiverId, giftSendId, totalCoins: Math.max(0, Number(totalCoins) || 0) },
+      );
+    }
+  }
+
   /** Record a server-verified, idempotent points event; never exposed as a user-award endpoint. */
   async recordPoints(
     relationshipId: string,
