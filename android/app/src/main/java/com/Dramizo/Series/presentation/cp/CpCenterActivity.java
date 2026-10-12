@@ -48,6 +48,8 @@ public class CpCenterActivity extends ThemedActivity {
         c = ContainerProvider.from(this);
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        binding.btnDiscoverCp.setOnClickListener(v ->
+                startActivity(new Intent(this, CpDiscoveryActivity.class)));
         binding.btnBecomeCp.setOnClickListener(v -> {
             if (partner != null) {
                 confirmEndCp();
