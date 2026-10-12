@@ -76,6 +76,12 @@ export class CpService {
         [roomId, [userId, recipientId]],
       );
       if (Number(present[0]?.n || 0) !== 2) throw new BadRequestException('يجب أن يكون الطرفان موجودين في الغرفة نفسها');
+      const duplicate = await manager.query(
+        `SELECT id FROM cp_requests WHERE status='pending' AND type=$1
+         AND (("fromUserId"=$2 AND "toUserId"=$3) OR ("fromUserId"=$3 AND "toUserId"=$2)) LIMIT 1 FOR UPDATE`,
+        [type, userId, recipientId],
+      );
+      if (duplicate.length) throw new ConflictException('يوجد طلب CP معلّق بين الحسابين بالفعل');
       const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.price.${type}`]);
       const price = Number(priceRow?.value);
       if (!Number.isSafeInteger(price) || price <= 0) {
@@ -117,6 +123,16 @@ export class CpService {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
         return { id: requestId, status: 'rejected', refunded: true };
+      }
+      const active = await manager.query(
+        `SELECT id FROM cp_relationships WHERE status='active' AND type=$1
+         AND (("userAId"=$2 AND "userBId"=$3) OR ("userAId"=$3 AND "userBId"=$2)) LIMIT 1 FOR UPDATE`,
+        [request.type, request.fromUserId, request.toUserId],
+      );
+      if (active.length) {
+        await this.refund(manager, request);
+        await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
+        return { id: requestId, status: 'rejected', refunded: true, reason: 'relationship_already_active' };
       }
       const [relationship] = await manager.query(
         `INSERT INTO cp_relationships ("userAId","userBId",type,status,points,level,"startedAt","createdAt","updatedAt")
