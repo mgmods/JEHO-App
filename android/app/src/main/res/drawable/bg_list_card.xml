@@ -2,9 +2,9 @@
 <!-- Light list/card chip for white theme screens (not room chat). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="#FFF7F7F8" />
+    <solid android:color="#FFFFF0D1" />
     <corners android:radius="14dp" />
     <stroke
         android:width="1dp"
-        android:color="#FFE5E5EA" />
+        android:color="#FFE8C36A" />
 </shape>
