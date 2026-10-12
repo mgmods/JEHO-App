@@ -190,8 +190,12 @@ public class SplashActivity extends ThemedActivity {
             com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
         java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto> items =
                 new java.util.ArrayList<>();
-        if (theme != null && theme.splash != null && theme.splash.enabled
-                && theme.splash.items != null) {
+        // Older dashboard records may contain brand.splashUrl or backgrounds.splash
+        // without the newer "splash" object. Treat a missing object as enabled for
+        // backward compatibility; only an explicit enabled=false disables remote splash.
+        boolean splashEnabled = theme != null
+                && (theme.splash == null || theme.splash.enabled);
+        if (splashEnabled && theme.splash != null && theme.splash.items != null) {
             for (com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item : theme.splash.items) {
                 if (item != null && item.active && item.url != null && !item.url.trim().isEmpty()) {
                     items.add(item);
@@ -201,7 +205,7 @@ public class SplashActivity extends ThemedActivity {
                     Integer.compare(left.sortOrder, right.sortOrder));
         }
         if (!items.isEmpty()) return items.get(0);
-        if (theme != null && theme.splash != null && theme.splash.enabled
+        if (splashEnabled
                 && theme.brand != null && theme.brand.splashUrl != null
                 && !theme.brand.splashUrl.trim().isEmpty()) {
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
@@ -213,7 +217,7 @@ public class SplashActivity extends ThemedActivity {
         }
         // Compatibility with dashboard versions that stored one splash image
         // in backgrounds.splash rather than the newer splash.items collection.
-        if (theme != null && theme.splash != null && theme.splash.enabled
+        if (splashEnabled
                 && theme.backgrounds != null && theme.backgrounds.splash != null
                 && !theme.backgrounds.splash.trim().isEmpty()) {
             com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
