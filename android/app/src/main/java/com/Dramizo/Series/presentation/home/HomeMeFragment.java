@@ -1,6 +1,7 @@
 package com.Dramizo.Series.presentation.home;
 
 import android.graphics.drawable.Drawable;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -58,6 +59,7 @@ public class HomeMeFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         applySectionWallpaper();
+        bindProfileDashboard();
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(HomeViewModel.class);
@@ -71,7 +73,7 @@ public class HomeMeFragment extends Fragment {
         binding.recyclerMeRooms.setItemAnimator(null);
         binding.recyclerMeRooms.setItemViewCacheSize(12);
         binding.recyclerMeRooms.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        binding.recyclerMeRooms.setNestedScrollingEnabled(true);
+        binding.recyclerMeRooms.setNestedScrollingEnabled(false);
         binding.recyclerMeRooms.addItemDecoration(
                 new com.Dramizo.Series.util.RoomGridSpacingDecoration(Math.round(10 * d)));
         binding.recyclerMeRooms.setAdapter(roomAdapter);
@@ -117,6 +119,59 @@ public class HomeMeFragment extends Fragment {
         binding.dotSubFollowing.setVisibility(recent ? View.INVISIBLE : View.VISIBLE);
         if (sub == SUB_FOLLOWING) viewModel.loadFollowingRooms();
         bindList();
+    }
+
+
+    private void bindProfileDashboard() {
+        if (binding == null || !isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        AuthDtos.UserDto me = c.getSessionManager().getUser();
+        if (me != null) {
+            String name = me.displayName;
+            if (name == null || name.trim().isEmpty()) name = me.username;
+            if (name == null || name.trim().isEmpty()) name = "عضو جيهو";
+            binding.tvProfileName.setText(name);
+            String publicId = me.displayPublicId();
+            binding.tvProfileId.setText(publicId.isEmpty() ? "ID —" : "ID " + publicId);
+            String bio = me.bio;
+            binding.tvProfileBio.setText(bio == null || bio.trim().isEmpty()
+                    ? "أهلاً بك في جيهو" : bio.trim());
+            binding.tvProfileDiamonds.setText(String.valueOf(Math.max(0L, me.totalReceivedDiamonds)));
+            binding.tvProfileGold.setText(String.valueOf(Math.max(0L, me.totalSentCoins)));
+            binding.tvProfileVip.setText("VIP " + Math.max(0, me.vipLevel));
+            binding.tvProfileVerified.setVisibility(me.isAdmin
+                    || (me.staffRole != null && !me.staffRole.trim().isEmpty())
+                    ? View.VISIBLE : View.GONE);
+            if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
+                Glide.with(this).load(me.avatarUrl).placeholder(R.drawable.ic_default_avatar)
+                        .error(R.drawable.ic_default_avatar).into(binding.imgProfileAvatar);
+            } else {
+                binding.imgProfileAvatar.setImageResource(R.drawable.ic_default_avatar);
+            }
+        }
+
+        binding.imgProfileAvatar.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
+        binding.tvProfileName.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
+        binding.btnProfileSettings.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.SettingsActivity.class)));
+        binding.actionWallet.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.wallet.BagActivity.class)));
+        binding.actionVip.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.vip.VipActivity.class)));
+        binding.actionGifts.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.GiftHistoryActivity.class)));
+        binding.actionStore.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.StoreHubActivity.class)));
+        binding.actionEditProfile.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.EditProfileActivity.class)));
+        binding.actionSecurity.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.AccountSecurityActivity.class)));
+        binding.actionActivities.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.MyEventsActivity.class)));
+        binding.actionSupport.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.CustomerSupportActivity.class)));
     }
 
     private void applySectionWallpaper() {
