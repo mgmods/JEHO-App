@@ -267,6 +267,17 @@ public class ChatConversationActivity extends ThemedActivity {
         });
 
         binding.btnSend.setOnClickListener(v -> sendNow());
+        if (binding.btnPaidMessageRecharge != null) {
+            binding.btnPaidMessageRecharge.setOnClickListener(v ->
+                    com.Dramizo.Series.util.BalanceRedirect.openRecharge(this));
+        }
+        if (binding.btnDismissPaidMessageRecharge != null) {
+            binding.btnDismissPaidMessageRecharge.setOnClickListener(v -> {
+                if (binding.paidMessageRechargeBanner != null) {
+                    binding.paidMessageRechargeBanner.setVisibility(View.GONE);
+                }
+            });
+        }
         setupVoiceButton();
         binding.btnAttach.setOnClickListener(v -> showAttachPicker());
         if (binding.btnChatGift != null) {
@@ -341,6 +352,17 @@ public class ChatConversationActivity extends ThemedActivity {
             if (msg.contains("DM_GIFT_REQUIRED") || msg.contains("أرسل هدية أولاً")) {
                 Toast.makeText(this, R.string.send_gift_to_open_chat, Toast.LENGTH_LONG).show();
                 openGiftGateSheet();
+                return;
+            }
+            if (msg.contains("تحتاج إلى") && msg.contains("عملة")) {
+                if (binding.paidMessageRechargeBanner != null) {
+                    if (binding.tvPaidMessageRechargeText != null) {
+                        binding.tvPaidMessageRechargeText.setText(msg + " — اشحن رصيدك للمتابعة.");
+                    }
+                    binding.paidMessageRechargeBanner.setVisibility(View.VISIBLE);
+                } else {
+                    com.Dramizo.Series.util.BalanceRedirect.handle(this, msg);
+                }
                 return;
             }
             if (com.Dramizo.Series.util.BalanceRedirect.looksLikeInsufficient(msg)) {
