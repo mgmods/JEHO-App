@@ -1,5 +1,4 @@
 package com.Dramizo.Series.presentation.splash;
-
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
@@ -12,14 +11,6 @@ import android.util.Log;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
-import android.view.ViewGroup;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-import com.bumptech.glide.Glide;
-import com.bumptech.glide.load.DataSource;
-import com.bumptech.glide.load.engine.GlideException;
-import com.bumptech.glide.request.RequestListener;
-import com.bumptech.glide.request.target.Target;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
@@ -29,6 +20,7 @@ import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.auth.LoginActivity;
+import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
@@ -40,15 +32,15 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends ThemedActivity {
     private static final String TAG = "SplashActivity";
-    private static final long SPLASH_FALLBACK_MS = 5000L;
+    /** Keep splash short — never wait on network gates. */
+    private static final long SPLASH_MIN_MS = 350L;
+    private static final long SPLASH_MAX_MS = 1800L;
 
     private boolean navigated;
     private String pendingRoomId;
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
-    private long splashDurationMs = SPLASH_FALLBACK_MS;
-    private AppContainer appContainer;
 
     @Override
     protected boolean wantsEdgeToEdgeWallpaper() {
@@ -62,190 +54,42 @@ public class SplashActivity extends ThemedActivity {
             super.onCreate(savedInstanceState);
             InviteReferralHelper.captureInstallReferrer(this);
             parseDeepLink(getIntent());
-            // Keep this activity only as a startup/deep-link router; never render a splash UI.
-            forceLeaveSplash();
+            ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
+            setContentView(binding.getRoot());
+            EdgeToEdgeHelper.apply(this);
+            EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
+            EdgeToEdgeHelper.padBottom(binding.splashContent);
+            if (getWindow() != null) {
+                getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+                getWindow().setNavigationBarColor(
+                        androidx.core.content.ContextCompat.getColor(this, R.color.bg_light));
+            }
+
+            android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, SPLASH_MIN_MS);
+            binding.imgSplashLogo.startAnimation(logoIn);
+
+            // Stagger brand text + tagline for a calmer premiere.
+            if (binding.tvSplashBrand != null) {
+                AlphaAnimation brandFade = new AlphaAnimation(0f, 1f);
+                brandFade.setDuration(420L);
+                brandFade.setStartOffset(120L);
+                brandFade.setFillAfter(true);
+                binding.tvSplashBrand.startAnimation(brandFade);
+            }
+            if (binding.tvSplashTagline != null) {
+                AlphaAnimation tagFade = new AlphaAnimation(0f, 1f);
+                tagFade.setDuration(480L);
+                tagFade.setStartOffset(220L);
+                tagFade.setFillAfter(true);
+                binding.tvSplashTagline.startAnimation(tagFade);
+            }
+
+            mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
+            mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
         } catch (Throwable t) {
-            Log.e(TAG, "Startup routing failed", t);
+            Log.e(TAG, "Splash failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
         }
-    }
-
-    private AppContainer getAppContainer() {
-        if (appContainer == null) appContainer = new AppContainer(this);
-        return appContainer;
-    }
-
-    private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
-    }
-
-    private void scheduleSplashNavigation() {
-        mainHandler.removeCallbacksAndMessages(null);
-        mainHandler.postDelayed(this::prepareSession, splashDurationMs);
-        mainHandler.postDelayed(hardTimeout, splashDurationMs + 1500L);
-    }
-
-    private void refreshRemoteSplashFromServer(ActivitySplashBinding binding) {
-        try {
-            AppContainer c = getAppContainer();
-            c.getIoExecutor().execute(() -> {
-                try {
-                    com.Dramizo.Series.util.RemoteTheme.refreshFromApi(this, c.getConfigApi());
-                    com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto latest =
-                            resolveSplashItem(com.Dramizo.Series.util.RemoteTheme.getCached(this));
-                    runOnUiThread(() -> {
-                        if (navigated || isFinishing()) return;
-                        splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(latest);
-                        applyRemoteSplash(binding, latest);
-                        applySkipVisibility(binding,
-                                com.Dramizo.Series.util.RemoteTheme.getCached(this));
-                        scheduleSplashNavigation();
-                    });
-                } catch (Throwable t) {
-                    Log.w(TAG, "Remote splash refresh skipped", t);
-                }
-            });
-        } catch (Throwable t) {
-            Log.w(TAG, "Remote splash setup skipped", t);
-        }
-    }
-
-    private void applySkipVisibility(ActivitySplashBinding binding,
-            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
-        if (binding == null || binding.btnSplashSkip == null) return;
-        // Fail closed until the server/cached dashboard setting is known. This
-        // prevents the default Skip button from flashing on when the dashboard hid it.
-        boolean enabled = theme != null && theme.splash != null && theme.splash.skipEnabled;
-        binding.btnSplashSkip.setVisibility(
-                enabled ? android.view.View.VISIBLE : android.view.View.GONE);
-    }
-
-    /** Resolve from the exact theme response/cache used by this splash render. */
-    private com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto resolveSplashItem(
-            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto theme) {
-        java.util.List<com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto> items =
-                new java.util.ArrayList<>();
-        // Older dashboard records may contain brand.splashUrl or backgrounds.splash
-        // without the newer "splash" object. Treat a missing object as enabled for
-        // backward compatibility; only an explicit enabled=false disables remote splash.
-        boolean splashEnabled = theme != null
-                && (theme.splash == null || theme.splash.enabled);
-        if (splashEnabled && theme.splash != null && theme.splash.items != null) {
-            for (com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item : theme.splash.items) {
-                if (item != null && item.active && item.url != null && !item.url.trim().isEmpty()) {
-                    items.add(item);
-                }
-            }
-            java.util.Collections.sort(items, (left, right) ->
-                    Integer.compare(left.sortOrder, right.sortOrder));
-        }
-        if (!items.isEmpty()) return items.get(0);
-        if (splashEnabled
-                && theme.brand != null && theme.brand.splashUrl != null
-                && !theme.brand.splashUrl.trim().isEmpty()) {
-            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
-                    new com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto();
-            fallback.url = theme.brand.splashUrl;
-            fallback.durationSeconds = 5;
-            fallback.active = true;
-            return fallback;
-        }
-        // Compatibility with dashboard versions that stored one splash image
-        // in backgrounds.splash rather than the newer splash.items collection.
-        if (splashEnabled
-                && theme.backgrounds != null && theme.backgrounds.splash != null
-                && !theme.backgrounds.splash.trim().isEmpty()) {
-            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto fallback =
-                    new com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto();
-            fallback.url = theme.backgrounds.splash;
-            fallback.durationSeconds = 5;
-            fallback.active = true;
-            return fallback;
-        }
-        return null;
-    }
-
-    /**
-     * Load the dashboard image without hiding the bundled splash first.
-     * The remote image becomes visible only after Glide has decoded it.
-     * This prevents the full-screen white placeholder from flashing/showing on
-     * slow connections or when the dashboard asset is temporarily unavailable.
-     */
-    private void applyRemoteSplash(ActivitySplashBinding binding,
-            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto item) {
-        if (binding == null) return;
-        if (item == null || item.url == null || item.url.trim().isEmpty()) {
-            // A dashboard disable/removal must also clear a previously loaded remote image.
-            restoreBundledSplash(binding);
-            return;
-        }
-        try {
-            String rawUrl = item.url.trim();
-            if (rawUrl.startsWith("//")) rawUrl = "https:" + rawUrl;
-            String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(rawUrl);
-            if (resolved == null || resolved.trim().isEmpty()) {
-                restoreBundledSplash(binding);
-                return;
-            }
-
-            // Keep bundled artwork visible while the network image is loading.
-            binding.imgSplashRemote.setVisibility(android.view.View.GONE);
-            binding.imgSplashRemote.setImageDrawable(null);
-            binding.imgSplashLogo.setVisibility(android.view.View.VISIBLE);
-            binding.tvSplashBrand.setVisibility(android.view.View.VISIBLE);
-            binding.tvSplashTagline.setVisibility(android.view.View.VISIBLE);
-            binding.splashProgress.setVisibility(android.view.View.VISIBLE);
-
-            Log.d(TAG, "Loading dashboard splash image: " + resolved);
-            Glide.with(this)
-                    .load(resolved)
-                    .dontAnimate()
-                    .centerCrop()
-                    .listener(new RequestListener<android.graphics.drawable.Drawable>() {
-                        @Override
-                        public boolean onLoadFailed(
-                                GlideException e,
-                                Object model,
-                                Target<android.graphics.drawable.Drawable> target,
-                                boolean isFirstResource) {
-                            Log.e(TAG, "Dashboard splash image failed: " + resolved, e);
-                            runOnUiThread(() -> restoreBundledSplash(binding));
-                            return false;
-                        }
-
-                        @Override
-                        public boolean onResourceReady(
-                                android.graphics.drawable.Drawable resource,
-                                Object model,
-                                Target<android.graphics.drawable.Drawable> target,
-                                DataSource dataSource,
-                                boolean isFirstResource) {
-                            runOnUiThread(() -> {
-                                if (navigated || isFinishing()) return;
-                                binding.imgSplashRemote.setVisibility(android.view.View.VISIBLE);
-                                binding.imgSplashLogo.setVisibility(android.view.View.GONE);
-                                binding.tvSplashBrand.setVisibility(android.view.View.GONE);
-                                binding.tvSplashTagline.setVisibility(android.view.View.GONE);
-                                binding.splashProgress.setVisibility(android.view.View.GONE);
-                            });
-                            return false;
-                        }
-                    })
-                    .into(binding.imgSplashRemote);
-        } catch (Throwable t) {
-            Log.w(TAG, "Remote splash load failed; using bundled splash", t);
-            restoreBundledSplash(binding);
-        }
-    }
-
-    private void restoreBundledSplash(ActivitySplashBinding binding) {
-        if (binding == null || isFinishing() || navigated) return;
-        binding.imgSplashRemote.setImageDrawable(null);
-        binding.imgSplashRemote.setVisibility(android.view.View.GONE);
-        binding.imgSplashLogo.setVisibility(android.view.View.VISIBLE);
-        binding.tvSplashBrand.setVisibility(android.view.View.VISIBLE);
-        binding.tvSplashTagline.setVisibility(android.view.View.VISIBLE);
-        binding.splashProgress.setVisibility(android.view.View.VISIBLE);
     }
 
     @Override
@@ -314,7 +158,8 @@ public class SplashActivity extends ThemedActivity {
 
     private void prepareSession() {
         try {
-            AppContainer c = getAppContainer();
+            AppContainer c = ContainerProvider.from(this);
+            // Features + catalogs on IO — never block splash/main paint.
             c.getIoExecutor().execute(() -> {
                 try {
                     AppFeatures.refresh(c);
@@ -334,9 +179,10 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
+    /** Resume main flow when splash UI fails but tokens are still on disk. */
     private boolean tryResumeLoggedInSession() {
         try {
-            AppContainer c = getAppContainer();
+            AppContainer c = ContainerProvider.from(this);
             if (!c.getSessionManager().isLoggedIn()) return false;
             routeLoggedIn(c, c.getSessionManager().getUser());
             refreshSessionInBackground(c);
@@ -349,7 +195,7 @@ public class SplashActivity extends ThemedActivity {
     private void forceLeaveSplash() {
         if (navigated || isFinishing()) return;
         try {
-            AppContainer c = getAppContainer();
+            AppContainer c = ContainerProvider.from(this);
             if (c.getSessionManager().isLoggedIn()) {
                 routeLoggedIn(c, c.getSessionManager().getUser());
             } else {
@@ -376,6 +222,7 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
+    /** Refresh tokens + profile without holding the splash. */
     private void refreshSessionInBackground(AppContainer c) {
         c.getIoExecutor().execute(() -> {
             try {
@@ -397,6 +244,7 @@ public class SplashActivity extends ThemedActivity {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
+        // Resume voice room after process death / launcher reopen when still in a room.
         String activeRoom = null;
         try {
             activeRoom = com.Dramizo.Series.service.VoiceRoomForegroundService.activeRoomId(this);
