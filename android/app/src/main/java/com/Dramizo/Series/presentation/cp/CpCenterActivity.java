@@ -229,7 +229,8 @@ public class CpCenterActivity extends ThemedActivity {
                 if (result.data.isEmpty()) {
                     new androidx.appcompat.app.AlertDialog.Builder(this)
                             .setTitle("طلبات علاقات CP")
-                            .setMessage("لا توجد طلبات معلّقة حالياً.")
+                            .setMessage("لا توجد طلبات واردة معلّقة حالياً.")
+                            .setNeutralButton("الطلبات المرسلة", (d, w) -> showCpSentRequestsDialog())
                             .setPositiveButton("حسناً", null).show();
                     return;
                 }
@@ -261,7 +262,75 @@ public class CpCenterActivity extends ThemedActivity {
                                     .setNegativeButton("رفض وإرجاع المبلغ", (d, w) -> respondCpRequest(id, false))
                                     .setNeutralButton("لاحقاً", null).show();
                         })
+                        .setNeutralButton("الطلبات المرسلة", (d, w) -> showCpSentRequestsDialog())
                         .setPositiveButton("إغلاق", null).show();
+            });
+        });
+    }
+
+
+    private void showCpSentRequestsDialog() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpSentRequests());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (!result.success || result.data == null) {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل الطلبات المرسلة", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (result.data.isEmpty()) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("الطلبات المرسلة")
+                            .setMessage("لم ترسل أي طلب CP بعد.")
+                            .setPositiveButton("حسناً", null).show();
+                    return;
+                }
+                List<Map<String, Object>> rows = result.data;
+                List<Map<String, Object>> cancellable = new java.util.ArrayList<>();
+                List<String> labels = new java.util.ArrayList<>();
+                for (Map<String, Object> row : rows) {
+                    String status = valueOf(row.get("status"));
+                    String name = "عضو";
+                    Object raw = row.get("recipient");
+                    if (raw instanceof Map) {
+                        @SuppressWarnings("unchecked") Map<String, Object> peer = (Map<String, Object>) raw;
+                        name = valueOf(peer.get("displayName"));
+                        if (name.isEmpty()) name = valueOf(peer.get("username"));
+                    }
+                    String label = name + " — " + cpLabel(valueOf(row.get("type"))) + " · " + status;
+                    if ("pending".equals(status)) {
+                        label += " · إلغاء واسترداد";
+                        cancellable.add(row);
+                        labels.add(label);
+                    } else {
+                        labels.add(label);
+                        cancellable.add(null);
+                    }
+                }
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("الطلبات المرسلة")
+                        .setItems(labels.toArray(new String[0]), (d, which) -> {
+                            Map<String, Object> row = cancellable.get(which);
+                            if (row == null) return;
+                            String id = valueOf(row.get("id"));
+                            new androidx.appcompat.app.AlertDialog.Builder(this)
+                                    .setTitle("إلغاء طلب CP؟")
+                                    .setMessage("سيتم إلغاء الطلب وإرجاع المبلغ كاملاً إذا لم تتم معالجته.")
+                                    .setPositiveButton("إلغاء واسترداد", (a, b) -> cancelCpRequest(id))
+                                    .setNegativeButton("رجوع", null).show();
+                        })
+                        .setPositiveButton("إغلاق", null).show();
+            });
+        });
+    }
+
+    private void cancelCpRequest(String id) {
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().cancelCpRequest(id));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                Toast.makeText(this, result.success ? "تم إلغاء الطلب وإرجاع المبلغ" :
+                        (result.error != null ? result.error : "تعذر الإلغاء"), Toast.LENGTH_LONG).show();
+                if (result.success) loadPartner();
             });
         });
     }
