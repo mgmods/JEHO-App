@@ -6,6 +6,8 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -23,11 +25,14 @@ import com.google.gson.Gson;
 import com.bumptech.glide.request.target.CustomTarget;
 import com.bumptech.glide.request.transition.Transition;
 
+import java.util.concurrent.CopyOnWriteArrayList;
+
 /**
  * Applies APK-bundled visuals only. Dashboard remote theme is not used.
  */
 public final class RemoteTheme {
     private static volatile MiscDtos.ThemeDto cached;
+    private static final CopyOnWriteArrayList<Runnable> refreshListeners = new CopyOnWriteArrayList<>();
 
     private RemoteTheme() {}
 
@@ -48,6 +53,26 @@ public final class RemoteTheme {
         return defaults;
     }
 
+    /** Registers a lightweight callback for screens that display dashboard-controlled theme assets. */
+    public static void addRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.addIfAbsent(listener);
+    }
+
+    public static void removeRefreshListener(@Nullable Runnable listener) {
+        if (listener != null) refreshListeners.remove(listener);
+    }
+
+    private static void notifyRefreshListeners() {
+        new Handler(Looper.getMainLooper()).post(() -> {
+            for (Runnable listener : refreshListeners) {
+                try {
+                    listener.run();
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
     /** Downloads the dashboard-controlled theme once per app start; failures keep the last cache. */
     public static void refreshFromApi(Context context, com.Dramizo.Series.data.remote.api.ConfigApi api) {
         if (context == null || api == null) return;
@@ -57,6 +82,7 @@ public final class RemoteTheme {
             if (!result.success || result.data == null) return;
             cached = result.data;
             writeDisk(context, result.data);
+            notifyRefreshListeners();
         } catch (Throwable ignored) {
             // Remote configuration must never prevent the app from opening.
         }
