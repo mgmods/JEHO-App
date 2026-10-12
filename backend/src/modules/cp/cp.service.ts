@@ -26,6 +26,25 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     this.expiryTimer = null;
   }
 
+
+  async catalog() {
+    const rows = await this.dataSource.query(
+      `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
+    );
+    const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
+    return Object.values(CpType).map(type => {
+      const price = Number(settings[`cp.price.${type}`]);
+      const enabled = settings[`cp.enabled.${type}`] === 'true' && Number.isSafeInteger(price) && price > 0;
+      return {
+        type,
+        enabled,
+        priceCoins: enabled ? price : null,
+        giftId: settings[`cp.gift.${type}`] || null,
+        giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
+      };
+    });
+  }
+
   async discover(type?: CpType) {
     if (type && !TYPES.has(type)) throw new BadRequestException('نوع CP غير صالح');
     const where = type ? 'AND r.type = $1' : '';
