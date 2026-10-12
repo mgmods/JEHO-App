@@ -98,6 +98,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         [type, userId, recipientId],
       );
       if (duplicate.length) throw new ConflictException('يوجد طلب CP معلّق بين الحسابين بالفعل');
+      const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
+      if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
+        throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
+      }
       const [priceRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.price.${type}`]);
       const price = Number(priceRow?.value);
       if (!Number.isSafeInteger(price) || price <= 0) {
@@ -168,6 +172,50 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
     if (!result.length) throw new NotFoundException('العلاقة غير موجودة أو منتهية');
     return result[0];
+  }
+
+
+  /** Record a server-verified, idempotent points event; never exposed as a user-award endpoint. */
+  async recordPoints(
+    relationshipId: string,
+    eventType: string,
+    referenceType: string,
+    referenceId: string,
+    points: number,
+    metadata: Record<string, unknown> = {},
+  ) {
+    if (!Number.isSafeInteger(points) || points < 0 || !eventType || !referenceType || !referenceId) {
+      throw new BadRequestException('حدث النقاط غير صالح');
+    }
+    return this.dataSource.transaction(async manager => {
+      const [relationship] = await manager.query(
+        'SELECT * FROM cp_relationships WHERE id=$1 AND status=\'active\' FOR UPDATE',
+        [relationshipId],
+      );
+      if (!relationship) throw new NotFoundException('العلاقة غير نشطة');
+      const inserted = await manager.query(
+        `INSERT INTO cp_point_events ("relationshipId","eventType","referenceType","referenceId",points,metadata,"createdAt")
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,now())
+         ON CONFLICT ("referenceType","referenceId") DO NOTHING RETURNING id`,
+        [relationshipId, eventType, referenceType, referenceId, String(points), JSON.stringify(metadata)],
+      );
+      if (!inserted.length) return { relationshipId, duplicate: true, points: relationship.points, level: relationship.level };
+      const total = BigInt(String(relationship.points)) + BigInt(points);
+      const [levelConfig] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.levels.${relationship.type}`]);
+      let level = 1;
+      try {
+        const levels = JSON.parse(levelConfig?.value || '[]') as Array<{ level: number; pointsRequired: number }>;
+        for (const item of levels) if (Number(item.pointsRequired) <= Number(total)) level = Math.max(level, Number(item.level) || 1);
+      } catch { /* malformed admin config never blocks point ledger writes */ }
+      const [maxRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.max_level.${relationship.type}`]);
+      const maxLevel = Number(maxRow?.value);
+      if (Number.isInteger(maxLevel) && maxLevel > 0) level = Math.min(level, maxLevel);
+      await manager.query(
+        'UPDATE cp_relationships SET points=$1,level=$2,"updatedAt"=now() WHERE id=$3',
+        [total.toString(), level, relationshipId],
+      );
+      return { relationshipId, duplicate: false, points: total.toString(), level };
+    });
   }
 
   private async expireDueRequests() {
