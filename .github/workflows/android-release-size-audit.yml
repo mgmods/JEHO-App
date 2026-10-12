@@ -92,7 +92,7 @@ jobs:
       - name: Build release APKs for size measurement only
         working-directory: android
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL }}
+          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1' }}
         run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleRelease
 
       - name: Report APK sizes
