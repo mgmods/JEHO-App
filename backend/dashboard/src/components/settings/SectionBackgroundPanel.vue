@@ -1,7 +1,7 @@
 <template>
   <section class="settings-card">
     <h3 class="settings-card-title">خلفية الأقسام الرئيسية</h3>
-    <p class="form-text mb-3">صورة واحدة مشتركة لشاشات الرومات الرئيسية و«أنا» وقائمة الدردشات وقائمة الألعاب فقط. لا تُطبّق داخل الغرف أو المحادثات أو تفاصيل الألعاب.</p>
+    <p class="form-text mb-3">صورة واحدة مشتركة لخلفية الصفحة الرئيسية خلف البنر وكروت الرومات، وقسم «أنا»، وقائمة الرسائل والمحادثات الخاصة، والصفحة الرئيسية للألعاب. لا تُطبّق داخل غرف الصوت نفسها أو داخل واجهة اللعب.</p>
     <div v-if="previewUrl" class="mb-3">
       <img :src="previewUrl" alt="معاينة خلفية الأقسام" style="display:block;width:100%;max-height:280px;object-fit:cover;border-radius:12px" />
     </div>
