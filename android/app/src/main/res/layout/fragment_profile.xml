@@ -428,6 +428,7 @@
                     android:textSize="12sp" />
 
                 <TextView
+                    android:id="@+id/tvStaffPowersHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
@@ -446,7 +447,7 @@
                     android:gravity="center"
                     android:paddingHorizontal="14dp"
                     android:paddingVertical="12dp"
-                    android:text="فتح لوحة السوبر أدمن المركزية"
+                    android:text="لوحة سوبر أدمن"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     android:textStyle="bold"
