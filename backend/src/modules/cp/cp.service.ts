@@ -6,6 +6,7 @@ import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class CpService implements OnModuleInit, OnModuleDestroy {
@@ -163,7 +164,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const roomId = String(input?.roomId || '');
     const key = String(input?.idempotencyKey || '').trim();
     const type = input?.type;
-    if (!recipientId || !roomId || !key || key.length > 128 || !TYPES.has(type)) {
+    if (!UUID_REGEX.test(recipientId) || !UUID_REGEX.test(roomId) || !key || key.length > 128 || !TYPES.has(type)) {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
@@ -330,7 +331,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     points: number,
     metadata: Record<string, unknown> = {},
   ) {
-    if (!Number.isSafeInteger(points) || points < 0 || !eventType || !referenceType || !referenceId) {
+    if (!UUID_REGEX.test(relationshipId) || !Number.isSafeInteger(points) || points < 0 || !eventType || !referenceType || !referenceId) {
       throw new BadRequestException('حدث النقاط غير صالح');
     }
     return this.dataSource.transaction(async manager => {
