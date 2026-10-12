@@ -276,6 +276,40 @@ export class ContestsService implements OnModuleInit {
           ? Math.max(0, Math.floor(Number(context.diamondsAwarded || 0)))
           : amount;
       if (scoreDelta <= 0) continue;
+      // Team-vs-team challenges keep side totals on the configured challenge
+      // record; no user-provided room/agency IDs are trusted without matching
+      // the dashboard's explicit side membership lists.
+      if (c.challengeType === 'room_vs_room' || c.challengeType === 'agency_vs_agency') {
+        const isRoomBattle = c.challengeType === 'room_vs_room';
+        const key = isRoomBattle ? 'roomIds' : 'agencyIds';
+        const candidate = isRoomBattle ? context.roomId : context.agencyId;
+        if (!candidate) continue;
+        const sideAIds = Array.isArray((c.sideA as any)?.[key]) ? (c.sideA as any)[key].map(String) : [];
+        const sideBIds = Array.isArray((c.sideB as any)?.[key]) ? (c.sideB as any)[key].map(String) : [];
+        const sideKey = sideAIds.includes(String(candidate)) ? 'sideA' : sideBIds.includes(String(candidate)) ? 'sideB' : null;
+        if (!sideKey) continue;
+        const side = { ...((c[sideKey] as Record<string, unknown> | null) || {}) };
+        side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
+        (c as any)[sideKey] = side;
+        await this.contestsRepo.save(c);
+        const payload = {
+          contestId: c.id,
+          challengeType: c.challengeType,
+          sideA: c.sideA,
+          sideB: c.sideB,
+          delta: scoreDelta,
+          roomId: context.roomId || null,
+          agencyId: context.agencyId || null,
+          at: occurredAt.toISOString(),
+        };
+        if (context.roomId) this.realtime?.emitToRoom(context.roomId, 'room:event', {
+          roomId: context.roomId,
+          event: 'contest:team-score',
+          payload,
+          at: payload.at,
+        });
+        continue;
+      }
       const entry = await this.entriesRepo.findOne({
         where: { contestId: c.id, userId },
       });
