@@ -73,6 +73,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     private int giftQty = 1;
 
     private final List<GiftRecipient> micRecipients = new ArrayList<>();
+    private final LinkedHashSet<String> selectedRecipientIds = new LinkedHashSet<>();
     private final List<String> lastTargets = new ArrayList<>();
     private final List<GiftDtos.GiftDto> allGifts = new ArrayList<>();
     @Nullable private String giftTypeFilter;
@@ -788,6 +789,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             selectedRecipient = micRecipients.get(0);
             receiverId = selectedRecipient.userId;
         }
+        selectedRecipientIds.clear();
+        if (receiverId != null && !receiverId.isEmpty()) selectedRecipientIds.add(receiverId);
         binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
         refreshSendBtn();
         updateDockText();
@@ -798,9 +801,18 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         sendToAllMic = false;
         selectedRecipient = r;
         receiverId = r.userId;
+        selectedRecipientIds.clear();
         if (binding != null) {
+            for (GiftRecipient target : binding.guavGiftUserAvatar.getSelectMicAccounts()) {
+                if (target != null && target.userId != null && !target.userId.isEmpty()) {
+                    selectedRecipientIds.add(target.userId);
+                }
+            }
+            // Defensive fallback if the strip has not finished updating yet.
+            if (selectedRecipientIds.isEmpty() && receiverId != null && !receiverId.isEmpty()) {
+                selectedRecipientIds.add(receiverId);
+            }
             binding.guavGiftUserAvatar.setPersonalAvatar(true);
-            binding.guavGiftUserAvatar.submit(micRecipients, receiverId, false);
         }
         refreshSendBtn();
         updateDockText();
@@ -815,6 +827,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             for (GiftRecipient r : micRecipients) {
                 if (r != null && r.userId != null && !r.userId.isEmpty()) ids.add(r.userId);
             }
+        } else if (!selectedRecipientIds.isEmpty()) {
+            ids.addAll(selectedRecipientIds);
         } else if (receiverId != null && !receiverId.isEmpty()) {
             ids.add(receiverId);
         }
@@ -938,10 +952,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
     }
 
     private int previewTargetCount() {
-        if (sendToAllMic) {
-            int n = uniqueMicCount();
-            return Math.max(1, n);
-        }
+        if (sendToAllMic) return Math.max(1, uniqueMicCount());
+        if (!selectedRecipientIds.isEmpty()) return selectedRecipientIds.size();
         return 1;
     }
 
@@ -986,7 +998,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         if (binding == null) return;
         boolean ok = selected != null && (sendToAllMic
                 ? !micRecipients.isEmpty()
-                : receiverId != null && !receiverId.isEmpty());
+                : !selectedRecipientIds.isEmpty()
+                || (receiverId != null && !receiverId.isEmpty()));
         boolean enabled = ok && !sending;
         binding.bltvSendGift.setEnabled(enabled);
         binding.bltvSendGift.setAlpha(enabled ? 1f : 0.45f);
@@ -1037,6 +1050,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     unique.add(r.userId);
             }
             targets.addAll(unique);
+        } else if (!selectedRecipientIds.isEmpty()) {
+            targets.addAll(selectedRecipientIds);
         } else if (receiverId != null && !receiverId.isEmpty()) {
             targets.add(receiverId);
         } else if (!chatMode && getActivity() instanceof GiftRecipientSource src) {
