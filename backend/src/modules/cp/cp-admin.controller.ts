@@ -77,12 +77,12 @@ export class CpAdminController {
     }
     const config: Record<string, unknown> = {};
     if (body.priceCoins !== undefined) config[`cp.price.${type}`] = String(body.priceCoins);
-    if (body.giftId !== undefined) config[`cp.gift.${body.type}`] = body.giftId;
-    if (body.giftPoints !== undefined) config[`cp.gift_points.${body.type}`] = String(body.giftPoints);
-    if (body.maxLevel !== undefined) config[`cp.max_level.${body.type}`] = String(body.maxLevel);
-    if (body.levels !== undefined) config[`cp.levels.${body.type}`] = JSON.stringify(body.levels);
-    if (body.enabled !== undefined) config[`cp.enabled.${body.type}`] = String(body.enabled);
-    if (body.rules !== undefined) config[`cp.rules.${body.type}`] = JSON.stringify(body.rules);
+    if (body.giftId !== undefined) config[`cp.gift.${type}`] = body.giftId;
+    if (body.giftPoints !== undefined) config[`cp.gift_points.${type}`] = String(body.giftPoints);
+    if (body.maxLevel !== undefined) config[`cp.max_level.${type}`] = String(body.maxLevel);
+    if (body.levels !== undefined) config[`cp.levels.${type}`] = JSON.stringify(body.levels);
+    if (body.enabled !== undefined) config[`cp.enabled.${type}`] = String(body.enabled);
+    if (body.rules !== undefined) config[`cp.rules.${type}`] = JSON.stringify(body.rules);
     await this.dataSource.transaction(async manager => {
       for (const [key, value] of Object.entries(config)) {
         await manager.query(
@@ -95,7 +95,7 @@ export class CpAdminController {
       await manager.query(
         `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
          VALUES ($1,'config_update','cp_type',$2,$3::jsonb,now())`,
-        [adminId, body.type, JSON.stringify({ keys: Object.keys(config) })],
+        [adminId, type, JSON.stringify({ keys: Object.keys(config) })],
       );
     });
     return this.getConfig();
