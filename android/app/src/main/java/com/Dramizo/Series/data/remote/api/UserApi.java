@@ -115,6 +115,12 @@ public interface UserApi {
     @GET("cp/me")
     Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
 
+    @GET("cp/sent-requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpSentRequests();
+
+    @POST("cp/requests/{id}/cancel")
+    Call<ApiResponse<Map<String, Object>>> cancelCpRequest(@Path("id") String id);
+
     @GET("cp/requests")
     Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
 
