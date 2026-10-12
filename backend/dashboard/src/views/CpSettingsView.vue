@@ -38,7 +38,10 @@
               <option value="">اختر هدية موجودة</option>
               <option v-for="gift in gifts" :key="gift.id" :value="gift.id">{{ gift.name }} · {{ gift.coinPrice ?? gift.price ?? '—' }}</option>
             </select>
-            <div v-if="selectedGift(item)" class="form-text">الهدية: {{ selectedGift(item).name }} · تُحفظ لقطة من الصورة والأنيميشن عند إرسال الطلب.</div>
+            <div v-if="selectedGift(item)" class="d-flex align-items-center gap-2 mt-2 small">
+              <img v-if="selectedGift(item).iconUrl" :src="selectedGift(item).iconUrl" :alt="selectedGift(item).name" width="40" height="40" style="object-fit:contain" />
+              <div>الهدية: {{ selectedGift(item).name }}<div class="form-text">تُحفظ لقطة من الصورة والأنيميشن عند إرسال الطلب.</div></div>
+            </div>
           </div>
           <div class="col-sm-6 col-xl-3">
             <label class="form-label">نقاط هدية البدء</label>
