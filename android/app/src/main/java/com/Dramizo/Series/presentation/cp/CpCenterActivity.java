@@ -3,13 +3,11 @@ package com.Dramizo.Series.presentation.cp;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
-import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivityCpCenterBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -346,79 +344,6 @@ public class CpCenterActivity extends ThemedActivity {
                         ? (accept ? "تم قبول الطلب وإنشاء العلاقة" : "تم رفض الطلب وإرجاع المبلغ")
                         : (result.error != null ? result.error : "تعذرت معالجة الطلب"), Toast.LENGTH_LONG).show();
                 if (result.success) loadPartner();
-            });
-        });
-    }
-
-    private void showSendCpDialog() {
-        EditText input = new EditText(this);
-        input.setHint("معرّف المستخدم أو الاسم");
-        input.setPadding(48, 32, 48, 32);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("إرسال طلب CP")
-                .setMessage("أدخل public ID أو اسم المستخدم. الطرف يقبل من الطلبات.")
-                .setView(input)
-                .setPositiveButton("إرسال", (d, w) -> {
-                    String q = input.getText() != null ? input.getText().toString().trim() : "";
-                    if (q.isEmpty()) {
-                        Toast.makeText(this, "أدخل معرّفاً صالحاً", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    sendCpRequest(q);
-                })
-                .setNegativeButton("إلغاء", null)
-                .setNeutralButton("طلباتي", (d, w) -> {
-                    Intent i = new Intent(this, RequestsActivity.class);
-                    i.putExtra(RequestsActivity.EXTRA_TAB, 2);
-                    startActivity(i);
-                })
-                .show();
-    }
-
-    private void sendCpRequest(String query) {
-        Toast.makeText(this, "جارٍ البحث...", Toast.LENGTH_SHORT).show();
-        c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<AuthDtos.UserDto>> search =
-                    ApiCall.execute(c.getUserApi().search(query, 1));
-            AuthDtos.UserDto target = null;
-            if (search.success && search.data != null && search.data.items != null) {
-                for (AuthDtos.UserDto u : search.data.items) {
-                    if (u == null) continue;
-                    if (query.equals(u.publicId) || query.equalsIgnoreCase(u.username)
-                            || query.equals(u.id)) {
-                        target = u;
-                        break;
-                    }
-                }
-                if (target == null && !search.data.items.isEmpty()) {
-                    target = search.data.items.get(0);
-                }
-            }
-            if (target == null || target.id == null) {
-                runOnUiThread(() -> Toast.makeText(this, "لم يتم العثور على المستخدم",
-                        Toast.LENGTH_SHORT).show());
-                return;
-            }
-            String myId = c.getSessionManager().getUserId();
-            if (myId != null && myId.equals(target.id)) {
-                runOnUiThread(() -> Toast.makeText(this, "لا يمكن إرسال طلب لنفسك",
-                        Toast.LENGTH_SHORT).show());
-                return;
-            }
-            Map<String, String> body = new HashMap<>();
-            body.put("type", "relation");
-            Result<Object> sent = ApiCall.execute(c.getUserApi().sendRequest(target.id, body));
-            final String name = target.displayName != null ? target.displayName : target.username;
-            runOnUiThread(() -> {
-                if (!sent.success) {
-                    Toast.makeText(this,
-                            sent.error != null ? sent.error : "فشل إرسال الطلب",
-                            Toast.LENGTH_LONG).show();
-                    return;
-                }
-                Toast.makeText(this,
-                        "تم إرسال طلب CP إلى " + name + " — ينتظر القبول",
-                        Toast.LENGTH_LONG).show();
             });
         });
     }
