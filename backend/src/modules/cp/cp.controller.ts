@@ -62,7 +62,7 @@ export class CpController {
   @Post('requests/:id/respond')
   respond(
     @CurrentUser('sub') userId: string,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('accept') accept: boolean,
   ) {
     if (typeof accept !== 'boolean') throw new BadRequestException('يجب تحديد القبول أو الرفض بشكل صريح');
@@ -70,7 +70,7 @@ export class CpController {
   }
 
   @Post(':id/end')
-  end(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+  end(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.cp.end(userId, id);
   }
 }
