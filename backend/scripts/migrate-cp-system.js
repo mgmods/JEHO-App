@@ -47,6 +47,11 @@ async function main() {
     )`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_request_recipient_status_expiry ON cp_requests("toUserId",status,"expiresAt")`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_request_sender_status ON cp_requests("fromUserId",status)`);
+    await client.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "giftId" uuid NULL');
+    await client.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "giftName" varchar(160) NULL');
+    await client.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "giftIconUrl" varchar(512) NULL');
+    await client.query('ALTER TABLE cp_requests ADD COLUMN IF NOT EXISTS "giftAnimationUrl" varchar(512) NULL');
+
     await client.query(`CREATE TABLE IF NOT EXISTS cp_audit_logs (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       "adminUserId" uuid NULL REFERENCES users(id) ON DELETE SET NULL,
