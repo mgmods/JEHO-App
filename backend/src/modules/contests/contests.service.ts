@@ -581,6 +581,77 @@ export class ContestsService implements OnModuleInit {
       });
       if (already) return;
 
+      const configuredPrizes = Array.isArray(contest.prizes) ? contest.prizes : [];
+      if (configuredPrizes.length) {
+        const maxRank = Math.min(100, Math.max(1, ...configuredPrizes.map((p) =>
+          Math.max(1, Math.floor(Number(p?.rank ?? p?.place ?? 1) || 1)),
+        )));
+        const ranked = await manager.find(ContestEntry, {
+          where: { contestId: contest.id },
+          order: { score: 'DESC', joinedAt: 'ASC' },
+          take: maxRank,
+        });
+        if (!ranked.length) return;
+        winnerId = ranked[0].userId;
+        for (let index = 0; index < configuredPrizes.length; index++) {
+          const prize = configuredPrizes[index] || {};
+          const rank = Math.max(1, Math.floor(Number(prize.rank ?? prize.place ?? 1) || 1));
+          const entrant = ranked[rank - 1];
+          if (!entrant) continue;
+          const minimumScore = Math.max(0, Number(prize.minimumScore || 0));
+          if (Number(entrant.score || 0) < minimumScore) continue;
+          const coins = Math.max(0, Math.floor(Number(prize.coins || 0)));
+          const diamonds = Math.max(0, Math.floor(Number(prize.diamonds || 0)));
+          if (coins <= 0 && diamonds <= 0) continue;
+          let prizeWallet = await manager.findOne(Wallet, {
+            where: { userId: entrant.userId },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!prizeWallet) {
+            prizeWallet = await manager.save(manager.create(Wallet, {
+              userId: entrant.userId, coins: 0, diamonds: 0,
+            }));
+            prizeWallet = await manager.findOne(Wallet, {
+              where: { userId: entrant.userId },
+              lock: { mode: 'pessimistic_write' },
+            });
+          }
+          if (!prizeWallet) continue;
+          if (coins > 0) prizeWallet.coins = Number(prizeWallet.coins || 0) + coins;
+          if (diamonds > 0) prizeWallet.diamonds = Number(prizeWallet.diamonds || 0) + diamonds;
+          await manager.save(prizeWallet);
+          const label = String(prize.label || prize.title || ('المركز ' + rank));
+          if (coins > 0) await manager.save(manager.create(WalletTransaction, {
+            userId: entrant.userId, type: TransactionType.LUCKY_REWARD,
+            currency: CurrencyType.COINS, amount: coins,
+            balanceAfter: Number(prizeWallet.coins || 0),
+            referenceType: 'contest_prize_stage_coins',
+            referenceId: contest.id + ':' + rank + ':' + index,
+            description: 'جائزة ' + label + ' — ' + contest.title,
+            metadata: { contestId: contest.id, rank, score: entrant.score, label },
+          }));
+          if (diamonds > 0) await manager.save(manager.create(WalletTransaction, {
+            userId: entrant.userId, type: TransactionType.LUCKY_REWARD,
+            currency: CurrencyType.DIAMONDS, amount: diamonds,
+            balanceAfter: Number(prizeWallet.diamonds || 0),
+            referenceType: 'contest_prize_stage_diamonds',
+            referenceId: contest.id + ':' + rank + ':' + index,
+            description: 'جائزة ' + label + ' — ' + contest.title,
+            metadata: { contestId: contest.id, rank, score: entrant.score, label },
+          }));
+        }
+        const markerWallet = await manager.findOne(Wallet, { where: { userId: ranked[0].userId } });
+        if (markerWallet) await manager.save(manager.create(WalletTransaction, {
+          userId: ranked[0].userId, type: TransactionType.LUCKY_REWARD,
+          currency: CurrencyType.COINS, amount: 0,
+          balanceAfter: Number(markerWallet.coins || 0),
+          referenceType: 'contest_prize', referenceId: contest.id,
+          description: 'تم تسوية جوائز: ' + contest.title,
+          metadata: { contestId: contest.id, configuredPrizes: configuredPrizes.length },
+        }));
+        return;
+      }
+
       const top = await manager.find(ContestEntry, {
         where: { contestId: contest.id },
         order: { score: 'DESC', joinedAt: 'ASC' },
