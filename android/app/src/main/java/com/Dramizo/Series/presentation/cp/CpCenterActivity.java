@@ -15,7 +15,6 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
-import com.Dramizo.Series.presentation.friends.RequestsActivity;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.util.ApiCall;
@@ -59,14 +58,6 @@ public class CpCenterActivity extends ThemedActivity {
         });
         binding.btnOpenInvite.setOnClickListener(v ->
                 startActivity(new Intent(this, InvitationActivity.class)));
-        binding.btnOpenInvite.setOnLongClickListener(v -> {
-            Intent i = new Intent(this, RequestsActivity.class);
-            i.putExtra(RequestsActivity.EXTRA_TAB, 2);
-            startActivity(i);
-            return true;
-        });
-        binding.btnCpWealth.setOnClickListener(v -> openRanking("rich"));
-        binding.btnCpCharm.setOnClickListener(v -> openRanking("popular"));
         binding.cardCpPartner.setOnClickListener(v -> {
             if (partner == null || partner.id == null) return;
             UserProfileCardSheet.show(
