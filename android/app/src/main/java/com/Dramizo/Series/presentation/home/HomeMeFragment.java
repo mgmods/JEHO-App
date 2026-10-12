@@ -159,11 +159,13 @@ public class HomeMeFragment extends Fragment {
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.wallet.BagActivity.class)));
         binding.actionVip.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.vip.VipActivity.class)));
-        binding.actionGifts.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.GiftHistoryActivity.class)));
+        binding.actionAgency.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.agency.AgencyActivity.class)));
+        binding.actionRechargeAgent.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.wallet.RechargeAgentActivity.class)));
         binding.actionStore.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.StoreHubActivity.class)));
-        binding.actionEditProfile.setOnClickListener(v ->
+        binding.actionEditProfileTop.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.EditProfileActivity.class)));
         binding.actionSecurity.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.AccountSecurityActivity.class)));
