@@ -215,6 +215,20 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
       const balance = Number(wallet.coins);
       if (balance < price) throw new BadRequestException('رصيد العملات غير كافٍ');
+      // Prevent repeated taps/network retries from charging the sender multiple times
+      // for the same active or still-pending relationship type.
+      const [activeRelationship] = await manager.query(
+        `SELECT id FROM cp_relationships WHERE status='active' AND type=$1
+         AND (("userAId"=$2 AND "userBId"=$3) OR ("userAId"=$3 AND "userBId"=$2)) LIMIT 1 FOR UPDATE`,
+        [type, userId, recipientId],
+      );
+      if (activeRelationship) throw new ConflictException('هذه العلاقة موجودة بالفعل بينكما');
+      const [pendingRequest] = await manager.query(
+        `SELECT id FROM cp_requests WHERE "fromUserId"=$1 AND "toUserId"=$2 AND type=$3
+         AND status='pending' AND "expiresAt" > now() LIMIT 1 FOR UPDATE`,
+        [userId, recipientId, type],
+      );
+      if (pendingRequest) throw new ConflictException('لديك طلب CP معلّق لهذا الشخص؛ ألغِه أو انتظر الرد أولاً');
       const [user] = await manager.query('SELECT id FROM users WHERE id = $1 AND status = $2', [recipientId, 'active']);
       if (!user) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
       const [request] = await manager.query(
