@@ -175,6 +175,14 @@ public final class RemoteTheme {
     @Nullable
     private static String backgroundField(MiscDtos.ThemeBackgrounds bg, String screenKey) {
         if (bg == null || screenKey == null) return null;
+        // One dashboard wallpaper can be shared by the four main tabs only.
+        if ("home".equals(screenKey) && notEmpty(bg.home)) return bg.home;
+        if ("profile".equals(screenKey) && notEmpty(bg.profile)) return bg.profile;
+        if ("chat".equals(screenKey) && notEmpty(bg.chat)) return bg.chat;
+        if ("games".equals(screenKey) && notEmpty(bg.games)) return bg.games;
+        if (("home".equals(screenKey) || "profile".equals(screenKey)
+                || "chat".equals(screenKey) || "games".equals(screenKey))
+                && notEmpty(bg.allSections)) return bg.allSections;
         switch (screenKey) {
             case "app": return bg.app;
             case "auth": return bg.auth;
