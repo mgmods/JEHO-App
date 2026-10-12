@@ -35,6 +35,7 @@ public class CpDiscoveryActivity extends ThemedActivity {
     private AppContainer container;
     private LinearLayout list;
     private String selectedType;
+    private int loadGeneration;
 
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
@@ -96,15 +97,17 @@ public class CpDiscoveryActivity extends ThemedActivity {
     }
 
     private void loadRelationships() {
+        final int generation = ++loadGeneration;
+        final String requestedType = selectedType;
         list.removeAllViews();
         TextView loading = text("جارٍ تحميل العلاقات الفعلية…", 14, Color.GRAY, false);
         loading.setGravity(Gravity.CENTER);
         loading.setPadding(0, dp(30), 0, dp(30));
         list.addView(loading);
         container.getIoExecutor().execute(() -> {
-            Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().discoverCp(selectedType));
+            Result<List<Map<String, Object>>> result = ApiCall.execute(container.getUserApi().discoverCp(requestedType));
             runOnUiThread(() -> {
-                if (isFinishing()) return;
+                if (isFinishing() || generation != loadGeneration) return;
                 list.removeAllViews();
                 if (!result.success || result.data == null) {
                     emptyState(result.error != null ? result.error : "تعذر تحميل العلاقات حالياً");
