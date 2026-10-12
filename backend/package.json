@@ -16,7 +16,8 @@
     "migrate:payments": "node scripts/migrate-payments-agents-theme.js",
     "migrate:dashboard-assets": "node scripts/migrate-dashboard-assets.js",
     "seed:catalog": "node scripts/upsert_catalog_pack.js",
-    "lint": "tsc -p tsconfig.json --noEmit"
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "migrate:cp-system": "node scripts/migrate-cp-system.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
