@@ -559,18 +559,19 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
         }
 
         if (showAvatar) {
-            AvatarCosmetics.bindAvatar(holder.b.imgAvatar, avatarUrl);
-            AvatarCosmetics.applyHostWear(
-                    holder.b.imgFrame,
-                    holder.b.imgHostBadge,
-                    holder.b.imgAvatar,
-                    frameUrl,
-                    hostBadgeUrl,
-                    frameMeta,
-                    hostBadgeMeta);
+            // Central wear binder keeps GIF/WebP animation and uses the native player for
+            // SVGA/video frames instead of silently flattening them in an ImageView.
+            AvatarCosmetics.bindWear(
+                    holder.b.imgAvatar, holder.b.imgFrame, avatarUrl, frameUrl,
+                    hostBadgeUrl, frameMeta, hostBadgeMeta);
             if (holder.b.imgFrame != null && frameUrl != null && !frameUrl.isEmpty()) {
                 holder.b.imgFrame.bringToFront();
             }
+        } else if (holder.b.imgAvatar != null && holder.b.imgFrame != null) {
+            // Clear any playback view retained by a recycled message row.
+            AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, null, null);
+            holder.b.imgAvatar.setVisibility(View.INVISIBLE);
+            holder.b.imgFrame.setVisibility(View.GONE);
         }
 
         holder.b.tvSender.setVisibility(View.GONE);
