@@ -759,13 +759,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
               where: { id: candidate.id },
               lock: { mode: 'pessimistic_write' },
             });
-            if (!paidTx || paidTx.referenceType !== 'paid_message' || Number(paidTx.amount) >= 0) return;
+            if (!paidTx || paidTx.referenceType !== 'paid_message' || Number(paidTx.amount) >= 0 || !paidTx.referenceId) return;
+            const paidMessageId = paidTx.referenceId;
             const alreadyRefunded = await manager.findOne(WalletTransaction, {
-              where: { userId: paidTx.userId, referenceType: 'paid_message_refund', referenceId: paidTx.referenceId },
+              where: { userId: paidTx.userId, referenceType: 'paid_message_refund', referenceId: paidMessageId },
             });
             if (alreadyRefunded) return;
 
-            const message = await manager.findOne(ChatMessage, { where: { id: paidTx.referenceId } });
+            const message = await manager.findOne(ChatMessage, { where: { id: paidMessageId } });
             if (!message) return;
             const metadata = (paidTx.metadata || {}) as Record<string, unknown>;
             const configuredMinutes = metadata.refundWindowMinutes !== undefined
