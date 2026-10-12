@@ -37,6 +37,7 @@ public class CpDiscoveryActivity extends ThemedActivity {
     private LinearLayout list;
     private String selectedType;
     private TextView titleView;
+    private TextView countView;
     private final List<TextView> filterChips = new ArrayList<>();
     private int loadGeneration;
 
@@ -60,12 +61,24 @@ public class CpDiscoveryActivity extends ThemedActivity {
         titleView = text(selectedType == null ? "اكتشف علاقات CP" : "قسم " + labelFor(selectedType), 20, Color.rgb(74, 46, 35), true);
         titleView.setGravity(Gravity.CENTER);
         header.addView(titleView, new LinearLayout.LayoutParams(0, dp(48), 1));
+        TextView refresh = text("↻", 24, Color.rgb(125, 78, 35), true);
+        refresh.setGravity(Gravity.CENTER);
+        header.addView(refresh, new LinearLayout.LayoutParams(dp(42), dp(48)));
+        refresh.setContentDescription("تحديث العلاقات");
+        refresh.setOnClickListener(v -> loadRelationships());
         root.addView(header);
 
         TextView intro = text("أجمل الروابط تُبنى بالتفاعل الحقيقي", 14, Color.rgb(125, 96, 78), false);
         intro.setGravity(Gravity.CENTER);
         intro.setPadding(dp(16), dp(4), dp(16), dp(16));
         root.addView(intro);
+        countView = text("العلاقات النشطة", 12, Color.rgb(143, 105, 60), true);
+        countView.setGravity(Gravity.CENTER);
+        countView.setPadding(dp(12), dp(8), dp(12), dp(8));
+        countView.setBackground(round(Color.rgb(255, 239, 216), dp(14)));
+        LinearLayout.LayoutParams countLp = new LinearLayout.LayoutParams(-1, -2);
+        countLp.setMargins(dp(14), 0, dp(14), dp(8));
+        root.addView(countView, countLp);
 
         ScrollView filtersScroll = new ScrollView(this);
         filtersScroll.setHorizontalScrollBarEnabled(false);
@@ -129,11 +142,13 @@ public class CpDiscoveryActivity extends ThemedActivity {
                 if (isFinishing() || generation != loadGeneration) return;
                 list.removeAllViews();
                 if (!result.success || result.data == null) {
-                    emptyState(result.error != null ? result.error : "تعذر تحميل العلاقات حالياً");
+                    countView.setText("تعذر جلب العلاقات");
+                    emptyState(result.error != null ? result.error : "تعذر تحميل العلاقات حالياً", true);
                     return;
                 }
+                countView.setText("عدد العلاقات النشطة: " + result.data.size() + (selectedType == null ? " · جميع الأقسام" : " · " + labelFor(selectedType)));
                 if (result.data.isEmpty()) {
-                    emptyState("لا توجد علاقات نشطة في هذا القسم بعد. ستظهر هنا العلاقات الحقيقية عند قبولها.");
+                    emptyState("لا توجد علاقات نشطة في هذا القسم بعد. ستظهر هنا العلاقات الحقيقية عند قبولها.", false);
                     return;
                 }
                 int rank = 1;
@@ -293,11 +308,21 @@ public class CpDiscoveryActivity extends ThemedActivity {
         return image;
     }
 
-    private void emptyState(String message) {
+    private void emptyState(String message, boolean canRetry) {
         TextView state = text(message, 14, Color.rgb(116, 96, 82), false);
         state.setGravity(Gravity.CENTER);
-        state.setPadding(dp(18), dp(36), dp(18), dp(36));
+        state.setPadding(dp(18), dp(36), dp(18), dp(18));
         list.addView(state);
+        if (canRetry) {
+            TextView retry = text("إعادة المحاولة", 14, Color.WHITE, true);
+            retry.setGravity(Gravity.CENTER);
+            retry.setPadding(dp(18), dp(12), dp(18), dp(12));
+            retry.setBackground(round(Color.rgb(190, 132, 42), dp(20)));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+            lp.gravity = Gravity.CENTER_HORIZONTAL;
+            list.addView(retry, lp);
+            retry.setOnClickListener(v -> loadRelationships());
+        }
     }
 
     private String nameOf(Map<String, Object> user) {
