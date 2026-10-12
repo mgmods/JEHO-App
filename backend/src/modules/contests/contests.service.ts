@@ -236,7 +236,7 @@ export class ContestsService implements OnModuleInit {
     userId: string,
     coinsSpent: number,
     kind: 'gifts' | 'rich' | 'popular' = 'gifts',
-    context: { roomId?: string; agencyId?: string; occurredAt?: Date | string } = {},
+    context: { roomId?: string; agencyId?: string; occurredAt?: Date | string; giftId?: string; quantity?: number; diamondsAwarded?: number } = {},
   ) {
     const amount = Math.max(0, Math.floor(Number(coinsSpent) || 0));
     if (amount <= 0) return;
@@ -268,6 +268,14 @@ export class ContestsService implements OnModuleInit {
             ? cat === 'rich'
             : cat === 'gifts' || cat === 'gift' || cat === 'rich';
       if (!match) continue;
+      const allowed = Array.isArray(c.allowedGiftIds) ? c.allowedGiftIds.map(String) : [];
+      if (allowed.length && (!context.giftId || !allowed.includes(String(context.giftId)))) continue;
+      const scoreDelta = c.scoringMode === 'gifts'
+        ? Math.max(0, Math.floor(Number(context.quantity || 1)))
+        : c.scoringMode === 'diamonds' || c.scoringMode === 'points'
+          ? Math.max(0, Math.floor(Number(context.diamondsAwarded || 0)))
+          : amount;
+      if (scoreDelta <= 0) continue;
       const entry = await this.entriesRepo.findOne({
         where: { contestId: c.id, userId },
       });
@@ -276,14 +284,14 @@ export class ContestsService implements OnModuleInit {
         .createQueryBuilder()
         .update()
         .set({
-          score: () => `CAST(CAST(COALESCE(score, '0') AS BIGINT) + ${amount} AS VARCHAR)`,
+          score: () => `CAST(CAST(COALESCE(score, '0') AS BIGINT) + ${scoreDelta} AS VARCHAR)`,
         })
         .where('id = :id', { id: entry.id })
         .execute();
       const payload = {
         contestId: c.id,
         userId,
-        delta: amount,
+        delta: scoreDelta,
         roomId: c.roomId,
         agencyId: c.agencyId,
         at: occurredAt.toISOString(),
