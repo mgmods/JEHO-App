@@ -59,8 +59,18 @@ public class ProfileFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        // This profile screen intentionally uses the requested pure-white design.
-        binding.getRoot().setBackgroundColor(android.graphics.Color.WHITE);
+        // The main "أنا" tab must use the dashboard's shared section wallpaper,
+        // behind profile cards (not only as an activity/window background).
+        String sectionWallpaper = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(
+                requireContext(), "profile");
+        if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
+            binding.imgThemeBg.setVisibility(View.VISIBLE);
+            com.Dramizo.Series.util.RemoteTheme.loadInto(
+                    binding.imgThemeBg, sectionWallpaper, R.drawable.bg_mikoo_page);
+        } else {
+            binding.imgThemeBg.setVisibility(View.GONE);
+            binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
+        }
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(ProfileViewModel.class);
 
