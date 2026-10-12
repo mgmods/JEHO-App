@@ -191,7 +191,7 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostMeta) {
         // HostSignalView: wing-flap motion for host badges AND VIP PNG frames (Mikoo-style).
         if (hostSignalView != null && frameUrl != null && !frameUrl.isEmpty()
-                && (isHostSignalUrl(frameUrl) || hostMeta != null || isWearFrameUrl(frameUrl))) {
+                && (shouldUseLiveWear(frameUrl) || hostMeta != null)) {
             bindHostLikeLive(hostSignalView, avatarView, frameView, avatarUrl, frameUrl, hostMeta, 1);
             return;
         }
@@ -210,6 +210,13 @@ public final class AvatarCosmetics {
             frameView.setImageDrawable(null);
             if (avatarView != null) resetWearTransform(avatarView);
         }
+    }
+
+    /** Keep still frames still; only playable media and native host frames use live rendering. */
+    private static boolean shouldUseLiveWear(@Nullable String url) {
+        return isHostSignalUrl(url)
+                || isAnimatedWearMedia(url)
+                || CosmeticMedia.isAnimatedWear(url);
     }
 
     public static boolean isHostSignalUrl(@Nullable String url) {
@@ -556,7 +563,8 @@ public final class AvatarCosmetics {
             avatarView.setTag(R.id.tag_wear_key, wearKey);
         }
         // Personal profile: animate VIP frame via HostSignalView when present.
-        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()) {
+        if (hostSignal != null && vipFrameUrl != null && !vipFrameUrl.isEmpty()
+                && shouldUseLiveWear(vipFrameUrl)) {
             boolean live = bindHostLikeLive(
                     hostSignal, avatarView, frameView, avatarUrl, vipFrameUrl, null,
                     Math.max(1, fallbackLevel));
@@ -601,7 +609,8 @@ public final class AvatarCosmetics {
         final String wearUrl = (agencyRoom && hasHost) ? hostBadgeUrl : vipFrameUrl;
         final Map<String, ?> wearMeta = (agencyRoom && hasHost) ? hostBadgeMeta : null;
 
-        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()) {
+        if (hostSignal != null && wearUrl != null && !wearUrl.isEmpty()
+                && (shouldUseLiveWear(wearUrl) || wearMeta != null)) {
             boolean live = bindHostLikeLive(
                     hostSignal, avatarView, frameView, avatarUrl, wearUrl, wearMeta,
                     fallbackLevel);
