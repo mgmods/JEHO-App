@@ -16,6 +16,7 @@ import { UserProfile } from '../../database/entities/user-profile.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
+import { Follow } from '../../database/entities/follow.entity';
 import { ModerationModule } from '../moderation/moderation.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { ModerationModule } from '../moderation/moderation.module';
       AppSetting,
       Wallet,
       WalletTransaction,
+      Follow,
     ]),
     RealtimeModule,
     NotificationsModule,
