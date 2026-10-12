@@ -32,17 +32,23 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
     );
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
-    return Object.values(CpType).map(type => {
+    const catalog = [];
+    for (const type of Object.values(CpType)) {
       const price = Number(settings[`cp.price.${type}`]);
-      const enabled = settings[`cp.enabled.${type}`] === 'true' && Number.isSafeInteger(price) && price > 0;
-      return {
-        type,
-        enabled,
-        priceCoins: enabled ? price : null,
-        giftId: settings[`cp.gift.${type}`] || null,
+      const giftId = settings[`cp.gift.${type}`] || null;
+      const [gift] = giftId ? await this.dataSource.query(
+        'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1',
+        [giftId],
+      ) : [];
+      const enabled = settings[`cp.enabled.${type}`] === 'true'
+        && Number.isSafeInteger(price) && price > 0 && !!gift;
+      catalog.push({
+        type, enabled, priceCoins: enabled ? price : null,
+        gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
-      };
-    });
+      });
+    }
+    return catalog;
   }
 
   async discover(type?: CpType) {
@@ -173,6 +179,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!Number.isSafeInteger(price) || price <= 0) {
         throw new BadRequestException('سعر هذا النوع غير محدد من لوحة التحكم بعد');
       }
+      const [giftSetting] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.gift.${type}`]);
+      const [gift] = giftSetting?.value
+        ? await manager.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1', [giftSetting.value])
+        : [];
+      if (!gift) throw new BadRequestException('يجب تحديد هدية فعلية لهذا النوع من لوحة التحكم');
       const [wallet] = await manager.query('SELECT id, coins FROM wallets WHERE "userId" = $1 FOR UPDATE', [userId]);
       if (!wallet) throw new NotFoundException('المحفظة غير موجودة');
       const balance = Number(wallet.coins);
@@ -180,9 +191,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const [user] = await manager.query('SELECT id FROM users WHERE id = $1 AND status = $2', [recipientId, 'active']);
       if (!user) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
       const [request] = await manager.query(
-        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","idempotencyKey","expiresAt","createdAt","updatedAt")
-         VALUES ($1,$2,$3,'pending',$4,$5,$6,now() + ($7 || ' minutes')::interval,now(),now()) RETURNING *`,
-        [userId, recipientId, type, roomId, String(price), key, String(expiryMinutes)],
+        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","giftId","giftName","giftIconUrl","giftAnimationUrl","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',$4,$5,$6,$7,$8,$9,$10,now() + ($11 || ' minutes')::interval,now(),now()) RETURNING *`,
+        [userId, recipientId, type, roomId, String(price), gift.id, gift.name, gift.iconUrl, gift.animationUrl, key, String(expiryMinutes)],
       );
       await manager.query('UPDATE wallets SET coins = coins - $1, "updatedAt" = now() WHERE "userId" = $2', [price, userId]);
       await manager.query(
