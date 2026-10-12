@@ -216,12 +216,20 @@ export class ContestsService {
     userId: string,
     coinsSpent: number,
     kind: 'gifts' | 'rich' | 'popular' = 'gifts',
-    context: { roomId?: string; agencyId?: string } = {},
+    context: { roomId?: string; agencyId?: string; occurredAt?: Date | string } = {},
   ) {
     const amount = Math.max(0, Math.floor(Number(coinsSpent) || 0));
     if (amount <= 0) return;
-    await this.refreshStatuses();
-    const active = await this.contestsRepo.find({ where: { status: 'active' } });
+    // Use the persisted server timestamp of the gift send, not the later async
+    // scoring time. This prevents delayed processing from moving a gift across
+    // the event's start/end boundary.
+    const occurredAt = context.occurredAt ? new Date(context.occurredAt) : new Date();
+    if (Number.isNaN(occurredAt.getTime())) return;
+    const active = await this.contestsRepo
+      .createQueryBuilder('contest')
+      .where('contest.startAt <= :occurredAt', { occurredAt })
+      .andWhere('contest.endAt >= :occurredAt', { occurredAt })
+      .getMany();
     for (const c of active) {
       if (c.scope === 'room' && (!context.roomId || c.roomId !== context.roomId)) {
         continue;
@@ -258,7 +266,7 @@ export class ContestsService {
         delta: amount,
         roomId: c.roomId,
         agencyId: c.agencyId,
-        at: new Date().toISOString(),
+        at: occurredAt.toISOString(),
       };
       this.realtime?.emitToUser(userId, 'contest:score', payload);
       if (c.scope === 'room' && c.roomId) {
