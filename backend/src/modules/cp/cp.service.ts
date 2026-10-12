@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
@@ -7,8 +7,24 @@ const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
 
 @Injectable()
-export class CpService {
+export class CpService implements OnModuleInit, OnModuleDestroy {
+  private expiryTimer: ReturnType<typeof setInterval> | null = null;
+
   constructor(private readonly dataSource: DataSource) {}
+
+  onModuleInit() {
+    // Expiry processing only touches CP requests and their wallet ledger rows.
+    this.expiryTimer = setInterval(() => {
+      void this.expireDueRequests().catch(() => undefined);
+    }, 60_000);
+    this.expiryTimer.unref?.();
+    void this.expireDueRequests().catch(() => undefined);
+  }
+
+  onModuleDestroy() {
+    if (this.expiryTimer) clearInterval(this.expiryTimer);
+    this.expiryTimer = null;
+  }
 
   async discover(type?: CpType) {
     if (type && !TYPES.has(type)) throw new BadRequestException('نوع CP غير صالح');
