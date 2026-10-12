@@ -30,11 +30,11 @@ async function main() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_relationship_user_b_status ON cp_relationships("userBId",status)`);
     await client.query(`CREATE TABLE IF NOT EXISTS cp_requests (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      "fromUserId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      "toUserId" uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      "fromUserId" uuid NOT NULL,
+      "toUserId" uuid NOT NULL,
       type varchar(24) NOT NULL CHECK (type IN ('friendship','brotherhood','love','engagement','marriage')),
       status varchar(16) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected','expired','cancelled')),
-      "roomId" uuid NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      "roomId" uuid NOT NULL,
       "priceCoins" bigint NOT NULL CHECK ("priceCoins" > 0),
       "idempotencyKey" varchar(128) NOT NULL UNIQUE,
       "expiresAt" timestamptz NOT NULL,
