@@ -119,7 +119,15 @@ public class SplashActivity extends ThemedActivity {
                 ViewCompat.requestApplyInsets(binding.btnSplashSkip);
             }
 
-            scheduleSplashNavigation();
+            // If a splash image is already cached, show it immediately. On a fresh
+            // install, wait for the dashboard config before starting the short splash
+            // timer; otherwise the app can navigate away before the image arrives.
+            if (splashItem != null) {
+                scheduleSplashNavigation();
+            } else {
+                mainHandler.removeCallbacks(hardTimeout);
+                mainHandler.postDelayed(hardTimeout, 12000L);
+            }
             refreshRemoteSplashFromServer(binding);
         } catch (Throwable t) {
             Log.e(TAG, "Splash failed", t);
