@@ -132,33 +132,4 @@
             android:textColor="@color/text_hint"
             android:textSize="12sp" />
     </LinearLayout>
-
-    <!-- Keep remote splash above all placeholder content; leave Skip above the image. -->
-    <ImageView
-        android:id="@+id/imgSplashRemote"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/white"
-        android:contentDescription="@null"
-        android:scaleType="centerCrop"
-        android:visibility="gone" />
-
-    <!-- Skip is anchored below the Android status bar, always at the top-left. -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnSplashSkip"
-        android:layout_width="wrap_content"
-        android:layout_height="44dp"
-        android:layout_gravity="top|start"
-        android:layout_marginStart="12dp"
-        android:layout_marginTop="8dp"
-        android:minWidth="92dp"
-        android:minHeight="44dp"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:text="تخطي"
-        android:textAllCaps="false"
-        android:textColor="@color/text_primary"
-        android:textSize="14sp"
-        android:backgroundTint="#E6FFFFFF"
-        android:visibility="gone" />
 </FrameLayout>
