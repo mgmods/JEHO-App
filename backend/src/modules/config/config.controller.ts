@@ -425,6 +425,14 @@ export class ConfigController {
         version,
         updatedAt,
       };
+      // Normalize only the four top-level section wallpapers. Detail screens
+      // (liveRoom, voiceRoom, createRoom) are deliberately left untouched.
+      if (next.backgrounds && typeof next.backgrounds === 'object') {
+        next.backgrounds = { ...next.backgrounds };
+        for (const key of ['home', 'profile', 'chat', 'games']) {
+          if (next.backgrounds[key]) next.backgrounds[key] = bust(next.backgrounds[key]);
+        }
+      }
       if (next.brand?.splashUrl) {
         next.brand = { ...next.brand, splashUrl: bust(next.brand.splashUrl) };
       }
