@@ -55,7 +55,7 @@ export class CpController {
   }
 
   @Post('requests/:id/cancel')
-  cancelRequest(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+  cancelRequest(@CurrentUser('sub') userId: string, @Param('id', ParseUUIDPipe) id: string) {
     return this.cp.cancelRequest(userId, id);
   }
 
