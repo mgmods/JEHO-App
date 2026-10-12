@@ -47,6 +47,10 @@
 
 
 
+        <template v-else-if="settingsTab === 'section-background'">
+          <SectionBackgroundPanel />
+        </template>
+
         <template v-else-if="settingsTab === 'zego'">
           <ZegoSettingsPanel />
         </template>
@@ -587,6 +591,7 @@ import PaymentSettingsPanel from '@/components/settings/PaymentSettingsPanel.vue
 import FourthwallPaymentPanel from '@/components/settings/FourthwallPaymentPanel.vue'
 import ShamCashPaymentPanel from '@/components/settings/ShamCashPaymentPanel.vue'
 import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
+import SectionBackgroundPanel from '@/components/settings/SectionBackgroundPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
 import { useAuthStore } from '@/stores/auth'
@@ -607,6 +612,7 @@ const settingTabs = computed(() => {
     { id: 'general', label: t('settings.tabGeneral'), icon: 'bi-sliders' },
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected' },
+    { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image' },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
