@@ -160,11 +160,9 @@ public class CpCenterActivity extends ThemedActivity {
             binding.tvCpPartnerName.setText(name);
             AvatarImageLoader.load(binding.imgCpPartner, partner.avatarUrl);
             binding.tvCpHeroTitle.setText("مساحة CP");
-            binding.tvCpHint.setText(String.format(Locale.US,
-                    "مرتبطان كـ CP · المستوى LV.%d\nنقاط الألفة: %,d (من هدايا CP بينكما)\n"
-                            + "أرسل هدايا تبويب CP في الغرفة لرفع المستوى.\n"
-                            + "اضغط البطاقة لملف الشريك.",
-                    bondLevel, bondScore));
+            binding.tvCpHint.setText("علاقة " + cpLabel(activeRelationshipType)
+                    + " · المستوى LV." + bondLevel + "\nنقاط العلاقة: " + bondScore
+                    + "\nاضغط البطاقة لعرض ملف الطرف الآخر.");
             binding.btnBecomeCp.setText("إنهاء CP");
         } else {
             binding.cardCpPartner.setVisibility(View.GONE);
@@ -184,8 +182,20 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+    private String cpLabel(String type) {
+        if (type == null) return "CP";
+        switch (type) {
+            case "friendship": return "الصداقة";
+            case "brotherhood": return "الأخوّة";
+            case "love": return "الحب";
+            case "engagement": return "الخطوبة";
+            case "marriage": return "الزواج";
+            default: return "CP";
+        }
+    }
+
     private void confirmEndCp() {
-        if (partner == null || partner.id == null) return;
+        if (partner == null || partner.id == null || activeRelationshipId == null) return;
         String name = partner.displayName != null ? partner.displayName : "الشريك";
         AuraDialogHelper.confirm(this,
                 "إنهاء CP",
@@ -193,7 +203,7 @@ public class CpCenterActivity extends ThemedActivity {
                 "إنهاء",
                 () -> c.getIoExecutor().execute(() -> {
                     Result<Object> r = ApiCall.execute(
-                            c.getUserApi().endBond(partner.id, "relation"));
+                            c.getUserApi().endCpRelationship(activeRelationshipId));
                     runOnUiThread(() -> {
                         Toast.makeText(this,
                                 r.success ? "تم إنهاء CP"
