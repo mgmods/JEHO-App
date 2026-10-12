@@ -156,15 +156,19 @@ public class GiftRecipientAdapter extends RecyclerView.Adapter<GiftRecipientAdap
         float alpha = selected ? 1f : 0.92f;
         holder.itemView.setAlpha(alpha);
         holder.itemView.setOnClickListener(v -> {
-            selectAll = false;
-            if (r.userId != null && !r.userId.isEmpty()) {
+            // Tapping a person while «الكل» is active switches to that person first.
+            if (selectAll) {
+                selectAll = false;
+                selectedUserIds.clear();
+                if (r.userId != null && !r.userId.isEmpty()) selectedUserIds.add(r.userId);
+            } else if (r.userId != null && !r.userId.isEmpty()) {
                 if (!selectedUserIds.add(r.userId)) {
                     selectedUserIds.remove(r.userId);
                 }
                 // Keep at least one explicit recipient selected for a valid send target.
                 if (selectedUserIds.isEmpty()) selectedUserIds.add(r.userId);
-                selectedUserId = r.userId;
             }
+            selectedUserId = r.userId;
             notifyDataSetChanged();
             if (listener != null) listener.onRecipientSelected(r);
         });
