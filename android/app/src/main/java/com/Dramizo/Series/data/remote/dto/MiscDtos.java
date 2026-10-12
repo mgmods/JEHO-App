@@ -423,7 +423,7 @@ public final class MiscDtos {
 
     public static class SplashConfigDto {
         @SerializedName("enabled") public boolean enabled = true;
-        @SerializedName("skipEnabled") public boolean skipEnabled = true;
+        @SerializedName("skipEnabled") public boolean skipEnabled = false;
         @SerializedName("items") public List<SplashItemDto> items;
     }
 
