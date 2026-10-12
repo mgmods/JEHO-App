@@ -125,6 +125,18 @@
                 android:textSize="14sp" />
 
             <TextView
+                android:id="@+id/btnCpRequests"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/bg_lucky_win_btn"
+                android:gravity="center"
+                android:text="طلبات علاقات CP"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
                 android:id="@+id/btnBecomeCp"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
