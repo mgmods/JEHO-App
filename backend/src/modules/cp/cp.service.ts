@@ -224,7 +224,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       await manager.query('UPDATE wallets SET coins = coins - $1, "updatedAt" = now() WHERE "userId" = $2', [price, userId]);
       await manager.query(
         `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
-         VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6::json,now())`,
+         VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
         [userId, price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, roomId })],
       );
       return request;
@@ -388,7 +388,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const amount = Number(request.priceCoins);
     const inserted = await manager.query(
       `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
-       VALUES ($1,'refund','coins',$2,$3,'cp_request_refund',$4,'استرداد هدية CP',$5::json,now())
+       VALUES ($1,'refund','coins',$2,$3,'cp_request_refund',$4,'استرداد هدية CP',$5,now())
        ON CONFLICT ("userId","referenceType","referenceId") WHERE "referenceType" IS NOT NULL AND "referenceId" IS NOT NULL DO NOTHING
        RETURNING id`,
       [request.fromUserId, amount, balance + amount, request.id, JSON.stringify({ cpRequestId: request.id, reason: request.status })],
