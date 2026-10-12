@@ -70,19 +70,26 @@ export class ChatService {
   }
 
   private async paidMessageConfig() {
-    const [enabledRow, freeRow, priceRow, discountRow, refundRow] = await Promise.all([
+    const [enabledRow, freeRow, priceRow, discountRow, refundMinutesRow, legacyRefundHoursRow] = await Promise.all([
       this.settingsRepo.findOne({ where: { key: 'paid_messages.enabled' } }),
       this.settingsRepo.findOne({ where: { key: 'paid_messages.free_count' } }),
       this.settingsRepo.findOne({ where: { key: 'paid_messages.price_coins' } }),
       this.settingsRepo.findOne({ where: { key: 'paid_messages.discount_percent' } }),
+      this.settingsRepo.findOne({ where: { key: 'paid_messages.refund_window_minutes' } }),
       this.settingsRepo.findOne({ where: { key: 'paid_messages.refund_window_hours' } }),
     ]);
     const enabled = ['true', '1', 'yes', 'on'].includes(String(enabledRow?.value || '').toLowerCase());
     const freeCount = Math.min(1000, Math.max(0, Math.floor(Number(freeRow?.value) || 0)));
     const basePrice = Math.min(10_000_000, Math.max(0, Math.floor(Number(priceRow?.value) || 0)));
     const discountPercent = Math.min(100, Math.max(0, Number(discountRow?.value) || 0));
-    const refundWindowHours = Math.min(168, Math.max(0, Number(refundRow?.value) || 0));
-    return { enabled, freeCount, basePrice, discountPercent, refundWindowHours };
+    // New dashboard setting is minutes (default 30); retain compatibility with
+    // deployments that still only have the legacy hours key.
+    const refundWindowMinutes = refundMinutesRow?.value !== undefined && refundMinutesRow?.value !== null
+      ? Math.min(10080, Math.max(0, Number(refundMinutesRow.value) || 0))
+      : legacyRefundHoursRow?.value !== undefined && legacyRefundHoursRow?.value !== null
+        ? Math.min(10080, Math.max(0, Number(legacyRefundHoursRow.value) || 0) * 60)
+        : 30;
+    return { enabled, freeCount, basePrice, discountPercent, refundWindowMinutes };
   }
 
   private async isGlobalDmGiftGateEnabled() {
@@ -470,7 +477,7 @@ export class ChatService {
               freeMessagesCount: paidConfig.freeCount,
               basePriceCoins: paidConfig.basePrice,
               discountPercent: paidConfig.discountPercent,
-              refundWindowHours: paidConfig.refundWindowHours,
+              refundWindowMinutes: paidConfig.refundWindowMinutes,
             },
           }),
         );
@@ -696,15 +703,18 @@ export class ChatService {
     });
     if (!paidTx || Number(paidTx.amount) >= 0) return 0;
 
-    const refundWindowHours = Math.max(
+    const metadata = (paidTx.metadata || {}) as any;
+    const refundWindowMinutes = Math.max(
       0,
-      Number((paidTx.metadata as any)?.refundWindowHours || 0),
+      metadata.refundWindowMinutes !== undefined
+        ? Number(metadata.refundWindowMinutes) || 0
+        : (Number(metadata.refundWindowHours) || 0) * 60,
     );
-    if (refundWindowHours <= 0) return 0;
+    if (refundWindowMinutes <= 0) return 0;
 
     const createdAt = new Date(message.createdAt).getTime();
     const ageMs = Date.now() - createdAt;
-    if (ageMs < 0 || ageMs > refundWindowHours * 60 * 60 * 1000) return 0;
+    if (ageMs < 0 || ageMs > refundWindowMinutes * 60 * 1000) return 0;
 
     const refundReferenceType = 'paid_message_refund';
     const existingRefund = await manager.findOne(WalletTransaction, {
@@ -739,7 +749,7 @@ export class ChatService {
         description: 'استرداد رسالة مدفوعة',
         metadata: {
           paidTransactionId: paidTx.id,
-          refundWindowHours,
+          refundWindowMinutes,
         },
       }),
     );
