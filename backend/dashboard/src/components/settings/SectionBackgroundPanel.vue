@@ -44,7 +44,7 @@ async function loadTheme() {
   const row = rows.find((item) => item.key === 'app_theme')
   try { themeConfig = row?.value ? JSON.parse(row.value) : {} } catch { themeConfig = {} }
   const bg = themeConfig.backgrounds || {}
-  savedUrl.value = bg.home || bg.profile || bg.chat || bg.games || ''
+  savedUrl.value = bg.allSections || bg.home || bg.profile || bg.chat || bg.games || ''
   previewUrl.value = makeAbsoluteUrl(savedUrl.value)
 }
 
