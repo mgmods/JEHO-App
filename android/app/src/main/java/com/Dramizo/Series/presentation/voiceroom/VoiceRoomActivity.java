@@ -399,6 +399,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             uri -> {
                 if (uri != null) uploadRoomCover(uri);
             });
+    private final ActivityResultLauncher<String> roomBackgroundPicker = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) uploadRoomBackground(uri);
+            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -8219,6 +8224,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         View progress = sheet.findViewById(R.id.progressBgPicker);
         TextView empty = sheet.findViewById(R.id.tvBgPickerEmpty);
+        TextView chooseFromPhone = sheet.findViewById(R.id.btnChooseRoomBackgroundFromPhone);
+        if (chooseFromPhone != null) {
+            boolean showPhonePicker = "room_background".equals(cosmeticType) && canManageRoom;
+            chooseFromPhone.setVisibility(showPhonePicker ? View.VISIBLE : View.GONE);
+            chooseFromPhone.setOnClickListener(v -> {
+                dialog.dismiss();
+                roomBackgroundPicker.launch("image/*");
+            });
+        }
         androidx.recyclerview.widget.RecyclerView recycler = sheet.findViewById(R.id.recyclerRoomBackgrounds);
         recycler.setLayoutManager(new GridLayoutManager(this, 2));
         int maxListH = Math.round(getResources().getDisplayMetrics().heightPixels * 0.48f);
@@ -12867,6 +12881,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void uploadRoomBackground(@NonNull android.net.Uri uri) {
+        if (roomId == null || roomId.isEmpty() || viewModel == null) return;
+        if (!canManageRoom) {
+            Toast.makeText(this, R.string.host_mode, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "جاري رفع خلفية الغرفة…", Toast.LENGTH_SHORT).show();
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                okhttp3.MultipartBody.Part part = AvatarImageLoader.multipartFromUri(
+                        getContentResolver(), uri, "file");
+                retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> resp =
+                        c.getUploadApi().upload(part).execute();
+                if (!resp.isSuccessful() || resp.body() == null || !resp.body().success
+                        || resp.body().data == null || resp.body().data.url == null
+                        || resp.body().data.url.isEmpty()) {
+                    throw new IllegalStateException("تعذر رفع خلفية الغرفة");
+                }
+                String url = resp.body().data.url;
+                runOnUiThread(() -> {
+                    if (isFinishing() || viewModel == null) return;
+                    viewModel.setBackground(roomId, url);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    Toast.makeText(this,
+                            e.getMessage() != null ? e.getMessage() : "تعذر رفع خلفية الغرفة",
+                            Toast.LENGTH_LONG).show();
+                });
+            }
+        });
     }
 
     private void uploadRoomCover(@NonNull android.net.Uri uri) {
