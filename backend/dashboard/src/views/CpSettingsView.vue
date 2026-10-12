@@ -86,6 +86,19 @@
       </section>
 
       <section class="settings-card mb-3">
+        <h3 class="settings-card-title">تعديل نقاط علاقة (إجراء إداري مسجّل)</h3>
+        <p class="form-text">يُستخدم للتصحيح الإداري فقط. لا يمنح المستخدم صلاحية إرسال نقاط لنفسه، وكل تعديل يسجل في سجل التدقيق.</p>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">معرّف العلاقة</label><input v-model.trim="pointForm.relationshipId" class="form-control font-monospace" dir="ltr" placeholder="UUID"></div>
+          <div class="col-md-3"><label class="form-label">النقاط</label><input v-model.number="pointForm.points" class="form-control" type="number" min="0" step="1"></div>
+          <div class="col-md-3"><label class="form-label">نوع الحدث</label><input v-model.trim="pointForm.eventType" class="form-control" placeholder="admin_adjustment"></div>
+          <div class="col-md-6"><label class="form-label">نوع المرجع الفريد</label><input v-model.trim="pointForm.referenceType" class="form-control" dir="ltr" placeholder="admin_adjustment"></div>
+          <div class="col-md-6"><label class="form-label">معرّف المرجع الفريد</label><input v-model.trim="pointForm.referenceId" class="form-control" dir="ltr" placeholder="Unique ID"></div>
+        </div>
+        <div class="mt-3 d-flex justify-content-end"><button class="btn btn-aurora" :disabled="savingPoints" @click="adjustPoints"><span v-if="savingPoints" class="spinner-border spinner-border-sm me-1" />تسجيل تعديل النقاط</button></div>
+      </section>
+
+      <section class="settings-card mb-3">
         <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
           <div>
             <h3 class="settings-card-title mb-1">طلبات CP وسجل الاسترداد</h3>
@@ -144,6 +157,8 @@ const loading = ref(false)
 const loadingLogs = ref(false)
 const saving = ref(false)
 const savingType = ref('')
+const savingPoints = ref(false)
+const pointForm = ref({ relationshipId: '', points: 0, eventType: 'admin_adjustment', referenceType: 'admin_adjustment', referenceId: '' })
 const error = ref('')
 const success = ref('')
 const policy = ref({ requestExpiryMinutes: 30, rulesText: '{}' })
@@ -218,6 +233,24 @@ async function savePolicy() {
     await load()
   } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر حفظ السياسة' }
   finally { saving.value = false }
+}
+
+
+async function adjustPoints() {
+  error.value = ''; success.value = ''
+  if (!pointForm.value.relationshipId || !pointForm.value.referenceId || !pointForm.value.referenceType || !pointForm.value.eventType ||
+      !Number.isSafeInteger(Number(pointForm.value.points)) || Number(pointForm.value.points) < 0) {
+    error.value = 'أكمل بيانات تعديل النقاط بشكل صحيح.'
+    return
+  }
+  savingPoints.value = true
+  try {
+    await cpAdminApi.adjustPoints({ ...pointForm.value, points: Number(pointForm.value.points), metadata: { source: 'dashboard_manual_adjustment' } })
+    success.value = 'تم تسجيل الحدث. إذا كان المرجع مستخدماً سابقاً فلن تُضاف النقاط مرتين.'
+    pointForm.value.referenceId = ''
+    await loadLogs()
+  } catch (e) { error.value = e?.response?.data?.message || e?.message || 'تعذر تسجيل تعديل النقاط' }
+  finally { savingPoints.value = false }
 }
 
 async function loadLogs() {
