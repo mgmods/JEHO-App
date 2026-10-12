@@ -194,7 +194,7 @@ public class CpCenterActivity extends ThemedActivity {
                 "هل تريد إنهاء ارتباط CP مع " + name + "؟",
                 "إنهاء",
                 () -> c.getIoExecutor().execute(() -> {
-                    Result<Object> r = ApiCall.execute(
+                    Result<Map<String, Object>> r = ApiCall.execute(
                             c.getUserApi().endCpRelationship(activeRelationshipId));
                     runOnUiThread(() -> {
                         Toast.makeText(this,
