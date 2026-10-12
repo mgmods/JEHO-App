@@ -216,6 +216,71 @@ public class CpCenterActivity extends ThemedActivity {
                 null);
     }
 
+
+    private void showCpRequestsDialog() {
+        c.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpRequests());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (!result.success || result.data == null) {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل الطلبات", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                if (result.data.isEmpty()) {
+                    new androidx.appcompat.app.AlertDialog.Builder(this)
+                            .setTitle("طلبات علاقات CP")
+                            .setMessage("لا توجد طلبات معلّقة حالياً.")
+                            .setPositiveButton("حسناً", null).show();
+                    return;
+                }
+                List<Map<String, Object>> rows = result.data;
+                String[] labels = new String[rows.size()];
+                for (int i = 0; i < rows.size(); i++) {
+                    Map<String, Object> row = rows.get(i);
+                    Object rawSender = row.get("sender");
+                    String senderName = "عضو";
+                    if (rawSender instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> sender = (Map<String, Object>) rawSender;
+                        senderName = valueOf(sender.get("displayName"));
+                        if (senderName.isEmpty()) senderName = valueOf(sender.get("username"));
+                    }
+                    labels[i] = senderName + " — " + cpLabel(valueOf(row.get("type")))
+                            + " · " + valueOf(row.get("priceCoins")) + " عملة";
+                }
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("طلبات علاقات CP")
+                        .setItems(labels, (dialog, which) -> {
+                            Map<String, Object> row = rows.get(which);
+                            String id = valueOf(row.get("id"));
+                            String senderName = labels[which];
+                            new androidx.appcompat.app.AlertDialog.Builder(this)
+                                    .setTitle("طلب علاقة جديد")
+                                    .setMessage(senderName + "\\nبقبولك، ستُنشأ العلاقة. إذا رفضت أو انتهت المهلة يُعاد المبلغ كاملاً لصاحب الطلب.")
+                                    .setPositiveButton("قبول", (d, w) -> respondCpRequest(id, true))
+                                    .setNegativeButton("رفض وإرجاع المبلغ", (d, w) -> respondCpRequest(id, false))
+                                    .setNeutralButton("لاحقاً", null).show();
+                        })
+                        .setPositiveButton("إغلاق", null).show();
+            });
+        });
+    }
+
+    private void respondCpRequest(String requestId, boolean accept) {
+        Map<String, Boolean> body = new HashMap<>();
+        body.put("accept", accept);
+        c.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                Toast.makeText(this, result.success
+                        ? (accept ? "تم قبول الطلب وإنشاء العلاقة" : "تم رفض الطلب وإرجاع المبلغ")
+                        : (result.error != null ? result.error : "تعذرت معالجة الطلب"), Toast.LENGTH_LONG).show();
+                if (result.success) loadPartner();
+            });
+        });
+    }
+
     private void showSendCpDialog() {
         EditText input = new EditText(this);
         input.setHint("معرّف المستخدم أو الاسم");
