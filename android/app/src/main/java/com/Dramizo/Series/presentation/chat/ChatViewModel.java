@@ -492,12 +492,38 @@ public class ChatViewModel extends ViewModel {
         messages.postValue(new ArrayList<>(merged.values()));
     }
 
+    private static long parseMessageTimestamp(String value) {
+        if (value == null || value.isEmpty()) return 0L;
+        try { return java.time.Instant.parse(value).toEpochMilli(); } catch (Exception ignored) {}
+        try { return java.time.OffsetDateTime.parse(value).toInstant().toEpochMilli(); } catch (Exception ignored) {}
+        return 0L;
+    }
+
     private synchronized void appendMessage(ChatDtos.MessageDto message) {
         if (message == null) return;
         if (message.id != null && isDismissed(message.id)) return;
         normalizeMine(message);
         List<ChatDtos.MessageDto> current = messages.getValue();
         List<ChatDtos.MessageDto> next = new ArrayList<>(current != null ? current : Collections.emptyList());
+        // Update paid-message reply status live when the other participant replies before deadline.
+        if (message.senderId != null && message.type != null
+                && !message.type.equalsIgnoreCase("gift") && !message.type.equalsIgnoreCase("system")) {
+            long replyAt = parseMessageTimestamp(message.createdAt);
+            if (replyAt > 0) {
+                boolean statusChanged = false;
+                for (ChatDtos.MessageDto prior : next) {
+                    if (prior == null || prior.paidCoins <= 0 || !"pending".equals(prior.paidStatus)
+                            || prior.senderId == null || prior.senderId.equals(message.senderId)) continue;
+                    long sentAt = parseMessageTimestamp(prior.createdAt);
+                    long deadline = parseMessageTimestamp(prior.replyDeadlineAt);
+                    if (sentAt > 0 && replyAt > sentAt && deadline > 0 && replyAt <= deadline) {
+                        prior.paidStatus = "replied";
+                        statusChanged = true;
+                    }
+                }
+                // The list below is always posted after this block, so the adapter refreshes its status labels.
+            }
+        }
 
         // Same id → update in place.
         if (message.id != null) {
