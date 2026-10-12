@@ -96,42 +96,59 @@ public class CpCenterActivity extends ThemedActivity {
 
     private void loadPartner() {
         c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.CpStatusDto> status = ApiCall.execute(c.getUserApi().myCp());
-            Result<List<MiscDtos.SocialRequestDto>> pending =
-                    ApiCall.execute(c.getUserApi().requests("relation"));
-            final int pendingCount = (pending.success && pending.data != null)
-                    ? pending.data.size() : 0;
+            Result<List<Map<String, Object>>> relationships = ApiCall.execute(c.getUserApi().myCpRelationships());
+            Result<List<Map<String, Object>>> pending = ApiCall.execute(c.getUserApi().cpRequests());
+            int pendingCount = pending.success && pending.data != null ? pending.data.size() : 0;
             AuthDtos.UserDto found = null;
+            String relationId = null;
+            String relationType = null;
             long score = 0;
-            int level = 0;
-            if (status.success && status.data != null && status.data.hasCp
-                    && status.data.partner != null) {
-                found = status.data.partner;
-                score = Math.max(0, status.data.bondScore);
-                level = Math.max(0, status.data.level);
-            } else if (!status.success) {
-                Result<List<MiscDtos.SocialRequestDto>> r =
-                        ApiCall.execute(c.getUserApi().relations("relation"));
-                if (r.success && r.data != null) {
-                    for (MiscDtos.SocialRequestDto row : r.data) {
-                        if (row != null && row.user != null) {
-                            found = row.user;
-                            break;
-                        }
-                    }
+            int level = 1;
+            if (relationships.success && relationships.data != null) {
+                for (Map<String, Object> row : relationships.data) {
+                    if (row == null || !"active".equals(String.valueOf(row.get("status")))) continue;
+                    Object raw = row.get("partner");
+                    if (!(raw instanceof Map)) continue;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> peer = (Map<String, Object>) raw;
+                    found = new AuthDtos.UserDto();
+                    found.id = valueOf(peer.get("id"));
+                    found.username = valueOf(peer.get("username"));
+                    found.displayName = valueOf(peer.get("displayName"));
+                    found.avatarUrl = valueOf(peer.get("avatarUrl"));
+                    relationId = valueOf(row.get("id"));
+                    relationType = valueOf(row.get("type"));
+                    score = longOf(row.get("points"));
+                    level = Math.max(1, (int) longOf(row.get("level")));
+                    break;
                 }
             }
-            final AuthDtos.UserDto partnerRes = found;
-            final long scoreRes = score;
-            final int levelRes = level;
+            final AuthDtos.UserDto partnerResult = found;
+            final String relationIdResult = relationId;
+            final String relationTypeResult = relationType;
+            final long scoreResult = score;
+            final int levelResult = level;
+            final int pendingResult = pendingCount;
             runOnUiThread(() -> {
                 if (isFinishing() || binding == null) return;
-                partner = partnerRes;
-                bondScore = scoreRes;
-                bondLevel = levelRes;
-                bindPartnerUi(pendingCount);
+                partner = partnerResult;
+                activeRelationshipId = relationIdResult;
+                activeRelationshipType = relationTypeResult;
+                bondScore = scoreResult;
+                bondLevel = levelResult;
+                binding.btnCpRequests.setText(pendingResult > 0 ? "طلبات علاقات CP (" + pendingResult + ")" : "طلبات علاقات CP");
+                bindPartnerUi(pendingResult);
             });
         });
+    }
+
+    private String valueOf(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private long longOf(Object value) {
+        try { return value == null ? 0L : Long.parseLong(String.valueOf(value)); }
+        catch (Exception ignored) { return 0L; }
     }
 
     private void bindPartnerUi(int pendingIncoming) {
