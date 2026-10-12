@@ -18,9 +18,9 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import com.Dramizo.Series.data.remote.api.AdminApi
 import com.Dramizo.Series.data.remote.dto.ApiResponse
 import com.Dramizo.Series.presentation.common.ContainerProvider
@@ -1194,7 +1194,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("تعذر قراءة الصورة")
             if (bytes.isEmpty() || bytes.size > 20 * 1024 * 1024) throw IllegalArgumentException("حجم الصورة يجب ألا يتجاوز 20 ميغابايت")
             val ext = when (mime.lowercase()) { "image/png" -> ".png"; "image/webp" -> ".webp"; "image/gif" -> ".gif"; else -> ".jpg" }
-            val part = MultipartBody.Part.createFormData("file", "admin-message-" + System.currentTimeMillis() + ext, RequestBody.create(MediaType.parse(mime), bytes))
+            val part = MultipartBody.Part.createFormData("file", "admin-message-" + System.currentTimeMillis() + ext, bytes.toRequestBody(mime.toMediaType()))
             ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
                 override fun onResponse(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>) {
                     notificationImageUploadInProgress = false
