@@ -168,6 +168,7 @@ const sections = computed(() => [
     items: [
       { name: 'reports', icon: 'bi-flag', label: t('nav.reports') },
       { name: 'notifications', icon: 'bi-bell', label: t('nav.notifications') },
+{ label: t('nav.cpSettings'), to: '/cp-settings', icon: 'heart' },
       { name: 'settings', icon: 'bi-gear', label: t('nav.settings'), settingsRoot: true },
       ...(auth.isSuperAdmin
         ? [{
