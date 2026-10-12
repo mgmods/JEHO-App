@@ -2073,6 +2073,9 @@ export class GiftsService implements OnModuleInit {
         roomId: dto.roomId,
         agencyId: taskRoom?.agencyId || undefined,
         occurredAt: result.send?.createdAt,
+        giftId: result.send?.giftId || gift.id,
+        quantity: result.send?.quantity || qty,
+        diamondsAwarded: result.send?.diamondsAwarded || 0,
       };
       // Finish scoring from the persisted gift row before returning the send
       // result, so end-of-event settlement sees the latest eligible gift.
@@ -2618,10 +2621,14 @@ export class GiftsService implements OnModuleInit {
           agencyId: room.agencyId || undefined,
         })
         .catch(() => undefined);
-      void this.contestsService
+      await this.contestsService
         ?.addScore(senderId, totalCoins, 'gifts', {
           roomId: dto.roomId,
           agencyId: room.agencyId || undefined,
+          occurredAt: result.sends?.[0]?.createdAt,
+          giftId: gift.id,
+          quantity: qty,
+          diamondsAwarded: Number(result.breakdown?.diamondPool || 0),
         })
         .catch(() => undefined);
       // Host target: all-mic gifts must count for the room host (was missing → under-target).
@@ -2653,10 +2660,14 @@ export class GiftsService implements OnModuleInit {
       }
       const perTargetCoins = coinPrice * qty;
       for (const rid of receiverIds) {
-        void this.contestsService
+        await this.contestsService
           ?.addScore(rid, perTargetCoins, 'popular', {
             roomId: dto.roomId,
             agencyId: room.agencyId || undefined,
+            occurredAt: result.sends?.find((send) => send.receiverId === rid)?.createdAt,
+            giftId: gift.id,
+            quantity: qty,
+            diamondsAwarded: Number(result.micShares?.[rid] || 0),
           })
           .catch(() => undefined);
       }
