@@ -466,6 +466,8 @@ public final class MiscDtos {
         @SerializedName("appNight") public String appNight;
         @SerializedName("homeHeader") public String homeHeader;
         @SerializedName("roomDefault") public String roomDefault;
+        /** Single shared wallpaper configured for the four main tabs only. */
+        @SerializedName("allSections") public String allSections;
     }
 
     public static class TickerDto {
