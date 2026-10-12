@@ -224,11 +224,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       );
       if (activeRelationship) throw new ConflictException('هذه العلاقة موجودة بالفعل بينكما');
       const [pendingRequest] = await manager.query(
-        `SELECT id FROM cp_requests WHERE "fromUserId"=$1 AND "toUserId"=$2 AND type=$3
-         AND status='pending' AND "expiresAt" > now() LIMIT 1 FOR UPDATE`,
+        `SELECT id FROM cp_requests WHERE
+           (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
+           AND type=$3 AND status='pending' AND "expiresAt" > now() LIMIT 1 FOR UPDATE`,
         [userId, recipientId, type],
       );
-      if (pendingRequest) throw new ConflictException('لديك طلب CP معلّق لهذا الشخص؛ ألغِه أو انتظر الرد أولاً');
+      if (pendingRequest) throw new ConflictException('يوجد طلب CP معلّق بينكما لهذا النوع؛ عالجوا الطلب الحالي أولاً');
       const [user] = await manager.query('SELECT id FROM users WHERE id = $1 AND status = $2', [recipientId, 'active']);
       if (!user) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
       const [request] = await manager.query(
