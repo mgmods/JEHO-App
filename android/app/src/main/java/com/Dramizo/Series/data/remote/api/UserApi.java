@@ -115,6 +115,18 @@ public interface UserApi {
     @POST("cp/{id}/end")
     Call<ApiResponse<Map<String, Object>>> endCpRelationship(@Path("id") String id);
 
+    @GET("cp/requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
+
+    @GET("cp/sent-requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpSentRequests();
+
+    @POST("cp/requests/{id}/cancel")
+    Call<ApiResponse<Map<String, Object>>> cancelCpRequest(@Path("id") String id);
+
+    @POST("cp/requests/{id}/respond")
+    Call<ApiResponse<Map<String, Object>>> respondCpRequest(@Path("id") String id, @Body Map<String, Boolean> body);
+
     @GET("users/me/gender-verification")
     Call<ApiResponse<MiscDtos.GenderVerificationDto>> getGenderVerification();
 
