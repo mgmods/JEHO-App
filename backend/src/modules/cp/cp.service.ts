@@ -30,7 +30,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     if (type && !TYPES.has(type)) throw new BadRequestException('نوع CP غير صالح');
     const where = type ? 'AND r.type = $1' : '';
     const args = type ? [type] : [];
-    return this.dataSource.query(
+    const rows = await this.dataSource.query(
       `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
         json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl") AS "userA",
         json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl") AS "userB"
@@ -40,8 +40,38 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
        ORDER BY r.points DESC, r."startedAt" ASC LIMIT 100`,
       args,
     );
+    const types = [...new Set(rows.map((row: any) => String(row.type)))];
+    const configs: Record<string, Array<{ level: number; pointsRequired: number; reward?: string }>> = {};
+    for (const itemType of types) {
+      const [setting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.levels.${itemType}`],
+      );
+      try { configs[itemType] = JSON.parse(setting?.value || '[]'); }
+      catch { configs[itemType] = []; }
+    }
+    return rows.map((row: any) => {
+      const points = BigInt(String(row.points || 0));
+      const levels = (configs[row.type] || []).slice().sort((a, b) => Number(a.pointsRequired) - Number(b.pointsRequired));
+      const currentThreshold = levels.filter(item => Number(item.level) <= Number(row.level)).reduce((max, item) => Math.max(max, Number(item.pointsRequired) || 0), 0);
+      const next = levels.find(item => Number(item.level) > Number(row.level));
+      const nextThreshold = next ? BigInt(Math.max(0, Number(next.pointsRequired) || 0)) : null;
+      const span = nextThreshold === null ? 0n : (nextThreshold - BigInt(currentThreshold));
+      const progressed = points > BigInt(currentThreshold) ? points - BigInt(currentThreshold) : 0n;
+      const progressPercent = span > 0n ? Math.max(0, Math.min(100, Number((progressed * 10000n) / span) / 100)) : 100;
+      const startedAt = new Date(row.startedAt);
+      const durationDays = Number.isNaN(startedAt.getTime()) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
+      const rewardsUnlocked = levels.filter(item => Number(item.level) <= Number(row.level) && item.reward).map(item => ({ level: item.level, reward: item.reward }));
+      return {
+        ...row,
+        durationDays,
+        nextLevel: next ? Number(next.level) : null,
+        nextLevelPoints: nextThreshold === null ? null : nextThreshold.toString(),
+        progressPercent,
+        rewardsUnlocked,
+      };
+    });
   }
-
 
   async profileRelationships(userId: string) {
     return this.dataSource.query(
