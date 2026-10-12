@@ -377,8 +377,12 @@ public final class RemoteTheme {
         if (root == null) return;
         ImageView target = findBackgroundImageView(root);
         if (target != null) {
-            // Preserve XML artwork when no remote wallpaper URL is configured.
+            // Dashboard wallpaper ImageViews are intentionally GONE in XML until
+            // a URL is configured. Reveal the target before loadInto(), which
+            // deliberately skips GONE views to avoid waking unrelated placeholders.
             if (notEmpty(url)) {
+                target.setVisibility(View.VISIBLE);
+                target.setAlpha(1f);
                 loadInto(target, url, fallbackRes);
             }
             return;
