@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Param, UseGuards, BadRequestException } f
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
+import { CpService } from './cp.service';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators';
@@ -23,7 +24,7 @@ class CpTypeConfigDto {
 @Controller('admin/cp')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class CpAdminController {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource, private readonly cp: CpService) {}
 
   @Get('config')
   @ApiOperation({ summary: 'Read CP types and admin-configured prices, gifts, levels and rules' })
@@ -99,6 +100,27 @@ export class CpAdminController {
       );
     });
     return this.getConfig();
+  }
+
+
+  @Post('relationships/points')
+  @ApiOperation({ summary: 'Admin-only point adjustment recorded in the idempotent CP ledger' })
+  async adjustRelationshipPoints(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: { relationshipId: string; eventType: string; referenceType: string; referenceId: string; points: number; metadata?: Record<string, unknown> },
+  ) {
+    if (!body?.relationshipId || !body.eventType || !body.referenceType || !body.referenceId || !Number.isSafeInteger(body.points) || body.points < 0) {
+      throw new BadRequestException('بيانات نقاط العلاقة غير صالحة');
+    }
+    const result = await this.cp.recordPoints(
+      body.relationshipId, body.eventType, body.referenceType, body.referenceId, body.points, body.metadata || {},
+    );
+    await this.dataSource.query(
+      `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+       VALUES ($1,'points_adjustment','cp_relationship',$2,$3::jsonb,now())`,
+      [adminId, body.relationshipId, JSON.stringify({ eventType: body.eventType, referenceType: body.referenceType, referenceId: body.referenceId, points: body.points, duplicate: (result as any).duplicate })],
+    );
+    return result;
   }
 
   @Get('audit')
