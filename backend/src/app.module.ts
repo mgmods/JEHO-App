@@ -39,6 +39,7 @@ import { DramaModule } from './modules/drama/drama.module';
 import { HostTargetModule } from './modules/host-target/host-target.module';
 import { InvitesModule } from './modules/invites/invites.module';
 import { RoomCupModule } from './modules/room-cup/room-cup.module';
+import { CpModule } from './modules/cp/cp.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
