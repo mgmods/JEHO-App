@@ -8,7 +8,7 @@
     </item>
     <item android:top="2dp">
         <shape android:shape="rectangle">
-            <solid android:color="#FFFDFB" />
+            <gradient android:angle="270" android:startColor="#FFFFE4A6" android:centerColor="#FFFFF0D1" android:endColor="#FFF7F8FA" android:type="linear" />
             <corners android:topLeftRadius="28dp" android:topRightRadius="28dp" />
         </shape>
     </item>
