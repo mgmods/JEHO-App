@@ -6,104 +6,299 @@
     android:orientation="vertical"
     android:background="@drawable/bg_home_full_gradient">
 
-    <include
-        android:id="@+id/myRoomCardMe"
-        layout="@layout/include_my_room_card"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp" />
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp">
-
-        <LinearLayout
-            android:id="@+id/subRecentWrap"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingHorizontal="16dp">
-
-            <TextView
-                android:id="@+id/tvSubRecent"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/tab_recent"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <View
-                android:id="@+id/dotSubRecent"
-                android:layout_width="28dp"
-                android:layout_height="3dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_tab_dot_active" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/subFollowingWrap"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:paddingHorizontal="16dp">
-
-            <TextView
-                android:id="@+id/tvSubFollowing"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:alpha="0.5"
-                android:text="@string/home_section_following_rooms"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <View
-                android:id="@+id/dotSubFollowing"
-                android:layout_width="28dp"
-                android:layout_height="3dp"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/bg_tab_dot_active"
-                android:visibility="invisible" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <FrameLayout
+    <ScrollView
+        android:id="@+id/profileScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@drawable/bg_home_full_gradient">
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:paddingBottom="10dp">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recyclerMeRooms"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@android:color/transparent"
-            android:clipToPadding="false"
-            android:nestedScrollingEnabled="true"
-            android:overScrollMode="never"
-            android:paddingHorizontal="10dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="96dp"
-            tools:listitem="@layout/item_party_room" />
-
-        <TextView
-            android:id="@+id/tvMeEmpty"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:minHeight="120dp"
-            android:padding="24dp"
-            android:text="@string/home_empty_recent"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:visibility="gone" />
-    </FrameLayout>
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:paddingTop="12dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:layoutDirection="rtl"
+                android:padding="16dp"
+                android:background="@drawable/bg_profile_lux_card">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/imgProfileAvatar"
+                    android:layout_width="76dp"
+                    android:layout_height="76dp"
+                    android:contentDescription="@string/tab_me_home"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_default_avatar"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.Drama.Rounded8" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginHorizontal="12dp"
+                    android:orientation="vertical">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:id="@+id/tvProfileName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="عضو جيهو"
+                            android:textColor="#3B2B17"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvProfileVerified"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:text="✦"
+                            android:textColor="#C18A25"
+                            android:textSize="18sp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvProfileId"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="ID —"
+                        android:textColor="#806A4A"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvProfileBio"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:maxLines="2"
+                        android:ellipsize="end"
+                        android:text="أهلاً بك في جيهو"
+                        android:textColor="#69563B"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/btnProfileSettings"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:gravity="center"
+                    android:text="⚙"
+                    android:textColor="#8A6427"
+                    android:textSize="23sp"
+                    android:background="@drawable/bg_profile_lux_chip"
+                    android:contentDescription="الإعدادات"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:layoutDirection="rtl"
+                android:padding="12dp"
+                android:background="@drawable/bg_profile_lux_card">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="💎" android:textSize="22sp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="الألماس المستلم" android:textColor="#806A4A" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tvProfileDiamonds" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#49371D" android:textStyle="bold" android:textSize="15sp"/>
+                </LinearLayout>
+                <View android:layout_width="1dp" android:layout_height="52dp" android:layout_gravity="center_vertical" android:background="#DCCAA8"/>
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="🪙" android:textSize="22sp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="الذهب المرسل" android:textColor="#806A4A" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tvProfileGold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0" android:textColor="#49371D" android:textStyle="bold" android:textSize="15sp"/>
+                </LinearLayout>
+                <View android:layout_width="1dp" android:layout_height="52dp" android:layout_gravity="center_vertical" android:background="#DCCAA8"/>
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="👑" android:textSize="22sp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="مستوى VIP" android:textColor="#806A4A" android:textSize="11sp"/>
+                    <TextView android:id="@+id/tvProfileVip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="VIP 0" android:textColor="#49371D" android:textStyle="bold" android:textSize="15sp"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="خدماتك السريعة"
+                android:textColor="#49371D"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="4"
+                android:useDefaultMargins="false"
+                android:alignmentMode="alignMargins">
+
+                <LinearLayout android:id="@+id/actionWallet" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="💰"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="محفظتي"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/actionVip" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="👑"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="العضوية"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/actionGifts" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🎁"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="هداياي"/>
+                </LinearLayout>
+                <LinearLayout android:id="@+id/actionStore" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🛍"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="المتجر"/>
+                </LinearLayout>
+            </GridLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="الحساب والمساعدة"
+                android:textColor="#49371D"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/bg_profile_lux_card"
+                android:paddingHorizontal="12dp">
+
+                <LinearLayout android:id="@+id/actionEditProfile" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="✍️"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="تعديل الملف الشخصي"/>
+                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
+                </LinearLayout>
+                <View style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionSecurity" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🛡"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="الأمان والخصوصية"/>
+                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
+                </LinearLayout>
+                <View style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionActivities" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="✨"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="فعالياتي ومركز المهام"/>
+                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
+                </LinearLayout>
+                <View style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionSupport" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="💬"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="الدعم والمساعدة"/>
+                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="6dp"
+                android:text="غرفتك ونشاطك"
+                android:textColor="#49371D"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <include
+                android:id="@+id/myRoomCardMe"
+                layout="@layout/include_my_room_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:paddingTop="8dp"
+                android:paddingBottom="4dp">
+
+                <LinearLayout
+                    android:id="@+id/subRecentWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp">
+                    <TextView android:id="@+id/tvSubRecent" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/tab_recent" android:textColor="#49371D" android:textSize="14sp" android:textStyle="bold"/>
+                    <View android:id="@+id/dotSubRecent" android:layout_width="28dp" android:layout_height="3dp" android:layout_marginTop="5dp" android:background="@drawable/bg_tab_dot_active"/>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/subFollowingWrap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp">
+                    <TextView android:id="@+id/tvSubFollowing" android:layout_width="wrap_content" android:layout_height="wrap_content" android:alpha="0.55" android:text="@string/home_section_following_rooms" android:textColor="#49371D" android:textSize="14sp" android:textStyle="bold"/>
+                    <View android:id="@+id/dotSubFollowing" android:layout_width="28dp" android:layout_height="3dp" android:layout_marginTop="5dp" android:background="@drawable/bg_tab_dot_active" android:visibility="invisible"/>
+                </LinearLayout>
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerMeRooms"
+                android:layout_width="match_parent"
+                android:layout_height="260dp"
+                android:background="@android:color/transparent"
+                android:clipToPadding="false"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never"
+                android:paddingHorizontal="2dp"
+                android:paddingTop="4dp"
+                tools:listitem="@layout/item_party_room" />
+
+            <TextView
+                android:id="@+id/tvMeEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:minHeight="80dp"
+                android:padding="18dp"
+                android:text="@string/home_empty_recent"
+                android:textColor="#806A4A"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+    </ScrollView>
 </LinearLayout>
