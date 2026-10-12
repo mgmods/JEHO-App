@@ -928,11 +928,29 @@ function normalizeAppName(raw) {
   return name
 }
 
+const SPLASH_API_ORIGIN = (import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1')
+  .trim()
+  .replace(/\/api\/v\d+\/?$/i, '')
+  .replace(/\/$/, '')
+
 function splashAbsUrl(url) {
   const value = String(url || '').trim()
   if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  return value.startsWith('/') ? value : '/' + value
+  // Uploads belong to this JEHO-OWN backend. Resolve both fresh relative paths
+  // and older absolute /uploads URLs against the current API host so the
+  // dashboard preview and APK never point at the dashboard origin or legacy host.
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value)
+      if (/^\/uploads\//i.test(parsed.pathname)) {
+        return SPLASH_API_ORIGIN + parsed.pathname + parsed.search
+      }
+    } catch {}
+    return value
+  }
+  if (value.startsWith('//')) return 'https:' + value
+  const path = value.startsWith('/') ? value : '/' + value
+  return SPLASH_API_ORIGIN + path
 }
 
 function parseAppTheme(raw) {
