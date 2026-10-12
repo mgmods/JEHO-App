@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class CpDiscoveryActivity extends ThemedActivity {
+public class CpDiscoveryActivity extends ThemedActivity {\n    public static final String EXTRA_CP_TYPE = "cp_type";
     private AppContainer container;
     private LinearLayout list;
     private String selectedType;
@@ -39,7 +39,7 @@ public class CpDiscoveryActivity extends ThemedActivity {
 
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
-        container = ContainerProvider.from(this);
+        container = ContainerProvider.from(this);\n        String initialType = getIntent().getStringExtra(EXTRA_CP_TYPE);\n        selectedType = isValidType(initialType) ? initialType : null;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(255, 250, 242));
@@ -52,7 +52,7 @@ public class CpDiscoveryActivity extends ThemedActivity {
         back.setGravity(Gravity.CENTER);
         header.addView(back, new LinearLayout.LayoutParams(dp(44), dp(48)));
         back.setOnClickListener(v -> finish());
-        TextView title = text("اكتشف علاقات CP", 20, Color.rgb(74, 46, 35), true);
+        TextView title = text(selectedType == null ? "اكتشف علاقات CP" : "قسم " + labelFor(selectedType), 20, Color.rgb(74, 46, 35), true);
         title.setGravity(Gravity.CENTER);
         header.addView(title, new LinearLayout.LayoutParams(0, dp(48), 1));
         root.addView(header);
@@ -285,6 +285,12 @@ public class CpDiscoveryActivity extends ThemedActivity {
         String name = String.valueOf(user.getOrDefault("displayName", ""));
         if (name.trim().isEmpty() || "null".equals(name)) name = String.valueOf(user.getOrDefault("username", "عضو"));
         return name;
+    }
+
+    private boolean isValidType(String type) {
+        return "brotherhood".equals(type) || "friendship".equals(type)
+                || "love".equals(type) || "engagement".equals(type)
+                || "marriage".equals(type);
     }
 
     private String labelFor(String type) {
