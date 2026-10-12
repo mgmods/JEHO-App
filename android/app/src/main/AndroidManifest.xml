@@ -114,6 +114,7 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.invite.InvitationActivity" android:exported="false" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.cp.CpDiscoveryActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.cp.CpCenterActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestsActivity" android:exported="false" 
