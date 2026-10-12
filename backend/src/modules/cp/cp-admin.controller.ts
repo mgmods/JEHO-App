@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Param, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
@@ -8,6 +8,7 @@ import { CurrentUser } from '../../common/decorators';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 
 class CpTypeConfigDto {
+  type?: CpType;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) priceCoins?: number;
   @IsOptional() @IsString() giftId?: string;
   @IsOptional() @IsInt() @Min(0) @Max(1000000000) giftPoints?: number;
@@ -55,20 +56,12 @@ export class CpAdminController {
   }
 
   @Patch('config/:type')
-  @ApiOperation({ summary: 'Configure one CP type; no default price is created' })
-  async updateType(
-    @CurrentUser('sub') adminId: string,
-    @Body() body: CpTypeConfigDto,
-  ) {
-    const type = (arguments as any)[0]?.params?.type;
-    return { error: 'Use PATCH /admin/cp/config/type with type in the body', suppliedType: type };
-  }
-
-  @Patch('config/type')
   async setTypeConfig(
     @CurrentUser('sub') adminId: string,
-    @Body() body: CpTypeConfigDto & { type: CpType },
+    @Param('type') type: CpType,
+    @Body() body: CpTypeConfigDto,
   ) {
+    body.type = type;
     if (!Object.values(CpType).includes(body.type)) throw new BadRequestException('نوع CP غير صالح');
     if (body.priceCoins !== undefined && (!Number.isSafeInteger(body.priceCoins) || body.priceCoins < 0)) {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
