@@ -67,12 +67,7 @@ public class MessagesFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        // Shared wallpaper is limited to the inbox list; opened conversations use their own screen.
-        String sectionWallpaper = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(requireContext(), "chat");
-        if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
-            com.Dramizo.Series.util.RemoteTheme.loadInto(binding.imgThemeBg, sectionWallpaper, R.drawable.bg_home_full_gradient);
-            binding.imgThemeBg.setVisibility(View.VISIBLE);
-        }
+        applySectionWallpaper();
         viewModel = new ViewModelProvider(
                 this, new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(MessagesViewModel.class);
@@ -173,6 +168,27 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        applySectionWallpaper();
+    }
+
+    /** Applies the shared wallpaper only to the inbox list, never to opened conversations. */
+    private void applySectionWallpaper() {
+        if (binding == null || !isAdded()) return;
+        String sectionWallpaper = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(requireContext(), "chat");
+        if (sectionWallpaper == null || sectionWallpaper.trim().isEmpty()) {
+            binding.imgThemeBg.setVisibility(View.GONE);
+            binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
+            return;
+        }
+        binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
+        binding.imgThemeBg.setVisibility(View.VISIBLE);
+        com.Dramizo.Series.util.RemoteTheme.loadInto(
+                binding.imgThemeBg, sectionWallpaper, R.drawable.bg_home_full_gradient);
     }
 
     private void openFriendsTab(int tab) {
