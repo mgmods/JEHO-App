@@ -170,12 +170,6 @@ public class MessagesFragment extends Fragment {
         viewModel.load();
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        applySectionWallpaper();
-    }
-
     /** Applies the shared wallpaper only to the inbox list, never to opened conversations. */
     private void applySectionWallpaper() {
         if (binding == null || !isAdded()) return;
