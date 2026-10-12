@@ -149,10 +149,10 @@ public class ProfileFragment extends Fragment {
             if (tag instanceof Integer) i.putExtra(FriendsActivity.EXTRA_TAB, (Integer) tag);
             startActivity(i);
         };
-        binding.statFriends.setTag(0);
+        binding.statFriends.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), VisitorsActivity.class)));
         binding.statFollowing.setTag(1);
         binding.statFans.setTag(2);
-        binding.statFriends.setOnClickListener(openFriends);
         binding.statFollowing.setOnClickListener(openFriends);
         binding.statFans.setOnClickListener(openFriends);
         binding.tvWealthChip.setOnClickListener(v -> openRanking("rich"));
@@ -180,7 +180,9 @@ public class ProfileFragment extends Fragment {
                     }
                 });
             }
-            binding.tvFollowers.setText(String.valueOf(Math.max(0, user.friendsCount)));
+            // The first statistic is Visitors: load its count from the visitors endpoint.
+            binding.tvFollowers.setText("—");
+            cLoadVisitorCount();
             binding.tvFollowing.setText(String.valueOf(Math.max(0, user.followingCount)));
             binding.tvFans.setText(String.valueOf(Math.max(0, user.followersCount)));
             // Profile: fixed VIP nobility frame (ud_vip_tou); mall SVGA stays on mics only.
@@ -266,6 +268,22 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
+    }
+
+    private void cLoadVisitorCount() {
+        if (!isAdded() || binding == null) return;
+        com.Dramizo.Series.di.AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<MiscDtos.ListResult<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(c.getUserApi().visitors(1));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                int total = result.success && result.data != null
+                        ? Math.max(0, result.data.resolveTotal()) : 0;
+                binding.tvFollowers.setText(String.valueOf(total));
+            });
+        });
     }
 
     private int ageFrom(String birthday) {
