@@ -36,18 +36,26 @@ export class CpAdminController {
     const settings = Object.fromEntries(rows.map((row: { key: string; value: string }) => {
       try { return [row.key, JSON.parse(row.value)]; } catch { return [row.key, row.value]; }
     }));
-    return {
-      types: Object.values(CpType).map(type => ({
+    const types = [];
+    for (const type of Object.values(CpType)) {
+      const giftId = settings[`cp.gift.${type}`] ?? null;
+      const price = Number(settings[`cp.price.${type}`]);
+      const [gift] = giftId ? await this.dataSource.query('SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1', [giftId]) : [];
+      types.push({
         type,
-        priceCoins: settings[`cp.price.${type}`] ?? null,
-        giftId: settings[`cp.gift.${type}`] ?? null,
-        giftPoints: settings[`cp.gift_points.${type}`] ?? null,
+        priceCoins: Number.isSafeInteger(price) && price > 0 ? price : null,
+        giftId: giftId || null,
+        gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
+        giftPoints: settings[`cp.gift_points.${type}`] ?? 0,
         giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
         maxLevel: settings[`cp.max_level.${type}`] ?? null,
         levels: settings[`cp.levels.${type}`] ?? [],
-        enabled: settings[`cp.enabled.${type}`] ?? false,
+        enabled: settings[`cp.enabled.${type}`] === true && Number.isSafeInteger(price) && price > 0 && !!gift,
         rules: settings[`cp.rules.${type}`] ?? {},
-      })),
+      });
+    }
+    return {
+      types,
       policy: {
         requestExpiryMinutes: settings['cp.policy.request_expiry_minutes'] ?? 30,
         rules: settings['cp.policy.rules'] ?? {},
