@@ -78,8 +78,8 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         Joiner j = items.get(position);
-        AvatarCosmetics.bindAvatar(h.b.imgJoinerAvatar, j.avatarUrl);
-        AvatarCosmetics.applyFrame(h.b.imgJoinerFrame,
+        AvatarCosmetics.bindWear(
+                h.b.imgJoinerAvatar, h.b.imgJoinerFrame, j.avatarUrl,
                 agencyRoom
                         ? firstNonEmpty(j.hostBadgeUrl, j.vipBadgeUrl)
                         : j.vipBadgeUrl);
