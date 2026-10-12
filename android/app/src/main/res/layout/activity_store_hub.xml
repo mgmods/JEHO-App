@@ -214,7 +214,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="0.5dp"
                         android:layout_marginStart="64dp"
-                        android:background="#FFE8ECF0" />
+                        android:background="#FFFFE4A6" />
 
                     <LinearLayout
                         android:id="@+id/rowBadges"
