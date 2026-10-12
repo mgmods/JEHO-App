@@ -64,11 +64,13 @@ function selectImage(event) {
 async function persistTheme(url) {
   const backgrounds = { ...(themeConfig.backgrounds || {}) }
   if (url) {
+    backgrounds.allSections = url
     backgrounds.home = url
     backgrounds.profile = url
     backgrounds.chat = url
     backgrounds.games = url
   } else {
+    delete backgrounds.allSections
     delete backgrounds.home
     delete backgrounds.profile
     delete backgrounds.chat
