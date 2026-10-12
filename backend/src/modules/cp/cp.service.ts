@@ -225,7 +225,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       await manager.query(
         `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
          VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
-        [userId, price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, roomId })],
+        [userId, -price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, roomId })],
       );
       return request;
     });
