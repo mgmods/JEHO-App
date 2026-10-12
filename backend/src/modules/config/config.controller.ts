@@ -428,6 +428,11 @@ export class ConfigController {
       if (next.brand?.splashUrl) {
         next.brand = { ...next.brand, splashUrl: bust(next.brand.splashUrl) };
       }
+      // Normalize the legacy splash background field too; some dashboard versions
+      // store a single splash asset here instead of splash.items.
+      if (next.backgrounds?.splash) {
+        next.backgrounds = { ...next.backgrounds, splash: bust(next.backgrounds.splash) };
+      }
       if (next.splash?.items && Array.isArray(next.splash.items)) {
         next.splash = {
           ...next.splash,
