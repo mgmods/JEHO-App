@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { CpType, CpRelationshipStatus } from '../../database/entities/cp-relationship.entity';
+import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 
 const TYPES = new Set<string>(Object.values(CpType));
@@ -68,11 +68,6 @@ export class CpService {
       if (!room || room.type !== 'voice' || room.status === 'closed') {
         throw new BadRequestException('يجب اختيار غرفة صوتية فعالة');
       }
-      const presence = await manager.query(
-        `SELECT id FROM (SELECT id FROM room_seats WHERE "roomId" = $1 AND "userId" = ANY($2::uuid[]) AND status IN ('occupied','muted')
-         UNION SELECT id FROM rooms WHERE id = $1 AND "hostId" = ANY($2::uuid[])) p`,
-        [roomId, [userId, recipientId]],
-      );
       const present = await manager.query(
         `SELECT count(DISTINCT member_id)::int AS n FROM (
           SELECT "userId" AS member_id FROM room_seats WHERE "roomId" = $1 AND "userId" = ANY($2::uuid[]) AND status IN ('occupied','muted')
@@ -116,7 +111,7 @@ export class CpService {
       if (new Date(request.expiresAt).getTime() <= Date.now()) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='expired',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        throw new ConflictException('انتهت مهلة الطلب وتم رد المبلغ');
+        return { id: requestId, status: 'expired', refunded: true };
       }
       if (!accept) {
         await this.refund(manager, request);
