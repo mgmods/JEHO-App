@@ -1,6 +1,5 @@
 package com.Dramizo.Series.presentation.home;
 
-import android.graphics.drawable.Drawable;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -11,8 +10,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.bumptech.glide.Glide;
-import com.bumptech.glide.request.target.CustomTarget;
-import com.bumptech.glide.request.transition.Transition;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.GridLayoutManager;
 
@@ -179,16 +176,13 @@ public class HomeMeFragment extends Fragment {
         if (binding == null || !isAdded()) return;
         String sectionWallpaper = RemoteTheme.backgroundUrl(requireContext(), "profile");
         if (sectionWallpaper == null || sectionWallpaper.trim().isEmpty()) {
+            binding.imgThemeBg.setVisibility(View.GONE);
             binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
             return;
         }
-        Glide.with(this).load(sectionWallpaper).into(new CustomTarget<Drawable>() {
-            @Override public void onResourceReady(@NonNull Drawable resource,
-                    @Nullable Transition<? super Drawable> transition) {
-                if (binding != null) binding.getRoot().setBackground(resource);
-            }
-            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
-        });
+        binding.getRoot().setBackgroundResource(R.drawable.bg_home_full_gradient);
+        binding.imgThemeBg.setVisibility(View.VISIBLE);
+        RemoteTheme.loadInto(binding.imgThemeBg, sectionWallpaper, R.drawable.bg_home_full_gradient);
     }
 
     private void refreshMyRoom() {
