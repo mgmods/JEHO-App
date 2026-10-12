@@ -88,7 +88,14 @@ public class GamesFragment extends Fragment {
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        com.Dramizo.Series.util.RemoteTheme.applyActivityBackground(binding.getRoot(), "games");
+        // Apply the shared wallpaper to the games landing page only; opened games are separate activities.
+        String sectionWallpaper = com.Dramizo.Series.util.RemoteTheme.backgroundUrl(requireContext(), "games");
+        if (sectionWallpaper != null && !sectionWallpaper.trim().isEmpty()) {
+            binding.imgThemeBg.setVisibility(View.VISIBLE);
+            com.Dramizo.Series.util.RemoteTheme.loadInto(binding.imgThemeBg, sectionWallpaper, R.drawable.bg_mikoo_page);
+        } else {
+            binding.imgThemeBg.setVisibility(View.GONE);
+        }
         c = ContainerProvider.from(requireActivity());
 
         if (binding.cardWheel != null && binding.cardWheel.getRoot() != null) {
