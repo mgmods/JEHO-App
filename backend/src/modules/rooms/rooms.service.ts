@@ -3516,10 +3516,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     if (!room) throw new NotFoundException('Room not found');
     const next = backgroundUrl?.trim() || null;
     if (next) {
-      await this.assertOwnedRoomCosmetic(actorId, 'room_background', next);
+      // Room owners may upload a private wallpaper from their phone. Only accept
+      // server-generated /uploads UUID image paths here; catalog URLs still need
+      // to pass the existing owned/free cosmetic check.
+      const uploadedImagePath = next.split('?')[0];
+      const isUploadedRoomImage =
+        /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i.test(uploadedImagePath);
+      if (!isUploadedRoomImage) {
+        await this.assertOwnedRoomCosmetic(actorId, 'room_background', next);
+      }
     }
-    // Do NOT mediaCleanup.replaceUpload here: backgroundUrl points at shared
-    // cosmetic/catalog media. Deleting it broke dashboard-uploaded wallpapers.
+    // Do NOT mediaCleanup.replaceUpload here: backgrounds can be shared catalog
+    // media or an uploaded room wallpaper; replacing it must not delete old media.
     room.backgroundUrl = next;
     room.backgroundEquippedById = next ? actorId : null;
     await this.roomsRepo.save(room);
