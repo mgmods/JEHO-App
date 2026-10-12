@@ -1261,6 +1261,30 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('paid-messages/settings')
+  @ApiOperation({ summary: 'Get paid direct-message rules' })
+  getPaidMessageSettings() {
+    return this.adminService.getPaidMessageSettings();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('paid-messages/settings')
+  @ApiOperation({ summary: 'Update paid direct-message rules without redeploying' })
+  patchPaidMessageSettings(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchPaidMessageSettings(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('paid-messages/stats')
+  @ApiOperation({ summary: 'Paid direct-message performance and refund statistics' })
+  paidMessageStats() {
+    return this.adminService.paidMessageStats();
+  }
+
   @Get('settings')
   getSettings() {
     return this.adminService.getSettings();
