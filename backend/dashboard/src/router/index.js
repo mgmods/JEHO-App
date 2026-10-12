@@ -21,6 +21,12 @@ const routes = [
         meta: { titleKey: 'routes.dashboard' },
       },
       {
+        path: 'cp',
+        name: 'cp',
+        component: () => import('@/views/CpSettingsView.vue'),
+        meta: { title: 'إعدادات علاقات CP' },
+      },
+      {
         path: 'paid-messages',
         name: 'paid-messages',
         component: () => import('@/views/PaidMessagesView.vue'),
