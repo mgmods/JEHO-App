@@ -223,10 +223,41 @@ public class CpDiscoveryActivity extends ThemedActivity {
                 + "\nالمستوى الحالي: " + level + "\nمجموع النقاط: " + points
                 + "\n" + (nextLevel > 0 ? "المستوى التالي: " + nextLevel + " (" + Math.round(progress) + "%)" : "لا يوجد مستوى تالٍ مضبوط")
                 + "\n" + rewardText;
-        card.setOnClickListener(v -> new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(typeLabel + " · مستوى " + level)
-                .setMessage(detailText)
-                .setPositiveButton("حسناً", null).show());
+        String myId = container.getSessionManager().getUserId();
+        String userAId = String.valueOf(a.getOrDefault("id", ""));
+        String userBId = String.valueOf(b.getOrDefault("id", ""));
+        boolean isMyRelationship = myId != null && (myId.equals(userAId) || myId.equals(userBId));
+        card.setOnClickListener(v -> {
+            androidx.appcompat.app.AlertDialog.Builder details = new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(typeLabel + " · مستوى " + level)
+                    .setMessage(detailText);
+            if (isMyRelationship) {
+                details.setPositiveButton("إنهاء العلاقة", (dialog, which) -> confirmEndRelationship(
+                        String.valueOf(row.get("id")), typeLabel));
+                details.setNegativeButton("إغلاق", null);
+            } else {
+                details.setPositiveButton("حسناً", null);
+            }
+            details.show();
+        });
+    }
+
+
+    private void confirmEndRelationship(String relationshipId, String typeLabel) {
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("إنهاء " + typeLabel)
+                .setMessage("هل أنت متأكد؟ ستُحفظ العلاقة في السجل لكنها لن تظهر كعلاقة نشطة.")
+                .setPositiveButton("إنهاء", (dialog, which) -> container.getIoExecutor().execute(() -> {
+                    Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().endCpRelationship(relationshipId));
+                    runOnUiThread(() -> {
+                        if (isFinishing()) return;
+                        Toast.makeText(this, result.success ? "تم إنهاء العلاقة" :
+                                (result.error != null ? result.error : "تعذر إنهاء العلاقة"), Toast.LENGTH_LONG).show();
+                        if (result.success) loadRelationships();
+                    });
+                }))
+                .setNegativeButton("إلغاء", null)
+                .show();
     }
 
     private ImageView avatar(String url) {
