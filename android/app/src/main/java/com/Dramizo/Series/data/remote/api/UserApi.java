@@ -43,6 +43,9 @@ public interface UserApi {
     @POST("users/{id}/unfollow")
     Call<ApiResponse<Object>> unfollow(@Path("id") String id);
 
+    @GET("cp/users/{id}")
+    Call<ApiResponse<List<Map<String, Object>>>> cpProfileRelationships(@Path("id") String id);
+
     @GET("users/{id}/followers")
     Call<ApiResponse<MiscDtos.ListResult<AuthDtos.UserDto>>> followers(@Path("id") String id, @Query("page") int page);
 
