@@ -2072,13 +2072,16 @@ export class GiftsService implements OnModuleInit {
       const contestContext = {
         roomId: dto.roomId,
         agencyId: taskRoom?.agencyId || undefined,
+        occurredAt: result.send?.createdAt,
       };
-      void this.contestsService
+      // Finish scoring from the persisted gift row before returning the send
+      // result, so end-of-event settlement sees the latest eligible gift.
+      await this.contestsService
         ?.addScore(senderId, spent, 'gifts', contestContext)
         .catch(() => undefined);
       const receiverId = result.send?.receiverId;
       if (receiverId) {
-        void this.contestsService
+        await this.contestsService
           ?.addScore(receiverId, spent, 'popular', contestContext)
           .catch(() => undefined);
       }
