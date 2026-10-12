@@ -60,3 +60,6 @@ export * from './user-promo-progress.entity';
 
 export * from './cp-relationship.entity';
 export * from './cp-request.entity';
+
+export * from './cp-audit-log.entity';
+export * from './cp-point-event.entity';
