@@ -21,7 +21,8 @@
   - `GET /api/v1/cp/me`, `GET /api/v1/cp/requests`, `GET /api/v1/cp/sent-requests`.
   - `POST /api/v1/cp/requests`, `POST /api/v1/cp/requests/:id/respond`, `POST /api/v1/cp/requests/:id/cancel`, `POST /api/v1/cp/:id/end`.
   - `GET /api/v1/cp/users/:id` — active CP relationships for a profile, without wallet data.
-- Protected dashboard API:
+- Protected dashboard API and Vue settings page:
+  - Dashboard route `/admin/cp` configures all five types, actual gift selection, initiation and exchange points, prices, levels/rewards, expiry policy, request/refund logs, audit history, and audited manual point corrections.
   - `GET /api/v1/admin/cp/config`
   - `PATCH /api/v1/admin/cp/config/:type`
   - `PATCH /api/v1/admin/cp/policy`
@@ -43,7 +44,7 @@ For each type `friendship`, `brotherhood`, `love`, `engagement`, `marriage`:
 - `cp.max_level.<type>` and `cp.rules.<type>` — optional cap and future eligibility/cardinality rules.
 - `cp.policy.request_expiry_minutes` — admin-configurable between 5 and 1440; fallback is 30 minutes.
 
-The current dashboard source is not included as a separate frontend in this repository, so these are protected backend APIs, not a completed visual admin settings page. Normal gift exchanges are not yet automatically connected to the CP point ledger; the idempotent server-side point service and audited admin adjustment endpoint are present, and event-source integration remains.
+The dashboard view is included in `backend/dashboard/src/views/CpSettingsView.vue` and is permission-gated under the `cp` module. Normal one-to-one and all-mic gift sends call the CP point processor after the gift transaction commits; only active CP pairs earn the configured per-type points, and the event ledger prevents duplicate scoring.
 
 ## HTML concept
 
