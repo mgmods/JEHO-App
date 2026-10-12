@@ -204,7 +204,20 @@ public class CpDiscoveryActivity extends ThemedActivity {
         card.addView(track, trackLp);
         String rewardText = "لا توجد مكافآت مفتوحة حالياً";
         Object rewards = row.get("rewardsUnlocked");
-        if (rewards instanceof List && !((List<?>) rewards).isEmpty()) rewardText = "المكافآت المفتوحة: " + ((List<?>) rewards).size();
+        if (rewards instanceof List && !((List<?>) rewards).isEmpty()) {
+            java.util.ArrayList<String> rewardNames = new java.util.ArrayList<>();
+            for (Object reward : (List<?>) rewards) {
+                if (reward instanceof Map) {
+                    @SuppressWarnings("unchecked") Map<String, Object> rewardMap = (Map<String, Object>) reward;
+                    Object rewardName = rewardMap.get("reward");
+                    if (rewardName != null && !String.valueOf(rewardName).trim().isEmpty()) {
+                        rewardNames.add("LV." + String.valueOf(rewardMap.getOrDefault("level", "")) + " " + String.valueOf(rewardName));
+                    }
+                }
+            }
+            rewardText = rewardNames.isEmpty() ? "مكافآت مفتوحة: " + ((List<?>) rewards).size()
+                    : "المكافآت المفتوحة: " + android.text.TextUtils.join("، ", rewardNames);
+        }
         String startedAt = String.valueOf(row.getOrDefault("startedAt", "—"));
         String detailText = nameA + " و " + nameB + "\nالنوع: " + typeLabel + "\nتاريخ البدء: " + startedAt + "\nمدة العلاقة: " + days + " يوم"
                 + "\nالمستوى الحالي: " + level + "\nمجموع النقاط: " + points
