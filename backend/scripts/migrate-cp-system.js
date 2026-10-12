@@ -47,6 +47,29 @@ async function main() {
     )`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_request_recipient_status_expiry ON cp_requests("toUserId",status,"expiresAt")`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_request_sender_status ON cp_requests("fromUserId",status)`);
+    await client.query(`CREATE TABLE IF NOT EXISTS cp_audit_logs (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "adminUserId" uuid NULL REFERENCES users(id) ON DELETE SET NULL,
+      action varchar(64) NOT NULL,
+      "entityType" varchar(64) NOT NULL,
+      "entityId" varchar(128) NULL,
+      details jsonb NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" timestamptz NOT NULL DEFAULT now()
+    )`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_audit_created_at ON cp_audit_logs("createdAt" DESC)`);
+    await client.query(`CREATE TABLE IF NOT EXISTS cp_point_events (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      "relationshipId" uuid NOT NULL REFERENCES cp_relationships(id) ON DELETE CASCADE,
+      "eventType" varchar(64) NOT NULL,
+      "referenceType" varchar(128) NOT NULL,
+      "referenceId" varchar(255) NOT NULL,
+      points bigint NOT NULL CHECK (points >= 0),
+      metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+      "createdAt" timestamptz NOT NULL DEFAULT now(),
+      CONSTRAINT uq_cp_point_event_reference UNIQUE ("referenceType","referenceId")
+    )`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_cp_point_events_relationship_created ON cp_point_events("relationshipId","createdAt" DESC)`);
+
     await client.query('COMMIT');
     console.log('CP schema created/verified. No existing rows were deleted or reset.');
   } catch (error) {
