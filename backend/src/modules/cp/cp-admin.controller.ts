@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Param, UseGuards, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Param, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Max, Min } from 'class-validator';
 import { DataSource } from 'typeorm';
