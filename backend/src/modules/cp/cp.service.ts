@@ -139,9 +139,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!request) throw new NotFoundException('طلب CP غير موجود');
       if (request.fromUserId !== userId) throw new BadRequestException('لا يمكنك إلغاء طلب ليس لك');
       if (request.status !== CpRequestStatus.PENDING) throw new ConflictException('لا يمكن إلغاء هذا الطلب بعد معالجته');
+      const expired = new Date(request.expiresAt).getTime() <= Date.now();
       await this.refund(manager, request);
-      await manager.query(`UPDATE cp_requests SET status='cancelled',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-      return { id: requestId, status: 'cancelled', refunded: true };
+      const status = expired ? 'expired' : 'cancelled';
+      await manager.query('UPDATE cp_requests SET status=$2,"respondedAt"=now(),"updatedAt"=now() WHERE id=$1', [requestId, status]);
+      return { id: requestId, status, refunded: true };
     });
   }
 
