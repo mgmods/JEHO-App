@@ -182,7 +182,8 @@ public class CpDiscoveryActivity extends ThemedActivity {
         String rewardText = "لا توجد مكافآت مفتوحة حالياً";
         Object rewards = row.get("rewardsUnlocked");
         if (rewards instanceof List && !((List<?>) rewards).isEmpty()) rewardText = "المكافآت المفتوحة: " + ((List<?>) rewards).size();
-        String detailText = nameA + " و " + nameB + "\nالنوع: " + typeLabel + "\nمدة العلاقة: " + days + " يوم"
+        String startedAt = String.valueOf(row.getOrDefault("startedAt", "—"));
+        String detailText = nameA + " و " + nameB + "\nالنوع: " + typeLabel + "\nتاريخ البدء: " + startedAt + "\nمدة العلاقة: " + days + " يوم"
                 + "\nالمستوى الحالي: " + level + "\nمجموع النقاط: " + points
                 + "\n" + (nextLevel > 0 ? "المستوى التالي: " + nextLevel + " (" + Math.round(progress) + "%)" : "لا يوجد مستوى تالٍ مضبوط")
                 + "\n" + rewardText;
