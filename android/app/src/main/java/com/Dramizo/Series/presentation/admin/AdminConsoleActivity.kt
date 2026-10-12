@@ -49,27 +49,20 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private data class Module(val key: String, val title: String, val subtitle: String, val icon: String)
 
+    // Keep the native Super Admin focused on the operations requested for JEHO.
+    // Other backend/dashboard tools remain untouched and are not deleted.
     private val modules = listOf(
-        Module("users", "إدارة المستخدمين", "بحث، مراجعة الحالة والحظر", "👥"),
-        Module("rooms", "إدارة الرومات", "عرض الرومات وتعديل إعداداتها", "🏠"),
-        Module("agencies", "الوكالات", "عرض الوكالات وتعليق وكالة", "🏢"),
-        Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات أو رفضها", "📨"),
-        Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة طلبات الوكلاء", "💳"),
-        Module("rechargeAgents", "وكلاء الشحن", "تفعيل الوكلاء أو إيقافهم", "💰"),
-        Module("operators", "المديرون والصلاحيات", "إدارة مديري لوحة التحكم المحدودين", "🛡️"),
-        Module("reports", "البلاغات", "مراجعة البلاغات وحسمها", "🚩"),
-        Module("genderVerifications", "توثيق الجنس", "مراجعة طلبات التوثيق وقبولها أو رفضها", "🪪"),
-        Module("withdrawals", "طلبات السحب", "مراجعة طلبات السحب", "🏦"),
-        Module("recharges", "طلبات الشحن", "إتمام أو إلغاء طلب شحن", "🪙"),
-        Module("walletTransactions", "حركة المحفظة", "عرض معاملات المحفظة", "📒"),
-        Module("walletAdjust", "تعديل رصيد مستخدم", "إضافة أو خصم رصيد مع سبب وسجل مراجعة", "🧮"),
-        Module("cosmetics", "الإطارات والدخوليات", "تفعيل أو تعطيل المقتنيات", "✨"),
-        Module("grantCosmetics", "إهداء المميزات", "منح إطار أو دخولية بمدة محددة أو دائمة", "🎁"),
-        Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة أو بشكل دائم", "🔢"),
-        Module("gifts", "الهدايا والمميزات", "عرض كتالوج الهدايا الحالي", "🎁"),
-        Module("vip", "العضويات VIP", "مراجعة العضويات ومنح VIP", "👑"),
-        Module("notifications", "رسائل وإشعارات الإدارة", "إرسال رسالة تظهر في قسم رسالة الإدارة داخل الدردشة مع إشعار للمستخدم", "🔔"),
-        Module("logs", "سجل الإدارة", "مراجعة سجل عمليات الإدارة", "🧾")
+        Module("users", "المستخدمون", "بحث بالـ ID وتقييد الحساب أو حظره", "👥"),
+        Module("rooms", "إدارة الرومات", "تعديل الرومات وإغلاقها", "🏠"),
+        Module("streams", "البث المباشر", "متابعة البث وإنهاؤه عند الحاجة", "📡"),
+        Module("agencies", "الوكالات", "إدارة الوكالات وتعليقها أو حذفها", "🏢"),
+        Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات لتفعيل وكالة جديدة", "📨"),
+        Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة الطلبات وقبولها أو رفضها", "💳"),
+        Module("rechargeAgents", "وكلاء الشحن", "إضافة الوكلاء وإدارة حالتهم", "💰"),
+        Module("notifications", "الرسائل والإشعارات", "رسائل عامة أو خاصة بعنوان ومحتوى", "🔔"),
+        Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
+        Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
+        Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,13 +150,48 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView.text = "مركز إدارة JEHO"
         backButton.visibility = View.GONE
         body.removeAllViews()
-        val intro = TextView(this).apply {
-            text = "أهلًا بك في مركز الإدارة\nاختر القسم الذي تريد إدارته. جميع البيانات والأوامر تُقرأ من الخادم مباشرة."
-            textSize = 14f
-            setTextColor(TEXT)
-            setPadding(dp(4), dp(4), dp(4), dp(14))
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFF20254F.toInt(), 0xFF5541A4.toInt(), 0xFF8062D5.toInt())
+            ).apply { cornerRadius = dp(22).toFloat() }
+            elevation = dp(3).toFloat()
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
         }
-        body.addView(intro)
+        val heroEyebrow = TextView(this).apply {
+            text = "JEHO  •  SUPER ADMIN"
+            textSize = 10f
+            letterSpacing = 0.12f
+            setTextColor(0xFFDCD4FF.toInt())
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        hero.addView(heroEyebrow)
+        val heroTitle = TextView(this).apply {
+            text = "مركز التحكم الرئيسي"
+            textSize = 23f
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(0, dp(7), 0, dp(5))
+        }
+        hero.addView(heroTitle)
+        val heroCopy = TextView(this).apply {
+            text = "إدارة المستخدمين والرومات والوكالات والرسائل والهدايا من مكان واحد."
+            textSize = 13f
+            setTextColor(0xFFF0EDFF.toInt())
+            setLineSpacing(dp(3).toFloat(), 1f)
+        }
+        hero.addView(heroCopy)
+        val secureLine = TextView(this).apply {
+            text = "●  متصل بالخادم  •  الصلاحيات تُتحقق على الخادم"
+            textSize = 11f
+            setTextColor(0xFFD7F7E8.toInt())
+            setPadding(0, dp(13), 0, 0)
+        }
+        hero.addView(secureLine)
+        body.addView(hero)
         load(api.overview()) { data ->
             val stats = mapOfEntries(data)
             if (stats.isNotEmpty()) {
@@ -174,7 +202,8 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(card)
             }
         }
-        addText(body, "أدوات الإدارة", 16f, true, TEXT)
+        addText(body, "أدوات الإدارة", 18f, true, TEXT)
+        addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
         val rows = modules.chunked(2)
         rows.forEach { pair ->
             val row = LinearLayout(this).apply {
@@ -204,7 +233,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 tile.addView(icon)
                 addText(tile, module.title, 14f, true, TEXT)
                 addText(tile, module.subtitle, 11f, false, MUTED)
-                addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                addText(tile, "فتح الإدارة  ←", 11f, true, ACCENT)
                 val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
                     bottomMargin = dp(10)
                     if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
@@ -243,10 +272,16 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
             "streams" -> load(api.streams(1, 40)) { renderItems(it, "streams") }
-            "agencies" -> load(api.agencies(1, 40)) { renderItems(it, "agencies") }
+            "agencies" -> {
+                body.addView(button("↻ تحديث قائمة الوكالات") { openModule("agencies") })
+                load(api.agencies(1, 40)) { renderItems(it, "agencies") }
+            }
             "agencyApplications" -> load(api.agencyApplications(1, 40)) { renderItems(it, "agencyApplications") }
             "rechargeApplications" -> load(api.rechargeAgentApplications()) { renderItems(it, "rechargeApplications") }
-            "rechargeAgents" -> load(api.rechargeAgents()) { renderItems(it, "rechargeAgents") }
+            "rechargeAgents" -> {
+                body.addView(button("＋ إضافة وكيل شحن") { showAssignRechargeAgentDialog() })
+                load(api.rechargeAgents()) { renderItems(it, "rechargeAgents") }
+            }
             "operators" -> {
                 body.addView(button("＋ إضافة مدير محدود") { showCreateOperatorDialog() })
                 load(api.operators()) { renderItems(it, "operators") }
@@ -277,7 +312,8 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(plansButton)
             }
             "notifications" -> {
-                body.addView(button("＋ رسالة إدارة (دردشة + إشعار)") { showNotificationDialog() })
+                body.addView(button("＋ رسالة عامة أو خاصة + إشعار") { showNotificationDialog() })
+                body.addView(button("✉ رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
                 load(api.notifications(1, 40)) { renderItems(it, "notifications") }
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
@@ -384,13 +420,25 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                 }
-                "agencies" -> if (!id.isNullOrBlank()) card.addView(button("تعليق الوكالة") {
-                    confirm("تعليق الوكالة قد يؤثر على أعضائها. هل تريد المتابعة؟") {
-                        load(api.suspendAgency(id, mapOf("reason" to "تم التعليق من تطبيق JEHO"))) {
-                            toast("استجاب الخادم لطلب تعليق الوكالة"); openModule("agencies")
+                "agencies" -> if (!id.isNullOrBlank()) {
+                    val suspended = status?.contains("suspended", true) == true
+                    card.addView(button(if (suspended) "إعادة تفعيل الوكالة" else "تعليق الوكالة") {
+                        confirm(if (suspended) "إعادة تفعيل الوكالة؟" else "تعليق الوكالة قد يغلق روماتها. هل تريد المتابعة؟") {
+                            load(if (suspended) api.approveAgency(id) else api.suspendAgency(id, mapOf("reason" to "تم التعليق من تطبيق JEHO"))) {
+                                toast(if (suspended) "تم إرسال طلب تفعيل الوكالة" else "تم إرسال طلب تعليق الوكالة")
+                                openModule("agencies")
+                            }
                         }
-                    }
-                })
+                    })
+                    card.addView(button("حذف الوكالة نهائيًا") {
+                        confirm("تحذير: حذف الوكالة قد ينهي بث روماتها ويحذف ارتباطاتها. لا يمكن التراجع. متابعة؟") {
+                            load(api.deleteAgency(id)) {
+                                toast("استجاب الخادم لطلب حذف الوكالة")
+                                openModule("agencies")
+                            }
+                        }
+                    })
+                }
                 "vipPlans" -> if (!id.isNullOrBlank()) {
                     card.addView(button("تعديل الخطة") { showEditVipPlanDialog(id, primary, vipLevel, vipPrice) })
                     val active = status?.equals("true", true) == true
@@ -449,6 +497,14 @@ class AdminConsoleActivity : ThemedActivity() {
                         }
                     })
                     card.addView(button("تعديل رصيد الوكيل") { showAdjustFloatDialog(id) })
+                    card.addView(button("حذف وكيل الشحن") {
+                        confirm("سيُحذف تسجيل الوكيل. تأكد من تسوية رصيده والتزاماته أولًا. متابعة؟") {
+                            load(api.deleteRechargeAgent(id)) {
+                                toast("استجاب الخادم لطلب حذف وكيل الشحن")
+                                openModule("rechargeAgents")
+                            }
+                        }
+                    })
                 }
                 "genderVerifications" -> if (!id.isNullOrBlank()) {
                     card.addView(button("قبول التوثيق") {
@@ -641,6 +697,52 @@ class AdminConsoleActivity : ThemedActivity() {
                                 dialog.dismiss()
                                 toast("تم تحديث إعدادات الروم")
                                 openModule("rooms")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showAssignRechargeAgentDialog() {
+        val form = formFields(listOf(
+            "معرّف المستخدم (UUID)",
+            "رصيد الوكيل الابتدائي بالعملات (اختياري)",
+            "العمولة بالنقاط الأساسية BPS (اختياري)",
+            "الحد اليومي للعملات (اختياري)",
+            "ملاحظات داخلية (اختياري)"
+        ))
+        AlertDialog.Builder(this).setTitle("إضافة وكيل شحن")
+            .setView(form.first).setNegativeButton("إلغاء", null)
+            .setPositiveButton("مراجعة وإضافة", null).create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val userId = form.second[0].text.toString().trim()
+                        val floatCoins = form.second[1].text.toString().trim().toLongOrNull()
+                        val commissionBps = form.second[2].text.toString().trim().toIntOrNull()
+                        val dailyLimit = form.second[3].text.toString().trim().toLongOrNull()
+                        val notes = form.second[4].text.toString().trim()
+                        if (userId.isBlank()) {
+                            toast("أدخل معرّف المستخدم أولًا")
+                            return@setOnClickListener
+                        }
+                        if ((floatCoins != null && floatCoins < 0) ||
+                            (commissionBps != null && commissionBps !in 0..10000) ||
+                            (dailyLimit != null && dailyLimit < 0)) {
+                            toast("تحقق من الرصيد والعمولة والحد اليومي")
+                            return@setOnClickListener
+                        }
+                        val payload = mutableMapOf<String, Any>("userId" to userId)
+                        if (floatCoins != null) payload["floatCoins"] = floatCoins
+                        if (commissionBps != null) payload["commissionBps"] = commissionBps
+                        if (dailyLimit != null) payload["dailyLimitCoins"] = dailyLimit
+                        if (notes.isNotBlank()) payload["notes"] = notes
+                        confirm("إضافة المستخدم كوكيل شحن؟ سيتم تطبيق الإعدادات التي أدخلتها.") {
+                            load(api.assignRechargeAgent(payload)) {
+                                dialog.dismiss()
+                                toast("استجاب الخادم لطلب إضافة وكيل الشحن")
+                                openModule("rechargeAgents")
                             }
                         }
                     }
