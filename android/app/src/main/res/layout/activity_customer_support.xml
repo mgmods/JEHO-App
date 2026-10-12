@@ -4,7 +4,7 @@
     android:id="@+id/contentRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#FFF7FB"
+    android:background="@drawable/bg_home_full_gradient"
     android:fillViewport="true">
 
     <LinearLayout
@@ -120,7 +120,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginHorizontal="16dp"
-                android:background="#EEE4EC"
+                android:background="#FFFFE4A6"
                 android:visibility="gone" />
 
             <LinearLayout
