@@ -163,6 +163,13 @@ public class CpDiscoveryActivity extends ThemedActivity {
                     pulseX.setDuration(900); pulseY.setDuration(900);
                     pulseX.setRepeatMode(ValueAnimator.REVERSE); pulseY.setRepeatMode(ValueAnimator.REVERSE);
                     pulseX.setRepeatCount(ValueAnimator.INFINITE); pulseY.setRepeatCount(ValueAnimator.INFINITE);
+                    symbol.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                        @Override public void onViewAttachedToWindow(View v) {}
+                        @Override public void onViewDetachedFromWindow(View v) {
+                            pulseX.cancel();
+                            pulseY.cancel();
+                        }
+                    });
                     pulseX.start(); pulseY.start();
                 }
             } catch (Exception ignored) { /* reduced motion or device setting unavailable */ }
