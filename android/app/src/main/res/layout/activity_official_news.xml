@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white">
+    android:background="@drawable/bg_home_full_gradient">
 
     <LinearLayout
         android:id="@+id/contentRoot"
@@ -83,7 +83,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#FFE5E5EA" />
+            android:background="#FFE8C36A" />
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -116,7 +116,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#FFF7F7F8"
+            android:background="#FFFFF0D1"
             android:gravity="center"
             android:paddingHorizontal="16dp"
             android:paddingVertical="12dp"
