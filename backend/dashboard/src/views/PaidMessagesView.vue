@@ -89,7 +89,7 @@ const form = reactive({
   'paid_messages.agent_percent': 10,
 })
 const fields = [
-  { key: 'paid_messages.free_count', label: 'عدد الرسائل المجانية لكل حساب', max: 1000 },
+  { key: 'paid_messages.free_count', label: 'عدد الرسائل المجانية لكل محادثة', max: 1000 },
   { key: 'paid_messages.price_coins', label: 'السعر الأساسي بالعملات' },
   { key: 'paid_messages.one_way_discount_percent', label: 'خصم المتابعة من طرف واحد (%)', max: 100, step: 0.1 },
   { key: 'paid_messages.price_step_coins', label: 'زيادة السعر لكل مستوى' },
