@@ -396,10 +396,22 @@ export class ConfigController {
           .trim()
           .replace(/\/+$/, '')
           .replace(/\/api\/v\d+$/i, '');
-        const url =
-          raw.startsWith('/uploads/') && !raw.startsWith('//')
-            ? apiBase + raw
-            : raw;
+        let url = raw;
+        if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
+          url = apiBase + raw;
+        } else if (/^https?:\/\//i.test(raw)) {
+          // Older dashboard settings may contain an absolute /uploads URL
+          // from the legacy host. Uploaded files are owned by this deployment,
+          // so normalize those paths to the current JEHO-OWN API host.
+          try {
+            const parsed = new URL(raw);
+            if (/^\/uploads\//i.test(parsed.pathname)) {
+              url = apiBase + parsed.pathname + parsed.search;
+            }
+          } catch {
+            // Keep an unparseable URL unchanged; the client will use its fallback.
+          }
+        }
 
         const isHttp = url.startsWith('http://') || url.startsWith('https://');
         if (!isHttp) return value;
