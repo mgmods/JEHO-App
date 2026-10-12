@@ -2577,6 +2577,7 @@ export class GiftsService implements OnModuleInit {
 
       return {
         send: primary,
+        sends,
         gift,
         comboCount,
         luckyMultiplier,
