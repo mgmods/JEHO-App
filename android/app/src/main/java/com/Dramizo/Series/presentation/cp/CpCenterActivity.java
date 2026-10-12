@@ -48,11 +48,12 @@ public class CpCenterActivity extends ThemedActivity {
         c = ContainerProvider.from(this);
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
+        binding.btnDiscoverCp.setOnClickListener(v -> startActivity(new Intent(this, CpDiscoveryActivity.class)));
         binding.btnBecomeCp.setOnClickListener(v -> {
             if (partner != null) {
                 confirmEndCp();
             } else {
-                showSendCpDialog();
+                startActivity(new Intent(this, CpDiscoveryActivity.class));
             }
         });
         binding.btnOpenInvite.setOnClickListener(v ->
@@ -159,7 +160,7 @@ public class CpCenterActivity extends ThemedActivity {
                             + "يمكنكم رابطاً واحداً فقط في نفس الوقت."
                             + pendingHint
                             + "\n\nاضغط مطوّلاً على «رمز دعوتي» لفتح طلبات CP.");
-            binding.btnBecomeCp.setText("أرسل طلب CP");
+            binding.btnBecomeCp.setText("اكتشف العلاقات");
         }
     }
 
