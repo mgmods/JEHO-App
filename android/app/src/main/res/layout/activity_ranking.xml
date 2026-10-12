@@ -10,8 +10,8 @@
         android:layout_height="match_parent"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
-        android:src="@color/white"
-        android:background="#FFF7FB" />
+        android:src="@drawable/bg_home_full_gradient"
+        android:background="@drawable/bg_home_full_gradient" />
 
     <LinearLayout
         android:id="@+id/contentRoot"
