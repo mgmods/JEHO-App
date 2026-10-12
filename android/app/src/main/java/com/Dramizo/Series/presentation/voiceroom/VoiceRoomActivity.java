@@ -7511,7 +7511,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!hasAny) return;
         for (int i = 0; i < top.size(); i++) {
             RoomDtos.SupporterDto supporter = top.get(i);
-            bindTop(slots[i], imgs[i], frames[i], supporter.avatarUrl, null);
+            bindTop(slots[i], imgs[i], frames[i], supporter.avatarUrl, supporter.vipBadgeUrl);
             // Front avatar (left) highest elevation — Mikoo cascade.
             if (slots[i] != null) slots[i].setElevation(dp(8 - i * 2));
             slots[i].setContentDescription(
