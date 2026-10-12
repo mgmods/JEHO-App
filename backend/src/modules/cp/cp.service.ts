@@ -32,7 +32,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       `SELECT key,value FROM app_settings WHERE key LIKE 'cp.%' ORDER BY key`,
     );
     const settings: Record<string, string> = Object.fromEntries(rows.map((row: any) => [row.key, String(row.value)]));
-    const catalog = [];
+    const catalog: Array<Record<string, unknown>> = [];
     for (const type of Object.values(CpType)) {
       const price = Number(settings[`cp.price.${type}`]);
       const giftId = settings[`cp.gift.${type}`] || null;
@@ -65,7 +65,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
        ORDER BY r.points DESC, r."startedAt" ASC LIMIT 100`,
       args,
     );
-    const types = [...new Set(rows.map((row: any) => String(row.type)))];
+    const types: string[] = Array.from(new Set<string>(rows.map((row: any) => String(row.type))));
     const configs: Record<string, Array<{ level: number; pointsRequired: number; reward?: string }>> = {};
     for (const itemType of types) {
       const [setting] = await this.dataSource.query(
