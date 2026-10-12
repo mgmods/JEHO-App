@@ -42,6 +42,8 @@ import { Notification, NotificationType } from '../../database/entities/notifica
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
 import { UserGameItem } from '../../database/entities/user-game-item.entity';
+import { ChatMessage, MessageType } from '../../database/entities/chat-message.entity';
+import { ChatParticipant } from '../../database/entities/chat-participant.entity';
 import { WalletService } from '../wallet/wallet.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -1537,6 +1539,108 @@ export class AdminService {
     report.adminNote = adminNote || null;
     report.handledById = adminId || null;
     return this.reportsRepo.save(report);
+  }
+
+  async getPaidMessageSettings() {
+    const defaults: Record<string, string> = {
+      'paid_messages.enabled': 'false', 'paid_messages.free_count': '3',
+      'paid_messages.price_coins': '10', 'paid_messages.one_way_discount_percent': '25',
+      'paid_messages.price_step_coins': '0', 'paid_messages.price_step_every': '10',
+      'paid_messages.price_max_coins': '10000000', 'paid_messages.refund_window_minutes': '30',
+      'paid_messages.daily_limit': '0', 'paid_messages.app_percent': '20',
+      'paid_messages.host_percent': '70', 'paid_messages.agent_percent': '10',
+    };
+    const rows = await this.settingsRepo.find({ where: Object.keys(defaults).map((key) => ({ key })) });
+    const current = { ...defaults };
+    for (const row of rows) current[row.key] = String(row.value ?? '');
+    return { current, defaults };
+  }
+
+  async patchPaidMessageSettings(body: Record<string, unknown>) {
+    const allowed = new Set([
+      'paid_messages.enabled','paid_messages.free_count','paid_messages.price_coins',
+      'paid_messages.one_way_discount_percent','paid_messages.price_step_coins',
+      'paid_messages.price_step_every','paid_messages.price_max_coins',
+      'paid_messages.refund_window_minutes','paid_messages.daily_limit',
+      'paid_messages.app_percent','paid_messages.host_percent','paid_messages.agent_percent',
+    ]);
+    const values: Record<string, string> = {};
+    for (const [key, raw] of Object.entries(body || {})) {
+      if (!allowed.has(key)) continue;
+      if (key === 'paid_messages.enabled') {
+        values[key] = ['true','1','yes','on'].includes(String(raw).toLowerCase()) ? 'true' : 'false';
+        continue;
+      }
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0) throw new BadRequestException('قيمة غير صالحة: ' + key);
+      const max = key.includes('percent') ? 100 : key.endsWith('refund_window_minutes') ? 10080 : 10000000;
+      if (value > max) throw new BadRequestException('القيمة تتجاوز الحد المسموح: ' + key);
+      values[key] = String(['paid_messages.free_count','paid_messages.price_coins','paid_messages.price_step_coins',
+        'paid_messages.price_step_every','paid_messages.price_max_coins','paid_messages.daily_limit',
+        'paid_messages.refund_window_minutes'].includes(key) ? Math.floor(value) : value);
+    }
+    const splitKeys = ['paid_messages.app_percent','paid_messages.host_percent','paid_messages.agent_percent'];
+    if (splitKeys.some((key) => values[key] !== undefined)) {
+      const loaded = await this.getPaidMessageSettings();
+      const sum = splitKeys.reduce((total, key) => total + Number(values[key] ?? loaded.current[key]), 0);
+      if (Math.abs(sum - 100) > 0.001) throw new BadRequestException('مجموع نسب التطبيق والمضيف والوكيل يجب أن يساوي 100%');
+    }
+    for (const [key, value] of Object.entries(values)) await this.setSetting(key, value, 'إعدادات الرسائل المدفوعة');
+    return this.getPaidMessageSettings();
+  }
+
+  async paidMessageStats() {
+    const messagesRepo = this.dataSource.getRepository(ChatMessage);
+    const participantsRepo = this.dataSource.getRepository(ChatParticipant);
+    const [totalMessages, paidRows, refunds, settings] = await Promise.all([
+      messagesRepo.createQueryBuilder('m').where('m.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] }).getCount(),
+      this.txRepo.find({ where: { referenceType: 'paid_message' }, order: { createdAt: 'DESC' } }),
+      this.txRepo.find({ where: { referenceType: 'paid_message_refund' }, order: { createdAt: 'DESC' } }),
+      this.getPaidMessageSettings(),
+    ]);
+    const debits = paidRows.filter((tx) => Number(tx.amount) < 0);
+    const refundedIds = new Set(refunds.map((tx) => tx.referenceId).filter(Boolean));
+    const ids = [...new Set(debits.map((tx) => tx.referenceId).filter((id): id is string => !!id))];
+    const messages = ids.length ? await messagesRepo.createQueryBuilder('m').where('m.id IN (:...ids)', { ids }).getMany() : [];
+    const byId = new Map(messages.map((m) => [m.id, m]));
+    const convIds = [...new Set(messages.map((m) => m.conversationId))];
+    const participants = convIds.length ? await participantsRepo.createQueryBuilder('p').where('p.conversationId IN (:...ids)', { ids: convIds }).getMany() : [];
+    let replied = 0, pending = 0, expiredUnreplied = 0;
+    const now = Date.now();
+    for (const tx of debits) {
+      const message = byId.get(tx.referenceId || '');
+      if (!message) continue;
+      const metadata = (tx.metadata || {}) as Record<string, unknown>;
+      const rawWindow = metadata.refundWindowMinutes !== undefined ? Number(metadata.refundWindowMinutes) : metadata.refundWindowHours !== undefined ? Number(metadata.refundWindowHours) * 60 : 30;
+      const minutes = Math.max(0, Number.isFinite(rawWindow) ? rawWindow : 30);
+      const deadline = new Date(new Date(message.createdAt).getTime() + minutes * 60_000);
+      const peer = participants.find((p) => p.conversationId === message.conversationId && p.userId !== message.senderId);
+      const hasReply = peer ? await messagesRepo.createQueryBuilder('reply')
+        .where('reply.conversationId = :conversationId', { conversationId: message.conversationId })
+        .andWhere('reply.senderId = :peerId', { peerId: peer.userId })
+        .andWhere('reply.createdAt > :createdAt', { createdAt: message.createdAt })
+        .andWhere('reply.createdAt <= :deadline', { deadline })
+        .andWhere('reply.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
+        .getExists() : false;
+      if (hasReply) replied++;
+      else if (now < deadline.getTime()) pending++;
+      else if (!refundedIds.has(message.id)) expiredUnreplied++;
+    }
+    const spent = debits.reduce((sum, tx) => sum + Math.abs(Number(tx.amount) || 0), 0);
+    const refunded = refunds.reduce((sum, tx) => sum + Math.max(0, Number(tx.amount) || 0), 0);
+    const share = (key: string) => Number(settings.current[key]) || 0;
+    return {
+      totalMessages, paidMessages: debits.length, freeMessages: Math.max(0, totalMessages - debits.length),
+      coinsSpent: spent, coinsRefunded: refunded, replied, pending, expiredUnreplied,
+      replyRatePercent: debits.length ? Math.round(replied / debits.length * 10000) / 100 : 0,
+      earnings: {
+        app: Math.round((spent - refunded) * share('paid_messages.app_percent') / 100),
+        host: Math.round((spent - refunded) * share('paid_messages.host_percent') / 100),
+        agent: Math.round((spent - refunded) * share('paid_messages.agent_percent') / 100),
+        note: 'قيم تقديرية محسوبة من النسب وليست تحويلات أرصدة فعلية',
+      },
+      checkedAt: new Date().toISOString(),
+    };
   }
 
   async getSettings() {
