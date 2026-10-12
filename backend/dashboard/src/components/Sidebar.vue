@@ -89,6 +89,7 @@ const sections = computed(() => [
       { name: 'users', icon: 'bi-people', label: t('nav.users'), also: ['user-detail'] },
       { name: 'conversations', icon: 'bi-chat-left-text', label: t('nav.conversations') },
       { name: 'paid-messages', icon: 'bi-chat-square-text', label: 'الرسائل المدفوعة' },
+      { name: 'cp', icon: 'bi-heart', label: 'علاقات CP' },
       { name: 'agencies', icon: 'bi-building', label: t('nav.agencies') },
       ...(femaleVerifyEnabled.value
         ? [{ name: 'gender-verifications', icon: 'bi-person-check', label: t('nav.genderVerifications') }]
