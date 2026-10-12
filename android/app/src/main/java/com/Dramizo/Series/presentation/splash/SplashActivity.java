@@ -62,75 +62,10 @@ public class SplashActivity extends ThemedActivity {
             super.onCreate(savedInstanceState);
             InviteReferralHelper.captureInstallReferrer(this);
             parseDeepLink(getIntent());
-            ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
-            setContentView(binding.getRoot());
-            EdgeToEdgeHelper.apply(this);
-            EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
-            EdgeToEdgeHelper.padBottom(binding.splashContent);
-
-            com.Dramizo.Series.data.remote.dto.MiscDtos.ThemeDto remoteTheme =
-                    com.Dramizo.Series.util.RemoteTheme.getCached(this);
-            com.Dramizo.Series.data.remote.dto.MiscDtos.SplashItemDto splashItem =
-                    resolveSplashItem(remoteTheme);
-            splashDurationMs = com.Dramizo.Series.util.RemoteTheme.splashDurationMs(splashItem);
-            applyRemoteSplash(binding, splashItem);
-
-            if (getWindow() != null) {
-                getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
-                getWindow().setNavigationBarColor(
-                        androidx.core.content.ContextCompat.getColor(this, R.color.bg_light));
-            }
-
-            if (splashItem == null) {
-                android.view.animation.AnimationSet logoIn = brandEnter(0.86f, 1f, 500L);
-                binding.imgSplashLogo.startAnimation(logoIn);
-            }
-
-            if (binding.tvSplashBrand != null) {
-                AlphaAnimation brandFade = new AlphaAnimation(0f, 1f);
-                brandFade.setDuration(420L);
-                brandFade.setStartOffset(120L);
-                brandFade.setFillAfter(true);
-                binding.tvSplashBrand.startAnimation(brandFade);
-            }
-            if (binding.tvSplashTagline != null) {
-                AlphaAnimation tagFade = new AlphaAnimation(0f, 1f);
-                tagFade.setDuration(480L);
-                tagFade.setStartOffset(220L);
-                tagFade.setFillAfter(true);
-                binding.tvSplashTagline.startAnimation(tagFade);
-            }
-
-            // The dashboard owns Skip visibility; honor its cached setting immediately.
-            if (binding.btnSplashSkip != null) {
-                // Do not flash a stale cached Skip setting while the current
-                // dashboard configuration is being refreshed.
-                binding.btnSplashSkip.setVisibility(android.view.View.GONE);
-                binding.btnSplashSkip.setOnClickListener(v -> forceLeaveSplash());
-                ViewCompat.setOnApplyWindowInsetsListener(binding.btnSplashSkip, (view, insets) -> {
-                    androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
-                    ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
-                    lp.topMargin = bars.top + dp(8);
-                    lp.leftMargin = dp(12);
-                    lp.rightMargin = dp(12);
-                    view.setLayoutParams(lp);
-                    return insets;
-                });
-                ViewCompat.requestApplyInsets(binding.btnSplashSkip);
-            }
-
-            // If a splash image is already cached, show it immediately. On a fresh
-            // install, wait for the dashboard config before starting the short splash
-            // timer; otherwise the app can navigate away before the image arrives.
-            if (splashItem != null) {
-                scheduleSplashNavigation();
-            } else {
-                mainHandler.removeCallbacks(hardTimeout);
-                mainHandler.postDelayed(hardTimeout, 12000L);
-            }
-            refreshRemoteSplashFromServer(binding);
+            // Keep this activity only as a startup/deep-link router; never render a splash UI.
+            forceLeaveSplash();
         } catch (Throwable t) {
-            Log.e(TAG, "Splash failed", t);
+            Log.e(TAG, "Startup routing failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
         }
     }
