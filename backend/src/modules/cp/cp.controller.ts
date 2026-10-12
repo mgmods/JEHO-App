@@ -65,7 +65,8 @@ export class CpController {
     @Param('id') id: string,
     @Body('accept') accept: boolean,
   ) {
-    return this.cp.respond(userId, id, Boolean(accept));
+    if (typeof accept !== 'boolean') throw new BadRequestException('يجب تحديد القبول أو الرفض بشكل صريح');
+    return this.cp.respond(userId, id, accept);
   }
 
   @Post(':id/end')
