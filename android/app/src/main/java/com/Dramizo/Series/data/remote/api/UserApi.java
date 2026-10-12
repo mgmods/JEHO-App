@@ -115,6 +115,9 @@ public interface UserApi {
     @POST("cp/{id}/end")
     Call<ApiResponse<Map<String, Object>>> endCpRelationship(@Path("id") String id);
 
+    @GET("cp/me")
+    Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
+
     @GET("cp/requests")
     Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
 
