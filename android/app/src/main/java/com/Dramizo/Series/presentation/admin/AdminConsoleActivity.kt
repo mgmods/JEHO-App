@@ -273,6 +273,8 @@ class AdminConsoleActivity : ThemedActivity() {
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
             "streams" -> load(api.streams(1, 40)) { renderItems(it, "streams") }
             "agencies" -> {
+                body.addView(button("＋ إضافة وكالة عبر مراجعة الطلب") { openModule("agencyApplications") })
+                addText(body, "تُنشأ الوكالة عند قبول طلبها حتى يتم تجهيز المالك وعضوية الوكالة ورومها الدائم وكود التفعيل بشكل صحيح.", 12f, false, MUTED)
                 body.addView(button("↻ تحديث قائمة الوكالات") { openModule("agencies") })
                 load(api.agencies(1, 40)) { renderItems(it, "agencies") }
             }
