@@ -18,6 +18,15 @@ export const operatorsApi = {
   remove: (id) => safeRequest(() => api.delete(`/admin/operators/${id}`)),
 }
 
+export const cpAdminApi = {
+  config: () => safeRequest(() => api.get('/admin/cp/config')),
+  updateType: (type, payload) => safeRequest(() => api.patch(`/admin/cp/config/${encodeURIComponent(type)}`, payload)),
+  updatePolicy: (payload) => safeRequest(() => api.patch('/admin/cp/policy', payload)),
+  adjustPoints: (payload) => safeRequest(() => api.post('/admin/cp/relationships/points', payload)),
+  requests: (params) => safeRequest(() => api.get('/admin/cp/requests', { params })),
+  audit: (params) => safeRequest(() => api.get('/admin/cp/audit', { params })),
+}
+
 export const paidMessagesApi = {
   settings: () => safeRequest(() => api.get('/admin/paid-messages/settings')),
   updateSettings: (payload) => safeRequest(() => api.patch('/admin/paid-messages/settings', payload)),
