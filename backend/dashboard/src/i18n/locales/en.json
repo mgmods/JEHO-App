@@ -445,6 +445,7 @@
     "readOnly": "Your account is read-only — cannot save",
     "mod": {
       "dashboard": "Overview",
+      "cp": "CP relationships",
       "users": "Users",
       "agencies": "Agencies",
       "rooms": "Rooms",
