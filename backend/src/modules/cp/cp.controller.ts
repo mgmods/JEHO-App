@@ -18,6 +18,12 @@ export class CpController {
     return this.cp.profileRelationships(userId);
   }
 
+  @Get('catalog')
+  @ApiOperation({ summary: 'Enabled CP types and configured gift prices' })
+  catalog() {
+    return this.cp.catalog();
+  }
+
   @Get('discover')
   @ApiOperation({ summary: 'Real active CP relationships, ranked by points' })
   discover(@Query('type') type?: CpType) {
