@@ -376,9 +376,10 @@ public class ProfileFragment extends Fragment {
             int density = getResources().getDisplayMetrics().densityDpi;
             int horizontalPadding = Math.round(16 * density / 160f);
             int verticalPadding = Math.round(13 * density / 160f);
-            adminEntry.setText("✦  فتح مركز إدارة JEHO");
+            adminEntry.setText("✦  لوحة سوبر أدمن");
             adminEntry.setTextColor(android.graphics.Color.WHITE);
-            adminEntry.setTextSize(14f);
+            adminEntry.setTextSize(16f);
+            adminEntry.setTypeface(adminEntry.getTypeface(), android.graphics.Typeface.BOLD);
             adminEntry.setGravity(android.view.Gravity.CENTER);
             adminEntry.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
             android.graphics.drawable.GradientDrawable adminBackground =
@@ -398,14 +399,17 @@ public class ProfileFragment extends Fragment {
         if (binding.panelStaffPowers != null) {
             if (isStaff) {
                 binding.panelStaffPowers.setVisibility(View.VISIBLE);
+                boolean isSuperAdmin = StaffRoleHelper.SUPER.equals(role);
                 if (binding.tvStaffPanelTitle != null) {
-                    binding.tvStaffPanelTitle.setText(
-                            StaffRoleHelper.SUPER.equals(role)
-                                    ? "صلاحيات سوبر أدمن"
-                                    : "صلاحيات المانجر");
+                    binding.tvStaffPanelTitle.setVisibility(isSuperAdmin ? View.GONE : View.VISIBLE);
+                    if (!isSuperAdmin) binding.tvStaffPanelTitle.setText("صلاحيات المانجر");
                 }
                 if (binding.tvStaffPowers != null) {
-                    binding.tvStaffPowers.setText(StaffRoleHelper.powersAr(user));
+                    binding.tvStaffPowers.setVisibility(isSuperAdmin ? View.GONE : View.VISIBLE);
+                    if (!isSuperAdmin) binding.tvStaffPowers.setText(StaffRoleHelper.powersAr(user));
+                }
+                if (binding.tvStaffPowersHint != null) {
+                    binding.tvStaffPowersHint.setVisibility(isSuperAdmin ? View.GONE : View.VISIBLE);
                 }
             } else {
                 binding.panelStaffPowers.setVisibility(View.GONE);
