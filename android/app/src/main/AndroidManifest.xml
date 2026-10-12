@@ -40,7 +40,7 @@
         <activity
             android:name=".presentation.splash.SplashActivity"
             android:exported="true"
-            android:theme="@style/Theme.AuraLive.Splash"
+            android:theme="@style/Theme.AuraLive"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
