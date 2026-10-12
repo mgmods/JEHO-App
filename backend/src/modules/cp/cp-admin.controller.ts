@@ -61,8 +61,7 @@ export class CpAdminController {
     @Param('type') type: CpType,
     @Body() body: CpTypeConfigDto,
   ) {
-    body.type = type;
-    if (!Object.values(CpType).includes(body.type)) throw new BadRequestException('نوع CP غير صالح');
+    if (!Object.values(CpType).includes(type)) throw new BadRequestException('نوع CP غير صالح');
     if (body.priceCoins !== undefined && (!Number.isSafeInteger(body.priceCoins) || body.priceCoins < 0)) {
       throw new BadRequestException('سعر العملات يجب أن يكون عدداً صحيحاً غير سالب؛ الصفر يعطّل الشراء');
     }
@@ -77,7 +76,7 @@ export class CpAdminController {
       }
     }
     const config: Record<string, unknown> = {};
-    if (body.priceCoins !== undefined) config[`cp.price.${body.type}`] = String(body.priceCoins);
+    if (body.priceCoins !== undefined) config[`cp.price.${type}`] = String(body.priceCoins);
     if (body.giftId !== undefined) config[`cp.gift.${body.type}`] = body.giftId;
     if (body.giftPoints !== undefined) config[`cp.gift_points.${body.type}`] = String(body.giftPoints);
     if (body.maxLevel !== undefined) config[`cp.max_level.${body.type}`] = String(body.maxLevel);
