@@ -48,12 +48,46 @@ export class CpAdminController {
       })),
       policy: {
         requestExpiryMinutes: settings['cp.policy.request_expiry_minutes'] ?? 30,
+        rules: settings['cp.policy.rules'] ?? {},
         fullRefundOnReject: settings['cp.policy.full_refund_on_reject'] ?? true,
         fullRefundOnExpiry: settings['cp.policy.full_refund_on_expiry'] ?? true,
         allowEitherPartyToEnd: settings['cp.policy.allow_either_party_to_end'] ?? true,
       },
       note: 'Prices and levels are intentionally unset until an administrator configures them.',
     };
+  }
+
+
+  @Patch('policy')
+  @ApiOperation({ summary: 'Configure CP request expiry and lifecycle policy without weakening full refunds' })
+  async updatePolicy(
+    @CurrentUser('sub') adminId: string,
+    @Body() body: { requestExpiryMinutes?: number; rules?: Record<string, unknown> },
+  ) {
+    const config: Record<string, string> = {};
+    if (body.requestExpiryMinutes !== undefined) {
+      if (!Number.isInteger(body.requestExpiryMinutes) || body.requestExpiryMinutes < 5 || body.requestExpiryMinutes > 1440) {
+        throw new BadRequestException('مهلة الطلب يجب أن تكون بين 5 دقائق و24 ساعة');
+      }
+      config['cp.policy.request_expiry_minutes'] = String(body.requestExpiryMinutes);
+    }
+    if (body.rules !== undefined) config['cp.policy.rules'] = JSON.stringify(body.rules);
+    await this.dataSource.transaction(async manager => {
+      for (const [key, value] of Object.entries(config)) {
+        await manager.query(
+          `INSERT INTO app_settings (id,key,value,description,"createdAt","updatedAt")
+           VALUES (gen_random_uuid(),$1,$2,$3,now(),now())
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value,description=EXCLUDED.description,"updatedAt"=now()`,
+          [key, value, 'CP lifecycle policy configured by admin'],
+        );
+      }
+      await manager.query(
+        `INSERT INTO cp_audit_logs ("adminUserId",action,"entityType","entityId",details,"createdAt")
+         VALUES ($1,'policy_update','cp_policy','global',$2::jsonb,now())`,
+        [adminId, JSON.stringify({ keys: Object.keys(config) })],
+      );
+    });
+    return this.getConfig();
   }
 
   @Patch('config/:type')
