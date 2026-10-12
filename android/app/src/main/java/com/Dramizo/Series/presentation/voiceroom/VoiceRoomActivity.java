@@ -6505,7 +6505,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (!Boolean.parseBoolean(String.valueOf(item.get("enabled")))) continue;
                     enabled.add(item);
                     String type = String.valueOf(item.get("type"));
-                    labels.add(cpLabel(type) + " — " + String.valueOf(item.get("priceCoins")) + " عملة");
+                    Object rawGift = item.get("gift");
+                    String giftName = "الهدية";
+                    if (rawGift instanceof java.util.Map) {
+                        @SuppressWarnings("unchecked") java.util.Map<String, Object> gift = (java.util.Map<String, Object>) rawGift;
+                        if (gift.get("name") != null) giftName = String.valueOf(gift.get("name"));
+                    }
+                    labels.add(cpLabel(type) + " · " + giftName + " — " + String.valueOf(item.get("priceCoins")) + " عملة");
                 }
                 if (enabled.isEmpty()) {
                     Toast.makeText(this, "أنواع CP غير مفعّلة أو أسعارها غير محددة من لوحة التحكم", Toast.LENGTH_LONG).show();
@@ -6513,7 +6519,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 new androidx.appcompat.app.AlertDialog.Builder(this)
                         .setTitle("إهداء بدء علاقة مع " + (recipientName == null ? "العضو" : recipientName))
-                        .setMessage("سيتم خصم قيمة الهدية الآن. أمام الطرف الآخر 30 دقيقة أو المهلة المضبوطة للرد، ويُعاد المبلغ كاملاً عند الرفض أو انتهاء المهلة.")
+                        .setMessage("سيتم خصم قيمة الهدية الآن. أمام الطرف الآخر المهلة المحددة في النظام للرد، ويُعاد المبلغ كاملاً عند الرفض أو انتهاء المهلة.")
                         .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                             java.util.Map<String, Object> selected = enabled.get(which);
                             sendCpInitiation(app, recipientId, String.valueOf(selected.get("type")));
