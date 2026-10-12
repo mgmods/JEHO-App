@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
 
@@ -10,7 +11,7 @@ const EXPIRY_MINUTES = 30;
 export class CpService implements OnModuleInit, OnModuleDestroy {
   private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(private readonly dataSource: DataSource, private readonly realtime: RealtimeGateway) {}
 
   onModuleInit() {
     // Expiry processing only touches CP requests and their wallet ledger rows.
@@ -180,20 +181,13 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!room || room.type !== 'voice' || room.status === 'closed') {
         throw new BadRequestException('يجب اختيار غرفة صوتية فعالة');
       }
-      const present = await manager.query(
-        `SELECT count(DISTINCT member_id)::int AS n FROM (
-          SELECT "userId" AS member_id FROM room_seats WHERE "roomId" = $1 AND "userId" = ANY($2::uuid[]) AND status IN ('occupied','muted')
-          UNION SELECT "hostId" AS member_id FROM rooms WHERE id = $1 AND "hostId" = ANY($2::uuid[])
-        ) s`,
-        [roomId, [userId, recipientId]],
-      );
-      if (Number(present[0]?.n || 0) !== 2) throw new BadRequestException('يجب أن يكون الطرفان موجودين في الغرفة نفسها');
-      const duplicate = await manager.query(
-        `SELECT id FROM cp_requests WHERE status='pending' AND type=$1
-         AND (("fromUserId"=$2 AND "toUserId"=$3) OR ("fromUserId"=$3 AND "toUserId"=$2)) LIMIT 1 FOR UPDATE`,
-        [type, userId, recipientId],
-      );
-      if (duplicate.length) throw new ConflictException('يوجد طلب CP معلّق بين الحسابين بالفعل');
+      const [senderPresent, recipientPresent] = await Promise.all([
+        this.realtime.isUserPresentInRoom(roomId, userId),
+        this.realtime.isUserPresentInRoom(roomId, recipientId),
+      ]);
+      if (!senderPresent || !recipientPresent) {
+        throw new BadRequestException('يجب أن يكون الطرفان متصلين داخل الغرفة نفسها عند إرسال الهدية');
+      }
       const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
       if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
         throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
