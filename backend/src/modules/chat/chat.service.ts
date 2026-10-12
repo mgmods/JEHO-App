@@ -29,6 +29,7 @@ import { MediaCleanupService } from '../uploads/media-cleanup.service';
 import { TasksService } from '../tasks/tasks.service';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { UserProfile } from '../../database/entities/user-profile.entity';
+import { Follow } from '../../database/entities/follow.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { levelFromScore, MAX_ECONOMY_LEVEL } from '../../common/pricing-catalog';
 import { effectiveVipLevel } from '../../common/vip-progress';
@@ -86,26 +87,36 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async paidMessageConfig() {
-    const [enabledRow, freeRow, priceRow, discountRow, refundMinutesRow, legacyRefundHoursRow] = await Promise.all([
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.enabled' } }),
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.free_count' } }),
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.price_coins' } }),
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.discount_percent' } }),
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.refund_window_minutes' } }),
-      this.settingsRepo.findOne({ where: { key: 'paid_messages.refund_window_hours' } }),
-    ]);
-    const enabled = ['true', '1', 'yes', 'on'].includes(String(enabledRow?.value || '').toLowerCase());
-    const freeCount = Math.min(1000, Math.max(0, Math.floor(Number(freeRow?.value) || 0)));
-    const basePrice = Math.min(10_000_000, Math.max(0, Math.floor(Number(priceRow?.value) || 0)));
-    const discountPercent = Math.min(100, Math.max(0, Number(discountRow?.value) || 0));
-    // New dashboard setting is minutes (default 30); retain compatibility with
-    // deployments that still only have the legacy hours key.
-    const refundWindowMinutes = refundMinutesRow?.value !== undefined && refundMinutesRow?.value !== null
-      ? Math.min(10080, Math.max(0, Number(refundMinutesRow.value) || 0))
-      : legacyRefundHoursRow?.value !== undefined && legacyRefundHoursRow?.value !== null
-        ? Math.min(10080, Math.max(0, Number(legacyRefundHoursRow.value) || 0) * 60)
+    const keys = [
+      'paid_messages.enabled', 'paid_messages.free_count', 'paid_messages.price_coins',
+      'paid_messages.discount_percent', 'paid_messages.one_way_discount_percent',
+      'paid_messages.price_step_coins', 'paid_messages.price_step_every',
+      'paid_messages.price_max_coins', 'paid_messages.daily_limit',
+      'paid_messages.refund_window_minutes', 'paid_messages.refund_window_hours',
+    ];
+    const rows = await this.settingsRepo.find({ where: keys.map((key) => ({ key })) });
+    const values = new Map(rows.map((row) => [row.key, row.value]));
+    const num = (key: string, fallback: number) => {
+      const raw = values.get(key);
+      const parsed = raw == null || raw === '' ? fallback : Number(raw);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+    const enabled = ['true', '1', 'yes', 'on'].includes(String(values.get('paid_messages.enabled') || '').toLowerCase());
+    const freeCount = Math.min(1000, Math.max(0, Math.floor(num('paid_messages.free_count', 3))));
+    const basePrice = Math.min(10_000_000, Math.max(0, Math.floor(num('paid_messages.price_coins', 10))));
+    const discountPercent = Math.min(100, Math.max(0, num('paid_messages.one_way_discount_percent', num('paid_messages.discount_percent', 25))));
+    const priceStepCoins = Math.min(10_000_000, Math.max(0, Math.floor(num('paid_messages.price_step_coins', 0))));
+    const priceStepEvery = Math.min(100000, Math.max(1, Math.floor(num('paid_messages.price_step_every', 10))));
+    const maxPriceCoins = Math.min(10_000_000, Math.max(basePrice, Math.floor(num('paid_messages.price_max_coins', 10_000_000))));
+    const dailyLimit = Math.min(100000, Math.max(0, Math.floor(num('paid_messages.daily_limit', 0))));
+    const refundMinutesRaw = values.get('paid_messages.refund_window_minutes');
+    const legacyHoursRaw = values.get('paid_messages.refund_window_hours');
+    const refundWindowMinutes = refundMinutesRaw != null
+      ? Math.min(10080, Math.max(0, num('paid_messages.refund_window_minutes', 30)))
+      : legacyHoursRaw != null
+        ? Math.min(10080, Math.max(0, num('paid_messages.refund_window_hours', 0) * 60))
         : 30;
-    return { enabled, freeCount, basePrice, discountPercent, refundWindowMinutes };
+    return { enabled, freeCount, basePrice, discountPercent, priceStepCoins, priceStepEvery, maxPriceCoins, dailyLimit, refundWindowMinutes };
   }
 
   private async isGlobalDmGiftGateEnabled() {
@@ -429,32 +440,53 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       });
       if (!conversation) throw new NotFoundException('Conversation not found');
 
-      const priorBillableMessages =
-        type !== MessageType.GIFT && type !== MessageType.SYSTEM
-          ? await manager
-              .getRepository(ChatMessage)
-              .createQueryBuilder('m')
-              .where('m.conversationId = :conversationId', { conversationId })
-              .andWhere('m.senderId = :senderId', { senderId })
-              .andWhere('m.type NOT IN (:...excludedTypes)', {
-                excludedTypes: [MessageType.GIFT, MessageType.SYSTEM],
-              })
-              .getCount()
-          : 0;
-      const isPaidMessage =
-        paidConfig.enabled &&
-        type !== MessageType.GIFT &&
-        type !== MessageType.SYSTEM &&
-        priorBillableMessages >= paidConfig.freeCount &&
-        paidConfig.basePrice > 0;
-      const paidCoins = isPaidMessage
-        ? Math.max(
-            0,
-            Math.round(
-              paidConfig.basePrice * (1 - paidConfig.discountPercent / 100),
-            ),
-          )
+      const billable = type !== MessageType.GIFT && type !== MessageType.SYSTEM;
+      // The free allowance belongs to the sender account, not each conversation.
+      const priorBillableMessages = billable
+        ? await manager.getRepository(ChatMessage)
+            .createQueryBuilder('m')
+            .where('m.senderId = :senderId', { senderId })
+            .andWhere('m.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
+            .getCount()
         : 0;
+      const paidCount = billable
+        ? await manager.count(WalletTransaction, { where: { userId: senderId, referenceType: 'paid_message' } })
+        : 0;
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const paidToday = billable && paidConfig.dailyLimit > 0
+        ? await manager.getRepository(WalletTransaction).createQueryBuilder('tx')
+            .where('tx.userId = :senderId', { senderId })
+            .andWhere('tx.referenceType = :referenceType', { referenceType: 'paid_message' })
+            .andWhere('tx.createdAt >= :todayStart', { todayStart })
+            .getCount()
+        : 0;
+      if (paidConfig.enabled && billable && paidConfig.dailyLimit > 0 && paidToday >= paidConfig.dailyLimit) {
+        throw new BadRequestException('وصلت إلى الحد اليومي للرسائل المدفوعة');
+      }
+      const peers = billable
+        ? await manager.find(ChatParticipant, { where: { conversationId } })
+        : [];
+      const receiver = peers.find((participant) => participant.userId !== senderId);
+      const senderFollows = receiver
+        ? !!(await manager.findOne(Follow, { where: { followerId: senderId, followingId: receiver.userId } }))
+        : false;
+      const receiverFollows = receiver
+        ? !!(await manager.findOne(Follow, { where: { followerId: receiver.userId, followingId: senderId } }))
+        : false;
+      const mutualFollow = senderFollows && receiverFollows;
+      const oneWayFollow = senderFollows || receiverFollows;
+      const tierPrice = Math.min(
+        paidConfig.maxPriceCoins,
+        paidConfig.basePrice + Math.floor(paidCount / paidConfig.priceStepEvery) * paidConfig.priceStepCoins,
+      );
+      const isPaidMessage =
+        paidConfig.enabled && billable && !mutualFollow &&
+        priorBillableMessages >= paidConfig.freeCount && tierPrice > 0;
+      const effectivePrice = oneWayFollow
+        ? Math.round(tierPrice * (1 - paidConfig.discountPercent / 100))
+        : tierPrice;
+      const paidCoins = isPaidMessage ? Math.max(0, effectivePrice) : 0;
 
       const saved = await manager.save(
         manager.create(ChatMessage, {
@@ -492,7 +524,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
               conversationId,
               freeMessagesCount: paidConfig.freeCount,
               basePriceCoins: paidConfig.basePrice,
-              discountPercent: paidConfig.discountPercent,
+              chargedCoins: paidCoins,
+              paidMessageNumber: paidCount + 1,
+              discountPercent: oneWayFollow ? paidConfig.discountPercent : 0,
+              followStatus: mutualFollow ? 'mutual' : oneWayFollow ? 'one_way' : 'none',
               refundWindowMinutes: paidConfig.refundWindowMinutes,
             },
           }),
