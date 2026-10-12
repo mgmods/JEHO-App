@@ -465,10 +465,11 @@ public final class AvatarCosmetics {
     private static boolean isAnimatedWearMedia(@Nullable String url) {
         if (url == null || url.trim().isEmpty()) return false;
         CosmeticMedia.Kind kind = CosmeticMedia.kind(url);
+        // GIF, video and SVGA require a playback-capable view. WebP stays on Glide,
+        // which preserves animation only when the source actually contains frames.
         return kind == CosmeticMedia.Kind.GIF
                 || kind == CosmeticMedia.Kind.VIDEO
-                || kind == CosmeticMedia.Kind.SVGA
-                || CosmeticMedia.isAnimatedWear(url);
+                || kind == CosmeticMedia.Kind.SVGA;
     }
 
     @Nullable
