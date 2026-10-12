@@ -82,6 +82,7 @@ public class ChatConversationActivity extends ThemedActivity {
     private boolean peerTyping;
     private boolean showOnlineAllowed = true;
     private String editingMessageId;
+    private String pendingPaidDraft;
     private Runnable typingStop;
     private MediaRecorder mediaRecorder;
     private File voiceFile;
@@ -355,6 +356,10 @@ public class ChatConversationActivity extends ThemedActivity {
                 return;
             }
             if (msg.contains("تحتاج إلى") && msg.contains("عملة")) {
+                if (pendingPaidDraft != null && !pendingPaidDraft.isEmpty() && binding.etMessage != null) {
+                    binding.etMessage.setText(pendingPaidDraft);
+                    binding.etMessage.setSelection(binding.etMessage.getText().length());
+                }
                 if (binding.paidMessageRechargeBanner != null) {
                     if (binding.tvPaidMessageRechargeText != null) {
                         binding.tvPaidMessageRechargeText.setText(msg + " — اشحن رصيدك للمتابعة.");
@@ -448,6 +453,7 @@ public class ChatConversationActivity extends ThemedActivity {
             clearEditing();
             return;
         }
+        pendingPaidDraft = text;
         viewModel.send(conversationId, text);
         binding.etMessage.setText("");
     }
