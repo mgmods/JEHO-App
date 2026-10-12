@@ -49,6 +49,16 @@ export class CpController {
     return this.cp.createRequest(userId, body);
   }
 
+  @Get('sent-requests')
+  sentRequests(@CurrentUser('sub') userId: string) {
+    return this.cp.sentRequests(userId);
+  }
+
+  @Post('requests/:id/cancel')
+  cancelRequest(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+    return this.cp.cancelRequest(userId, id);
+  }
+
   @Post('requests/:id/respond')
   respond(
     @CurrentUser('sub') userId: string,
