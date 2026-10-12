@@ -467,6 +467,48 @@
                 app:tint="@color/text_primary" />
         </LinearLayout>
 
+        <LinearLayout
+            android:id="@+id/paidMessageRechargeBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/bg_chat_reply_quote"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvPaidMessageRechargeText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="رصيدك لا يكفي لإرسال الرسالة. اشحن رصيدك للمتابعة."
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnPaidMessageRecharge"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="12dp"
+                android:text="شحن الرصيد"
+                android:textAllCaps="false"
+                android:textSize="12sp" />
+
+            <ImageView
+                android:id="@+id/btnDismissPaidMessageRecharge"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:contentDescription="@string/cancel"
+                android:padding="6dp"
+                android:src="@drawable/ic_pro_close"
+                app:tint="@color/text_secondary" />
+        </LinearLayout>
+
         <!-- Composer: + | pill input+emoji | mic/send -->
         <LinearLayout
             android:id="@+id/inputBar"
