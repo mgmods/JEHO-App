@@ -1,6 +1,9 @@
 package com.Dramizo.Series.presentation.cp;
 
 import android.graphics.Color;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
+import android.provider.Settings;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -151,6 +154,19 @@ public class CpDiscoveryActivity extends ThemedActivity {
         people.addView(avatarA, new LinearLayout.LayoutParams(dp(58), dp(58)));
         TextView symbol = text(symbolFor(type), 28, Color.rgb(208, 151, 54), true);
         symbol.setGravity(Gravity.CENTER);
+        if (rank <= 10) {
+            try {
+                float animatorScale = Settings.Global.getFloat(getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE, 1f);
+                if (animatorScale > 0f) {
+                    ObjectAnimator pulseX = ObjectAnimator.ofFloat(symbol, "scaleX", 0.96f, 1.06f);
+                    ObjectAnimator pulseY = ObjectAnimator.ofFloat(symbol, "scaleY", 0.96f, 1.06f);
+                    pulseX.setDuration(900); pulseY.setDuration(900);
+                    pulseX.setRepeatMode(ValueAnimator.REVERSE); pulseY.setRepeatMode(ValueAnimator.REVERSE);
+                    pulseX.setRepeatCount(ValueAnimator.INFINITE); pulseY.setRepeatCount(ValueAnimator.INFINITE);
+                    pulseX.start(); pulseY.start();
+                }
+            } catch (Exception ignored) { /* reduced motion or device setting unavailable */ }
+        }
         people.addView(symbol, new LinearLayout.LayoutParams(dp(58), dp(58)));
         people.addView(avatarB, new LinearLayout.LayoutParams(dp(58), dp(58)));
         card.addView(people);
