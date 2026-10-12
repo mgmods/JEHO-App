@@ -66,6 +66,13 @@
             android:scaleType="fitCenter"
             android:visibility="gone" />
 
+        <com.Dramizo.Series.util.HostSignalView
+            android:id="@+id/userCardHostSignal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
         <ImageView
             android:id="@+id/imgUserHostBadge"
             android:layout_width="match_parent"
