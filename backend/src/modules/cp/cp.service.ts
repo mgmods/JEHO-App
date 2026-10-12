@@ -37,7 +37,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const price = Number(settings[`cp.price.${type}`]);
       const giftId = settings[`cp.gift.${type}`] || null;
       const [gift] = giftId ? await this.dataSource.query(
-        'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1',
+        'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
       const enabled = settings[`cp.enabled.${type}`] === 'true'
