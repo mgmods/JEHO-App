@@ -524,6 +524,17 @@
         tools:text="Heyy! How are you?" />
 
     <TextView
+        android:id="@+id/tvPaidMessageInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:maxWidth="250dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone"
+        tools:text="💰 10 عملة · بانتظار الرد" />
+
+    <TextView
         android:id="@+id/tvTranslateAction"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
