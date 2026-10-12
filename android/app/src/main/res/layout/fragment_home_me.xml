@@ -109,6 +109,26 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/actionEditProfileTop"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:layoutDirection="rtl"
+                android:background="@drawable/bg_profile_lux_chip"
+                android:clickable="true"
+                android:focusable="true">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✍️  تعديل الملف الشخصي"
+                    android:textColor="#6F4A14"
+                    android:textSize="14sp"
+                    android:textStyle="bold"/>
+            </LinearLayout>
+
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
@@ -176,13 +196,13 @@
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="👑"/>
                     <TextView style="@style/ProfileLuxuryLabel" android:text="العضوية"/>
                 </LinearLayout>
-                <LinearLayout android:id="@+id/actionGifts" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
-                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🎁"/>
-                    <TextView style="@style/ProfileLuxuryLabel" android:text="هداياي"/>
+                <LinearLayout android:id="@+id/actionAgency" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🏢"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="افتح وكالة"/>
                 </LinearLayout>
-                <LinearLayout android:id="@+id/actionStore" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
-                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🛍"/>
-                    <TextView style="@style/ProfileLuxuryLabel" android:text="المتجر"/>
+                <LinearLayout android:id="@+id/actionRechargeAgent" style="@style/ProfileLuxuryShortcut" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:padding="10dp">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="💳"/>
+                    <TextView style="@style/ProfileLuxuryLabel" android:text="وكيل شحن"/>
                 </LinearLayout>
             </GridLayout>
 
@@ -203,12 +223,6 @@
                 android:background="@drawable/bg_profile_lux_card"
                 android:paddingHorizontal="12dp">
 
-                <LinearLayout android:id="@+id/actionEditProfile" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
-                    <TextView style="@style/ProfileLuxuryEmoji" android:text="✍️"/>
-                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="تعديل الملف الشخصي"/>
-                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
-                </LinearLayout>
-                <View style="@style/ProfileLuxuryDivider"/>
                 <LinearLayout android:id="@+id/actionSecurity" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="🛡"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="الأمان والخصوصية"/>
@@ -218,6 +232,12 @@
                 <LinearLayout android:id="@+id/actionActivities" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="✨"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="فعالياتي ومركز المهام"/>
+                    <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
+                </LinearLayout>
+                <View style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionStore" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                    <TextView style="@style/ProfileLuxuryEmoji" android:text="🛍"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="المتجر"/>
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
                 </LinearLayout>
                 <View style="@style/ProfileLuxuryDivider"/>
