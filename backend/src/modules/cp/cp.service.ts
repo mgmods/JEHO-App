@@ -121,6 +121,30 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+
+  async sentRequests(userId: string) {
+    await this.expireDueRequests();
+    return this.dataSource.query(
+      `SELECT q.*, json_build_object('id',u.id,'username',u.username,'displayName',u."displayName",'avatarUrl',u."avatarUrl") AS recipient
+       FROM cp_requests q JOIN users u ON u.id=q."toUserId"
+       WHERE q."fromUserId"=$1 AND q.status IN ('pending','accepted','rejected','expired','cancelled')
+       ORDER BY q."createdAt" DESC LIMIT 100`,
+      [userId],
+    );
+  }
+
+  async cancelRequest(userId: string, requestId: string) {
+    return this.dataSource.transaction(async manager => {
+      const [request] = await manager.query('SELECT * FROM cp_requests WHERE id=$1 FOR UPDATE', [requestId]);
+      if (!request) throw new NotFoundException('طلب CP غير موجود');
+      if (request.fromUserId !== userId) throw new BadRequestException('لا يمكنك إلغاء طلب ليس لك');
+      if (request.status !== CpRequestStatus.PENDING) throw new ConflictException('لا يمكن إلغاء هذا الطلب بعد معالجته');
+      await this.refund(manager, request);
+      await manager.query(`UPDATE cp_requests SET status='cancelled',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
+      return { id: requestId, status: 'cancelled', refunded: true };
+    });
+  }
+
   async requests(userId: string) {
     await this.expireDueRequests();
     return this.dataSource.query(
