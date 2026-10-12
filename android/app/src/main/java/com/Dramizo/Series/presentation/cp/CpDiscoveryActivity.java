@@ -217,6 +217,10 @@ public class CpDiscoveryActivity extends ThemedActivity {
         }
     }
 
+    private int numberOf(Object value, int fallback) { try { return value == null ? fallback : (int) Double.parseDouble(String.valueOf(value)); } catch (Exception ignored) { return fallback; } }
+
+    private double doubleOf(Object value, double fallback) { try { return value == null ? fallback : Double.parseDouble(String.valueOf(value)); } catch (Exception ignored) { return fallback; } }
+
     private TextView text(String value, int size, int color, boolean bold) {
         TextView view = new TextView(this);
         view.setText(value);
