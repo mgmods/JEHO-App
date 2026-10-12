@@ -57,6 +57,15 @@ public interface AdminApi {
     @GET("admin/agencies")
     Call<ApiResponse<Object>> agencies(@Query("page") int page, @Query("limit") int limit);
 
+    @POST("admin/agencies")
+    Call<ApiResponse<Object>> createAgency(@Body Map<String, Object> body);
+
+    @POST("admin/agencies/{id}/approve")
+    Call<ApiResponse<Object>> approveAgency(@Path("id") String id);
+
+    @DELETE("admin/agencies/{id}")
+    Call<ApiResponse<Object>> deleteAgency(@Path("id") String id);
+
     @POST("admin/agencies/{id}/suspend")
     Call<ApiResponse<Object>> suspendAgency(@Path("id") String id, @Body Map<String, String> body);
 
@@ -120,6 +129,12 @@ public interface AdminApi {
     Call<ApiResponse<Object>> rejectRechargeAgentApplication(@Path("id") String id, @Body Map<String, Object> body);
     @GET("admin/recharge-agents")
     Call<ApiResponse<Object>> rechargeAgents();
+
+    @POST("admin/recharge-agents/assign")
+    Call<ApiResponse<Object>> assignRechargeAgent(@Body Map<String, Object> body);
+
+    @DELETE("admin/recharge-agents/{id}")
+    Call<ApiResponse<Object>> deleteRechargeAgent(@Path("id") String id);
 
     @POST("admin/recharge-agents/{id}/float")
     Call<ApiResponse<Object>> adjustRechargeAgentFloat(@Path("id") String id, @Body Map<String, Object> body);
