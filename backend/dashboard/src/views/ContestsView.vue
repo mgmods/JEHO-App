@@ -79,6 +79,68 @@
           </select>
         </div>
         <div class="col-md-12">
+          <label class="form-label small">نوع النشاط</label>
+          <select v-model="form.kind" class="form-select form-select-sm">
+            <option value="celebration">احتفالية</option>
+            <option value="event">فعالية تفاعلية داخل الروم</option>
+            <option value="challenge">تحدّي</option>
+          </select>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label small">رابط البنر</label>
+          <input v-model="form.bannerUrl" class="form-control form-control-sm" placeholder="https://..." />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">الهدف بالألماسات</label>
+          <input v-model.number="form.goalDiamonds" type="number" min="0" class="form-control form-control-sm" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">طريقة الاحتساب</label>
+          <select v-model="form.scoringMode" class="form-select form-select-sm">
+            <option value="coins">الكوينز المرسلة</option>
+            <option value="diamonds">الألماسات</option>
+            <option value="gifts">عدد الهدايا</option>
+            <option value="points">النقاط</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">نوع التحدي</label>
+          <select v-model="form.challengeType" class="form-select form-select-sm">
+            <option value="individual">مستخدم ضد مستخدم</option>
+            <option value="host">مضيفون</option>
+            <option value="room_vs_room">روم ضد روم</option>
+            <option value="agency_vs_agency">وكالة ضد وكالة</option>
+          </select>
+        </div>
+        <div class="col-md-12 form-check ms-2">
+          <input id="interactiveEvent" v-model="form.isInteractive" type="checkbox" class="form-check-input" />
+          <label class="form-check-label small" for="interactiveEvent">إظهار كعنصر تفاعلي داخل شاشة الروم</label>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">معرّفات الهدايا المسموحة (JSON array)</label>
+          <textarea v-model="form.allowedGiftIdsText" rows="2" class="form-control form-control-sm" placeholder='["gift-uuid-1"]'></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">المراحل والأهداف (JSON array)</label>
+          <textarea v-model="form.milestonesText" rows="2" class="form-control form-control-sm" placeholder='[{"goal":1000,"prize":"..."}]'></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">الجوائز وشروط الاستحقاق (JSON array)</label>
+          <textarea v-model="form.prizesText" rows="2" class="form-control form-control-sm" placeholder='[{"rank":1,"coins":1000}]'></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">قواعد وشروط إضافية (JSON object)</label>
+          <textarea v-model="form.rulesText" rows="2" class="form-control form-control-sm" placeholder='{"minimumDiamonds":100}'></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">الطرف الأول (JSON object)</label>
+          <textarea v-model="form.sideAText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الفريق الأول","roomIds":[]} '></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">الطرف الثاني (JSON object)</label>
+          <textarea v-model="form.sideBText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الفريق الثاني","roomIds":[]} '></textarea>
+        </div>
+        <div class="col-md-12">
           <label class="form-label small">{{ t('common.description') }}</label>
           <input v-model="form.description" class="form-control form-control-sm" />
         </div>
@@ -303,6 +365,18 @@ async function onBulkAction(key) {
 const form = reactive({
   title: '',
   description: '',
+  kind: 'challenge',
+  bannerUrl: '',
+  goalDiamonds: 0,
+  scoringMode: 'coins',
+  challengeType: 'individual',
+  allowedGiftIdsText: '[]',
+  milestonesText: '[]',
+  prizesText: '[]',
+  rulesText: '{}',
+  sideAText: '{}',
+  sideBText: '{}',
+  isInteractive: false,
   category: 'rich',
   durationUnit: 'hours',
   durationValue: 24,
@@ -374,6 +448,18 @@ function onBannerError() {
 function resetForm() {
   form.title = ''
   form.description = ''
+  form.kind = 'challenge'
+  form.bannerUrl = ''
+  form.goalDiamonds = 0
+  form.scoringMode = 'coins'
+  form.challengeType = 'individual'
+  form.allowedGiftIdsText = '[]'
+  form.milestonesText = '[]'
+  form.prizesText = '[]'
+  form.rulesText = '{}'
+  form.sideAText = '{}'
+  form.sideBText = '{}'
+  form.isInteractive = false
   form.category = 'rich'
   form.durationUnit = 'hours'
   form.durationValue = 24
@@ -408,6 +494,18 @@ function openEdit(c) {
   editingId.value = c.id
   form.title = c.title || ''
   form.description = c.description || ''
+  form.kind = c.kind || 'challenge'
+  form.bannerUrl = c.bannerUrl || ''
+  form.goalDiamonds = Number(c.goalDiamonds || 0)
+  form.scoringMode = c.scoringMode || 'coins'
+  form.challengeType = c.challengeType || 'individual'
+  form.allowedGiftIdsText = JSON.stringify(c.allowedGiftIds || [], null, 2)
+  form.milestonesText = JSON.stringify(c.milestones || [], null, 2)
+  form.prizesText = JSON.stringify(c.prizes || [], null, 2)
+  form.rulesText = JSON.stringify(c.rules || {}, null, 2)
+  form.sideAText = JSON.stringify(c.sideA || {}, null, 2)
+  form.sideBText = JSON.stringify(c.sideB || {}, null, 2)
+  form.isInteractive = c.isInteractive === true
   form.category = c.category || 'rich'
   form.durationUnit = 'hours'
   form.durationValue = 24
@@ -482,9 +580,37 @@ async function saveContest() {
   if (!validateForm()) return
   saving.value = true
   error.value = ''
+  let advanced
+  try {
+    advanced = {
+      allowedGiftIds: JSON.parse(form.allowedGiftIdsText || '[]'),
+      milestones: JSON.parse(form.milestonesText || '[]'),
+      prizes: JSON.parse(form.prizesText || '[]'),
+      rules: JSON.parse(form.rulesText || '{}'),
+      sideA: JSON.parse(form.sideAText || '{}'),
+      sideB: JSON.parse(form.sideBText || '{}'),
+    }
+    if (!Array.isArray(advanced.allowedGiftIds) || !Array.isArray(advanced.milestones) || !Array.isArray(advanced.prizes) ||
+        !advanced.rules || Array.isArray(advanced.rules) || typeof advanced.rules !== 'object' ||
+        !advanced.sideA || Array.isArray(advanced.sideA) || typeof advanced.sideA !== 'object' ||
+        !advanced.sideB || Array.isArray(advanced.sideB) || typeof advanced.sideB !== 'object') {
+      throw new Error('تحقق من صيغة JSON: القوائم يجب أن تكون arrays والقواعد والأطراف objects')
+    }
+  } catch (parseError) {
+    error.value = parseError instanceof Error ? parseError.message : 'صيغة JSON غير صحيحة'
+    saving.value = false
+    return
+  }
   const payload = {
     title: form.title.trim(),
     description: form.description,
+    kind: form.kind,
+    bannerUrl: form.bannerUrl.trim(),
+    goalDiamonds: Math.max(0, Number(form.goalDiamonds) || 0),
+    scoringMode: form.scoringMode,
+    challengeType: form.challengeType,
+    isInteractive: form.isInteractive,
+    ...advanced,
     category: form.category,
     entryFeeCoins: form.entryFeeCoins,
     prizeCoins: form.prizeCoins,
