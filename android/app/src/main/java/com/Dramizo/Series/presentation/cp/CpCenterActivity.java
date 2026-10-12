@@ -48,6 +48,11 @@ public class CpCenterActivity extends ThemedActivity {
 
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.btnDiscoverCp.setOnClickListener(v -> startActivity(new Intent(this, CpDiscoveryActivity.class)));
+        binding.btnCpBrotherhood.setOnClickListener(v -> openCpCategory("brotherhood"));
+        binding.btnCpFriendship.setOnClickListener(v -> openCpCategory("friendship"));
+        binding.btnCpLove.setOnClickListener(v -> openCpCategory("love"));
+        binding.btnCpEngagement.setOnClickListener(v -> openCpCategory("engagement"));
+        binding.btnCpMarriage.setOnClickListener(v -> openCpCategory("marriage"));
         binding.btnCpRequests.setOnClickListener(v -> showCpRequestsDialog());
         binding.btnBecomeCp.setOnClickListener(v -> {
             if (partner != null) {
@@ -347,6 +352,12 @@ public class CpCenterActivity extends ThemedActivity {
                 if (result.success) loadPartner();
             });
         });
+    }
+
+    private void openCpCategory(String type) {
+        Intent intent = new Intent(this, CpDiscoveryActivity.class);
+        intent.putExtra(CpDiscoveryActivity.EXTRA_CP_TYPE, type);
+        startActivity(intent);
     }
 
     private void openRanking(String tab) {
