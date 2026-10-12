@@ -139,8 +139,7 @@ public class HomeMeFragment extends Fragment {
             binding.tvProfileDiamonds.setText(String.valueOf(Math.max(0L, me.totalReceivedDiamonds)));
             binding.tvProfileGold.setText(String.valueOf(Math.max(0L, me.totalSentCoins)));
             binding.tvProfileVip.setText("VIP " + Math.max(0, me.vipLevel));
-            binding.tvProfileVerified.setVisibility(me.isAdmin
-                    || (me.staffRole != null && !me.staffRole.trim().isEmpty())
+            binding.tvProfileVerified.setVisibility(me.genderVerified
                     ? View.VISIBLE : View.GONE);
             if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
                 Glide.with(this).load(me.avatarUrl).placeholder(R.drawable.ic_default_avatar)
