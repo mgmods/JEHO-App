@@ -29,6 +29,9 @@ public final class ChatDtos {
         @SerializedName("replyTo") public MessageDto replyTo;
         @SerializedName("isEdited") public boolean isEdited;
         @SerializedName("createdAt") public String createdAt;
+        @SerializedName("paidCoins") public long paidCoins;
+        @SerializedName("paidStatus") public String paidStatus;
+        @SerializedName("replyDeadlineAt") public String replyDeadlineAt;
         @SerializedName("sender") public AuthDtos.UserDto sender;
         /** Client-only: pending until server ack. */
         public transient boolean localPending;
