@@ -31,7 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class CpDiscoveryActivity extends ThemedActivity {\n    public static final String EXTRA_CP_TYPE = "cp_type";
+public class CpDiscoveryActivity extends ThemedActivity {
+    public static final String EXTRA_CP_TYPE = "cp_type";
     private AppContainer container;
     private LinearLayout list;
     private String selectedType;
@@ -39,7 +40,9 @@ public class CpDiscoveryActivity extends ThemedActivity {\n    public static fin
 
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
-        container = ContainerProvider.from(this);\n        String initialType = getIntent().getStringExtra(EXTRA_CP_TYPE);\n        selectedType = isValidType(initialType) ? initialType : null;
+        container = ContainerProvider.from(this);
+        String initialType = getIntent().getStringExtra(EXTRA_CP_TYPE);
+        selectedType = isValidType(initialType) ? initialType : null;
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.rgb(255, 250, 242));
