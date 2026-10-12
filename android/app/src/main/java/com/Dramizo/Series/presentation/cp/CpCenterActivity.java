@@ -136,8 +136,11 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     private long longOf(Object value) {
-        try { return value == null ? 0L : Long.parseLong(String.valueOf(value)); }
-        catch (Exception ignored) { return 0L; }
+        try {
+            if (value == null) return 0L;
+            if (value instanceof Number) return ((Number) value).longValue();
+            return (long) Double.parseDouble(String.valueOf(value));
+        } catch (Exception ignored) { return 0L; }
     }
 
     private void bindPartnerUi(int pendingIncoming) {
