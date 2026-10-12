@@ -15,6 +15,7 @@
     "migrate:professional-room-features": "node scripts/migrate-professional-room-features.js",
     "migrate:payments": "node scripts/migrate-payments-agents-theme.js",
     "migrate:dashboard-assets": "node scripts/migrate-dashboard-assets.js",
+    "migrate:cp": "node scripts/migrate-cp-system.js",
     "seed:catalog": "node scripts/upsert_catalog_pack.js",
     "lint": "tsc -p tsconfig.json --noEmit"
   },

@@ -943,6 +943,20 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     return !access.expiresAt || access.expiresAt > new Date();
   }
 
+
+  /**
+   * Read-only live membership check for room-scoped actions.
+   * It does not join/leave sockets or modify voice/audio state.
+   */
+  async isUserPresentInRoom(roomId: string, userId: string): Promise<boolean> {
+    if (!roomId || !userId || !this.server) return false;
+    const sockets = await this.server.in(`room:${roomId}`).fetchSockets();
+    return sockets.some(socket => {
+      const profile = socket.data?.roomProfiles?.[roomId];
+      return profile && String(profile.userId || '') === userId;
+    });
+  }
+
   isOnline(userId: string): boolean {
     return this.onlineUsers.has(userId);
   }

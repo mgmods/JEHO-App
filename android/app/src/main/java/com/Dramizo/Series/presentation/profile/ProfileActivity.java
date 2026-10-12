@@ -9,6 +9,12 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -48,6 +54,88 @@ public class ProfileActivity extends ThemedActivity {
     private ActivityProfileBinding binding;
     private boolean isFollowingTarget;
 
+    private void loadCpProfileRelationships(AppContainer container, String profileUserId) {
+        if (profileUserId == null || profileUserId.isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            Result<java.util.List<Map<String, Object>>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(
+                            container.getUserApi().cpProfileRelationships(profileUserId));
+            runOnUiThread(() -> {
+                if (isFinishing() || !result.success || result.data == null || result.data.isEmpty()) return;
+                LinearLayout section = new LinearLayout(this);
+                section.setOrientation(LinearLayout.VERTICAL);
+                section.setPadding(dpCp(16), dpCp(14), dpCp(16), dpCp(14));
+                section.setBackground(cpRounded(Color.rgb(255, 250, 241), dpCp(18)));
+                LinearLayout.LayoutParams sectionLp = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                sectionLp.setMargins(dpCp(14), dpCp(12), dpCp(14), dpCp(12));
+                TextView heading = cpText("علاقات CP النشطة", 17, Color.rgb(91, 57, 37), true);
+                section.addView(heading);
+                for (Map<String, Object> relation : result.data) {
+                    Object rawPartner = relation.get("partner");
+                    if (!(rawPartner instanceof Map)) continue;
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> partner = (Map<String, Object>) rawPartner;
+                    LinearLayout row = new LinearLayout(this);
+                    row.setGravity(Gravity.CENTER_VERTICAL);
+                    row.setPadding(0, dpCp(12), 0, dpCp(4));
+                    ImageView avatar = new ImageView(this);
+                    avatar.setLayoutParams(new LinearLayout.LayoutParams(dpCp(48), dpCp(48)));
+                    com.Dramizo.Series.util.AvatarImageLoader.load(avatar,
+                            String.valueOf(partner.getOrDefault("avatarUrl", "")));
+                    row.addView(avatar);
+                    LinearLayout info = new LinearLayout(this);
+                    info.setOrientation(LinearLayout.VERTICAL);
+                    info.setPadding(dpCp(12), 0, 0, 0);
+                    TextView name = cpText(String.valueOf(partner.getOrDefault("displayName",
+                            partner.getOrDefault("username", "عضو"))), 15, Color.rgb(65, 48, 40), true);
+                    TextView meta = cpText(cpTypeLabel(String.valueOf(relation.get("type")))
+                            + " · المستوى " + String.valueOf(relation.getOrDefault("level", 1))
+                            + " · النقاط " + String.valueOf(relation.getOrDefault("points", "0")),
+                            12, Color.rgb(128, 101, 80), false);
+                    info.addView(name);
+                    info.addView(meta);
+                    row.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+                    section.addView(row);
+                }
+                binding.contentRoot.addView(section);
+            });
+        });
+    }
+
+    private String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "الصداقة";
+            case "brotherhood": return "الأخوّة";
+            case "love": return "الحب";
+            case "engagement": return "الخطوبة";
+            case "marriage": return "الزواج";
+            default: return "CP";
+        }
+    }
+
+    private TextView cpText(String value, int size, int color, boolean bold) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return view;
+    }
+
+    private GradientDrawable cpRounded(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        return drawable;
+    }
+
+    private int dpCp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,6 +158,8 @@ public class ProfileActivity extends ThemedActivity {
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
+
+        loadCpProfileRelationships(container, targetUserIdHold[0]);
 
         // Mikoo card taps on full profile page.
         if (binding.cellProfileFollowers != null) {

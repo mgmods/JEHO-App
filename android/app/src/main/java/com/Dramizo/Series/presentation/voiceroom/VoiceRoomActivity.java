@@ -6481,6 +6481,87 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         showUserCard(userId, name, avatarUrl, frameUrl, null, vipLevel, userLevel);
     }
 
+
+    private void showCpInitiationPicker(String recipientId, String recipientName,
+                                        BottomSheetDialog profileDialog) {
+        if (roomId == null || roomId.isEmpty() || recipientId == null || recipientId.isEmpty()
+                || myUserId == null || myUserId.equals(recipientId)) {
+            Toast.makeText(this, "اختر عضواً آخر من داخل الغرفة", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        AppContainer app = ContainerProvider.from(this);
+        app.getIoExecutor().execute(() -> {
+            Result<java.util.List<java.util.Map<String, Object>>> result =
+                    ApiCall.execute(app.getUserApi().cpCatalog());
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (!result.success || result.data == null) {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل أنواع CP", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                java.util.List<java.util.Map<String, Object>> enabled = new java.util.ArrayList<>();
+                java.util.List<String> labels = new java.util.ArrayList<>();
+                for (java.util.Map<String, Object> item : result.data) {
+                    if (!Boolean.parseBoolean(String.valueOf(item.get("enabled")))) continue;
+                    enabled.add(item);
+                    String type = String.valueOf(item.get("type"));
+                    Object rawGift = item.get("gift");
+                    String giftName = "الهدية";
+                    if (rawGift instanceof java.util.Map) {
+                        @SuppressWarnings("unchecked") java.util.Map<String, Object> gift = (java.util.Map<String, Object>) rawGift;
+                        if (gift.get("name") != null) giftName = String.valueOf(gift.get("name"));
+                    }
+                    labels.add(cpLabel(type) + " · " + giftName + " — " + String.valueOf(item.get("priceCoins")) + " عملة");
+                }
+                if (enabled.isEmpty()) {
+                    Toast.makeText(this, "أنواع CP غير مفعّلة أو أسعارها غير محددة من لوحة التحكم", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                new androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("إهداء بدء علاقة مع " + (recipientName == null ? "العضو" : recipientName))
+                        .setMessage("سيتم خصم قيمة الهدية الآن. أمام الطرف الآخر المهلة المحددة في النظام للرد، ويُعاد المبلغ كاملاً عند الرفض أو انتهاء المهلة.")
+                        .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                            java.util.Map<String, Object> selected = enabled.get(which);
+                            sendCpInitiation(app, recipientId, String.valueOf(selected.get("type")));
+                        })
+                        .setNegativeButton("إلغاء", null)
+                        .show();
+            });
+        });
+    }
+
+    private void sendCpInitiation(AppContainer app, String recipientId, String type) {
+        if (roomId == null || roomId.isEmpty()) return;
+        java.util.Map<String, String> body = new java.util.HashMap<>();
+        body.put("recipientId", recipientId);
+        body.put("type", type);
+        body.put("roomId", roomId);
+        body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+        app.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> result =
+                    ApiCall.execute(app.getUserApi().createCpRequest(body));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                if (result.success) {
+                    Toast.makeText(this, "تم إرسال طلب CP؛ ستُنشأ العلاقة بعد الموافقة", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, result.error != null ? result.error : "تعذر إرسال طلب CP", Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    private String cpLabel(String type) {
+        switch (type) {
+            case "friendship": return "الصداقة";
+            case "brotherhood": return "الأخوّة";
+            case "love": return "الحب";
+            case "engagement": return "الخطوبة";
+            case "marriage": return "الزواج";
+            default: return "CP";
+        }
+    }
+
     private void bindVipUserCardHead(@Nullable ImageView vipHead, int vipLevel,
                                      @Nullable String headUrl) {
         if (vipHead == null) return;
@@ -6631,6 +6712,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView chipWealth = sheet.findViewById(R.id.chipWealth);
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
+        TextView actCpInitiate = sheet.findViewById(R.id.actCpInitiate);
+        if (actCpInitiate != null) {
+            boolean canOfferCp = userId != null && !userId.isEmpty()
+                    && myUserId != null && !myUserId.equals(userId)
+                    && roomId != null && !roomId.isEmpty();
+            actCpInitiate.setVisibility(canOfferCp ? View.VISIBLE : View.GONE);
+            actCpInitiate.setOnClickListener(v -> showCpInitiationPicker(userId, name, dialog));
+        }
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");

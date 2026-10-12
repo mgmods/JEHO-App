@@ -20,6 +20,7 @@ import { TasksModule } from '../tasks/tasks.module';
 import { ContestsModule } from '../contests/contests.module';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { HostTargetModule } from '../host-target/host-target.module';
+import { CpModule } from '../cp/cp.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { HostTargetModule } from '../host-target/host-target.module';
     forwardRef(() => ContestsModule),
     RealtimeModule,
     HostTargetModule,
+    CpModule,
   ],
   controllers: [GiftsController],
   providers: [GiftsService],

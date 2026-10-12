@@ -43,6 +43,9 @@ public interface UserApi {
     @POST("users/{id}/unfollow")
     Call<ApiResponse<Object>> unfollow(@Path("id") String id);
 
+    @GET("cp/users/{id}")
+    Call<ApiResponse<List<Map<String, Object>>>> cpProfileRelationships(@Path("id") String id);
+
     @GET("users/{id}/followers")
     Call<ApiResponse<MiscDtos.ListResult<AuthDtos.UserDto>>> followers(@Path("id") String id, @Query("page") int page);
 
@@ -102,6 +105,33 @@ public interface UserApi {
 
     @DELETE("users/{id}/bond")
     Call<ApiResponse<Object>> endBond(@Path("id") String id, @Query("type") String type);
+
+    @GET("cp/catalog")
+    Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
+
+    @GET("cp/discover")
+    Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
+
+    @GET("cp/me")
+    Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
+
+    @GET("cp/sent-requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpSentRequests();
+
+    @POST("cp/requests/{id}/cancel")
+    Call<ApiResponse<Map<String, Object>>> cancelCpRequest(@Path("id") String id);
+
+    @GET("cp/requests")
+    Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
+
+    @POST("cp/requests")
+    Call<ApiResponse<Map<String, Object>>> createCpRequest(@Body Map<String, String> body);
+
+    @POST("cp/requests/{id}/respond")
+    Call<ApiResponse<Map<String, Object>>> respondCpRequest(@Path("id") String id, @Body Map<String, Boolean> body);
+
+    @POST("cp/{id}/end")
+    Call<ApiResponse<Map<String, Object>>> endCpRelationship(@Path("id") String id);
 
     @GET("users/me/gender-verification")
     Call<ApiResponse<MiscDtos.GenderVerificationDto>> getGenderVerification();

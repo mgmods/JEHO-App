@@ -2,6 +2,7 @@
 
 export const ROUTE_MODULE = {
   dashboard: 'dashboard',
+  cp: 'cp',
   conversations: 'conversations',
   users: 'users',
   'user-detail': 'users',
@@ -39,6 +40,7 @@ export const ROUTE_MODULE = {
 
 export const DASHBOARD_MODULES = [
   'dashboard',
+  'cp',
   'conversations',
   'users',
   'agencies',

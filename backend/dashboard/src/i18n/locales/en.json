@@ -50,6 +50,7 @@
   "nav": {
     "overview": "Overview",
     "community": "Community",
+    "cp": "CP relationships",
     "liveRooms": "Voice rooms",
     "monetization": "Monetization",
     "money": "Money & wallet",
@@ -445,6 +446,7 @@
     "readOnly": "Your account is read-only — cannot save",
     "mod": {
       "dashboard": "Overview",
+      "cp": "CP relationships",
       "users": "Users",
       "agencies": "Agencies",
       "rooms": "Rooms",

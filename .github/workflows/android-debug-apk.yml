@@ -9,6 +9,11 @@ on:
       # Rebuild the APK when API configuration or upload contracts change.
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
+  pull_request:
+    branches: [jeho-own]
+    paths:
+      - ".github/workflows/android-debug-apk.yml"
+      - "android/**"
   workflow_dispatch:
 
 permissions:

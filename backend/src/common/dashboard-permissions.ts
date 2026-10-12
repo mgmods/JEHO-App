@@ -5,6 +5,7 @@
 
 export const DASHBOARD_MODULES = [
   'dashboard',
+  'cp',
   'conversations',
   'users',
   'agencies',
@@ -51,6 +52,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   auth: 'self',
   operators: 'super-only',
   dashboard: 'dashboard',
+  cp: 'cp',
   conversations: 'conversations',
   'policy-brochure': 'policyBrochure',
   users: 'users',
@@ -103,6 +105,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
 /** Route name (vue-router) → module */
 export const ROUTE_MODULE: Record<string, DashboardModule | 'super-only'> = {
   dashboard: 'dashboard',
+  cp: 'cp',
   users: 'users',
   'user-detail': 'users',
   agencies: 'agencies',

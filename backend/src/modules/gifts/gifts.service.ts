@@ -48,6 +48,7 @@ import {
   recommendedGiftDiamonds,
 } from '../../common/pricing-catalog';
 import { ECONOMY } from '../../common/economy-config';
+import { CpService } from '../cp/cp.service';
 
 type LuckyRoll = {
   luckyMultiplier: number | null;
@@ -78,6 +79,7 @@ export class GiftsService implements OnModuleInit {
     @InjectRepository(UserVip) private readonly userVipRepo: Repository<UserVip>,
     private readonly dataSource: DataSource,
     private readonly tasksService: TasksService,
+    private readonly cpService: CpService,
     @Optional() private readonly realtime?: RealtimeGateway,
     @Optional()
     @Inject(forwardRef(() => ContestsService))
@@ -2009,6 +2011,10 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
+      if (result.send?.id && result.send?.receiverId) {
+        void this.cpService.recordGiftInteraction(senderId, result.send.receiverId, result.send.id, result.totalCoins)
+          .catch((err) => this.log.warn(`CP gift points skipped: ${err instanceof Error ? err.message : String(err)}`));
+      }
       const taskRoom = dto.roomId
         ? await this.roomsRepo.findOne({ where: { id: dto.roomId } })
         : null;
@@ -2571,6 +2577,7 @@ export class GiftsService implements OnModuleInit {
 
       return {
         send: primary,
+        sends,
         gift,
         comboCount,
         luckyMultiplier,
@@ -2609,6 +2616,11 @@ export class GiftsService implements OnModuleInit {
         },
       };
     }).then(async (result) => {
+      for (const sent of (result.sends || [])) {
+        if (!sent?.id || !sent?.receiverId) continue;
+        void this.cpService.recordGiftInteraction(senderId, sent.receiverId, sent.id, sent.totalCoins)
+          .catch((err) => this.log.warn(`CP all-mic gift points skipped: ${err instanceof Error ? err.message : String(err)}`));
+      }
       void this.tasksService
         .recordProgress(senderId, 'gift', 1, {
           roomId: dto.roomId,
