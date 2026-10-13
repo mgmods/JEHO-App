@@ -163,6 +163,7 @@ const entityList = Object.values(entities).filter(
     HostTargetModule,
     InvitesModule,
     RoomCupModule,
+    CpModule,
     PromotionsModule,
     VanityIdsModule,
     ModerationModule,
