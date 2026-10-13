@@ -105,6 +105,62 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
+  Future<void> _sendGiftToHost() async {
+    if (_roomActionBusy) return;
+    final host = widget.room['host'] is Map<String, dynamic>
+        ? widget.room['host'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final receiverId = (host['id'] ?? widget.room['hostId'] ?? '').toString();
+    if (receiverId.isEmpty || widget.accessToken.isEmpty) {
+      setState(() => _error = 'لا تتوفر بيانات المضيف لإرسال الهدية.');
+      return;
+    }
+    try {
+      final gifts = await widget.apiClient.getGiftCatalog();
+      if (!mounted) return;
+      if (gifts.isEmpty) {
+        setState(() => _error = 'كتالوج الهدايا فارغ حاليًا.');
+        return;
+      }
+      final gift = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(title: Text('اختر هدية للمضيف')),
+              for (final item in gifts)
+                ListTile(
+                  leading: const Icon(Icons.card_giftcard_rounded, color: _featureGold),
+                  title: Text((item['name'] ?? item['title'] ?? 'هدية').toString()),
+                  subtitle: Text('السعر: ${item['price'] ?? item['coinCost'] ?? item['cost'] ?? '—'}'),
+                  onTap: () => Navigator.pop(context, item),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (gift == null || !mounted) return;
+      final giftId = (gift['id'] ?? gift['giftId'] ?? '').toString();
+      if (giftId.isEmpty) {
+        setState(() => _error = 'معرّف الهدية غير موجود في بيانات الخادم.');
+        return;
+      }
+      await _roomAction(
+        () => widget.apiClient.sendGift(
+          widget.accessToken,
+          giftId: giftId,
+          receiverId: receiverId,
+          roomId: _roomId,
+        ),
+        'تم إرسال الهدية.',
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _chooseCover() async {
     if (_uploading) return;
     if (_roomId.isEmpty || widget.accessToken.isEmpty) {
@@ -228,6 +284,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             onPressed: _roomActionBusy || !_roomEntered ? null : _raiseHand,
             icon: const Icon(Icons.pan_tool_alt_rounded),
             label: const Text('طلب المايك'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _sendGiftToHost,
+            icon: const Icon(Icons.card_giftcard_rounded),
+            label: const Text('إرسال هدية للمضيف'),
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : () async {
