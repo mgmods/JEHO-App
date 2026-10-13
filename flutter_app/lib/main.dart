@@ -655,15 +655,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => CosmeticsPage(
+                              builder: (_) => SocialHubPage(
                                 apiClient: widget.apiClient,
                                 accessToken: widget.session['accessToken']?.toString() ?? '',
                               ),
                             ),
                           ),
-                          icon: const Icon(Icons.auto_awesome_rounded),
-                          label: const Text('الإطارات والزينة'),
+                          icon: const Icon(Icons.favorite_rounded),
+                          label: const Text('CP والعلاقات'),
                         ),
+
+
                       ],
                     ),
                     const SizedBox(height: 18),
