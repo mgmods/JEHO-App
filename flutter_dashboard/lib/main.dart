@@ -83,6 +83,7 @@ const modules=<Module>[
  Module('طلبات السحب','admin/wallet/withdraws?page=1&limit=50',Icons.outbox),
  Module('الشحنات','admin/wallet/recharges?page=1&limit=50',Icons.add_card),
  Module('المظاهر والإطارات','admin/cosmetics?page=1&limit=50',Icons.auto_awesome),
+ Module('الآي دي المميز','vanity-ids/admin/all',Icons.badge),
  Module('المسابقات','admin/contests',Icons.emoji_events),
  Module('المهام اليومية','admin/tasks',Icons.task_alt),
  Module('التقارير','admin/reports?page=1&limit=50',Icons.flag),
@@ -188,7 +189,10 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/wallet/withdraws'))return [('الموافقة على السحب','withdraw-approve',Icons.check_circle),('رفض السحب','withdraw-reject',Icons.cancel)];
   if(path.startsWith('admin/wallet/recharges'))return [('تأكيد الشحنة','recharge-complete',Icons.verified),('إلغاء الشحنة','recharge-cancel',Icons.cancel)];
   if(path.startsWith('admin/gender-verifications'))return [('قبول التحقق','gender-approve',Icons.verified_user),('رفض التحقق','gender-reject',Icons.cancel)];
+  if(path.startsWith('admin/vip/plans'))return [('منح هذه الخطة لمستخدم','vip-assign',Icons.workspace_premium)];
   if(path.startsWith('admin/vip?'))return [('إلغاء عضوية VIP','vip-revoke',Icons.remove_circle_outline)];
+  if(path.startsWith('admin/cosmetics'))return [('تفعيل/تعطيل المظهر','cosmetic-toggle',Icons.toggle_on),('إهداء هذا المظهر','cosmetic-grant',Icons.card_giftcard)];
+  if(path.startsWith('vanity-ids/admin/all'))return [('إهداء الآي دي','vanity-grant',Icons.card_giftcard),('تفعيل الآي دي','vanity-enable',Icons.check_circle),('تعطيل الآي دي','vanity-disable',Icons.pause_circle_outline),('سحب الآي دي','vanity-revoke',Icons.remove_circle_outline)];
   if(path.startsWith('admin/agencies?'))return [('تعليق الوكالة','agency-suspend',Icons.pause_circle_outline)];
   if(path.startsWith('admin/recharge-agents/applications'))return [('قبول طلب الوكيل','agent-approve',Icons.check_circle),('رفض طلب الوكيل','agent-reject',Icons.cancel)];
   if(path.startsWith('admin/contests'))return [('إنهاء المسابقة','contest-end',Icons.flag_circle)];
@@ -209,10 +213,59 @@ class AdminContent extends StatelessWidget {
   }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تحديث التصنيف: '+e.toString().replaceFirst('Exception: ',''))));}
   finally{controller.dispose();}
  }
+ Future<List<String>?> _askValues(BuildContext context,String title,List<String> labels) async {
+  final controllers=labels.map((_)=>TextEditingController()).toList();
+  try {
+    return await showDialog<List<String>>(context:context,builder:(ctx)=>AlertDialog(
+      title:Text(title),
+      content:SizedBox(width:440,child:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
+        for(var i=0;i<labels.length;i++) Padding(padding:const EdgeInsets.only(bottom:10),child:TextField(controller:controllers[i],decoration:InputDecoration(labelText:labels[i]),textDirection:i==0?TextDirection.ltr:TextDirection.rtl))
+      ]))),
+      actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,controllers.map((c)=>c.text.trim()).toList()),child:const Text('متابعة'))],
+    ));
+  } finally { for(final c in controllers){c.dispose();} }
+ }
+ Future<void> _grantAction(BuildContext context,Map row,String action,String rowId) async {
+  final publicId=(row['publicId']??row['code']??row['slug']??row['cosmeticCode']??rowId).toString();
+  final labels=action=='vanity-grant'
+    ? ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent']
+    : action=='cosmetic-grant'
+      ? ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent']
+      : ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent'];
+  final values=await _askValues(context,action=='vanity-grant'?'إهداء الآي دي $publicId':action=='cosmetic-grant'?'إهداء المظهر $publicId':'منح خطة VIP',labels);
+  if(values==null||!context.mounted)return;
+  final userId=values[0].trim();
+  final term=values[1].trim().toLowerCase();
+  final permanent=term=='permanent'||term=='دائم';
+  final days=int.tryParse(term);
+  if(userId.isEmpty||(!permanent&&![7,15,30].contains(days))){
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent.')));
+    return;
+  }
+  final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
+    title:Text(action.$1),
+    content:Text('سيتم تطبيق الإجراء على المستخدم $userId لمدة ${permanent?'دائمة':'$days يومًا'}، هل تؤكد؟'),
+    actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))],
+  ));
+  if(confirmed!=true)return;
+  try {
+    if(action=='vanity-grant'){
+      await api.post('vanity-ids/admin/assign',{'userId':userId,'publicId':publicId,'days':days??7,'permanent':permanent});
+    } else if(action=='cosmetic-grant'){
+      await api.post('admin/cosmetics/grant',{'userId':userId,'cosmeticCode':publicId,'days':days??7,'permanent':permanent});
+    } else {
+      await api.post('admin/vip/assign',{'userId':userId,'planId':rowId,'days':days??30,'permanent':permanent});
+    }
+    if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال الطلب إلى الخادم بنجاح.')));reload();}
+  } catch(e) {
+    if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));
+  }
+ }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
   final id=(row['id']??row['applicationId']??row['reportId']??row['streamId']??row['userId']??'').toString();
   if(id.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('لا يوجد معرّف واضح لهذا العنصر.')));return;}
   if(action.$2=='gift-category-edit'){await _editGiftCategory(context,id,Map<String,dynamic>.from(row));return;}
+  if(['vanity-grant','cosmetic-grant','vip-assign'].contains(action.$2)){await _grantAction(context,row,action.$2,id);return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
   String endpoint;Map<String,dynamic> body=const {};
@@ -229,6 +282,10 @@ class AdminContent extends StatelessWidget {
    case 'recharge-cancel': endpoint='admin/wallet/recharges/$id/cancel'; break;
    case 'gender-approve': endpoint='admin/gender-verifications/$id/approve'; break;
    case 'vip-revoke': endpoint='admin/vip/$id/revoke'; break;
+   case 'vanity-enable': endpoint='vanity-ids/admin/$id/enable'; break;
+   case 'vanity-disable': endpoint='vanity-ids/admin/$id/disable'; break;
+   case 'vanity-revoke': endpoint='vanity-ids/admin/$id/revoke'; break;
+   case 'cosmetic-toggle': endpoint='admin/cosmetics/$id'; body={'isActive': !(row['isActive']==true)}; break;
    case 'agency-suspend': endpoint='admin/agencies/$id/suspend'; body={'reason':'تعليق من لوحة الإدارة'}; break;
    case 'agent-approve': endpoint='admin/recharge-agents/applications/$id/approve'; break;
    case 'agent-reject': endpoint='admin/recharge-agents/applications/$id/reject'; body={'reason':'رفض من لوحة الإدارة'}; break;
