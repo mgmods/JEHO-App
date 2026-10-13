@@ -364,7 +364,7 @@ async function load() {
     toast().danger(err.message)
     return
   }
-  const settingsRows = Array.isArray(data) ? data : (data?.items || data?.data?.items || [])
+  const settingsRows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (data?.items || data?.data?.items || []))
   rows.value = parseSetting(settingsRows, 'home_banners', [])
   const themeRow = settingsRows.find((s) => s?.key === 'app_theme')
   try {
