@@ -329,9 +329,23 @@ public class VoiceRoomForegroundService extends Service {
                 .getString(EXTRA_COVER, null);
     }
 
+    /** Remove every room-session notification synchronously when the user explicitly leaves. */
+    private static void clearRoomNotifications(Context context) {
+        try {
+            NotificationManagerCompat manager =
+                    NotificationManagerCompat.from(context.getApplicationContext());
+            manager.cancel(NOTIFICATION_ID);
+            manager.cancel(BUBBLE_NOTIFICATION_ID);
+            manager.cancel(SUMMON_NOTIFICATION_ID);
+            manager.cancel(SEAT_INVITE_NOTIFICATION_ID);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
     public static void leaveActiveRoom(Context context) {
         String activeRoom = activeRoomId(context);
         context.getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
+        clearRoomNotifications(context);
         try {
             context.startService(new Intent(context, VoiceRoomForegroundService.class)
                     .setAction(ACTION_LEAVE)
@@ -344,6 +358,7 @@ public class VoiceRoomForegroundService extends Service {
     /** Stop only the background owner; the attached activity performs the actual room leave. */
     public static void stopForUiExit(Context context) {
         context.getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
+        clearRoomNotifications(context);
         try {
             context.startService(new Intent(context, VoiceRoomForegroundService.class)
                     .setAction(ACTION_UI_EXIT));
@@ -789,7 +804,15 @@ public class VoiceRoomForegroundService extends Service {
     }
 
     private void leaveRoom(String requestedRoomId) {
-        if (stopping) return;
+        if (stopping) {
+            clearRoomNotifications(this);
+            try {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+            } catch (Exception ignored) {
+            }
+            stopSelf();
+            return;
+        }
         stopping = true;
         String leavingRoom = requestedRoomId != null ? requestedRoomId : roomId != null ? roomId
                 : getSharedPreferences(PREFS, MODE_PRIVATE).getString(EXTRA_ROOM_ID, null);
@@ -802,9 +825,7 @@ public class VoiceRoomForegroundService extends Service {
         RoomRtcEngine.getInstance().logoutRoom();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().clear().apply();
         detachBackgroundOwner();
-        NotificationManagerCompat.from(this).cancel(BUBBLE_NOTIFICATION_ID);
-        NotificationManagerCompat.from(this).cancel(SUMMON_NOTIFICATION_ID);
-        NotificationManagerCompat.from(this).cancel(SEAT_INVITE_NOTIFICATION_ID);
+        clearRoomNotifications(this);
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
