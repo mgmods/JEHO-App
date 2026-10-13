@@ -22,7 +22,7 @@ The Android platform scaffold is generated in CI, rather than committed as gener
 
 - Arabic RTL theme and login/register/guest authentication with access-token storage and session restoration.
 - Public room listing and room details.
-- Gallery image upload for a room background, then `PATCH rooms/:id/background`; API permissions remain authoritative.
+- Gallery image uploads for room backgrounds and room cover photos; existing host/mod permissions remain authoritative.
 - Profile display-name/bio edits and avatar image upload.
 - Conversations list, message history, and text-message sending.
 - Wallet balance, withdrawal progress, transaction history, and recharge-package display.
@@ -34,7 +34,7 @@ The Android platform scaffold is generated in CI, rather than committed as gener
 ## API routes currently used
 
 - `POST auth/login`, `POST auth/register`, `POST auth/guest`
-- `GET rooms?page=1&limit=20`, `GET rooms/:id`, `PATCH rooms/:id/background`
+- `GET rooms?page=1&limit=20`, `GET rooms/:id`, `PATCH rooms/:id`, `PATCH rooms/:id/background`
 - `POST uploads` (multipart field `file`)
 - `GET users/me`, `PATCH users/me`
 - `GET chat/conversations?page=1&limit=20`
@@ -47,7 +47,7 @@ The Android platform scaffold is generated in CI, rather than committed as gener
 ## Known migration gaps (not yet feature parity)
 
 - Native in-room voice, seat/mic moderation and realtime events are not ported. ZEGO and current voice infrastructure have intentionally not been touched.
-- Room join/leave, room creation, room covers, seats, moderators, follows, room music, and live room controls still need implementation and device acceptance.
+- Room join/leave, room creation, seats, moderators, follows, room music, and live room controls still need implementation and device acceptance.
 - Sending gifts to a selected user/room is not wired to a UI; only the gift catalog is shown.
 - Recharge packages are informational only. Native store billing, purchase verification, withdrawal requests, and exchanges are not enabled in this Flutter UI.
 - Cosmetics page supports catalog, purchase, and equip; richer filters, expiration details, and complete frame rendering still need parity work.
