@@ -11,6 +11,7 @@ on:
     branches: [jeho-own]
     paths:
       - "flutter_app/**"
+      - "flutter_dashboard/**"
       - ".github/workflows/flutter-client-checks.yml"
 
 permissions:
