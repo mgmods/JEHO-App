@@ -40,7 +40,7 @@ class SettingsPage extends StatelessWidget {
       _SettingsTile(icon: Icons.privacy_tip_outlined, title: 'الخصوصية والرسائل', subtitle: 'الظهور وحظر الرسائل من الغرباء وبوابة هدايا الرسائل', onTap: () => _open(context, _PrivacySettingsPage(apiClient: apiClient, token: accessToken))),
       _SettingsTile(icon: Icons.language_rounded, title: 'اللغة', subtitle: 'اختيار اللغة المفضلة وحفظ الاختيار على الجهاز', onTap: () => _open(context, _LanguageSettingsPage(apiClient: apiClient))),
       _SettingsTile(icon: Icons.support_agent_rounded, title: 'الدعم الفني', subtitle: 'قنوات الدعم التي يحددها الخادم', onTap: () => _open(context, _SupportSettingsPage(apiClient: apiClient))),
-      _SettingsTile(icon: Icons.workspace_premium_rounded, title: 'المتجر وعضوية VIP', subtitle: 'عرض خطط VIP وشراء العضوية من رصيد الحساب', onTap: () => _open(context, _StoreSettingsPage(apiClient: apiClient, token: accessToken))),
+      _SettingsTile(icon: Icons.workspace_premium_rounded, title: 'المتجر وعضوية VIP', subtitle: 'عرض خطط VIP وشراء العضوية من رصيد الحساب', onTap: () => _open(context, StoreHubPage(apiClient: apiClient, accessToken: accessToken))),
       _SettingsTile(icon: Icons.card_giftcard_rounded, title: 'كتالوج الهدايا', subtitle: 'عرض الهدايا وأسعارها من الخادم', onTap: () => _open(context, GiftCatalogPage(apiClient: apiClient, accessToken: accessToken))),
       _SettingsTile(icon: Icons.history_rounded, title: 'سجل الهدايا', subtitle: 'الهدايا المرسلة وسجلها', onTap: () => _open(context, GiftHistoryPage(apiClient: apiClient, accessToken: accessToken))),
       const Card(child: ListTile(leading: Icon(Icons.mic_off_outlined), title: Text('الصوت واتصال الغرف'), subtitle: Text('لم يتم تغيير ZEGO أو إعدادات الصوت أو اتصال الغرف أو Redis ضمن هذه المهمة.'))),
