@@ -1240,10 +1240,11 @@ class _SocialHubPageState extends State<SocialHubPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على مستخدمين.')));
         return;
       }
+      final pageContext = context;
       await showModalBottomSheet<void>(
-        context: context,
+        context: pageContext,
         isScrollControlled: true,
-        builder: (context) => SafeArea(
+        builder: (sheetContext) => SafeArea(
           child: ListView(
             shrinkWrap: true,
             children: [
@@ -1262,10 +1263,11 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       try {
                         await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend');
                         if (!mounted) return;
-                        Navigator.of(this.context).pop();
-                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
+                        Navigator.of(sheetContext).pop();
+                        ScaffoldMessenger.of(pageContext).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
+                        await _load();
                       } on JehoApiException catch (error) {
-                        if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(error.message)));
+                        if (mounted) ScaffoldMessenger.of(pageContext).showSnackBar(SnackBar(content: Text(error.message)));
                       }
                     },
                   ),
