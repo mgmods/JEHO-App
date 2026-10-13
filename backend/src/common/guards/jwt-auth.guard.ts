@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { IS_PUBLIC_KEY } from '../decorators';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
 import { AdminRole, AdminUser } from '../../database/entities/admin-user.entity';
 import {
@@ -29,7 +29,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
-    @InjectRepository(AdminUser) private readonly adminUsersRepo: Repository<AdminUser>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -68,9 +68,12 @@ export class JwtAuthGuard implements CanActivate {
         secret: this.configService.get<string>('app.jwt.secret'),
       });
       // Dashboard sessions are backed by admin_users, not app users.
-      // This makes dashboard access independent from app status/role changes.
+      // Resolve this repository from the root TypeORM DataSource so guarded
+      // feature modules do not each need to register AdminUser in forFeature.
       if (payload.tokenType === 'dashboard') {
-        const admin = await this.adminUsersRepo.findOne({ where: { id: payload.sub } });
+        const admin = await this.dataSource.getRepository(AdminUser).findOne({
+          where: { id: payload.sub },
+        });
         if (!admin || !admin.isActive) {
           if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
           return false;
