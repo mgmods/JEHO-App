@@ -359,7 +359,49 @@ class _ConversationPageState extends State<ConversationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        toolbarHeight: 72,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [Color(0xFFE5B45D), Color(0xFFFFEFD0)]),
+              ),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: const Color(0xFFFFF0D1),
+                backgroundImage: (() {
+                  final peer = widget.conversation['peer'] is Map<String, dynamic>
+                      ? widget.conversation['peer'] as Map<String, dynamic>
+                      : <String, dynamic>{};
+                  final avatar = (peer['avatarUrl'] ?? peer['avatar'] ?? widget.conversation['avatarUrl'] ?? '').toString().trim();
+                  return avatar.isEmpty ? null : NetworkImage(_resolveMediaUrl(avatar)) as ImageProvider;
+                })(),
+                child: (() {
+                  final peer = widget.conversation['peer'] is Map<String, dynamic>
+                      ? widget.conversation['peer'] as Map<String, dynamic>
+                      : <String, dynamic>{};
+                  final avatar = (peer['avatarUrl'] ?? peer['avatar'] ?? widget.conversation['avatarUrl'] ?? '').toString().trim();
+                  return avatar.isEmpty ? const Icon(Icons.person_rounded, color: Color(0xFF8C641D)) : null;
+                })(),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 3),
+                  const Text('محادثة خاصة', style: TextStyle(fontSize: 11, color: Color(0xFF8C641D), fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           PopupMenuButton<String>(
             tooltip: 'خيارات المحادثة',
@@ -378,9 +420,17 @@ class _ConversationPageState extends State<ConversationPage> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF8EC), Color(0xFFFFFCF7), Color(0xFFFFF4E3)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
             if (_error != null)
               MaterialBanner(
                 content: Text(_error!),
@@ -662,7 +712,8 @@ class _ConversationPageState extends State<ConversationPage> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
