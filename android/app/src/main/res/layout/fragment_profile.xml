@@ -236,7 +236,8 @@
                         android:text="Lv.1"
                         android:textColor="@color/white"
                         android:textSize="10sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:visibility="gone" />
 
                     <ImageView
                         android:id="@+id/imgVipBadge"
@@ -566,37 +567,27 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Level + VIP cards (Mikoo art) -->
+            <!-- Hidden legacy Level/VIP cards; actions are available in the quick row below. -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="8dp"
-                android:baselineAligned="false"
+                android:layout_height="0dp"
+                android:visibility="gone"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/levelCard"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/user_level"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/ic_me_level_card" />
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:contentDescription="@string/user_level" />
 
                 <ImageView
                     android:id="@+id/vipCard"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/vip"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/ic_me_vip_card" />
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:contentDescription="@string/vip" />
 
-                <!-- Compatibility stubs for old binding IDs -->
                 <include
                     android:id="@+id/btnUserLevel"
                     layout="@layout/item_profile_service_row"
@@ -672,6 +663,33 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
                         android:text="@string/room_short"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnQuickVip"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingVertical="4dp">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:contentDescription="@string/vip"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_feat_vip" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/vip"
                         android:textColor="@color/text_primary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
