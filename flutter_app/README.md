@@ -10,9 +10,10 @@ This folder is an **independent migration workspace**. The existing Android Java
 
 ## Run
 
-From this directory:
+From this directory, generate the Android platform folder once (it is intentionally generated in CI rather than committed during this first scaffold):
 
 ```bash
+flutter create --platforms=android --project-name jeho_own_flutter --org com.jehoown .
 flutter pub get
 flutter analyze
 flutter test
