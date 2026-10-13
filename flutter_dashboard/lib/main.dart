@@ -178,7 +178,7 @@ class AdminContent extends StatelessWidget {
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
   final id=(row['id']??row['applicationId']??row['reportId']??row['streamId']??row['userId']??'').toString();
   if(id.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('لا يوجد معرّف واضح لهذا العنصر.')));return;}
-  if(action.$2=='gift-category-edit'){await _editGiftCategory(context,id,row);return;}
+  if(action.$2=='gift-category-edit'){await _editGiftCategory(context,id,Map<String,dynamic>.from(row));return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
   String endpoint;Map<String,dynamic> body=const {};
