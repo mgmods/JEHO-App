@@ -6,6 +6,7 @@ on:
       - jeho-own
     paths:
       - "backend/**"
+      - "flutter_dashboard/**"
       - ".github/workflows/publish-jeho-own-backend.yml"
   workflow_dispatch:
 
@@ -37,7 +38,7 @@ jobs:
       - name: Build and publish backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: true
           tags: |
