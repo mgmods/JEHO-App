@@ -1592,10 +1592,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Live presence is already gated by activeHostId (except support rooms pinned by admin).
     const q = (query.search || '').trim();
     if (q) {
-      // displayRoomId shown in-app is the host publicId — include it in search.
+      // Search by independent room ID and account ID, plus title/name.
       qb.leftJoin('room.host', 'searchHost');
       qb.andWhere(
-        '(LOWER(room.title) LIKE :q OR CAST(room.id AS text) LIKE :q OR searchHost.publicId = :exact OR CAST(searchHost.publicId AS text) LIKE :q OR LOWER(searchHost.displayName) LIKE :q OR LOWER(searchHost.username) LIKE :q)',
+        '(LOWER(room.title) LIKE :q OR CAST(room.id AS text) LIKE :q OR room.publicId = :exact OR searchHost.publicId = :exact OR CAST(searchHost.publicId AS text) LIKE :q OR LOWER(searchHost.displayName) LIKE :q OR LOWER(searchHost.username) LIKE :q)',
         { q: `%${q.toLowerCase()}%`, exact: q },
       );
     }
