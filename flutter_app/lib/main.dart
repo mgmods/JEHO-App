@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'data/jeho_api_client.dart';
+import 'presentation/auth_page.dart';
+
 const Color _brandColor = Color(0xFFB68A35);
 
 const String apiBaseUrl = String.fromEnvironment(
@@ -11,8 +14,28 @@ void main() {
   runApp(const JehoOwnApp());
 }
 
-class JehoOwnApp extends StatelessWidget {
+class JehoOwnApp extends StatefulWidget {
   const JehoOwnApp({super.key});
+
+  @override
+  State<JehoOwnApp> createState() => _JehoOwnAppState();
+}
+
+class _JehoOwnAppState extends State<JehoOwnApp> {
+  late final JehoApiClient _apiClient;
+  Map<String, dynamic>? _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _apiClient = JehoApiClient(baseUrl: apiBaseUrl);
+  }
+
+  @override
+  void dispose() {
+    _apiClient.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,18 +55,40 @@ class JehoOwnApp extends StatelessWidget {
           foregroundColor: Color(0xFF493512),
           centerTitle: true,
         ),
+        inputDecorationTheme: const InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+        ),
       ),
       builder: (context, child) => Directionality(
         textDirection: TextDirection.rtl,
         child: child ?? const SizedBox.shrink(),
       ),
-      home: const MigrationHomePage(),
+      home: _session == null
+          ? AuthPage(
+              apiClient: _apiClient,
+              onAuthenticated: (session) => setState(() => _session = session),
+            )
+          : MigrationHomePage(
+              session: _session!,
+              onLogout: () async {
+                await _apiClient.clearSession();
+                if (mounted) setState(() => _session = null);
+              },
+            ),
     );
   }
 }
 
 class MigrationHomePage extends StatefulWidget {
-  const MigrationHomePage({super.key});
+  const MigrationHomePage({
+    required this.session,
+    required this.onLogout,
+    super.key,
+  });
+
+  final Map<String, dynamic> session;
+  final VoidCallback onLogout;
 
   @override
   State<MigrationHomePage> createState() => _MigrationHomePageState();
@@ -55,7 +100,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   static const _sections = <_SectionInfo>[
     _SectionInfo(
       title: 'الرئيسية',
-      subtitle: 'سيتم نقل واجهة الصفحة الرئيسية وربط بياناتها في المرحلة التالية.',
+      subtitle: 'تم تسجيل الدخول بنجاح. سيتم نقل واجهة الصفحة الرئيسية وربط بياناتها في المرحلة التالية.',
       icon: Icons.home_rounded,
     ),
     _SectionInfo(
@@ -73,6 +118,11 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   @override
   Widget build(BuildContext context) {
     final section = _sections[_selectedIndex];
+    final user = widget.session['user'] is Map<String, dynamic>
+        ? widget.session['user'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final displayName = (user['displayName'] ?? user['username'] ?? 'مستخدم JEHO')
+        .toString();
 
     return Scaffold(
       appBar: AppBar(
@@ -80,6 +130,13 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
           'JEHO-OWN',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'تسجيل الخروج',
+            onPressed: widget.onLogout,
+            icon: const Icon(Icons.logout_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Center(
@@ -110,6 +167,12 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           fontWeight: FontWeight.w800,
                         ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'أهلًا $displayName',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     section.subtitle,
@@ -128,12 +191,10 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         children: [
                           const Icon(Icons.shield_outlined, color: _brandColor),
                           const SizedBox(width: 12),
-                          Expanded(
+                          const Expanded(
                             child: Text(
                               'هذه نسخة Flutter مستقلة للتطوير. التطبيق الحالي وواجهات الخادم وقاعدة البيانات لم يتم تغييرها.',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    height: 1.6,
-                                  ),
+                              style: TextStyle(height: 1.6),
                             ),
                           ),
                         ],
