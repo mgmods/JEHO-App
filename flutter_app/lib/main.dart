@@ -71,6 +71,7 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
             )
           : MigrationHomePage(
               session: _session!,
+              apiClient: _apiClient,
               onLogout: () async {
                 await _apiClient.clearSession();
                 if (mounted) setState(() => _session = null);
@@ -83,11 +84,13 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
 class MigrationHomePage extends StatefulWidget {
   const MigrationHomePage({
     required this.session,
+    required this.apiClient,
     required this.onLogout,
     super.key,
   });
 
   final Map<String, dynamic> session;
+  final JehoApiClient apiClient;
   final VoidCallback onLogout;
 
   @override
@@ -96,6 +99,44 @@ class MigrationHomePage extends StatefulWidget {
 
 class _MigrationHomePageState extends State<MigrationHomePage> {
   int _selectedIndex = 0;
+  bool _loading = true;
+  String? _loadError;
+  List<Map<String, dynamic>> _rooms = const [];
+  Map<String, dynamic>? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeData();
+  }
+
+  Future<void> _loadHomeData() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    final token = widget.session['accessToken']?.toString() ?? '';
+    try {
+      final rooms = await widget.apiClient.getPublicRooms();
+      Map<String, dynamic>? profile;
+      if (token.isNotEmpty) {
+        try {
+          profile = await widget.apiClient.getMyProfile(token);
+        } on JehoApiException {
+          // Keep public room browsing available if the profile endpoint is unavailable.
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _rooms = rooms;
+        _profile = profile;
+      });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _loadError = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   static const _sections = <_SectionInfo>[
     _SectionInfo(
@@ -121,7 +162,10 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     final user = widget.session['user'] is Map<String, dynamic>
         ? widget.session['user'] as Map<String, dynamic>
         : <String, dynamic>{};
-    final displayName = (user['displayName'] ?? user['username'] ?? 'مستخدم JEHO')
+    final activeUser = _profile ?? user;
+    final displayName = (activeUser['displayName'] ??
+            activeUser['username'] ??
+            'مستخدم JEHO')
         .toString();
 
     return Scaffold(
@@ -131,6 +175,11 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
+          IconButton(
+            tooltip: 'تحديث البيانات',
+            onPressed: _loading ? null : _loadHomeData,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
           IconButton(
             tooltip: 'تسجيل الخروج',
             onPressed: widget.onLogout,
@@ -174,14 +223,134 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    section.subtitle,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.7,
-                          color: Colors.black54,
+                  if (_selectedIndex == 0) ...[
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'الغرف العامة',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
                         ),
-                  ),
+                        Text(
+                          '${_rooms.length} غرفة',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_loadError != null)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              Text(_loadError!, textAlign: TextAlign.center),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: _loadHomeData,
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text('إعادة المحاولة'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else if (_rooms.isEmpty)
+                      const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Text(
+                            'لا توجد غرف عامة متاحة حاليًا.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      ..._rooms.map((room) {
+                        final title = (room['title'] ??
+                                room['name'] ??
+                                room['roomName'] ??
+                                'غرفة JEHO')
+                            .toString();
+                        final host = room['host'] is Map<String, dynamic>
+                            ? room['host'] as Map<String, dynamic>
+                            : <String, dynamic>{};
+                        final hostName = (host['displayName'] ??
+                                host['username'] ??
+                                'مضيف')
+                            .toString();
+                        final viewers = room['viewerCount'] ?? room['onlineCount'] ?? 0;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE7B0),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.forum_rounded,
+                                color: Color(0xFF8C641D),
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text('المضيف: $hostName'),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.people_outline_rounded, size: 18),
+                                Text('$viewers'),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                  ] else if (_selectedIndex == 1) ...[
+                    const SizedBox(height: 24),
+                    const Icon(Icons.chat_bubble_outline_rounded, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      'الرسائل',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'تم تجهيز الاتصال الأساسي بالخادم. نقل قائمة المحادثات وإرسال الرسائل هو المرحلة التالية.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    const Icon(Icons.person_rounded, size: 48),
+                    const SizedBox(height: 12),
+                    Text(
+                      displayName,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('اسم المستخدم: ${activeUser['username'] ?? '—'}'),
+                    Text('المعرّف: ${activeUser['publicId'] ?? '—'}'),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'الملف الشخصي المعروض من بيانات الخادم عند توفرها. بقية إعدادات الحساب ستُنقل في مراحل لاحقة.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   const Card(
                     child: Padding(
@@ -193,7 +362,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'هذه نسخة Flutter مستقلة للتطوير. التطبيق الحالي وواجهات الخادم وقاعدة البيانات لم يتم تغييرها.',
+                              'هذه نسخة Flutter مستقلة للتطوير. الصوت وZEGO وRedis لم يتم تعديلها.',
                               style: TextStyle(height: 1.6),
                             ),
                           ),
