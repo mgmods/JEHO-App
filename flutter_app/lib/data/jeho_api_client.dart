@@ -291,6 +291,9 @@ class JehoApiClient {
   Future<List<Map<String, dynamic>>> getVipPlans() async =>
       _asList(await _get('vip/plans'), ['items', 'results', 'plans', 'data']);
 
+  Future<Map<String, dynamic>> getMyVip(String token) async =>
+      _asMap(await _get('vip/me', accessToken: token), 'تعذر تحميل حالة عضوية VIP.');
+
   Future<Map<String, dynamic>> purchaseVip(
     String accessToken, {required int level, int durationDays = 30}
   ) async => _asMap(await _post('vip/purchase', {
@@ -639,6 +642,14 @@ class JehoApiClient {
 
   Future<Map<String, dynamic>> createRechargeOrder(String token, {required String sku, required String provider, String currency = 'USD'}) async =>
       _asMap(await _post('wallet/recharge', {'sku': sku, 'provider': provider, 'currency': currency}, accessToken: token), 'تعذر إنشاء طلب الشحن.');
+
+  Future<Map<String, dynamic>> tradeDiamondsWithHost(
+    String token, {required String recipientUserId, required int diamonds}
+  ) async =>
+      _asMap(await _post('wallet/host-trade', {
+        'toUserId': recipientUserId,
+        'diamonds': diamonds,
+      }, accessToken: token), 'تعذر تحويل الألماس إلى المستخدم.');
 
   Future<Map<String, dynamic>> exchangeDiamonds(String token, int diamonds) async =>
       _asMap(await _post('wallet/exchange', {'diamonds': diamonds}, accessToken: token), 'تعذر تبديل الرصيد.');
