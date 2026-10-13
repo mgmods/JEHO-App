@@ -433,6 +433,8 @@ public final class MiscDtos {
         @SerializedName("durationSeconds") public int durationSeconds = 5;
         @SerializedName("active") public boolean active = true;
         @SerializedName("sortOrder") public int sortOrder = 0;
+        @SerializedName("target") public String target;
+        @SerializedName("targetUrl") public String targetUrl;
     }
 
     public static class ThemeBrand {
