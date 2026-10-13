@@ -198,6 +198,10 @@ class JehoApiClient {
   Future<Map<String, dynamic>> claimDramaEpisodeReward(String episodeId, String token) async =>
       _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/claim-reward', const {}, accessToken: token), 'تعذر استلام مكافأة الحلقة.');
 
+  // Dashboard-managed visual theme (read-only; no theme settings are modified).
+  Future<Map<String, dynamic>> getAppTheme() async =>
+      _asMap(await _get('config/theme'), 'تعذر تحميل إعدادات المظهر.');
+
   // Games catalog uses the existing Dashboard-controlled config/games endpoint.
   Future<List<Map<String, dynamic>>> getConfiguredGames() async =>
       _asList(await _get('config/games'), ['items', 'results', 'games', 'data']);
