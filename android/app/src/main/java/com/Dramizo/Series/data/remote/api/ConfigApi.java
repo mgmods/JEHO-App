@@ -9,6 +9,7 @@ import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.Headers;
 import retrofit2.http.POST;
+import retrofit2.http.Query;
 
 public interface ConfigApi {
     @GET("config/banners")
@@ -38,6 +39,10 @@ public interface ConfigApi {
     @Headers({"Cache-Control: no-cache", "Pragma: no-cache"})
     @GET("config/theme")
     Call<ApiResponse<MiscDtos.ThemeDto>> theme();
+
+    @Headers({"Cache-Control: no-cache", "Pragma: no-cache"})
+    @GET("config/splash-target")
+    Call<ApiResponse<MiscDtos.SplashTargetDto>> resolveSplashTarget(@Query("type") String type, @Query("id") String id);
 
     @GET("config/support")
     Call<ApiResponse<MiscDtos.SupportConfigDto>> support();
