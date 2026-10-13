@@ -449,7 +449,7 @@ export class AuthService implements OnModuleInit {
   /** 8-digit numeric ID, unique & permanent (app-facing). */
   async allocatePublicId(): Promise<string> {
     for (let i = 0; i < 64; i++) {
-      const id = String(randomInt(10_000_000, 99_999_999));
+      const id = String(randomInt(100_000, 1_000_000));
       const exists = await this.usersRepo.exist({ where: { publicId: id } });
       if (!exists) return id;
     }
