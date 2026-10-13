@@ -43,13 +43,17 @@
           <input v-model.number="splashDuration" type="number" min="5" max="120" step="1" class="form-control form-control-sm mb-3" />
           <label class="form-label small">الوجهة عند الضغط على الصورة</label>
           <select v-model="splashTarget" class="form-select form-select-sm mb-2">
-            <option value="home">الرئيسية (home)</option>
-            <option value="messages">الرسائل (messages)</option>
-            <option value="drama">الدراما (drama)</option>
-            <option value="create_room">إنشاء غرفة (create_room)</option>
-            <option value="custom">رابط خارجي مخصص</option>
+            <option value="home">الرئيسية</option>
+            <option value="messages">الرسائل</option>
+            <option value="drama">الدراما</option>
+            <option value="create_room">إنشاء غرفة</option>
+            <option value="room_id">فتح روم بواسطة ID</option>
+            <option value="agency_id">فتح وكالة بواسطة ID</option>
+            <option value="user_id">فتح حساب شخص بواسطة ID</option>
+            <option value="custom">رابط خارجي</option>
           </select>
-          <input v-if="splashTarget === 'custom'" v-model="splashTargetUrl" type="url" class="form-control form-control-sm mb-3" placeholder="https://example.com/page" />
+          <input v-if="['room_id', 'agency_id', 'user_id'].includes(splashTarget)" v-model.trim="splashTargetId" type="text" inputmode="text" class="form-control form-control-sm mb-3" :placeholder="splashTarget === 'room_id' ? 'ID الروم (مثال: 123456)' : splashTarget === 'agency_id' ? 'ID الوكالة' : 'ID الشخص'" />
+          <input v-if="splashTarget === 'custom'" v-model.trim="splashTargetUrl" type="url" class="form-control form-control-sm mb-3" placeholder="https://example.com/page" />
           <p class="form-text">زر «تخطي» يظهر أسفل الإعلان. المدة الافتراضية 5 ثوانٍ. التعديلات تصل إلى التطبيق من إعدادات الخادم دون تحديث APK.</p>
           <div v-if="splashMessage" class="alert py-2 mt-2" :class="splashError ? 'alert-warning' : 'alert-success'" role="status">{{ splashMessage }}</div>
         </div>
@@ -137,6 +141,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
+import apiClient from '@/api/client'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -148,7 +153,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
 
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
+const ORIGIN = (import.meta.env.VITE_API_ORIGIN || apiClient.defaults.baseURL || '').replace(/\/api\/v\d+\/?$/i, '').replace(/\/$/, '')
 const PROMO = `${ORIGIN}/promos`
 
 const promoLinks = computed(() => [
@@ -178,6 +183,7 @@ const splashEnabled = ref(true)
 const splashDuration = ref(5)
 const splashTarget = ref('home')
 const splashTargetUrl = ref('')
+const splashTargetId = ref('')
 const splashSaving = ref(false)
 const splashUploading = ref(false)
 const splashMessage = ref('')
@@ -224,16 +230,21 @@ async function saveSplashAd() {
   splashMessage.value = ''
   splashError.value = false
   try {
-    const duration = Math.max(5, Math.min(120, Math.floor(Number(splashDuration.value) || 5)))
+    const duration = Math.max(1, Math.min(5, Math.floor(Number(splashDuration.value) || 5)))
     const next = { ...(themeConfig || {}) }
     const oldSplash = next.splash && typeof next.splash === 'object' ? next.splash : {}
     const items = Array.isArray(oldSplash.items) ? [...oldSplash.items] : []
     const current = items[0] && typeof items[0] === 'object' ? items[0] : {}
-    const target = splashTarget.value === 'custom'
-      ? String(splashTargetUrl.value || '').trim()
-      : splashTarget.value
-    if (target && /^https?:\/\//i.test(target) === false && !['home', 'messages', 'drama', 'create_room'].includes(target)) {
-      throw new Error('الوجهة غير صالحة. اختر وجهة داخلية أو رابطًا يبدأ بـ https://')
+    let target = splashTarget.value
+    if (splashTarget.value === 'custom') {
+      target = String(splashTargetUrl.value || '').trim()
+      if (!/^https?:\/\//i.test(target)) throw new Error('الرابط الخارجي يجب أن يبدأ بـ https:// أو http://')
+    } else if (['room_id', 'agency_id', 'user_id'].includes(splashTarget.value)) {
+      const id = String(splashTargetId.value || '').trim()
+      if (!id || !/^[A-Za-z0-9_-]{3,64}$/.test(id)) throw new Error('أدخل ID صالحاً للوجهة المختارة.')
+      target = `${splashTarget.value.replace('_id', '')}:${id}`
+    } else if (!['home', 'messages', 'drama', 'create_room'].includes(target)) {
+      throw new Error('اختر وجهة صالحة.')
     }
     items[0] = {
       ...current,
@@ -381,16 +392,24 @@ async function load() {
   splashImageUrl.value = String(item.url || '')
   splashPreviewUrl.value = splashAbsUrl(splashImageUrl.value)
   splashEnabled.value = splash.enabled !== false && item.active !== false
-  splashDuration.value = Math.max(5, Math.min(120, Number(item.durationSeconds) || 5))
+  splashDuration.value = Math.max(1, Math.min(5, Number(item.durationSeconds) || 5))
   const target = String(item.target || item.targetUrl || 'home')
-  if (['home', 'messages', 'drama', 'create_room'].includes(target)) {
+  const idTarget = target.match(/^(room|agency|user):(.+)$/i)
+  if (idTarget) {
+    splashTarget.value = idTarget[1].toLowerCase() + '_id'
+    splashTargetId.value = idTarget[2]
+    splashTargetUrl.value = ''
+  } else if (['home', 'messages', 'drama', 'create_room'].includes(target)) {
     splashTarget.value = target
+    splashTargetId.value = ''
     splashTargetUrl.value = ''
   } else if (/^https?:\/\//i.test(target)) {
     splashTarget.value = 'custom'
     splashTargetUrl.value = target
+    splashTargetId.value = ''
   } else {
     splashTarget.value = 'home'
+    splashTargetId.value = ''
     splashTargetUrl.value = ''
   }
 }
