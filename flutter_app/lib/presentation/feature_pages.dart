@@ -1240,9 +1240,8 @@ class _SocialHubPageState extends State<SocialHubPage> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على مستخدمين.')));
         return;
       }
-      final pageContext = context;
       await showModalBottomSheet<void>(
-        context: pageContext,
+        context: context,
         isScrollControlled: true,
         builder: (sheetContext) => SafeArea(
           child: ListView(
