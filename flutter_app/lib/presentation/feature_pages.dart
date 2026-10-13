@@ -315,6 +315,14 @@ class GiftCatalogPage extends StatefulWidget {
 }
 
 class _GiftCatalogPageState extends State<GiftCatalogPage> {
+  String _mediaUrl(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl);
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
   List<Map<String, dynamic>> _gifts = const [];
   bool _loading = true;
   String? _error;
@@ -366,7 +374,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                                 children: [
                                   Expanded(
                                     child: image.startsWith('http')
-                                        ? Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 52))
+                                        ? Image.network(_mediaUrl(image), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 52))
                                         : const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold),
                                   ),
                                   const SizedBox(height: 8),
