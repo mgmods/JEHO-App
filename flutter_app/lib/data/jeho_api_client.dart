@@ -251,12 +251,19 @@ class JehoApiClient {
       throw const JehoApiException('الخادم لم يرجع رابط الصورة.');
     }
     if (path.startsWith('https://') || path.startsWith('http://')) return path;
+    // Upload URLs are returned as /uploads/<filename>. In cloud deployments
+    // the durable-storage controller lives under the API prefix, so resolve
+    // that path through the configured API base instead of the static root.
+    final normalizedPath = path.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalizedPath.startsWith('uploads/')) {
+      return base.resolve(normalizedPath).toString();
+    }
     final origin = Uri(
       scheme: base.scheme,
       host: base.host,
       port: base.hasPort ? base.port : null,
     );
-    return origin.resolve(path.startsWith('/') ? path : '/$path').toString();
+    return origin.resolve(normalizedPath.startsWith('/') ? normalizedPath : '/$normalizedPath').toString();
   }
 
   Future<Map<String, dynamic>> setRoomBackground(
