@@ -930,12 +930,54 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         ),
                       )
                     else if (_visibleRooms.isEmpty)
-                      const Card(
+                      Card(
+                        color: const Color(0xEFFFFCF4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          side: const BorderSide(color: Color(0xFFE9D4A7)),
+                        ),
                         child: Padding(
-                          padding: EdgeInsets.all(18),
-                          child: Text(
-                            'لا توجد غرف عامة متاحة حاليًا.',
-                            textAlign: TextAlign.center,
+                          padding: const EdgeInsets.fromLTRB(18, 24, 18, 20),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 66,
+                                height: 66,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [Color(0xFFFFE8B0), Color(0xFFE7BD76)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                ),
+                                child: const Icon(Icons.forum_rounded, size: 32, color: Color(0xFF76521B)),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _homeTab == 'ملكي' ? 'لسه ما أنشأت غرفتك' : 'ما في غرف متاحة بهالفلتر',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF493512),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _homeTab == 'ملكي'
+                                    ? 'أنشئ غرفة وابدأ جمعتك مع الأصدقاء.'
+                                    : 'غيّر المنطقة أو حدّث القائمة لتشوف غرفًا أخرى.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Color(0xFF88775D), height: 1.4),
+                              ),
+                              const SizedBox(height: 14),
+                              FilledButton.icon(
+                                onPressed: _loading ? null : _createRoom,
+                                icon: const Icon(Icons.add_rounded),
+                                label: const Text('إنشاء غرفة'),
+                              ),
+                            ],
                           ),
                         ),
                       )
