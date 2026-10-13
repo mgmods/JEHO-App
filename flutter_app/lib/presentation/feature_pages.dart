@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../data/jeho_api_client.dart';
+import 'discovery_hub_page.dart';
 
 const _featureGold = Color(0xFFB68A35);
 
@@ -465,6 +466,46 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     } finally {
       passwordController.dispose();
     }
+  }
+
+  Future<void> _openRoomEvents() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => DiscoveryHubPage(
+        apiClient: widget.apiClient,
+        accessToken: widget.accessToken,
+      ),
+    ));
+  }
+
+  Future<void> _startRoomGame() async {
+    if (!_roomEntered || widget.accessToken.isEmpty || _roomActionBusy) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ادخل الغرفة أولًا لبدء لعبة.')),
+      );
+      return;
+    }
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('ألعاب الغرفة')),
+            ListTile(
+              leading: const Icon(Icons.grid_3x3_rounded),
+              title: const Text('إكس أو (XO)'),
+              subtitle: const Text('بدء جلسة لعبة داخل الغرفة'),
+              onTap: () => Navigator.pop(context, 'tic_tac_toe'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    await _roomAction(
+      () => widget.apiClient.startRoomGame(widget.accessToken, _roomId, type: selected),
+      'تم إرسال طلب بدء اللعبة إلى الخادم.',
+    );
   }
 
   Future<void> _sendGiftToHost() async {
@@ -1118,10 +1159,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _VoiceQuickAction(icon: Icons.celebration_rounded, label: 'الفعاليات', onTap: () => _showRoomDisplaySettings()),
-                    const SizedBox(width: 6),
+                    _VoiceQuickAction(icon: Icons.celebration_rounded, label: 'الفعاليات', onTap: _openRoomEvents),
+                    const SizedBox(width: 5),
+                    _VoiceQuickAction(icon: Icons.grid_3x3_rounded, label: 'الألعاب', onTap: _startRoomGame),
+                    const SizedBox(width: 5),
                     _VoiceQuickAction(icon: Icons.card_giftcard_rounded, label: 'الهدايا', onTap: _sendGiftToHost),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     _VoiceQuickAction(icon: Icons.pan_tool_alt_rounded, label: 'طلب المايك', onTap: _raiseHand),
                   ],
                 ),
