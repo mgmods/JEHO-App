@@ -375,6 +375,9 @@ class JehoApiClient {
   Future<Map<String, dynamic>> getMyAgency(String token) async =>
       _asMap(await _get('agencies/mine', accessToken: token), 'لا توجد وكالة مرتبطة بالحساب أو تعذر تحميلها.');
 
+  Future<Map<String, dynamic>> joinAgencyByCode(String token, String code) async =>
+      _asMap(await _post('agencies/join-by-code', {'code': code.trim()}, accessToken: token), 'تعذر إرسال طلب الانضمام للوكالة.');
+
   Future<Map<String, dynamic>> applyForAgency(String token, Map<String, Object?> data) async =>
       _asMap(await _post('agencies/applications', data, accessToken: token), 'تعذر إرسال طلب الوكالة.');
 
