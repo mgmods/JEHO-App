@@ -114,6 +114,59 @@ class JehoApiClient {
     return payload;
   }
 
+  Future<Map<String, dynamic>> getMyProfile(String accessToken) async {
+    final payload = await _get('users/me', accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    throw const JehoApiException('تعذر قراءة بيانات الملف الشخصي.');
+  }
+
+  Future<List<Map<String, dynamic>>> getPublicRooms() async {
+    final payload = await _get('rooms?page=1&limit=20');
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['data'] ?? items['rooms'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<dynamic> _get(String endpoint, {String? accessToken}) async {
+    final base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/');
+    final uri = base.resolve(endpoint);
+    http.Response response;
+    try {
+      response = await _client.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          if (accessToken != null && accessToken.isNotEmpty)
+            'Authorization': 'Bearer $accessToken',
+        },
+      ).timeout(const Duration(seconds: 20));
+    } on Exception {
+      throw const JehoApiException(
+        'تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.',
+      );
+    }
+
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      throw const JehoApiException('استجابة الخادم غير مفهومة.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map<String, dynamic>
+          ? (decoded['message'] ?? decoded['error'])
+          : null;
+      throw JehoApiException(_safeMessage(message, response.statusCode));
+    }
+    if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+      return decoded['data'];
+    }
+    return decoded;
+  }
+
   Future<String?> readAccessToken() =>
       _secureStorage.read(key: 'jeho_access_token');
 
