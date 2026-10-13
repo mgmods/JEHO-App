@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/jeho_api_client.dart';
@@ -102,6 +103,63 @@ class _ConversationPageState extends State<ConversationPage> {
       if (mounted) setState(() => _error = error.message);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _sendFileAttachment() async {
+    if (_uploadingAttachment || _sending) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'webm', 'mp3', 'm4a', 'aac', 'wav', 'pdf'],
+        allowMultiple: false,
+        withData: false,
+      );
+      if (result == null || result.files.isEmpty || !mounted) return;
+      final picked = result.files.single;
+      final path = picked.path;
+      if (path == null || path.isEmpty) {
+        setState(() => _error = 'تعذر الوصول إلى الملف المختار.');
+        return;
+      }
+      final extension = (picked.extension ?? '').toLowerCase();
+      final mimeType = switch (extension) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'mp4' || 'mov' || 'webm' => 'video/$extension',
+        'mp3' || 'm4a' || 'aac' || 'wav' => 'audio/$extension',
+        'pdf' => 'application/pdf',
+        _ => 'application/octet-stream',
+      };
+      final type = mimeType.startsWith('image/')
+          ? 'image'
+          : mimeType.startsWith('video/')
+              ? 'video'
+              : mimeType.startsWith('audio/')
+                  ? 'audio'
+                  : 'file';
+      setState(() { _uploadingAttachment = true; _error = null; });
+      final file = File(path);
+      final url = await widget.apiClient.uploadImage(widget.accessToken, file);
+      final size = picked.size > 0 ? picked.size : await file.length();
+      final sent = await widget.apiClient.sendMessageAttachment(
+        widget.accessToken,
+        _conversationId,
+        url,
+        mimeType: mimeType,
+        size: size,
+        type: type,
+      );
+      if (!mounted) return;
+      setState(() => _messages = [..._messages, sent]);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر رفع الملف وإرساله.');
+    } finally {
+      if (mounted) setState(() => _uploadingAttachment = false);
     }
   }
 
@@ -248,7 +306,12 @@ class _ConversationPageState extends State<ConversationPage> {
                     onPressed: _uploadingAttachment ? null : _sendImageAttachment,
                     icon: _uploadingAttachment
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.attach_file_rounded),
+                        : const Icon(Icons.image_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'إرفاق ملف أو فيديو',
+                    onPressed: _uploadingAttachment ? null : _sendFileAttachment,
+                    icon: const Icon(Icons.attach_file_rounded),
                   ),
                   Expanded(
                     child: TextField(
