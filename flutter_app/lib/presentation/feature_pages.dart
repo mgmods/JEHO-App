@@ -106,6 +106,69 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
+  Future<void> _showSeatRequests() async {
+    if (_roomActionBusy) return;
+    try {
+      final requests = await widget.apiClient.getSeatRequests(widget.accessToken, _roomId);
+      if (!mounted) return;
+      if (requests.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد طلبات مايك معلّقة.')));
+        return;
+      }
+      final selected = await showModalBottomSheet<Map<String, dynamic>>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(title: Text('طلبات المايك المعلّقة')),
+              for (final request in requests)
+                ListTile(
+                  leading: const Icon(Icons.pan_tool_alt_rounded),
+                  title: Text((request['displayName'] ?? request['username'] ?? request['userId'] ?? 'مستخدم').toString()),
+                  subtitle: Text((request['createdAt'] ?? request['status'] ?? '').toString()),
+                  trailing: Wrap(
+                    spacing: 4,
+                    children: [
+                      IconButton(
+                        tooltip: 'قبول',
+                        onPressed: () => Navigator.pop(sheetContext, {...request, '_accept': true}),
+                        icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+                      ),
+                      IconButton(
+                        tooltip: 'رفض',
+                        onPressed: () => Navigator.pop(sheetContext, {...request, '_accept': false}),
+                        icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null || !mounted) return;
+      final userId = (selected['userId'] ?? selected['id'] ?? selected['user']?['id'] ?? '').toString();
+      if (userId.isEmpty) {
+        setState(() => _error = 'طلب المايك لا يحتوي معرّف المستخدم المطلوب.');
+        return;
+      }
+      final accept = selected['_accept'] == true;
+      await _roomAction(
+        () => widget.apiClient.respondSeatRequest(
+          widget.accessToken,
+          _roomId,
+          userId,
+          accept: accept,
+        ),
+        accept ? 'تم قبول طلب المايك.' : 'تم رفض طلب المايك.',
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _showModerationTools() async {
     final userIdController = TextEditingController();
     try {
@@ -381,6 +444,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             onPressed: _roomActionBusy || !_roomEntered ? null : _raiseHand,
             icon: const Icon(Icons.pan_tool_alt_rounded),
             label: const Text('طلب المايك'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatRequests,
+            icon: const Icon(Icons.how_to_reg_rounded),
+            label: const Text('مراجعة طلبات المايك'),
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : _sendGiftToHost,
