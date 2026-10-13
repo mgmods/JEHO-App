@@ -682,7 +682,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                   )
                 : Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
@@ -716,7 +716,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     if (_banners.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       SizedBox(
-                        height: 156,
+                        height: 190,
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: _banners.length,
@@ -727,7 +727,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                             final title = (banner['title'] ?? banner['name'] ?? '').toString();
                             final imageUrl = imageValue.isEmpty ? '' : _resolveMediaUrl(imageValue);
                             return SizedBox(
-                              width: MediaQuery.sizeOf(context).width * 0.82,
+                              width: MediaQuery.sizeOf(context).width * 0.94,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(18),
                                 child: Stack(
@@ -768,7 +768,20 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 78,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: const [
+                          _HomeCategoryChip(label: 'شائع 🔥', selected: true),
+                          _HomeCategoryChip(label: 'سوريا 🇸🇾'),
+                          _HomeCategoryChip(label: 'مصر 🇪🇬'),
+                          _HomeCategoryChip(label: 'المملكة العربية 🇸🇦'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
@@ -891,7 +904,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 SizedBox(
-                                  height: 154,
+                                  height: 230,
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
@@ -1599,4 +1612,25 @@ class _SectionInfo {
   final String title;
   final String subtitle;
   final IconData icon;
+}
+
+class _HomeCategoryChip extends StatelessWidget {
+  const _HomeCategoryChip({required this.label, this.selected = false});
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsetsDirectional.only(end: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF19C6A5) : Colors.white.withOpacity(0.94),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: selected ? const Color(0xFF19C6A5) : const Color(0xFFE7E7E7)),
+          boxShadow: selected ? const [] : const [BoxShadow(color: Color(0x12000000), blurRadius: 5, offset: Offset(0, 2))],
+        ),
+        child: Center(
+          child: Text(label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF383838), fontWeight: FontWeight.w800)),
+        ),
+      );
 }
