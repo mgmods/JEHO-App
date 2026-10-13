@@ -635,7 +635,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => GiftCatalogPage(apiClient: widget.apiClient),
+                              builder: (_) => GiftCatalogPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
                             ),
                           ),
                           icon: const Icon(Icons.card_giftcard_rounded),
