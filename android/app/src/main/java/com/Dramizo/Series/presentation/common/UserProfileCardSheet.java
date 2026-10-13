@@ -7,6 +7,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -38,6 +39,8 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Same Mikoo-style user card as the in-room profile sheet, for use anywhere
@@ -117,6 +120,10 @@ public final class UserProfileCardSheet {
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        View actCpRequest = sheet.findViewById(R.id.actCpRequest);
+        View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
 
         final String[] publicIdHold = {""};
         final String[] displayNameHold = {name != null ? name : ""};
@@ -141,6 +148,35 @@ public final class UserProfileCardSheet {
         if (rowHostTasks != null) rowHostTasks.setVisibility(View.GONE);
         if (btnHi != null) btnHi.setVisibility(View.GONE);
         if (chipFirstDay != null) chipFirstDay.setVisibility(View.GONE);
+
+        // Public CP badge: fetched from the public profile endpoint, so every viewer sees the same active bond.
+        if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        if (actCpRequest != null) {
+            actCpRequest.setVisibility(uid.equals(myId) ? View.GONE : View.VISIBLE);
+            actCpRequest.setOnClickListener(v -> showCpRequestDialog(activity, container, uid, dialog));
+        }
+        if (!uid.equals(myId)) {
+            container.getIoExecutor().execute(() -> {
+                Result<List<Map<String, Object>>> cp = ApiCall.execute(container.getUserApi().cpProfileRelationships(uid));
+                if (!cp.success || cp.data == null || cp.data.isEmpty()) return;
+                Map<String, Object> relation = cp.data.get(0);
+                Object partnerObj = relation.get("partner");
+                Map<?, ?> cpPartner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
+                String partnerName = cpPartner == null ? "" : String.valueOf(
+                        cpPartner.get("displayName") != null ? cpPartner.get("displayName") : cpPartner.get("username"));
+                String partnerAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? "" : String.valueOf(cpPartner.get("avatarUrl"));
+                activity.runOnUiThread(() -> {
+                    if (dialog.getWindow() == null || rowCpRelationship == null) return;
+                    rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
+                    if (imgCpPartnerAvatar != null && !partnerAvatar.isEmpty()) {
+                        Glide.with(activity).load(partnerAvatar).placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
+                });
+            });
+        }
 
         UserSocialNav.wireUserCard(activity, sheet, uid, myId, dialog::dismiss);
 
@@ -510,6 +546,40 @@ public final class UserProfileCardSheet {
         }
 
         dialog.show();
+    }
+
+    private static void showCpRequestDialog(@NonNull FragmentActivity activity, @NonNull AppContainer container,
+                                             @NonNull String recipientId, @NonNull BottomSheetDialog parent) {
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(activity)
+                .setTitle("إرسال طلب علاقة")
+                .setItems(labels, (dialog, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", UUID.randomUUID().toString());
+                    container.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = ApiCall.execute(container.getUserApi().createProfileCpRequest(body));
+                        activity.runOnUiThread(() -> Toast.makeText(activity,
+                                result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                        : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                Toast.LENGTH_LONG).show());
+                    });
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
+    }
+
+    private static String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
     }
 
     @Nullable
