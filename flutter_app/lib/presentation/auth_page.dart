@@ -98,32 +98,89 @@ class _AuthPageState extends State<AuthPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Container(
-                      width: 82,
-                      height: 82,
+                      width: 148,
+                      height: 148,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFE7B0),
-                        borderRadius: BorderRadius.circular(26),
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Color(0xFFFFE9D8),
+                            Color(0xFFFFF7E9),
+                            Color(0xFFF3D6A1),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: const Color(0x33FE2C55),
+                          width: 1.2,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x22C47B77),
+                            blurRadius: 30,
+                            spreadRadius: 3,
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.forum_rounded,
-                        size: 44,
-                        color: Color(0xFF8C641D),
+                      child: Container(
+                        width: 126,
+                        height: 126,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(
+                            color: const Color(0x33D9A44A),
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/original/android-res/drawable-xxhdpi/jeho_logo.webp',
+                            width: 116,
+                            height: 116,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                                  Icons.forum_rounded,
+                                  size: 52,
+                                  color: Color(0xFF8C641D),
+                                ),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 20),
                     Text(
-                      'أهلًا بك في JEHO-OWN',
+                      'JEHO-OWN',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontSize: 26,
+                        letterSpacing: 1.4,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF352C29),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
+                    Container(
+                      width: 40,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD77A), Color(0xFFE99B35)],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Text(
                       _isRegister ? 'أنشئ حسابك للمتابعة' : 'سجّل الدخول للمتابعة',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: const Color(0xFF756966),
+                      ),
                     ),
                     const SizedBox(height: 28),
                     if (_isRegister) ...[
