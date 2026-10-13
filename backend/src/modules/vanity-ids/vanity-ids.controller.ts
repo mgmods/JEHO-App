@@ -156,11 +156,6 @@ export class VanityIdsController {
     ) {
       throw new BadRequestException('ID is reserved by another user');
     }
-    const taken = await this.usersRepo.findOne({ where: { publicId } });
-    if (taken && taken.id !== userId) {
-      throw new BadRequestException('This public ID is already in use');
-    }
-
     const now = new Date();
     const fullPrice = Math.max(0, Math.floor(Number(row.priceCoins) || 0));
     const isOwner = row.status === VanityIdStatus.OWNED && row.ownerUserId === userId;
