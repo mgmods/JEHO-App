@@ -170,7 +170,7 @@ public final class RemoteTheme {
 
     public static long splashDurationMs(@Nullable MiscDtos.SplashItemDto item) {
         if (item == null) return 5000L;
-        int seconds = Math.max(1, Math.min(120, item.durationSeconds));
+        int seconds = Math.max(1, Math.min(5, item.durationSeconds));
         return seconds * 1000L;
     }
 
