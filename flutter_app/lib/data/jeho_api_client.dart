@@ -198,6 +198,13 @@ class JehoApiClient {
   Future<Map<String, dynamic>> claimDramaEpisodeReward(String episodeId, String token) async =>
       _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/claim-reward', const {}, accessToken: token), 'تعذر استلام مكافأة الحلقة.');
 
+  // Games catalog uses the existing Dashboard-controlled config/games endpoint.
+  Future<List<Map<String, dynamic>>> getConfiguredGames() async =>
+      _asList(await _get('config/games'), ['items', 'results', 'games', 'data']);
+
+  Future<List<Map<String, dynamic>>> getGamePromotions() async =>
+      _asList(await _get('config/offers'), ['items', 'results', 'offers', 'data']);
+
   // Notifications, rankings, events and games use existing backend routes.
   Future<List<Map<String, dynamic>>> getNotifications(String token) async =>
       _asList(await _get('notifications?page=1&limit=30', accessToken: token), ['items', 'results', 'data']);
