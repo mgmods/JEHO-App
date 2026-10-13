@@ -230,6 +230,89 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
     }
   }
 
+  Future<void> _showAgencyMembers() async {
+    final agencyId = _myAgencyId;
+    if (agencyId == null) {
+      setState(() => _error = 'لا توجد وكالة مرتبطة بحسابك.');
+      return;
+    }
+    try {
+      final members = await widget.apiClient.getAgencyMembers(widget.accessToken, agencyId);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * 0.72,
+            child: members.isEmpty
+                ? const Center(child: Text('لا يوجد أعضاء للعرض.'))
+                : ListView(
+                    children: [
+                      const ListTile(title: Text('أعضاء الوكالة'), subtitle: Text('عرض فقط — إدارة العضوية تخضع لصلاحيات الخادم.')),
+                      for (final member in members)
+                        ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.person_outline_rounded)),
+                          title: Text((member['displayName'] ?? member['username'] ?? member['userId'] ?? member['user']?['displayName'] ?? 'عضو').toString()),
+                          subtitle: Text([
+                            if ((member['role'] ?? '').toString().isNotEmpty) 'الرتبة: ${member['role']}',
+                            if ((member['status'] ?? member['membershipStatus'] ?? '').toString().isNotEmpty) 'الحالة: ${member['status'] ?? member['membershipStatus']}',
+                          ].join(' · ')),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تحميل أعضاء الوكالة.');
+    }
+  }
+
+  Future<void> _showAgencyPayouts() async {
+    final agencyId = _myAgencyId;
+    if (agencyId == null) {
+      setState(() => _error = 'لا توجد وكالة مرتبطة بحسابك.');
+      return;
+    }
+    try {
+      final requests = await widget.apiClient.getAgencyPayoutRequests(widget.accessToken, agencyId);
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * 0.72,
+            child: requests.isEmpty
+                ? const Center(child: Text('لا توجد طلبات صرف أرباح.'))
+                : ListView(
+                    children: [
+                      const ListTile(title: Text('طلبات صرف أرباح الوكالة'), subtitle: Text('عرض فقط — لم يتم تغيير أي حالة مالية.')),
+                      for (final request in requests)
+                        ListTile(
+                          leading: const CircleAvatar(child: Icon(Icons.receipt_long_outlined)),
+                          title: Text('${request['diamonds'] ?? request['amount'] ?? '—'} ألماس'),
+                          subtitle: Text([
+                            (request['status'] ?? 'قيد المراجعة').toString(),
+                            if ((request['createdAt'] ?? '').toString().isNotEmpty) request['createdAt'].toString(),
+                            if ((request['note'] ?? '').toString().isNotEmpty) request['note'].toString(),
+                          ].join(' · ')),
+                        ),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تحميل طلبات صرف الأرباح.');
+    }
+  }
+
   Future<void> _showAgencyJoinRequests() async {
     final agencyId = _myAgencyId;
     if (agencyId == null) {
@@ -404,6 +487,25 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
                         title: Text((_agency?['agency'] as Map<String, dynamic>?)?['name']?.toString() ?? 'وكالتي'),
                         subtitle: Text('الدور: ${_agency?['role'] ?? 'عضو'} · الحالة: ${_agency?['membershipStatus'] ?? '—'}'),
                       ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _showAgencyMembers,
+                            icon: const Icon(Icons.people_alt_outlined),
+                            label: const Text('الأعضاء'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _showAgencyPayouts,
+                            icon: const Icon(Icons.receipt_long_outlined),
+                            label: const Text('طلبات الصرف'),
+                          ),
+                        ),
+                      ],
                     ),
                     Row(
                       children: [
