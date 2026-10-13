@@ -24,6 +24,9 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 - Public room listing, room creation, room details, room entry/leave, password prompts, seat requests and selection, seat locking, room password lock, moderator actions, room follow, gift-to-host UI, room cover/background uploads, and room display controls where exposed by the existing API.
 - Profile display name/bio editing and avatar upload.
 - Direct-message list, message history, text sending, image/file attachment upload and sending, media rendering, message edit/unsend, mute/pin/archive/delete-for-me controls.
+- Added a Flutter user-search screen using the existing public `GET users/search` and `GET users/:id` routes; search is accessible from the main app bar and opens a public profile preview.
+- Added a separate `flutter_dashboard/` Flutter Web migration target with existing admin login integration and a responsive shell for key admin areas. It is currently a read-only migration foundation, not a replacement for the Vue dashboard; full CRUD, permissions, uploads, charts, and module-specific workflows remain incomplete.
+- CI now includes a dedicated Flutter Web analyze/build job for the dashboard package.
 - Initial Flutter drama catalog connected to the existing `drama/config`, `drama/series`, series detail, view, like, and episode playback routes. This is a partial port; player reward timing, all native player behaviors, and remaining app screens still require parity work.
 - Initial Flutter games catalog reads Dashboard-controlled `config/games` and `config/offers`, opens configured web games, and applies the Dashboard `games` wallpaper when supplied. Native-only game modes, offline bundled game assets, daily task claiming, contests, and game store are not yet at parity.
 - Flutter home/profile, drama, and games surfaces now read the existing `config/theme` background configuration; image loading is optional and does not block navigation.
