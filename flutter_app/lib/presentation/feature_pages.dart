@@ -896,71 +896,128 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             ),
           ),
           const SizedBox(height: 14),
-          FilledButton.icon(
-            onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : (_roomEntered ? _leaveRoom : _enterRoom),
-            icon: _roomActionBusy
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(_roomEntered ? Icons.logout_rounded : Icons.login_rounded),
-            label: Text(_roomActionBusy ? 'جارٍ التنفيذ…' : _roomEntered ? 'مغادرة الغرفة' : 'دخول الغرفة'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _raiseHand,
-            icon: const Icon(Icons.pan_tool_alt_rounded),
-            label: const Text('طلب المايك'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatRequests,
-            icon: const Icon(Icons.how_to_reg_rounded),
-            label: const Text('مراجعة طلبات المايك'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _sendGiftToHost,
-            icon: const Icon(Icons.card_giftcard_rounded),
-            label: const Text('إرسال هدية للمضيف'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _showModerationTools,
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            label: const Text('إشراف الغرفة: إخراج أو حظر'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomDisplaySettings,
-            icon: const Icon(Icons.tune_rounded),
-            label: const Text('إعدادات عرض الغرفة'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
-            icon: const Icon(Icons.event_seat_rounded),
-            label: const Text('قفل أو فتح مقعد'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomPasswordLock,
-            icon: const Icon(Icons.lock_outline_rounded),
-            label: const Text('قفل الغرفة بكلمة مرور'),
-          ),
-          OutlinedButton.icon(
-            onPressed: _roomActionBusy || !_roomEntered ? null : () async {
-              final seat = await showModalBottomSheet<int>(
-                context: context,
-                builder: (context) => SafeArea(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      const ListTile(title: Text('اختر المقعد المطلوب')),
-                      for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
-                        ListTile(
-                          leading: CircleAvatar(child: Text('$index')),
-                          title: Text(index == 0 ? 'مقعد المضيف' : 'المقعد $index'),
-                          onTap: () => Navigator.pop(context, index),
-                        ),
-                    ],
-                  ),
+          Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFFFFD782),
+                onPrimary: Color(0xFF241A2C),
+                secondary: Color(0xFFE7BD76),
+                onSecondary: Color(0xFF241A2C),
+                surface: Color(0xFF2A2031),
+                onSurface: Colors.white,
+                error: Color(0xFFFF8D8D),
+                onError: Color(0xFF241A2C),
+                brightness: Brightness.dark,
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFE8C5),
+                  side: const BorderSide(color: Color(0x66E7BD76)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-              );
-              if (seat != null && mounted) await _takeSeat(seat);
-            },
-            icon: const Icon(Icons.event_seat_rounded),
-            label: const Text('اختيار مقعد'),
+              ),
+              filledButtonTheme: FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD782),
+                  foregroundColor: const Color(0xFF241A2C),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+              ),
+            ),
+            child: Card(
+              color: const Color(0xCC2A2031),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22),
+                side: const BorderSide(color: Color(0x55E4BD76)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      child: Text(
+                        'أدوات الغرفة',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                              FilledButton.icon(
+                                onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : (_roomEntered ? _leaveRoom : _enterRoom),
+                                icon: _roomActionBusy
+                                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                    : Icon(_roomEntered ? Icons.logout_rounded : Icons.login_rounded),
+                                label: Text(_roomActionBusy ? 'جارٍ التنفيذ…' : _roomEntered ? 'مغادرة الغرفة' : 'دخول الغرفة'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _raiseHand,
+                                icon: const Icon(Icons.pan_tool_alt_rounded),
+                                label: const Text('طلب المايك'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatRequests,
+                                icon: const Icon(Icons.how_to_reg_rounded),
+                                label: const Text('مراجعة طلبات المايك'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _sendGiftToHost,
+                                icon: const Icon(Icons.card_giftcard_rounded),
+                                label: const Text('إرسال هدية للمضيف'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _showModerationTools,
+                                icon: const Icon(Icons.admin_panel_settings_outlined),
+                                label: const Text('إشراف الغرفة: إخراج أو حظر'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomDisplaySettings,
+                                icon: const Icon(Icons.tune_rounded),
+                                label: const Text('إعدادات عرض الغرفة'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
+                                icon: const Icon(Icons.event_seat_rounded),
+                                label: const Text('قفل أو فتح مقعد'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomPasswordLock,
+                                icon: const Icon(Icons.lock_outline_rounded),
+                                label: const Text('قفل الغرفة بكلمة مرور'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _roomActionBusy || !_roomEntered ? null : () async {
+                                  final seat = await showModalBottomSheet<int>(
+                                    context: context,
+                                    builder: (context) => SafeArea(
+                                      child: ListView(
+                                        shrinkWrap: true,
+                                        children: [
+                                          const ListTile(title: Text('اختر المقعد المطلوب')),
+                                          for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
+                                            ListTile(
+                                              leading: CircleAvatar(child: Text('$index')),
+                                              title: Text(index == 0 ? 'مقعد المضيف' : 'المقعد $index'),
+                                              onTap: () => Navigator.pop(context, index),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                  if (seat != null && mounted) await _takeSeat(seat);
+                                },
+                                icon: const Icon(Icons.event_seat_rounded),
+                                label: const Text('اختيار مقعد'),
+                              ),
+                  ],
+                ),
+              ),
+            ),
           ),
           if (coverUrl != null) ...[
             const SizedBox(height: 12),
