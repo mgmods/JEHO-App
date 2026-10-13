@@ -6,7 +6,6 @@ import 'feature_pages.dart';
 import 'feature_hub_page.dart';
 import 'discovery_hub_page.dart';
 import 'user_search_page.dart';
-import 'feature_hub_page.dart';
 
 const _settingsGold = Color(0xFF9A7026);
 
