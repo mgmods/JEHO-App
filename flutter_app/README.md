@@ -1,6 +1,8 @@
-# JEHO-OWN Flutter client migration workspace
+# JEHO-OWN Flutter migration — incomplete candidate
 
-This branch is an isolated Flutter migration candidate. The existing Android application remains the production/rollback path. Do not merge or release this branch until feature-by-feature review and live-device acceptance are complete.
+**Important status:** this is not yet a complete migration of the original Android app. The original app is `android/`, package `com.Dramizo.Series`, and contains the existing production screens, assets, native integrations, and ZEGO voice-room implementation. `flutter_app/` began as a separate Flutter client workspace and must not be represented as a full replacement. The original Android app remains the production/rollback path.
+
+The CI-generated Flutter APK is now configured and checked to target the same Android application ID, `com.Dramizo.Series`. Matching the package ID does **not** mean feature parity has been achieved, and installing an incomplete build over the original app is not approved. Do not merge or release this branch until the actual original app's screens, assets, API flows, permissions, and platform integrations have been migrated and tested feature by feature.
 
 ## Build and local run
 
@@ -16,7 +18,7 @@ flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backe
 
 CI generates the Android platform scaffold in its workspace, runs analysis and widget tests, builds a debug APK, and uploads the artifact. The latest successful run at the time of this update is documented in the pull request checks. A debug APK is a test build, not a signed production release.
 
-## Implemented Flutter flows (client-side integration)
+## Current partial Flutter flows (not production parity)
 
 - Arabic RTL theme and login/register/guest authentication, secure token storage, and session restoration.
 - Public room listing, room creation, room details, room entry/leave, password prompts, seat requests and selection, seat locking, room password lock, moderator actions, room follow, gift-to-host UI, room cover/background uploads, and room display controls where exposed by the existing API.
@@ -32,7 +34,7 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 
 ## Important limits (not yet production parity)
 
-- **Voice is deliberately not migrated or modified.** The current ZEGO integration, voice tokens, room audio connection, audio settings, and Redis/realtime infrastructure must remain untouched. Room entry and seat management UI calls do not themselves provide a complete native voice-room experience.
+- **The original native application has not yet been fully ported.** The current Flutter screens are a partial reimplementation, not the original full app converted to Flutter. In particular, existing native screen behavior, deep links, platform integrations, and many production flows still need parity review.
 - Some screens expose only a subset of the existing server functionality. Remaining parity work includes deeper moderation tools, complete relationship/CP sections and request edge cases, agency member/commission/payout workflows, task rewards, all wallet exchange/payment provider variants and verification/polling, gift combo/all-mic flows, and complete Dashboard-driven navigation/theme/content settings.
 - The Dashboard remains its existing web application; this Flutter branch migrates the **mobile client**, not the Dashboard frontend.
 - API method presence and a successful CI build do not prove live server correctness. Authenticated flows must be validated against the deployed backend using test accounts, including uploads on the deployed storage configuration, payment-provider callbacks, wallet accounting, and authorization failures.
