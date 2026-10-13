@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../data/jeho_api_client.dart';
 
@@ -26,6 +29,7 @@ class _ConversationPageState extends State<ConversationPage> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   bool _sending = false;
+  bool _uploadingAttachment = false;
   String? _error;
 
   String get _conversationId => widget.conversation['id']?.toString() ?? '';
@@ -98,6 +102,42 @@ class _ConversationPageState extends State<ConversationPage> {
       if (mounted) setState(() => _error = error.message);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _sendImageAttachment() async {
+    if (_uploadingAttachment || _sending) return;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _uploadingAttachment = true;
+        _error = null;
+      });
+      final file = File(picked.path);
+      final url = await widget.apiClient.uploadImage(widget.accessToken, file);
+      final size = await file.length();
+      final sent = await widget.apiClient.sendMessageAttachment(
+        widget.accessToken,
+        _conversationId,
+        url,
+        mimeType: 'image/${picked.path.toLowerCase().endsWith('.png') ? 'png' : picked.path.toLowerCase().endsWith('.webp') ? 'webp' : 'jpeg'}',
+        size: size,
+        type: 'image',
+      );
+      if (!mounted) return;
+      setState(() => _messages = [..._messages, sent]);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر رفع الصورة وإرسالها.');
+    } finally {
+      if (mounted) setState(() => _uploadingAttachment = false);
     }
   }
 
@@ -203,6 +243,13 @@ class _ConversationPageState extends State<ConversationPage> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               child: Row(
                 children: [
+                  IconButton(
+                    tooltip: 'إرفاق صورة',
+                    onPressed: _uploadingAttachment ? null : _sendImageAttachment,
+                    icon: _uploadingAttachment
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.attach_file_rounded),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _composer,
