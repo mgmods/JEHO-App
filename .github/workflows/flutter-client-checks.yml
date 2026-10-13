@@ -80,6 +80,16 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
 
+      - name: Verify APK package identity
+        shell: bash
+        run: |
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -f "$APK"
+          test -n "$AAPT"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.Dramizo.Series'"
+          echo "Verified target package: com.Dramizo.Series"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
