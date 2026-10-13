@@ -43,7 +43,6 @@ import com.bumptech.glide.Glide;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
-import java.util.HashMap;
 import java.util.UUID;
 import java.text.NumberFormat;
 
