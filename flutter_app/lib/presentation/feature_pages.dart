@@ -1460,3 +1460,166 @@ class _SocialHubPageState extends State<SocialHubPage> {
     );
   }
 }
+
+
+class SocialPage extends StatefulWidget {
+  const SocialPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+
+  @override
+  State<SocialPage> createState() => _SocialPageState();
+}
+
+class _SocialPageState extends State<SocialPage> {
+  final _searchController = TextEditingController();
+  List<Map<String, dynamic>> _results = const [];
+  List<Map<String, dynamic>> _friends = const [];
+  List<Map<String, dynamic>> _relations = const [];
+  bool _loading = false;
+  String? _error;
+  int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSocialData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSocialData() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final friends = await widget.apiClient.getMyFriends(widget.accessToken);
+      List<Map<String, dynamic>> relations = const [];
+      try { relations = await widget.apiClient.getMyRelations(widget.accessToken); } on JehoApiException { }
+      if (mounted) setState(() { _friends = friends; _relations = relations; });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _search() async {
+    final query = _searchController.text.trim();
+    if (query.length < 2) { setState(() => _error = 'اكتب حرفين على الأقل للبحث.'); return; }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await widget.apiClient.searchUsers(query);
+      if (mounted) setState(() => _results = results);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _act(Future<void> Function() action, String success) async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
+      await _loadSocialData();
+      if (_searchController.text.trim().length >= 2) await _search();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted && _loading) setState(() => _loading = false);
+    }
+  }
+
+  String _userId(Map<String, dynamic> user) =>
+      (user['id'] ?? user['userId'] ?? user['user']?['id'] ?? '').toString();
+
+  Widget _userTile(Map<String, dynamic> user, {bool searchable = false}) {
+    final id = _userId(user);
+    final title = (user['displayName'] ?? user['username'] ?? user['user']?['displayName'] ?? 'مستخدم').toString();
+    final subtitle = (user['publicId'] ?? user['username'] ?? user['status'] ?? '').toString();
+    return Card(
+      child: ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.person_outline_rounded)),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: subtitle.isEmpty ? null : Text(subtitle),
+        trailing: searchable
+            ? PopupMenuButton<String>(
+                enabled: id.isNotEmpty && !_loading,
+                onSelected: (action) {
+                  if (action == 'friend') {
+                    _act(() async { await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend'); }, 'تم إرسال طلب الصداقة.');
+                  } else if (action == 'follow') {
+                    _act(() async { await widget.apiClient.followUser(widget.accessToken, id, follow: true); }, 'تمت متابعة المستخدم.');
+                  } else if (action == 'block') {
+                    _act(() async { await widget.apiClient.blockUser(widget.accessToken, id); }, 'تم حظر المستخدم.');
+                  } else if (action == 'chat') {
+                    _act(() async { await widget.apiClient.startConversation(widget.accessToken, id); }, 'تم إنشاء المحادثة أو فتحها من الخادم.');
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'friend', child: Text('إرسال طلب صداقة')),
+                  PopupMenuItem(value: 'follow', child: Text('متابعة')),
+                  PopupMenuItem(value: 'chat', child: Text('بدء محادثة')),
+                  PopupMenuItem(value: 'block', child: Text('حظر المستخدم')),
+                ],
+              )
+            : const Icon(Icons.verified_user_outlined),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('العلاقات والأصدقاء'),
+      actions: [IconButton(onPressed: _loading ? null : _loadSocialData, icon: const Icon(Icons.refresh_rounded))],
+    ),
+    body: Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+          child: Row(children: [
+            Expanded(child: TextField(
+              controller: _searchController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _search(),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), labelText: 'ابحث بالاسم أو المعرّف'),
+            )),
+            const SizedBox(width: 8),
+            IconButton.filled(onPressed: _loading ? null : _search, icon: const Icon(Icons.search_rounded)),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('بحث'), icon: Icon(Icons.search_rounded)),
+              ButtonSegment(value: 1, label: Text('أصدقائي'), icon: Icon(Icons.people_alt_outlined)),
+              ButtonSegment(value: 2, label: Text('علاقاتي'), icon: Icon(Icons.favorite_border_rounded)),
+            ],
+            selected: {_tab},
+            onSelectionChanged: (value) => setState(() => _tab = value.first),
+          ),
+        ),
+        if (_loading) const LinearProgressIndicator(),
+        if (_error != null) Padding(padding: const EdgeInsets.all(10), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: Builder(builder: (context) {
+            final items = _tab == 0 ? _results : _tab == 1 ? _friends : _relations;
+            if (items.isEmpty) return Center(child: Text(_tab == 0 ? 'ابحث عن مستخدم لإرسال طلب صداقة أو بدء محادثة.' : _tab == 1 ? 'لا توجد صداقات للعرض حاليًا.' : 'لا توجد علاقات نشطة للعرض حاليًا.'));
+            return ListView.builder(
+              padding: const EdgeInsets.all(10),
+              itemCount: items.length,
+              itemBuilder: (context, index) => _userTile(items[index], searchable: _tab == 0),
+            );
+          }),
+        ),
+      ],
+    ),
+  );
+}
