@@ -101,15 +101,38 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
           seedColor: _brandColor,
           brightness: Brightness.light,
         ),
-        scaffoldBackgroundColor: const Color(0xFFFFFBF3),
+        scaffoldBackgroundColor: const Color(0xFFFFF9F0),
+        cardTheme: CardThemeData(
+          color: const Color(0xFFFFFEFB),
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: Color(0xFFEEDFC6)),
+          ),
+        ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFFFF0CC),
+          backgroundColor: Color(0xFFFFF9F0),
           foregroundColor: Color(0xFF493512),
-          centerTitle: true,
+          centerTitle: false,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFFFFFEFB),
+          indicatorColor: const Color(0xFFFFE7B0),
+          elevation: 4,
+          labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w500,
+            color: states.contains(WidgetState.selected) ? const Color(0xFF8C641D) : const Color(0xFF8A8174),
+          )),
         ),
         inputDecorationTheme: const InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: Color(0xFFEEDFC6))),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: Color(0xFFEEDFC6))),
         ),
       ),
       builder: (context, child) => Directionality(
@@ -648,39 +671,30 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE7B0),
-                      borderRadius: BorderRadius.circular(26),
-                    ),
-                    child: _selectedIndex == 2 &&
-                            (activeUser['avatarUrl'] ?? '').toString().isNotEmpty
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(26),
-                            child: Image.network(
-                              _resolveMediaUrl((activeUser['avatarUrl'] ?? '').toString()),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(section.icon, size: 46, color: const Color(0xFF8C641D)),
-                            ),
-                          )
-                        : Icon(section.icon, size: 46, color: const Color(0xFF8C641D)),
-                  ),
-                  const SizedBox(height: 22),
-                  Text(
-                    section.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'أهلًا $displayName',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
+                  if (_selectedIndex != 2) ...[
+                    if (_selectedIndex == 0) ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('اكتشف غرف JEHOO', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF493512))),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('ادخل إلى المجتمعات وتواصل مع أصدقائك', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: const Color(0xFF88775D))),
+                      ),
+                    ] else ...[
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('محادثاتك', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF493512))),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('رسائلك وأصدقاؤك في مكان واحد', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: const Color(0xFF88775D))),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                  ],
                   if (_selectedIndex == 0) ...[
                     if (_banners.isNotEmpty) ...[
                       const SizedBox(height: 16),
@@ -1148,7 +1162,9 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         final unread = conversation['unreadCount'] ?? 0;
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
+                          clipBehavior: Clip.antiAlias,
                           child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                             onTap: () {
                               final token = widget.session['accessToken']?.toString() ?? '';
                               final conversationId = conversation['id']?.toString() ?? '';
@@ -1172,18 +1188,28 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                 ),
                               ).then((_) => _loadHomeData());
                             },
-                            leading: CircleAvatar(
-                              backgroundColor: const Color(0xFFFFE7B0),
-                              child: Text(
-                                title.isEmpty ? '؟' : title.characters.first,
-                                style: const TextStyle(color: Color(0xFF8C641D)),
+                            leading: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(colors: [Color(0xFFE5B45D), Color(0xFFFFEFD0)]),
+                              ),
+                              child: CircleAvatar(
+                                radius: 27,
+                                backgroundColor: const Color(0xFFFFF3DA),
+                                backgroundImage: ((peer['avatarUrl'] ?? peer['avatar'] ?? conversation['avatarUrl'] ?? '').toString().trim().isNotEmpty)
+                                    ? NetworkImage(_resolveMediaUrl((peer['avatarUrl'] ?? peer['avatar'] ?? conversation['avatarUrl']).toString()))
+                                    : null,
+                                child: ((peer['avatarUrl'] ?? peer['avatar'] ?? conversation['avatarUrl'] ?? '').toString().trim().isEmpty)
+                                    ? Text(title.isEmpty ? '؟' : title.characters.first, style: const TextStyle(color: Color(0xFF8C641D), fontWeight: FontWeight.w900, fontSize: 19))
+                                    : null,
                               ),
                             ),
                             title: Text(
                               title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF493512), fontSize: 15),
                             ),
                             subtitle: Text(
                               preview.isEmpty ? 'لا توجد رسالة أخيرة' : preview,
@@ -1212,264 +1238,182 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       textAlign: TextAlign.center,
                     ),
                   ] else ...[
-                    const SizedBox(height: 16),
-                    Card(
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                    // Original JEHOO-style profile dashboard: keep every shortcut wired
+                    // to its existing functional page while using the app's original assets.
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [Color(0xFFFFD8A8), Color(0xFFFFF0D7), Color(0xFFFFF9F0)],
+                        ),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: const Color(0xFFE8C58D)),
+                        boxShadow: const [BoxShadow(color: Color(0x18000000), blurRadius: 14, offset: Offset(0, 5))],
+                      ),
                       child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                        padding: const EdgeInsets.all(18),
+                        child: Column(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: SizedBox(
-                                width: 82,
-                                height: 82,
-                                child: (activeUser['avatarUrl'] ?? '').toString().trim().isNotEmpty
-                                    ? Image.network(
-                                        _resolveMediaUrl(activeUser['avatarUrl'].toString()),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const ColoredBox(
-                                          color: Color(0xFFFFE7B0),
-                                          child: Icon(Icons.person_rounded, size: 42, color: Color(0xFF8C641D)),
-                                        ),
-                                      )
-                                    : const ColoredBox(
-                                        color: Color(0xFFFFE7B0),
-                                        child: Icon(Icons.person_rounded, size: 42, color: Color(0xFF8C641D)),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
-                                  const SizedBox(height: 5),
-                                  Text('@${activeUser['username'] ?? '—'}',
-                                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Colors.black54)),
-                                  Text('ID ${activeUser['publicId'] ?? '—'}',
-                                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Color(0xFF8C641D), fontWeight: FontWeight.w700)),
-                                  if ((activeUser['bio'] ?? '').toString().trim().isNotEmpty) ...[
-                                    const SizedBox(height: 7),
-                                    Text(activeUser['bio'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(color: Colors.black54, height: 1.4)),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'إعدادات التطبيق',
-                              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                                builder: (_) => SettingsPage(
-                                  apiClient: widget.apiClient,
-                                  accessToken: widget.session['accessToken']?.toString() ?? '',
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const LinearGradient(colors: [Color(0xFFE3AD52), Color(0xFFFFEAC1)]),
+                                    boxShadow: const [BoxShadow(color: Color(0x338C641D), blurRadius: 8)],
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 39,
+                                    backgroundColor: const Color(0xFFFFF7E8),
+                                    backgroundImage: (activeUser['avatarUrl'] ?? '').toString().trim().isNotEmpty
+                                        ? NetworkImage(_resolveMediaUrl(activeUser['avatarUrl'].toString()))
+                                        : null,
+                                    child: (activeUser['avatarUrl'] ?? '').toString().trim().isEmpty
+                                        ? const Icon(Icons.person_rounded, size: 42, color: Color(0xFF8C641D))
+                                        : null,
+                                  ),
                                 ),
-                              )),
-                              icon: const Icon(Icons.settings_rounded, color: Color(0xFF8C641D)),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900, color: Color(0xFF493512))),
+                                      const SizedBox(height: 4),
+                                      Text('@${activeUser['username'] ?? '—'}', maxLines: 1, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF786342))),
+                                      const SizedBox(height: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                        decoration: BoxDecoration(color: const Color(0xFFFFF8E9), borderRadius: BorderRadius.circular(20)),
+                                        child: Text('ID ${activeUser['publicId'] ?? activeUser['vanityId'] ?? '—'}',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF986B21))),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton.filledTonal(
+                                  tooltip: 'تعديل الملف الشخصي',
+                                  onPressed: _loading ? null : () => _editProfile(activeUser),
+                                  style: IconButton.styleFrom(backgroundColor: const Color(0xFFFFF8E9), foregroundColor: const Color(0xFF8C641D)),
+                                  icon: const Icon(Icons.edit_rounded),
+                                ),
+                              ],
+                            ),
+                            if ((activeUser['bio'] ?? '').toString().trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(activeUser['bio'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Color(0xFF786342), height: 1.35)),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(child: _profileMetric(
+                                  icon: Icons.diamond_rounded,
+                                  title: 'الألماس',
+                                  value: (activeUser['diamonds'] ?? activeUser['diamondBalance'] ?? activeUser['wallet']?['diamonds'] ?? '—').toString(),
+                                  tint: const Color(0xFF6C76D9),
+                                )),
+                                const SizedBox(width: 8),
+                                Expanded(child: _profileMetric(
+                                  icon: Icons.monetization_on_rounded,
+                                  title: 'الذهب',
+                                  value: (activeUser['gold'] ?? activeUser['goldBalance'] ?? activeUser['wallet']?['gold'] ?? '—').toString(),
+                                  tint: const Color(0xFFB98324),
+                                )),
+                                const SizedBox(width: 8),
+                                Expanded(child: _profileMetric(
+                                  icon: Icons.workspace_premium_rounded,
+                                  title: 'VIP',
+                                  value: (activeUser['vipLevel'] ?? activeUser['vip']?['level'] ?? 'VIP').toString(),
+                                  tint: const Color(0xFF9B5E9F),
+                                )),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                                      builder: (_) => WalletPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
+                                    )),
+                                    icon: const Icon(Icons.account_balance_wallet_rounded, size: 18),
+                                    label: const Text('المحفظة'),
+                                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8C641D), foregroundColor: Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: _loading ? null : _changeAvatar,
+                                    icon: const Icon(Icons.add_a_photo_rounded, size: 18),
+                                    label: const Text('الصورة'),
+                                    style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF8C641D), side: const BorderSide(color: Color(0xFFD4AD70))),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      onPressed: _loading ? null : _changeAvatar,
-                      icon: const Icon(Icons.add_a_photo_rounded),
-                      label: const Text('تغيير الصورة الشخصية'),
+                    const SizedBox(height: 20),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text('خدمات حسابك', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF493512))),
                     ),
-                    const SizedBox(height: 8),
-                    FilledButton.tonalIcon(
-                      onPressed: _loading ? null : () => _editProfile(activeUser),
-                      icon: const Icon(Icons.edit_rounded),
-                      label: const Text('تعديل الملف الشخصي'),
-                    ),
-                    const SizedBox(height: 18),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 10,
-                      runSpacing: 10,
+                    const SizedBox(height: 10),
+                    _profileActionGroup(
+                      title: 'الحساب والأمان',
                       children: [
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => SettingsPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.settings_rounded),
-                          label: const Text('إعدادات التطبيق'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => WalletPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.account_balance_wallet_rounded),
-                          label: const Text('المحفظة'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => GiftCatalogPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
-                            ),
-                          ),
-                          icon: const Icon(Icons.card_giftcard_rounded),
-                          label: const Text('الهدايا'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => GiftHistoryPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.history_rounded),
-                          label: const Text('سجل الهدايا'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => CosmeticsPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.auto_awesome_rounded),
-                          label: const Text('الإطارات والزينة'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => VanityIdsPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.tag_rounded),
-                          label: const Text('الآي دي المميز'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => SocialHubPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.favorite_rounded),
-                          label: const Text('CP والعلاقات'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ProfilePeoplePage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                                visitors: true,
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.visibility_outlined),
-                          label: const Text('الزوار'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ProfilePeoplePage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                                visitors: false,
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.people_alt_outlined),
-                          label: const Text('أصدقائي'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => FeatureHubPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.dashboard_customize_rounded),
-                          label: const Text('المهام والوكالات'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => DiscoveryHubPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.notifications_active_outlined),
-                          label: const Text('الإشعارات والترتيب والفعاليات والألعاب'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => DramaPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.movie_creation_outlined),
-                          label: const Text('الدراما والمسلسلات'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => GamesPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.sports_esports_rounded),
-                          label: const Text('الألعاب'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => SocialPage(
-                                apiClient: widget.apiClient,
-                                accessToken: widget.session['accessToken']?.toString() ?? '',
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.person_search_rounded),
-                          label: const Text('البحث عن أشخاص'),
-                        ),
-
-
+                        _profileAction(icon: Icons.person_outline_rounded, title: 'تعديل الملف الشخصي', onTap: _loading ? null : () => _editProfile(activeUser)),
+                        _profileAction(icon: Icons.settings_rounded, title: 'الإعدادات', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SettingsPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.visibility_outlined, title: 'الزوار', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProfilePeoplePage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '', visitors: true)))),
+                        _profileAction(icon: Icons.people_alt_outlined, title: 'أصدقائي', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ProfilePeoplePage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '', visitors: false)))),
+                        _profileAction(icon: Icons.person_search_rounded, title: 'البحث عن أشخاص', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SocialPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    const Text(
-                      'تجد هنا الملف الشخصي والمحفظة والشحن والهدايا والإطارات والآي دي والعلاقات والمهام والوكالات.',
-                      textAlign: TextAlign.center,
+                    const SizedBox(height: 12),
+                    _profileActionGroup(
+                      title: 'المحفظة والمظهر',
+                      children: [
+                        _profileAction(icon: Icons.card_giftcard_rounded, title: 'الهدايا', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GiftCatalogPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.history_rounded, title: 'سجل الهدايا', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GiftHistoryPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.workspace_premium_rounded, title: 'عضوية VIP', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => VipCatalogPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.auto_awesome_rounded, title: 'الإطارات والزينة', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => CosmeticsPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.tag_rounded, title: 'الآي دي المميز', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => VanityIdsPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _profileActionGroup(
+                      title: 'المجتمع والفعاليات',
+                      children: [
+                        _profileAction(icon: Icons.favorite_rounded, title: 'CP والعلاقات', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SocialHubPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.groups_rounded, title: 'المهام والوكالات', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureHubPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.notifications_active_outlined, title: 'الإشعارات والترتيب والفعاليات', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DiscoveryHubPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.movie_creation_outlined, title: 'الدراما والمسلسلات', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DramaPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                        _profileAction(icon: Icons.sports_esports_rounded, title: 'الألعاب', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => GamesPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? '')))),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      color: const Color(0xFFFFF7E9),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18), side: const BorderSide(color: Color(0xFFEED8B2))),
+                      child: ListTile(
+                        leading: const Icon(Icons.logout_rounded, color: Color(0xFF9A4B3B)),
+                        title: const Text('تسجيل الخروج', style: TextStyle(fontWeight: FontWeight.w800)),
+                        subtitle: const Text('إنهاء الجلسة على هذا الجهاز'),
+                        onTap: widget.onLogout,
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -1557,6 +1501,54 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     );
   }
 }
+
+
+Widget _profileMetric({required IconData icon, required String title, required String value, required Color tint}) =>
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(color: const Color(0xFFFFF8E9), borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFEED8B2))),
+      child: Column(
+        children: [
+          Icon(icon, color: tint, size: 21),
+          const SizedBox(height: 5),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Color(0xFF493512))),
+          const SizedBox(height: 2),
+          Text(title, style: const TextStyle(fontSize: 11, color: Color(0xFF786342))),
+        ],
+      ),
+    );
+
+Widget _profileActionGroup({required String title, required List<Widget> children}) =>
+    Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      decoration: BoxDecoration(color: const Color(0xFFFFFEFB), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFEEDFC6))),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Color(0xFF8C641D))),
+          ),
+          ...children,
+        ],
+      ),
+    );
+
+Widget _profileAction({required IconData icon, required String title, required VoidCallback? onTap}) =>
+    ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+      visualDensity: const VisualDensity(vertical: -2),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: const Color(0xFFFFF0D1), borderRadius: BorderRadius.circular(13)),
+        child: Icon(icon, color: const Color(0xFF8C641D), size: 21),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF493512))),
+      trailing: const Icon(Icons.chevron_left_rounded, color: Color(0xFFB7A17D)),
+      onTap: onTap,
+    );
 
 class _SectionInfo {
   const _SectionInfo({
