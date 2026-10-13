@@ -374,8 +374,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                 'محادثة')
                             .toString();
                         final preview = (last['content'] ??
-                                (last['type'] == 'IMAGE' ? '📷 صورة' : '') ??
-                                'ابدأ المحادثة')
+                                (last['type'] == 'IMAGE' ? '📷 صورة' : 'ابدأ المحادثة'))
                             .toString();
                         final unread = conversation['unreadCount'] ?? 0;
                         return Card(
