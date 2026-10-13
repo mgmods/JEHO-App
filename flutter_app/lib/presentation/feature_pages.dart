@@ -1149,7 +1149,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       try {
                         await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend');
                         if (!mounted) return;
-                        Navigator.pop(context);
+                        Navigator.of(this.context).pop();
                         ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
                       } on JehoApiException catch (error) {
                         if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(error.message)));
