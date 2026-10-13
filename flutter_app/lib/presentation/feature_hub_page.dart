@@ -281,7 +281,7 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
                           if (userId.isEmpty) return;
                           try {
                             await widget.apiClient.respondAgencyJoinRequest(widget.accessToken, agencyId, userId, approve: false);
-                            if (!mounted) return;
+                            if (!mounted || !sheetContext.mounted) return;
                             Navigator.of(sheetContext).pop();
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفض طلب الانضمام.')));
                             await _load();
