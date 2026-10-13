@@ -651,10 +651,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             .whereType<Map<String, dynamic>>()
             .toList()
         : <Map<String, dynamic>>[];
-    final configuredSeatCount = (roomData['seatCount'] is num
+    final configuredSeatCount = ((roomData['seatCount'] is num
             ? (roomData['seatCount'] as num).toInt()
             : 10)
-        .clamp(2, 10);
+        .clamp(2, 10)).toInt();
     final seatsByIndex = <int, Map<String, dynamic>>{
       for (final seat in rawSeats)
         if (seat['seatIndex'] is num)
