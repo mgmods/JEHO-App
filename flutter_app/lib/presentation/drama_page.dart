@@ -179,9 +179,9 @@ class _DramaPageState extends State<DramaPage> {
                     Center(child: FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة'))),
                   ])
                 : !enabled
-                    ? const ListView(children: [SizedBox(height: 100), Center(child: Text('قسم الدراما متوقف حاليًا من إعدادات التطبيق.'))])
+                    ? ListView(children: const [SizedBox(height: 100), Center(child: Text('قسم الدراما متوقف حاليًا من إعدادات التطبيق.'))])
                     : _series.isEmpty
-                        ? const ListView(children: [SizedBox(height: 100), Center(child: Text('لا توجد مسلسلات متاحة حاليًا.'))])
+                        ? ListView(children: const [SizedBox(height: 100), Center(child: Text('لا توجد مسلسلات متاحة حاليًا.'))])
                         : GridView.builder(
                             padding: const EdgeInsets.all(12),
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
