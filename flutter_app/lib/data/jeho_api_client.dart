@@ -349,6 +349,24 @@ class JehoApiClient {
   Future<Map<String, dynamic>> sendMessageAttachment(String token, String conversationId, String url, {required String mimeType, required int size, String? caption, String? type}) async =>
       _asMap(await _post('chat/conversations/$conversationId/messages', {'type': type ?? (mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file'), 'content': caption ?? '', 'media': {'url': url, 'mimeType': mimeType, 'size': size}}, accessToken: token), 'تعذر إرسال المرفق.');
 
+  Future<Map<String, dynamic>> setConversationMuted(String token, String conversationId, {required bool muted}) async =>
+      _asMap(await _post('chat/conversations/$conversationId/mute', {'muted': muted}, accessToken: token), 'تعذر تحديث كتم المحادثة.');
+
+  Future<Map<String, dynamic>> setConversationPinned(String token, String conversationId, {required bool pinned}) async =>
+      _asMap(await _post('chat/conversations/$conversationId/pin', {'pinned': pinned}, accessToken: token), 'تعذر تحديث تثبيت المحادثة.');
+
+  Future<Map<String, dynamic>> setConversationArchived(String token, String conversationId, {required bool archived}) async =>
+      _asMap(await _post('chat/conversations/$conversationId/archive', {'archived': archived}, accessToken: token), 'تعذر تحديث أرشفة المحادثة.');
+
+  Future<Map<String, dynamic>> deleteConversationForMe(String token, String conversationId) async =>
+      _asMap(await _post('chat/conversations/$conversationId/delete', const {}, accessToken: token), 'تعذر حذف المحادثة من قائمتك.');
+
+  Future<Map<String, dynamic>> editMessage(String token, String messageId, String content) async =>
+      _asMap(await _patch('chat/messages/$messageId', {'content': content}, accessToken: token), 'تعذر تعديل الرسالة.');
+
+  Future<Map<String, dynamic>> unsendMessage(String token, String messageId) async =>
+      _asMap(await _post('chat/messages/$messageId/unsend', const {}, accessToken: token), 'تعذر سحب الرسالة.');
+
   Future<Map<String, dynamic>> startConversation(String token, String peerId) async =>
       _asMap(await _post('chat/conversations', {'peerId': peerId}, accessToken: token), 'تعذر بدء المحادثة.');
 
