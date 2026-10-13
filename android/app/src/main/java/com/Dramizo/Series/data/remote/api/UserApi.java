@@ -118,6 +118,9 @@ public interface UserApi {
     @GET("cp/me")
     Call<ApiResponse<List<Map<String, Object>>>> myCpRelationships();
 
+    @POST("cp/profile-requests")
+    Call<ApiResponse<Map<String, Object>>> createProfileCpRequest(@Body Map<String, String> body);
+
     @GET("cp/requests")
     Call<ApiResponse<List<Map<String, Object>>>> cpRequests();
 
