@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/jeho_api_client.dart';
 import 'feature_pages.dart';
+import 'feature_hub_page.dart';
 
 const _settingsGold = Color(0xFF9A7026);
 
