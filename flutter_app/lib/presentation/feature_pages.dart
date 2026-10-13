@@ -1093,63 +1093,250 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
     return const Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
   }
 
+  String _resolveGiftImage(String value) {
+    if (value.startsWith('https://') || value.startsWith('http://')) {
+      return value;
+    }
+    final base = Uri.parse(
+      widget.apiClient.baseUrl.endsWith('/')
+          ? widget.apiClient.baseUrl
+          : '${widget.apiClient.baseUrl}/',
+    );
+    final origin = Uri(
+      scheme: base.scheme,
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+    );
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) {
+      return origin.resolve('/$normalized').toString();
+    }
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('الهدايا'),
-        actions: [IconButton(onPressed: _loading || _sending ? null : _load, icon: const Icon(Icons.refresh_rounded))],
+        actions: [
+          IconButton(
+            onPressed: _loading || _sending ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'تحديث الهدايا',
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(children: [
-              if (_error != null)
-                Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
-              if (_sending) const LinearProgressIndicator(),
-              Expanded(
-                child: _gifts.isEmpty
-                    ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2, childAspectRatio: .78, crossAxisSpacing: 10, mainAxisSpacing: 10,
-                        ),
-                        itemCount: _gifts.length,
-                        itemBuilder: (context, index) {
-                          final gift = _gifts[index];
-                          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
-                          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
-                          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
-                          return Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(children: [
-                                Expanded(
-                                  child: image.startsWith('http')
-                                      ? Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => _giftArtwork(gift))
-                                      : _giftArtwork(gift),
+          : Column(
+              children: [
+                if (_error != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF0EC),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Color(0xFF9C3327)),
+                    ),
+                  ),
+                if (_sending) const LinearProgressIndicator(),
+                Expanded(
+                  child: _gifts.isEmpty
+                      ? const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.card_giftcard_rounded,
+                                size: 58,
+                                color: Color(0xFFB68A35),
+                              ),
+                              SizedBox(height: 12),
+                              Text('لا توجد هدايا متاحة حاليًا.'),
+                            ],
+                          ),
+                        )
+                      : GridView.builder(
+                          padding: const EdgeInsets.all(12),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: .70,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                          itemCount: _gifts.length,
+                          itemBuilder: (context, index) {
+                            final gift = _gifts[index];
+                            final title =
+                                (gift['name'] ?? gift['title'] ?? 'هدية')
+                                    .toString();
+                            final cost = gift['price'] ??
+                                gift['coinCost'] ??
+                                gift['cost'] ??
+                                '—';
+                            final imageValue = (gift['imageUrl'] ??
+                                    gift['image'] ??
+                                    gift['mediaUrl'] ??
+                                    gift['image_url'] ??
+                                    '')
+                                .toString()
+                                .trim();
+                            final imageUrl = imageValue.isEmpty
+                                ? ''
+                                : _resolveGiftImage(imageValue);
+                            return Card(
+                              clipBehavior: Clip.antiAlias,
+                              elevation: 2,
+                              shadowColor: const Color(0x1A493512),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: const BorderSide(
+                                  color: Color(0x1AB68A35),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text('السعر: $cost'),
-                                const SizedBox(height: 6),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton.tonalIcon(
-                                    onPressed: _sending ? null : () => _sendGift(gift),
-                                    icon: const Icon(Icons.send_rounded, size: 16),
-                                    label: const Text('إرسال'),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      margin: const EdgeInsets.all(8),
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(15),
+                                        gradient: const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFFFFF5D9),
+                                            Color(0xFFF0D7A1),
+                                          ],
+                                        ),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          Positioned(
+                                            top: 2,
+                                            right: 2,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(5),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white
+                                                    .withOpacity(0.78),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.auto_awesome_rounded,
+                                                size: 14,
+                                                color: Color(0xFF8C641D),
+                                              ),
+                                            ),
+                                          ),
+                                          Center(
+                                            child: imageUrl.isNotEmpty
+                                                ? Image.network(
+                                                    imageUrl,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder:
+                                                        (_, __, ___) =>
+                                                            _giftArtwork(gift),
+                                                  )
+                                                : _giftArtwork(gift),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ]),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ]),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      10,
+                                      0,
+                                      10,
+                                      10,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          title,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF493512),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 7),
+                                        Container(
+                                          alignment: Alignment.center,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF2D1),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              const Icon(
+                                                Icons.monetization_on_rounded,
+                                                size: 16,
+                                                color: Color(0xFFB68A35),
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  '$cost عملة',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: Color(0xFF79551B),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        SizedBox(
+                                          height: 38,
+                                          child: FilledButton.tonalIcon(
+                                            onPressed: _sending
+                                                ? null
+                                                : () => _sendGift(gift),
+                                            icon: const Icon(
+                                              Icons.send_rounded,
+                                              size: 15,
+                                            ),
+                                            label: const Text('إرسال'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
     );
   }
 }
