@@ -526,7 +526,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                         bottom: 0,
                                         child: Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                                          color: Colors.black.withOpacity(0.52),
+                                          color: const Color.fromARGB(133, 0, 0, 0),
                                           child: Text(
                                             title,
                                             maxLines: 2,
