@@ -1296,6 +1296,8 @@ class GiftCatalogPage extends StatefulWidget {
 
 class _GiftCatalogPageState extends State<GiftCatalogPage> {
   List<Map<String, dynamic>> _gifts = const [];
+  List<Map<String, dynamic>> _categories = const [];
+  String _selectedCategory = 'all';
   bool _loading = true;
   bool _sending = false;
   String? _error;
@@ -1307,7 +1309,9 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
     setState(() { _loading = true; _error = null; });
     try {
       final gifts = await widget.apiClient.getGiftCatalog();
-      if (mounted) setState(() => _gifts = gifts);
+      List<Map<String, dynamic>> categories = const [];
+      try { categories = await widget.apiClient.getGiftCategories(); } on JehoApiException { /* Keep catalog usable if optional tabs are unavailable. */ }
+      if (mounted) setState(() { _gifts = gifts; _categories = categories; });
     } on JehoApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
@@ -1434,6 +1438,29 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                     ),
                   ),
                 if (_sending) const LinearProgressIndicator(),
+                if (_categories.isNotEmpty) SizedBox(
+                  height: 54,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    children: [
+                      Padding(padding: const EdgeInsetsDirectional.only(end: 8), child: ChoiceChip(
+                        label: const Text('الكل'),
+                        selected: _selectedCategory == 'all',
+                        onSelected: (_) => setState(() => _selectedCategory = 'all'),
+                      )),
+                      ..._categories.map((category) {
+                        final key = (category['key'] ?? category['category'] ?? category['id'] ?? '').toString();
+                        final label = (category['labelAr'] ?? category['name'] ?? category['label'] ?? category['key'] ?? 'فئة').toString();
+                        return Padding(padding: const EdgeInsetsDirectional.only(end: 8), child: ChoiceChip(
+                          label: Text(label),
+                          selected: _selectedCategory == key,
+                          onSelected: (_) => setState(() => _selectedCategory = key),
+                        ));
+                      }),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: _gifts.isEmpty
                       ? const Center(
@@ -1459,9 +1486,10 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                             crossAxisSpacing: 12,
                             mainAxisSpacing: 12,
                           ),
-                          itemCount: _gifts.length,
+                          itemCount: (_selectedCategory == 'all' ? _gifts : _gifts.where((gift) => (gift['category'] ?? gift['categoryKey'] ?? gift['type'] ?? '').toString() == _selectedCategory).toList()).length,
                           itemBuilder: (context, index) {
-                            final gift = _gifts[index];
+                            final visibleGifts = _selectedCategory == 'all' ? _gifts : _gifts.where((gift) => (gift['category'] ?? gift['categoryKey'] ?? gift['type'] ?? '').toString() == _selectedCategory).toList();
+                            final gift = visibleGifts[index];
                             final title =
                                 (gift['name'] ?? gift['title'] ?? 'هدية')
                                     .toString();
