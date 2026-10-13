@@ -1535,6 +1535,33 @@ Widget _profileActionGroup({required String title, required List<Widget> childre
       ),
     );
 
+Widget _profileOriginalIcon(String title, IconData fallback) {
+  const base = 'assets/original/android-res/drawable-xxhdpi/';
+  const assets = <String, String>{
+    'تعديل الملف الشخصي': 'ic_me_edit.webp',
+    'الإعدادات': 'ic_me_setting.webp',
+    'الهدايا': 'ic_me_gift.webp',
+    'سجل الهدايا': 'icon_bills_gift.webp',
+    'عضوية VIP': 'ic_me_vip_card.webp',
+    'الإطارات والزينة': 'ic_me_mall.webp',
+    'الآي دي المميز': 'ic_me_level.webp',
+    'المهام والوكالات': 'ic_me_agency.webp',
+    'الإشعارات والترتيب والفعاليات': 'ic_me_notice.webp',
+    'الزوار': 'ic_me_living_record.webp',
+    'أصدقائي': 'ic_chat_friends.png',
+    'البحث عن أشخاص': 'ic_chat_friends.png',
+  };
+  final asset = assets[title];
+  if (asset == null) return Icon(fallback, color: const Color(0xFF8C641D), size: 21);
+  return Image.asset(
+    '$base$asset',
+    width: 27,
+    height: 27,
+    fit: BoxFit.contain,
+    errorBuilder: (_, __, ___) => Icon(fallback, color: const Color(0xFF8C641D), size: 21),
+  );
+}
+
 Widget _profileAction({required IconData icon, required String title, required VoidCallback? onTap}) =>
     ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -1543,7 +1570,7 @@ Widget _profileAction({required IconData icon, required String title, required V
         width: 40,
         height: 40,
         decoration: BoxDecoration(color: const Color(0xFFFFF0D1), borderRadius: BorderRadius.circular(13)),
-        child: Icon(icon, color: const Color(0xFF8C641D), size: 21),
+        child: _profileOriginalIcon(title, icon),
       ),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF493512))),
       trailing: const Icon(Icons.chevron_left_rounded, color: Color(0xFFB7A17D)),
