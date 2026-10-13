@@ -44,7 +44,6 @@ import java.util.Collections;
 import java.util.Locale;
 
 public class AgencyActivity extends ThemedActivity {
-    public static final String EXTRA_SPLASH_TARGET_AGENCY_ID = "splash_target_agency_id";
     private static final int PERIOD_WEEK = 0;
     private static final int PERIOD_MONTH = 1;
     private static final int PERIOD_ALL = 2;
@@ -376,14 +375,6 @@ public class AgencyActivity extends ThemedActivity {
         binding.btnAgencyRoom.setOnClickListener(v ->
                 RoomOpenChooser.openWithMine(this, myAgency));
         binding.btnDeleteAgency.setOnClickListener(v -> confirmDeleteAgency());
-        String splashTargetAgencyId = getIntent() != null
-                ? getIntent().getStringExtra(EXTRA_SPLASH_TARGET_AGENCY_ID) : null;
-        if (splashTargetAgencyId != null && !splashTargetAgencyId.trim().isEmpty()) {
-            String targetAgencyId = splashTargetAgencyId.trim();
-            binding.getRoot().postDelayed(() -> {
-                if (!isFinishing()) enterLiveAgency(targetAgencyId, null);
-            }, 250L);
-        }
         vm.load();
     }
 
