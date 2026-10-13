@@ -697,9 +697,29 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                 color: const Color(0xFFFFE7B0),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Icon(
-                                Icons.forum_rounded,
-                                color: Color(0xFF8C641D),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: ((room['coverUrl'] ?? room['coverImage'] ?? room['imageUrl'] ?? room['backgroundUrl'] ?? '').toString().trim().isNotEmpty)
+                                    ? Image.network(
+                                        _resolveMediaUrl((room['coverUrl'] ?? room['coverImage'] ?? room['imageUrl'] ?? room['backgroundUrl']).toString()),
+                                        width: 46,
+                                        height: 46,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Image.asset(
+                                          'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
+                                          width: 46,
+                                          height: 46,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(Icons.forum_rounded, color: Color(0xFF8C641D)),
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
+                                        width: 46,
+                                        height: 46,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.forum_rounded, color: Color(0xFF8C641D)),
+                                      ),
                               ),
                             ),
                             title: Text(
