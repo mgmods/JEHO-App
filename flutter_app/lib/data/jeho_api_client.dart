@@ -143,7 +143,7 @@ class JehoApiClient {
   ) async {
     final payload = await _post(
       'chat/conversations/$conversationId/messages',
-      {'type': 'TEXT', 'content': content},
+      {'type': 'text', 'content': content},
       accessToken: accessToken,
     );
     if (payload is Map<String, dynamic>) return payload;
