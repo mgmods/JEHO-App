@@ -78,7 +78,7 @@ export class VanityIdsController {
       where: { ownerUserId: userId, status: VanityIdStatus.OWNED },
       order: { purchasedAt: 'DESC' },
     });
-    if (!row) return { item: null, leaseDays: VANITY_LEASE_DAYS };
+    if (!row) return { item: null, leaseDays: VANITY_LEASE_DAYS, canApplyToAgency: await this.agenciesRepo.exist({ where: { ownerId: userId } }) };
     const active = !row.expiresAt || row.expiresAt > new Date();
     return {
       item: {
@@ -88,6 +88,7 @@ export class VanityIdsController {
         renewPriceCoins: Math.max(0, Math.ceil(Number(row.priceCoins || 0) / 2)),
       },
       leaseDays: VANITY_LEASE_DAYS,
+      canApplyToAgency: await this.agenciesRepo.exist({ where: { ownerId: userId } }),
     };
   }
 
