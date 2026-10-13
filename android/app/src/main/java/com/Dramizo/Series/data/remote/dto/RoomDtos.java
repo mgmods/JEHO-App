@@ -8,6 +8,7 @@ public final class RoomDtos {
 
     public static class RoomDto {
         @SerializedName("id") public String id;
+        @SerializedName("publicId") public String publicId;
         @SerializedName("title") public String title;
         @SerializedName("description") public String description;
         @SerializedName("coverUrl") public String coverUrl;
