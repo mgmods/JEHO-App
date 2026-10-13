@@ -151,6 +151,16 @@ public class AgencyActivity extends ThemedActivity {
                 vm.searchAgencies(q);
             });
         }
+        // Splash advertisements may target a specific agency ID. Reuse the existing
+        // agency search instead of inventing a parallel agency-detail screen.
+        String splashAgencyId = getIntent().getStringExtra("splash_target_agency_id");
+        if (splashAgencyId != null && !splashAgencyId.trim().isEmpty()
+                && binding.etAgencySearch != null && binding.btnSearchAgency != null) {
+            binding.etAgencySearch.setText(splashAgencyId.trim());
+            binding.btnSearchAgency.post(() -> {
+                if (!isFinishing()) binding.btnSearchAgency.performClick();
+            });
+        }
         binding.btnCopyCode.setOnClickListener(v -> {
             CharSequence code = binding.tvActivationCode.getText();
             if (code == null || code.length() == 0) return;
