@@ -461,7 +461,7 @@ export class AuthService implements OnModuleInit {
   async ensureAllPublicIds(): Promise<{ updated: number }> {
     const missing = await this.usersRepo
       .createQueryBuilder('u')
-       .where(`u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{6}
+      .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{6}$'")
       .getMany();
     let updated = 0;
     for (const u of missing) {
@@ -470,11 +470,10 @@ export class AuthService implements OnModuleInit {
       updated += 1;
     }
     if (updated > 0) {
-      this.logger.log(`Allocated publicId for ${updated} existing user(s)`);
+      this.logger.log(`Allocated six-digit publicId for ${updated} existing user(s)`);
     }
     return { updated };
   }
-
   private async issueTokens(user: User) {
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Account is restricted');
