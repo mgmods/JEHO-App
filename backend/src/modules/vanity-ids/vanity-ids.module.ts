@@ -6,12 +6,14 @@ import { VanityId } from '../../database/entities/vanity-id.entity';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
+import { Room } from '../../database/entities/room.entity';
+import { Agency } from '../../database/entities/agency.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     AuthModule,
-    TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction]),
+    TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction, Room, Agency]),
   ],
   controllers: [VanityIdsController],
   providers: [VanityIdsService],
