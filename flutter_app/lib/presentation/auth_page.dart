@@ -39,9 +39,12 @@ class _AuthPageState extends State<AuthPage> {
     super.dispose();
   }
 
-  Future<void> _run(Future<Map<String, dynamic>> Function() action) async {
+  Future<void> _run(
+    Future<Map<String, dynamic>> Function() action, {
+    bool validate = true,
+  }) async {
     if (_isBusy) return;
-    if (action != _guestAction && !(_formKey.currentState?.validate() ?? false)) {
+    if (validate && !(_formKey.currentState?.validate() ?? false)) {
       return;
     }
     setState(() {
@@ -244,7 +247,7 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                     const Divider(height: 28),
                     OutlinedButton.icon(
-                      onPressed: _isBusy ? null : () => _run(_guestAction),
+                      onPressed: _isBusy ? null : () => _run(_guestAction, validate: false),
                       icon: const Icon(Icons.person_add_alt_1_rounded),
                       label: const Text('الدخول كضيف'),
                     ),
