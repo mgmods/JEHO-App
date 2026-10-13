@@ -53,6 +53,7 @@ public class VanityIdsActivity extends ThemedActivity {
     @Nullable private VanityDtos.VanityItem myLease;
     private long coinsBal;
     @Nullable private String userPublicId;
+    private boolean canApplyToAgency;
 
     @Override
     protected boolean wantsRemoteThemeChrome() {
@@ -159,6 +160,7 @@ public class VanityIdsActivity extends ThemedActivity {
                 AppLoadingOverlay.hide(this);
                 coinsBal = (w.success && w.data != null) ? w.data.coins : 0;
                 myLease = mine.success && mine.data != null ? mine.data.item : null;
+                canApplyToAgency = mine.success && mine.data != null && mine.data.canApplyToAgency;
 
                 allItems.clear();
                 if (cat.success && cat.data != null && cat.data.items != null) {
@@ -345,7 +347,24 @@ public class VanityIdsActivity extends ThemedActivity {
             }
             h.tvMeta.setText(meta);
             h.btnBuy.setText(renew ? R.string.vanity_renew : R.string.vanity_buy);
-            h.btnBuy.setOnClickListener(v -> purchase(item));
+            h.btnBuy.setOnClickListener(v -> {
+                if (renew) {
+                    new androidx.appcompat.app.AlertDialog.Builder(VanityIdsActivity.this)
+                            .setTitle("الآيدي " + pid)
+                            .setItems(new String[]{"تطبيق الآيدي", "تجديد الآيدي 30 يوم"}, (dialog, which) -> {
+                                if (which == 0) showApplyTargetDialog(pid, canApplyToAgency);
+                                else purchase(item);
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                } else {
+                    purchase(item);
+                }
+            });
+            h.tvPublicId.setOnClickListener(v -> {
+                if (renew) showApplyTargetDialog(pid, canApplyToAgency);
+                else purchase(item);
+            });
         }
 
         @Override
