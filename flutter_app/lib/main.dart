@@ -787,67 +787,291 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                             : <String, dynamic>{};
                         final hostName = (host['displayName'] ??
                                 host['username'] ??
+                                room['hostName'] ??
                                 'مضيف')
                             .toString();
-                        final viewers = room['viewerCount'] ?? room['onlineCount'] ?? 0;
+                        final viewers = room['viewerCount'] ??
+                            room['onlineCount'] ??
+                            room['memberCount'] ??
+                            0;
+                        final seats = room['seatCount'] ?? room['maxSeats'] ?? 11;
+                        final coverValue = (room['coverUrl'] ??
+                                room['coverImage'] ??
+                                room['imageUrl'] ??
+                                room['backgroundUrl'] ??
+                                '')
+                            .toString()
+                            .trim();
+                        final coverUrl = coverValue.isEmpty
+                            ? ''
+                            : _resolveMediaUrl(coverValue);
+                        final locked = room['isLocked'] == true ||
+                            room['hasPassword'] == true ||
+                            room['passwordProtected'] == true;
+                        final description =
+                            (room['description'] ?? room['notice'] ?? '')
+                                .toString()
+                                .trim();
                         return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
+                          clipBehavior: Clip.antiAlias,
+                          margin: const EdgeInsets.only(bottom: 14),
+                          elevation: 2,
+                          shadowColor: const Color(0x1A493512),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: const BorderSide(color: Color(0x1AE0B85E)),
+                          ),
+                          child: InkWell(
                             onTap: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute<void>(
                                   builder: (_) => RoomDetailPage(
                                     apiClient: widget.apiClient,
-                                    accessToken: widget.session['accessToken']?.toString() ?? '',
+                                    accessToken: widget.session['accessToken']
+                                            ?.toString() ??
+                                        '',
                                     room: room,
                                   ),
                                 ),
                               ).then((_) => _loadHomeData());
                             },
-                            leading: Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFE7B0),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(14),
-                                child: ((room['coverUrl'] ?? room['coverImage'] ?? room['imageUrl'] ?? room['backgroundUrl'] ?? '').toString().trim().isNotEmpty)
-                                    ? Image.network(
-                                        _resolveMediaUrl((room['coverUrl'] ?? room['coverImage'] ?? room['imageUrl'] ?? room['backgroundUrl']).toString()),
-                                        width: 46,
-                                        height: 46,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Image.asset(
-                                          'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
-                                          width: 46,
-                                          height: 46,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.forum_rounded, color: Color(0xFF8C641D)),
-                                        ),
-                                      )
-                                    : Image.asset(
-                                        'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
-                                        width: 46,
-                                        height: 46,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(Icons.forum_rounded, color: Color(0xFF8C641D)),
-                                      ),
-                              ),
-                            ),
-                            title: Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                            subtitle: Text('المضيف: $hostName'),
-                            trailing: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                const Icon(Icons.people_outline_rounded, size: 18),
-                                Text('$viewers'),
+                                SizedBox(
+                                  height: 154,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      if (coverUrl.isNotEmpty)
+                                        Image.network(
+                                          coverUrl,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              Image.asset(
+                                            'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const ColoredBox(
+                                              color: Color(0xFFE9D4A7),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        Image.asset(
+                                          'assets/original/android-res/drawable-xxhdpi/img_bg_room.webp',
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const ColoredBox(
+                                            color: Color(0xFFE9D4A7),
+                                          ),
+                                        ),
+                                      const DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                            colors: [
+                                              Color(0x00000000),
+                                              Color(0xCC1A1713),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: locked
+                                                ? const Color(0xE6FFF0D2)
+                                                : const Color(0xE61E684A),
+                                            borderRadius:
+                                                BorderRadius.circular(30),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                locked
+                                                    ? Icons.lock_rounded
+                                                    : Icons.public_rounded,
+                                                size: 14,
+                                                color: locked
+                                                    ? const Color(0xFF79551B)
+                                                    : Colors.white,
+                                              ),
+                                              const SizedBox(width: 5),
+                                              Text(
+                                                locked ? 'خاصة' : 'عامة',
+                                                style: TextStyle(
+                                                  color: locked
+                                                      ? const Color(0xFF79551B)
+                                                      : Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 12,
+                                        right: 14,
+                                        left: 14,
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                title,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 19,
+                                                  fontWeight: FontWeight.w900,
+                                                  shadows: [
+                                                    Shadow(
+                                                      color: Color(0x88000000),
+                                                      blurRadius: 8,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 7,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xD91B1712),
+                                                borderRadius:
+                                                    BorderRadius.circular(24),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.people_alt_rounded,
+                                                    color: Colors.white,
+                                                    size: 16,
+                                                  ),
+                                                  const SizedBox(width: 5),
+                                                  Text(
+                                                    '$viewers',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    14,
+                                    12,
+                                    14,
+                                    14,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.workspace_premium_rounded,
+                                            size: 18,
+                                            color: Color(0xFFB68A35),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'المضيف: $hostName',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF493512),
+                                              ),
+                                            ),
+                                          ),
+                                          const Icon(
+                                            Icons.chair_alt_rounded,
+                                            size: 17,
+                                            color: Color(0xFF8C641D),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '$seats مقعد',
+                                            style: const TextStyle(
+                                              color: Color(0xFF6E6250),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (description.isNotEmpty) ...[
+                                        const SizedBox(height: 7),
+                                        Text(
+                                          description,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF756B5B),
+                                            height: 1.35,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 11),
+                                      Row(
+                                        children: [
+                                          const Icon(
+                                            Icons.forum_rounded,
+                                            size: 16,
+                                            color: Color(0xFF8C641D),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          const Expanded(
+                                            child: Text(
+                                              'اضغط للدخول إلى الغرفة',
+                                              style: TextStyle(
+                                                color: Color(0xFF8C641D),
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.arrow_back_ios_new_rounded,
+                                            size: 15,
+                                            color: Color(0xFF8C641D),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ),
