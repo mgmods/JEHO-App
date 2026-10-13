@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 
-/** Pretty numerical IDs with length-based coins. Seeded when catalog is empty. */
+/** Six-digit numerical IDs with length-based coin prices. Seeded when catalog is empty. */
 const SEED_CATALOG: Array<{ publicId: string; priceCoins: number }> = [
   { publicId: '100001', priceCoins: 8000 },
   { publicId: '100008', priceCoins: 9000 },
