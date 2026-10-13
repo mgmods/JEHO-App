@@ -442,11 +442,14 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
       const billable = type !== MessageType.GIFT && type !== MessageType.SYSTEM;
       // The free allowance belongs to the sender account, not each conversation.
+      // The configured free allowance is counted per sender account across all direct conversations.
+      // Gift/system events never consume the allowance; unsent messages remain part of the historical count.
       const priorBillableMessages = billable
         ? await manager.getRepository(ChatMessage)
             .createQueryBuilder('m')
+            .innerJoin(ChatConversation, 'c', 'c.id = m.conversationId')
             .where('m.senderId = :senderId', { senderId })
-            .andWhere('m.conversationId = :conversationId', { conversationId })
+            .andWhere('c.type = :conversationType', { conversationType: ConversationType.DIRECT })
             .andWhere('m.type NOT IN (:...excludedTypes)', { excludedTypes: [MessageType.GIFT, MessageType.SYSTEM] })
             .getCount()
         : 0;
