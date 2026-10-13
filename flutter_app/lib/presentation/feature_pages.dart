@@ -140,7 +140,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       () => widget.apiClient.joinRoom(widget.accessToken, _roomId, password: password),
       'تم تسجيل دخولك إلى الغرفة.',
     );
-    if (mounted && _error == null) setState(() => _roomEntered = true);
+    if (mounted && _error == null) {
+      setState(() => _roomEntered = true);
+      await _loadRoomDetails();
+    }
   }
 
   Future<void> _leaveRoom() async {
@@ -148,7 +151,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       () => widget.apiClient.leaveRoom(widget.accessToken, _roomId),
       'غادرت الغرفة.',
     );
-    if (mounted && _error == null) setState(() => _roomEntered = false);
+    if (mounted && _error == null) {
+      setState(() => _roomEntered = false);
+      await _loadRoomDetails();
+    }
   }
 
   Future<void> _takeSeat(int seatIndex) async {
