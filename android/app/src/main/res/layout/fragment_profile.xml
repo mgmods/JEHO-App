@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F0F3F0">
+    android:background="#F4F6F3">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -49,7 +49,7 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="104dp"
+                android:layout_height="118dp"
                 android:contentDescription="@null"
                 android:scaleType="fitXY"
                 android:src="@drawable/bg_home_full_gradient" />
@@ -59,7 +59,7 @@
                 android:id="@+id/headerProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-18dp"
+                android:layout_marginTop="-24dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="horizontal"
@@ -68,15 +68,15 @@
 
                 <!-- Mikoo Me: face 70dp + frame 90dp centered (same locked pair with/without wear). -->
                 <FrameLayout
-                    android:layout_width="90dp"
-                    android:layout_height="90dp"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/imgAvatar"
-                        android:layout_width="70dp"
-                        android:layout_height="70dp"
+                        android:layout_width="74dp"
+                        android:layout_height="74dp"
                         android:layout_gravity="center"
                         android:contentDescription="@string/nav_profile"
                         android:scaleType="centerCrop"
@@ -85,8 +85,8 @@
 
                     <ImageView
                         android:id="@+id/imgFrame"
-                        android:layout_width="90dp"
-                        android:layout_height="90dp"
+                        android:layout_width="96dp"
+                        android:layout_height="96dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:scaleType="fitCenter"
@@ -200,8 +200,8 @@
             <HorizontalScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:paddingHorizontal="16dp"
+                android:layout_marginTop="10dp"
+                android:paddingHorizontal="12dp"
                 android:scrollbars="none">
 
                 <LinearLayout
@@ -311,10 +311,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="12dp"
                 android:gravity="center"
                 android:orientation="horizontal"
-                android:paddingVertical="10dp"
+                android:paddingVertical="12dp"
                 android:background="@drawable/bg_mikoo_card">
 
                 <LinearLayout
