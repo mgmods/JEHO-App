@@ -128,8 +128,7 @@
                         android:paddingVertical="4dp"
                         android:textColor="@android:color/white"
                         android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
+                        android:textStyle="bold" />
 
                     <LinearLayout
                         android:id="@+id/rowUserId"
