@@ -24,7 +24,8 @@ class Api {
   dynamic v;try{v=jsonDecode(r.body);}catch(_){v=r.body;}
   if(r.statusCode<200||r.statusCode>=300)throw Exception(v is Map?(v['message']??v['error']??'فشل تنفيذ الإجراء').toString():'فشل الطلب: '+r.statusCode.toString());
   return v is Map&&v['data']!=null?v['data']:v;
- }\n Future<dynamic> patch(String path, Map<String,dynamic> body) async {
+ }
+ Future<dynamic> patch(String path, Map<String,dynamic> body) async {
   final r=await http.patch(uri(path),headers:{'Content-Type':'application/json','Accept':'application/json','Authorization':'Bearer '+token},body:jsonEncode(body)).timeout(const Duration(seconds:20));
   dynamic v;try{v=jsonDecode(r.body);}catch(_){v=r.body;}
   if(r.statusCode<200||r.statusCode>=300)throw Exception(v is Map?(v['message']??v['error']??'فشل حفظ الإعدادات').toString():'فشل الطلب: '+r.statusCode.toString());
