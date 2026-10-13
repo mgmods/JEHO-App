@@ -282,6 +282,7 @@ class _ConversationPageState extends State<ConversationPage> {
         await widget.apiClient.unsendMessage(widget.accessToken, messageId);
         if (!mounted) return;
         await _loadMessages();
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم طلب سحب الرسالة.')));
       } on JehoApiException catch (error) {
         if (mounted) setState(() => _error = error.message);
