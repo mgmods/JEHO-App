@@ -44,4 +44,5 @@ jobs:
           tags: |
             ghcr.io/mgmods/jeho-own-backend:jeho-own
             ghcr.io/mgmods/jeho-own-backend:mg-jeho
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-roomcup-fix
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
