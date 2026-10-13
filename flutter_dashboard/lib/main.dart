@@ -242,8 +242,9 @@ class AdminContent extends StatelessWidget {
   finally{controller.dispose();}
  }
  List<(String,String,IconData)> _actionsFor(String path){
-  if(path.startsWith('admin/users'))return [('حظر المستخدم','ban',Icons.block),('إلغاء الحظر','unban',Icons.check_circle_outline)];
+  if(path.startsWith('admin/users'))return [('حظر المستخدم','ban',Icons.block),('إلغاء الحظر','unban',Icons.check_circle_outline),('تعديل الصلاحية والحالة','user-access',Icons.manage_accounts),('تعديل المحفظة','wallet-adjust',Icons.account_balance_wallet)];
   if(path.startsWith('admin/agencies/applications'))return [('قبول الطلب','agency-approve',Icons.check_circle),('رفض الطلب','agency-reject',Icons.cancel)];
+  if(path.startsWith('admin/rooms'))return [('تعديل الغرفة','room-edit',Icons.edit),('إغلاق الغرفة','room-close',Icons.meeting_room)];
   if(path.startsWith('admin/reports'))return [('حل البلاغ','report-resolve',Icons.done_all),('رفض البلاغ','report-dismiss',Icons.remove_circle_outline)];
   if(path.startsWith('admin/wallet/withdraws'))return [('الموافقة على السحب','withdraw-approve',Icons.check_circle),('رفض السحب','withdraw-reject',Icons.cancel)];
   if(path.startsWith('admin/wallet/recharges'))return [('تأكيد الشحنة','recharge-complete',Icons.verified),('إلغاء الشحنة','recharge-cancel',Icons.cancel)];
@@ -320,10 +321,47 @@ class AdminContent extends StatelessWidget {
     if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));
   }
  }
+ Future<void> _editAdminRow(BuildContext context,Map row,String action,String id) async {
+  if(action=='user-access'){
+   final values=await _askValues(context,'تعديل صلاحية المستخدم',['الدور: user / support / admin / super_admin','الحالة: active / suspended / banned']);
+   if(values==null||!context.mounted)return;
+   const roles=['user','support','admin','super_admin'];const statuses=['active','suspended','banned'];
+   if(!roles.contains(values[0])||!statuses.contains(values[1])){
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('القيم المقبولة للدور: user أو support أو admin أو super_admin، وللحالة: active أو suspended أو banned.')));return;
+   }
+   final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد تعديل الصلاحية'),content:Text('سيتم تحديث دور المستخدم إلى '+values[0]+' وحالته إلى '+values[1]+'.'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
+   if(ok!=true)return;
+   try{await api.patch('admin/users/'+id,{'staffRole':values[0],'status':values[1]});if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تحديث صلاحية المستخدم.')));reload();}}
+   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
+   return;
+  }
+  if(action=='wallet-adjust'){
+   final values=await _askValues(context,'تعديل محفظة المستخدم',['تغيير العملات (+/-)','تغيير الألماس (+/-)','تغيير العملات الفضية (+/-)','تغيير نقاط اللعب (+/-)','السبب / ملاحظة إلزامية']);
+   if(values==null||!context.mounted)return;
+   final coins=int.tryParse(values[0])??0;final diamonds=int.tryParse(values[1])??0;final silver=int.tryParse(values[2])??0;final points=int.tryParse(values[3])??0;final note=values[4];
+   if(note.isEmpty||(coins==0&&diamonds==0&&silver==0&&points==0)){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل تغييرًا غير صفري وسببًا واضحًا.')));return;}
+   final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد تعديل المحفظة'),content:Text('عملات: $coins، ألماس: $diamonds، فضية: $silver، نقاط: $points. العملية تؤثر فعليًا على رصيد المستخدم.'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('رجوع')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تنفيذ'))]));
+   if(ok!=true)return;
+   try{await api.post('admin/wallet/'+id+'/adjust',{'coinsDelta':coins,'diamondsDelta':diamonds,'silverCoinsDelta':silver,'gamePointsDelta':points,'note':note,'reason':note});if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال تعديل المحفظة.')));reload();}}
+   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
+   return;
+  }
+  if(action=='room-edit'){
+   final values=await _askValues(context,'تعديل بيانات الغرفة',['اسم الغرفة: '+(row['title']??row['name']??'' ).toString(),'نوع الدخول: public أو private','رسوم الدخول بالعملات: '+(row['entryFeeCoins']??0).toString()]);
+   if(values==null||!context.mounted)return;
+   final mode=values[1].toLowerCase();final fee=int.tryParse(values[2]);
+   if(values[0].trim().isEmpty||!['public','private'].contains(mode)||fee==null||fee<0){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تحقق من اسم الغرفة ونوع الدخول ورسومه.')));return;}
+   final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد تعديل الغرفة'),content:const Text('سيتم تحديث بيانات الغرفة على الخادم.'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
+   if(ok!=true)return;
+   try{await api.patch('admin/rooms/'+id,{'title':values[0].trim(),'accessMode':mode,'entryFeeCoins':fee});if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تحديث الغرفة.')));reload();}}
+   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
+  }
+ }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
   final id=(row['id']??row['applicationId']??row['reportId']??row['streamId']??row['userId']??'').toString();
   if(id.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('لا يوجد معرّف واضح لهذا العنصر.')));return;}
   if(action.$2=='gift-category-edit'){await _editGiftCategory(context,id,Map<String,dynamic>.from(row));return;}
+  if(['user-access','wallet-adjust','room-edit'].contains(action.$2)){await _editAdminRow(context,row,action.$2,id);return;}
   if(['vanity-grant','cosmetic-grant','vip-assign'].contains(action.$2)){await _grantAction(context,row,action.$2,id);return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
@@ -341,6 +379,7 @@ class AdminContent extends StatelessWidget {
    case 'recharge-cancel': endpoint='admin/wallet/recharges/$id/cancel'; break;
    case 'gender-approve': endpoint='admin/gender-verifications/$id/approve'; break;
    case 'vip-revoke': endpoint='admin/vip/$id/revoke'; break;
+   case 'room-close': endpoint='admin/rooms/$id/close'; break;
    case 'vanity-enable': endpoint='vanity-ids/admin/$id/enable'; break;
    case 'vanity-disable': endpoint='vanity-ids/admin/$id/disable'; break;
    case 'vanity-revoke': endpoint='vanity-ids/admin/$id/revoke'; break;
