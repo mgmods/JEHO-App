@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'data/jeho_api_client.dart';
@@ -1049,20 +1050,44 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
         onDestinationSelected: (index) {
           setState(() => _selectedIndex = index);
         },
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
+            icon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_party_normal.svg',
+              width: 24,
+              height: 24,
+            ),
+            selectedIcon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_party_selected.svg',
+              width: 24,
+              height: 24,
+            ),
             label: 'الرئيسية',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon: Icon(Icons.chat_bubble_rounded),
+            icon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_chat_normal.svg',
+              width: 24,
+              height: 24,
+            ),
+            selectedIcon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_chat_selected.svg',
+              width: 24,
+              height: 24,
+            ),
             label: 'الرسائل',
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
+            icon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_me_normal.svg',
+              width: 24,
+              height: 24,
+            ),
+            selectedIcon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_me_selected.svg',
+              width: 24,
+              height: 24,
+            ),
             label: 'أنا',
           ),
         ],
