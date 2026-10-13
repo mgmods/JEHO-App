@@ -14,10 +14,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly dataSource: DataSource, private readonly realtime: RealtimeGateway) {}
 
-  onModuleInit() {
+  async onModuleInit() {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
-    void this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
-    void this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
