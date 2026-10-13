@@ -1212,27 +1212,71 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       textAlign: TextAlign.center,
                     ),
                   ] else ...[
-                    const SizedBox(height: 24),
-                    const Icon(Icons.person_rounded, size: 48),
-                    const SizedBox(height: 12),
-                    Text(
-                      displayName,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text('اسم المستخدم: ${activeUser['username'] ?? '—'}'),
-                    Text('المعرّف: ${activeUser['publicId'] ?? '—'}'),
-                    if ((activeUser['bio'] ?? '').toString().trim().isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        activeUser['bio'].toString(),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.black54,
-                              height: 1.5,
+                    const SizedBox(height: 16),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: SizedBox(
+                                width: 82,
+                                height: 82,
+                                child: (activeUser['avatarUrl'] ?? '').toString().trim().isNotEmpty
+                                    ? Image.network(
+                                        _resolveMediaUrl(activeUser['avatarUrl'].toString()),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const ColoredBox(
+                                          color: Color(0xFFFFE7B0),
+                                          child: Icon(Icons.person_rounded, size: 42, color: Color(0xFF8C641D)),
+                                        ),
+                                      )
+                                    : const ColoredBox(
+                                        color: Color(0xFFFFE7B0),
+                                        child: Icon(Icons.person_rounded, size: 42, color: Color(0xFF8C641D)),
+                                      ),
+                              ),
                             ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(displayName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+                                  const SizedBox(height: 5),
+                                  Text('@${activeUser['username'] ?? '—'}',
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.black54)),
+                                  Text('ID ${activeUser['publicId'] ?? '—'}',
+                                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Color(0xFF8C641D), fontWeight: FontWeight.w700)),
+                                  if ((activeUser['bio'] ?? '').toString().trim().isNotEmpty) ...[
+                                    const SizedBox(height: 7),
+                                    Text(activeUser['bio'].toString(), maxLines: 2, overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.black54, height: 1.4)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'إعدادات التطبيق',
+                              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                                builder: (_) => SettingsPage(
+                                  apiClient: widget.apiClient,
+                                  accessToken: widget.session['accessToken']?.toString() ?? '',
+                                ),
+                              )),
+                              icon: const Icon(Icons.settings_rounded, color: Color(0xFF8C641D)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                     const SizedBox(height: 18),
                     FilledButton.icon(
                       onPressed: _loading ? null : _changeAvatar,
