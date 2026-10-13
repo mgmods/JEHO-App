@@ -713,6 +713,104 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
+  Future<void> _requestWithdrawal() async {
+    final amountController = TextEditingController();
+    final accountController = TextEditingController();
+    final agentController = TextEditingController();
+    String method = 'paypal';
+    try {
+      final form = await showDialog<Map<String, Object?>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('طلب سحب الأرباح'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'عدد الألماس (الحد الأدنى 100)'),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: method,
+                    decoration: const InputDecoration(labelText: 'طريقة الاستلام'),
+                    items: const [
+                      DropdownMenuItem(value: 'paypal', child: Text('PayPal')),
+                      DropdownMenuItem(value: 'bank', child: Text('تحويل بنكي')),
+                      DropdownMenuItem(value: 'usdt', child: Text('USDT')),
+                      DropdownMenuItem(value: 'agent', child: Text('وكيل شحن')),
+                      DropdownMenuItem(value: 'sham_cash', child: Text('شام كاش')),
+                    ],
+                    onChanged: (value) => setDialogState(() => method = value ?? 'paypal'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: accountController,
+                    minLines: 1,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: method == 'paypal' ? 'بريد PayPal' : method == 'bank' ? 'تفاصيل الحساب البنكي' : method == 'usdt' ? 'عنوان محفظة USDT والشبكة' : method == 'sham_cash' ? 'رقم/معرّف شام كاش' : 'بيانات التواصل مع الوكيل',
+                    ),
+                  ),
+                  if (method == 'agent') ...[
+                    const SizedBox(height: 10),
+                    TextField(controller: agentController, decoration: const InputDecoration(labelText: 'معرّف الوكيل')),
+                  ],
+                  const SizedBox(height: 8),
+                  const Text('سيُرسل الطلب إلى الخادم للمراجعة. لا يعني الإرسال أن الدفع تم.', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, {
+                  'diamonds': int.tryParse(amountController.text.trim()) ?? 0,
+                  'method': method,
+                  'account': accountController.text.trim(),
+                  'agentId': agentController.text.trim(),
+                }),
+                child: const Text('إرسال الطلب'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (form == null || !mounted) return;
+      final diamonds = form['diamonds'] as int? ?? 0;
+      final account = form['account'] as String? ?? '';
+      final selectedMethod = form['method'] as String? ?? 'paypal';
+      final agentId = form['agentId'] as String? ?? '';
+      if (diamonds < 100 || account.isEmpty || (selectedMethod == 'agent' && agentId.isEmpty)) {
+        setState(() => _error = 'تحقق من قيمة السحب وبيانات الاستلام ومعرّف الوكيل عند الحاجة.');
+        return;
+      }
+      setState(() { _loading = true; _error = null; });
+      await widget.apiClient.requestWithdrawal(
+        widget.accessToken,
+        diamonds: diamonds,
+        method: selectedMethod,
+        payoutDetails: {'account': account},
+        agentId: selectedMethod == 'agent' ? agentId : null,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب السحب للمراجعة.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر إرسال طلب السحب.');
+    } finally {
+      amountController.dispose();
+      accountController.dispose();
+      agentController.dispose();
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _wallet ?? <String, dynamic>{};
@@ -734,6 +832,12 @@ class _WalletPageState extends State<WalletPage> {
                     _BalanceTile(label: 'الماس', value: balances['diamonds'] ?? balances['diamondBalance'] ?? '—', icon: Icons.diamond_rounded),
                     _BalanceTile(label: 'العملات', value: balances['coins'] ?? balances['coinBalance'] ?? '—', icon: Icons.monetization_on_rounded),
                     _BalanceTile(label: 'تقدّم حد السحب', value: '${((double.tryParse((balances['withdrawProgress'] ?? 0).toString()) ?? 0) * 100).clamp(0, 100).toStringAsFixed(0)}%', icon: Icons.trending_up_rounded),
+                    const SizedBox(height: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: _loading ? null : _requestWithdrawal,
+                      icon: const Icon(Icons.payments_outlined),
+                      label: const Text('طلب سحب الألماس'),
+                    ),
                     const SizedBox(height: 18),
                     Text('باقات الشحن', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
                     if (_packages.isEmpty)
