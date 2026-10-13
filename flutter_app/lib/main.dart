@@ -183,15 +183,15 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         ),
                   ),
                   const SizedBox(height: 24),
-                  Card(
+                  const Card(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
+                      padding: EdgeInsets.all(16),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.shield_outlined, color: _brandColor),
-                          const SizedBox(width: 12),
-                          const Expanded(
+                          Icon(Icons.shield_outlined, color: _brandColor),
+                          SizedBox(width: 12),
+                          Expanded(
                             child: Text(
                               'هذه نسخة Flutter مستقلة للتطوير. التطبيق الحالي وواجهات الخادم وقاعدة البيانات لم يتم تغييرها.',
                               style: TextStyle(height: 1.6),
