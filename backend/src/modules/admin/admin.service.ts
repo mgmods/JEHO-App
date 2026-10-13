@@ -2094,7 +2094,28 @@ export class AdminService {
     };
   }
 
+  private dashboardAdminSchemaReady = false;
+
+  private async ensureDashboardAdminSchema() {
+    if (this.dashboardAdminSchemaReady) return;
+    // Additive-only migration: preserve all existing admin records and user data.
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "displayName" varchar(120) NOT NULL DEFAULT 'Dashboard Admin'
+    `);
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) NOT NULL DEFAULT 'operator'
+    `);
+    await this.dataSource.query(`
+      ALTER TABLE admin_users
+      ADD COLUMN IF NOT EXISTS "dashboardPermissions" jsonb NULL
+    `);
+    this.dashboardAdminSchemaReady = true;
+  }
+
   async adminLogin(email: string, password: string) {
+    await this.ensureDashboardAdminSchema();
     const identifier = String(email || '').trim().toLowerCase();
     if (!identifier || !password) {
       throw new UnauthorizedException('Invalid admin credentials');
@@ -2220,6 +2241,7 @@ export class AdminService {
 
   // Dashboard operators live exclusively in admin_users; no app-user row is created or modified.
   async listDashboardOperators() {
+    await this.ensureDashboardAdminSchema();
     const items = await this.adminUsersRepo.find({
       where: { staffRole: 'operator' },
       order: { createdAt: 'DESC' },
