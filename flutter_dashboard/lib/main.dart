@@ -326,7 +326,8 @@ class AdminContent extends StatelessWidget {
    final decoded=jsonDecode(raw);if(decoded is! Map<String,dynamic>)throw const FormatException('يجب إدخال كائن JSON صالح.');
    if(path=='admin/gifts'){
     if((decoded['name']??'').toString().trim().isEmpty||(decoded['iconUrl']??'').toString().trim().isEmpty)throw const FormatException('اسم الهدية ورابط الصورة مطلوبان.');
-    if(num.tryParse((decoded['coinPrice']??'').toString())==null)throw const FormatException('سعر العملات غير صالح.');
+    if(int.tryParse((decoded['coinPrice']??'').toString())==null)throw const FormatException('سعر العملات يجب أن يكون عددًا صحيحًا.');
+    if(decoded['diamondValue']!=null&&int.tryParse(decoded['diamondValue'].toString())==null)throw const FormatException('قيمة الألماس يجب أن تكون عددًا صحيحًا.');
    } else if((decoded['key']??'').toString().trim().isEmpty||(decoded['labelAr']??'').toString().trim().isEmpty) {
     throw const FormatException('مفتاح التصنيف واسمه العربي labelAr مطلوبان.');
    }
