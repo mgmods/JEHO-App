@@ -234,8 +234,8 @@ class JehoApiClient {
   Future<Map<String, dynamic>> sendGift(String token, {required String giftId, required String receiverId, String? roomId, int quantity = 1}) async =>
       _asMap(await _post('gifts/send', {'giftId': giftId, 'receiverId': receiverId, 'quantity': quantity, if (roomId != null) 'roomId': roomId}, accessToken: token), 'تعذر إرسال الهدية.');
 
-  Future<Map<String, dynamic>> sendMessageAttachment(String token, String conversationId, String url, {required String mimeType, required int size, String? caption}) async =>
-      _asMap(await _post('chat/conversations/$conversationId/messages', {'type': mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file', 'content': caption ?? '', 'media': {'url': url, 'mimeType': mimeType, 'size': size}}, accessToken: token), 'تعذر إرسال المرفق.');
+  Future<Map<String, dynamic>> sendMessageAttachment(String token, String conversationId, String url, {required String mimeType, required int size, String? caption, String? type}) async =>
+      _asMap(await _post('chat/conversations/$conversationId/messages', {'type': type ?? (mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file'), 'content': caption ?? '', 'media': {'url': url, 'mimeType': mimeType, 'size': size}}, accessToken: token), 'تعذر إرسال المرفق.');
 
   Future<Map<String, dynamic>> startConversation(String token, String peerId) async =>
       _asMap(await _post('chat/conversations', {'peerId': peerId}, accessToken: token), 'تعذر بدء المحادثة.');
