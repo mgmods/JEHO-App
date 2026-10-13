@@ -3,11 +3,11 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO-OWN is isolated from the legacy JEHO-CHAT backend.
- * A build-time override is supported, with production defaulting to the new Blitz API.
+ * JEHO CHAT uses the existing Adnova production API.
+ * A build-time override is supported, but the production default remains Adnova.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.blitz.cloud";
+    private static final String CANONICAL_API = "https://api.adnova.bbs.tr";
 
     private ApiOrigin() {}
 
