@@ -16,12 +16,12 @@ class _RoomInfoPill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
     decoration: BoxDecoration(
-      color: const Color(0xCC2A2031),
+      color: const Color(0xBB0B5039),
       borderRadius: BorderRadius.circular(30),
       border: Border.all(color: const Color(0x44E4BD76)),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 15, color: const Color(0xFFFFD782)),
+      Icon(icon, size: 15, color: const Color(0xFFFFD36B)),
       const SizedBox(width: 6),
       Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFF5EAF5), fontWeight: FontWeight.w800)),
     ]),
@@ -621,12 +621,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     };
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF241A2C),
-        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFF063B2B),
+        foregroundColor: const Color(0xFFEAF7EF),
         elevation: 0,
         centerTitle: true,
+        leading: IconButton(
+          tooltip: _roomEntered ? 'مغادرة الغرفة' : 'إغلاق الغرفة',
+          onPressed: _roomActionBusy
+              ? null
+              : (_roomEntered ? _leaveRoom : () => Navigator.of(context).maybePop()),
+          icon: const Icon(Icons.power_settings_new_rounded, color: Color(0xFFFFD36B), size: 27),
+        ),
         title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w900)),
+          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
         actions: [
           IconButton(
             tooltip: 'تحديث تفاصيل الغرفة',
@@ -635,19 +642,81 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ),
         ],
       ),
-      backgroundColor: const Color(0xFF17121F),
+      backgroundColor: const Color(0xFF042D22),
       body: Container(
         decoration: const BoxDecoration(gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [Color(0xFF38233A), Color(0xFF211727), Color(0xFF15121D)],
+          colors: [Color(0xFF0A6042), Color(0xFF06432F), Color(0xFF03291F)],
         )),
         child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
         children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Material(
+                color: const Color(0x6638A879),
+                shape: const CircleBorder(side: BorderSide(color: Color(0x66D5F5E1))),
+                child: IconButton(
+                  tooltip: _roomEntered ? 'مغادرة الغرفة' : 'دخول الغرفة',
+                  onPressed: _roomActionBusy || widget.accessToken.isEmpty
+                      ? null
+                      : (_roomEntered ? _leaveRoom : _enterRoom),
+                  icon: Icon(_roomEntered ? Icons.power_settings_new_rounded : Icons.login_rounded,
+                      color: const Color(0xFFFFD36B), size: 25),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: const Color(0x773D8064),
+                      border: Border.all(color: const Color(0x66D9F3E2)),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D553C),
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(color: const Color(0x66D9F3E2)),
+                          ),
+                          child: const Icon(Icons.meeting_room_rounded, color: Color(0xFFFFD36B)),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                              const SizedBox(height: 4),
+                              Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}',
+                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Color(0xFFD4F0DF), fontSize: 11)),
+                              const SizedBox(height: 4),
+                              Text('${roomData['onlineCount'] ?? roomData['memberCount'] ?? roomData['viewerCount'] ?? 0} متصل',
+                                style: const TextStyle(color: Color(0xFFFFD36B), fontSize: 10, fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(24),
             child: AspectRatio(
-              aspectRatio: 1.72,
+              aspectRatio: 2.5,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -655,7 +724,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     Image.network(imageUrl, fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         decoration: const BoxDecoration(gradient: LinearGradient(
-                          colors: [Color(0xFF9B684A), Color(0xFF3D2945)],
+                          colors: [Color(0xFF187D56), Color(0xFF06412E)],
                           begin: Alignment.topLeft, end: Alignment.bottomRight,
                         )),
                         child: const Icon(Icons.forum_rounded, size: 60, color: Color(0xFFFFDFA0)),
@@ -663,22 +732,22 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   else
                     Container(
                       decoration: const BoxDecoration(gradient: LinearGradient(
-                        colors: [Color(0xFF9B684A), Color(0xFF3D2945)],
+                        colors: [Color(0xFF187D56), Color(0xFF06412E)],
                         begin: Alignment.topLeft, end: Alignment.bottomRight,
                       )),
                       child: const Center(child: Icon(Icons.forum_rounded, size: 60, color: Color(0xFFFFDFA0))),
                     ),
                   const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
                     begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color(0xDD17121F)],
+                    colors: [Colors.transparent, Color(0xDD03291F)],
                     stops: [0.28, 1],
                   ))),
                   PositionedDirectional(
                     top: 12, start: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-                      decoration: BoxDecoration(color: const Color(0xB31B1720), borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: const Color(0x66FFE0A0))),
+                      decoration: BoxDecoration(color: const Color(0xB3033526), borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: const Color(0x66D9F3E2))),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         const Icon(Icons.circle, size: 8, color: Color(0xFF72E2A5)),
                         const SizedBox(width: 6),
@@ -721,10 +790,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           const SizedBox(height: 14),
           Card(
             clipBehavior: Clip.antiAlias,
-            color: const Color(0xCC2A2031),
+            color: const Color(0xBB0B5039),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
-              side: const BorderSide(color: Color(0x55E4BD76)),
+              side: const BorderSide(color: Color(0x66D9F3E2)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
@@ -770,11 +839,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     itemCount: configuredSeatCount,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 3,
-                      childAspectRatio: .72,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 2,
+                      childAspectRatio: .76,
                     ),
-                    itemBuilder: (context, index) {
+                    itemBuilder: (context, visualIndex) {
+                      // Mirror the reference layout while keeping the backend's
+                      // zero-based seat indices unchanged.
+                      final index = visualIndex < 5
+                          ? 4 - visualIndex
+                          : 9 - (visualIndex - 5);
                       final seat = seatsByIndex[index] ?? <String, dynamic>{};
                       final user = seat['user'] is Map<String, dynamic>
                           ? seat['user'] as Map<String, dynamic>
@@ -811,14 +885,14 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             SizedBox(
-                              width: 72,
-                              height: 76,
+                              width: 58,
+                              height: 62,
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
                                   Container(
-                                    width: 55,
-                                    height: 55,
+                                    width: 49,
+                                    height: 49,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: locked
@@ -839,8 +913,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                   if (occupied && avatar.isNotEmpty)
                                     ClipOval(
                                       child: SizedBox(
-                                        width: 62,
-                                        height: 62,
+                                        width: 53,
+                                        height: 53,
                                         child: Image.network(
                                           _resolveMedia(avatar),
                                           fit: BoxFit.cover,
@@ -854,8 +928,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     )
                                   else
                                     SizedBox(
-                                      width: 62,
-                                      height: 62,
+                                      width: 53,
+                                      height: 53,
                                       child: Image.asset(
                                         locked
                                             ? 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_locked.webp'
@@ -863,7 +937,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                         fit: BoxFit.contain,
                                         errorBuilder: (_, __, ___) => Icon(
                                           locked ? Icons.lock_rounded : Icons.add_rounded,
-                                          color: const Color(0xFFFFD782),
+                                          color: const Color(0xFFFFD36B),
                                           size: 25,
                                         ),
                                       ),
@@ -879,7 +953,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                             ),
                             const SizedBox(height: 5),
                             Text(
-                              index == 0 ? 'المضيف' : 'مقعد $index',
+                              'مقعد ${index + 1}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
@@ -916,6 +990,116 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
             ),
           ),
+          const SizedBox(height: 10),
+          // Visual room chat shell. This migration's API client currently
+          // exposes room-chat clear/auto-clear only, not message fetch/send.
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0x773D8064),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x55D9F3E2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    _RoomInfoPill(icon: Icons.chat_bubble_outline_rounded, label: 'الدردشة'),
+                    const SizedBox(width: 7),
+                    _RoomInfoPill(icon: Icons.groups_rounded, label: 'الجميع'),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: 'آخر الرسائل',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('عرض الرسائل الحية يحتاج واجهة قراءة دردشة الغرفة من الخادم.')),
+                      ),
+                      icon: const Icon(Icons.keyboard_double_arrow_down_rounded, color: Color(0xFFFFD36B)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 280),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC0A6948),
+                      borderRadius: const BorderRadiusDirectional.only(
+                        topStart: Radius.circular(15),
+                        topEnd: Radius.circular(15),
+                        bottomStart: Radius.circular(15),
+                        bottomEnd: Radius.circular(4),
+                      ),
+                      border: Border.all(color: const Color(0x55D9F3E2)),
+                    ),
+                    child: Text(
+                      (roomData['welcomeMessage'] ?? roomData['welcomeText'] ?? 'أهلاً وسهلاً بالجميع في الغرفة').toString(),
+                      style: const TextStyle(color: Color(0xFFEAF7EF), fontSize: 12, height: 1.4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if ((roomData['lastMessage'] ?? roomData['lastChatMessage'] ?? '').toString().trim().isNotEmpty)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: const Color(0x66304F41),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        (roomData['lastMessage'] ?? roomData['lastChatMessage']).toString(),
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Text(
+                      'مساحة المحادثة جاهزة للعرض؛ الرسائل الحية غير متاحة عبر واجهة Flutter الحالية.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xBFEAF7EF), fontSize: 11, height: 1.5),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _VoiceQuickAction(icon: Icons.celebration_rounded, label: 'الفعاليات', onTap: () => _showRoomDisplaySettings()),
+                    const SizedBox(width: 6),
+                    _VoiceQuickAction(icon: Icons.card_giftcard_rounded, label: 'الهدايا', onTap: _sendGiftToHost),
+                    const SizedBox(width: 6),
+                    _VoiceQuickAction(icon: Icons.pan_tool_alt_rounded, label: 'طلب المايك', onTap: _raiseHand),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xE6032B20),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x44D9F3E2)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _VoiceBottomAction(icon: Icons.menu_rounded, label: 'القائمة', onTap: _showModerationTools),
+                _VoiceBottomAction(icon: Icons.mail_outline_rounded, label: 'البريد', onTap: _showSeatRequests),
+                _VoiceBottomAction(icon: Icons.card_giftcard_rounded, label: 'الهدايا', onTap: _sendGiftToHost),
+                _VoiceBottomAction(icon: Icons.chat_bubble_outline_rounded, label: 'الدردشة', onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('إرسال واستقبال رسائل الغرفة يحتاج واجهة دردشة من الخادم غير موجودة في Flutter API الحالي.')),
+                )),
+              ],
+            ),
+          ),
           const SizedBox(height: 14),
           Theme(
             data: Theme.of(context).copyWith(
@@ -932,7 +1116,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               outlinedButtonTheme: OutlinedButtonThemeData(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFE8C5),
+                  foregroundColor: const Color(0xFFD4F0DF),
                   side: const BorderSide(color: Color(0x66E7BD76)),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -940,18 +1124,18 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
               ),
               filledButtonTheme: FilledButtonThemeData(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD782),
-                  foregroundColor: const Color(0xFF241A2C),
+                  backgroundColor: const Color(0xFFFFD36B),
+                  foregroundColor: const Color(0xFF063B2B),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
               ),
             ),
             child: Card(
-              color: const Color(0xCC2A2031),
+              color: const Color(0xBB0B5039),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(22),
-                side: const BorderSide(color: Color(0x55E4BD76)),
+                side: const BorderSide(color: Color(0x66D9F3E2)),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
@@ -1091,6 +1275,62 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       ),
     );
   }
+}
+
+class _VoiceQuickAction extends StatelessWidget {
+  const _VoiceQuickAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0x663E8A68),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: const Color(0x44D9F3E2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 19, color: const Color(0xFFFFD36B)),
+            const SizedBox(height: 4),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _VoiceBottomAction extends StatelessWidget {
+  const _VoiceBottomAction({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFFFFD36B), size: 22),
+          const SizedBox(height: 3),
+          Text(label, style: const TextStyle(color: Color(0xFFEAF7EF), fontSize: 10)),
+        ],
+      ),
+    ),
+  );
 }
 
 class WalletPage extends StatefulWidget {
@@ -1475,7 +1715,7 @@ class _BalanceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
         child: ListTile(
-          leading: CircleAvatar(backgroundColor: const Color(0xFFFFE7B0), child: Icon(icon, color: const Color(0xFF8C641D))),
+          leading: CircleAvatar(backgroundColor: const Color(0xFFFFE7B0), child: Icon(icon, color: const Color(0xFFFFD36B))),
           title: Text(label),
           trailing: Text('$value', style: const TextStyle(fontWeight: FontWeight.w800, color: _featureGold, fontSize: 18)),
         ),
