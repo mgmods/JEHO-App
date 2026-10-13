@@ -57,6 +57,30 @@ class _GamesPageState extends State<GamesPage> {
   String _text(dynamic value, [String fallback = '']) =>
       value == null || value.toString().trim().isEmpty ? fallback : value.toString();
 
+  String _originalGameAsset(Map<String, dynamic> game) {
+    final key = '${_text(game['title'])} ${_text(game['titleEn'])} ${_text(game['slug'])} ${_text(game['code'])}'.toLowerCase();
+    final file = key.contains('ludo') || key.contains('لودو')
+        ? 'ic_game_entrance_ludo.webp'
+        : key.contains('domino') || key.contains('دومينو')
+            ? 'ic_game_entrance_domino.webp'
+            : key.contains('dice') || key.contains('نرد')
+                ? 'ic_game_entrance_dice.webp'
+                : key.contains('wheel') || key.contains('عجلة')
+                    ? 'ic_game_entrance_wheel.webp'
+                    : key.contains('ono') || key.contains('uno')
+                        ? 'ic_game_entrance_ono.webp'
+                        : 'ic_game_placeholder.webp';
+    return 'assets/original/android-res/drawable-xxhdpi/$file';
+  }
+
+  Widget _gameArtwork(Map<String, dynamic> game) {
+    return Image.asset(
+      _originalGameAsset(game),
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => const Icon(Icons.sports_esports_rounded, size: 38),
+    );
+  }
+
   Future<void> _openGame(Map<String, dynamic> game) async {
     final rawUrl = _text(game['playUrl']).trim();
     if (rawUrl.isEmpty) {
@@ -181,9 +205,9 @@ class _GamesPageState extends State<GamesPage> {
                                         children: [
                                           Expanded(
                                             child: cover.isEmpty
-                                                ? const ColoredBox(color: Color(0xFFEDE4D2), child: Icon(Icons.sports_esports_rounded, size: 38))
+                                                ? ColoredBox(color: const Color(0xFFEDE4D2), child: Center(child: _gameArtwork(game)))
                                                 : Image.network(cover, fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEDE4D2), child: Icon(Icons.sports_esports_rounded, size: 38))),
+                                                    errorBuilder: (_, __, ___) => ColoredBox(color: const Color(0xFFEDE4D2), child: Center(child: _gameArtwork(game)))),
                                           ),
                                           Padding(
                                             padding: const EdgeInsets.all(7),
