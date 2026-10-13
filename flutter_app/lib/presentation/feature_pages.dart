@@ -499,7 +499,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     final host = roomData['host'] is Map<String, dynamic>
         ? roomData['host'] as Map<String, dynamic>
         : <String, dynamic>{};
-    final imageUrl = _backgroundUrl;
+    final imageUrl = _backgroundUrl ?? _coverUrl;
     final coverUrl = _coverUrl;
     final rawSeats = roomData['seats'] is List
         ? (roomData['seats'] as List)
