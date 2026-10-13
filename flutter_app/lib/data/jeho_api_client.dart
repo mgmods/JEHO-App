@@ -294,6 +294,16 @@ class JehoApiClient {
   Future<Map<String, dynamic>> makeRoomGameMove(String token, String roomId, String gameId, int cell) async =>
       _asMap(await _post('rooms/$roomId/games/$gameId/move', {'cell': cell}, accessToken: token), 'تعذر تنفيذ الحركة.');
 
+  Future<List<Map<String, dynamic>>> getVipPlans() async =>
+      _asList(await _get('vip/plans'), ['items', 'results', 'plans', 'data']);
+
+  Future<Map<String, dynamic>> purchaseVip(
+    String accessToken, {required int level, int durationDays = 30}
+  ) async => _asMap(await _post('vip/purchase', {
+    'level': level,
+    'durationDays': durationDays == 7 || durationDays == 40 ? durationDays : 30,
+  }, accessToken: accessToken), 'تعذر شراء عضوية VIP.');
+
   Future<List<Map<String, dynamic>>> getCosmetics({String? type}) async {
     final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
     final payload = await _get('cosmetics$suffix');
