@@ -9,6 +9,8 @@ import 'presentation/conversation_page.dart';
 import 'presentation/feature_pages.dart';
 import 'presentation/feature_hub_page.dart';
 import 'presentation/discovery_hub_page.dart';
+import 'presentation/drama_page.dart';
+import 'presentation/games_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -918,6 +920,30 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           ),
                           icon: const Icon(Icons.notifications_active_outlined),
                           label: const Text('الإشعارات والترتيب والفعاليات والألعاب'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => DramaPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.movie_creation_outlined),
+                          label: const Text('الدراما والمسلسلات'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => GamesPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.sports_esports_rounded),
+                          label: const Text('الألعاب'),
                         ),
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
