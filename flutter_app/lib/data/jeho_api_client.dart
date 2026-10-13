@@ -5,9 +5,12 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class JehoApiException implements Exception {
-  const JehoApiException(this.message);
+  const JehoApiException(this.message, {this.statusCode});
 
   final String message;
+
+  /// HTTP status when the server returned a response; null for network/parse errors.
+  final int? statusCode;
 
   @override
   String toString() => message;
@@ -90,7 +93,7 @@ class JehoApiClient {
       final message = decoded is Map<String, dynamic>
           ? (decoded['message'] ?? decoded['error'])
           : null;
-      throw JehoApiException(_safeMessage(message, response.statusCode));
+      throw JehoApiException(_safeMessage(message, response.statusCode), statusCode: response.statusCode);
     }
 
     if (decoded is! Map<String, dynamic>) {
