@@ -157,7 +157,7 @@ class _StartupSplash extends StatelessWidget {
             ),
           ),
           DecoratedBox(
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.20)),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.20)),
           ),
           Center(
             child: Column(
