@@ -121,7 +121,7 @@ jobs:
       - name: Build debug APK
         working-directory: android
         env:
-          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          JEHO_OWN_API_URL: https://api.adnova.bbs.tr/api/v1
         run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleDebug
 
       - name: Upload debug APK
