@@ -27,6 +27,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   final _picker = ImagePicker();
   bool _uploading = false;
   String? _backgroundUrl;
+  String? _coverUrl;
   String? _error;
 
   String get _roomId => (widget.room['id'] ?? widget.room['roomId'] ?? '').toString();
@@ -35,6 +36,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   void initState() {
     super.initState();
+    final initialCover = (widget.room['coverUrl'] ?? '').toString();
+    if (initialCover.isNotEmpty) _coverUrl = _resolveMedia(initialCover);
     final initial = (widget.room['backgroundUrl'] ?? widget.room['background'] ?? '').toString();
     if (initial.isNotEmpty) {
       if (initial.startsWith('http://') || initial.startsWith('https://')) {
@@ -44,6 +47,39 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
         _backgroundUrl = origin.resolve(initial.startsWith('/') ? initial : '/$initial').toString();
       }
+    }
+  }
+
+  String _resolveMedia(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl);
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
+  Future<void> _chooseCover() async {
+    if (_uploading) return;
+    if (_roomId.isEmpty || widget.accessToken.isEmpty) {
+      setState(() => _error = 'بيانات الغرفة أو تسجيل الدخول غير مكتملة.');
+      return;
+    }
+    try {
+      final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 88, maxWidth: 1920, maxHeight: 1920);
+      if (picked == null || !mounted) return;
+      setState(() { _uploading = true; _error = null; });
+      final url = await widget.apiClient.uploadImage(widget.accessToken, File(picked.path));
+      await widget.apiClient.updateRoomCover(widget.accessToken, _roomId, url);
+      if (!mounted) return;
+      setState(() => _coverUrl = url);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ صورة الغلاف.')));
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر اختيار الغلاف أو حفظه.');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 
@@ -103,6 +139,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         ? widget.room['host'] as Map<String, dynamic>
         : <String, dynamic>{};
     final imageUrl = _backgroundUrl;
+    final coverUrl = _coverUrl;
     return Scaffold(
       appBar: AppBar(title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis)),
       body: ListView(
@@ -133,7 +170,25 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}'),
           const SizedBox(height: 8),
           Text((widget.room['description'] ?? widget.room['topic'] ?? '').toString()),
+          if (coverUrl != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(
+                coverUrl,
+                height: 110,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
+          OutlinedButton.icon(
+            onPressed: _uploading ? null : _chooseCover,
+            icon: const Icon(Icons.photo_size_select_actual_outlined),
+            label: const Text('تغيير صورة غلاف الغرفة'),
+          ),
           FilledButton.icon(
             onPressed: _uploading ? null : _chooseBackground,
             icon: _uploading
