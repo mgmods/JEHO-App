@@ -1413,6 +1413,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         : null;
     const roomCardUrl = fromRoom || fromHostProfile || fromHostDto || null;
     let finalRoomCardUrl = roomCardUrl;
+    if (!room.publicId) {
+      try {
+        room.publicId = await this.allocateRoomPublicId();
+        await this.roomsRepo.update({ id: room.id }, { publicId: room.publicId });
+      } catch {
+        // Keep the room visible even if ID allocation temporarily fails.
+      }
+    }
     const decorated = {
       ...room,
       roomCardUrl: finalRoomCardUrl,
@@ -1464,7 +1472,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           if (!agencyPublicId) {
             // Lazy-assign GID so room UI never falls back to owner user id.
             for (let i = 0; i < 12; i++) {
-              const candidate = String(10000 + Math.floor(Math.random() * 90000));
+              const candidate = String(100000 + Math.floor(Math.random() * 900000));
               const clash = await this.agenciesRepo.findOne({
                 where: { publicId: candidate },
               });
@@ -1510,10 +1518,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       backgroundUrl: equippedBackground,
       roomLabel: isSupport ? 'support' : isAgency ? 'agency' : 'personal',
       isSupport,
-      // Agency: show agency GID. Personal/support: host publicId.
-      displayRoomId: isAgency
-        ? agencyPublicId || decorated.host?.publicId || null
-        : decorated.host?.publicId || null,
+      // Room ID is independent from both the host account ID and agency ID.
+      displayRoomId: decorated.publicId || null,
       agencyPublicId,
       agencyLogoUrl,
       agencyLevel,
