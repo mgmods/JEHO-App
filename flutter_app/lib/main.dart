@@ -13,6 +13,7 @@ import 'presentation/discovery_hub_page.dart';
 import 'presentation/drama_page.dart';
 import 'presentation/games_page.dart';
 import 'presentation/user_search_page.dart';
+import 'presentation/settings_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -1233,6 +1234,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
+                              builder: (_) => SettingsPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.settings_rounded),
+                          label: const Text('إعدادات التطبيق'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
                               builder: (_) => WalletPage(
                                 apiClient: widget.apiClient,
                                 accessToken: widget.session['accessToken']?.toString() ?? '',
@@ -1384,24 +1397,6 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     ),
                   ],
                   const SizedBox(height: 24),
-                  const Card(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.shield_outlined, color: _brandColor),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'هذه نسخة Flutter مستقلة للتطوير. الصوت وZEGO وRedis لم يتم تعديلها.',
-                              style: TextStyle(height: 1.6),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
