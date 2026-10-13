@@ -539,3 +539,134 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
                       ),
       );
 }
+
+
+class SocialHubPage extends StatefulWidget {
+  const SocialHubPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+  @override
+  State<SocialHubPage> createState() => _SocialHubPageState();
+}
+
+class _SocialHubPageState extends State<SocialHubPage> {
+  int _tab = 0;
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic> _cp = const {};
+  List<Map<String, dynamic>> _friends = const [];
+  List<Map<String, dynamic>> _visitors = const [];
+  List<Map<String, dynamic>> _relations = const [];
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait<dynamic>([
+        widget.apiClient.getMyCp(widget.accessToken),
+        widget.apiClient.getMyFriends(widget.accessToken),
+        widget.apiClient.getMyVisitors(widget.accessToken),
+        widget.apiClient.getMyRelations(widget.accessToken),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _cp = results[0] as Map<String, dynamic>;
+        _friends = results[1] as List<Map<String, dynamic>>;
+        _visitors = results[2] as List<Map<String, dynamic>>;
+        _relations = results[3] as List<Map<String, dynamic>>;
+      });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _name(Map<String, dynamic> row) {
+    final user = row['user'] is Map<String, dynamic> ? row['user'] as Map<String, dynamic> : row;
+    final partner = row['partner'] is Map<String, dynamic> ? row['partner'] as Map<String, dynamic> : user;
+    return (partner['displayName'] ?? partner['username'] ?? row['displayName'] ?? row['name'] ?? 'مستخدم JEHO').toString();
+  }
+
+  String _avatar(Map<String, dynamic> row) {
+    final user = row['user'] is Map<String, dynamic> ? row['user'] as Map<String, dynamic> : row;
+    final partner = row['partner'] is Map<String, dynamic> ? row['partner'] as Map<String, dynamic> : user;
+    return (partner['avatarUrl'] ?? row['avatarUrl'] ?? '').toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const tabs = ['CP', 'الأصدقاء', 'الزوار', 'العلاقات'];
+    final list = _tab == 1 ? _friends : _tab == 2 ? _visitors : _relations;
+    final cpPartner = _cp['partner'] is Map<String, dynamic>
+        ? _cp['partner'] as Map<String, dynamic>
+        : _cp['cp'] is Map<String, dynamic> ? _cp['cp'] as Map<String, dynamic> : <String, dynamic>{};
+    final cpName = (cpPartner['displayName'] ?? cpPartner['username'] ?? _cp['partnerName'] ?? 'لا يوجد شريك CP مرتبط').toString();
+    final score = _cp['intimacyScore'] ?? _cp['score'] ?? _cp['intimacy'] ?? 0;
+    final level = _cp['level'] ?? _cp['cpLevel'] ?? 0;
+    return Scaffold(
+      appBar: AppBar(title: const Text('CP والعلاقات'), actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+      body: Column(children: [
+        SizedBox(
+          height: 54,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            children: List.generate(tabs.length, (index) => Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: ChoiceChip(label: Text(tabs[index]), selected: _tab == index, onSelected: _loading ? null : (_) => setState(() => _tab = index)),
+            )),
+          ),
+        ),
+        if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _tab == 0
+                  ? ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        Card(child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(children: [
+                            const Icon(Icons.favorite_rounded, color: _featureGold, size: 48),
+                            const SizedBox(height: 10),
+                            Text(cpName, style: Theme.of(context).textTheme.titleLarge, textAlign: TextAlign.center),
+                            const SizedBox(height: 8),
+                            Text('نقاط القرب: $score'),
+                            Text('مستوى CP: $level'),
+                            const SizedBox(height: 10),
+                            const Text('بيانات CP معروضة من الخادم. إرسال الطلبات وتغيير الشريك غير مفعّل من هذه الشاشة.'),
+                          ]),
+                        )),
+                        ListTile(leading: const Icon(Icons.people_alt_rounded), title: const Text('الأصدقاء'), trailing: Text('${_friends.length}')),
+                        ListTile(leading: const Icon(Icons.visibility_rounded), title: const Text('الزوار'), trailing: Text('${_visitors.length}')),
+                        ListTile(leading: const Icon(Icons.diversity_3_rounded), title: const Text('العلاقات المقبولة'), trailing: Text('${_relations.length}')),
+                      ],
+                    )
+                  : list.isEmpty
+                      ? Center(child: Text(_tab == 1 ? 'لا يوجد أصدقاء لعرضهم.' : _tab == 2 ? 'لا يوجد زوار لعرضهم.' : 'لا توجد علاقات مقبولة لعرضها.'))
+                      : ListView.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final row = list[index];
+                            final avatar = _avatar(row);
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: const Color(0xFFFFE7B0),
+                                backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
+                                child: avatar.startsWith('http') ? null : const Icon(Icons.person_rounded, color: _featureGold),
+                              ),
+                              title: Text(_name(row)),
+                              subtitle: Text((row['type'] ?? row['relationType'] ?? '').toString()),
+                            );
+                          },
+                        ),
+        ),
+      ]),
+    );
+  }
+}
