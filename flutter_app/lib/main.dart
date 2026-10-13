@@ -49,6 +49,7 @@ class JehoOwnApp extends StatefulWidget {
 class _JehoOwnAppState extends State<JehoOwnApp> {
   late final JehoApiClient _apiClient;
   Map<String, dynamic>? _session;
+  bool _isRestoringSession = true;
 
   @override
   void initState() {
@@ -76,6 +77,8 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
       }
     } catch (_) {
       // Keep the login screen usable if secure storage is unavailable.
+    } finally {
+      if (mounted) setState(() => _isRestoringSession = false);
     }
   }
 
@@ -112,19 +115,103 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
         textDirection: TextDirection.rtl,
         child: child ?? const SizedBox.shrink(),
       ),
-      home: _session == null
-          ? AuthPage(
-              apiClient: _apiClient,
-              onAuthenticated: (session) => setState(() => _session = session),
-            )
-          : MigrationHomePage(
-              session: _session!,
-              apiClient: _apiClient,
-              onLogout: () async {
-                await _apiClient.clearSession();
-                if (mounted) setState(() => _session = null);
-              },
+      home: _isRestoringSession
+          ? const _StartupSplash()
+          : _session == null
+              ? AuthPage(
+                  apiClient: _apiClient,
+                  onAuthenticated: (session) => setState(() => _session = session),
+                )
+              : MigrationHomePage(
+                  session: _session!,
+                  apiClient: _apiClient,
+                  onLogout: () async {
+                    await _apiClient.clearSession();
+                    if (mounted) setState(() => _session = null);
+                  },
+                ),
+    );
+  }
+}
+
+class _StartupSplash extends StatelessWidget {
+  const _StartupSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            'assets/original/android-res/drawable-xxhdpi/home_page_bg.webp',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFFFF3D5), Color(0xFFE9C77D)],
+                ),
+              ),
             ),
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.20)),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 116,
+                  height: 116,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x22000000),
+                        blurRadius: 24,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Image.asset(
+                    'assets/original/android-res/drawable-xxhdpi/jeho_logo.webp',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.forum_rounded,
+                      size: 64,
+                      color: Color(0xFF8C641D),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'JEHO-OWN',
+                  style: TextStyle(
+                    color: Color(0xFF493512),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Color(0xFF8C641D),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
