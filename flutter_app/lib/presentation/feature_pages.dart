@@ -841,7 +841,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
       final form = await showDialog<Map<String, String>>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: Text('إرسال ' + (gift['name'] ?? gift['title'] ?? 'هدية').toString()),
+          title: Text('إرسال ${(gift['name'] ?? gift['title'] ?? 'هدية').toString()}'),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('أدخل معرّف المستخدم UUID المستلم. يتحقق الخادم من الرصيد وصلاحيات الإرسال.'),
             const SizedBox(height: 10),
