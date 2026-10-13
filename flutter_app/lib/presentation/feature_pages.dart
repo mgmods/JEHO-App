@@ -2003,50 +2003,6 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
     );
   }
 }
-), '');
-    final fileName = normalized.isEmpty
-        ? ''
-        : (normalized.startsWith('gift-') ? normalized : 'gift-$normalized');
-    if (fileName.isEmpty) {
-      return const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold);
-    }
-    return Image.asset(
-      'assets/original/visual-system/gifts/assets/$fileName.png',
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) =>
-          const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('الهدايا'), actions: [IconButton(onPressed: _loading || _sending ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
-    body: _loading ? const Center(child: CircularProgressIndicator()) : Column(children: [
-      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
-      if (_sending) const LinearProgressIndicator(),
-      Expanded(child: _gifts.isEmpty ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.')) : GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .78, crossAxisSpacing: 10, mainAxisSpacing: 10),
-        itemCount: _gifts.length,
-        itemBuilder: (context, index) {
-          final gift = _gifts[index];
-          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
-          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
-          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
-          return Card(clipBehavior: Clip.antiAlias, child: Padding(padding: const EdgeInsets.all(10), child: Column(children: [
-            Expanded(child: image.startsWith('http') ? Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 52)) : const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold)),
-            const SizedBox(height: 8),
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('السعر: $cost'),
-            const SizedBox(height: 6),
-            SizedBox(width: double.infinity, child: FilledButton.tonalIcon(onPressed: _sending ? null : () => _sendGift(gift), icon: const Icon(Icons.send_rounded, size: 16), label: const Text('إرسال'))),
-          ])));
-        },
-      )),
-    ]),
-  );
-}
 
 class VanityIdsPage extends StatefulWidget {
   const VanityIdsPage({required this.apiClient, required this.accessToken, super.key});
