@@ -437,6 +437,21 @@
                 </div>
                 <input v-model="form.giftSoundsEnabled" class="form-check-input" type="checkbox" role="switch" />
               </label>
+              <section class="settings-card mt-3">
+                <h3 class="settings-card-title">الرسائل الخاصة المدفوعة</h3>
+                <p class="form-text">تُطبّق على الرسائل النصية والوسائط في المحادثات الخاصة. الصفر في الحد اليومي يعني بلا حد يومي، والصفر في مدة الاسترداد يعني تعطيل الاسترداد.</p>
+                <label class="settings-switch">
+                  <div><div class="settings-switch-title">تفعيل الرسائل المدفوعة</div><div class="settings-switch-hint">بعد انتهاء الرسائل المجانية، تُخصم العملات من المرسل.</div></div>
+                  <input v-model="form.paidMessagesEnabled" class="form-check-input" type="checkbox" role="switch" />
+                </label>
+                <div class="row g-3 mt-1">
+                  <div class="col-md-4"><label class="form-label">عدد الرسائل المجانية لكل محادثة</label><input v-model.number="form.paidMessagesFreeCount" type="number" min="0" max="1000" class="form-control" /></div>
+                  <div class="col-md-4"><label class="form-label">سعر الرسالة بالعملات</label><input v-model.number="form.paidMessagesPriceCoins" type="number" min="0" max="10000000" class="form-control" /></div>
+                  <div class="col-md-4"><label class="form-label">خصم المتابعة باتجاه واحد (%)</label><input v-model.number="form.paidMessagesDiscountPercent" type="number" min="0" max="100" class="form-control" /></div>
+                  <div class="col-md-6"><label class="form-label">الحد اليومي للرسائل المدفوعة (0 = بلا حد)</label><input v-model.number="form.paidMessagesDailyLimit" type="number" min="0" class="form-control" /></div>
+                  <div class="col-md-6"><label class="form-label">مدة الاسترداد بالدقائق (0 = تعطيل)</label><input v-model.number="form.paidMessagesRefundWindowMinutes" type="number" min="0" max="10080" class="form-control" /></div>
+                </div>
+              </section>
               <label class="settings-switch">
                 <div>
                   <div class="settings-switch-title">{{ t('settings.requireGiftToDm') }}</div>
@@ -829,6 +844,12 @@ const form = reactive({
   micWithoutHostApproval: true,
   giftSoundsEnabled: true,
   requireGiftToDm: false,
+  paidMessagesEnabled: false,
+  paidMessagesFreeCount: 3,
+  paidMessagesPriceCoins: 10,
+  paidMessagesDiscountPercent: 25,
+  paidMessagesDailyLimit: 0,
+  paidMessagesRefundWindowMinutes: 30,
   roomRulesText: 'احترموا القوانين واستمتعوا بالجلسة',
   autoModeration: true,
   liveNsfwEnabled: true,
@@ -957,6 +978,12 @@ async function load() {
       map['chat.requireGiftToDm'] ?? map.requireGiftToDm,
       form.requireGiftToDm,
     ),
+    paidMessagesEnabled: bool(map['paid_messages.enabled'], form.paidMessagesEnabled),
+    paidMessagesFreeCount: Math.max(0, num(map['paid_messages.free_count'], form.paidMessagesFreeCount)),
+    paidMessagesPriceCoins: Math.max(0, num(map['paid_messages.price_coins'], form.paidMessagesPriceCoins)),
+    paidMessagesDiscountPercent: Math.min(100, Math.max(0, num(map['paid_messages.one_way_discount_percent'] ?? map['paid_messages.discount_percent'], form.paidMessagesDiscountPercent))),
+    paidMessagesDailyLimit: Math.max(0, num(map['paid_messages.daily_limit'], form.paidMessagesDailyLimit)),
+    paidMessagesRefundWindowMinutes: Math.min(10080, Math.max(0, num(map['paid_messages.refund_window_minutes'], form.paidMessagesRefundWindowMinutes))),
     roomRulesText: String(map['rooms.rules_text'] ?? map.roomRulesText ?? form.roomRulesText),
     autoModeration: bool(map.autoModeration ?? map.auto_moderation, form.autoModeration),
     liveNsfwEnabled: bool(map.live_nsfw_enabled ?? map.liveNsfwEnabled, form.liveNsfwEnabled),
@@ -1021,6 +1048,12 @@ async function save() {
     'rooms.mic_without_host_approval': String(!!form.micWithoutHostApproval),
     'gifts.sound_enabled': String(!!form.giftSoundsEnabled),
     'chat.requireGiftToDm': String(!!form.requireGiftToDm),
+    'paid_messages.enabled': String(!!form.paidMessagesEnabled),
+    'paid_messages.free_count': String(Math.max(0, Math.floor(Number(form.paidMessagesFreeCount) || 0))),
+    'paid_messages.price_coins': String(Math.max(0, Math.floor(Number(form.paidMessagesPriceCoins) || 0))),
+    'paid_messages.one_way_discount_percent': String(Math.min(100, Math.max(0, Number(form.paidMessagesDiscountPercent) || 0))),
+    'paid_messages.daily_limit': String(Math.max(0, Math.floor(Number(form.paidMessagesDailyLimit) || 0))),
+    'paid_messages.refund_window_minutes': String(Math.min(10080, Math.max(0, Math.floor(Number(form.paidMessagesRefundWindowMinutes) || 0)))),
     'rooms.rules_text': String(form.roomRulesText ?? ''),
     autoModeration: String(!!form.autoModeration),
     auto_moderation: String(!!form.autoModeration),
