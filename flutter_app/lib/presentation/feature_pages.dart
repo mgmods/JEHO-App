@@ -312,3 +312,161 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                       ),
       );
 }
+
+
+class CosmeticsPage extends StatefulWidget {
+  const CosmeticsPage({
+    required this.apiClient,
+    required this.accessToken,
+    super.key,
+  });
+
+  final JehoApiClient apiClient;
+  final String accessToken;
+
+  @override
+  State<CosmeticsPage> createState() => _CosmeticsPageState();
+}
+
+class _CosmeticsPageState extends State<CosmeticsPage> {
+  List<Map<String, dynamic>> _catalog = const [];
+  List<Map<String, dynamic>> _inventory = const [];
+  bool _loading = true;
+  String? _error;
+  final Set<String> _busy = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait([
+        widget.apiClient.getCosmetics(),
+        widget.apiClient.getCosmeticInventory(widget.accessToken),
+      ]);
+      if (mounted) {
+        setState(() {
+          _catalog = results[0];
+          _inventory = results[1];
+        });
+      }
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _mediaUrl(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl);
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
+  Map<String, dynamic>? _ownedFor(String id) {
+    for (final row in _inventory) {
+      final cosmetic = row['cosmetic'] is Map<String, dynamic>
+          ? row['cosmetic'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      if ((row['cosmeticId'] ?? cosmetic['id'])?.toString() == id) return row;
+    }
+    return null;
+  }
+
+  Future<void> _act(Map<String, dynamic> item, {required bool owned}) async {
+    final id = item['id']?.toString() ?? '';
+    if (id.isEmpty || _busy.contains(id)) return;
+    setState(() => _busy.add(id));
+    try {
+      if (owned) {
+        await widget.apiClient.equipCosmetic(widget.accessToken, id);
+      } else {
+        await widget.apiClient.purchaseCosmetic(widget.accessToken, id);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(owned ? 'تم ارتداء العنصر.' : 'تم الشراء ومحاولة ارتداء العنصر.')),
+      );
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _busy.remove(id));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('الإطارات والزينة'), actions: [
+          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
+        ]),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+                : _catalog.isEmpty
+                    ? const Center(child: Text('لا توجد عناصر زينة متاحة حاليًا.'))
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: .72,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                        ),
+                        itemCount: _catalog.length,
+                        itemBuilder: (context, index) {
+                          final item = _catalog[index];
+                          final id = item['id']?.toString() ?? '';
+                          final owned = _ownedFor(id);
+                          final isOwned = owned != null &&
+                              (owned['expiresAt'] == null ||
+                                  DateTime.tryParse(owned['expiresAt'].toString())?.isAfter(DateTime.now()) == true);
+                          final title = (item['name'] ?? item['code'] ?? 'زينة').toString();
+                          final preview = (item['animationUrl'] ?? item['previewUrl'] ?? '').toString();
+                          final price = item['coinPrice'] ?? 0;
+                          final busy = _busy.contains(id);
+                          return Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Column(
+                                children: [
+                                  Expanded(
+                                    child: preview.isNotEmpty
+                                        ? Image.network(
+                                            _mediaUrl(preview),
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
+                                          )
+                                        : const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
+                                  ),
+                                  Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 4),
+                                  Text(isOwned ? 'موجود في أغراضي' : 'السعر: $price عملة', maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 6),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: FilledButton(
+                                      onPressed: busy ? null : () => _act(item, owned: isOwned),
+                                      child: Text(busy ? 'جارٍ التنفيذ…' : isOwned ? 'ارتداء' : 'شراء'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+      );
+}
