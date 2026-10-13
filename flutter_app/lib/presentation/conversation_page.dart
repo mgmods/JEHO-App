@@ -154,7 +154,7 @@ class _ConversationPageState extends State<ConversationPage> {
                             final isMine =
                                 message['isMine'] == true ||
                                 message['isOwn'] == true ||
-                                (currentUserId.isNotEmpty &&
+                                (widget.currentUserId.isNotEmpty &&
                                   message['senderId']?.toString() == widget.currentUserId);
                             final text = content.isNotEmpty
                                 ? content
