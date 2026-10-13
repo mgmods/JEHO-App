@@ -662,7 +662,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       crossAxisCount: 4,
                       mainAxisSpacing: 10,
                       crossAxisSpacing: 4,
-                      childAspectRatio: .67,
+                      childAspectRatio: .55,
                     ),
                     itemBuilder: (context, index) {
                       final seat = seatsByIndex[index] ?? <String, dynamic>{};
