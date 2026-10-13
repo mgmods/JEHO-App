@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/jeho_api_client.dart';
+import 'drama_page.dart';
 
 class FeatureHubPage extends StatefulWidget {
   const FeatureHubPage({
@@ -326,7 +327,21 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_section]),
-        actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))],
+        actions: [
+          IconButton(
+            tooltip: 'الدراما',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DramaPage(
+                  apiClient: widget.apiClient,
+                  accessToken: widget.accessToken,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.movie_creation_outlined),
+          ),
+          IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
+        ],
       ),
       body: Column(
         children: [
