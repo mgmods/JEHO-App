@@ -3,11 +3,11 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO CHAT uses the existing Adnova production API.
- * A build-time override is supported, but the production default remains Adnova.
+ * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on Blitz Cloud.
+ * The admin dashboard is served by the same backend host under /admin/.
  */
 public final class ApiOrigin {
-    private static final String CANONICAL_API = "https://api.adnova.bbs.tr";
+    private static final String CANONICAL_API = "https://jeho-own-backend.mgs.blitz.cloud";
 
     private ApiOrigin() {}
 
