@@ -189,6 +189,119 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
     }
   }
 
+  String? get _myAgencyId {
+    final agency = _agency?['agency'];
+    if (agency is Map<String, dynamic>) {
+      final id = agency['id']?.toString();
+      if (id != null && id.isNotEmpty) return id;
+    }
+    return null;
+  }
+
+  Future<void> _showAgencyEarnings() async {
+    final agencyId = _myAgencyId;
+    if (agencyId == null) {
+      setState(() => _error = 'لا توجد وكالة مرتبطة بحسابك أو لا تملك صلاحية عرض الأرباح.');
+      return;
+    }
+    try {
+      final result = await widget.apiClient.getAgencyEarnings(widget.accessToken, agencyId);
+      if (!mounted) return;
+      final summary = result.entries
+          .where((entry) => entry.value == null || entry.value is String || entry.value is num || entry.value is bool)
+          .map((entry) => '${entry.key}: ${entry.value ?? '—'}')
+          .join('\n');
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('ملخص أرباح الوكالة'),
+          content: SingleChildScrollView(
+            child: SelectableText(summary.isEmpty ? 'تم تحميل بيانات الأرباح، لكن لا توجد حقول بسيطة للعرض.' : summary),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق')),
+          ],
+        ),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
+  Future<void> _showAgencyJoinRequests() async {
+    final agencyId = _myAgencyId;
+    if (agencyId == null) {
+      setState(() => _error = 'لا توجد وكالة مرتبطة بحسابك أو لا تملك صلاحية إدارة الطلبات.');
+      return;
+    }
+    try {
+      final requests = await widget.apiClient.getAgencyJoinRequests(widget.accessToken, agencyId);
+      if (!mounted) return;
+      if (requests.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد طلبات انضمام معلّقة.')));
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (sheetContext) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(title: Text('طلبات انضمام الوكالة')),
+              for (final request in requests)
+                ListTile(
+                  title: Text((request['displayName'] ?? request['username'] ?? request['user']?['displayName'] ?? request['userId'] ?? 'مستخدم').toString()),
+                  subtitle: Text((request['createdAt'] ?? request['status'] ?? '').toString()),
+                  trailing: Wrap(
+                    spacing: 2,
+                    children: [
+                      IconButton(
+                        tooltip: 'قبول',
+                        icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+                        onPressed: () async {
+                          final userId = (request['userId'] ?? request['id'] ?? request['user']?['id'] ?? '').toString();
+                          if (userId.isEmpty) return;
+                          try {
+                            await widget.apiClient.respondAgencyJoinRequest(widget.accessToken, agencyId, userId, approve: true);
+                            if (!mounted) return;
+                            Navigator.of(sheetContext).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم قبول طلب الانضمام.')));
+                            await _load();
+                          } on JehoApiException catch (error) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+                          }
+                        },
+                      ),
+                      IconButton(
+                        tooltip: 'رفض',
+                        icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                        onPressed: () async {
+                          final userId = (request['userId'] ?? request['id'] ?? request['user']?['id'] ?? '').toString();
+                          if (userId.isEmpty) return;
+                          try {
+                            await widget.apiClient.respondAgencyJoinRequest(widget.accessToken, agencyId, userId, approve: false);
+                            if (!mounted) return;
+                            Navigator.of(sheetContext).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفض طلب الانضمام.')));
+                            await _load();
+                          } on JehoApiException catch (error) {
+                            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _runAction(Future<void> Function() action, String success) async {
     try {
       await action();
@@ -256,6 +369,34 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
                       label: const Text('الانضمام بكود تفعيل'),
                     ),
                   ),
+                  if (_myAgencyId != null) ...[
+                    Card(
+                      child: ListTile(
+                        leading: const CircleAvatar(child: Icon(Icons.groups_rounded)),
+                        title: Text((_agency?['agency'] as Map<String, dynamic>?)?['name']?.toString() ?? 'وكالتي'),
+                        subtitle: Text('الدور: ${_agency?['role'] ?? 'عضو'} · الحالة: ${_agency?['membershipStatus'] ?? '—'}'),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _showAgencyJoinRequests,
+                            icon: const Icon(Icons.how_to_reg_rounded),
+                            label: const Text('طلبات الانضمام'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _loading ? null : _showAgencyEarnings,
+                            icon: const Icon(Icons.account_balance_wallet_outlined),
+                            label: const Text('الأرباح'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
