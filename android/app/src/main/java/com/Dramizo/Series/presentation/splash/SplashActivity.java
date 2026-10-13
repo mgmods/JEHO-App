@@ -27,6 +27,8 @@ import com.Dramizo.Series.presentation.auth.LoginActivity;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
+import com.Dramizo.Series.presentation.profile.ProfileActivity;
+import com.Dramizo.Series.presentation.agency.AgencyActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AppFeatures;
 import com.Dramizo.Series.util.RemoteTheme;
@@ -54,6 +56,8 @@ public class SplashActivity extends ThemedActivity {
     private AuthDtos.UserDto pendingUser;
     private MiscDtos.SplashItemDto displayedSplashItem;
     private String pendingSplashTarget;
+    private String pendingSplashTargetType;
+    private String pendingSplashTargetId;
     private ImageView splashAdImage;
     private View splashContentView;
     private View skipSplashAd;
@@ -351,9 +355,35 @@ public class SplashActivity extends ThemedActivity {
         if (clicked && displayedSplashItem != null) {
             String target = displayedSplashItem.target;
             if (target == null || target.trim().isEmpty()) target = displayedSplashItem.targetUrl;
-            pendingSplashTarget = target != null ? target.trim() : null;
+            String type = displayedSplashItem.targetType;
+            if (type == null || type.trim().isEmpty()) {
+                if (target != null && target.trim().matches("(?i)^https?://.+")) type = "external";
+                else type = target;
+            }
+            pendingSplashTargetType = type != null ? type.trim().toLowerCase(java.util.Locale.ROOT) : "home";
+            pendingSplashTargetId = displayedSplashItem.targetId != null
+                    ? displayedSplashItem.targetId.trim() : "";
+            if ("external".equals(pendingSplashTargetType)) {
+                String url = displayedSplashItem.targetUrl;
+                if (url == null || url.trim().isEmpty()) url = target;
+                pendingSplashTarget = url != null ? url.trim() : null;
+            } else {
+                pendingSplashTarget = pendingSplashTargetType;
+            }
+            if ("room".equals(pendingSplashTargetType)) {
+                if (!pendingSplashTargetId.isEmpty()) pendingRoomId = pendingSplashTargetId;
+                else { pendingSplashTargetType = "home"; pendingSplashTarget = "home"; }
+            }
+            if ("person".equals(pendingSplashTargetType) && pendingSplashTargetId.isEmpty()) {
+                pendingSplashTargetType = "home"; pendingSplashTarget = "home";
+            }
+            if ("agency".equals(pendingSplashTargetType) && pendingSplashTargetId.isEmpty()) {
+                pendingSplashTargetType = "home"; pendingSplashTarget = "home";
+            }
         } else {
             pendingSplashTarget = null;
+            pendingSplashTargetType = null;
+            pendingSplashTargetId = null;
         }
         splashDecisionResolved = true;
         splashAdShowing = false;
@@ -399,6 +429,20 @@ public class SplashActivity extends ThemedActivity {
                 && activeRoom != null && !activeRoom.isEmpty()) {
             pendingRoomId = activeRoom;
         }
+        if ("person".equals(pendingSplashTargetType) && pendingSplashTargetId != null
+                && !pendingSplashTargetId.isEmpty()) {
+            Intent profile = new Intent(this, ProfileActivity.class);
+            profile.putExtra(ProfileActivity.EXTRA_USER_ID, pendingSplashTargetId);
+            putPendingExtras(profile);
+            startActivity(profile);
+            finish();
+            return;
+        }
+        if ("agency".equals(pendingSplashTargetType) && pendingSplashTargetId != null
+                && !pendingSplashTargetId.isEmpty()) {
+            openAgencySplashTarget(pendingSplashTargetId);
+            return;
+        }
         if (pendingRoomId != null && !pendingRoomId.isEmpty()) {
             Intent i = new Intent(this, VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoomId);
@@ -420,6 +464,48 @@ public class SplashActivity extends ThemedActivity {
             }
         }
         finish();
+    }
+
+    /** Resolve a selected agency ID through the existing API; open its live room when available. */
+    private void openAgencySplashTarget(String agencyId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                String liveRoomId = null;
+                boolean found = false;
+                try {
+                    Result<MiscDtos.AgencyDto> result = ApiCall.execute(c.getAgencyApi().get(agencyId));
+                    if (result != null && result.success && result.data != null) {
+                        found = true;
+                        liveRoomId = result.data.openRoomId;
+                    }
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash agency target lookup failed", error);
+                }
+                final boolean agencyFound = found;
+                final String roomId = liveRoomId;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (roomId != null && !roomId.trim().isEmpty()) {
+                        Intent room = new Intent(this, VoiceRoomActivity.class);
+                        room.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId.trim());
+                        room.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+                        startActivity(room);
+                    } else if (agencyFound) {
+                        // Existing app destination for agency management/discovery.
+                        startActivity(new Intent(this, AgencyActivity.class)
+                                .putExtra("splash_target_agency_id", agencyId));
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash agency target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
     }
 
     private void openProfileSetup() {
