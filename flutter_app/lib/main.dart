@@ -641,7 +641,13 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       )
-                    : const SizedBox.shrink(),
+                    : _selectedIndex == 2
+                        ? Image.asset(
+                            'assets/original/android-res/drawable-xxhdpi/me_bg.webp',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          )
+                        : const SizedBox.shrink(),
               ),
             )
           else if (_selectedIndex == 0)
@@ -650,6 +656,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                 'assets/original/android-res/drawable-xxhdpi/home_page_bg.webp',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            )
+          else if (_selectedIndex == 2)
+            Positioned.fill(
+              child: Opacity(
+                opacity: 0.24,
+                child: Image.asset(
+                  'assets/original/android-res/drawable-xxhdpi/me_bg.webp',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
               ),
             ),
           SafeArea(
