@@ -27,6 +27,9 @@ export class AdminUser {
   @Column({ type: 'varchar', length: 48 })
   username: string;
 
+  @Column({ type: 'varchar', length: 120, default: 'Dashboard Admin' })
+  displayName: string;
+
   @Column({ type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
