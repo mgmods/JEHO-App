@@ -106,6 +106,65 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
+  Future<void> _showModerationTools() async {
+    final userIdController = TextEditingController();
+    try {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('إشراف الغرفة'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('أدخل معرّف المستخدم المستهدف. صلاحيات المضيف والمشرف يتحقق منها الخادم.'),
+              TextField(controller: userIdController, decoration: const InputDecoration(labelText: 'معرّف المستخدم UUID')),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+            TextButton(onPressed: () => Navigator.pop(context, 'kick'), child: const Text('إخراج')),
+            FilledButton(onPressed: () => Navigator.pop(context, 'ban'), child: const Text('حظر 30 دقيقة')),
+          ],
+        ),
+      );
+      final target = userIdController.text.trim();
+      if (choice == null || target.isEmpty || !mounted) return;
+      await _roomAction(
+        () => choice == 'kick'
+            ? widget.apiClient.kickRoomUser(widget.accessToken, _roomId, target)
+            : widget.apiClient.banRoomUser(widget.accessToken, _roomId, target),
+        choice == 'kick' ? 'تم إرسال طلب إخراج المستخدم.' : 'تم إرسال طلب الحظر.',
+      );
+    } finally {
+      userIdController.dispose();
+    }
+  }
+
+  Future<void> _showSeatLock() async {
+    final seat = await showModalBottomSheet<int>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(title: Text('اختر المقعد لقفله')),
+            for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
+              ListTile(
+                leading: CircleAvatar(child: Text('$index')),
+                title: Text('قفل المقعد $index'),
+                onTap: () => Navigator.pop(context, index),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (seat == null || !mounted) return;
+    await _roomAction(
+      () => widget.apiClient.lockRoomSeat(widget.accessToken, _roomId, seat),
+      'تم إرسال طلب قفل المقعد.',
+    );
+  }
+
   Future<void> _sendGiftToHost() async {
     if (_roomActionBusy) return;
     final host = widget.room['host'] is Map<String, dynamic>
@@ -290,6 +349,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             onPressed: _roomActionBusy || !_roomEntered ? null : _sendGiftToHost,
             icon: const Icon(Icons.card_giftcard_rounded),
             label: const Text('إرسال هدية للمضيف'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _showModerationTools,
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            label: const Text('إشراف الغرفة: إخراج أو حظر'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
+            icon: const Icon(Icons.lock_outline_rounded),
+            label: const Text('قفل مقعد'),
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : () async {
