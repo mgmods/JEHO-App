@@ -130,6 +130,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   bool _loading = true;
   String? _loadError;
   List<Map<String, dynamic>> _rooms = const [];
+  List<Map<String, dynamic>> _banners = const [];
   List<Map<String, dynamic>> _conversations = const [];
   Map<String, dynamic>? _profile;
 
@@ -147,6 +148,13 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     final token = widget.session['accessToken']?.toString() ?? '';
     try {
       final rooms = await widget.apiClient.getPublicRooms();
+      // Banner configuration is optional and must never block room browsing.
+      List<Map<String, dynamic>> banners = const [];
+      try {
+        banners = await widget.apiClient.getHomeBanners();
+      } on JehoApiException {
+        // Keep the home screen usable when banner configuration is unavailable.
+      }
       Map<String, dynamic>? profile;
       List<Map<String, dynamic>> conversations = const [];
       if (token.isNotEmpty) {
@@ -164,6 +172,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
       if (!mounted) return;
       setState(() {
         _rooms = rooms;
+        _banners = banners;
         _profile = profile;
         _conversations = conversations;
       });
@@ -479,6 +488,61 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                   ),
                   const SizedBox(height: 12),
                   if (_selectedIndex == 0) ...[
+                    if (_banners.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        height: 156,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _banners.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (context, index) {
+                            final banner = _banners[index];
+                            final imageValue = (banner['imageUrl'] ?? banner['image'] ?? banner['mediaUrl'] ?? banner['url'] ?? '').toString().trim();
+                            final title = (banner['title'] ?? banner['name'] ?? '').toString();
+                            final imageUrl = imageValue.isEmpty ? '' : _resolveMediaUrl(imageValue);
+                            return SizedBox(
+                              width: MediaQuery.sizeOf(context).width * 0.82,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(18),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Container(
+                                      color: const Color(0xFFFFE7B0),
+                                      alignment: Alignment.center,
+                                      child: const Icon(Icons.campaign_rounded, size: 42, color: Color(0xFF8C641D)),
+                                    ),
+                                    if (imageUrl.isNotEmpty)
+                                      Image.network(
+                                        imageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                      ),
+                                    if (title.trim().isNotEmpty)
+                                      Positioned(
+                                        right: 0,
+                                        left: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                          color: Colors.black.withValues(alpha: 0.52),
+                                          child: Text(
+                                            title,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Row(
                       children: [
