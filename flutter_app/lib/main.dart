@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
 import 'presentation/conversation_page.dart';
-import 'presentation/feature_pages.dart';
+import 'presentation/feature_pages.dart' hide Center;
 import 'presentation/feature_hub_page.dart';
 import 'presentation/discovery_hub_page.dart';
 import 'presentation/drama_page.dart';
