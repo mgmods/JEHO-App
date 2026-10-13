@@ -117,7 +117,7 @@ class _GamesPageState extends State<GamesPage> {
                     Center(child: FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('إعادة المحاولة'))),
                   ])
                 : _games.isEmpty
-                    ? const ListView(children: [SizedBox(height: 100), Center(child: Text('لا توجد ألعاب متاحة حاليًا.'))])
+                    ? ListView(children: const [SizedBox(height: 100), Center(child: Text('لا توجد ألعاب متاحة حاليًا.'))])
                     : CustomScrollView(
                         physics: const AlwaysScrollableScrollPhysics(),
                         slivers: [
