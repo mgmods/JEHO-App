@@ -244,6 +244,9 @@ async function saveSplashAd() {
       sortOrder: Number.isFinite(Number(current.sortOrder)) ? Number(current.sortOrder) : 0,
       target,
     }
+    // This dashboard control manages one active startup ad. Keep any legacy items
+    // in the existing config but deactivate them so an old image cannot rotate in.
+    for (let i = 1; i < items.length; i += 1) items[i] = { ...items[i], active: false }
     next.splash = { ...oldSplash, enabled: !!splashEnabled.value && !!items[0].url, skipEnabled: true, items }
     next.version = (Number(next.version) || 1) + 1
     next.updatedAt = new Date().toISOString()
