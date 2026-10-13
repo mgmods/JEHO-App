@@ -174,6 +174,8 @@ class WalletPage extends StatefulWidget {
 
 class _WalletPageState extends State<WalletPage> {
   Map<String, dynamic>? _wallet;
+  List<Map<String, dynamic>> _transactions = const [];
+  List<Map<String, dynamic>> _packages = const [];
   bool _loading = true;
   String? _error;
 
@@ -190,7 +192,25 @@ class _WalletPageState extends State<WalletPage> {
     });
     try {
       final result = await widget.apiClient.getWallet(widget.accessToken);
-      if (mounted) setState(() => _wallet = result);
+      List<Map<String, dynamic>> transactions = const [];
+      List<Map<String, dynamic>> packages = const [];
+      try {
+        transactions = await widget.apiClient.getWalletTransactions(widget.accessToken);
+      } on JehoApiException {
+        // Keep the balance visible if transaction history is unavailable.
+      }
+      try {
+        packages = await widget.apiClient.getRechargePackages();
+      } on JehoApiException {
+        // Packages are informational until native store billing is integrated.
+      }
+      if (mounted) {
+        setState(() {
+          _wallet = result;
+          _transactions = transactions;
+          _packages = packages;
+        });
+      }
     } on JehoApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
@@ -218,9 +238,50 @@ class _WalletPageState extends State<WalletPage> {
                   children: [
                     _BalanceTile(label: 'الماس', value: balances['diamonds'] ?? balances['diamondBalance'] ?? '—', icon: Icons.diamond_rounded),
                     _BalanceTile(label: 'العملات', value: balances['coins'] ?? balances['coinBalance'] ?? '—', icon: Icons.monetization_on_rounded),
-                    _BalanceTile(label: 'ألماس قابل للسحب', value: balances['personalDiamonds'] ?? balances['diamonds'] ?? '—', icon: Icons.account_balance_wallet_rounded),
+                    _BalanceTile(label: 'تقدّم حد السحب', value: '${((double.tryParse((balances['withdrawProgress'] ?? 0).toString()) ?? 0) * 100).clamp(0, 100).toStringAsFixed(0)}%', icon: Icons.trending_up_rounded),
+                    const SizedBox(height: 18),
+                    Text('باقات الشحن', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    if (_packages.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('لا تتوفر باقات للعرض حاليًا.'),
+                      )
+                    else
+                      ..._packages.map((pkg) {
+                        final coins = pkg['coins'] ?? pkg['amount'] ?? '—';
+                        final bonus = pkg['bonusCoins'] ?? 0;
+                        final price = pkg['priceUsd'] ?? pkg['price'] ?? '—';
+                        return Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.add_card_rounded, color: _featureGold),
+                            title: Text('$coins عملة${bonus is num && bonus > 0 ? ' + $bonus إضافية' : ''}'),
+                            trailing: Text('$price'),
+                            subtitle: const Text('عرض فقط — الدفع داخل التطبيق غير مفعّل في نسخة Flutter التجريبية.'),
+                          ),
+                        );
+                      }),
+                    const SizedBox(height: 18),
+                    Text('آخر الحركات', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    if (_transactions.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('لا توجد حركات حديثة أو تعذّر تحميل السجل.'),
+                      )
+                    else
+                      ..._transactions.map((tx) {
+                        final amount = tx['amount'] ?? '—';
+                        final description = (tx['description'] ?? tx['type'] ?? 'حركة رصيد').toString();
+                        final created = (tx['createdAt'] ?? '').toString();
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.receipt_long_rounded),
+                          title: Text(description, maxLines: 2, overflow: TextOverflow.ellipsis),
+                          subtitle: Text(created),
+                          trailing: Text('$amount'),
+                        );
+                      }),
                     const SizedBox(height: 12),
-                    const Text('الرصيد معروض من الخادم الحالي. عمليات الشحن والسحب والتبديل لم تُفعّل من هذه الشاشة بعد.'),
+                    const Text('الرصيد وسجل الحركات من الخادم الحالي. لم يتم تفعيل الشحن أو السحب في Flutter قبل ربط فوترة المتجر والتحقق منها.'),
                   ],
                 ),
     );
