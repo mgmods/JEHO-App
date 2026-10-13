@@ -21,6 +21,17 @@ flutter run --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.c
 
 The API base URL is configurable through `JEHO_API_BASE_URL`. No API calls are made by the starter screen yet.
 
+## Current API coverage
+
+The client currently calls the existing NestJS endpoints only:
+
+- `POST auth/login`, `POST auth/register`, `POST auth/guest`
+- `GET rooms?page=1&limit=20`
+- `GET users/me` with the returned bearer token
+- `GET chat/conversations?page=1&limit=20` with the returned bearer token
+
+No backend route or database schema was changed for this migration.
+
 ## Migration safety rules
 
 1. Keep the current Android application and APK as the rollback path until the Flutter build passes feature-by-feature acceptance.
