@@ -363,40 +363,14 @@ class AdminContent extends StatelessWidget {
   } finally { for(final c in controllers){c.dispose();} }
  }
  Future<void> _grantAction(BuildContext context,Map row,String action,String rowId) async {
-  final publicId=(row['publicId']??row['code']??row['slug']??row['cosmeticCode']??rowId).toString();
-  final labels=action=='vanity-grant'
-    ? ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent']
-    : action=='cosmetic-grant'
-      ? ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent']
-      : ['معرّف المستخدم','المدة بالأيام: 7 أو 15 أو 30 أو permanent'];
-  final values=await _askValues(context,action=='vanity-grant'?'إهداء الآي دي $publicId':action=='cosmetic-grant'?'إهداء المظهر $publicId':'منح خطة VIP',labels);
+  final values=await _askValues(context,'منح خطة VIP',['معرّف المستخدم','معرّف خطة VIP']);
   if(values==null||!context.mounted)return;
-  final userId=values[0].trim();
-  final term=values[1].trim().toLowerCase();
-  final permanent=term=='permanent'||term=='دائم';
-  final days=int.tryParse(term);
-  if(userId.isEmpty||(!permanent&&![7,15,30].contains(days))){
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('أدخل معرّف المستخدم ومدة 7 أو 15 أو 30 أو permanent.')));
-    return;
-  }
-  final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
-    title:Text(action=='vanity-grant'?'تأكيد إهداء الآي دي':action=='cosmetic-grant'?'تأكيد إهداء المظهر':'تأكيد منح VIP'),
-    content:Text('سيتم تطبيق الإجراء على المستخدم $userId لمدة ${permanent?'دائمة':'$days يومًا'}، هل تؤكد؟'),
-    actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))],
-  ));
-  if(confirmed!=true)return;
-  try {
-    if(action=='vanity-grant'){
-      await api.post('vanity-ids/admin/assign',{'userId':userId,'publicId':publicId,'days':days??7,'permanent':permanent});
-    } else if(action=='cosmetic-grant'){
-      await api.post('admin/cosmetics/grant',{'userId':userId,'cosmeticCode':publicId,'days':days??7,'permanent':permanent});
-    } else {
-      await api.post('admin/vip/assign',{'userId':userId,'planId':rowId,'days':days??30,'permanent':permanent});
-    }
-    if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم إرسال الطلب إلى الخادم بنجاح.')));reload();}
-  } catch(e) {
-    if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));
-  }
+  final userId=values[0].trim();final planId=values[1].trim().isEmpty?rowId:values[1].trim();
+  if(userId.isEmpty||planId.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('معرّف المستخدم ومعرّف خطة VIP مطلوبان.')));return;}
+  final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد منح VIP'),content:Text('سيتم منح الخطة للمستخدم '+userId+'. هل تؤكد؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
+  if(ok!=true)return;
+  try{await api.post('admin/vip/assign',{'userId':userId,'planId':planId});if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم منح خطة VIP.')));reload();}}
+  catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
  }
  Future<void> _editAdminRow(BuildContext context,Map row,String action,String id) async {
   if(action=='user-access'){
@@ -478,7 +452,7 @@ class AdminContent extends StatelessWidget {
    case 'gender-reject': endpoint='admin/gender-verifications/$id/reject'; break;
    default: throw StateError('إجراء غير معروف: '+action.$2);
   }
-  try{await api.post(endpoint,body);if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم تنفيذ: '+action.$1)));reload();}}
+  try{if(action.$2=='cosmetic-toggle'){await api.patch(endpoint,body);}else{await api.post(endpoint,body);}if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم تنفيذ: '+action.$1)));reload();}}
   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
  }
  Widget metric(String label,String value,IconData icon)=>SizedBox(width:220,child:Card(child:Padding(padding:const EdgeInsets.all(16),child:Row(children:[Icon(icon,color:gold,size:26),const SizedBox(width:10),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(label,style:const TextStyle(color:Colors.black54)),Text(value,maxLines:2,overflow:TextOverflow.ellipsis,style:const TextStyle(fontWeight:FontWeight.w800))]))]))));
