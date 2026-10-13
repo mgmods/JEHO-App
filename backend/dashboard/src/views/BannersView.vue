@@ -40,7 +40,13 @@
             <label class="form-check-label" for="splash-ad-enabled">تفعيل إعلان التشغيل</label>
           </div>
           <label class="form-label small">مدة العرض بالثواني</label>
-          <input v-model.number="splashDuration" type="number" min="5" max="120" step="1" class="form-control form-control-sm mb-3" />
+          <select v-model.number="splashDuration" class="form-select form-select-sm mb-3">
+            <option :value="1">ثانية واحدة</option>
+            <option :value="2">ثانيتان</option>
+            <option :value="3">3 ثوانٍ</option>
+            <option :value="4">4 ثوانٍ</option>
+            <option :value="5">5 ثوانٍ</option>
+          </select>
           <label class="form-label small">الوجهة عند الضغط على الصورة</label>
           <select v-model="splashTarget" class="form-select form-select-sm mb-2">
             <option value="home">الرئيسية</option>
@@ -54,7 +60,7 @@
           </select>
           <input v-if="['room_id', 'agency_id', 'user_id'].includes(splashTarget)" v-model.trim="splashTargetId" type="text" inputmode="text" class="form-control form-control-sm mb-3" :placeholder="splashTarget === 'room_id' ? 'ID الروم (مثال: 123456)' : splashTarget === 'agency_id' ? 'ID الوكالة' : 'ID الشخص'" />
           <input v-if="splashTarget === 'custom'" v-model.trim="splashTargetUrl" type="url" class="form-control form-control-sm mb-3" placeholder="https://example.com/page" />
-          <p class="form-text">زر «تخطي» يظهر أسفل الإعلان. المدة الافتراضية 5 ثوانٍ. التعديلات تصل إلى التطبيق من إعدادات الخادم دون تحديث APK.</p>
+          <p class="form-text">زر «تخطي» يظهر أسفل اليسار. المدة من ثانية إلى 5 ثوانٍ فقط. تُنشر الإعدادات من الخادم دون إصدار APK جديد.</p>
           <div v-if="splashMessage" class="alert py-2 mt-2" :class="splashError ? 'alert-warning' : 'alert-success'" role="status">{{ splashMessage }}</div>
         </div>
       </div>
@@ -197,6 +203,28 @@ function splashAbsUrl(url) {
   return absolute + separator + 'preview=' + encodeURIComponent(String(themeConfig.version || 1) + '-' + String(themeConfig.updatedAt || ''))
 }
 
+function probeSplashImage(url, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    const timer = window.setTimeout(() => {
+      image.onload = null
+      image.onerror = null
+      reject(new Error('رابط الصورة لم يستجب خلال المهلة المحددة. لم يتم اعتماد الصورة.'))
+    }, timeoutMs)
+    image.onload = () => {
+      window.clearTimeout(timer)
+      if (image.naturalWidth > 0 && image.naturalHeight > 0) resolve(true)
+      else reject(new Error('الخادم أعاد ملفاً ليس صورة صالحة.'))
+    }
+    image.onerror = () => {
+      window.clearTimeout(timer)
+      reject(new Error('تعذر فتح الصورة من رابط الخادم. تحقق من التخزين وصلاحيات الوصول.'))
+    }
+    const absolute = absUrl(url)
+    image.src = absolute + (absolute.includes('?') ? '&' : '?') + 'splash_probe=' + Date.now()
+  })
+}
+
 async function onSplashFile(event) {
   const file = event.target.files?.[0]
   if (!file) return
@@ -213,15 +241,18 @@ async function onSplashFile(event) {
     if (err) throw new Error(err.message || 'فشل رفع الصورة')
     const url = data?.url || data?.data?.url || data?.path || data?.data?.path || ''
     if (!url) throw new Error('تم الرفع دون الحصول على رابط الصورة')
+    // Do not report a successful upload until the public URL is actually readable.
+    await probeSplashImage(url)
     splashImageUrl.value = url
     splashPreviewUrl.value = URL.createObjectURL(file)
     splashError.value = false
-    splashMessage.value = 'تم رفع الصورة. اضغط «حفظ إعلان التشغيل» لنشرها.'
+    splashMessage.value = 'تم رفع الصورة والتحقق من إمكانية فتحها من الخادم. اضغط «حفظ إعلان التشغيل» للنشر.'
   } catch (err) {
     splashError.value = true
     splashMessage.value = err?.message || 'تعذّر رفع صورة الإعلان.'
   } finally {
     splashUploading.value = false
+    event.target.value = ''
   }
 }
 
@@ -263,6 +294,13 @@ async function saveSplashAd() {
     next.updatedAt = new Date().toISOString()
     const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(next) })
     if (err) throw new Error(err.message || 'تعذّر حفظ إعدادات الإعلان')
+    // Read back the public mobile config so we know the saved settings reached the same API.
+    const readBack = await apiClient.get('/config/theme', { params: { splash_verify: Date.now() } })
+    const published = readBack.data?.data || readBack.data
+    const publishedItem = published?.splash?.items?.[0]
+    if (!publishedItem || String(publishedItem.url || '').split('?')[0].split('/').pop() !== String(items[0].url || '').split('?')[0].split('/').pop()) {
+      throw new Error('تم إرسال الحفظ لكن تعذّر تأكيد إعداد السبلاش من واجهة التطبيق العامة.')
+    }
     themeConfig = next
     splashDuration.value = duration
     splashPreviewUrl.value = splashAbsUrl(splashImageUrl.value)
