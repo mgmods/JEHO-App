@@ -434,6 +434,8 @@ public final class MiscDtos {
         @SerializedName("active") public boolean active = true;
         @SerializedName("sortOrder") public int sortOrder = 0;
         @SerializedName("target") public String target;
+        @SerializedName("targetType") public String targetType;
+        @SerializedName("targetId") public String targetId;
         @SerializedName("targetUrl") public String targetUrl;
     }
 
