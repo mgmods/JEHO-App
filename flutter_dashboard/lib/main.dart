@@ -243,7 +243,7 @@ class AdminContent extends StatelessWidget {
     return;
   }
   final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(
-    title:Text(action.$1),
+    title:Text(action=='vanity-grant'?'تأكيد إهداء الآي دي':action=='cosmetic-grant'?'تأكيد إهداء المظهر':'تأكيد منح VIP'),
     content:Text('سيتم تطبيق الإجراء على المستخدم $userId لمدة ${permanent?'دائمة':'$days يومًا'}، هل تؤكد؟'),
     actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))],
   ));
