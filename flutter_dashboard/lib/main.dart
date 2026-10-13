@@ -58,6 +58,16 @@ const modules=<Module>[
  Module('الإشعارات','admin/notifications?page=1&limit=50',Icons.notifications),
  Module('إعدادات الاقتصاد','admin/economy/settings',Icons.tune),
  Module('إعدادات التطبيق','admin/settings',Icons.settings),
+ Module('طلبات CP','admin/cp/requests?page=1&limit=50',Icons.favorite),
+ Module('إعدادات CP','admin/cp/config',Icons.favorite_border),
+ Module('سجل تدقيق CP','admin/cp/audit?page=1&limit=50',Icons.fact_check),
+ Module('التحقق من الجنس','admin/gender-verifications?page=1&limit=50',Icons.verified_user),
+ Module('المشرفون','admin/operators',Icons.admin_panel_settings),
+ Module('صحة النظام','admin/system/health',Icons.health_and_safety),
+ Module('إحصائيات مباشرة','admin/dashboard/live',Icons.monitor_heart),
+ Module('إحصائيات الرسائل المدفوعة','admin/paid-messages/stats',Icons.query_stats),
+ Module('احتمالات الألعاب','admin/games/odds',Icons.casino),
+ Module('إعدادات دفع شام كاش','admin/payment-settings/sham-cash',Icons.payment),
 ];
 class AdminHome extends StatefulWidget {const AdminHome({required this.token,required this.user,super.key});final String token;final Map<String,dynamic> user;@override State<AdminHome> createState()=>_AdminHomeState();}
 class _AdminHomeState extends State<AdminHome>{
