@@ -141,28 +141,65 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _showSeatLock() async {
-    final seat = await showModalBottomSheet<int>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(title: Text('اختر المقعد لقفله')),
-            for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
-              ListTile(
-                leading: CircleAvatar(child: Text('$index')),
-                title: Text('قفل المقعد $index'),
-                onTap: () => Navigator.pop(context, index),
+    final passwordController = TextEditingController();
+    bool lock = true;
+    try {
+      final result = await showDialog<Map<String, Object?>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('قفل الغرفة بكلمة مرور'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: lock,
+                  onChanged: (value) => setDialogState(() => lock = value),
+                  title: Text(lock ? 'تفعيل القفل' : 'إلغاء القفل'),
+                ),
+                if (lock)
+                  TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'كلمة مرور الغرفة'),
+                  ),
+                const SizedBox(height: 8),
+                const Text('هذا يقفل دخول الغرفة بكلمة مرور؛ لا يقفل مقعدًا منفردًا.'),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, {
+                  'locked': lock,
+                  'password': passwordController.text.trim(),
+                }),
+                child: const Text('حفظ'),
               ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-    if (seat == null || !mounted) return;
-    await _roomAction(
-      () => widget.apiClient.lockRoomSeat(widget.accessToken, _roomId, seat),
-      'تم إرسال طلب قفل المقعد.',
-    );
+      );
+      if (result == null || !mounted) return;
+      final shouldLock = result['locked'] == true;
+      final password = (result['password'] ?? '').toString();
+      if (shouldLock && password.isEmpty) {
+        setState(() => _error = 'أدخل كلمة مرور لقفل الغرفة.');
+        return;
+      }
+      await _roomAction(
+        () => widget.apiClient.setRoomLock(
+          widget.accessToken,
+          _roomId,
+          locked: shouldLock,
+          password: password.isEmpty ? null : password,
+        ),
+        shouldLock ? 'تم تفعيل كلمة مرور الغرفة.' : 'تم إلغاء قفل الغرفة.',
+      );
+    } finally {
+      passwordController.dispose();
+    }
   }
 
   Future<void> _sendGiftToHost() async {
@@ -358,7 +395,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
             icon: const Icon(Icons.lock_outline_rounded),
-            label: const Text('قفل مقعد'),
+            label: const Text('قفل الغرفة بكلمة مرور'),
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : () async {
