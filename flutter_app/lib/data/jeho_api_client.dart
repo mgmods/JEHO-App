@@ -212,6 +212,96 @@ class JehoApiClient {
     return <String, dynamic>{};
   }
 
+  // Room lifecycle and moderation (business rules remain enforced by the API).
+  Future<Map<String, dynamic>> createRoom(String token, Map<String, Object?> data) async =>
+      _asMap(await _post('rooms', data, accessToken: token), 'تعذر إنشاء الغرفة.');
+
+  Future<Map<String, dynamic>> joinRoom(String token, String roomId, {String? password}) async =>
+      _asMap(await _post('rooms/$roomId/join', {if (password != null) 'password': password}, accessToken: token), 'تعذر دخول الغرفة.');
+
+  Future<Map<String, dynamic>> leaveRoom(String token, String roomId) async =>
+      _asMap(await _post('rooms/$roomId/leave', const {}, accessToken: token), 'تعذر مغادرة الغرفة.');
+
+  Future<Map<String, dynamic>> takeSeat(String token, String roomId, int seatIndex) async =>
+      _asMap(await _post('rooms/$roomId/seats/take', {'seatIndex': seatIndex}, accessToken: token), 'تعذر حجز المقعد.');
+
+  Future<Map<String, dynamic>> leaveSeat(String token, String roomId) async =>
+      _asMap(await _post('rooms/$roomId/seats/leave', const {}, accessToken: token), 'تعذر مغادرة المقعد.');
+
+  Future<Map<String, dynamic>> raiseHand(String token, String roomId, {bool raised = true, int? seatIndex}) async =>
+      _asMap(await _post('rooms/$roomId/raise-hand', {'raised': raised, if (seatIndex != null) 'seatIndex': seatIndex}, accessToken: token), 'تعذر إرسال طلب المايك.');
+
+  Future<Map<String, dynamic>> sendGift(String token, {required String giftId, required String receiverId, String? roomId, int quantity = 1}) async =>
+      _asMap(await _post('gifts/send', {'giftId': giftId, 'receiverId': receiverId, 'quantity': quantity, if (roomId != null) 'roomId': roomId}, accessToken: token), 'تعذر إرسال الهدية.');
+
+  Future<Map<String, dynamic>> sendMessageAttachment(String token, String conversationId, String url, {required String mimeType, required int size, String? caption}) async =>
+      _asMap(await _post('chat/conversations/$conversationId/messages', {'type': 'media', 'content': caption ?? '', 'media': {'url': url, 'mimeType': mimeType, 'size': size}}, accessToken: token), 'تعذر إرسال المرفق.');
+
+  Future<Map<String, dynamic>> startConversation(String token, String peerId) async =>
+      _asMap(await _post('chat/conversations', {'peerId': peerId}, accessToken: token), 'تعذر بدء المحادثة.');
+
+  Future<Map<String, dynamic>> socialRequest(String token, String userId, {String type = 'friend'}) async =>
+      _asMap(await _post('users/$userId/request', {'type': type}, accessToken: token), 'تعذر إرسال طلب العلاقة.');
+
+  Future<Map<String, dynamic>> respondSocialRequest(String token, String requestId, {required bool accept}) async =>
+      _asMap(await _post('users/me/requests/$requestId/${accept ? 'accept' : 'reject'}', const {}, accessToken: token), 'تعذر تحديث الطلب.');
+
+  Future<List<Map<String, dynamic>>> getIncomingRequests(String token) async =>
+      _asList(await _get('users/me/requests', accessToken: token), ['items', 'results', 'requests', 'data']);
+
+  Future<List<Map<String, dynamic>>> getDailyTasks(String token) async =>
+      _asList(await _get('tasks/daily', accessToken: token), ['items', 'results', 'tasks', 'data']);
+
+  Future<Map<String, dynamic>> claimTask(String token, String taskId) async =>
+      _asMap(await _post('tasks/daily/$taskId/claim', const {}, accessToken: token), 'تعذر استلام المكافأة.');
+
+  Future<Map<String, dynamic>> dailyCheckIn(String token) async =>
+      _asMap(await _post('tasks/checkin', const {}, accessToken: token), 'تعذر تسجيل الحضور.');
+
+  Future<List<Map<String, dynamic>>> getAgencies() async =>
+      _asList(await _get('agencies?page=1&limit=30'), ['items', 'results', 'agencies', 'data']);
+
+  Future<Map<String, dynamic>> getMyAgency(String token) async =>
+      _asMap(await _get('agencies/mine', accessToken: token), 'لا توجد وكالة مرتبطة بالحساب أو تعذر تحميلها.');
+
+  Future<Map<String, dynamic>> applyForAgency(String token, Map<String, Object?> data) async =>
+      _asMap(await _post('agencies/applications', data, accessToken: token), 'تعذر إرسال طلب الوكالة.');
+
+  Future<List<Map<String, dynamic>>> getCpDiscover({String? type}) async {
+    final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
+    return _asList(await _get('cp/discover$suffix'), ['items', 'results', 'data']);
+  }
+
+  Future<Map<String, dynamic>> getCpStatus(String token) async =>
+      _asMap(await _get('cp/me', accessToken: token), 'تعذر تحميل قسم CP.');
+
+  Future<List<Map<String, dynamic>>> getPaymentPackages() async => getRechargePackages();
+
+  Future<Map<String, dynamic>> createRechargeOrder(String token, {required String sku, required String provider, String currency = 'USD'}) async =>
+      _asMap(await _post('wallet/recharge', {'sku': sku, 'provider': provider, 'currency': currency}, accessToken: token), 'تعذر إنشاء طلب الشحن.');
+
+  Future<Map<String, dynamic>> exchangeDiamonds(String token, int diamonds) async =>
+      _asMap(await _post('wallet/exchange', {'diamonds': diamonds}, accessToken: token), 'تعذر تبديل الرصيد.');
+
+  Future<Map<String, dynamic>> createPaymentCheckout(String token, String provider, Map<String, Object?> data) async =>
+      _asMap(await _post('payments/$provider', data, accessToken: token), 'تعذر إنشاء عملية الدفع.');
+
+  Map<String, dynamic> _asMap(dynamic payload, String error) {
+    if (payload is Map<String, dynamic>) return payload;
+    throw JehoApiException(error);
+  }
+
+  List<Map<String, dynamic>> _asList(dynamic payload, List<String> keys) {
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      for (final key in keys) {
+        if (items[key] is List) { items = items[key]; break; }
+      }
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
   Future<Map<String, dynamic>> getWallet(String accessToken) async {
     final payload = await _get('wallet', accessToken: accessToken);
     if (payload is Map<String, dynamic>) return payload;
