@@ -7,6 +7,7 @@ import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
 import 'presentation/conversation_page.dart';
 import 'presentation/feature_pages.dart';
+import 'presentation/feature_hub_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -663,6 +664,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           ),
                           icon: const Icon(Icons.favorite_rounded),
                           label: const Text('CP والعلاقات'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => FeatureHubPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.dashboard_customize_rounded),
+                          label: const Text('المهام والوكالات'),
                         ),
 
 
