@@ -41,9 +41,9 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends ThemedActivity {
     private static final String TAG = "SplashActivity";
-    /** Keep splash short — never wait on network gates. */
+    /** Show the branded fallback briefly, then bypass a slow/unavailable ad request. */
     private static final long SPLASH_MIN_MS = 350L;
-    private static final long SPLASH_MAX_MS = 1800L;
+    private static final long SPLASH_MAX_MS = 4000L;
 
     private boolean navigated;
     private boolean splashDecisionResolved;
