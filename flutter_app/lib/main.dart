@@ -1442,83 +1442,78 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        destinations: [
-          NavigationDestination(
-            icon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_party_normal.svg',
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_party_selected.svg',
-              width: 24,
-              height: 24,
-            ),
-            label: 'الرئيسية',
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(5, 7, 5, 5),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFFEFB),
+            border: Border(top: BorderSide(color: Color(0xFFEDE0CC))),
+            boxShadow: [BoxShadow(color: Color(0x10000000), blurRadius: 12, offset: Offset(0, -3))],
           ),
-          NavigationDestination(
-            icon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_chat_normal.svg',
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_chat_selected.svg',
-              width: 24,
-              height: 24,
-            ),
-            label: 'الرسائل',
+          child: Row(
+            children: [
+              Expanded(child: _originalNavItem(label: 'الرئيسية', selected: _selectedIndex == 0, normalAsset: 'assets/original/icons/ic_home_tab_party_normal.svg', selectedAsset: 'assets/original/icons/ic_home_tab_party_selected.svg', onTap: () => setState(() => _selectedIndex = 0))),
+              Expanded(child: _originalNavItem(label: 'الدراما', selected: _selectedIndex == 4, normalAsset: 'assets/original/icons/ic_home_tab_drama_normal.svg', selectedAsset: 'assets/original/icons/ic_home_tab_drama_selected.svg', onTap: () => setState(() => _selectedIndex = 4))),
+              Expanded(child: _originalNavItem(label: 'الألعاب', selected: _selectedIndex == 3, normalAsset: 'assets/original/icons/ic_home_tab_game_normal.svg', selectedAsset: 'assets/original/icons/ic_home_tab_game_selected.svg', onTap: () => setState(() => _selectedIndex = 3))),
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: _loading ? null : _createRoom,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 1),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                        width: 42, height: 42, padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFFFFD98E), Color(0xFFE4AD4C)]), boxShadow: [BoxShadow(color: Color(0x2A8C641D), blurRadius: 6, offset: Offset(0, 2))]),
+                        child: Image.asset('assets/original/android-res/drawable-xxhdpi/ic_tab_create_room.webp', fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.add_rounded, color: Color(0xFF493512), size: 28)),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text('إنشاء غرفة', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF8C641D))),
+                    ]),
+                  ),
+                ),
+              ),
+              Expanded(child: _originalNavItem(label: 'الرسائل', selected: _selectedIndex == 1, normalAsset: 'assets/original/icons/ic_home_tab_chat_normal.svg', selectedAsset: 'assets/original/icons/ic_home_tab_chat_selected.svg', onTap: () => setState(() => _selectedIndex = 1))),
+              Expanded(child: _originalNavItem(label: 'أنا', selected: _selectedIndex == 2, normalAsset: 'assets/original/icons/ic_home_tab_me_normal.svg', selectedAsset: 'assets/original/icons/ic_home_tab_me_selected.svg', onTap: () => setState(() => _selectedIndex = 2))),
+            ],
           ),
-          NavigationDestination(
-            icon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_me_normal.svg',
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_me_selected.svg',
-              width: 24,
-              height: 24,
-            ),
-            label: 'أنا',
-          ),
-          NavigationDestination(
-            icon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_game_normal.svg',
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_game_selected.svg',
-              width: 24,
-              height: 24,
-            ),
-            label: 'الألعاب',
-          ),
-          NavigationDestination(
-            icon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_drama_normal.svg',
-              width: 24,
-              height: 24,
-            ),
-            selectedIcon: SvgPicture.asset(
-              'assets/original/icons/ic_home_tab_drama_selected.svg',
-              width: 24,
-              height: 24,
-            ),
-            label: 'الدراما',
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
+
+Widget _originalNavItem({
+  required String label,
+  required bool selected,
+  required String normalAsset,
+  required String selectedAsset,
+  required VoidCallback onTap,
+}) =>
+    InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
+              decoration: BoxDecoration(color: selected ? const Color(0xFFFFF0D1) : Colors.transparent, borderRadius: BorderRadius.circular(14)),
+              child: SvgPicture.asset(selected ? selectedAsset : normalAsset, width: 24, height: 24),
+            ),
+            const SizedBox(height: 2),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10, fontWeight: selected ? FontWeight.w900 : FontWeight.w500, color: selected ? const Color(0xFF8C641D) : const Color(0xFF8A8174))),
+          ],
+        ),
+      ),
+    );
 
 Widget _profileMetric({required IconData icon, required String title, required String value, required Color tint}) =>
     Container(
