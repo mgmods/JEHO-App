@@ -415,15 +415,16 @@ public class SplashActivity extends ThemedActivity {
                 resolveAndOpenSplashTarget(type, pendingSplashTargetId.trim());
                 return;
             }
-            if ("external".equals(type) && pendingSplashTarget != null
-                    && pendingSplashTarget.matches("(?i)^https?://.+")) {
+            if ("external".equals(type)) {
                 navigated = true;
                 mainHandler.removeCallbacks(hardTimeout);
                 openMainForSplashRoute(null);
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pendingSplashTarget)));
-                } catch (Throwable error) {
-                    Log.w(TAG, "Could not open splash ad destination", error);
+                if (pendingSplashTarget != null && pendingSplashTarget.matches("(?i)^https?://.+")) {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pendingSplashTarget)));
+                    } catch (Throwable error) {
+                        Log.w(TAG, "Could not open splash ad destination", error);
+                    }
                 }
                 finish();
                 return;
