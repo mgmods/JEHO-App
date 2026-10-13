@@ -413,9 +413,6 @@ class JehoApiClient {
   Future<Map<String, dynamic>> getAgencyPricing() async =>
       _asMap(await _get('agencies/pricing'), 'تعذر تحميل أسعار الوكالات.');
 
-  Future<List<Map<String, dynamic>>> getAgencies({int page = 1, int limit = 20}) async =>
-      _asList(await _get('agencies?page=${page < 1 ? 1 : page}&limit=${limit.clamp(1, 50)}'), ['items', 'results', 'agencies', 'data']);
-
   Future<Map<String, dynamic>> getAgency(String agencyId, {String? token}) async =>
       _asMap(await _get('agencies/${Uri.encodeComponent(agencyId)}', accessToken: token), 'تعذر تحميل بيانات الوكالة.');
 
@@ -606,8 +603,8 @@ class JehoApiClient {
   Future<Map<String, dynamic>> dailyCheckIn(String token) async =>
       _asMap(await _post('tasks/checkin', const {}, accessToken: token), 'تعذر تسجيل الحضور.');
 
-  Future<List<Map<String, dynamic>>> getAgencies() async =>
-      _asList(await _get('agencies?page=1&limit=30'), ['items', 'results', 'agencies', 'data']);
+  Future<List<Map<String, dynamic>>> getAgencies({int page = 1, int limit = 30}) async =>
+      _asList(await _get('agencies?page=${page < 1 ? 1 : page}&limit=${limit.clamp(1, 50)}'), ['items', 'results', 'agencies', 'data']);
 
   Future<List<Map<String, dynamic>>> getAgencyJoinRequests(String token, String agencyId) async =>
       _asList(await _get('agencies/$agencyId/join-requests', accessToken: token), ['items', 'results', 'requests', 'data']);
