@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 
 /** Pretty numerical IDs with length-based coins. Seeded when catalog is empty. */
@@ -38,9 +38,16 @@ export class VanityIdsService implements OnModuleInit {
   constructor(
     @InjectRepository(VanityId)
     private readonly vanityRepo: Repository<VanityId>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async onModuleInit() {
+    try {
+      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
+      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
+    } catch (e) {
+      this.log.warn(`vanity target columns ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
+    }
     try {
       let added = 0;
       for (const seed of SEED_CATALOG) {
