@@ -31,6 +31,11 @@ jobs:
           channel: stable
           cache: true
 
+      # Generate only the missing Android platform scaffold in the CI workspace.
+      # No production Android files are changed or overwritten.
+      - name: Generate Android platform scaffold
+        run: flutter create --platforms=android --project-name jeho_own_flutter --org com.jehoown .
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -39,3 +44,14 @@ jobs:
 
       - name: Widget tests
         run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeho-own-flutter-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
