@@ -1331,6 +1331,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
+                              builder: (_) => GiftHistoryPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.history_rounded),
+                          label: const Text('سجل الهدايا'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
                               builder: (_) => CosmeticsPage(
                                 apiClient: widget.apiClient,
                                 accessToken: widget.session['accessToken']?.toString() ?? '',
