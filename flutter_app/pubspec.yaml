@@ -28,6 +28,7 @@ flutter:
     - assets/original/icons/
     - assets/original/lottie/
     - assets/original/visual-system/gifts/assets/
+    - assets/original/visual-system/host-frames/assets/
     - assets/original/android-res/drawable-hdpi/
     - assets/original/android-res/drawable-ldrtl-xxhdpi/
     - assets/original/android-res/drawable-mdpi/
