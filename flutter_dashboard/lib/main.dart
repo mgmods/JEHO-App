@@ -158,10 +158,11 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/agencies?'))return [('تعليق الوكالة','agency-suspend',Icons.pause_circle_outline)];
   if(path.startsWith('admin/recharge-agents/applications'))return [('قبول طلب الوكيل','agent-approve',Icons.check_circle),('رفض طلب الوكيل','agent-reject',Icons.cancel)];
   if(path.startsWith('admin/contests'))return [('إنهاء المسابقة','contest-end',Icons.flag_circle)];
+  if(path.startsWith('admin/streams'))return [('إنهاء البث','stream-end',Icons.stop_circle)];
   return const [];
  }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
-  final id=(row['id']??row['applicationId']??row['reportId']??'').toString();
+  final id=(row['id']??row['applicationId']??row['reportId']??row['streamId']??row['userId']??'').toString();
   if(id.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('لا يوجد معرّف واضح لهذا العنصر.')));return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
@@ -183,6 +184,7 @@ class AdminContent extends StatelessWidget {
    case 'agent-approve': endpoint='admin/recharge-agents/applications/$id/approve'; break;
    case 'agent-reject': endpoint='admin/recharge-agents/applications/$id/reject'; body={'reason':'رفض من لوحة الإدارة'}; break;
    case 'contest-end': endpoint='admin/contests/$id/end'; break;
+   case 'stream-end': endpoint='admin/streams/$id/end'; break;
    case 'gender-reject': endpoint='admin/gender-verifications/$id/reject'; break;
    default: throw StateError('إجراء غير معروف: '+action.$2);
   }
