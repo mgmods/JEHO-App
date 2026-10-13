@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/jeho_api_client.dart';
 
@@ -490,8 +491,48 @@ class _ConversationPageState extends State<ConversationPage> {
                                           );
                                         }
                                         return Padding(
-                                          padding: const EdgeInsets.only(bottom: 6),
-                                          child: SelectableText('مرفق: ${media['mimeType'] ?? type}\\n$resolved'),
+                                          padding: const EdgeInsets.only(bottom: 8),
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 250),
+                                            child: OutlinedButton.icon(
+                                              onPressed: () async {
+                                                final uri = Uri.tryParse(resolved);
+                                                if (uri == null ||
+                                                    (uri.scheme != 'https' &&
+                                                        uri.scheme != 'http')) {
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('رابط المرفق غير صالح.')),
+                                                    );
+                                                  }
+                                                  return;
+                                                }
+                                                final opened = await launchUrl(
+                                                  uri,
+                                                  mode: LaunchMode.externalApplication,
+                                                );
+                                                if (!opened && context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(content: Text('تعذر فتح المرفق.')),
+                                                  );
+                                                }
+                                              },
+                                              icon: Icon(
+                                                type == 'video'
+                                                    ? Icons.play_circle_outline_rounded
+                                                    : type == 'audio'
+                                                        ? Icons.audio_file_rounded
+                                                        : Icons.attach_file_rounded,
+                                              ),
+                                              label: Flexible(
+                                                child: Text(
+                                                  'فتح المرفق · ${media['mimeType'] ?? type}',
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
                                         );
                                       }),
                                     ],
