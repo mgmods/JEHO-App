@@ -383,8 +383,9 @@ export class ConfigController {
   }
 
   @Public()
+  @Public()
   @Get('theme')
-  @ApiOperation({ summary: 'Remote app theme/assets managed from server settings' })
+  @ApiOperation({ summary: 'Public remote app theme/assets, including startup splash ads' })
   async theme() {
     const row = await this.settingsRepo.findOne({ where: { key: 'app_theme' } });
     const defaults = {
