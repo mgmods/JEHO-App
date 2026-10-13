@@ -17,7 +17,7 @@ permissions:
 
 # Keep only the newest validation for this branch/PR; stale queued builds are wasteful.
 concurrency:
-  group: flutter-client-checks-${{ github.event.pull_request.number || github.ref }}
+  group: flutter-client-checks-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
