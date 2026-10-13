@@ -433,8 +433,135 @@ class JehoApiClient {
   Future<Map<String, dynamic>> exchangeDiamonds(String token, int diamonds) async =>
       _asMap(await _post('wallet/exchange', {'diamonds': diamonds}, accessToken: token), 'تعذر تبديل الرصيد.');
 
-  Future<Map<String, dynamic>> createPaymentCheckout(String token, String provider, Map<String, Object?> data) async =>
-      _asMap(await _post('payments/$provider', data, accessToken: token), 'تعذر إنشاء عملية الدفع.');
+  /// Provider-specific checkout paths mirror PaymentsController exactly.
+  /// Never send arbitrary provider names to a guessed /payments/:provider URL.
+  Future<Map<String, dynamic>> createPaymentCheckout(
+    String token,
+    String provider,
+    Map<String, Object?> data,
+  ) async {
+    final normalized = provider.trim().toLowerCase().replaceAll('_', '-');
+    final routes = <String, String>{
+      'stripe': 'payments/stripe/checkout',
+      'fourthwall': 'payments/fourthwall/checkout',
+      'paypal': 'payments/paypal/create',
+      'google-play': 'payments/google-play/verify',
+      'googleplay': 'payments/google-play/verify',
+      'crypto': 'payments/crypto/orders',
+      'binance-wallet': 'payments/binance-wallet/orders',
+      'binance-wallet-deposit-address': 'payments/binance-wallet/deposit-address',
+      'binance-pay': 'payments/binance-pay/orders',
+      'sham-cash': 'payments/sham-cash/orders',
+      'shamcash': 'payments/sham-cash/orders',
+    };
+    final route = routes[normalized];
+    if (route == null) {
+      throw const JehoApiException('طريقة الدفع غير مدعومة. اختر طريقة ظاهرة في إعدادات الخادم.');
+    }
+    return _asMap(
+      await _post(route, data, accessToken: token),
+      'تعذر إنشاء عملية الدفع.',
+    );
+  }
+
+  Future<Map<String, dynamic>> getWalletEconomyConfig() async =>
+      _asMap(await _get('wallet/economy-config'), 'تعذر تحميل إعدادات المحفظة.');
+
+  Future<List<Map<String, dynamic>>> getWithdrawPackages() async =>
+      _asList(await _get('wallet/withdraw-packages'), ['items', 'results', 'packages', 'data']);
+
+  Future<List<Map<String, dynamic>>> getMyWithdrawals(String token) async =>
+      _asList(await _get('wallet/withdraws?page=1&limit=30', accessToken: token), ['items', 'results', 'withdraws', 'data']);
+
+  Future<Map<String, dynamic>> requestWithdrawal(
+    String token, {
+    required int diamonds,
+    required String method,
+    required Map<String, Object?> payoutDetails,
+    String? agentId,
+  }) async =>
+      _asMap(
+        await _post('wallet/withdraw', {
+          'diamonds': diamonds,
+          'method': method,
+          'payoutDetails': payoutDetails,
+          if (agentId != null && agentId.isNotEmpty) 'agentId': agentId,
+        }, accessToken: token),
+        'تعذر إرسال طلب السحب.',
+      );
+
+  Future<Map<String, dynamic>> createCpRequest(
+    String token, {
+    required String recipientId,
+    required String type,
+    required String roomId,
+    required String idempotencyKey,
+  }) async =>
+      _asMap(
+        await _post('cp/requests', {
+          'recipientId': recipientId,
+          'type': type,
+          'roomId': roomId,
+          'idempotencyKey': idempotencyKey,
+        }, accessToken: token),
+        'تعذر إرسال طلب CP.',
+      );
+
+  Future<List<Map<String, dynamic>>> getCpRequests(String token) async =>
+      _asList(await _get('cp/requests', accessToken: token), ['items', 'results', 'requests', 'data']);
+
+  Future<Map<String, dynamic>> respondCpRequest(
+    String token,
+    String requestId, {
+    required bool accept,
+  }) async =>
+      _asMap(
+        await _post('cp/requests/$requestId/respond', {'accept': accept}, accessToken: token),
+        'تعذر الرد على طلب CP.',
+      );
+
+  Future<Map<String, dynamic>> cancelCpRequest(String token, String requestId) async =>
+      _asMap(await _post('cp/requests/$requestId/cancel', const {}, accessToken: token), 'تعذر إلغاء طلب CP.');
+
+  Future<Map<String, dynamic>> endCpRelationship(String token, String relationshipId) async =>
+      _asMap(await _post('cp/$relationshipId/end', const {}, accessToken: token), 'تعذر إنهاء العلاقة.');
+
+  Future<Map<String, dynamic>> followUser(String token, String userId, {required bool follow}) async {
+    final payload = follow
+        ? await _post('users/$userId/follow', const {}, accessToken: token)
+        : await _delete('users/$userId/follow', accessToken: token);
+    return _asMap(payload, 'تعذر تحديث المتابعة.');
+  }
+
+  Future<Map<String, dynamic>> blockUser(String token, String userId, {String? reason}) async =>
+      _asMap(await _post('users/$userId/block', {if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim()}, accessToken: token), 'تعذر حظر المستخدم.');
+
+  Future<Map<String, dynamic>> unblockUser(String token, String userId) async =>
+      _asMap(await _delete('users/$userId/block', accessToken: token), 'تعذر إلغاء الحظر.');
+
+  Future<Map<String, dynamic>> endSocialBond(String token, String userId, {String? type}) async {
+    final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
+    return _asMap(await _delete('users/$userId/bond$suffix', accessToken: token), 'تعذر إنهاء العلاقة.');
+  }
+
+  Future<List<Map<String, dynamic>>> getMyBlocks(String token) async =>
+      _asList(await _get('users/me/blocks?page=1&limit=30', accessToken: token), ['items', 'results', 'blocks', 'data']);
+
+  Future<Map<String, dynamic>> pollPaymentOrder(String token, String provider, String orderId) async {
+    final normalized = provider.trim().toLowerCase().replaceAll('_', '-');
+    final routes = <String, String>{
+      'fourthwall': 'payments/fourthwall/orders/$orderId',
+      'sham-cash': 'payments/sham-cash/orders/$orderId',
+      'shamcash': 'payments/sham-cash/orders/$orderId',
+      'binance-wallet': 'payments/binance-wallet/orders/$orderId',
+      'binance-pay': 'payments/binance-pay/orders/$orderId',
+    };
+    final route = routes[normalized];
+    if (route == null) {
+      throw const JehoApiException('لا تتوفر حالة طلب لهذه الطريقة.');
+    }
+    return _asMap(await _get(route, accessToken: token), 'تعذر قراءة حالة طلب الدفع.');
+  }
 
   Map<String, dynamic> _asMap(dynamic payload, String error) {
     if (payload is Map<String, dynamic>) return payload;
