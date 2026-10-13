@@ -217,8 +217,8 @@ class _WalletPageState extends State<WalletPage> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     _BalanceTile(label: 'الماس', value: balances['diamonds'] ?? balances['diamondBalance'] ?? '—', icon: Icons.diamond_rounded),
-                    _BalanceTile(label: 'عملات', value: balances['coins'] ?? balances['coinBalance'] ?? '—', icon: Icons.monetization_on_rounded),
-                    _BalanceTile(label: 'رصيد إضافي', value: balances['balance'] ?? balances['credits'] ?? '—', icon: Icons.account_balance_wallet_rounded),
+                    _BalanceTile(label: 'العملات', value: balances['coins'] ?? balances['coinBalance'] ?? '—', icon: Icons.monetization_on_rounded),
+                    _BalanceTile(label: 'ألماس قابل للسحب', value: balances['personalDiamonds'] ?? balances['diamonds'] ?? '—', icon: Icons.account_balance_wallet_rounded),
                     const SizedBox(height: 12),
                     const Text('الرصيد معروض من الخادم الحالي. عمليات الشحن والسحب والتبديل لم تُفعّل من هذه الشاشة بعد.'),
                   ],
@@ -295,8 +295,8 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                         itemBuilder: (context, index) {
                           final gift = _gifts[index];
                           final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
-                          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
-                          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
+                          final cost = gift['coinPrice'] ?? gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
+                          final image = (gift['animationUrl'] ?? gift['iconUrl'] ?? gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
                           return Card(
                             clipBehavior: Clip.antiAlias,
                             child: Padding(
