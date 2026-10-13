@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
@@ -169,6 +172,33 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     }
   }
 
+  Future<void> _changeAvatar() async {
+    final token = widget.session['accessToken']?.toString() ?? '';
+    if (token.isEmpty) return;
+    try {
+      final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 86, maxWidth: 1200, maxHeight: 1200);
+      if (picked == null || !mounted) return;
+      final url = await widget.apiClient.uploadImage(token, File(picked.path));
+      final updated = await widget.apiClient.updateMyProfile(token, {'avatarUrl': url});
+      if (!mounted) return;
+      setState(() => _profile = {...?_profile, ...updated, 'avatarUrl': url});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحديث الصورة الشخصية.')));
+    } on JehoApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر اختيار الصورة أو رفعها. حاول مرة أخرى.')));
+    }
+  }
+
+  String _resolveMediaUrl(String value) {
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl);
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
   Future<void> _editProfile(Map<String, dynamic> activeUser) async {
     final token = widget.session['accessToken']?.toString() ?? '';
     if (token.isEmpty) return;
@@ -301,11 +331,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       color: const Color(0xFFFFE7B0),
                       borderRadius: BorderRadius.circular(26),
                     ),
-                    child: Icon(
-                      section.icon,
-                      size: 46,
-                      color: const Color(0xFF8C641D),
-                    ),
+                    child: _selectedIndex == 2 &&
+                            (activeUser['avatarUrl'] ?? '').toString().isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Image.network(
+                              _resolveMediaUrl((activeUser['avatarUrl'] ?? '').toString()),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(section.icon, size: 46, color: const Color(0xFF8C641D)),
+                            ),
+                          )
+                        : Icon(section.icon, size: 46, color: const Color(0xFF8C641D)),
                   ),
                   const SizedBox(height: 22),
                   Text(
@@ -567,6 +603,12 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     ],
                     const SizedBox(height: 18),
                     FilledButton.icon(
+                      onPressed: _loading ? null : _changeAvatar,
+                      icon: const Icon(Icons.add_a_photo_rounded),
+                      label: const Text('تغيير الصورة الشخصية'),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonalIcon(
                       onPressed: _loading ? null : () => _editProfile(activeUser),
                       icon: const Icon(Icons.edit_rounded),
                       label: const Text('تعديل الملف الشخصي'),
