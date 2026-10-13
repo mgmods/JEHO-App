@@ -441,7 +441,14 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
         ? _theme['backgrounds'] as Map<String, dynamic>
         : <String, dynamic>{};
     final sectionKey = _selectedIndex == 0 ? 'home' : _selectedIndex == 1 ? 'chat' : 'profile';
-    final wallpaper = (backgrounds['allSections'] ?? backgrounds[sectionKey] ?? backgrounds['app'] ?? '').toString().trim();
+    final sharedWallpaper = (backgrounds['allSections'] ?? '').toString().trim();
+    final sectionWallpaper = (backgrounds[sectionKey] ?? '').toString().trim();
+    final appWallpaper = (backgrounds['app'] ?? '').toString().trim();
+    final wallpaper = sharedWallpaper.isNotEmpty
+        ? sharedWallpaper
+        : sectionWallpaper.isNotEmpty
+            ? sectionWallpaper
+            : appWallpaper;
 
     return Scaffold(
       appBar: AppBar(
@@ -479,7 +486,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          if (wallpaper.startsWith('https://') || wallpaper.startsWith('http://'))
+          if (wallpaper.isNotEmpty)
             Positioned.fill(
               child: Image.network(
                 _resolveMediaUrl(wallpaper),
