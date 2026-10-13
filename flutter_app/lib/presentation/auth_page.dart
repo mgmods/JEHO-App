@@ -317,9 +317,12 @@ class _AuthPageState extends State<AuthPage> {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      'واجهة Flutter تجريبية مستقلة؛ التطبيق الحالي لم يتم استبداله.',
+                      'تواصل مع أصدقائك، واكتشف الغرف والمجتمعات في JEHO',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.black54),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF756966),
+                        height: 1.5,
+                      ),
                     ),
                   ],
                 ),
