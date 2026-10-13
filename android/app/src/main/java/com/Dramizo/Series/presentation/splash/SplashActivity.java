@@ -473,6 +473,13 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void resolveAndOpenSplashTarget(String type, String publicId) {
+        final Runnable targetTimeout = () -> {
+            if (isFinishing()) return;
+            Log.w(TAG, "Splash target lookup timed out; falling back to home");
+            openMainForSplashRoute(null);
+            finish();
+        };
+        mainHandler.postDelayed(targetTimeout, 5000L);
         try {
             AppContainer c = ContainerProvider.from(this);
             c.getIoExecutor().execute(() -> {
@@ -486,6 +493,7 @@ public class SplashActivity extends ThemedActivity {
                 }
                 MiscDtos.SplashTargetDto finalResolved = resolved;
                 runOnUiThread(() -> {
+                    mainHandler.removeCallbacks(targetTimeout);
                     if (isFinishing()) return;
                     if (finalResolved == null || !finalResolved.found || finalResolved.id == null
                             || finalResolved.id.trim().isEmpty()) {
@@ -516,6 +524,7 @@ public class SplashActivity extends ThemedActivity {
                 });
             });
         } catch (Throwable error) {
+            mainHandler.removeCallbacks(targetTimeout);
             Log.w(TAG, "Splash target lookup unavailable", error);
             openMainForSplashRoute(null);
             finish();
