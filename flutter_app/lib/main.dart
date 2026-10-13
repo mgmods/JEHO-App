@@ -173,6 +173,125 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     }
   }
 
+  Future<void> _createRoom() async {
+    final token = widget.session['accessToken']?.toString() ?? '';
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('سجّل الدخول أولًا لإنشاء غرفة.')),
+      );
+      return;
+    }
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    int seatCount = 11;
+    try {
+      final form = await showDialog<Map<String, Object?>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('إنشاء غرفة جديدة'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    autofocus: true,
+                    maxLength: 128,
+                    decoration: const InputDecoration(labelText: 'اسم الغرفة'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descriptionController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(labelText: 'وصف الغرفة (اختياري)'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: seatCount,
+                    decoration: const InputDecoration(labelText: 'عدد المقاعد'),
+                    items: [2, 5, 8, 11, 15, 20, 30]
+                        .map((count) => DropdownMenuItem<int>(
+                              value: count,
+                              child: Text('$count مقعد'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) setDialogState(() => seatCount = value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, {
+                  'title': titleController.text.trim(),
+                  'description': descriptionController.text.trim(),
+                  'seatCount': seatCount,
+                  'type': 'voice',
+                  'preferPersonal': true,
+                }),
+                child: const Text('إنشاء'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (form == null || !mounted) return;
+      final title = (form['title'] ?? '').toString();
+      if (title.length < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('اكتب اسمًا للغرفة من حرفين على الأقل.')),
+        );
+        return;
+      }
+      final created = await widget.apiClient.createRoom(token, form);
+      if (!mounted) return;
+      final room = created['room'] is Map<String, dynamic>
+          ? created['room'] as Map<String, dynamic>
+          : created;
+      await _loadHomeData();
+      if (!mounted) return;
+      final roomId = (room['id'] ?? room['roomId'] ?? '').toString();
+      if (roomId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم إرسال طلب الإنشاء، لكن الخادم لم يُرجع معرّف الغرفة لفتحها.')),
+        );
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => RoomDetailPage(
+            apiClient: widget.apiClient,
+            accessToken: token,
+            room: room,
+          ),
+        ),
+      );
+      if (mounted) await _loadHomeData();
+    } on JehoApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تعذر إنشاء الغرفة. حاول مرة أخرى.')),
+        );
+      }
+    } finally {
+      titleController.dispose();
+      descriptionController.dispose();
+    }
+  }
+
   Future<void> _changeAvatar() async {
     final token = widget.session['accessToken']?.toString() ?? '';
     if (token.isEmpty) return;
@@ -377,6 +496,15 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _loading ? null : _createRoom,
+                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        label: const Text('إنشاء غرفة'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     if (_loading)
                       const Padding(
                         padding: EdgeInsets.all(24),
@@ -577,7 +705,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       }),
                     const SizedBox(height: 8),
                     const Text(
-                      'يمكنك فتح المحادثة من القائمة وإرسال الرسائل النصية. الوسائط والميزات المتقدمة لم تُنقل بعد.',
+                      'يمكنك فتح المحادثة وإرسال النصوص والصور والملفات. تستمر إضافة بقية أدوات الرسائل تدريجيًا.',
                       textAlign: TextAlign.center,
                     ),
                   ] else ...[
@@ -695,7 +823,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     ),
                     const SizedBox(height: 18),
                     const Text(
-                      'يمكنك تعديل الاسم والنبذة، ومراجعة رصيد المحفظة وكتالوج الهدايا. بقية وظائف الحساب تنتقل تدريجيًا.',
+                      'تجد هنا الملف الشخصي والمحفظة والشحن والهدايا والإطارات والآي دي والعلاقات والمهام والوكالات.',
                       textAlign: TextAlign.center,
                     ),
                   ],
