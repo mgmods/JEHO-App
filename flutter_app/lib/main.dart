@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+const Color _brandColor = Color(0xFFB68A35);
+
 const String apiBaseUrl = String.fromEnvironment(
   'JEHO_API_BASE_URL',
   defaultValue: 'https://jeho-own-backend.mgs.blitz.cloud/api/v1/',
@@ -14,8 +16,6 @@ class JehoOwnApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const brandColor = Color(0xFFB68A35);
-
     return MaterialApp(
       title: 'JEHO-OWN',
       debugShowCheckedModeBanner: false,
@@ -23,7 +23,7 @@ class JehoOwnApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: brandColor,
+          seedColor: _brandColor,
           brightness: Brightness.light,
         ),
         scaffoldBackgroundColor: const Color(0xFFFFFBF3),
@@ -97,10 +97,10 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       color: const Color(0xFFFFE7B0),
                       borderRadius: BorderRadius.circular(26),
                     ),
-                    child: const Icon(
-                      Icons.forum_rounded,
+                    child: Icon(
+                      section.icon,
                       size: 46,
-                      color: Color(0xFF8C641D),
+                      color: const Color(0xFF8C641D),
                     ),
                   ),
                   const SizedBox(height: 22),
@@ -126,7 +126,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.shield_outlined, color: brandColor),
+                          const Icon(Icons.shield_outlined, color: _brandColor),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
