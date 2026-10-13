@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_home_full_gradient">
+    android:background="#F0F3F0">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -34,8 +34,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="14dp"
-            android:paddingTop="12dp">
+            android:paddingHorizontal="12dp"
+            android:paddingTop="0dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -43,13 +43,15 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
-                android:padding="16dp"
-                android:background="@drawable/bg_profile_lux_card">
+                android:paddingTop="18dp"
+                android:paddingBottom="10dp"
+                android:paddingHorizontal="8dp"
+                android:background="@android:color/transparent">
 
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgProfileAvatar"
-                    android:layout_width="76dp"
-                    android:layout_height="76dp"
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
                     android:contentDescription="@string/tab_me_home"
                     android:scaleType="centerCrop"
                     android:src="@drawable/ic_default_avatar"
@@ -72,7 +74,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="عضو جيهو"
-                            android:textColor="#3B2B17"
+                            android:textColor="#262626"
                             android:textSize="20sp"
                             android:textStyle="bold" />
                         <TextView
@@ -92,8 +94,8 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
                         android:text="ID —"
-                        android:textColor="#806A4A"
-                        android:textSize="12sp" />
+                        android:textColor="#777777"
+                        android:textSize="14sp" />
 
                     <TextView
                         android:id="@+id/tvProfileBio"
@@ -124,8 +126,8 @@
             <LinearLayout
                 android:id="@+id/actionEditProfileTop"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:layout_marginTop="10dp"
+                android:layout_height="0dp"
+                android:layout_marginTop="0dp"
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
