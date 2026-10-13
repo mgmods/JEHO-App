@@ -234,6 +234,52 @@ class JehoApiClient {
   Future<Map<String, dynamic>> banRoomUser(String token, String roomId, String userId, {int durationMinutes = 30}) async =>
       _asMap(await _post('rooms/$roomId/ban', {'userId': userId, 'durationMinutes': durationMinutes}, accessToken: token), 'تعذر حظر المستخدم.');
 
+  Future<Map<String, dynamic>> forceLeaveSeat(String token, String roomId, String userId, {String? reason}) async =>
+      _asMap(await _post('rooms/$roomId/seats/force-leave', {'userId': userId, if (reason != null) 'reason': reason}, accessToken: token), 'تعذر إنزال المستخدم من المقعد.');
+
+  Future<Map<String, dynamic>> setRoomGiftSounds(String token, String roomId, {required bool enabled}) async =>
+      _asMap(await _post('rooms/$roomId/gift-sounds', {'enabled': enabled}, accessToken: token), 'تعذر تحديث أصوات الهدايا.');
+
+  Future<Map<String, dynamic>> setRoomDisplaySettings(String token, String roomId, Map<String, Object?> settings) async =>
+      _asMap(await _post('rooms/$roomId/display-settings', settings, accessToken: token), 'تعذر تحديث إعدادات عرض الغرفة.');
+
+  Future<Map<String, dynamic>> clearRoomChat(String token, String roomId) async =>
+      _asMap(await _post('rooms/$roomId/chat/clear', const {}, accessToken: token), 'تعذر مسح دردشة الغرفة.');
+
+  Future<Map<String, dynamic>> setRoomChatAutoClear(String token, String roomId, int minutes) async =>
+      _asMap(await _post('rooms/$roomId/chat/auto-clear', {'minutes': minutes}, accessToken: token), 'تعذر تحديث مؤقت مسح الدردشة.');
+
+  Future<Map<String, dynamic>> closeRoom(String token, String roomId) async =>
+      _asMap(await _post('rooms/$roomId/close', const {}, accessToken: token), 'تعذر إنهاء الغرفة.');
+
+  Future<Map<String, dynamic>> followRoom(String token, String roomId, {required bool follow}) async {
+    final result = follow
+        ? await _post('rooms/$roomId/follow', const {}, accessToken: token)
+        : await _delete('rooms/$roomId/follow', accessToken: token);
+    return _asMap(result, 'تعذر تحديث متابعة الغرفة.');
+  }
+
+  Future<Map<String, dynamic>> sendAllMicGift(String token, {required String giftId, required List<String> receiverIds, required String roomId, int quantity = 1}) async =>
+      _asMap(await _post('gifts/send-all-mic', {'giftId': giftId, 'receiverIds': receiverIds, 'roomId': roomId, 'quantity': quantity}, accessToken: token), 'تعذر إرسال الهدية الجماعية.');
+
+  Future<List<Map<String, dynamic>>> getGiftHistory(String token) async =>
+      _asList(await _get('gifts/history?page=1&limit=30', accessToken: token), ['items', 'results', 'history', 'data']);
+
+  Future<List<Map<String, dynamic>>> getVanityIds() async =>
+      _asList(await _get('vanity-ids'), ['items', 'results', 'data']);
+
+  Future<Map<String, dynamic>> getMyVanityId(String token) async =>
+      _asMap(await _get('vanity-ids/mine', accessToken: token), 'تعذر تحميل الآي دي المميز.');
+
+  Future<Map<String, dynamic>> reserveVanityId(String token, String publicId) async =>
+      _asMap(await _post('vanity-ids/id/$publicId/reserve', const {}, accessToken: token), 'تعذر حجز الآي دي.');
+
+  Future<Map<String, dynamic>> purchaseVanityId(String token, String publicId) async =>
+      _asMap(await _post('vanity-ids/id/$publicId/purchase', const {}, accessToken: token), 'تعذر شراء الآي دي.');
+
+  Future<List<Map<String, dynamic>>> getMyApplications(String token) async =>
+      _asList(await _get('agencies/applications/mine', accessToken: token), ['items', 'results', 'applications', 'data']);
+
   Future<Map<String, dynamic>> setRoomPasswordLock(
     String token,
     String roomId, {
