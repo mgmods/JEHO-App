@@ -116,6 +116,86 @@ class _DiscoveryHubPageState extends State<DiscoveryHubPage> {
     }
   }
 
+  Future<void> _openLuckyWheel() async {
+    try {
+      final state = await widget.apiClient.getLuckyWheelState(widget.accessToken);
+      if (!mounted) return;
+      final config = state['config'] is Map<String, dynamic>
+          ? state['config'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      final rawChips = config['chips'];
+      final chips = rawChips is List
+          ? rawChips.whereType<num>().map((value) => value.toInt()).toList()
+          : <int>[];
+      final minBet = (config['minBet'] as num?)?.toInt() ?? 100;
+      final maxBet = (config['maxBet'] as num?)?.toInt() ?? 10000;
+      if (chips.isEmpty) chips.add(minBet);
+      var amount = chips.first;
+      final chosen = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('عجلة الحظ'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('رصيدك: ${_str(state['balance'], '0')} كوينز'),
+                const SizedBox(height: 10),
+                const Text('اختر قيمة الرهان. يمكن خسارة المبلغ المختار.'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: amount,
+                  items: chips.map((chip) => DropdownMenuItem<int>(value: chip, child: Text('$chip كوينز'))).toList(),
+                  onChanged: (value) { if (value != null) setDialogState(() => amount = value); },
+                  decoration: const InputDecoration(labelText: 'قيمة الرهان'),
+                ),
+                const SizedBox(height: 8),
+                Text('الحدود المعتمدة من الخادم: $minBet – $maxBet كوينز', style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, amount),
+                child: const Text('تأكيد الرهان واللف'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (chosen == null || !mounted) return;
+      if (chosen < minBet || chosen > maxBet) {
+        setState(() => _error = 'قيمة الرهان خارج الحدود التي أعادها الخادم.');
+        return;
+      }
+      setState(() { _busy = true; _error = null; });
+      try {
+        final result = await widget.apiClient.spinLuckyWheel(widget.accessToken, {'amount': chosen});
+        if (!mounted) return;
+        final resultText = result.entries
+            .where((entry) => entry.value == null || entry.value is String || entry.value is num || entry.value is bool)
+            .map((entry) => '${entry.key}: ${entry.value ?? '—'}')
+            .join('\n');
+        await showDialog<void>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('نتيجة عجلة الحظ'),
+            content: SelectableText(resultText.isEmpty ? 'أعاد الخادم نتيجة اللفة.' : resultText),
+            actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إغلاق'))],
+          ),
+        );
+        if (mounted) await _load();
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر فتح عجلة الحظ أو قراءة نتيجتها.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -362,9 +442,18 @@ class _DiscoveryHubPageState extends State<DiscoveryHubPage> {
             ),
           ),
         ),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.casino_outlined, color: _gold, size: 32),
+            title: const Text('عجلة الحظ'),
+            subtitle: const Text('تُعرض قيمة الرهان والحدود من الخادم قبل التأكيد.'),
+            trailing: const Icon(Icons.chevron_left_rounded),
+            onTap: _busy ? null : _openLuckyWheel,
+          ),
+        ),
         const Padding(
           padding: EdgeInsets.all(8),
-          child: Text('عمليات اللعب والمكافآت تُعتمد من الخادم؛ لن يُعرض رصيد أو مكسب محلي غير مؤكد.'),
+          child: Text('عمليات اللعب والمكافآت تُعتمد من الخادم. راجع قيمة الرهان قبل التأكيد؛ قد تخسر المبلغ المختار.'),
         ),
       ],
     );
