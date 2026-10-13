@@ -25,6 +25,8 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 - Profile display name/bio editing and avatar upload.
 - Direct-message list, message history, text sending, image/file attachment upload and sending, media rendering, message edit/unsend, mute/pin/archive/delete-for-me controls.
 - Initial Flutter drama catalog connected to the existing `drama/config`, `drama/series`, series detail, view, like, and episode playback routes. This is a partial port; player reward timing, all native player behaviors, and remaining app screens still require parity work.
+- Initial Flutter games catalog reads Dashboard-controlled `config/games` and `config/offers`, opens configured web games, and applies the Dashboard `games` wallpaper when supplied. Native-only game modes, offline bundled game assets, daily task claiming, contests, and game store are not yet at parity.
+- Flutter home/profile, drama, and games surfaces now read the existing `config/theme` background configuration; image loading is optional and does not block navigation.
 - Wallet balances and transaction history, recharge packages and hosted checkout launch, withdrawal request submission, and withdrawal-status API support.
 - Gift catalog, sending gifts, gift history API, and room gift-to-host flow.
 - Cosmetics catalog/inventory, purchase/equip/unequip API and UI.
