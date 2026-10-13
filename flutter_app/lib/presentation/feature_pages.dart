@@ -77,8 +77,37 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _enterRoom() async {
+    String? password;
+    final isLocked = widget.room['isLocked'] == true ||
+        widget.room['hasPassword'] == true ||
+        widget.room['passwordProtected'] == true;
+    if (isLocked) {
+      final controller = TextEditingController();
+      try {
+        password = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('الغرفة محمية بكلمة مرور'),
+            content: TextField(
+              controller: controller,
+              obscureText: true,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'كلمة المرور'),
+              onSubmitted: (_) => Navigator.pop(dialogContext, controller.text),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text), child: const Text('دخول')),
+            ],
+          ),
+        );
+      } finally {
+        controller.dispose();
+      }
+      if (password == null || !mounted) return;
+    }
     await _roomAction(
-      () => widget.apiClient.joinRoom(widget.accessToken, _roomId),
+      () => widget.apiClient.joinRoom(widget.accessToken, _roomId, password: password),
       'تم تسجيل دخولك إلى الغرفة.',
     );
     if (mounted && _error == null) setState(() => _roomEntered = true);
