@@ -53,6 +53,15 @@ class _ConversationPageState extends State<ConversationPage> {
     super.dispose();
   }
 
+  String _resolveMediaUrl(String value) {
+    if (value.startsWith('https://') || value.startsWith('http://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl.endsWith('/') ? widget.apiClient.baseUrl : '${widget.apiClient.baseUrl}/');
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
   Future<void> _loadMessages() async {
     setState(() {
       _loading = true;
@@ -288,7 +297,36 @@ class _ConversationPageState extends State<ConversationPage> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                    Text(text),
+                                    if (message['media'] is Map<String, dynamic>) ...[
+                                      Builder(builder: (context) {
+                                        final media = message['media'] as Map<String, dynamic>;
+                                        final mediaUrl = (media['url'] ?? '').toString();
+                                        if (mediaUrl.isEmpty) return const SizedBox.shrink();
+                                        final resolved = _resolveMediaUrl(mediaUrl);
+                                        if (type == 'image') {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 6),
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: Image.network(
+                                                resolved,
+                                                width: 230,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة المرفقة'),
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 6),
+                                          child: InkWell(
+                                            onTap: () {},
+                                            child: Text('مرفق: ${media['mimeType'] ?? type}\\n$resolved', style: const TextStyle(decoration: TextDecoration.underline)),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                    if (content.isNotEmpty || message['media'] == null) Text(text),
                                   ],
                                 ),
                               ),
