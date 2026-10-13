@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../data/jeho_api_client.dart';
 
 class DramaPage extends StatefulWidget {
@@ -52,7 +53,11 @@ class _DramaPageState extends State<DramaPage> {
     try {
       final detail = await widget.apiClient.getDramaSeriesDetail(id);
       if (!mounted) return;
-      await widget.apiClient.viewDramaSeries(id, token: widget.accessToken.isEmpty ? null : widget.accessToken);
+      try {
+        await widget.apiClient.viewDramaSeries(id, token: widget.accessToken.isEmpty ? null : widget.accessToken);
+      } catch (_) {
+        // Viewing details must remain possible if analytics is unavailable.
+      }
       if (!mounted) return;
       final episodes = detail['episodes'] is List
           ? (detail['episodes'] as List).whereType<Map<String, dynamic>>().toList()
@@ -100,14 +105,27 @@ class _DramaPageState extends State<DramaPage> {
                               title: Text(_text(episode['title'], 'الحلقة $number')),
                               subtitle: Text('الحلقة $number • ${_text(episode['durationSec'], '—')} ثانية'),
                               trailing: IconButton(
-                                tooltip: 'تسجيل مشاهدة',
-                                icon: const Icon(Icons.visibility_outlined),
+                                tooltip: 'تشغيل الحلقة',
+                                icon: const Icon(Icons.play_circle_outline_rounded),
                                 onPressed: episodeId.isEmpty ? null : () async {
+                                  final videoUrl = _text(episode['videoUrl']);
+                                  if (videoUrl.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('رابط الحلقة غير متوفر بعد.')));
+                                    return;
+                                  }
                                   try {
                                     await widget.apiClient.viewDramaEpisode(episodeId, token: widget.accessToken.isEmpty ? null : widget.accessToken);
-                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تسجيل المشاهدة لدى الخادم.')));
                                   } catch (_) {
-                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تسجيل المشاهدة.')));
+                                    // Playback should not be blocked by a view-counter failure.
+                                  }
+                                  final uri = Uri.tryParse(videoUrl);
+                                  if (uri == null || !uri.hasScheme || !(uri.scheme == 'https' || uri.scheme == 'http')) {
+                                    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('رابط الحلقة غير صالح.')));
+                                    return;
+                                  }
+                                  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                  if (!opened && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر فتح مشغل الحلقة.')));
                                   }
                                 },
                               ),
