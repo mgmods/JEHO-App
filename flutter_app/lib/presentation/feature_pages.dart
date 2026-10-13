@@ -612,8 +612,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         : <Map<String, dynamic>>[];
     final configuredSeatCount = (roomData['seatCount'] is num
             ? (roomData['seatCount'] as num).toInt()
-            : 11)
-        .clamp(2, 31);
+            : 10)
+        .clamp(2, 10);
     final seatsByIndex = <int, Map<String, dynamic>>{
       for (final seat in rawSeats)
         if (seat['seatIndex'] is num)
@@ -787,7 +787,44 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             _RoomInfoPill(icon: Icons.lock_outline_rounded, label: (roomData['isLocked'] == true || roomData['hasPassword'] == true) ? 'خاصة' : 'عامة'),
             if (roomData['category'] != null) _RoomInfoPill(icon: Icons.local_offer_outlined, label: roomData['category'].toString()),
           ]),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0x773D8064),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: const Color(0x55D9F3E2)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.stars_rounded, color: Color(0xFFFFD36B), size: 23),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('مستوى الغرفة', style: TextStyle(color: Color(0xFFEAF7EF), fontSize: 10)),
+                      Text(
+                        (roomData['level'] ?? roomData['roomLevel'] ?? roomData['rank'] ?? '—').toString(),
+                        style: const TextStyle(color: Color(0xFFFFD36B), fontSize: 13, fontWeight: FontWeight.w900),
+                      ),
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _roomActionBusy ? null : _sendGiftToHost,
+                  icon: const Icon(Icons.card_giftcard_rounded, size: 17),
+                  label: const Text('الهدايا'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFD36B),
+                    side: const BorderSide(color: Color(0x66D9F3E2)),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           Card(
             clipBehavior: Clip.antiAlias,
             color: const Color(0xBB0B5039),
@@ -896,16 +933,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: locked
-                                          ? const Color(0xFF393947)
+                                          ? const Color(0xFF164B38)
                                           : occupied
-                                              ? const Color(0xFF403727)
-                                              : const Color(0xFF292A38),
+                                              ? const Color(0xFF1B6748)
+                                              : const Color(0xFF0B5138),
                                       border: Border.all(
                                         color: occupied
-                                            ? const Color(0xFFFFD978)
+                                            ? const Color(0xFFFFD36B)
                                             : locked
-                                                ? const Color(0xFF777788)
-                                                : const Color(0x88C7A85A),
+                                                ? const Color(0xFF83BDA1)
+                                                : const Color(0x88D9F3E2),
                                         width: occupied ? 2.2 : 1.2,
                                       ),
                                     ),
@@ -951,12 +988,23 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 5),
-                            Text(
-                              'مقعد ${index + 1}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                            const SizedBox(height: 3),
+                            Container(
+                              width: 21,
+                              height: 21,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFF0A3527),
+                                border: Border.all(color: const Color(0x99D9F3E2)),
+                                boxShadow: const [
+                                  BoxShadow(color: Color(0x44000000), blurRadius: 5, offset: Offset(0, 2)),
+                                ],
+                              ),
+                              child: Text(
+                                '${index + 1}',
+                                style: const TextStyle(color: Color(0xFFFFD36B), fontSize: 10, fontWeight: FontWeight.w900),
+                              ),
                             ),
                             if (occupied && name.isNotEmpty)
                               Text(
