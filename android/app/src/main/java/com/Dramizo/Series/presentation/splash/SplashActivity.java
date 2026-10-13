@@ -351,7 +351,7 @@ public class SplashActivity extends ThemedActivity {
         if (splashDecisionResolved || isFinishing()) return;
         if (clicked && displayedSplashItem != null) {
             String target = displayedSplashItem.target;
-            if (target == null || target.trim().isEmpty()) target = displayedSplashItem.targetUrl;
+            if (target == null || target.trim().isEmpty() || "custom".equalsIgnoreCase(target.trim())) target = displayedSplashItem.targetUrl;
             pendingSplashTarget = target != null ? target.trim() : null;
             pendingSplashTargetType = displayedSplashItem.targetType;
             pendingSplashTargetId = displayedSplashItem.targetId;
@@ -505,7 +505,7 @@ public class SplashActivity extends ThemedActivity {
                             startActivity(i);
                         } else {
                             Intent i = new Intent(this, com.Dramizo.Series.presentation.agency.AgencyActivity.class);
-                            i.putExtra("splash_target_agency_id", finalResolved.id);
+                            i.putExtra(com.Dramizo.Series.presentation.agency.AgencyActivity.EXTRA_SPLASH_TARGET_AGENCY_ID, finalResolved.id);
                             startActivity(i);
                         }
                     } catch (Throwable error) {
