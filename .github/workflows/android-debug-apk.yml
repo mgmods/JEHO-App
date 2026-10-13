@@ -76,13 +76,13 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Validate independent API URL
+      - name: Validate confirmed Adnova API URL
         env:
-          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          JEHO_OWN_API_URL: https://api.adnova.bbs.tr/api/v1
         shell: bash
         run: |
           if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
-            echo "::error::Using canonical JEHO-CHAT production API unless JEHO_OWN_API_URL is explicitly configured."
+            echo "::error::The build must use the confirmed Adnova API URL."
             exit 1
           fi
 
