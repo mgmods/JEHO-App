@@ -307,8 +307,8 @@ public class SplashActivity extends ThemedActivity {
                         try {
                             Glide.with(SplashActivity.this)
                                     .load(item.url)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                                    .skipMemoryCache(true)
+                                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                                    .skipMemoryCache(false)
                                     .into(new CustomTarget<Drawable>() {
                                         @Override
                                         public void onResourceReady(
