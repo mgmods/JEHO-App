@@ -48,6 +48,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   final _picker = ImagePicker();
   bool _uploading = false;
   bool _roomEntered = false;
+  bool _following = false;
   bool _roomActionBusy = false;
   bool _detailsLoading = false;
   Map<String, dynamic>? _roomDetails;
@@ -87,6 +88,13 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       if (!mounted) return;
       setState(() {
         _roomDetails = details;
+        if (details.containsKey('isFollowing') ||
+            details.containsKey('isFollowed') ||
+            details.containsKey('following')) {
+          _following = details['isFollowing'] == true ||
+              details['isFollowed'] == true ||
+              details['following'] == true;
+        }
         final cover = (details['coverUrl'] ?? details['coverImage'] ?? '').toString();
         if (cover.isNotEmpty) _coverUrl = _resolveMedia(cover);
         final background = (details['backgroundUrl'] ?? details['background'] ?? '').toString();
@@ -162,6 +170,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
     if (mounted && _error == null) {
       setState(() => _roomEntered = true);
+      await _loadRoomDetails();
+    }
+  }
+
+  Future<void> _toggleFollowRoom() async {
+    if (_roomActionBusy || _roomId.isEmpty || widget.accessToken.isEmpty) return;
+    final next = !_following;
+    await _roomAction(
+      () => widget.apiClient.followRoom(widget.accessToken, _roomId, follow: next),
+      next ? 'تمت متابعة الغرفة.' : 'تم إلغاء متابعة الغرفة.',
+    );
+    if (mounted && _error == null) {
+      setState(() => _following = next);
       await _loadRoomDetails();
     }
   }
@@ -948,7 +969,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         ),
                       ),
                     ),
-                              FilledButton.icon(
+                              OutlinedButton.icon(
+                      onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : _toggleFollowRoom,
+                      icon: Icon(_following ? Icons.favorite_rounded : Icons.favorite_border_rounded),
+                      label: Text(_following ? 'إلغاء متابعة الغرفة' : 'متابعة الغرفة'),
+                    ),
+                    FilledButton.icon(
                                 onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : (_roomEntered ? _leaveRoom : _enterRoom),
                                 icon: _roomActionBusy
                                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
