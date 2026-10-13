@@ -8,6 +8,26 @@ import '../data/jeho_api_client.dart';
 
 const _featureGold = Color(0xFFB68A35);
 
+class _RoomInfoPill extends StatelessWidget {
+  const _RoomInfoPill({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+    decoration: BoxDecoration(
+      color: const Color(0xCC2A2031),
+      borderRadius: BorderRadius.circular(30),
+      border: Border.all(color: const Color(0x44E4BD76)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 15, color: const Color(0xFFFFD782)),
+      const SizedBox(width: 6),
+      Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFFF5EAF5), fontWeight: FontWeight.w800)),
+    ]),
+  );
+}
+
 class RoomDetailPage extends StatefulWidget {
   const RoomDetailPage({
     required this.apiClient,
@@ -579,45 +599,111 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           (seat['seatIndex'] as num).toInt(): seat,
     };
     return Scaffold(
-      appBar: AppBar(backgroundColor: const Color(0xFF064638), foregroundColor: Colors.white, elevation: 0, title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis)),
-      backgroundColor: const Color(0xFF003A2D),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF241A2C),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontWeight: FontWeight.w900)),
+        actions: [
+          IconButton(
+            tooltip: 'تحديث تفاصيل الغرفة',
+            onPressed: _detailsLoading ? null : _loadRoomDetails,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      backgroundColor: const Color(0xFF17121F),
       body: Container(
-        decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF075541), Color(0xFF00291F), Color(0xFF001F19)])),
+        decoration: const BoxDecoration(gradient: LinearGradient(
+          begin: Alignment.topCenter, end: Alignment.bottomCenter,
+          colors: [Color(0xFF38233A), Color(0xFF211727), Color(0xFF15121D)],
+        )),
         child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
             child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: imageUrl == null
-                  ? Container(
-                      color: const Color(0xFFFFE7B0),
-                      child: const Icon(Icons.forum_rounded, size: 64, color: Color(0xFF8C641D)),
-                    )
-                  : Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
+              aspectRatio: 1.72,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageUrl != null)
+                    Image.network(imageUrl, fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFFFE7B0),
-                        child: const Icon(Icons.broken_image_outlined, size: 48),
-                      ),
+                        decoration: const BoxDecoration(gradient: LinearGradient(
+                          colors: [Color(0xFF9B684A), Color(0xFF3D2945)],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight,
+                        )),
+                        child: const Icon(Icons.forum_rounded, size: 60, color: Color(0xFFFFDFA0)),
+                      ))
+                  else
+                    Container(
+                      decoration: const BoxDecoration(gradient: LinearGradient(
+                        colors: [Color(0xFF9B684A), Color(0xFF3D2945)],
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      )),
+                      child: const Center(child: Icon(Icons.forum_rounded, size: 60, color: Color(0xFFFFDFA0))),
                     ),
+                  const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(
+                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xDD17121F)],
+                    stops: [0.28, 1],
+                  ))),
+                  PositionedDirectional(
+                    top: 12, start: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                      decoration: BoxDecoration(color: const Color(0xB31B1720), borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: const Color(0x66FFE0A0))),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.circle, size: 8, color: Color(0xFF72E2A5)),
+                        const SizedBox(width: 6),
+                        Text('${roomData['onlineCount'] ?? roomData['memberCount'] ?? roomData['viewerCount'] ?? 0} متصل',
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                      ]),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    bottom: 14, start: 14, end: 14,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 23, height: 1.1, fontWeight: FontWeight.w900, color: Colors.white)),
+                      const SizedBox(height: 5),
+                      Row(children: [
+                        const Icon(Icons.workspace_premium_rounded, size: 15, color: Color(0xFFFFD782)),
+                        const SizedBox(width: 5),
+                        Expanded(child: Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFFFFE8C5), fontWeight: FontWeight.w700, fontSize: 12))),
+                      ]),
+                      if ((roomData['description'] ?? roomData['topic'] ?? '').toString().trim().isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text((roomData['description'] ?? roomData['topic'] ?? '').toString(),
+                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Color(0xFFE7D9E9), fontSize: 12)),
+                      ],
+                    ]),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          Text(_title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: Colors.white)),
-          const SizedBox(height: 6),
-          Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}', style: const TextStyle(color: Color(0xFFD4EEE5), fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Text((roomData['description'] ?? roomData['topic'] ?? '').toString(), style: const TextStyle(color: Color(0xFFD4EEE5))),
+          const SizedBox(height: 14),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _RoomInfoPill(icon: Icons.event_seat_rounded, label: '${rawSeats.where((seat) => seat['userId'] != null || seat['user'] != null).length}/$configuredSeatCount مقعد'),
+            _RoomInfoPill(icon: Icons.lock_outline_rounded, label: (roomData['isLocked'] == true || roomData['hasPassword'] == true) ? 'خاصة' : 'عامة'),
+            if (roomData['category'] != null) _RoomInfoPill(icon: Icons.local_offer_outlined, label: roomData['category'].toString()),
+          ]),
           const SizedBox(height: 14),
           Card(
             clipBehavior: Clip.antiAlias,
-            color: const Color(0x9920473B),
+            color: const Color(0xCC2A2031),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
-              side: const BorderSide(color: Color(0x3379D9C0)),
+              side: const BorderSide(color: Color(0x55E4BD76)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
@@ -626,7 +712,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.event_seat_rounded, color: Color(0xFFB5F1DD)),
+                      const Icon(Icons.event_seat_rounded, color: Color(0xFFFFD782)),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -756,7 +842,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                         fit: BoxFit.contain,
                                         errorBuilder: (_, __, ___) => Icon(
                                           locked ? Icons.lock_rounded : Icons.add_rounded,
-                                          color: const Color(0xFFFFD978),
+                                          color: const Color(0xFFFFD782),
                                           size: 25,
                                         ),
                                       ),
