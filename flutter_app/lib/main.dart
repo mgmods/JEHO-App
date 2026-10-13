@@ -1662,3 +1662,59 @@ class _HomeCategoryChip extends StatelessWidget {
       );
 }
 
+class _HomeHeaderIcon extends StatelessWidget {
+  const _HomeHeaderIcon({required this.asset, required this.fallback, required this.onTap});
+  final String asset;
+  final IconData fallback;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.white.withValues(alpha: 0.88),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Image.asset(asset, fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => Icon(fallback, color: const Color(0xFF175E49))),
+            ),
+          ),
+        ),
+      );
+}
+
+class _HomeFeatureTile extends StatelessWidget {
+  const _HomeFeatureTile({required this.title, required this.asset});
+  final String title;
+  final String asset;
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+        aspectRatio: 1.05,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(asset, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF45B9A0))),
+              DecoratedBox(decoration: BoxDecoration(
+                border: Border.all(color: Colors.white.withValues(alpha: 0.65), width: 1.4),
+                borderRadius: BorderRadius.circular(18),
+              )),
+              Positioned(
+                left: 6, right: 6, bottom: 8,
+                child: Text(title, textAlign: TextAlign.center, maxLines: 1,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900,
+                    shadows: [Shadow(color: Color(0xAA000000), blurRadius: 5)])),
+              ),
+            ],
+          ),
+        ),
+      );
+}
