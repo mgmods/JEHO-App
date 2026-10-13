@@ -56,9 +56,9 @@ class _ConversationPageState extends State<ConversationPage> {
   String _resolveMediaUrl(String value) {
     if (value.startsWith('https://') || value.startsWith('http://')) return value;
     final base = Uri.parse(widget.apiClient.baseUrl.endsWith('/') ? widget.apiClient.baseUrl : '${widget.apiClient.baseUrl}/');
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
     final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
     if (normalized.startsWith('uploads/')) return origin.resolve('/$normalized').toString();
-    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
     return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
   }
 
