@@ -719,28 +719,29 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                   width: occupied ? 2.2 : 1.2,
                                 ),
                               ),
-                              child: ClipOval(
-                                child: occupied && avatar.isNotEmpty
-                                    ? Image.network(
+                              child: occupied && avatar.isNotEmpty
+                                  ? ClipOval(
+                                      child: Image.network(
                                         _resolveMedia(avatar),
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Icon(
+                                        errorBuilder: (_, __, ___) => const Icon(
                                           Icons.person_rounded,
                                           color: Color(0xFFFFD978),
                                           size: 28,
                                         ),
-                                      )
-                                    : Icon(
-                                        locked
-                                            ? Icons.lock_rounded
-                                            : occupied
-                                                ? Icons.person_rounded
-                                                : Icons.add_rounded,
-                                        color: locked
-                                            ? const Color(0xFF786F61)
-                                            : const Color(0xFF8C641D),
+                                      ),
+                                    )
+                                  : Image.asset(
+                                      locked
+                                          ? 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_locked.webp'
+                                          : 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_normal.webp',
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, __, ___) => Icon(
+                                        locked ? Icons.lock_rounded : Icons.add_rounded,
+                                        color: const Color(0xFFFFD978),
                                         size: 25,
                                       ),
+                                    ),
                               ),
                             ),
                             const SizedBox(height: 5),
