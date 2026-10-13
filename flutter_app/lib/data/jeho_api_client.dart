@@ -405,6 +405,93 @@ class JehoApiClient {
   Future<Map<String, dynamic>> purchaseVanityId(String token, String publicId) async =>
       _asMap(await _post('vanity-ids/id/$publicId/purchase', const {}, accessToken: token), 'تعذر شراء الآي دي.');
 
+  // Agency discovery, membership, rooms and payout lifecycle. Paths mirror the
+  // existing NestJS AgenciesController; financial mutations remain server-authoritative.
+  Future<Map<String, dynamic>> getAgencyPricing() async =>
+      _asMap(await _get('agencies/pricing'), 'تعذر تحميل أسعار الوكالات.');
+
+  Future<List<Map<String, dynamic>>> getAgencies({int page = 1, int limit = 20}) async =>
+      _asList(await _get('agencies?page=${page < 1 ? 1 : page}&limit=${limit.clamp(1, 50)}'), ['items', 'results', 'agencies', 'data']);
+
+  Future<Map<String, dynamic>> getAgency(String agencyId, {String? token}) async =>
+      _asMap(await _get('agencies/${Uri.encodeComponent(agencyId)}', accessToken: token), 'تعذر تحميل بيانات الوكالة.');
+
+  Future<Map<String, dynamic>> getAgencyStats(String agencyId, {String? token}) async =>
+      _asMap(await _get('agencies/${Uri.encodeComponent(agencyId)}/stats', accessToken: token), 'تعذر تحميل إحصاءات الوكالة.');
+
+  Future<Map<String, dynamic>> followAgency(String token, String agencyId, {required bool follow}) async {
+    final id = Uri.encodeComponent(agencyId);
+    final result = follow
+        ? await _post('agencies/$id/follow', const {}, accessToken: token)
+        : await _delete('agencies/$id/follow', accessToken: token);
+    return _asMap(result, 'تعذر تحديث متابعة الوكالة.');
+  }
+
+  Future<List<Map<String, dynamic>>> getAgencyMembers(
+    String token, String agencyId, {String? query, int page = 1, int limit = 20, String? scope}
+  ) async {
+    final params = <String, String>{
+      'page': '${page < 1 ? 1 : page}',
+      'limit': '${limit.clamp(1, 50)}',
+      if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      if (scope != null && scope.isNotEmpty) 'scope': scope,
+    };
+    final id = Uri.encodeComponent(agencyId);
+    return _asList(await _get('agencies/$id/members?${Uri(queryParameters: params).query}', accessToken: token), ['items', 'results', 'members', 'data']);
+  }
+
+  Future<Map<String, dynamic>> addAgencyMember(String token, String agencyId, Map<String, Object?> data) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/members', data, accessToken: token), 'تعذر إضافة عضو للوكالة.');
+
+  Future<Map<String, dynamic>> updateAgencyMemberRole(String token, String agencyId, String userId, Map<String, Object?> data) async =>
+      _asMap(await _patch('agencies/${Uri.encodeComponent(agencyId)}/members/${Uri.encodeComponent(userId)}', data, accessToken: token), 'تعذر تحديث رتبة العضو.');
+
+  Future<Map<String, dynamic>> setAgencyMemberSuspended(String token, String agencyId, String userId, {required bool suspended}) async {
+    final id = Uri.encodeComponent(agencyId);
+    final member = Uri.encodeComponent(userId);
+    return _asMap(await _post('agencies/$id/members/$member/${suspended ? 'suspend' : 'unsuspend'}', const {}, accessToken: token), 'تعذر تحديث حالة العضو.');
+  }
+
+  Future<Map<String, dynamic>> removeAgencyMember(String token, String agencyId, String userId) async =>
+      _asMap(await _delete('agencies/${Uri.encodeComponent(agencyId)}/members/${Uri.encodeComponent(userId)}', accessToken: token), 'تعذر إزالة عضو الوكالة.');
+
+  Future<Map<String, dynamic>> leaveAgency(String token, String agencyId) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/leave', const {}, accessToken: token), 'تعذر مغادرة الوكالة.');
+
+  Future<Map<String, dynamic>> updateAgencySettings(String token, String agencyId, Map<String, Object?> settings) async =>
+      _asMap(await _patch('agencies/${Uri.encodeComponent(agencyId)}/settings', settings, accessToken: token), 'تعذر تحديث إعدادات الوكالة.');
+
+  Future<Map<String, dynamic>> updateAgencyCommission(String token, String agencyId, Map<String, Object?> settings) async =>
+      _asMap(await _patch('agencies/${Uri.encodeComponent(agencyId)}/commission', settings, accessToken: token), 'تعذر تحديث نسبة عمولة الوكالة.');
+
+  Future<Map<String, dynamic>> distributeAgencyEarnings(String token, String agencyId, {required String userId, required int diamonds}) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/distribute', {'userId': userId, 'diamonds': diamonds}, accessToken: token), 'تعذر توزيع أرباح الوكالة.');
+
+  Future<List<Map<String, dynamic>>> getAgencyPayoutRequests(String token, String agencyId, {String? status}) async {
+    final query = status == null || status.isEmpty ? '' : '?status=${Uri.encodeQueryComponent(status)}';
+    return _asList(await _get('agencies/${Uri.encodeComponent(agencyId)}/payout-requests$query', accessToken: token), ['items', 'results', 'requests', 'data']);
+  }
+
+  Future<Map<String, dynamic>> createAgencyPayoutRequest(String token, String agencyId, Map<String, Object?> data) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/payout-requests', data, accessToken: token), 'تعذر إرسال طلب صرف أرباح الوكالة.');
+
+  Future<Map<String, dynamic>> reviewAgencyPayoutRequest(String token, String agencyId, String requestId, {required bool paid, String? note}) async {
+    final action = paid ? 'paid' : 'reject';
+    return _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/payout-requests/${Uri.encodeComponent(requestId)}/$action', {if (note != null && note.trim().isNotEmpty) 'note': note.trim()}, accessToken: token), 'تعذر تحديث طلب صرف الأرباح.');
+  }
+
+  Future<Map<String, dynamic>> cancelAgencyPayoutRequest(String token, String agencyId, String requestId) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/payout-requests/${Uri.encodeComponent(requestId)}/cancel', const {}, accessToken: token), 'تعذر إلغاء طلب صرف الأرباح.');
+
+  Future<Map<String, dynamic>> getAgencyRoom(String agencyId, {String? token}) async =>
+      _asMap(await _get('agencies/${Uri.encodeComponent(agencyId)}/room', accessToken: token), 'تعذر تحميل غرفة الوكالة.');
+
+  Future<Map<String, dynamic>> enterAgencyRoom(String token, String agencyId) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/room/enter', const {}, accessToken: token), 'تعذر دخول غرفة الوكالة.');
+
+  Future<Map<String, dynamic>> openAgencyRoom(String token, String agencyId, Map<String, Object?> data) async =>
+      _asMap(await _post('agencies/${Uri.encodeComponent(agencyId)}/room/open', data, accessToken: token), 'تعذر فتح غرفة الوكالة.');
+
   Future<List<Map<String, dynamic>>> getMyApplications(String token) async =>
       _asList(await _get('agencies/applications/mine', accessToken: token), ['items', 'results', 'applications', 'data']);
 
