@@ -2114,8 +2114,57 @@ export class AdminService {
     this.dashboardAdminSchemaReady = true;
   }
 
+  private async migrateLegacyDashboardAccounts() {
+    const legacyAdmins = await this.usersRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where(
+        "LOWER(COALESCE(u.staffRole, '')) IN (:...roles) OR u.isAdmin = true",
+        { roles: ['super', 'operator'] },
+      )
+      .getMany();
+
+    for (const legacy of legacyAdmins) {
+      const staffRole = normalizeStaffRole(legacy);
+      if (!hasDashboardAccess(legacy) || !legacy.email || !legacy.passwordHash) continue;
+
+      const alreadyLinked = await this.adminUsersRepo.findOne({
+        where: { linkedUserId: legacy.id },
+      });
+      if (alreadyLinked) continue;
+
+      const email = String(legacy.email).trim().toLowerCase();
+      const emailTaken = await this.adminUsersRepo.findOne({ where: { email } });
+      if (emailTaken) continue;
+
+      const baseUsername = String(legacy.username || email.split('@')[0])
+        .replace(/[^a-zA-Z0-9_]/g, '')
+        .slice(0, 36) || 'admin';
+      let username = baseUsername;
+      if (await this.adminUsersRepo.findOne({ where: { username } })) {
+        username = `${baseUsername.slice(0, 36)}_${legacy.id.replace(/-/g, '').slice(0, 8)}`.slice(0, 48);
+      }
+
+      const migrated = this.adminUsersRepo.create({
+        email,
+        username,
+        displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
+        passwordHash: legacy.passwordHash,
+        role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
+        staffRole: staffRole === 'super' ? 'super' : 'operator',
+        dashboardPermissions: staffRole === 'super'
+          ? fullPermissions() as Record<string, string>
+          : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
+        linkedUserId: legacy.id,
+        isActive: legacy.status === UserStatus.ACTIVE,
+      });
+      await this.adminUsersRepo.save(migrated);
+    }
+  }
+
   async adminLogin(email: string, password: string) {
     await this.ensureDashboardAdminSchema();
+    await this.migrateLegacyDashboardAccounts();
     const identifier = String(email || '').trim().toLowerCase();
     if (!identifier || !password) {
       throw new UnauthorizedException('Invalid admin credentials');
