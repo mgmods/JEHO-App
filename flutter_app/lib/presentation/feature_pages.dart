@@ -802,38 +802,25 @@ class _BalanceTile extends StatelessWidget {
 }
 
 class GiftCatalogPage extends StatefulWidget {
-  const GiftCatalogPage({required this.apiClient, super.key});
-
+  const GiftCatalogPage({required this.apiClient, required this.accessToken, this.roomId, super.key});
   final JehoApiClient apiClient;
-
+  final String accessToken;
+  final String? roomId;
   @override
   State<GiftCatalogPage> createState() => _GiftCatalogPageState();
 }
 
 class _GiftCatalogPageState extends State<GiftCatalogPage> {
-  String _mediaUrl(String value) {
-    if (value.startsWith('http://') || value.startsWith('https://')) return value;
-    final base = Uri.parse(widget.apiClient.baseUrl);
-    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
-    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
-    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
-    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
-  }
   List<Map<String, dynamic>> _gifts = const [];
   bool _loading = true;
+  bool _sending = false;
   String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  void initState() { super.initState(); _load(); }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
       final gifts = await widget.apiClient.getGiftCatalog();
       if (mounted) setState(() => _gifts = gifts);
@@ -844,48 +831,79 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
     }
   }
 
+  Future<void> _sendGift(Map<String, dynamic> gift) async {
+    if (widget.accessToken.isEmpty) { setState(() => _error = 'سجّل الدخول أولًا لإرسال الهدايا.'); return; }
+    final giftId = (gift['id'] ?? '').toString();
+    if (giftId.isEmpty) { setState(() => _error = 'هذه الهدية لا تحتوي على معرّف صالح من الخادم.'); return; }
+    final receiver = TextEditingController();
+    final quantity = TextEditingController(text: '1');
+    try {
+      final form = await showDialog<Map<String, String>>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('إرسال ' + (gift['name'] ?? gift['title'] ?? 'هدية').toString()),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('أدخل معرّف المستخدم UUID المستلم. يتحقق الخادم من الرصيد وصلاحيات الإرسال.'),
+            const SizedBox(height: 10),
+            TextField(controller: receiver, decoration: const InputDecoration(labelText: 'معرّف المستلم')),
+            TextField(controller: quantity, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'الكمية')),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, {'receiverId': receiver.text.trim(), 'quantity': quantity.text.trim()}), child: const Text('إرسال')),
+          ],
+        ),
+      );
+      if (form == null || !mounted) return;
+      final receiverId = form['receiverId'] ?? '';
+      final count = int.tryParse(form['quantity'] ?? '');
+      if (receiverId.isEmpty || count == null || count < 1 || count > 99) {
+        setState(() => _error = 'أدخل معرّف مستلم صحيحًا وكمية بين 1 و99.');
+        return;
+      }
+      setState(() { _sending = true; _error = null; });
+      await widget.apiClient.sendGift(widget.accessToken, giftId: giftId, receiverId: receiverId, roomId: widget.roomId, quantity: count);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الهدية بنجاح.')));
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر إرسال الهدية.');
+    } finally {
+      receiver.dispose();
+      quantity.dispose();
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('الهدايا'), actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded))]),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _error != null
-                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
-                : _gifts.isEmpty
-                    ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.'))
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .86, crossAxisSpacing: 10, mainAxisSpacing: 10),
-                        itemCount: _gifts.length,
-                        itemBuilder: (context, index) {
-                          final gift = _gifts[index];
-                          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
-                          final cost = gift['coinPrice'] ?? gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
-                          final image = (gift['animationUrl'] ?? gift['iconUrl'] ?? gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
-                          return Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                children: [
-                                  Expanded(
-                                    child: image.startsWith('http')
-                                        ? Image.network(_mediaUrl(image), fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 52))
-                                        : const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                                  const SizedBox(height: 4),
-                                  Text('السعر: $cost'),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-      );
+    appBar: AppBar(title: const Text('الهدايا'), actions: [IconButton(onPressed: _loading || _sending ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : Column(children: [
+      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+      if (_sending) const LinearProgressIndicator(),
+      Expanded(child: _gifts.isEmpty ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.')) : GridView.builder(
+        padding: const EdgeInsets.all(12),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .78, crossAxisSpacing: 10, mainAxisSpacing: 10),
+        itemCount: _gifts.length,
+        itemBuilder: (context, index) {
+          final gift = _gifts[index];
+          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
+          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
+          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
+          return Card(clipBehavior: Clip.antiAlias, child: Padding(padding: const EdgeInsets.all(10), child: Column(children: [
+            Expanded(child: image.startsWith('http') ? Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 52)) : const Icon(Icons.card_giftcard_rounded, size: 52, color: _featureGold)),
+            const SizedBox(height: 8),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('السعر: $cost'),
+            const SizedBox(height: 6),
+            SizedBox(width: double.infinity, child: FilledButton.tonalIcon(onPressed: _sending ? null : () => _sendGift(gift), icon: const Icon(Icons.send_rounded, size: 16), label: const Text('إرسال'))),
+          ])));
+        },
+      )),
+    ]),
+  );
 }
-
 
 class CosmeticsPage extends StatefulWidget {
   const CosmeticsPage({
