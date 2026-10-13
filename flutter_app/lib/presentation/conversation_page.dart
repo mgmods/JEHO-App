@@ -481,12 +481,44 @@ class _ConversationPageState extends State<ConversationPage> {
                                             padding: const EdgeInsets.only(bottom: 6),
                                             child: ClipRRect(
                                               borderRadius: BorderRadius.circular(10),
+                                              child: GestureDetector(
+                                              onTap: () => showDialog<void>(
+                                                context: context,
+                                                barrierColor: Colors.black87,
+                                                builder: (dialogContext) => Dialog(
+                                                  backgroundColor: Colors.transparent,
+                                                  insetPadding: const EdgeInsets.all(12),
+                                                  child: Stack(
+                                                    alignment: Alignment.topRight,
+                                                    children: [
+                                                      InteractiveViewer(
+                                                        minScale: 0.7,
+                                                        maxScale: 4,
+                                                        child: Image.network(
+                                                          resolved,
+                                                          fit: BoxFit.contain,
+                                                          errorBuilder: (_, __, ___) => const Padding(
+                                                            padding: EdgeInsets.all(24),
+                                                            child: Text('تعذر عرض الصورة المرفقة', style: TextStyle(color: Colors.white)),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      IconButton.filledTonal(
+                                                        onPressed: () => Navigator.pop(dialogContext),
+                                                        icon: const Icon(Icons.close_rounded),
+                                                        tooltip: 'إغلاق الصورة',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
                                               child: Image.network(
                                                 resolved,
                                                 width: 230,
                                                 fit: BoxFit.cover,
                                                 errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة المرفقة'),
                                               ),
+                                            ),
                                             ),
                                           );
                                         }
