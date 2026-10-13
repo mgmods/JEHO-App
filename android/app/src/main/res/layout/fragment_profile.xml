@@ -59,11 +59,12 @@
                 android:id="@+id/headerProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-28dp"
+                android:layout_marginTop="-18dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="18dp"
+                android:layoutDirection="rtl">
 
                 <!-- Mikoo Me: face 70dp + frame 90dp centered (same locked pair with/without wear). -->
                 <FrameLayout
