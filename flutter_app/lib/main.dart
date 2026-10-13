@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
+import 'presentation/conversation_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -380,6 +381,29 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
                           child: ListTile(
+                            onTap: () {
+                              final token = widget.session['accessToken']?.toString() ?? '';
+                              final conversationId = conversation['id']?.toString() ?? '';
+                              if (token.isEmpty || conversationId.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('بيانات المحادثة غير مكتملة.')),
+                                );
+                                return;
+                              }
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => ConversationPage(
+                                    apiClient: widget.apiClient,
+                                    accessToken: token,
+                                    currentUserId: (_profile?['id'] ??
+                                      (widget.session['user'] is Map<String, dynamic>
+                                        ? (widget.session['user'] as Map<String, dynamic>)['id']
+                                        : null))?.toString() ?? '',
+                                    conversation: conversation,
+                                  ),
+                                ),
+                              ).then((_) => _loadHomeData());
+                            },
                             leading: CircleAvatar(
                               backgroundColor: const Color(0xFFFFE7B0),
                               child: Text(
