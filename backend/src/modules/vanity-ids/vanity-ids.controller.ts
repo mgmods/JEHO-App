@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
@@ -254,7 +254,7 @@ export class VanityIdsController {
       row.targetType = 'account';
       row.targetId = userId;
     } else if (targetType === 'room') {
-      const room = await this.roomsRepo.findOne({ where: { hostId: userId, agencyId: null, roomKind: RoomKind.STANDARD }, order: { createdAt: 'DESC' } });
+      const room = await this.roomsRepo.findOne({ where: { hostId: userId, agencyId: IsNull(), roomKind: RoomKind.STANDARD }, order: { createdAt: 'DESC' } });
       if (!room) throw new BadRequestException('افتح الروم الشخصي أولاً');
       const conflict = await this.roomsRepo.findOne({ where: { publicId } });
       if (conflict && conflict.id !== room.id) throw new BadRequestException('الآيدي مستخدم لروم آخر');
