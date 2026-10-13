@@ -28,3 +28,16 @@ flutter:
     - assets/original/icons/
     - assets/original/lottie/
     - assets/original/visual-system/gifts/assets/
+    - assets/original/android-res/drawable-hdpi/
+    - assets/original/android-res/drawable-ldrtl-xxhdpi/
+    - assets/original/android-res/drawable-mdpi/
+    - assets/original/android-res/drawable-nodpi/
+    - assets/original/android-res/drawable-xhdpi/
+    - assets/original/android-res/drawable-xxhdpi/
+    - assets/original/android-res/drawable-xxxhdpi/
+    - assets/original/android-res/drawable/
+    - assets/original/android-res/mipmap-hdpi/
+    - assets/original/android-res/mipmap-mdpi/
+    - assets/original/android-res/mipmap-xhdpi/
+    - assets/original/android-res/mipmap-xxhdpi/
+    - assets/original/android-res/mipmap-xxxhdpi/
