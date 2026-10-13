@@ -23,7 +23,7 @@ import {
   ReportStatus,
   ReportTargetType,
 } from '../../database/entities/report.entity';
-import { AdminUser } from '../../database/entities/admin-user.entity';
+import { AdminRole, AdminUser } from '../../database/entities/admin-user.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { AbuseLog, AbuseSeverity } from '../../database/entities/abuse-log.entity';
 import { WalletTransaction, TransactionType, CurrencyType } from '../../database/entities/wallet-transaction.entity';
@@ -2050,69 +2050,42 @@ export class AdminService {
     }
   }
 
-  async adminLogin(email: string, password: string) {
-    await this.ensureStaffRoleColumn();
-    await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo
-      .createQueryBuilder('u')
-      .addSelect('u.passwordHash')
-      .where('(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)', {
-        identifier: String(email || '').trim().toLowerCase(),
-      })
-      .getOne();
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid admin credentials');
-    }
-    if (!hasDashboardAccess(user)) {
-      throw new UnauthorizedException(
-        'Dashboard access denied — Super owner or limited admin only',
-      );
-    }
-    const staffRole = normalizeStaffRole(user);
-    if (staffRole === 'operator') {
-      const perms = normalizePermissions(user.dashboardPermissions);
-      if (!hasAnyPermission(perms)) {
-        throw new UnauthorizedException(
-          'This admin has no modules enabled — contact Super admin',
-        );
-      }
-    }
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new UnauthorizedException('Invalid admin credentials');
+  private publicDashboardAdmin(admin: AdminUser) {
+    const superAdmin = admin.staffRole === 'super' || admin.role === AdminRole.SUPER;
+    const permissions = superAdmin
+      ? fullPermissions()
+      : normalizePermissions(admin.dashboardPermissions);
+    return {
+      id: admin.id,
+      email: admin.email,
+      username: admin.username,
+      displayName: admin.displayName,
+      name: admin.displayName,
+      isAdmin: true,
+      isSuperAdmin: superAdmin,
+      staffRole: superAdmin ? 'super' : 'operator',
+      status: admin.isActive ? 'active' : 'disabled',
+      role: 'admin',
+      permissions,
+      modules: [...DASHBOARD_MODULES],
+    };
+  }
 
-    // Keep isAdmin + staffRole in sync for Super accounts.
-    let dirty = false;
-    if (staffRole === 'super') {
-      if (!user.isAdmin) {
-        user.isAdmin = true;
-        dirty = true;
-      }
-      if (String(user.staffRole || '').toLowerCase() !== 'super') {
-        user.staffRole = 'super';
-        dirty = true;
-      }
-    } else if (staffRole === 'operator') {
-      // Operators must not look like Super via isAdmin.
-      if (user.isAdmin) {
-        user.isAdmin = false;
-        dirty = true;
-      }
-      if (String(user.staffRole || '').toLowerCase() !== 'operator') {
-        user.staffRole = 'operator';
-        dirty = true;
-      }
-    }
-    if (dirty) await this.usersRepo.save(user);
-
-    const profile = this.publicAdminUser(user);
+  private async issueDashboardToken(admin: AdminUser) {
+    const profile = this.publicDashboardAdmin(admin);
     const accessToken = await this.jwtService.signAsync({
-      sub: user.id,
-      username: user.username,
+      sub: admin.id,
+      tokenType: 'dashboard',
+      username: admin.username,
+      email: admin.email,
       isAdmin: true,
       isSuperAdmin: profile.isSuperAdmin,
       staffRole: profile.staffRole,
+      permissions: profile.permissions,
       role: 'admin',
     });
+    admin.lastLoginAt = new Date();
+    await this.adminUsersRepo.save(admin);
     return {
       accessToken,
       token: accessToken,
@@ -2121,105 +2094,138 @@ export class AdminService {
     };
   }
 
-  async adminMe(userId: string) {
+  async adminLogin(email: string, password: string) {
+    const identifier = String(email || '').trim().toLowerCase();
+    if (!identifier || !password) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    // Dashboard accounts are checked first and are fully independent of app users.
+    const admin = await this.adminUsersRepo
+      .createQueryBuilder('a')
+      .addSelect('a.passwordHash')
+      .where('(LOWER(a.email) = :identifier OR LOWER(a.username) = :identifier)', { identifier })
+      .getOne();
+
+    if (admin) {
+      if (!admin.isActive || !(await bcrypt.compare(password, admin.passwordHash))) {
+        throw new UnauthorizedException('Invalid admin credentials');
+      }
+      if (admin.staffRole !== 'super') {
+        const perms = normalizePermissions(admin.dashboardPermissions);
+        if (!hasAnyPermission(perms)) {
+          throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
+        }
+      }
+      return this.issueDashboardToken(admin);
+    }
+
+    // One-time, non-destructive bootstrap for existing dashboard admins.
+    // After this copy is created, app status/role/password changes no longer affect dashboard access.
+    await this.ensureStaffRoleColumn();
     await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo.findOne({ where: { id: userId } });
-    if (!user || !hasDashboardAccess(user)) {
+    const legacy = await this.usersRepo
+      .createQueryBuilder('u')
+      .addSelect('u.passwordHash')
+      .where('(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)', { identifier })
+      .getOne();
+
+    if (!legacy || !legacy.passwordHash || !hasDashboardAccess(legacy)) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+    if (!(await bcrypt.compare(password, legacy.passwordHash))) {
+      throw new UnauthorizedException('Invalid admin credentials');
+    }
+
+    const staffRole = normalizeStaffRole(legacy);
+    const adminEmail = String(legacy.email || identifier).trim().toLowerCase();
+    const username = String(legacy.username || identifier.split('@')[0]).slice(0, 48);
+    const duplicateUsername = await this.adminUsersRepo.findOne({ where: { username } });
+    const safeUsername = duplicateUsername
+      ? `${username.slice(0, 38)}_${legacy.id.replace(/-/g, '').slice(0, 8)}`
+      : username;
+    const migrated = this.adminUsersRepo.create({
+      email: adminEmail,
+      username: safeUsername,
+      displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
+      passwordHash: legacy.passwordHash,
+      role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
+      staffRole: staffRole === 'super' ? 'super' : 'operator',
+      dashboardPermissions: staffRole === 'super'
+        ? fullPermissions() as Record<string, string>
+        : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
+      linkedUserId: legacy.id,
+      isActive: true,
+    });
+    const saved = await this.adminUsersRepo.save(migrated);
+    if (staffRole !== 'super' && !hasAnyPermission(saved.dashboardPermissions)) {
+      throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
+    }
+    return this.issueDashboardToken(saved);
+  }
+
+  async adminMe(adminId: string) {
+    const admin = await this.adminUsersRepo.findOne({ where: { id: adminId } });
+    if (!admin || !admin.isActive) {
       throw new UnauthorizedException('Dashboard access required');
     }
-    return this.publicAdminUser(user);
+    return this.publicDashboardAdmin(admin);
   }
 
   /**
-   * Self-service: update dashboard login email and/or password.
-   * Requires current password. Super or limited operator for own account.
+   * Update dashboard-only credentials. This never writes to the mobile users table.
    */
   async updateAdminCredentials(
-    userId: string,
-    dto: {
-      currentPassword: string;
-      newEmail?: string;
-      newPassword?: string;
-    },
+    adminId: string,
+    dto: { currentPassword: string; newEmail?: string; newPassword?: string },
   ) {
-    const user = await this.usersRepo
-      .createQueryBuilder('u')
-      .addSelect('u.passwordHash')
-      .where('u.id = :id', { id: userId })
+    const admin = await this.adminUsersRepo
+      .createQueryBuilder('a')
+      .addSelect('a.passwordHash')
+      .where('a.id = :id', { id: adminId })
       .getOne();
-    if (!user || !hasDashboardAccess(user)) {
+    if (!admin || !admin.isActive) {
       throw new UnauthorizedException('Dashboard access required');
     }
-    if (!user.passwordHash) {
-      throw new BadRequestException('This account has no password set');
-    }
-    const ok = await bcrypt.compare(String(dto.currentPassword || ''), user.passwordHash);
-    if (!ok) {
+    if (!(await bcrypt.compare(String(dto.currentPassword || ''), admin.passwordHash))) {
       throw new UnauthorizedException('Current password is incorrect');
     }
 
-    const nextEmailRaw = dto.newEmail != null ? String(dto.newEmail).trim().toLowerCase() : '';
+    const nextEmail = dto.newEmail != null ? String(dto.newEmail).trim().toLowerCase() : '';
     const nextPassword = dto.newPassword != null ? String(dto.newPassword) : '';
-    if (!nextEmailRaw && !nextPassword) {
+    if (!nextEmail && !nextPassword) {
       throw new BadRequestException('Provide a new email and/or a new password');
     }
-
-    if (nextEmailRaw) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmailRaw)) {
+    if (nextEmail) {
+      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(nextEmail)) {
         throw new BadRequestException('Invalid email address');
       }
-      if (nextEmailRaw !== String(user.email || '').toLowerCase()) {
-        const taken = await this.usersRepo
-          .createQueryBuilder('u')
-          .where('LOWER(u.email) = :email', { email: nextEmailRaw })
-          .andWhere('u.id != :id', { id: user.id })
-          .getOne();
-        if (taken) {
-          throw new ConflictException('Email is already in use');
-        }
-        user.email = nextEmailRaw;
-      }
+      const taken = await this.adminUsersRepo
+        .createQueryBuilder('a')
+        .where('LOWER(a.email) = :email', { email: nextEmail })
+        .andWhere('a.id != :id', { id: admin.id })
+        .getOne();
+      if (taken) throw new ConflictException('Email is already in use');
+      admin.email = nextEmail;
     }
-
-    let passwordHash: string | null = null;
     if (nextPassword) {
       if (nextPassword.length < 8) {
         throw new BadRequestException('New password must be at least 8 characters');
       }
-      passwordHash = await bcrypt.hash(nextPassword, 12);
-      user.passwordHash = passwordHash;
+      admin.passwordHash = await bcrypt.hash(nextPassword, 12);
     }
-
-    await this.usersRepo.save(user);
-
-    const linked = await this.adminUsersRepo.find({
-      where: [{ linkedUserId: user.id }],
-    });
-    for (const row of linked) {
-      if (nextEmailRaw) row.email = nextEmailRaw;
-      if (passwordHash) row.passwordHash = passwordHash;
-      await this.adminUsersRepo.save(row);
-    }
-
-    return {
-      ok: true,
-      email: user.email,
-      username: user.username,
-      message: 'Admin credentials updated',
-    };
+    await this.adminUsersRepo.save(admin);
+    return { ok: true, email: admin.email, username: admin.username, message: 'Admin credentials updated' };
   }
 
-  // ─── Multi-admin operators (Super only) ─────────────────────
-
+  // Dashboard operators live exclusively in admin_users; no app-user row is created or modified.
   async listDashboardOperators() {
-    await this.ensureDashboardPermissionsColumn();
-    const items = await this.usersRepo
-      .createQueryBuilder('u')
-      .where('LOWER(COALESCE(u.staffRole, \'\')) = :role', { role: 'operator' })
-      .orderBy('u.createdAt', 'DESC')
-      .getMany();
+    const items = await this.adminUsersRepo.find({
+      where: { staffRole: 'operator' },
+      order: { createdAt: 'DESC' },
+    });
     return {
-      items: items.map((u) => this.publicAdminUser(u)),
+      items: items.map((admin) => this.publicDashboardAdmin(admin)),
       modules: [...DASHBOARD_MODULES],
     };
   }
@@ -2230,119 +2236,70 @@ export class AdminService {
     displayName?: string;
     permissions?: Record<string, string>;
   }) {
-    await this.ensureStaffRoleColumn();
-    await this.ensureDashboardPermissionsColumn();
-    const email = String(dto.email || '')
-      .trim()
-      .toLowerCase();
+    const email = String(dto.email || '').trim().toLowerCase();
     const password = String(dto.password || '');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
       throw new BadRequestException('Invalid email address');
     }
     if (password.length < 8) {
       throw new BadRequestException('Password must be at least 8 characters');
     }
-    const perms = normalizePermissions(dto.permissions);
-    if (!hasAnyPermission(perms)) {
-      throw new BadRequestException(
-        'Grant at least one module as read or write',
-      );
+    const permissions = normalizePermissions(dto.permissions);
+    if (!hasAnyPermission(permissions)) {
+      throw new BadRequestException('Grant at least one module as read or write');
     }
-    const existing = await this.usersRepo
-      .createQueryBuilder('u')
-      .where('LOWER(u.email) = :email', { email })
-      .getOne();
-    if (existing) {
-      // Promote existing user to operator only if not Super.
-      if (isDashboardSuper(existing)) {
-        throw new ConflictException('This email belongs to Super admin');
-      }
-      existing.staffRole = 'operator';
-      existing.isAdmin = false;
-      existing.dashboardPermissions = perms as Record<string, string>;
-      existing.passwordHash = await bcrypt.hash(password, 12);
-      if (dto.displayName?.trim()) {
-        existing.displayName = dto.displayName.trim();
-      }
-      if (!existing.email) existing.email = email;
-      await this.usersRepo.save(existing);
-      return this.publicAdminUser(existing);
-    }
+    const existing = await this.adminUsersRepo.findOne({ where: { email } });
+    if (existing) throw new ConflictException('Dashboard email is already in use');
 
-    const baseUsername =
-      email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) ||
-      'admin';
-    let username = baseUsername.slice(0, 24);
-    let n = 0;
-    while (await this.usersRepo.findOne({ where: { username } })) {
-      n += 1;
-      username = `${baseUsername.slice(0, 20)}${n}`;
+    const base = email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').slice(0, 36) || 'admin';
+    let username = base;
+    let suffix = 0;
+    while (await this.adminUsersRepo.findOne({ where: { username } })) {
+      suffix += 1;
+      username = `${base.slice(0, 40)}_${suffix}`.slice(0, 48);
     }
-    const user = this.usersRepo.create({
+    const linked = await this.usersRepo.findOne({ where: { email } });
+    const admin = this.adminUsersRepo.create({
       email,
       username,
-      displayName: (dto.displayName || baseUsername || 'Admin').trim(),
+      displayName: String(dto.displayName || base || 'Admin').trim().slice(0, 120),
       passwordHash: await bcrypt.hash(password, 12),
+      role: AdminRole.MODERATOR,
       staffRole: 'operator',
-      isAdmin: false,
-      dashboardPermissions: perms as Record<string, string>,
-      status: UserStatus.ACTIVE,
-      emailVerified: true,
+      dashboardPermissions: permissions as Record<string, string>,
+      linkedUserId: linked?.id || null,
+      isActive: true,
     });
-    await this.usersRepo.save(user);
-    return this.publicAdminUser(user);
+    return this.publicDashboardAdmin(await this.adminUsersRepo.save(admin));
   }
 
   async updateDashboardOperator(
     id: string,
-    dto: {
-      displayName?: string;
-      password?: string;
-      permissions?: Record<string, string>;
-      active?: boolean;
-    },
+    dto: { displayName?: string; password?: string; permissions?: Record<string, string>; active?: boolean },
   ) {
-    await this.ensureDashboardPermissionsColumn();
-    const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || !isDashboardOperator(user)) {
-      throw new NotFoundException('Limited admin not found');
-    }
+    const admin = await this.adminUsersRepo.findOne({ where: { id, staffRole: 'operator' } });
+    if (!admin) throw new NotFoundException('Limited admin not found');
     if (dto.displayName != null) {
-      user.displayName = String(dto.displayName).trim() || user.displayName;
+      admin.displayName = String(dto.displayName).trim().slice(0, 120) || admin.displayName;
     }
     if (dto.password) {
-      if (String(dto.password).length < 8) {
-        throw new BadRequestException('Password must be at least 8 characters');
-      }
-      user.passwordHash = await bcrypt.hash(String(dto.password), 12);
+      if (String(dto.password).length < 8) throw new BadRequestException('Password must be at least 8 characters');
+      admin.passwordHash = await bcrypt.hash(String(dto.password), 12);
     }
     if (dto.permissions != null) {
-      const perms = normalizePermissions(dto.permissions);
-      if (!hasAnyPermission(perms)) {
-        throw new BadRequestException(
-          'Grant at least one module as read or write',
-        );
-      }
-      user.dashboardPermissions = perms as Record<string, string>;
+      const permissions = normalizePermissions(dto.permissions);
+      if (!hasAnyPermission(permissions)) throw new BadRequestException('Grant at least one module as read or write');
+      admin.dashboardPermissions = permissions as Record<string, string>;
     }
-    if (typeof dto.active === 'boolean') {
-      user.status = dto.active ? UserStatus.ACTIVE : UserStatus.SUSPENDED;
-    }
-    user.staffRole = 'operator';
-    user.isAdmin = false;
-    await this.usersRepo.save(user);
-    return this.publicAdminUser(user);
+    if (typeof dto.active === 'boolean') admin.isActive = dto.active;
+    return this.publicDashboardAdmin(await this.adminUsersRepo.save(admin));
   }
 
   async removeDashboardOperator(id: string) {
-    const user = await this.usersRepo.findOne({ where: { id } });
-    if (!user || !isDashboardOperator(user)) {
-      throw new NotFoundException('Limited admin not found');
-    }
-    user.staffRole = null;
-    user.isAdmin = false;
-    user.dashboardPermissions = null;
-    await this.usersRepo.save(user);
+    const admin = await this.adminUsersRepo.findOne({ where: { id, staffRole: 'operator' } });
+    if (!admin) throw new NotFoundException('Limited admin not found');
+    admin.isActive = false;
+    await this.adminUsersRepo.save(admin);
     return { ok: true };
   }
 
