@@ -656,6 +656,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
+                              builder: (_) => VanityIdsPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.tag_rounded),
+                          label: const Text('الآي دي المميز'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
                               builder: (_) => SocialHubPage(
                                 apiClient: widget.apiClient,
                                 accessToken: widget.session['accessToken']?.toString() ?? '',
