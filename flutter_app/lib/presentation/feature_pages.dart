@@ -700,48 +700,72 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              width: 55,
-                              height: 55,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: locked
-                                    ? const Color(0xFF393947)
-                                    : occupied
-                                        ? const Color(0xFF403727)
-                                        : const Color(0xFF292A38),
-                                border: Border.all(
-                                  color: occupied
-                                      ? const Color(0xFFFFD978)
-                                      : locked
-                                          ? const Color(0xFF777788)
-                                          : const Color(0x88C7A85A),
-                                  width: occupied ? 2.2 : 1.2,
-                                ),
-                              ),
-                              child: occupied && avatar.isNotEmpty
-                                  ? ClipOval(
-                                      child: Image.network(
-                                        _resolveMedia(avatar),
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(
-                                          Icons.person_rounded,
-                                          color: Color(0xFFFFD978),
-                                          size: 28,
+                            SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: 55,
+                                    height: 55,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: locked
+                                          ? const Color(0xFF393947)
+                                          : occupied
+                                              ? const Color(0xFF403727)
+                                              : const Color(0xFF292A38),
+                                      border: Border.all(
+                                        color: occupied
+                                            ? const Color(0xFFFFD978)
+                                            : locked
+                                                ? const Color(0xFF777788)
+                                                : const Color(0x88C7A85A),
+                                        width: occupied ? 2.2 : 1.2,
+                                      ),
+                                    ),
+                                  ),
+                                  if (occupied && avatar.isNotEmpty)
+                                    ClipOval(
+                                      child: SizedBox(
+                                        width: 52,
+                                        height: 52,
+                                        child: Image.network(
+                                          _resolveMedia(avatar),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => const Icon(
+                                            Icons.person_rounded,
+                                            color: Color(0xFFFFD978),
+                                            size: 28,
+                                          ),
                                         ),
                                       ),
                                     )
-                                  : Image.asset(
-                                      locked
-                                          ? 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_locked.webp'
-                                          : 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_normal.webp',
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, __, ___) => Icon(
-                                        locked ? Icons.lock_rounded : Icons.add_rounded,
-                                        color: const Color(0xFFFFD978),
-                                        size: 25,
+                                  else
+                                    SizedBox(
+                                      width: 52,
+                                      height: 52,
+                                      child: Image.asset(
+                                        locked
+                                            ? 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_locked.webp'
+                                            : 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_normal.webp',
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (_, __, ___) => Icon(
+                                          locked ? Icons.lock_rounded : Icons.add_rounded,
+                                          color: const Color(0xFFFFD978),
+                                          size: 25,
+                                        ),
                                       ),
                                     ),
+                                  if (locked)
+                                    const Positioned(
+                                      bottom: 20,
+                                      right: 20,
+                                      child: Icon(Icons.lock_rounded, size: 14, color: Color(0xFFFFD978)),
+                                    ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 5),
                             Text(
