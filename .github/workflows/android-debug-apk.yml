@@ -10,7 +10,7 @@ on:
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
   pull_request:
-    branches: [jeho-own]
+    branches: [jeho-own, MG-JEHO]
     paths:
       - ".github/workflows/android-debug-apk.yml"
       - "android/**"
