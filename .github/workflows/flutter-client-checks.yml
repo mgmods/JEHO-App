@@ -5,6 +5,7 @@ on:
     branches: [jeho-own]
     paths:
       - "flutter_app/**"
+      - "flutter_dashboard/**"
       - ".github/workflows/flutter-client-checks.yml"
   push:
     branches: [jeho-own]
@@ -97,3 +98,26 @@ jobs:
           path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+  flutter-admin-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flutter_dashboard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Web platform scaffold in CI workspace
+        run: flutter create --platforms=web --project-name jeho_admin_flutter .
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze
+      - name: Build Flutter Web dashboard
+        run: flutter build web --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
