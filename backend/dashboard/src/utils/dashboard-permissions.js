@@ -27,6 +27,7 @@ export const ROUTE_MODULE = {
   'game-ads': 'gameAds',
   drama: 'drama',
   banners: 'banners',
+  'splash-management': 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',
   reports: 'reports',
