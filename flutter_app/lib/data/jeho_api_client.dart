@@ -218,6 +218,37 @@ class JehoApiClient {
     throw const JehoApiException('تعذر تحميل المحفظة.');
   }
 
+  Future<Map<String, dynamic>> getMyCp(String accessToken) async {
+    final payload = await _get('users/me/cp', accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{'data': payload};
+  }
+
+  Future<List<Map<String, dynamic>>> getMyFriends(String accessToken) async {
+    final payload = await _get('users/me/friends?page=1&limit=30', accessToken: accessToken);
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) items = items['items'] ?? items['results'] ?? items['friends'] ?? items['data'];
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getMyVisitors(String accessToken) async {
+    final payload = await _get('users/me/visitors?page=1&limit=30', accessToken: accessToken);
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) items = items['items'] ?? items['results'] ?? items['visitors'] ?? items['data'];
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getMyRelations(String accessToken, {String? type}) async {
+    final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
+    final payload = await _get('users/me/relations$suffix', accessToken: accessToken);
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) items = items['items'] ?? items['results'] ?? items['relations'] ?? items['data'];
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
   Future<List<Map<String, dynamic>>> getWalletTransactions(String accessToken) async {
     final payload = await _get('wallet/transactions?page=1&limit=30', accessToken: accessToken);
     dynamic items = payload;
