@@ -292,7 +292,7 @@ export class VanityIdsController {
     const publicId = String(body.publicId || '').trim();
     if (!/^\d{3,12}$/.test(publicId)) {
       throw new BadRequestException(
-        'الآي دي يجب أن يكون أرقاماً فقط من 3 إلى 12 خانة',
+        'الآيدي يجب أن يتكون من 6 أرقام',
       );
     }
     let row = await this.vanityRepo.findOne({ where: { publicId } });
