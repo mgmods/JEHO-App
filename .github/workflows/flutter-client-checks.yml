@@ -7,7 +7,7 @@ on:
       - "flutter_app/**"
       - ".github/workflows/flutter-client-checks.yml"
   push:
-    branches: [feat/flutter-foundation-2026-10-13]
+    branches: [jeho-own]
     paths:
       - "flutter_app/**"
       - ".github/workflows/flutter-client-checks.yml"
