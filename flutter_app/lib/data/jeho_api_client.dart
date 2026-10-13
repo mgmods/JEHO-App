@@ -218,6 +218,36 @@ class JehoApiClient {
     throw const JehoApiException('تعذر تحميل المحفظة.');
   }
 
+  Future<List<Map<String, dynamic>>> getWalletTransactions(String accessToken) async {
+    final payload = await _get('wallet/transactions?page=1&limit=30', accessToken: accessToken);
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['transactions'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getRechargePackages() async {
+    final payload = await _get('wallet/packages');
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['packages'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getGiftCategories() async {
+    final payload = await _get('gifts/categories');
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['categories'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
   Future<List<Map<String, dynamic>>> getGiftCatalog() async {
     final payload = await _get('gifts');
     dynamic items = payload;
