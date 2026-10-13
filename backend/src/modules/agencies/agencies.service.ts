@@ -673,7 +673,7 @@ export class AgenciesService implements OnModuleInit {
           select: ['id'],
         });
         if (!clash) break;
-        publicId = String(10000 + Math.floor(Math.random() * 90000));
+        publicId = String(100000 + Math.floor(Math.random() * 900000));
       }
       const agency = await manager.save(
         manager.create(Agency, {
@@ -1163,7 +1163,7 @@ export class AgenciesService implements OnModuleInit {
       return agency;
     }
     for (let attempt = 0; attempt < 48; attempt++) {
-      const candidate = String(10000 + Math.floor(Math.random() * 90000));
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
       const clash = await this.agenciesRepo.findOne({
         where: { publicId: candidate },
         select: ['id'],
