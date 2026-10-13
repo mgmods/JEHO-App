@@ -3,6 +3,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -6481,6 +6482,37 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private void showRoomCardCpRequest(String recipientId, AppContainer cpContainer) {
+        if (recipientId == null || recipientId.isEmpty() || recipientId.equals(myUserId)) return;
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(this).setTitle("اختر نوع علاقة CP")
+                .setItems(labels, (d, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+                    cpContainer.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createProfileCpRequest(body));
+                        runOnUiThread(() -> Toast.makeText(this,
+                                result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                        : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                Toast.LENGTH_LONG).show());
+                    });
+                }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private String roomCpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
+    }
+
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
                               int vipLevel, int userLevel) {
         showUserCard(userId, name, avatarUrl, frameUrl, null, vipLevel, userLevel);
@@ -6637,6 +6669,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        View actCpRequest = sheet.findViewById(R.id.actCpRequest);
+        View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
@@ -6649,7 +6685,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
                     this, sheet, userId, myUserId, dialog::dismiss);
         }
-        com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
+        // CP requests are profile-level and independent of the room gift request flow.
+        if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        AppContainer cpContainer = ContainerProvider.from(this);
+        if (actCpRequest != null) {
+            actCpRequest.setVisibility(userId != null && !userId.equals(myUserId) ? View.VISIBLE : View.GONE);
+            actCpRequest.setOnClickListener(v -> showRoomCardCpRequest(userId, cpContainer));
+        }
+        if (userId != null && !userId.equals(myUserId)) {
+            cpContainer.getIoExecutor().execute(() -> {
+                Result<List<Map<String, Object>>> cpResult = ApiCall.execute(cpContainer.getUserApi().cpProfileRelationships(userId));
+                if (!cpResult.success || cpResult.data == null || cpResult.data.isEmpty()) return;
+                Map<String, Object> rel = cpResult.data.get(0);
+                Object partnerObject = rel.get("partner");
+                Map<?, ?> cpPartner = partnerObject instanceof Map ? (Map<?, ?>) partnerObject : null;
+                String type = String.valueOf(rel.get("type") == null ? "" : rel.get("type"));
+                String cpName = cpPartner == null ? "" : String.valueOf(cpPartner.get("displayName") != null
+                        ? cpPartner.get("displayName") : cpPartner.get("username"));
+                String cpAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? ""
+                        : String.valueOf(cpPartner.get("avatarUrl"));
+                runOnUiThread(() -> {
+                    if (rowCpRelationship == null || dialog.getWindow() == null) return;
+                    rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(type)
+                            + (cpName.isEmpty() ? "" : " · " + cpName));
+                    if (imgCpPartnerAvatar != null && !cpAvatar.isEmpty()) {
+                        Glide.with(VoiceRoomActivity.this).load(cpAvatar)
+                                .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
+                });
+            });
+        }
+                com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipUserCardMedal(imgVipMedal, vipLevel, null);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
