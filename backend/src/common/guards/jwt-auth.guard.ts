@@ -11,7 +11,7 @@ import { IS_PUBLIC_KEY } from '../decorators';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
-import { AdminUser } from '../../database/entities/admin-user.entity';
+import { AdminRole, AdminUser } from '../../database/entities/admin-user.entity';
 import {
   hasDashboardAccess,
   isDashboardSuper,
@@ -75,7 +75,7 @@ export class JwtAuthGuard implements CanActivate {
           if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
           return false;
         }
-        const staffRole = String(admin.staffRole || (admin.role === 'super' ? 'super' : 'operator'));
+        const staffRole = String(admin.staffRole || (admin.role === AdminRole.SUPER ? 'super' : 'operator'));
         const superAdmin = staffRole === 'super' || admin.role === 'super';
         const permissions = superAdmin
           ? fullPermissions()
