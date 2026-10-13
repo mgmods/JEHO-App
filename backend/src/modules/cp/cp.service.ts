@@ -15,6 +15,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly dataSource: DataSource, private readonly realtime: RealtimeGateway) {}
 
   onModuleInit() {
+    // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
+    void this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
+    void this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
@@ -123,6 +126,56 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+
+  async createProfileRequest(userId: string, input: { recipientId: string; type: CpType; idempotencyKey: string }) {
+    const recipientId = String(input?.recipientId || '');
+    const key = String(input?.idempotencyKey || '').trim();
+    const type = input?.type;
+    if (!UUID_REGEX.test(recipientId) || !key || key.length > 128 || !TYPES.has(type)) {
+      throw new BadRequestException('بيانات طلب العلاقة غير مكتملة');
+    }
+    if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء علاقة مع حسابك');
+    return this.dataSource.transaction(async manager => {
+      const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
+      const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE', [key]);
+      if (existing.length) {
+        if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type) {
+          throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
+        }
+        return existing[0];
+      }
+      const [recipient] = await manager.query('SELECT id FROM users WHERE id=$1 AND status=$2', [recipientId, 'active']);
+      if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
+      const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
+      if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
+        throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
+      }
+      const [active] = await manager.query(
+        `SELECT id FROM cp_relationships WHERE status='active'
+         AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1)) LIMIT 1 FOR UPDATE`,
+        [userId, recipientId],
+      );
+      if (active) throw new ConflictException('توجد علاقة نشطة بينكما بالفعل');
+      const [pending] = await manager.query(
+        `SELECT id FROM cp_requests WHERE
+         (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
+         AND type=$3 AND status='pending' AND "expiresAt">now() LIMIT 1 FOR UPDATE`,
+        [userId, recipientId, type],
+      );
+      if (pending) throw new ConflictException('يوجد طلب معلّق بينكما لهذا النوع');
+      const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', ['cp.policy.request_expiry_minutes']);
+      const configuredExpiry = Number(expiryRow?.value);
+      const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
+        ? configuredExpiry : EXPIRY_MINUTES;
+      const [request] = await manager.query(
+        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',NULL,0,$4,now()+($5 || ' minutes')::interval,now(),now()) RETURNING *`,
+        [userId, recipientId, type, key, String(expiryMinutes)],
+      );
+      return request;
+    });
+  }
 
   async sentRequests(userId: string) {
     await this.expireDueRequests();
@@ -400,10 +453,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   private async refund(manager: any, request: any) {
     if (request.refundedAt) return;
+    const amount = Math.max(0, Number(request.priceCoins) || 0);
+    if (amount === 0) {
+      await manager.query('UPDATE cp_requests SET "refundedAt"=now(),"updatedAt"=now() WHERE id=$1 AND "refundedAt" IS NULL', [request.id]);
+      return;
+    }
     const [wallet] = await manager.query('SELECT coins FROM wallets WHERE "userId"=$1 FOR UPDATE', [request.fromUserId]);
     if (!wallet) throw new NotFoundException('محفظة صاحب الطلب غير موجودة');
     const balance = Number(wallet.coins);
-    const amount = Number(request.priceCoins);
     const inserted = await manager.query(
       `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
        VALUES ($1,'refund','coins',$2,$3,'cp_request_refund',$4,'استرداد هدية CP',$5,now())
