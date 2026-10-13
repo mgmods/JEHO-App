@@ -16,7 +16,7 @@ flutter test
 flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
 ```
 
-CI generates the Android platform scaffold in its workspace, runs analysis and widget tests, builds a debug APK, and uploads the artifact. CI must be green on the latest branch commit before treating this checkpoint as validated. A debug APK is a test build, not a signed production release.
+CI generates the Android platform scaffold in its workspace, runs analysis and widget tests, builds a debug APK, and uploads the artifact. CI must be green on the exact commit being delivered; artifact metadata must point to that same commit SHA. A green run for an older commit is not evidence that newer changes were built. A debug APK is a test build, not a signed production release.
 
 ## Current partial Flutter flows (not production parity)
 
