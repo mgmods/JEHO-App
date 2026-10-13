@@ -386,9 +386,19 @@ public class VoiceRoomViewModel extends ViewModel {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().setBackground(roomId, backgroundUrl);
             if (r.success) {
+                // The server has confirmed persistence; update the visible room immediately
+                // instead of waiting for a second GET /rooms/:id to finish.
+                RoomDtos.RoomDto current = room.getValue();
+                if (current != null) {
+                    current.backgroundUrl = backgroundUrl;
+                    room.postValue(current);
+                } else {
+                    refresh(roomId);
+                }
                 info.postValue("تم تغيير خلفية الغرفة");
-                refresh(roomId);
-            } else error.postValue(r.error);
+            } else {
+                error.postValue(r.error != null ? r.error : "تعذر تطبيق خلفية الغرفة");
+            }
         });
     }
 
