@@ -1851,3 +1851,133 @@ class _SocialPageState extends State<SocialPage> {
     ),
   );
 }
+
+
+/// Profile connections that were previously available from the native profile page.
+class ProfilePeoplePage extends StatefulWidget {
+  const ProfilePeoplePage({
+    required this.apiClient,
+    required this.accessToken,
+    required this.visitors,
+    super.key,
+  });
+
+  final JehoApiClient apiClient;
+  final String accessToken;
+  final bool visitors;
+
+  @override
+  State<ProfilePeoplePage> createState() => _ProfilePeoplePageState();
+}
+
+class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _people = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final people = widget.visitors
+          ? await widget.apiClient.getMyVisitors(widget.accessToken)
+          : await widget.apiClient.getMyFriends(widget.accessToken);
+      if (mounted) setState(() => _people = people);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تحميل القائمة. حاول مرة أخرى.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _value(Map<String, dynamic> person, List<String> keys, [String fallback = '—']) {
+    for (final key in keys) {
+      final value = person[key];
+      if (value != null && value.toString().trim().isNotEmpty) return value.toString();
+    }
+    return fallback;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.visitors ? 'زوار ملفي الشخصي' : 'أصدقائي';
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: 'تحديث',
+            onPressed: _loading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('إعادة المحاولة'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : _people.isEmpty
+                  ? Center(child: Text(widget.visitors ? 'لا يوجد زوار لعرضهم حاليًا.' : 'قائمة الأصدقاء فارغة حاليًا.'))
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _people.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        itemBuilder: (context, index) {
+                          final person = _people[index];
+                          final nested = person['user'] is Map<String, dynamic>
+                              ? person['user'] as Map<String, dynamic>
+                              : person;
+                          final name = _value(nested, ['displayName', 'username', 'name'], 'مستخدم JEHO');
+                          final id = _value(nested, ['publicId', 'vanityId', 'id']);
+                          final avatar = _value(nested, ['avatarUrl', 'avatar', 'photoUrl'], '');
+                          return Card(
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundImage: avatar.startsWith('http')
+                                    ? NetworkImage(avatar)
+                                    : null,
+                                child: avatar.startsWith('http')
+                                    ? null
+                                    : Text(name.isEmpty ? '؟' : name.characters.first),
+                              ),
+                              title: Text(name),
+                              subtitle: Text(widget.visitors
+                                  ? 'زار ملفك الشخصي · $id'
+                                  : 'المعرّف: $id'),
+                              trailing: Icon(widget.visitors ? Icons.visibility_outlined : Icons.people_alt_outlined),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+    );
+  }
+}
