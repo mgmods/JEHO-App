@@ -391,7 +391,7 @@ export class ConfigController {
         const apiBase = String(
           process.env.PUBLIC_API_URL ||
             process.env.API_PUBLIC_URL ||
-            'https://api.adnova.bbs.tr',
+            'https://jeho-own-backend.mgs.blitz.cloud',
         )
           .trim()
           .replace(/\/+$/, '')
