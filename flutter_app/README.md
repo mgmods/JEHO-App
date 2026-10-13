@@ -31,7 +31,8 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 - Initial Flutter games catalog reads Dashboard-controlled `config/games` and `config/offers`, opens configured web games, and applies the Dashboard `games` wallpaper when supplied. Native-only game modes, offline bundled game assets, daily task claiming, contests, and game store are not yet at parity.
 - Flutter home/profile, drama, and games surfaces now read the existing `config/theme` background configuration; image loading is optional and does not block navigation.
 - Wallet balances and transaction history, recharge packages and hosted checkout launch, withdrawal request submission, and withdrawal-status API support.
-- Gift catalog, sending gifts, gift history API, and room gift-to-host flow.
+- Gift catalog, sending gifts, gift history API, and room gift-to-host flow. Gift-sheet category tabs are loaded from the backend `GET gifts/categories` endpoint when configured; missing categories leave the full catalog accessible. Room seat artwork sizing was aligned with the original 100dp seat container and original classic seat assets.
+- Latest-commit validation is required for this branch; an earlier successful artifact must not be reused as the APK for later source changes.
 - Cosmetics catalog/inventory, purchase/equip/unequip API and UI.
 - Vanity ID catalog and purchase flow.
 - Social/CP hub, friends/visitors/relations, follow/block tools, and CP request/status flows exposed by existing endpoints.
