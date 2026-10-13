@@ -62,7 +62,7 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
     try {
       final token = await _apiClient.readAccessToken();
       if (token == null || token.isEmpty || !mounted) return;
-      final profile = await _apiClient.getMyProfile(token);
+      final profile = await _apiClient.getMyProfile(token).timeout(const Duration(seconds: 8));
       if (!mounted) return;
       setState(() {
         _session = {'accessToken': token, 'user': profile};
