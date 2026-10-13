@@ -26,6 +26,8 @@ class RoomDetailPage extends StatefulWidget {
 class _RoomDetailPageState extends State<RoomDetailPage> {
   final _picker = ImagePicker();
   bool _uploading = false;
+  bool _roomEntered = false;
+  bool _roomActionBusy = false;
   String? _backgroundUrl;
   String? _coverUrl;
   String? _error;
@@ -57,6 +59,50 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
     if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
     return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
+  Future<void> _roomAction(Future<Map<String, dynamic>> Function() action, String success) async {
+    if (_roomActionBusy) return;
+    setState(() { _roomActionBusy = true; _error = null; });
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(success)));
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _roomActionBusy = false);
+    }
+  }
+
+  Future<void> _enterRoom() async {
+    await _roomAction(
+      () => widget.apiClient.joinRoom(widget.accessToken, _roomId),
+      'تم تسجيل دخولك إلى الغرفة.',
+    );
+    if (mounted && _error == null) setState(() => _roomEntered = true);
+  }
+
+  Future<void> _leaveRoom() async {
+    await _roomAction(
+      () => widget.apiClient.leaveRoom(widget.accessToken, _roomId),
+      'غادرت الغرفة.',
+    );
+    if (mounted && _error == null) setState(() => _roomEntered = false);
+  }
+
+  Future<void> _takeSeat(int seatIndex) async {
+    await _roomAction(
+      () => widget.apiClient.takeSeat(widget.accessToken, _roomId, seatIndex),
+      'تم تنفيذ طلب المقعد.',
+    );
+  }
+
+  Future<void> _raiseHand() async {
+    await _roomAction(
+      () => widget.apiClient.raiseHand(widget.accessToken, _roomId),
+      'تم إرسال طلب المايك للمشرف.',
+    );
   }
 
   Future<void> _chooseCover() async {
@@ -170,6 +216,43 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}'),
           const SizedBox(height: 8),
           Text((widget.room['description'] ?? widget.room['topic'] ?? '').toString()),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : (_roomEntered ? _leaveRoom : _enterRoom),
+            icon: _roomActionBusy
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(_roomEntered ? Icons.logout_rounded : Icons.login_rounded),
+            label: Text(_roomActionBusy ? 'جارٍ التنفيذ…' : _roomEntered ? 'مغادرة الغرفة' : 'دخول الغرفة'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _raiseHand,
+            icon: const Icon(Icons.pan_tool_alt_rounded),
+            label: const Text('طلب المايك'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : () async {
+              final seat = await showModalBottomSheet<int>(
+                context: context,
+                builder: (context) => SafeArea(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      const ListTile(title: Text('اختر المقعد المطلوب')),
+                      for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
+                        ListTile(
+                          leading: CircleAvatar(child: Text('$index')),
+                          title: Text(index == 0 ? 'مقعد المضيف' : 'المقعد $index'),
+                          onTap: () => Navigator.pop(context, index),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+              if (seat != null && mounted) await _takeSeat(seat);
+            },
+            icon: const Icon(Icons.event_seat_rounded),
+            label: const Text('اختيار مقعد'),
+          ),
           if (coverUrl != null) ...[
             const SizedBox(height: 12),
             ClipRRect(
@@ -208,7 +291,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ],
           const SizedBox(height: 12),
           const Text(
-            'تغيير الخلفية يستخدم صلاحيات الخادم الحالية. إذا لم تكن مالك الغرفة أو مشرفًا مخولًا، سيرفض الخادم التغيير ولن تُحفظ الصورة كخلفية.',
+            'الدخول والمقاعد وطلب المايك هنا تتعامل مع واجهات الغرفة فقط. لم يتم تغيير نظام الصوت أو ZEGO؛ الاتصال الصوتي الحالي يبقى كما هو.',
             style: TextStyle(height: 1.5, color: Colors.black54),
           ),
         ],
