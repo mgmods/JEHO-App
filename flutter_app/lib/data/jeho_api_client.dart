@@ -903,7 +903,7 @@ class JehoApiClient {
       final message = decoded is Map<String, dynamic>
           ? (decoded['message'] ?? decoded['error'])
           : null;
-      throw JehoApiException(_safeMessage(message, response.statusCode));
+      throw JehoApiException(_safeMessage(message, response.statusCode), statusCode: response.statusCode);
     }
     if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
       return decoded['data'];
@@ -940,7 +940,7 @@ class JehoApiClient {
       final message = decoded is Map<String, dynamic>
           ? (decoded['message'] ?? decoded['error'])
           : null;
-      throw JehoApiException(_safeMessage(message, response.statusCode));
+      throw JehoApiException(_safeMessage(message, response.statusCode), statusCode: response.statusCode);
     }
     if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
       return decoded['data'];
