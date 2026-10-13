@@ -86,7 +86,14 @@ class _AuthPageState extends State<AuthPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: SafeArea(
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/original/android-res/drawable-nodpi/bg_auth_3d.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
