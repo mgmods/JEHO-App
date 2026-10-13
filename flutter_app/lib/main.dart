@@ -702,7 +702,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_home.webp', fallback: Icons.home_rounded, onTap: () {}),
+                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_tab_party.webp', fallback: Icons.home_rounded, onTap: () {}),
                           const SizedBox(width: 8),
                           _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_search_home.png', fallback: Icons.search_rounded, onTap: () {
                             setState(() => _selectedIndex = 1);
@@ -807,7 +807,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Expanded(
@@ -825,15 +825,14 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
                         onPressed: _loading ? null : _createRoom,
-                        icon: const Icon(Icons.add_circle_outline_rounded),
+                        icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
                         label: const Text('إنشاء غرفة'),
                       ),
                     ),
-                    const SizedBox(height: 10),
                     if (_loading)
                       const Padding(
                         padding: EdgeInsets.all(24),
@@ -867,7 +866,10 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         ),
                       )
                     else
-                      ..._rooms.map((room) {
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 10,
+                        children: _rooms.map((room) {
                         final title = (room['title'] ??
                                 room['name'] ??
                                 room['roomName'] ??
@@ -903,9 +905,11 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                             (room['description'] ?? room['notice'] ?? '')
                                 .toString()
                                 .trim();
-                        return Card(
+                        return SizedBox(
+                          width: (MediaQuery.sizeOf(context).width - 42) / 2,
+                          child: Card(
                           clipBehavior: Clip.antiAlias,
-                          margin: const EdgeInsets.only(bottom: 14),
+                          margin: EdgeInsets.zero,
                           elevation: 2,
                           shadowColor: const Color(0x1A493512),
                           shape: RoundedRectangleBorder(
@@ -930,7 +934,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 SizedBox(
-                                  height: 230,
+                                  height: 190,
                                   child: Stack(
                                     fit: StackFit.expand,
                                     children: [
@@ -1026,7 +1030,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 19,
+                                                  fontSize: 15,
                                                   fontWeight: FontWeight.w900,
                                                   shadows: [
                                                     Shadow(
@@ -1076,12 +1080,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                                   ),
                                 ),
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    14,
-                                    12,
-                                    14,
-                                    14,
-                                  ),
+                                  padding: const EdgeInsets.fromLTRB(9, 9, 9, 10),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
@@ -1166,8 +1165,10 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                               ],
                             ),
                           ),
+                        ),
                         );
-                      }),
+                      }).toList(),
+                      ),
                   ] else if (_selectedIndex == 1) ...[
                     const SizedBox(height: 20),
                     Row(
