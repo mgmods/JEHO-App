@@ -64,7 +64,6 @@ export const DASHBOARD_MODULES = [
   'gameAds',
   'drama',
   'banners',
-  'splash',
   'navIcons',
   'seatStickers',
   'reports',
