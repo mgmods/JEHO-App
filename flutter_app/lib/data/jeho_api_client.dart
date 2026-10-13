@@ -211,6 +211,23 @@ class JehoApiClient {
       _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/claim-reward', const {}, accessToken: token), 'تعذر استلام مكافأة الحلقة.');
 
   // Dashboard-managed visual theme (read-only; no theme settings are modified).
+  Future<Map<String, dynamic>> getSupportConfig() async =>
+      _asMap(await _get('config/support'), 'تعذر تحميل قنوات الدعم.');
+
+  Future<List<Map<String, dynamic>>> getVipPlans() async =>
+      _asList(await _get('vip/plans'), ['items', 'results', 'plans', 'data']);
+
+  Future<Map<String, dynamic>> purchaseVip(String token, {required int level, int durationDays = 30}) async =>
+      _asMap(await _post('vip/purchase', {'level': level, 'durationDays': durationDays}, accessToken: token), 'تعذر شراء VIP.');
+
+  Future<Map<String, dynamic>> changePassword(String token, {required String currentPassword, required String newPassword}) async =>
+      _asMap(await _post('auth/change-password', {'currentPassword': currentPassword, 'newPassword': newPassword}, accessToken: token), 'تعذر تغيير كلمة المرور.');
+
+  Future<String?> readLocalPreference(String key) => _secureStorage.read(key: 'jeho_pref_$key');
+
+  Future<void> writeLocalPreference(String key, String value) =>
+      _secureStorage.write(key: 'jeho_pref_$key', value: value);
+
   Future<Map<String, dynamic>> getAppTheme() async =>
       _asMap(await _get('config/theme'), 'تعذر تحميل إعدادات المظهر.');
 
