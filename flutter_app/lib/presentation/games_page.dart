@@ -109,7 +109,7 @@ class _GamesPageState extends State<GamesPage> {
           RefreshIndicator(
         onRefresh: _load,
         child: _loading
-            ? const ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))])
+            ? ListView(children: [SizedBox(height: 260, child: Center(child: CircularProgressIndicator()))])
             : _error != null
                 ? ListView(children: [
                     const SizedBox(height: 70),
