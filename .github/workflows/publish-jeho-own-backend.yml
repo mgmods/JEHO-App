@@ -1,4 +1,4 @@
-name: Publish JEHO-OWN backend image
+name: Publish JEHO-OWN backend image (jeho-own and mg-jeho)
 
 on:
   push:
