@@ -611,9 +611,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           const SizedBox(height: 14),
           Card(
             clipBehavior: Clip.antiAlias,
+            color: const Color(0xE51A1B29),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0x1AB68A35)),
+              side: const BorderSide(color: Color(0x66D7B45F)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
@@ -627,7 +628,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       const Expanded(
                         child: Text(
                           'مقاعد الغرفة',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white),
                         ),
                       ),
                       if (_detailsLoading)
@@ -658,10 +659,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: configuredSeatCount,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 6,
-                      childAspectRatio: .72,
+                      crossAxisCount: 4,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 4,
+                      childAspectRatio: .67,
                     ),
                     itemBuilder: (context, index) {
                       final seat = seatsByIndex[index] ?? <String, dynamic>{};
@@ -700,22 +701,22 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 54,
-                              height: 54,
+                              width: 55,
+                              height: 55,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: locked
-                                    ? const Color(0xFFE7E1D7)
+                                    ? const Color(0xFF393947)
                                     : occupied
-                                        ? const Color(0xFFFFE8B3)
-                                        : const Color(0xFFFFF7E5),
+                                        ? const Color(0xFF403727)
+                                        : const Color(0xFF292A38),
                                 border: Border.all(
                                   color: occupied
-                                      ? const Color(0xFFB68A35)
+                                      ? const Color(0xFFFFD978)
                                       : locked
-                                          ? const Color(0xFFB5AA98)
-                                          : const Color(0x55B68A35),
-                                  width: occupied ? 2 : 1,
+                                          ? const Color(0xFF777788)
+                                          : const Color(0x88C7A85A),
+                                  width: occupied ? 2.2 : 1.2,
                                 ),
                               ),
                               child: ClipOval(
@@ -725,7 +726,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                         fit: BoxFit.cover,
                                         errorBuilder: (_, __, ___) => Icon(
                                           Icons.person_rounded,
-                                          color: Color(0xFF8C641D),
+                                          color: Color(0xFFFFD978),
                                           size: 28,
                                         ),
                                       )
@@ -747,21 +748,21 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               index == 0 ? 'المضيف' : 'مقعد $index',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
                             ),
                             if (occupied && name.isNotEmpty)
                               Text(
                                 name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 9, color: Color(0xFF756B5B)),
+                                style: const TextStyle(fontSize: 9, color: Color(0xCCFFFFFF)),
                               )
                             else if (locked)
-                              const Text('مقفل', style: TextStyle(fontSize: 9, color: Color(0xFF756B5B)))
+                              const Text('مقفل', style: TextStyle(fontSize: 9, color: Color(0xCCFFFFFF)))
                             else
                               Text(
                                 canSelect ? 'متاح' : 'فارغ',
-                                style: const TextStyle(fontSize: 9, color: Color(0xFF756B5B)),
+                                style: const TextStyle(fontSize: 9, color: Color(0xCCFFFFFF)),
                               ),
                           ],
                         ),
@@ -774,7 +775,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                       child: Text(
                         'تظهر حالة المقاعد من تفاصيل الغرفة؛ اختر مقعدًا بعد الدخول.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 11, color: Color(0xFF756B5B)),
+                        style: TextStyle(fontSize: 11, color: Color(0xCCFFFFFF)),
                       ),
                     ),
                 ],
