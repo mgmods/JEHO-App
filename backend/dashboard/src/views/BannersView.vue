@@ -14,47 +14,7 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
-    <section class="widget-card p-3 mb-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-        <div>
-          <h3 class="h6 mb-1">شاشة الإعلان عند تشغيل التطبيق</h3>
-          <p class="form-text mb-0">تظهر مرة واحدة عند بدء تشغيل التطبيق بالكامل. إذا تعذّر تحميل الصورة، يتابع التطبيق تلقائيًا دون تعطيل الدخول.</p>
-        </div>
-        <button class="btn btn-aurora btn-sm" type="button" :disabled="splashSaving || splashUploading" @click="saveSplashAd">
-          {{ splashSaving ? 'جارٍ الحفظ…' : 'حفظ إعلان التشغيل' }}
-        </button>
-      </div>
-      <div class="row g-3 align-items-start">
-        <div class="col-12 col-lg-5">
-          <div class="rounded overflow-hidden bg-light d-flex align-items-center justify-content-center" style="min-height:180px;max-height:360px">
-            <img v-if="splashImageUrl" :src="splashPreviewUrl" alt="معاينة إعلان التشغيل" style="display:block;width:100%;max-height:360px;object-fit:contain" />
-            <div v-else class="text-muted p-4 text-center"><i class="bi bi-image fs-1 d-block mb-2"></i>لم يتم اختيار صورة إعلان</div>
-          </div>
-          <label class="form-label small mt-3">صورة الإعلان (PNG / JPG / WebP)</label>
-          <input ref="splashFileInput" type="file" accept="image/png,image/jpeg,image/webp" class="form-control form-control-sm" :disabled="splashUploading || splashSaving" @change="onSplashFile" />
-          <div class="form-text">{{ splashUploading ? 'جارٍ رفع الصورة إلى التخزين…' : 'الصورة تُرفع إلى خدمة التخزين الحالية ويُحفظ رابطها في إعدادات التطبيق المركزية.' }}</div>
-        </div>
-        <div class="col-12 col-lg-7">
-          <div class="form-check form-switch mb-3">
-            <input id="splash-ad-enabled" v-model="splashEnabled" class="form-check-input" type="checkbox" />
-            <label class="form-check-label" for="splash-ad-enabled">تفعيل إعلان التشغيل</label>
-          </div>
-          <label class="form-label small">مدة العرض بالثواني</label>
-          <input v-model.number="splashDuration" type="number" min="5" max="120" step="1" class="form-control form-control-sm mb-3" />
-          <label class="form-label small">الوجهة عند الضغط على الصورة</label>
-          <select v-model="splashTarget" class="form-select form-select-sm mb-2">
-            <option value="home">الرئيسية (home)</option>
-            <option value="messages">الرسائل (messages)</option>
-            <option value="drama">الدراما (drama)</option>
-            <option value="create_room">إنشاء غرفة (create_room)</option>
-            <option value="custom">رابط خارجي مخصص</option>
-          </select>
-          <input v-if="splashTarget === 'custom'" v-model="splashTargetUrl" type="url" class="form-control form-control-sm mb-3" placeholder="https://example.com/page" />
-          <p class="form-text">زر «تخطي» يظهر أسفل الإعلان. المدة الافتراضية 5 ثوانٍ. التعديلات تصل إلى التطبيق من إعدادات الخادم دون تحديث APK.</p>
-          <div v-if="splashMessage" class="alert py-2 mt-2" :class="splashError ? 'alert-warning' : 'alert-success'" role="status">{{ splashMessage }}</div>
-        </div>
-      </div>
-    </section>
+
 
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h3 class="h6 mb-0">{{ t('banners.home') }}</h3>
@@ -171,98 +131,7 @@ const success = ref('')
 const confirmOpen = ref(false)
 const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
-const splashFileInput = ref(null)
-const splashImageUrl = ref('')
-const splashPreviewUrl = ref('')
-const splashEnabled = ref(true)
-const splashDuration = ref(5)
-const splashTarget = ref('home')
-const splashTargetUrl = ref('')
-const splashSaving = ref(false)
-const splashUploading = ref(false)
-const splashMessage = ref('')
-const splashError = ref(false)
-let themeConfig = {}
 
-function splashAbsUrl(url) {
-  if (!url) return ''
-  const absolute = absUrl(url)
-  const separator = absolute.includes('?') ? '&' : '?'
-  return absolute + separator + 'preview=' + encodeURIComponent(String(themeConfig.version || 1) + '-' + String(themeConfig.updatedAt || ''))
-}
-
-async function onSplashFile(event) {
-  const file = event.target.files?.[0]
-  if (!file) return
-  if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
-    splashError.value = true
-    splashMessage.value = 'اختر صورة PNG أو JPG أو WebP صالحة.'
-    event.target.value = ''
-    return
-  }
-  splashUploading.value = true
-  splashMessage.value = ''
-  try {
-    const { data, error: err } = await uploadsApi.upload(file)
-    if (err) throw new Error(err.message || 'فشل رفع الصورة')
-    const url = data?.url || data?.data?.url || data?.path || data?.data?.path || ''
-    if (!url) throw new Error('تم الرفع دون الحصول على رابط الصورة')
-    splashImageUrl.value = url
-    splashPreviewUrl.value = URL.createObjectURL(file)
-    splashError.value = false
-    splashMessage.value = 'تم رفع الصورة. اضغط «حفظ إعلان التشغيل» لنشرها.'
-  } catch (err) {
-    splashError.value = true
-    splashMessage.value = err?.message || 'تعذّر رفع صورة الإعلان.'
-  } finally {
-    splashUploading.value = false
-  }
-}
-
-async function saveSplashAd() {
-  splashSaving.value = true
-  splashMessage.value = ''
-  splashError.value = false
-  try {
-    const duration = Math.max(5, Math.min(120, Math.floor(Number(splashDuration.value) || 5)))
-    const next = { ...(themeConfig || {}) }
-    const oldSplash = next.splash && typeof next.splash === 'object' ? next.splash : {}
-    const items = Array.isArray(oldSplash.items) ? [...oldSplash.items] : []
-    const current = items[0] && typeof items[0] === 'object' ? items[0] : {}
-    const target = splashTarget.value === 'custom'
-      ? String(splashTargetUrl.value || '').trim()
-      : splashTarget.value
-    if (target && /^https?:\/\//i.test(target) === false && !['home', 'messages', 'drama', 'create_room'].includes(target)) {
-      throw new Error('الوجهة غير صالحة. اختر وجهة داخلية أو رابطًا يبدأ بـ https://')
-    }
-    items[0] = {
-      ...current,
-      id: current.id || 'splash-ad-main',
-      url: splashImageUrl.value || current.url || '',
-      durationSeconds: duration,
-      active: !!splashEnabled.value && !!(splashImageUrl.value || current.url),
-      sortOrder: Number.isFinite(Number(current.sortOrder)) ? Number(current.sortOrder) : 0,
-      target,
-    }
-    // This dashboard control manages one active startup ad. Keep any legacy items
-    // in the existing config but deactivate them so an old image cannot rotate in.
-    for (let i = 1; i < items.length; i += 1) items[i] = { ...items[i], active: false }
-    next.splash = { ...oldSplash, enabled: !!splashEnabled.value && !!items[0].url, skipEnabled: true, items }
-    next.version = (Number(next.version) || 1) + 1
-    next.updatedAt = new Date().toISOString()
-    const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(next) })
-    if (err) throw new Error(err.message || 'تعذّر حفظ إعدادات الإعلان')
-    themeConfig = next
-    splashDuration.value = duration
-    splashPreviewUrl.value = splashAbsUrl(splashImageUrl.value)
-    splashMessage.value = 'تم حفظ إعلان التشغيل ونشر إعداداته. سيجلب التطبيق الصورة الجديدة عند التشغيل التالي.'
-  } catch (err) {
-    splashError.value = true
-    splashMessage.value = err?.message || 'تعذّر حفظ إعدادات الإعلان.'
-  } finally {
-    splashSaving.value = false
-  }
-}
 
 const {
   selectedIds,
@@ -369,30 +238,7 @@ async function load() {
   }
   const settingsRows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (data?.items || data?.data?.items || []))
   rows.value = parseSetting(settingsRows, 'home_banners', [])
-  const themeRow = settingsRows.find((s) => s?.key === 'app_theme')
-  try {
-    themeConfig = themeRow?.value ? JSON.parse(themeRow.value) : {}
-  } catch {
-    themeConfig = {}
-  }
-  const splash = themeConfig?.splash && typeof themeConfig.splash === 'object' ? themeConfig.splash : {}
-  const items = Array.isArray(splash.items) ? splash.items : []
-  const item = items[0] && typeof items[0] === 'object' ? items[0] : {}
-  splashImageUrl.value = String(item.url || '')
-  splashPreviewUrl.value = splashAbsUrl(splashImageUrl.value)
-  splashEnabled.value = splash.enabled !== false && item.active !== false
-  splashDuration.value = Math.max(5, Math.min(120, Number(item.durationSeconds) || 5))
-  const target = String(item.target || item.targetUrl || 'home')
-  if (['home', 'messages', 'drama', 'create_room'].includes(target)) {
-    splashTarget.value = target
-    splashTargetUrl.value = ''
-  } else if (/^https?:\/\//i.test(target)) {
-    splashTarget.value = 'custom'
-    splashTargetUrl.value = target
-  } else {
-    splashTarget.value = 'home'
-    splashTargetUrl.value = ''
-  }
+
 }
 
 async function save() {

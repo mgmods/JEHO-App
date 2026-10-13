@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UploadsService } from './uploads.service';
 import { ConfigService } from '@nestjs/config';
 import { AdminGuard } from '../../common/guards/admin.guard';
+import { Public } from '../../common/decorators';
 
 @ApiTags('Uploads')
 @ApiBearerAuth()
@@ -93,6 +94,7 @@ export class UploadsController {
     return this.uploadsService.processMany(files, this.userIdFrom(req));
   }
 
+  @Public()
   @Get(':filename')
   @ApiOperation({ summary: 'Serve a file stored in Supabase Storage for ephemeral deployments' })
   async serveStoredFile(@Param('filename') filename: string, @Res() res: any) {
@@ -101,6 +103,7 @@ export class UploadsController {
       if (!stored) return res.status(404).send('File not found');
       res.setHeader('Content-Type', stored.contentType);
       res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
       return res.status(200).send(stored.buffer);
     } catch {
       return res.status(502).send('Storage unavailable');

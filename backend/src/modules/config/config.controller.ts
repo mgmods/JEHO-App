@@ -1,9 +1,12 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Request } from 'express';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { User } from '../../database/entities/user.entity';
+import { Room } from '../../database/entities/room.entity';
+import { Agency } from '../../database/entities/agency.entity';
 import { Public } from '../../common/decorators';
 import { ZegoSettingsService } from '../zego/zego-settings.service';
 import { LiveKitSettingsService } from '../livekit/livekit-settings.service';
@@ -18,7 +21,40 @@ export class ConfigController {
     private readonly zegoSettingsService: ZegoSettingsService,
     private readonly liveKitSettingsService: LiveKitSettingsService,
     private readonly moderation: ContentModerationService,
+    @InjectRepository(User) private readonly usersRepo: Repository<User>,
+    @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(Agency) private readonly agenciesRepo: Repository<Agency>,
   ) {}
+
+  @Public()
+  @Get('splash-target')
+  @ApiOperation({ summary: 'Resolve a public room, agency, or user ID for splash ad navigation' })
+  async resolveSplashTarget(
+    @Query('type') type: string,
+    @Query('id') id: string,
+  ) {
+    const value = String(id || '').trim();
+    const kind = String(type || '').trim().toLowerCase();
+    if (!value || !['room', 'agency', 'user'].includes(kind)) {
+      return { found: false, type: kind, id: null };
+    }
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    const where: any[] = [{ publicId: value }];
+    if (isUuid) where.push({ id: value });
+    try {
+      const row = kind === 'room'
+        ? await this.roomsRepo.findOne({ where })
+        : kind === 'agency'
+          ? await this.agenciesRepo.findOne({ where })
+          : await this.usersRepo.findOne({ where });
+      if (!row || (kind === 'room' && (row as Room).status === 'closed')) {
+        return { found: false, type: kind, id: null };
+      }
+      return { found: true, type: kind, id: row.id };
+    } catch {
+      return { found: false, type: kind, id: null };
+    }
+  }
 
   @Public()
   @Get('zego')
@@ -347,8 +383,9 @@ export class ConfigController {
   }
 
   @Public()
+  @Public()
   @Get('theme')
-  @ApiOperation({ summary: 'Remote app theme/assets managed from server settings' })
+  @ApiOperation({ summary: 'Public remote app theme/assets, including startup splash ads' })
   async theme() {
     const row = await this.settingsRepo.findOne({ where: { key: 'app_theme' } });
     const defaults = {
