@@ -3,6 +3,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,11 +12,14 @@ import android.util.Log;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import android.widget.ImageView;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -25,6 +29,11 @@ import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AppFeatures;
+import com.Dramizo.Series.util.RemoteTheme;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import com.Dramizo.Series.util.GenderVerificationGate;
 import com.Dramizo.Series.util.InviteReferralHelper;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
@@ -37,6 +46,16 @@ public class SplashActivity extends ThemedActivity {
     private static final long SPLASH_MAX_MS = 1800L;
 
     private boolean navigated;
+    private boolean splashDecisionResolved;
+    private boolean splashAdShowing;
+    private boolean sessionPrepared;
+    private boolean sessionLoggedIn;
+    private AppContainer pendingContainer;
+    private AuthDtos.UserDto pendingUser;
+    private MiscDtos.SplashItemDto displayedSplashItem;
+    private String pendingSplashTarget;
+    private ImageView splashAdImage;
+    private View skipSplashAd;
     private String pendingRoomId;
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -56,6 +75,10 @@ public class SplashActivity extends ThemedActivity {
             parseDeepLink(getIntent());
             ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
+            splashAdImage = binding.imgSplashAd;
+            skipSplashAd = binding.btnSkipSplashAd;
+            splashAdImage.setOnClickListener(v -> finishSplashAd(true));
+            skipSplashAd.setOnClickListener(v -> finishSplashAd(false));
             EdgeToEdgeHelper.apply(this);
             EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
             EdgeToEdgeHelper.padBottom(binding.splashContent);
@@ -84,6 +107,7 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
+            startSplashAdLoad();
             mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
             mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
         } catch (Throwable t) {
@@ -154,6 +178,15 @@ public class SplashActivity extends ThemedActivity {
             i.putExtra(InviteReferralHelper.EXTRA_PENDING_INVITE, invite);
             i.putExtra(InviteReferralHelper.EXTRA_OPEN_INVITE, true);
         }
+        if ("messages".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+        } else if ("drama".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_DRAMA, true);
+        } else if ("create_room".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_CREATE_ROOM, true);
+        } else if ("home".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
+        }
     }
 
     private void prepareSession() {
@@ -166,13 +199,12 @@ public class SplashActivity extends ThemedActivity {
                 } catch (Throwable ignored) {}
             });
             boolean loggedIn = c.getSessionManager().isLoggedIn();
-            if (!loggedIn) {
-                openLogin();
-                return;
-            }
-            AuthDtos.UserDto cached = c.getSessionManager().getUser();
-            routeLoggedIn(c, cached);
-            refreshSessionInBackground(c);
+            sessionPrepared = true;
+            sessionLoggedIn = loggedIn;
+            pendingContainer = c;
+            pendingUser = loggedIn ? c.getSessionManager().getUser() : null;
+            if (loggedIn) refreshSessionInBackground(c);
+            if (splashDecisionResolved) continueStartupNavigation();
         } catch (Throwable t) {
             Log.e(TAG, "Session prepare failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
@@ -193,20 +225,40 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void forceLeaveSplash() {
-        if (navigated || isFinishing()) return;
-        try {
-            AppContainer c = ContainerProvider.from(this);
-            if (c.getSessionManager().isLoggedIn()) {
-                routeLoggedIn(c, c.getSessionManager().getUser());
-            } else {
-                openLogin();
-            }
-        } catch (Throwable t) {
-            openLogin();
+        if (navigated || isFinishing() || splashAdShowing) return;
+        splashDecisionResolved = true;
+        if (sessionPrepared) {
+            continueStartupNavigation();
+            return;
         }
+        if (!tryResumeLoggedInSession()) openLogin();
+    }
+
+    private void continueStartupNavigation() {
+        if (!splashDecisionResolved || !sessionPrepared || navigated || isFinishing()) return;
+        if (pendingContainer == null) {
+            if (!tryResumeLoggedInSession()) openLogin();
+            return;
+        }
+        if (!sessionLoggedIn) {
+            openLogin();
+            return;
+        }
+        routeLoggedInNow(pendingContainer, pendingUser);
     }
 
     private void routeLoggedIn(AppContainer c, AuthDtos.UserDto user) {
+        if (!splashDecisionResolved) {
+            sessionPrepared = true;
+            sessionLoggedIn = true;
+            pendingContainer = c;
+            pendingUser = user;
+            return;
+        }
+        routeLoggedInNow(c, user);
+    }
+
+    private void routeLoggedInNow(AppContainer c, AuthDtos.UserDto user) {
         if (navigated || isFinishing()) return;
         if (ProfileSetupActivity.isProfileComplete(user)) {
             if (GenderVerificationGate.needsVerification(user, c.getSessionManager())) {
@@ -220,6 +272,102 @@ public class SplashActivity extends ThemedActivity {
         } else {
             openProfileSetup();
         }
+    }
+
+    private void startSplashAdLoad() {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                try {
+                    // The public theme endpoint is refreshed before choosing the next ad.
+                    // RemoteTheme keeps its last good cache if the request fails.
+                    RemoteTheme.refreshFromApi(getApplicationContext(), c.getConfigApi());
+                    MiscDtos.SplashItemDto item = RemoteTheme.nextSplash(getApplicationContext());
+                    runOnUiThread(() -> {
+                        if (isFinishing() || splashDecisionResolved) return;
+                        if (item == null || item.url == null || item.url.trim().isEmpty()) {
+                            finishSplashAd(false);
+                            return;
+                        }
+                        try {
+                            Glide.with(SplashActivity.this)
+                                    .load(item.url)
+                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                                    .skipMemoryCache(true)
+                                    .into(new CustomTarget<Drawable>() {
+                                        @Override
+                                        public void onResourceReady(
+                                                Drawable resource,
+                                                Transition<? super Drawable> transition) {
+                                            if (isFinishing() || splashDecisionResolved) return;
+                                            splashAdImage.setImageDrawable(resource);
+                                            showSplashAd(item);
+                                        }
+
+                                        @Override
+                                        public void onLoadCleared(Drawable placeholder) {
+                                        }
+
+                                        @Override
+                                        public void onLoadFailed(Drawable errorDrawable) {
+                                            finishSplashAd(false);
+                                        }
+                                    });
+                        } catch (Throwable imageError) {
+                            Log.w(TAG, "Splash ad image could not be started", imageError);
+                            finishSplashAd(false);
+                        }
+                    });
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash ad config unavailable; continuing startup", error);
+                    runOnUiThread(() -> finishSplashAd(false));
+                }
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash ad setup unavailable; continuing startup", error);
+            finishSplashAd(false);
+        }
+    }
+
+    private void showSplashAd(MiscDtos.SplashItemDto item) {
+        if (splashDecisionResolved || isFinishing()) return;
+        displayedSplashItem = item;
+        splashAdShowing = true;
+        mainHandler.removeCallbacks(hardTimeout);
+        splashContentVisibilityGone();
+        splashAdImage.setVisibility(View.VISIBLE);
+        skipSplashAd.setVisibility(View.VISIBLE);
+        mainHandler.postDelayed(() -> finishSplashAd(false), RemoteTheme.splashDurationMs(item));
+    }
+
+    private void splashContentVisibilityGone() {
+        try {
+            ActivitySplashBinding binding = ActivitySplashBinding.bind(findViewById(android.R.id.content));
+            binding.splashContent.setVisibility(View.GONE);
+        } catch (Throwable ignored) {
+            // If view binding is unavailable, the ad still covers the full screen.
+        }
+    }
+
+    private void finishSplashAd(boolean clicked) {
+        if (splashDecisionResolved || isFinishing()) return;
+        if (clicked && displayedSplashItem != null) {
+            String target = displayedSplashItem.target;
+            if (target == null || target.trim().isEmpty()) target = displayedSplashItem.targetUrl;
+            pendingSplashTarget = target != null ? target.trim() : null;
+        } else {
+            pendingSplashTarget = null;
+        }
+        splashDecisionResolved = true;
+        splashAdShowing = false;
+        mainHandler.removeCallbacks(hardTimeout);
+        if (splashAdImage != null) splashAdImage.setVisibility(View.GONE);
+        if (skipSplashAd != null) skipSplashAd.setVisibility(View.GONE);
+        continueStartupNavigation();
+    }
+
+    private void finishSplashAd() {
+        finishSplashAd(false);
     }
 
     /** Refresh tokens + profile without holding the splash. */
@@ -265,6 +413,14 @@ public class SplashActivity extends ThemedActivity {
             Intent i = new Intent(this, MainActivity.class);
             putPendingExtras(i);
             startActivity(i);
+        }
+        if (pendingSplashTarget != null && pendingSplashTarget.matches("(?i)^https?://.+")) {
+            try {
+                Intent external = new Intent(Intent.ACTION_VIEW, Uri.parse(pendingSplashTarget));
+                startActivity(external);
+            } catch (Throwable error) {
+                Log.w(TAG, "Could not open splash ad destination", error);
+            }
         }
         finish();
     }
