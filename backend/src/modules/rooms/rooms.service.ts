@@ -1225,6 +1225,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return anim || url || null;
   }
 
+  /**
+   * Phone-uploaded room wallpapers are private upload assets, not Mall cosmetics.
+   * Keep their server-generated UUID paths when decorating GET /rooms responses.
+   */
+  private isUploadedRoomImageUrl(url: string | null | undefined): boolean {
+    const path = String(url || '').trim().split('?')[0];
+    return /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i.test(path);
+  }
+
   private async activeOwnedWearUrl(
     userId: string,
     url: string | null,
@@ -1346,14 +1355,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       else if (s.user?.id) userIds.push(s.user.id);
     }
     const vipMap = await this.vipMapForUsers(userIds);
-    const [equippedBackground] =
-      await Promise.all([
-        this.activeOwnedWearUrl(
-          room.backgroundEquippedById || room.hostId,
-          room.backgroundUrl,
-          false,
-        ),
-      ]);
+    const uploadedRoomBackground = this.isUploadedRoomImageUrl(room.backgroundUrl)
+      ? String(room.backgroundUrl).trim()
+      : null;
+    const [equippedBackground] = await Promise.all([
+      uploadedRoomBackground
+        ? Promise.resolve(uploadedRoomBackground)
+        : this.activeOwnedWearUrl(
+            room.backgroundEquippedById || room.hostId,
+            room.backgroundUrl,
+            false,
+          ),
+    ]);
     // Prefer room-level frame; fall back to host profile / host DTO (mall equip).
     const fromRoom =
       typeof room.roomCardUrl === 'string' && room.roomCardUrl.trim()
@@ -3519,10 +3532,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // Room owners may upload a private wallpaper from their phone. Only accept
       // server-generated /uploads UUID image paths here; catalog URLs still need
       // to pass the existing owned/free cosmetic check.
-      const uploadedImagePath = next.split('?')[0];
-      const isUploadedRoomImage =
-        /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i.test(uploadedImagePath);
-      if (!isUploadedRoomImage) {
+      if (!this.isUploadedRoomImageUrl(next)) {
         await this.assertOwnedRoomCosmetic(actorId, 'room_background', next);
       }
     }
