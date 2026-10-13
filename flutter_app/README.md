@@ -21,6 +21,7 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 ## Current partial Flutter flows (not production parity)
 
 - Arabic RTL theme and login/register/guest authentication, secure token storage, and session restoration.
+- Gift catalog tabs now load from the backend `GET /gifts/categories` endpoint when available; sending gifts still uses the backend send endpoint. Category filtering is UI-only and does not change pricing or balances.
 - Public room listing, room creation, room details, room entry/leave, password prompts, seat requests and selection, seat locking, room password lock, moderator actions, room follow, gift-to-host UI, room cover/background uploads, and room display controls where exposed by the existing API.
 - Profile display name/bio editing and avatar upload.
 - Direct-message list, message history, text sending, image/file attachment upload and sending, media rendering, message edit/unsend, mute/pin/archive/delete-for-me controls.
