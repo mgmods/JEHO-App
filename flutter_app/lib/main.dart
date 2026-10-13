@@ -30,6 +30,21 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
   void initState() {
     super.initState();
     _apiClient = JehoApiClient(baseUrl: apiBaseUrl);
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final token = await _apiClient.readAccessToken();
+    if (token == null || token.isEmpty || !mounted) return;
+    try {
+      final profile = await _apiClient.getMyProfile(token);
+      if (!mounted) return;
+      setState(() {
+        _session = {'accessToken': token, 'user': profile};
+      });
+    } on JehoApiException {
+      await _apiClient.clearSession();
+    }
   }
 
   @override
