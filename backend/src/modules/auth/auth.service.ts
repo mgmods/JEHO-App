@@ -453,8 +453,7 @@ export class AuthService implements OnModuleInit {
       const exists = await this.usersRepo.exist({ where: { publicId: id } });
       if (!exists) return id;
     }
-    // Extremely unlikely fallback
-    return String(Date.now()).slice(-8);
+    throw new ConflictException('تعذر إنشاء آيدي حساب فريد من ستة أرقام، حاول مرة أخرى');
   }
 
   /** Backfill numeric publicId for users who still use login/store name as ID. */
