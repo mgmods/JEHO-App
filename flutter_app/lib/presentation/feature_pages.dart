@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../data/jeho_api_client.dart';
 import 'discovery_hub_page.dart';
+import 'room_realtime_chat.dart';
 
 const _featureGold = Color(0xFFB68A35);
 
@@ -1089,96 +1090,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             ),
           ),
           const SizedBox(height: 10),
-          // Visual room chat shell. This migration's API client currently
-          // exposes room-chat clear/auto-clear only, not message fetch/send.
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0x773D8064),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0x55D9F3E2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    _RoomInfoPill(icon: Icons.chat_bubble_outline_rounded, label: 'الدردشة'),
-                    const SizedBox(width: 7),
-                    _RoomInfoPill(icon: Icons.groups_rounded, label: 'الجميع'),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'آخر الرسائل',
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('عرض الرسائل الحية يحتاج واجهة قراءة دردشة الغرفة من الخادم.')),
-                      ),
-                      icon: const Icon(Icons.keyboard_double_arrow_down_rounded, color: Color(0xFFFFD36B)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Container(
-                    constraints: const BoxConstraints(maxWidth: 280),
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC0A6948),
-                      borderRadius: const BorderRadiusDirectional.only(
-                        topStart: Radius.circular(15),
-                        topEnd: Radius.circular(15),
-                        bottomStart: Radius.circular(15),
-                        bottomEnd: Radius.circular(4),
-                      ),
-                      border: Border.all(color: const Color(0x55D9F3E2)),
-                    ),
-                    child: Text(
-                      (roomData['welcomeMessage'] ?? roomData['welcomeText'] ?? 'أهلاً وسهلاً بالجميع في الغرفة').toString(),
-                      style: const TextStyle(color: Color(0xFFEAF7EF), fontSize: 12, height: 1.4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if ((roomData['lastMessage'] ?? roomData['lastChatMessage'] ?? '').toString().trim().isNotEmpty)
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Container(
-                      constraints: const BoxConstraints(maxWidth: 280),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: const Color(0x66304F41),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        (roomData['lastMessage'] ?? roomData['lastChatMessage']).toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    ),
-                  )
-                else
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10),
-                    child: Text(
-                      'مساحة المحادثة جاهزة للعرض؛ الرسائل الحية غير متاحة عبر واجهة Flutter الحالية.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xBFEAF7EF), fontSize: 11, height: 1.5),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    _VoiceQuickAction(icon: Icons.celebration_rounded, label: 'الفعاليات', onTap: _openRoomEvents),
-                    const SizedBox(width: 5),
-                    _VoiceQuickAction(icon: Icons.grid_3x3_rounded, label: 'الألعاب', onTap: _startRoomGame),
-                    const SizedBox(width: 5),
-                    _VoiceQuickAction(icon: Icons.card_giftcard_rounded, label: 'الهدايا', onTap: _sendGiftToHost),
-                    const SizedBox(width: 5),
-                    _VoiceQuickAction(icon: Icons.pan_tool_alt_rounded, label: 'طلب المايك', onTap: _raiseHand),
-                  ],
-                ),
-              ],
-            ),
+          RoomRealtimeChat(
+            apiBaseUrl: widget.apiClient.baseUrl,
+            accessToken: widget.accessToken,
+            roomId: _roomId,
+            joined: _roomEntered,
+            welcomeMessage: (roomData['welcomeMessage'] ?? roomData['welcomeText'] ?? 'أهلاً وسهلاً بالجميع في الغرفة').toString(),
+            onEvents: _openRoomEvents,
+            onGames: _startRoomGame,
+            onGifts: _sendGiftToHost,
+            onRaiseHand: _raiseHand,
           ),
           const SizedBox(height: 10),
           Container(
