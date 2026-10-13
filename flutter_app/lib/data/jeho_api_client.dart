@@ -234,8 +234,59 @@ class JehoApiClient {
   Future<Map<String, dynamic>> banRoomUser(String token, String roomId, String userId, {int durationMinutes = 30}) async =>
       _asMap(await _post('rooms/$roomId/ban', {'userId': userId, 'durationMinutes': durationMinutes}, accessToken: token), 'تعذر حظر المستخدم.');
 
-  Future<Map<String, dynamic>> lockRoomSeat(String token, String roomId, int seatIndex, {bool locked = true}) async =>
-      _asMap(await _post('rooms/$roomId/seats/lock', {'seatIndex': seatIndex, 'locked': locked}, accessToken: token), 'تعذر تحديث قفل المقعد.');
+  Future<Map<String, dynamic>> setRoomPasswordLock(
+    String token,
+    String roomId, {
+    required bool locked,
+    String? password,
+  }) async =>
+      _asMap(
+        await _post(
+          'rooms/$roomId/lock',
+          {'locked': locked, if (password != null && password.isNotEmpty) 'password': password},
+          accessToken: token,
+        ),
+        'تعذر تحديث قفل الغرفة.',
+      );
+
+  Future<List<Map<String, dynamic>>> getSeatRequests(String token, String roomId) async =>
+      _asList(await _get('rooms/$roomId/seat-requests', accessToken: token), ['items', 'results', 'requests', 'data']);
+
+  Future<Map<String, dynamic>> respondSeatRequest(
+    String token,
+    String roomId,
+    String userId, {
+    required bool accept,
+    int? seatIndex,
+  }) async =>
+      _asMap(
+        await _post(
+          'rooms/$roomId/seat-requests/${accept ? 'approve' : 'reject'}',
+          {'userId': userId, if (accept && seatIndex != null) 'seatIndex': seatIndex},
+          accessToken: token,
+        ),
+        'تعذر تحديث طلب المقعد.',
+      );
+
+  Future<Map<String, dynamic>> inviteUserToSeat(String token, String roomId, String userId, {int? seatIndex}) async =>
+      _asMap(await _post('rooms/$roomId/seat-invites', {'userId': userId, if (seatIndex != null) 'seatIndex': seatIndex}, accessToken: token), 'تعذر إرسال دعوة المقعد.');
+
+  Future<Map<String, dynamic>> respondSeatInvite(String token, String roomId, {required bool accept}) async =>
+      _asMap(await _post('rooms/$roomId/seat-invites/respond', {'accept': accept}, accessToken: token), 'تعذر الرد على دعوة المقعد.');
+
+  Future<Map<String, dynamic>> setRoomModerator(String token, String roomId, String userId, {required bool enabled}) async {
+    final payload = enabled
+        ? await _post('rooms/$roomId/moderators/$userId', const {}, accessToken: token)
+        : await _delete('rooms/$roomId/moderators/$userId', accessToken: token);
+    return _asMap(payload, 'تعذر تحديث مشرف الغرفة.');
+  }
+
+  Future<Map<String, dynamic>> updateModeratorPermissions(String token, String roomId, String userId, Map<String, Object?> permissions) async =>
+      _asMap(await _patch('rooms/$roomId/moderators/$userId/permissions', permissions, accessToken: token), 'تعذر تحديث صلاحيات المشرف.');
+
+  Future<Map<String, dynamic>> setRoomLock(String token, String roomId, {required bool locked, String? password}) async =>
+      setRoomPasswordLock(token, roomId, locked: locked, password: password);
+
 
   Future<Map<String, dynamic>> raiseHand(String token, String roomId, {bool raised = true, int? seatIndex}) async =>
       _asMap(await _post('rooms/$roomId/raise-hand', {'raised': raised, if (seatIndex != null) 'seatIndex': seatIndex}, accessToken: token), 'تعذر إرسال طلب المايك.');
@@ -484,6 +535,22 @@ class JehoApiClient {
         if (accessToken != null && accessToken.isNotEmpty)
           'Authorization': 'Bearer $accessToken',
       }, body: jsonEncode(body)).timeout(const Duration(seconds: 20));
+    } on Exception {
+      throw const JehoApiException('تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.');
+    }
+    return _decodeResponse(response);
+  }
+
+  Future<dynamic> _delete(String endpoint, {String? accessToken}) async {
+    final base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/');
+    final uri = base.resolve(endpoint);
+    http.Response response;
+    try {
+      response = await _client.delete(uri, headers: {
+        'Accept': 'application/json',
+        if (accessToken != null && accessToken.isNotEmpty)
+          'Authorization': 'Bearer $accessToken',
+      }).timeout(const Duration(seconds: 20));
     } on Exception {
       throw const JehoApiException('تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.');
     }
