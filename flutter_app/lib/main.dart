@@ -34,16 +34,22 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
   }
 
   Future<void> _restoreSession() async {
-    final token = await _apiClient.readAccessToken();
-    if (token == null || token.isEmpty || !mounted) return;
     try {
+      final token = await _apiClient.readAccessToken();
+      if (token == null || token.isEmpty || !mounted) return;
       final profile = await _apiClient.getMyProfile(token);
       if (!mounted) return;
       setState(() {
         _session = {'accessToken': token, 'user': profile};
       });
     } on JehoApiException {
-      await _apiClient.clearSession();
+      try {
+        await _apiClient.clearSession();
+      } catch (_) {
+        // A storage plugin may not be available in widget-test environments.
+      }
+    } catch (_) {
+      // Keep the login screen usable if secure storage is unavailable.
     }
   }
 
