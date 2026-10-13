@@ -55,6 +55,7 @@ public class SplashActivity extends ThemedActivity {
     private MiscDtos.SplashItemDto displayedSplashItem;
     private String pendingSplashTarget;
     private ImageView splashAdImage;
+    private View splashContentView;
     private View skipSplashAd;
     private String pendingRoomId;
     private String pendingInviteCode;
@@ -76,6 +77,7 @@ public class SplashActivity extends ThemedActivity {
             ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
             splashAdImage = binding.imgSplashAd;
+            splashContentView = binding.splashContent;
             skipSplashAd = binding.btnSkipSplashAd;
             splashAdImage.setOnClickListener(v -> finishSplashAd(true));
             skipSplashAd.setOnClickListener(v -> finishSplashAd(false));
@@ -341,12 +343,7 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void splashContentVisibilityGone() {
-        try {
-            ActivitySplashBinding binding = ActivitySplashBinding.bind(findViewById(android.R.id.content));
-            binding.splashContent.setVisibility(View.GONE);
-        } catch (Throwable ignored) {
-            // If view binding is unavailable, the ad still covers the full screen.
-        }
+        if (splashContentView != null) splashContentView.setVisibility(View.GONE);
     }
 
     private void finishSplashAd(boolean clicked) {
