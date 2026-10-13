@@ -173,6 +173,31 @@ class JehoApiClient {
     return items.whereType<Map<String, dynamic>>().toList(growable: false);
   }
 
+  // Drama catalog migrated from the existing Android DramaApi routes.
+  Future<Map<String, dynamic>> getDramaConfig() async =>
+      _asMap(await _get('drama/config'), 'تعذر تحميل إعدادات الدراما.');
+
+  Future<List<Map<String, dynamic>>> getDramaSeries() async =>
+      _asList(await _get('drama/series'), ['items', 'results', 'series', 'data']);
+
+  Future<Map<String, dynamic>> getDramaSeriesDetail(String seriesId) async =>
+      _asMap(await _get('drama/series/${Uri.encodeComponent(seriesId)}'), 'تعذر تحميل تفاصيل المسلسل.');
+
+  Future<Map<String, dynamic>> viewDramaSeries(String seriesId, {String? token}) async =>
+      _asMap(await _post('drama/series/${Uri.encodeComponent(seriesId)}/view', const {}, accessToken: token), 'تعذر تسجيل مشاهدة المسلسل.');
+
+  Future<Map<String, dynamic>> likeDramaSeries(String seriesId, {String? token}) async =>
+      _asMap(await _post('drama/series/${Uri.encodeComponent(seriesId)}/like', const {}, accessToken: token), 'تعذر تحديث إعجاب المسلسل.');
+
+  Future<Map<String, dynamic>> viewDramaEpisode(String episodeId, {String? token}) async =>
+      _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/view', const {}, accessToken: token), 'تعذر تسجيل مشاهدة الحلقة.');
+
+  Future<Map<String, dynamic>> likeDramaEpisode(String episodeId, {String? token}) async =>
+      _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/like', const {}, accessToken: token), 'تعذر تحديث إعجاب الحلقة.');
+
+  Future<Map<String, dynamic>> claimDramaEpisodeReward(String episodeId, String token) async =>
+      _asMap(await _post('drama/episodes/${Uri.encodeComponent(episodeId)}/claim-reward', const {}, accessToken: token), 'تعذر استلام مكافأة الحلقة.');
+
   // Notifications, rankings, events and games use existing backend routes.
   Future<List<Map<String, dynamic>>> getNotifications(String token) async =>
       _asList(await _get('notifications?page=1&limit=30', accessToken: token), ['items', 'results', 'data']);
