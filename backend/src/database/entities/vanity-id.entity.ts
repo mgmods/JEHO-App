@@ -54,6 +54,10 @@ export class VanityId {
   @Column({ type: 'varchar', length: 32, nullable: true })
   previousPublicId!: string | null;
 
+  /** Restore the room/agency ID that was present before this vanity ID was equipped. */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  previousTargetPublicId!: string | null;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt!: Date;
 
