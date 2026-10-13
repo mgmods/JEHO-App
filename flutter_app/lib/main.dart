@@ -208,7 +208,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int>(
-                    value: seatCount,
+                    initialValue: seatCount,
                     decoration: const InputDecoration(labelText: 'عدد المقاعد'),
                     items: [2, 5, 8, 11, 15, 20, 30]
                         .map((count) => DropdownMenuItem<int>(
