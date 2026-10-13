@@ -172,6 +172,63 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
     );
   }
 
+  Future<void> _showRoomDisplaySettings() async {
+    if (_roomActionBusy || !_roomEntered) return;
+    final room = _activeRoom;
+    final settings = <String, bool>{
+      'chatZoneEnabled': room['chatZoneEnabled'] is bool ? room['chatZoneEnabled'] as bool : true,
+      'charmEnabled': room['charmEnabled'] is bool ? room['charmEnabled'] as bool : true,
+      'bannerEnabled': room['bannerEnabled'] is bool ? room['bannerEnabled'] as bool : true,
+      'entryEffectsEnabled': room['entryEffectsEnabled'] is bool ? room['entryEffectsEnabled'] as bool : true,
+      'lowGiftEffectsEnabled': room['lowGiftEffectsEnabled'] is bool ? room['lowGiftEffectsEnabled'] as bool : true,
+    };
+    const labels = <String, String>{
+      'chatZoneEnabled': 'إظهار منطقة الدردشة',
+      'charmEnabled': 'إظهار إطارات الزينة',
+      'bannerEnabled': 'إظهار البنرات',
+      'entryEffectsEnabled': 'تأثيرات دخول الأعضاء',
+      'lowGiftEffectsEnabled': 'تقليل تأثيرات الهدايا',
+    };
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.tune_rounded, color: _featureGold),
+            SizedBox(width: 8),
+            Expanded(child: Text('إعدادات عرض الغرفة')),
+          ]),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: settings.keys.map((key) => SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(labels[key]!),
+                value: settings[key]!,
+                onChanged: (value) => setDialogState(() => settings[key] = value),
+              )).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton.icon(onPressed: () => Navigator.pop(dialogContext, true), icon: const Icon(Icons.save_rounded), label: const Text('حفظ الإعدادات')),
+          ],
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    await _roomAction(
+      () => widget.apiClient.setRoomDisplaySettings(
+        widget.accessToken,
+        _roomId,
+        settings.map((key, value) => MapEntry(key, value as Object?)),
+      ),
+      'تم حفظ إعدادات عرض الغرفة.',
+    );
+    if (mounted && _error == null) await _loadRoomDetails();
+  }
+
   Future<void> _showSeatRequests() async {
     if (_roomActionBusy) return;
     try {
@@ -751,6 +808,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
             onPressed: _roomActionBusy || !_roomEntered ? null : _showModerationTools,
             icon: const Icon(Icons.admin_panel_settings_outlined),
             label: const Text('إشراف الغرفة: إخراج أو حظر'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomDisplaySettings,
+            icon: const Icon(Icons.tune_rounded),
+            label: const Text('إعدادات عرض الغرفة'),
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
