@@ -77,6 +77,8 @@ class MainActivity : ThemedActivity() {
         const val EXTRA_OPEN_HOME = "open_home"
         const val EXTRA_OPEN_MESSAGES = "open_messages"
         const val EXTRA_OPEN_DRAMA = "open_drama"
+        const val EXTRA_OPEN_PROFILE_USER_ID = "open_profile_user_id"
+        const val EXTRA_OPEN_AGENCY_ID = "open_agency_id"
         private const val FLOATING_PREFS = "home_floating_widgets"
     }
 
@@ -225,6 +227,27 @@ class MainActivity : ThemedActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_DRAMA, false)) {
             intent.removeExtra(EXTRA_OPEN_DRAMA)
             go(R.id.nav_drama)
+        }
+        val targetUserId = intent.getStringExtra(EXTRA_OPEN_PROFILE_USER_ID)
+        if (!targetUserId.isNullOrBlank()) {
+            intent.removeExtra(EXTRA_OPEN_PROFILE_USER_ID)
+            binding?.root?.post {
+                if (!isFinishing) {
+                    startActivity(
+                        Intent(this, com.Dramizo.Series.presentation.profile.ProfileActivity::class.java)
+                            .putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, targetUserId),
+                    )
+                }
+            }
+        }
+        val targetAgencyId = intent.getStringExtra(EXTRA_OPEN_AGENCY_ID)
+        if (!targetAgencyId.isNullOrBlank()) {
+            intent.removeExtra(EXTRA_OPEN_AGENCY_ID)
+            binding?.root?.postDelayed({
+                if (!isFinishing) {
+                    com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet.show(this, targetAgencyId)
+                }
+            }, 350L)
         }
     }
 
