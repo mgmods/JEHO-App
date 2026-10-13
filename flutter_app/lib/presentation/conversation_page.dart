@@ -208,6 +208,87 @@ class _ConversationPageState extends State<ConversationPage> {
     }
   }
 
+  Future<void> _manageMessage(Map<String, dynamic> message, {required bool isMine}) async {
+    final messageId = (message['id'] ?? message['messageId'] ?? '').toString();
+    if (!isMine || messageId.isEmpty) return;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('تعديل الرسالة'),
+              onTap: () => Navigator.pop(sheetContext, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo_rounded),
+              title: const Text('سحب الرسالة'),
+              onTap: () => Navigator.pop(sheetContext, 'unsend'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'edit') {
+      final controller = TextEditingController(text: (message['content'] ?? '').toString());
+      try {
+        final content = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('تعديل الرسالة'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 5,
+              maxLength: 4000,
+              decoration: const InputDecoration(labelText: 'نص الرسالة'),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('حفظ')),
+            ],
+          ),
+        );
+        if (content == null || content.isEmpty || !mounted) return;
+        final updated = await widget.apiClient.editMessage(widget.accessToken, messageId, content);
+        if (!mounted) return;
+        setState(() {
+          final index = _messages.indexWhere((item) => (item['id'] ?? item['messageId']).toString() == messageId);
+          if (index >= 0) _messages[index] = {..._messages[index], ...updated, 'content': content};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تعديل الرسالة.')));
+      } on JehoApiException catch (error) {
+        if (mounted) setState(() => _error = error.message);
+      } finally {
+        controller.dispose();
+      }
+    } else {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('سحب الرسالة؟'),
+          content: const Text('سيطلب التطبيق من الخادم سحب الرسالة وفق صلاحياته وسياساته.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('سحب')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+      try {
+        await widget.apiClient.unsendMessage(widget.accessToken, messageId);
+        if (!mounted) return;
+        await _loadMessages();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم طلب سحب الرسالة.')));
+      } on JehoApiException catch (error) {
+        if (mounted) setState(() => _error = error.message);
+      }
+    }
+  }
+
   Future<void> _manageConversation(String action) async {
     final token = widget.accessToken;
     if (_conversationId.isEmpty || token.isEmpty) return;
@@ -325,7 +406,9 @@ class _ConversationPageState extends State<ConversationPage> {
                               alignment: isMine
                                   ? Alignment.centerLeft
                                   : Alignment.centerRight,
-                              child: Container(
+                              child: GestureDetector(
+                                onLongPress: isMine ? () => _manageMessage(message, isMine: isMine) : null,
+                                child: Container(
                                 constraints: const BoxConstraints(maxWidth: 320),
                                 margin: const EdgeInsets.symmetric(vertical: 4),
                                 padding: const EdgeInsets.symmetric(
@@ -380,6 +463,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                     ],
                                     if (content.isNotEmpty || message['media'] == null) Text(text),
                                   ],
+                                ),
                                 ),
                               ),
                             );
