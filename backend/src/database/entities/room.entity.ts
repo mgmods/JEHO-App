@@ -94,6 +94,11 @@ export class Room {
   @Column({ type: 'enum', enum: RoomStatus, default: RoomStatus.OPEN })
   status: RoomStatus;
 
+  /** Independent six-digit public room ID, separate from the host's account ID. */
+  @Index({ unique: true })
+  @Column({ type: 'varchar', length: 6, nullable: true })
+  publicId: string | null;
+
   @Index()
   @Column({ type: 'uuid' })
   hostId: string;
