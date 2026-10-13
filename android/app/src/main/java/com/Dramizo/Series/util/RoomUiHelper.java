@@ -75,16 +75,12 @@ public final class RoomUiHelper {
         lockOverlay.setVisibility(room != null && room.hasPassword ? View.VISIBLE : View.GONE);
     }
 
-    /** Numeric id for room header/search — prefers API displayRoomId, then host publicId. */
+    /** Independent numeric room ID; never fall back to the host's account ID. */
     @NonNull
     public static String displayRoomId(@Nullable RoomDtos.RoomDto room) {
         if (room == null) return "—";
         if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
             return room.displayRoomId.trim();
-        }
-        if (room.host != null) {
-            String pid = room.host.displayPublicId();
-            if (!pid.isEmpty()) return pid;
         }
         return "—";
     }
