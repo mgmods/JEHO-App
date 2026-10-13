@@ -323,6 +323,9 @@ class JehoApiClient {
   Future<Map<String, dynamic>> joinRoom(String token, String roomId, {String? password}) async =>
       _asMap(await _post('rooms/$roomId/join', {if (password != null) 'password': password}, accessToken: token), 'تعذر دخول الغرفة.');
 
+  Future<Map<String, dynamic>> getRoomDetails(String token, String roomId) async =>
+      _asMap(await _get('rooms/$roomId', accessToken: token), 'تعذر تحميل تفاصيل الغرفة.');
+
   Future<Map<String, dynamic>> leaveRoom(String token, String roomId) async =>
       _asMap(await _post('rooms/$roomId/leave', const {}, accessToken: token), 'تعذر مغادرة الغرفة.');
 
