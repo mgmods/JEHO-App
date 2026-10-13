@@ -471,11 +471,6 @@ class JehoApiClient {
   Future<Map<String, dynamic>> startConversation(String token, String peerId) async =>
       _asMap(await _post('chat/conversations', {'peerId': peerId}, accessToken: token), 'تعذر بدء المحادثة.');
 
-  Future<List<Map<String, dynamic>>> searchUsers(String query) async {
-    final payload = await _get('users/search?q=${Uri.encodeQueryComponent(query)}&page=1&limit=20');
-    return _asList(payload, ['items', 'results', 'users', 'data']);
-  }
-
   Future<Map<String, dynamic>> socialRequest(String token, String userId, {String type = 'friend'}) async =>
       _asMap(await _post('users/$userId/request', {'type': type}, accessToken: token), 'تعذر إرسال طلب العلاقة.');
 
