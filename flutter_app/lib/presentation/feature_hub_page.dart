@@ -70,6 +70,35 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
     }
   }
 
+  Future<void> _showAgencyJoinCode() async {
+    final codeController = TextEditingController();
+    try {
+      final code = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('الانضمام إلى وكالة'),
+          content: TextField(
+            controller: codeController,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'كود تفعيل الوكالة'),
+            onSubmitted: (_) => Navigator.pop(dialogContext, codeController.text.trim()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, codeController.text.trim()), child: const Text('إرسال')),
+          ],
+        ),
+      );
+      if (code == null || code.trim().isEmpty || !mounted) return;
+      await _runAction(
+        () async { await widget.apiClient.joinAgencyByCode(widget.accessToken, code); },
+        'تم إرسال طلب الانضمام باستخدام كود الوكالة.',
+      );
+    } finally {
+      codeController.dispose();
+    }
+  }
+
   Future<void> _showAgencyApplication() async {
     final name = TextEditingController();
     final description = TextEditingController();
@@ -209,13 +238,25 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
           if (_section == 2)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _loading ? null : _showAgencyApplication,
-                  icon: const Icon(Icons.add_business_rounded),
-                  label: const Text('تقديم طلب إنشاء وكالة'),
-                ),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _showAgencyApplication,
+                      icon: const Icon(Icons.add_business_rounded),
+                      label: const Text('تقديم طلب إنشاء وكالة'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading ? null : _showAgencyJoinCode,
+                      icon: const Icon(Icons.key_rounded),
+                      label: const Text('الانضمام بكود تفعيل'),
+                    ),
+                  ),
+                ],
               ),
             ),
           if (_section == 0)
