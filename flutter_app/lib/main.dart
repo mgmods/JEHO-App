@@ -610,6 +610,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           icon: const Icon(Icons.auto_awesome_rounded),
                           label: const Text('الإطارات والزينة'),
                         ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => CosmeticsPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.auto_awesome_rounded),
+                          label: const Text('الإطارات والزينة'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 18),
