@@ -1278,6 +1278,8 @@ class _SocialHubPageState extends State<SocialHubPage> {
   List<Map<String, dynamic>> _friends = const [];
   List<Map<String, dynamic>> _visitors = const [];
   List<Map<String, dynamic>> _relations = const [];
+  List<Map<String, dynamic>> _cpRequests = const [];
+  bool _cpBusy = false;
 
   @override
   void initState() { super.initState(); _load(); }
@@ -1291,17 +1293,135 @@ class _SocialHubPageState extends State<SocialHubPage> {
         widget.apiClient.getMyVisitors(widget.accessToken),
         widget.apiClient.getMyRelations(widget.accessToken),
       ]);
+      List<Map<String, dynamic>> cpRequests = const [];
+      try {
+        cpRequests = await widget.apiClient.getCpRequests(widget.accessToken);
+      } on JehoApiException {
+        // Keep the CP profile visible if pending-request access is unavailable.
+      }
       if (!mounted) return;
       setState(() {
         _cp = results[0] as Map<String, dynamic>;
         _friends = results[1] as List<Map<String, dynamic>>;
         _visitors = results[2] as List<Map<String, dynamic>>;
         _relations = results[3] as List<Map<String, dynamic>>;
+        _cpRequests = cpRequests;
       });
     } on JehoApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _createCpRequest() async {
+    final recipient = TextEditingController();
+    final room = TextEditingController();
+    String type = 'love';
+    try {
+      final form = await showDialog<Map<String, String>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('طلب علاقة CP'),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: recipient, decoration: const InputDecoration(labelText: 'معرّف المستخدم المستلم')),
+                const SizedBox(height: 8),
+                TextField(controller: room, decoration: const InputDecoration(labelText: 'معرّف الغرفة')),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'نوع العلاقة'),
+                  items: const [
+                    DropdownMenuItem(value: 'love', child: Text('الحب')),
+                    DropdownMenuItem(value: 'friendship', child: Text('الصداقة')),
+                    DropdownMenuItem(value: 'brotherhood', child: Text('الأخوة')),
+                  ],
+                  onChanged: (value) { if (value != null) setDialogState(() => type = value); },
+                ),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, {
+                'recipientId': recipient.text.trim(),
+                'roomId': room.text.trim(),
+                'type': type,
+              }), child: const Text('إرسال الطلب')),
+            ],
+          ),
+        ),
+      );
+      if (form == null || !mounted) return;
+      if ((form['recipientId'] ?? '').isEmpty || (form['roomId'] ?? '').isEmpty) {
+        setState(() => _error = 'أدخل معرّف المستلم ومعرّف الغرفة.');
+        return;
+      }
+      setState(() { _cpBusy = true; _error = null; });
+      await widget.apiClient.createCpRequest(
+        widget.accessToken,
+        recipientId: form['recipientId']!,
+        roomId: form['roomId']!,
+        type: form['type']!,
+        idempotencyKey: 'cp-${DateTime.now().microsecondsSinceEpoch}',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب CP.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      recipient.dispose();
+      room.dispose();
+      if (mounted) setState(() => _cpBusy = false);
+    }
+  }
+
+  Future<void> _respondToCpRequest(Map<String, dynamic> request, {required bool accept}) async {
+    final id = (request['id'] ?? request['requestId'] ?? '').toString();
+    if (id.isEmpty || _cpBusy) return;
+    setState(() { _cpBusy = true; _error = null; });
+    try {
+      await widget.apiClient.respondCpRequest(widget.accessToken, id, accept: accept);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(accept ? 'تم قبول طلب CP.' : 'تم رفض طلب CP.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _cpBusy = false);
+    }
+  }
+
+  Future<void> _endCp(Map<String, dynamic> relation) async {
+    final id = (relation['id'] ?? relation['relationshipId'] ?? relation['cpId'] ?? '').toString();
+    if (id.isEmpty || _cpBusy) {
+      setState(() => _error = 'لا يوجد معرّف علاقة صالح لإنهائها.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إنهاء العلاقة؟'),
+        content: const Text('سيُرسل طلب الإنهاء إلى الخادم.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('إنهاء')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() { _cpBusy = true; _error = null; });
+    try {
+      await widget.apiClient.endCpRelationship(widget.accessToken, id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب إنهاء العلاقة.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _cpBusy = false);
     }
   }
 
@@ -1397,7 +1517,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
     final score = _cp['intimacyScore'] ?? _cp['score'] ?? _cp['intimacy'] ?? 0;
     final level = _cp['level'] ?? _cp['cpLevel'] ?? 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('CP والعلاقات'), actions: [IconButton(tooltip: 'إضافة صديق', onPressed: _searchAndRequestFriend, icon: const Icon(Icons.person_add_alt_1_rounded)), IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+      appBar: AppBar(title: const Text('CP والعلاقات'), actions: [IconButton(tooltip: 'طلب CP', onPressed: _loading || _cpBusy ? null : _createCpRequest, icon: const Icon(Icons.favorite_border_rounded)), IconButton(tooltip: 'إضافة صديق', onPressed: _searchAndRequestFriend, icon: const Icon(Icons.person_add_alt_1_rounded)), IconButton(onPressed: _loading || _cpBusy ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
       body: Column(children: [
         SizedBox(
           height: 54,
@@ -1428,7 +1548,18 @@ class _SocialHubPageState extends State<SocialHubPage> {
                             Text('نقاط القرب: $score'),
                             Text('مستوى CP: $level'),
                             const SizedBox(height: 10),
-                            const Text('بيانات CP معروضة من الخادم. إرسال الطلبات وتغيير الشريك غير مفعّل من هذه الشاشة.'),
+                            FilledButton.icon(onPressed: _cpBusy ? null : _createCpRequest, icon: const Icon(Icons.favorite_rounded), label: const Text('إرسال طلب CP')),
+                            const SizedBox(height: 12),
+                            const Align(alignment: AlignmentDirectional.centerStart, child: Text('طلبات CP', style: TextStyle(fontWeight: FontWeight.w800))),
+                            if (_cpRequests.isEmpty) const Padding(padding: EdgeInsets.all(10), child: Text('لا توجد طلبات معلّقة.')),
+                            for (final request in _cpRequests) Card(child: ListTile(
+                              title: Text((request['senderName'] ?? request['recipientName'] ?? request['user']?['displayName'] ?? 'طلب CP').toString()),
+                              subtitle: Text((request['type'] ?? request['status'] ?? '').toString()),
+                              trailing: Wrap(spacing: 0, children: [
+                                IconButton(tooltip: 'قبول', onPressed: _cpBusy ? null : () => _respondToCpRequest(request, accept: true), icon: const Icon(Icons.check_circle_outline, color: Colors.green)),
+                                IconButton(tooltip: 'رفض', onPressed: _cpBusy ? null : () => _respondToCpRequest(request, accept: false), icon: const Icon(Icons.cancel_outlined, color: Colors.red)),
+                              ]),
+                            )),
                           ]),
                         )),
                         ListTile(leading: const Icon(Icons.people_alt_rounded), title: const Text('الأصدقاء'), trailing: Text('${_friends.length}')),
@@ -1452,6 +1583,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
                               ),
                               title: Text(_name(row)),
                               subtitle: Text((row['type'] ?? row['relationType'] ?? '').toString()),
+                               trailing: _tab == 3 ? IconButton(tooltip: 'إنهاء العلاقة', onPressed: _cpBusy ? null : () => _endCp(row), icon: const Icon(Icons.link_off_rounded)) : null,
                             );
                           },
                         ),
