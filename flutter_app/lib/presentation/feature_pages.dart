@@ -29,6 +29,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   bool _uploading = false;
   bool _roomEntered = false;
   bool _roomActionBusy = false;
+  bool _detailsLoading = false;
+  Map<String, dynamic>? _roomDetails;
   String? _backgroundUrl;
   String? _coverUrl;
   String? _error;
@@ -51,7 +53,35 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
         _backgroundUrl = origin.resolve(initial.startsWith('/') ? initial : '/$initial').toString();
       }
     }
+    _loadRoomDetails();
   }
+
+  Future<void> _loadRoomDetails() async {
+    if (widget.accessToken.isEmpty || _roomId.isEmpty || _detailsLoading) return;
+    setState(() => _detailsLoading = true);
+    try {
+      final response = await widget.apiClient.getRoomDetails(widget.accessToken, _roomId);
+      final details = response['room'] is Map<String, dynamic>
+          ? response['room'] as Map<String, dynamic>
+          : response;
+      if (!mounted) return;
+      setState(() {
+        _roomDetails = details;
+        final cover = (details['coverUrl'] ?? details['coverImage'] ?? '').toString();
+        if (cover.isNotEmpty) _coverUrl = _resolveMedia(cover);
+        final background = (details['backgroundUrl'] ?? details['background'] ?? '').toString();
+        if (background.isNotEmpty) _backgroundUrl = _resolveMedia(background);
+      });
+    } on JehoApiException catch (error) {
+      if (mounted && _roomDetails == null) {
+        setState(() => _error = error.message);
+      }
+    } finally {
+      if (mounted) setState(() => _detailsLoading = false);
+    }
+  }
+
+  Map<String, dynamic> get _activeRoom => {...widget.room, ...?_roomDetails};
 
   String _resolveMedia(String value) {
     if (value.startsWith('http://') || value.startsWith('https://')) return value;
@@ -126,6 +156,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
       () => widget.apiClient.takeSeat(widget.accessToken, _roomId, seatIndex),
       'تم تنفيذ طلب المقعد.',
     );
+    if (mounted && _error == null) await _loadRoomDetails();
   }
 
   Future<void> _raiseHand() async {
@@ -464,11 +495,26 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final host = widget.room['host'] is Map<String, dynamic>
-        ? widget.room['host'] as Map<String, dynamic>
+    final roomData = _activeRoom;
+    final host = roomData['host'] is Map<String, dynamic>
+        ? roomData['host'] as Map<String, dynamic>
         : <String, dynamic>{};
     final imageUrl = _backgroundUrl;
     final coverUrl = _coverUrl;
+    final rawSeats = roomData['seats'] is List
+        ? (roomData['seats'] as List)
+            .whereType<Map<String, dynamic>>()
+            .toList()
+        : <Map<String, dynamic>>[];
+    final configuredSeatCount = (roomData['seatCount'] is num
+            ? (roomData['seatCount'] as num).toInt()
+            : 11)
+        .clamp(2, 31);
+    final seatsByIndex = <int, Map<String, dynamic>>{
+      for (final seat in rawSeats)
+        if (seat['seatIndex'] is num)
+          (seat['seatIndex'] as num).toInt(): seat,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis)),
       body: ListView(
@@ -498,7 +544,180 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           const SizedBox(height: 6),
           Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}'),
           const SizedBox(height: 8),
-          Text((widget.room['description'] ?? widget.room['topic'] ?? '').toString()),
+          Text((roomData['description'] ?? roomData['topic'] ?? '').toString()),
+          const SizedBox(height: 14),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: const BorderSide(color: Color(0x1AB68A35)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.event_seat_rounded, color: _featureGold),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'مقاعد الغرفة',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                      if (_detailsLoading)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        IconButton(
+                          tooltip: 'تحديث المقاعد',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _loadRoomDetails,
+                          icon: const Icon(Icons.refresh_rounded, size: 19),
+                        ),
+                      Text(
+                        '${rawSeats.where((seat) => seat['userId'] != null || seat['user'] != null).length}/$configuredSeatCount',
+                        style: const TextStyle(
+                          color: Color(0xFF8C641D),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: configuredSeatCount,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 6,
+                      childAspectRatio: .72,
+                    ),
+                    itemBuilder: (context, index) {
+                      final seat = seatsByIndex[index] ?? <String, dynamic>{};
+                      final user = seat['user'] is Map<String, dynamic>
+                          ? seat['user'] as Map<String, dynamic>
+                          : <String, dynamic>{};
+                      final userId = (seat['userId'] ?? user['id'] ?? '').toString();
+                      final occupied = userId.isNotEmpty;
+                      final status = (seat['status'] ?? '').toString().toLowerCase();
+                      final locked = seat['isLocked'] == true ||
+                          seat['locked'] == true ||
+                          status.contains('locked');
+                      final avatar = (user['avatarUrl'] ?? user['avatar'] ?? '').toString();
+                      final name = (user['displayName'] ?? user['username'] ?? '').toString();
+                      final canSelect = _roomEntered && !occupied && !locked && !_roomActionBusy;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () {
+                          if (locked || occupied) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(locked ? 'هذا المقعد مقفول.' : 'المقعد مشغول حاليًا.'),
+                              ),
+                            );
+                            return;
+                          }
+                          if (!_roomEntered) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('ادخل الغرفة أولًا لاختيار مقعد.')),
+                            );
+                            return;
+                          }
+                          _takeSeat(index);
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: locked
+                                    ? const Color(0xFFE7E1D7)
+                                    : occupied
+                                        ? const Color(0xFFFFE8B3)
+                                        : const Color(0xFFFFF7E5),
+                                border: Border.all(
+                                  color: occupied
+                                      ? const Color(0xFFB68A35)
+                                      : locked
+                                          ? const Color(0xFFB5AA98)
+                                          : const Color(0x55B68A35),
+                                  width: occupied ? 2 : 1,
+                                ),
+                              ),
+                              child: ClipOval(
+                                child: occupied && avatar.isNotEmpty
+                                    ? Image.network(
+                                        _resolveMedia(avatar),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Icon(
+                                          Icons.person_rounded,
+                                          color: Color(0xFF8C641D),
+                                          size: 28,
+                                        ),
+                                      )
+                                    : Icon(
+                                        locked
+                                            ? Icons.lock_rounded
+                                            : occupied
+                                                ? Icons.person_rounded
+                                                : Icons.add_rounded,
+                                        color: locked
+                                            ? const Color(0xFF786F61)
+                                            : const Color(0xFF8C641D),
+                                        size: 25,
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              index == 0 ? 'المضيف' : 'مقعد $index',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800),
+                            ),
+                            if (occupied && name.isNotEmpty)
+                              Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 9, color: Color(0xFF756B5B)),
+                              )
+                            else if (locked)
+                              const Text('مقفل', style: TextStyle(fontSize: 9, color: Color(0xFF756B5B)))
+                            else
+                              Text(
+                                canSelect ? 'متاح' : 'فارغ',
+                                style: const TextStyle(fontSize: 9, color: Color(0xFF756B5B)),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  if (!_roomEntered)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'تظهر حالة المقاعد من تفاصيل الغرفة؛ اختر مقعدًا بعد الدخول.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, color: Color(0xFF756B5B)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 14),
           FilledButton.icon(
             onPressed: _roomActionBusy || widget.accessToken.isEmpty ? null : (_roomEntered ? _leaveRoom : _enterRoom),
