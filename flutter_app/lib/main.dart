@@ -147,6 +147,73 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     }
   }
 
+  Future<void> _editProfile(Map<String, dynamic> activeUser) async {
+    final token = widget.session['accessToken']?.toString() ?? '';
+    if (token.isEmpty) return;
+    final nameController = TextEditingController(
+      text: (activeUser['displayName'] ?? '').toString(),
+    );
+    final bioController = TextEditingController(
+      text: (activeUser['bio'] ?? '').toString(),
+    );
+    final changes = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('تعديل الملف الشخصي'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                maxLength: 128,
+                decoration: const InputDecoration(labelText: 'الاسم الظاهر'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: bioController,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'نبذة عني'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, {
+              'displayName': nameController.text.trim(),
+              'bio': bioController.text.trim(),
+            }),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    nameController.dispose();
+    bioController.dispose();
+    if (changes == null || !mounted) return;
+    try {
+      final updated = await widget.apiClient.updateMyProfile(token, changes);
+      if (!mounted) return;
+      setState(() {
+        _profile = {...? _profile, ...updated};
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم تحديث الملف الشخصي.')),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    }
+  }
+
   static const _sections = <_SectionInfo>[
     _SectionInfo(
       title: 'الرئيسية',
@@ -454,6 +521,12 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     const SizedBox(height: 8),
                     Text('اسم المستخدم: ${activeUser['username'] ?? '—'}'),
                     Text('المعرّف: ${activeUser['publicId'] ?? '—'}'),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: _loading ? null : () => _editProfile(activeUser),
+                      icon: const Icon(Icons.edit_rounded),
+                      label: const Text('تعديل الملف الشخصي'),
+                    ),
                     const SizedBox(height: 18),
                     const Text(
                       'الملف الشخصي المعروض من بيانات الخادم عند توفرها. بقية إعدادات الحساب ستُنقل في مراحل لاحقة.',
