@@ -344,7 +344,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     final base = Uri.parse(widget.apiClient.baseUrl);
     final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
     final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
-    if (normalized.startsWith('uploads/')) return base.resolve(normalized).toString();
+    if (normalized.startsWith('uploads/')) return origin.resolve('/$normalized').toString();
     return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
   }
 
