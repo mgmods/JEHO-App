@@ -735,7 +735,7 @@ class _WalletPageState extends State<WalletPage> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    value: method,
+                    initialValue: method,
                     decoration: const InputDecoration(labelText: 'طريقة الاستلام'),
                     items: const [
                       DropdownMenuItem(value: 'paypal', child: Text('PayPal')),
@@ -1497,7 +1497,11 @@ class _SocialPageState extends State<SocialPage> {
     try {
       final friends = await widget.apiClient.getMyFriends(widget.accessToken);
       List<Map<String, dynamic>> relations = const [];
-      try { relations = await widget.apiClient.getMyRelations(widget.accessToken); } on JehoApiException { }
+      try {
+          relations = await widget.apiClient.getMyRelations(widget.accessToken);
+        } on JehoApiException {
+          // Friend data remains useful if the optional relations endpoint is unavailable.
+        }
       if (mounted) setState(() { _friends = friends; _relations = relations; });
     } on JehoApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
