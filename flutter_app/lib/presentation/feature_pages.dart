@@ -579,9 +579,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           (seat['seatIndex'] as num).toInt(): seat,
     };
     return Scaffold(
-      appBar: AppBar(title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(backgroundColor: const Color(0xFF064638), foregroundColor: Colors.white, elevation: 0, title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+      backgroundColor: const Color(0xFF003A2D),
+      body: Container(
+        decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF075541), Color(0xFF00291F), Color(0xFF001F19)])),
+        child: ListView(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 20),
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
@@ -602,19 +605,19 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(_title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 12),
+          Text(_title, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: Colors.white)),
           const SizedBox(height: 6),
-          Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}'),
+          Text('المضيف: ${host['displayName'] ?? host['username'] ?? 'غير معروف'}', style: const TextStyle(color: Color(0xFFD4EEE5), fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          Text((roomData['description'] ?? roomData['topic'] ?? '').toString()),
+          Text((roomData['description'] ?? roomData['topic'] ?? '').toString(), style: const TextStyle(color: Color(0xFFD4EEE5))),
           const SizedBox(height: 14),
           Card(
             clipBehavior: Clip.antiAlias,
-            color: const Color(0xE51A1B29),
+            color: const Color(0x9920473B),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: const BorderSide(color: Color(0x66D7B45F)),
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: Color(0x3379D9C0)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
@@ -623,7 +626,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.event_seat_rounded, color: _featureGold),
+                      const Icon(Icons.event_seat_rounded, color: Color(0xFFB5F1DD)),
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
@@ -659,10 +662,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: configuredSeatCount,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 4,
-                      childAspectRatio: .55,
+                      crossAxisCount: 5,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 3,
+                      childAspectRatio: .72,
                     ),
                     itemBuilder: (context, index) {
                       final seat = seatsByIndex[index] ?? <String, dynamic>{};
@@ -701,8 +704,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             SizedBox(
-                              width: 100,
-                              height: 100,
+                              width: 72,
+                              height: 76,
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
@@ -729,8 +732,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                   if (occupied && avatar.isNotEmpty)
                                     ClipOval(
                                       child: SizedBox(
-                                        width: 52,
-                                        height: 52,
+                                        width: 62,
+                                        height: 62,
                                         child: Image.network(
                                           _resolveMedia(avatar),
                                           fit: BoxFit.cover,
@@ -744,8 +747,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                     )
                                   else
                                     SizedBox(
-                                      width: 52,
-                                      height: 52,
+                                      width: 62,
+                                      height: 62,
                                       child: Image.asset(
                                         locked
                                             ? 'assets/original/android-res/drawable-xxhdpi/icon_classic_seat_locked.webp'
