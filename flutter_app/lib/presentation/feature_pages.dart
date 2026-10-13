@@ -1720,6 +1720,127 @@ class _GiftHistoryPageState extends State<GiftHistoryPage> {
   );
 }
 
+class PrivacySettingsPage extends StatefulWidget {
+  const PrivacySettingsPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+  @override
+  State<PrivacySettingsPage> createState() => _PrivacySettingsPageState();
+}
+
+class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
+  bool _loading = true;
+  bool _saving = false;
+  bool _showOnline = true;
+  bool _allowStrangers = true;
+  bool _giftGate = false;
+  String? _requiredGiftId;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final user = await widget.apiClient.getMyProfile(widget.accessToken);
+      if (!mounted) return;
+      setState(() {
+        _showOnline = user['showOnlineStatus'] is bool ? user['showOnlineStatus'] as bool : true;
+        _allowStrangers = user['allowDmFromStrangers'] is bool ? user['allowDmFromStrangers'] as bool : true;
+        _giftGate = user['dmGiftGateEnabled'] == true;
+        _requiredGiftId = user['dmRequiredGiftId']?.toString();
+        _loading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+
+  Future<void> _save({String? giftId, bool clearGift = false}) async {
+    setState(() => _saving = true);
+    try {
+      await widget.apiClient.updateMyProfile(widget.accessToken, {
+        'showOnlineStatus': _showOnline,
+        'allowDmFromStrangers': _allowStrangers,
+        'dmGiftGateEnabled': _giftGate,
+        'dmRequiredGiftId': clearGift ? null : (giftId ?? _requiredGiftId),
+      });
+      if (giftId != null || clearGift) _requiredGiftId = clearGift ? null : giftId;
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ إعدادات الخصوصية.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر حفظ الإعدادات: '+e.toString().replaceFirst('Exception: ', ''))));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _chooseGift() async {
+    try {
+      final gifts = await widget.apiClient.getGiftCatalog();
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('اختر هدية مطلوبة للرسائل'),
+        content: SizedBox(width: 420, child: ListView(shrinkWrap: true, children: [
+          ListTile(title: const Text('السماح دون هدية محددة'), onTap: () => Navigator.pop(ctx, <String,dynamic>{'id':''})),
+          ...gifts.map((g) => ListTile(
+            leading: const Icon(Icons.card_giftcard_rounded),
+            title: Text((g['name'] ?? g['title'] ?? 'هدية').toString()),
+            subtitle: Text('السعر: '+(g['coinPrice'] ?? g['price'] ?? '—').toString()),
+            onTap: () => Navigator.pop(ctx, g),
+          )),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء'))],
+      ));
+      if (selected == null) return;
+      final id = (selected['id'] ?? selected['giftId'] ?? '').toString();
+      if (id.isEmpty) { setState(() => _requiredGiftId = null); await _save(clearGift: true); }
+      else { setState(() => _requiredGiftId = id); await _save(giftId: id); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تحميل الهدايا: '+e.toString().replaceFirst('Exception: ', ''))));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('الأمان والخصوصية')),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(_error!, textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+        ])))
+      : ListView(padding: const EdgeInsets.all(16), children: [
+          Card(child: SwitchListTile(
+            secondary: const Icon(Icons.visibility_outlined),
+            title: const Text('إظهار حالة الاتصال'),
+            subtitle: const Text('السماح للآخرين برؤية أنك متصل'),
+            value: _showOnline, onChanged: _saving ? null : (v) { setState(() => _showOnline = v); _save(); },
+          )),
+          Card(child: SwitchListTile(
+            secondary: const Icon(Icons.message_outlined),
+            title: const Text('الرسائل من غير الأصدقاء'),
+            subtitle: const Text('السماح للمستخدمين غير الموجودين في قائمة الأصدقاء بمراسلتك'),
+            value: _allowStrangers, onChanged: _saving ? null : (v) { setState(() => _allowStrangers = v); _save(); },
+          )),
+          Card(child: SwitchListTile(
+            secondary: const Icon(Icons.card_giftcard_outlined),
+            title: const Text('اشتراط هدية للرسائل الخاصة'),
+            subtitle: const Text('يمكنك تحديد هدية مطلوبة قبل استقبال رسالة خاصة'),
+            value: _giftGate, onChanged: _saving ? null : (v) { setState(() => _giftGate = v); _save(); },
+          )),
+          if (_giftGate) Card(child: ListTile(
+            leading: const Icon(Icons.redeem_rounded),
+            title: const Text('الهدية المطلوبة'),
+            subtitle: Text(_requiredGiftId == null || _requiredGiftId!.isEmpty ? 'أي هدية' : 'معرّف الهدية: $_requiredGiftId'),
+            trailing: const Icon(Icons.chevron_left_rounded),
+            onTap: _saving ? null : _chooseGift,
+          )),
+          if (_saving) const Padding(padding: EdgeInsets.all(16), child: LinearProgressIndicator()),
+        ]),
+  );
+}
+
 class VanityIdsPage extends StatefulWidget {
   const VanityIdsPage({required this.apiClient, required this.accessToken, super.key});
   final JehoApiClient apiClient;
