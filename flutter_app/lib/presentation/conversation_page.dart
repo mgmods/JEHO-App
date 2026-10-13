@@ -53,6 +53,25 @@ class _ConversationPageState extends State<ConversationPage> {
     super.dispose();
   }
 
+  String _formatMessageTime(Map<String, dynamic> message) {
+    final raw = message['createdAt'] ??
+        message['created_at'] ??
+        message['sentAt'] ??
+        message['timestamp'];
+    if (raw == null) return '';
+    DateTime? date;
+    if (raw is num) {
+      final value = raw > 1000000000000 ? raw.toInt() : (raw * 1000).toInt();
+      date = DateTime.fromMillisecondsSinceEpoch(value).toLocal();
+    } else {
+      date = DateTime.tryParse(raw.toString())?.toLocal();
+    }
+    if (date == null) return '';
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
   String _resolveMediaUrl(String value) {
     if (value.startsWith('https://') || value.startsWith('http://')) return value;
     final base = Uri.parse(widget.apiClient.baseUrl.endsWith('/') ? widget.apiClient.baseUrl : '${widget.apiClient.baseUrl}/');
@@ -420,10 +439,24 @@ class _ConversationPageState extends State<ConversationPage> {
                                   color: isMine
                                       ? const Color(0xFFFFE7B0)
                                       : Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: const Color(0xFFE8DCC5),
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft: Radius.circular(isMine ? 18 : 5),
+                                    bottomRight: Radius.circular(isMine ? 5 : 18),
                                   ),
+                                  border: Border.all(
+                                    color: isMine
+                                        ? const Color(0xFFE8CC8B)
+                                        : const Color(0xFFE8DCC5),
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x08000000),
+                                      blurRadius: 5,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +495,41 @@ class _ConversationPageState extends State<ConversationPage> {
                                         );
                                       }),
                                     ],
-                                    if (content.isNotEmpty || message['media'] == null) Text(text),
+                                    if (content.isNotEmpty || message['media'] == null)
+                                      Text(
+                                        text,
+                                        style: TextStyle(
+                                          height: 1.4,
+                                          color: const Color(0xFF342A1C),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (message['editedAt'] != null ||
+                                            message['edited_at'] != null)
+                                          const Padding(
+                                            padding: EdgeInsets.only(left: 5),
+                                            child: Text(
+                                              'معدّلة',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: Color(0xFF8B7C64),
+                                              ),
+                                            ),
+                                          ),
+                                        Text(
+                                          _formatMessageTime(message),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Color(0xFF8B7C64),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                                 ),
