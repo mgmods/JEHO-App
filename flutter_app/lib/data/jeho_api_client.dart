@@ -280,6 +280,12 @@ class JehoApiClient {
   Future<List<Map<String, dynamic>>> getMyApplications(String token) async =>
       _asList(await _get('agencies/applications/mine', accessToken: token), ['items', 'results', 'applications', 'data']);
 
+  Future<Map<String, dynamic>> lockRoomSeat(String token, String roomId, int seatIndex, {bool locked = true}) async =>
+      _asMap(
+        await _post('rooms/$roomId/seats/lock', {'seatIndex': seatIndex, 'locked': locked}, accessToken: token),
+        'تعذر تحديث قفل المقعد.',
+      );
+
   Future<Map<String, dynamic>> setRoomPasswordLock(
     String token,
     String roomId, {
