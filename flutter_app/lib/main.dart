@@ -462,9 +462,22 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'JEHO-OWN',
-          style: TextStyle(fontWeight: FontWeight.w800),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/original/android-res/drawable-xxhdpi/jeho_logo.webp',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Icon(Icons.forum_rounded, size: 26),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'JEHO-OWN',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -500,6 +513,20 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
             Positioned.fill(
               child: Image.network(
                 _resolveMediaUrl(wallpaper),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _selectedIndex == 0
+                    ? Image.asset(
+                        'assets/original/android-res/drawable-xxhdpi/home_page_bg.webp',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            )
+          else if (_selectedIndex == 0)
+            Positioned.fill(
+              child: Image.asset(
+                'assets/original/android-res/drawable-xxhdpi/home_page_bg.webp',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
