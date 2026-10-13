@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -170,6 +171,67 @@ class JehoApiClient {
     }
     if (items is! List) return const [];
     return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> getWallet(String accessToken) async {
+    final payload = await _get('wallet', accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    throw const JehoApiException('تعذر تحميل المحفظة.');
+  }
+
+  Future<List<Map<String, dynamic>>> getGiftCatalog() async {
+    final payload = await _get('gifts');
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['gifts'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<String> uploadImage(String accessToken, File file) async {
+    final base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/');
+    final uri = base.resolve('uploads');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Accept'] = 'application/json'
+      ..headers['Authorization'] = 'Bearer $accessToken'
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    http.StreamedResponse streamed;
+    try {
+      streamed = await request.send().timeout(const Duration(seconds: 60));
+    } on Exception {
+      throw const JehoApiException('تعذر رفع الصورة. تحقق من الإنترنت ومساحة التخزين.');
+    }
+    final response = await http.Response.fromStream(streamed);
+    final payload = _decodeResponse(response);
+    if (payload is! Map<String, dynamic>) {
+      throw const JehoApiException('الخادم لم يرجع رابط الصورة.');
+    }
+    final path = (payload['url'] ?? payload['path'])?.toString();
+    if (path == null || path.isEmpty) {
+      throw const JehoApiException('الخادم لم يرجع رابط الصورة.');
+    }
+    if (path.startsWith('https://') || path.startsWith('http://')) return path;
+    final origin = Uri(
+      scheme: base.scheme,
+      host: base.host,
+      port: base.hasPort ? base.port : null,
+    );
+    return origin.resolve(path.startsWith('/') ? path : '/$path').toString();
+  }
+
+  Future<Map<String, dynamic>> setRoomBackground(
+    String accessToken,
+    String roomId,
+    String? backgroundUrl,
+  ) async {
+    final payload = await _patch(
+      'rooms/$roomId/background',
+      {'backgroundUrl': backgroundUrl},
+      accessToken: accessToken,
+    );
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{};
   }
 
   Future<List<Map<String, dynamic>>> getPublicRooms() async {
