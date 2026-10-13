@@ -92,6 +92,8 @@ public class ProfileFragment extends Fragment {
         bindRow(binding.btnContests, v ->
                 startActivity(new Intent(requireContext(), MedalActivity.class)));
         bindRow(binding.btnMyRoom, v -> RoomOpenChooser.open(requireActivity()));
+        bindRow(binding.btnQuickVip, v ->
+                startActivity(new Intent(requireContext(), VipActivity.class)));
         loadAgencyAction();
         bindRow(binding.btnVisitors, v ->
                 startActivity(new Intent(requireContext(), VisitorsActivity.class)));
