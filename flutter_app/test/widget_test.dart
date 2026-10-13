@@ -6,19 +6,70 @@ import 'package:jeho_own_flutter/presentation/auth_page.dart';
 
 void main() {
   test('section wallpaper overrides shared wallpaper and falls back safely', () {
-    expect(resolveSectionWallpaper({'allSections': 'https://cdn.example/shared.jpg', 'profile': 'https://cdn.example/profile.jpg'}, 'profile'), 'https://cdn.example/profile.jpg');
-    expect(resolveSectionWallpaper({'allSections': 'https://cdn.example/shared.jpg', 'profile': '', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/shared.jpg');
-    expect(resolveSectionWallpaper({'allSections': '', 'profile': 'https://cdn.example/profile.jpg', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/profile.jpg');
-    expect(resolveSectionWallpaper({'allSections': '  ', 'profile': '', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/app.jpg');
+    expect(
+      resolveSectionWallpaper({
+        'allSections': 'https://cdn.example/shared.jpg',
+        'profile': 'https://cdn.example/profile.jpg',
+      }, 'profile'),
+      'https://cdn.example/profile.jpg',
+    );
+    expect(
+      resolveSectionWallpaper({
+        'allSections': 'https://cdn.example/shared.jpg',
+        'profile': '',
+        'app': 'https://cdn.example/app.jpg',
+      }, 'profile'),
+      'https://cdn.example/shared.jpg',
+    );
+    expect(
+      resolveSectionWallpaper({
+        'allSections': '',
+        'profile': 'https://cdn.example/profile.jpg',
+        'app': 'https://cdn.example/app.jpg',
+      }, 'profile'),
+      'https://cdn.example/profile.jpg',
+    );
+    expect(
+      resolveSectionWallpaper({
+        'allSections': '  ',
+        'profile': '',
+        'app': 'https://cdn.example/app.jpg',
+      }, 'profile'),
+      'https://cdn.example/app.jpg',
+    );
   });
 
-
   test('only definitive auth failures invalidate a saved session', () {
-    expect(shouldClearSessionForError(const JehoApiException('expired', statusCode: 401)), isTrue);
-    expect(shouldClearSessionForError(const JehoApiException('forbidden', statusCode: 403)), isTrue);
-    expect(shouldClearSessionForError(const JehoApiException('rate limited', statusCode: 429)), isFalse);
-    expect(shouldClearSessionForError(const JehoApiException('server error', statusCode: 500)), isFalse);
-    expect(shouldClearSessionForError(const JehoApiException('network unavailable')), isFalse);
+    expect(
+      shouldClearSessionForError(
+        const JehoApiException('expired', statusCode: 401),
+      ),
+      isTrue,
+    );
+    expect(
+      shouldClearSessionForError(
+        const JehoApiException('forbidden', statusCode: 403),
+      ),
+      isTrue,
+    );
+    expect(
+      shouldClearSessionForError(
+        const JehoApiException('rate limited', statusCode: 429),
+      ),
+      isFalse,
+    );
+    expect(
+      shouldClearSessionForError(
+        const JehoApiException('server error', statusCode: 500),
+      ),
+      isFalse,
+    );
+    expect(
+      shouldClearSessionForError(
+        const JehoApiException('network unavailable'),
+      ),
+      isFalse,
+    );
   });
 
   testWidgets('shows Arabic login and guest entry', (tester) async {
@@ -44,8 +95,16 @@ void main() {
     apiClient.dispose();
   });
 
-  testWidgets('app renders Arabic auth screen', (tester) async {
+  testWidgets('app renders Arabic auth screen after session restore', (
+    tester,
+  ) async {
     await tester.pumpWidget(const JehoOwnApp());
+
+    // Session restoration is asynchronous and initially shows the branded
+    // startup splash. Advance the test clock without waiting on its spinner.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump();
 
     expect(find.byType(AuthPage), findsOneWidget);
     expect(find.text('الدخول كضيف'), findsOneWidget);
