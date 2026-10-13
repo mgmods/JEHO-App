@@ -431,16 +431,17 @@ public class SplashActivity extends ThemedActivity {
         }
         if ("person".equals(pendingSplashTargetType) && pendingSplashTargetId != null
                 && !pendingSplashTargetId.isEmpty()) {
-            Intent profile = new Intent(this, ProfileActivity.class);
-            profile.putExtra(ProfileActivity.EXTRA_USER_ID, pendingSplashTargetId);
-            putPendingExtras(profile);
-            startActivity(profile);
-            finish();
+            openSplashPersonTarget(pendingSplashTargetId);
             return;
         }
         if ("agency".equals(pendingSplashTargetType) && pendingSplashTargetId != null
                 && !pendingSplashTargetId.isEmpty()) {
             openAgencySplashTarget(pendingSplashTargetId);
+            return;
+        }
+        if ("room".equals(pendingSplashTargetType) && pendingRoomId != null
+                && !pendingRoomId.isEmpty()) {
+            openSplashRoomTarget(pendingRoomId);
             return;
         }
         if (pendingRoomId != null && !pendingRoomId.isEmpty()) {
@@ -464,6 +465,74 @@ public class SplashActivity extends ThemedActivity {
             }
         }
         finish();
+    }
+
+    /** Validate a splash user ID before navigating; invalid targets fall back home. */
+    private void openSplashPersonTarget(String userId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean found = false;
+                try {
+                    Result<AuthDtos.UserDto> result = ApiCall.execute(c.getUserApi().getUser(userId));
+                    found = result != null && result.success && result.data != null;
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash person target lookup failed", error);
+                }
+                final boolean valid = found;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (valid) {
+                        Intent profile = new Intent(this, ProfileActivity.class);
+                        profile.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
+                        putPendingExtras(profile);
+                        startActivity(profile);
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash person target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
+    }
+
+    /** Validate a splash room ID before entering it; invalid targets fall back home. */
+    private void openSplashRoomTarget(String roomId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean found = false;
+                try {
+                    Result<com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto> result =
+                            ApiCall.execute(c.getRoomApi().get(roomId));
+                    found = result != null && result.success && result.data != null;
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash room target lookup failed", error);
+                }
+                final boolean valid = found;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (valid) {
+                        Intent room = new Intent(this, VoiceRoomActivity.class);
+                        room.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+                        room.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+                        putPendingExtras(room);
+                        startActivity(room);
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash room target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
     }
 
     /** Resolve a selected agency ID through the existing API; open its live room when available. */
