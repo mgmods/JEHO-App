@@ -58,7 +58,7 @@ export class VanityIdsController {
       where,
       order: { priceCoins: 'ASC', publicId: 'ASC' },
       take: 200,
-    })).filter((i) => /^\\d{6}$/.test(i.publicId));
+    })).filter((i) => /^\d{6}$/.test(i.publicId));
     return {
       items: items.map((i) => ({
         ...i,
@@ -99,7 +99,7 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
-    if (!/^\\d{6}$/.test(publicId)) {
+    if (!/^\d{6}$/.test(publicId)) {
       throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
@@ -136,7 +136,7 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
-    if (!/^\\d{6}$/.test(publicId)) {
+    if (!/^\d{6}$/.test(publicId)) {
       throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
@@ -231,7 +231,7 @@ export class VanityIdsController {
     @Param('publicId') publicId: string,
     @Body() body: { targetType?: string },
   ) {
-    if (!/^\\d{6}$/.test(publicId)) {
+    if (!/^\d{6}$/.test(publicId)) {
       throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
@@ -290,7 +290,7 @@ export class VanityIdsController {
     body: { publicId: string; priceCoins?: number; status?: string },
   ) {
     const publicId = String(body.publicId || '').trim();
-    if (!/^\d{3,12}$/.test(publicId)) {
+    if (!/^\d{6}$/.test(publicId)) {
       throw new BadRequestException(
         'الآيدي يجب أن يتكون من 6 أرقام',
       );
