@@ -7,6 +7,7 @@ import java.util.Map;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
+import retrofit2.http.Headers;
 import retrofit2.http.POST;
 
 public interface ConfigApi {
@@ -34,6 +35,7 @@ public interface ConfigApi {
     @GET("config/zego")
     Call<ApiResponse<MiscDtos.ZegoConfigDto>> zego();
 
+    @Headers({"Cache-Control: no-cache", "Pragma: no-cache"})
     @GET("config/theme")
     Call<ApiResponse<MiscDtos.ThemeDto>> theme();
 
