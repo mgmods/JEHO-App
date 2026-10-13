@@ -8,6 +8,7 @@ import 'presentation/auth_page.dart';
 import 'presentation/conversation_page.dart';
 import 'presentation/feature_pages.dart';
 import 'presentation/feature_hub_page.dart';
+import 'presentation/discovery_hub_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -816,6 +817,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           ),
                           icon: const Icon(Icons.dashboard_customize_rounded),
                           label: const Text('المهام والوكالات'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => DiscoveryHubPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.notifications_active_outlined),
+                          label: const Text('الإشعارات والترتيب والفعاليات والألعاب'),
                         ),
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
