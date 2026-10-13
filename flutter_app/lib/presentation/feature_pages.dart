@@ -1814,6 +1814,28 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
     }
   }
 
+  String? _originalFrameAsset(Map<String, dynamic> item) {
+    final code = (item['code'] ?? item['slug'] ?? item['name'] ?? item['title'] ?? '').toString().toLowerCase();
+    final type = (item['type'] ?? item['category'] ?? item['kind'] ?? '').toString().toLowerCase();
+    final isFrame = type.contains('frame') || type.contains('إطار') || code.contains('frame') || code.contains('إطار');
+    if (!isFrame) return null;
+    const names = [
+      'bronze-falcon','silver-stag','crimson-griffin','emerald-jaguar','sapphire-leviathan',
+      'amethyst-owl','solar-scarab','fire-stallion','celestial-swan','royal-seraph',
+      'cobra','lion','eagle','wolf','phoenix','scorpion','kraken','ram','raven','emperor',
+      'dragon','tiger','polar-bear','shark','minotaur','spider','thunder','samurai','demon','cosmic',
+    ];
+    for (var i = 0; i < names.length; i++) {
+      if (code.contains(names[i])) {
+        return 'assets/original/visual-system/host-frames/assets/frame-${(i + 1).toString().padLeft(2, '0')}-${names[i]}-transparent.png';
+      }
+    }
+    final rawNumber = item['frameNumber'] ?? item['sortOrder'] ?? item['level'];
+    final number = rawNumber is num ? rawNumber.toInt() : int.tryParse(rawNumber?.toString() ?? '');
+    if (number == null || number < 1 || number > names.length) return null;
+    return 'assets/original/visual-system/host-frames/assets/frame-${number.toString().padLeft(2, '0')}-${names[number - 1]}-transparent.png';
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('الإطارات والزينة'), actions: [
@@ -1843,6 +1865,7 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
                                   DateTime.tryParse(owned['expiresAt'].toString())?.isAfter(DateTime.now()) == true);
                           final title = (item['name'] ?? item['code'] ?? 'زينة').toString();
                           final preview = (item['animationUrl'] ?? item['previewUrl'] ?? '').toString();
+                          final localFrame = _originalFrameAsset(item);
                           final price = item['coinPrice'] ?? 0;
                           final busy = _busy.contains(id);
                           return Card(
@@ -1856,9 +1879,13 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
                                         ? Image.network(
                                             _mediaUrl(preview),
                                             fit: BoxFit.contain,
-                                            errorBuilder: (_, __, ___) => const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
+                                            errorBuilder: (_, __, ___) => localFrame != null
+                                                ? Image.asset(localFrame, fit: BoxFit.contain)
+                                                : const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
                                           )
-                                        : const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
+                                        : localFrame != null
+                                            ? Image.asset(localFrame, fit: BoxFit.contain)
+                                            : const Icon(Icons.auto_awesome_rounded, size: 48, color: _featureGold),
                                   ),
                                   Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
                                   const SizedBox(height: 4),
