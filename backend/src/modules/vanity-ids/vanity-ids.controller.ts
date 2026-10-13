@@ -219,6 +219,7 @@ export class VanityIdsController {
       userId,
       targetType: row.targetType || null,
       targetId: row.targetId || null,
+      canApplyToAgency: await this.agenciesRepo.exist({ where: { ownerId: userId } }),
     };
   }
 
