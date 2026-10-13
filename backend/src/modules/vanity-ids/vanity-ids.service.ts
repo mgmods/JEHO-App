@@ -46,6 +46,7 @@ export class VanityIdsService implements OnModuleInit {
     try {
       await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetType" VARCHAR(16)');
       await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "targetId" UUID');
+      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "previousTargetPublicId" VARCHAR(32)');
     } catch (e) {
       this.log.warn(`vanity target columns ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
     }
