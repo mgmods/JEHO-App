@@ -915,6 +915,32 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         OutlinedButton.icon(
                           onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute<void>(
+                              builder: (_) => ProfilePeoplePage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                                visitors: true,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.visibility_outlined),
+                          label: const Text('الزوار'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ProfilePeoplePage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                                visitors: false,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.people_alt_outlined),
+                          label: const Text('أصدقائي'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
                               builder: (_) => FeatureHubPage(
                                 apiClient: widget.apiClient,
                                 accessToken: widget.session['accessToken']?.toString() ?? '',
