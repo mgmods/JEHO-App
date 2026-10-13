@@ -280,7 +280,7 @@ public class SplashActivity extends ThemedActivity {
                 return;
             }
             if (isIdSplashTarget(pendingSplashTarget)) {
-                openIdSplashTarget(pendingContainer, pendingSplashTarget);
+                openIdSplashTarget(c, pendingSplashTarget);
             } else {
                 openDestination();
             }
