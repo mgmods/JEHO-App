@@ -4,6 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../data/jeho_api_client.dart';
 import 'feature_pages.dart';
 import 'feature_hub_page.dart';
+import 'discovery_hub_page.dart';
+import 'user_search_page.dart';
+import 'feature_hub_page.dart';
 
 const _settingsGold = Color(0xFF9A7026);
 
@@ -43,6 +46,9 @@ class SettingsPage extends StatelessWidget {
       _SettingsTile(icon: Icons.support_agent_rounded, title: 'الدعم الفني', subtitle: 'قنوات الدعم التي يحددها الخادم', onTap: () => _open(context, _SupportSettingsPage(apiClient: apiClient))),
       _SettingsTile(icon: Icons.workspace_premium_rounded, title: 'المتجر وعضوية VIP', subtitle: 'عرض خطط VIP وشراء العضوية من رصيد الحساب', onTap: () => _open(context, StoreHubPage(apiClient: apiClient, accessToken: accessToken))),
       _SettingsTile(icon: Icons.card_giftcard_rounded, title: 'كتالوج الهدايا', subtitle: 'عرض الهدايا وأسعارها من الخادم', onTap: () => _open(context, GiftCatalogPage(apiClient: apiClient, accessToken: accessToken))),
+      _SettingsTile(icon: Icons.groups_rounded, title: 'الوكالات والمهام', subtitle: 'الوكالات والمهام ومركز العلاقات', onTap: () => _open(context, FeatureHubPage(apiClient: apiClient, accessToken: accessToken))),
+      _SettingsTile(icon: Icons.explore_rounded, title: 'الاكتشاف والإشعارات', subtitle: 'الترتيب والفعاليات والتنبيهات', onTap: () => _open(context, DiscoveryHubPage(apiClient: apiClient, accessToken: accessToken))),
+      _SettingsTile(icon: Icons.person_search_rounded, title: 'البحث عن الأشخاص', subtitle: 'البحث عن المستخدمين وفتح ملفاتهم', onTap: () => _open(context, UserSearchPage(apiClient: apiClient, accessToken: accessToken))),
       _SettingsTile(icon: Icons.history_rounded, title: 'سجل الهدايا', subtitle: 'الهدايا المرسلة وسجلها', onTap: () => _open(context, GiftHistoryPage(apiClient: apiClient, accessToken: accessToken))),
       const Card(child: ListTile(leading: Icon(Icons.mic_off_outlined), title: Text('الصوت واتصال الغرف'), subtitle: Text('لم يتم تغيير ZEGO أو إعدادات الصوت أو اتصال الغرف أو Redis ضمن هذه المهمة.'))),
     ]),
