@@ -145,7 +145,7 @@ class _DiscoveryHubPageState extends State<DiscoveryHubPage> {
                 const Text('اختر قيمة الرهان. يمكن خسارة المبلغ المختار.'),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
-                  value: amount,
+                  initialValue: amount,
                   items: chips.map((chip) => DropdownMenuItem<int>(value: chip, child: Text('$chip كوينز'))).toList(),
                   onChanged: (value) { if (value != null) setDialogState(() => amount = value); },
                   decoration: const InputDecoration(labelText: 'قيمة الرهان'),
