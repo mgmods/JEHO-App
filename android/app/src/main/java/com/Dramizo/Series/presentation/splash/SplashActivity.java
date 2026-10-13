@@ -528,7 +528,6 @@ public class SplashActivity extends ThemedActivity {
         else if ("messages".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
         else if ("drama".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_DRAMA, true);
         else if ("create_room".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_CREATE_ROOM, true);
-        putPendingExtras(i);
         startActivity(i);
     }
 
