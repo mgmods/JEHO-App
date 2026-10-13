@@ -17,7 +17,7 @@ import { Repository } from 'typeorm';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
-import { Room } from '../../database/entities/room.entity';
+import { Room, RoomKind } from '../../database/entities/room.entity';
 import { Agency } from '../../database/entities/agency.entity';
 import {
   WalletTransaction,
@@ -254,7 +254,7 @@ export class VanityIdsController {
       row.targetType = 'account';
       row.targetId = userId;
     } else if (targetType === 'room') {
-      const room = await this.roomsRepo.findOne({ where: { hostId: userId, agencyId: null }, order: { createdAt: 'DESC' } });
+      const room = await this.roomsRepo.findOne({ where: { hostId: userId, agencyId: null, roomKind: RoomKind.STANDARD }, order: { createdAt: 'DESC' } });
       if (!room) throw new BadRequestException('افتح الروم الشخصي أولاً');
       const conflict = await this.roomsRepo.findOne({ where: { publicId } });
       if (conflict && conflict.id !== room.id) throw new BadRequestException('الآيدي مستخدم لروم آخر');
