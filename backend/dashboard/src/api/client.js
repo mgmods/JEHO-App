@@ -3,9 +3,10 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 const api = axios.create({
-  // Keep the dashboard connected to the existing JEHO CHAT production API.
-  // Deployments may override this with VITE_API_URL, but never default to Blitz.
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.adnova.bbs.tr/api/v1',
+  // Dashboard is hosted by the JEHO-OWN backend at /admin/, so use the
+  // same origin's /api/v1 by default and avoid stale production API data.
+  // VITE_API_URL remains available for explicit deployment overrides.
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',
