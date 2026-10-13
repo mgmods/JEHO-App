@@ -327,6 +327,20 @@ class JehoApiClient {
     return origin.resolve(normalizedPath.startsWith('/') ? normalizedPath : '/$normalizedPath').toString();
   }
 
+  Future<Map<String, dynamic>> updateRoomCover(
+    String accessToken,
+    String roomId,
+    String coverUrl,
+  ) async {
+    final payload = await _patch(
+      'rooms/$roomId',
+      {'coverUrl': coverUrl},
+      accessToken: accessToken,
+    );
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> setRoomBackground(
     String accessToken,
     String roomId,
