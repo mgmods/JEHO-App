@@ -131,6 +131,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   String? _loadError;
   List<Map<String, dynamic>> _rooms = const [];
   List<Map<String, dynamic>> _banners = const [];
+  Map<String, dynamic> _theme = const {};
   List<Map<String, dynamic>> _conversations = const [];
   Map<String, dynamic>? _profile;
 
@@ -155,6 +156,12 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
       } on JehoApiException {
         // Keep the home screen usable when banner configuration is unavailable.
       }
+      Map<String, dynamic> theme = _theme;
+      try {
+        theme = await widget.apiClient.getAppTheme();
+      } on JehoApiException {
+        // Theme is optional; retain the last loaded value or bundled appearance.
+      }
       Map<String, dynamic>? profile;
       List<Map<String, dynamic>> conversations = const [];
       if (token.isNotEmpty) {
@@ -173,6 +180,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
       setState(() {
         _rooms = rooms;
         _banners = banners;
+        _theme = theme;
         _profile = profile;
         _conversations = conversations;
       });
@@ -426,6 +434,12 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
             'مستخدم JEHO')
         .toString();
 
+    final backgrounds = _theme['backgrounds'] is Map<String, dynamic>
+        ? _theme['backgrounds'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final sectionKey = _selectedIndex == 0 ? 'home' : _selectedIndex == 1 ? 'chat' : 'profile';
+    final wallpaper = (backgrounds['allSections'] ?? backgrounds[sectionKey] ?? backgrounds['app'] ?? '').toString().trim();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -445,7 +459,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
           ),
         ],
       ),
-      body: SafeArea(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (wallpaper.startsWith('https://') || wallpaper.startsWith('http://'))
+            Positioned.fill(
+              child: Image.network(
+                _resolveMediaUrl(wallpaper),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -940,6 +965,8 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
             ),
           ),
         ),
+          ),
+        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
