@@ -914,7 +914,7 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                   GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: configuredSeatCount,
+                    itemCount: 10,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,
                       mainAxisSpacing: 8,
@@ -939,7 +939,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           status.contains('locked');
                       final avatar = (user['avatarUrl'] ?? user['avatar'] ?? '').toString();
                       final name = (user['displayName'] ?? user['username'] ?? '').toString();
-                      final canSelect = _roomEntered && !occupied && !locked && !_roomActionBusy;
+                      final seatConfigured = index < configuredSeatCount;
+                      final canSelect = _roomEntered && seatConfigured && !occupied && !locked && !_roomActionBusy;
                       return InkWell(
                         borderRadius: BorderRadius.circular(14),
                         onTap: () {
@@ -954,6 +955,12 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                           if (!_roomEntered) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('ادخل الغرفة أولًا لاختيار مقعد.')),
+                            );
+                            return;
+                          }
+                          if (!seatConfigured) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('هذا المقعد غير مفعّل في إعدادات الغرفة.')),
                             );
                             return;
                           }
@@ -1056,6 +1063,8 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                               )
                             else if (locked)
                               const Text('مقفل', style: TextStyle(fontSize: 9, color: Color(0xCCFFFFFF)))
+                            else if (!seatConfigured)
+                              const Text('غير مفعّل', style: TextStyle(fontSize: 9, color: Color(0xBFEAF7EF)))
                             else
                               Text(
                                 canSelect ? 'متاح' : 'فارغ',
