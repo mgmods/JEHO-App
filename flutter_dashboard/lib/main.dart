@@ -46,6 +46,19 @@ class _AdminLoginState extends State<AdminLogin>{
 }
 class Module {const Module(this.title,this.path,this.icon);final String title,path;final IconData icon;}
 const modules=<Module>[
+ Module('مخططات لوحة التحكم','admin/dashboard/charts?period=7d',Icons.bar_chart),
+ Module('البثوث المباشرة','admin/streams?page=1&limit=50',Icons.live_tv),
+ Module('تصنيفات الهدايا','admin/gift-categories',Icons.category),
+ Module('خطط VIP','admin/vip/plans',Icons.workspace_premium),
+ Module('باقات الشحن','admin/wallet/packages',Icons.add_card),
+ Module('باقات السحب','admin/wallet/withdraw-packages',Icons.outbox),
+ Module('تسعير وكلاء الشحن','admin/recharge-agent-pricing',Icons.price_change),
+ Module('صناديق الحظ','lucky-boxes/admin/boxes',Icons.redeem),
+ Module('سجل فتح صناديق الحظ','lucky-boxes/admin/opens',Icons.history),
+ Module('كأس الغرف','room-cup/leaderboard',Icons.emoji_events),
+ Module('سجلات النظام','admin/logs?page=1&limit=50',Icons.receipt_long),
+ Module('ملخص السياسات','admin/policy-brochure/snapshot',Icons.policy),
+ Module('إعدادات الدراما','admin/drama/settings',Icons.movie_filter),
  Module('نظرة عامة','admin/dashboard/overview',Icons.dashboard),
  Module('المستخدمون','admin/users?page=1&limit=50',Icons.people),
  Module('المحادثات','admin/conversations?page=1&limit=50',Icons.forum),
