@@ -528,6 +528,16 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
       subtitle: 'راجع بيانات حسابك وعدّل الاسم الظاهر والنبذة.',
       icon: Icons.person_rounded,
     ),
+    _SectionInfo(
+      title: 'الألعاب',
+      subtitle: 'ألعاب JEHO',
+      icon: Icons.sports_esports_rounded,
+    ),
+    _SectionInfo(
+      title: 'الدراما',
+      subtitle: 'المسلسلات والحلقات',
+      icon: Icons.movie_creation_rounded,
+    ),
   ];
 
   @override
@@ -545,7 +555,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     final backgrounds = _theme['backgrounds'] is Map<String, dynamic>
         ? _theme['backgrounds'] as Map<String, dynamic>
         : <String, dynamic>{};
-    final sectionKey = _selectedIndex == 0 ? 'home' : _selectedIndex == 1 ? 'chat' : 'profile';
+    final sectionKey = _selectedIndex == 0 ? 'home' : _selectedIndex == 1 ? 'chat' : _selectedIndex == 2 ? 'profile' : _selectedIndex == 3 ? 'games' : 'drama';
     final wallpaper = resolveSectionWallpaper(backgrounds, sectionKey);
 
     return Scaffold(
@@ -620,7 +630,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
               ),
             ),
           SafeArea(
-        child: Center(
+        child: _selectedIndex == 3
+            ? GamesPage(
+                apiClient: widget.apiClient,
+                accessToken: widget.session['accessToken']?.toString() ?? '',
+              )
+            : _selectedIndex == 4
+                ? DramaPage(
+                    apiClient: widget.apiClient,
+                    accessToken: widget.session['accessToken']?.toString() ?? '',
+                  )
+                : Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
@@ -1449,6 +1469,32 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
               height: 24,
             ),
             label: 'أنا',
+          ),
+          NavigationDestination(
+            icon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_game_normal.svg',
+              width: 24,
+              height: 24,
+            ),
+            selectedIcon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_game_selected.svg',
+              width: 24,
+              height: 24,
+            ),
+            label: 'الألعاب',
+          ),
+          NavigationDestination(
+            icon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_drama_normal.svg',
+              width: 24,
+              height: 24,
+            ),
+            selectedIcon: SvgPicture.asset(
+              'assets/original/icons/ic_home_tab_drama_selected.svg',
+              width: 24,
+              height: 24,
+            ),
+            label: 'الدراما',
           ),
         ],
       ),
