@@ -102,6 +102,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   bool _loading = true;
   String? _loadError;
   List<Map<String, dynamic>> _rooms = const [];
+  List<Map<String, dynamic>> _conversations = const [];
   Map<String, dynamic>? _profile;
 
   @override
@@ -119,17 +120,24 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
     try {
       final rooms = await widget.apiClient.getPublicRooms();
       Map<String, dynamic>? profile;
+      List<Map<String, dynamic>> conversations = const [];
       if (token.isNotEmpty) {
         try {
           profile = await widget.apiClient.getMyProfile(token);
         } on JehoApiException {
           // Keep public room browsing available if the profile endpoint is unavailable.
         }
+        try {
+          conversations = await widget.apiClient.getConversations(token);
+        } on JehoApiException {
+          // Conversation errors are shown only inside the messages section.
+        }
       }
       if (!mounted) return;
       setState(() {
         _rooms = rooms;
         _profile = profile;
+        _conversations = conversations;
       });
     } on JehoApiException catch (error) {
       if (mounted) setState(() => _loadError = error.message);
@@ -322,16 +330,94 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         );
                       }),
                   ] else if (_selectedIndex == 1) ...[
-                    const SizedBox(height: 24),
-                    const Icon(Icons.chat_bubble_outline_rounded, size: 48),
-                    const SizedBox(height: 12),
-                    Text(
-                      'الرسائل',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'محادثاتي',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        Text('${_conversations.length}'),
+                      ],
                     ),
+                    const SizedBox(height: 10),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (_conversations.isEmpty)
+                      const Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(18),
+                          child: Text(
+                            'لا توجد محادثات لعرضها، أو تعذر تحميلها. يمكنك تحديث البيانات والمحاولة مجددًا.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    else
+                      ..._conversations.map((conversation) {
+                        final peer = conversation['peer'] is Map<String, dynamic>
+                            ? conversation['peer'] as Map<String, dynamic>
+                            : <String, dynamic>{};
+                        final last = conversation['lastMessage'] is Map<String, dynamic>
+                            ? conversation['lastMessage'] as Map<String, dynamic>
+                            : <String, dynamic>{};
+                        final title = (conversation['title'] ??
+                                peer['displayName'] ??
+                                peer['username'] ??
+                                'محادثة')
+                            .toString();
+                        final preview = (last['content'] ??
+                                (last['type'] == 'IMAGE' ? '📷 صورة' : '') ??
+                                'ابدأ المحادثة')
+                            .toString();
+                        final unread = conversation['unreadCount'] ?? 0;
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: const Color(0xFFFFE7B0),
+                              child: Text(
+                                title.isEmpty ? '؟' : title.characters.first,
+                                style: const TextStyle(color: Color(0xFF8C641D)),
+                              ),
+                            ),
+                            title: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text(
+                              preview.isEmpty ? 'لا توجد رسالة أخيرة' : preview,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: unread is num && unread > 0
+                                ? CircleAvatar(
+                                    radius: 12,
+                                    backgroundColor: _brandColor,
+                                    child: Text(
+                                      '$unread',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      }),
                     const SizedBox(height: 8),
                     const Text(
-                      'تم تجهيز الاتصال الأساسي بالخادم. نقل قائمة المحادثات وإرسال الرسائل هو المرحلة التالية.',
+                      'عرض المحادثات فقط في هذه المرحلة؛ فتح المحادثة وإرسال الرسائل سيأتيان بعده.',
                       textAlign: TextAlign.center,
                     ),
                   ] else ...[
