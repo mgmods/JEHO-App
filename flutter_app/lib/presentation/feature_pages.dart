@@ -35,8 +35,16 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   @override
   void initState() {
     super.initState();
-    _backgroundUrl = (widget.room['backgroundUrl'] ?? widget.room['background'] ?? '').toString();
-    if (_backgroundUrl?.isEmpty ?? true) _backgroundUrl = null;
+    final initial = (widget.room['backgroundUrl'] ?? widget.room['background'] ?? '').toString();
+    if (initial.isNotEmpty) {
+      if (initial.startsWith('http://') || initial.startsWith('https://')) {
+        _backgroundUrl = initial;
+      } else {
+        final base = Uri.parse(widget.apiClient.baseUrl);
+        final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+        _backgroundUrl = origin.resolve(initial.startsWith('/') ? initial : '/$initial').toString();
+      }
+    }
   }
 
   Future<void> _chooseBackground() async {
