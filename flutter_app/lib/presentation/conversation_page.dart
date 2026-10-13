@@ -147,7 +147,7 @@ class _ConversationPageState extends State<ConversationPage> {
                           itemBuilder: (context, index) {
                             final message = _messages[index];
                             final content = (message['content'] ?? '').toString();
-                            final type = (message['type'] ?? 'TEXT').toString();
+                            final type = (message['type'] ?? 'text').toString().toLowerCase();
                             final sender = message['sender'] is Map<String, dynamic>
                                 ? message['sender'] as Map<String, dynamic>
                                 : <String, dynamic>{};
@@ -158,7 +158,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                   message['senderId']?.toString() == widget.currentUserId);
                             final text = content.isNotEmpty
                                 ? content
-                                : (type == 'IMAGE' ? '📷 صورة مرفقة' : 'رسالة من نوع $type');
+                                : (type == 'image' ? '📷 صورة مرفقة' : 'رسالة من نوع $type');
                             return Align(
                               alignment: isMine
                                   ? Alignment.centerLeft
