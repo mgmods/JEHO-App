@@ -817,6 +817,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           icon: const Icon(Icons.dashboard_customize_rounded),
                           label: const Text('المهام والوكالات'),
                         ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => SocialPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.person_search_rounded),
+                          label: const Text('البحث عن أشخاص'),
+                        ),
 
 
                       ],
