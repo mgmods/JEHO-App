@@ -38,6 +38,12 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 - Tasks, agency discovery/application/join-by-code, agency earnings and join-request views, events, contests, rankings, notifications, app-feature config, and mini-game views exposed by existing endpoints.
 - CI checks for Flutter analysis, widget tests, debug APK build, and artifact upload; backend/dashboard/Docker checks run separately.
 
+## Latest dashboard migration work (2026-10-13)
+
+- Added existing read-only dashboard routes for dashboard charts, live streams, gift categories, VIP plans, wallet package lists, recharge-agent pricing, lucky-box configuration/open history, room-cup leaderboard, system logs, policy snapshot, and drama settings.
+- Added guarded JSON-list editing for the existing daily-task and game-store catalog APIs. Both require a second confirmation before sending updates. These controls do not touch voice settings, ZEGO, LiveKit, Redis, credentials, encryption keys, or database infrastructure.
+- These additions increase route coverage but do not replace the Vue dashboard's full CRUD forms, upload workflows, role-based UI permissions, chart visualizations, or acceptance testing. Verify each route against a non-production/test account before relying on administrative writes.
+
 ## Important limits (not yet production parity)
 
 - **The original native application has not yet been fully ported.** The current Flutter screens are a partial reimplementation, not the original full app converted to Flutter. In particular, existing native screen behavior, deep links, platform integrations, and many production flows still need parity review.
