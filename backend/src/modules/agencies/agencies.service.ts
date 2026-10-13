@@ -149,6 +149,20 @@ export class AgenciesService implements OnModuleInit {
         CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agencies_publicId"
         ON agencies ("publicId") WHERE "publicId" IS NOT NULL
       `);
+      // Normalize existing agency display IDs to six digits without deleting agency data.
+      const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
+      for (const agency of agencies) {
+        if (agency.publicId && /^\\d{6}$/.test(String(agency.publicId))) continue;
+        let candidate = '';
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const next = String(100000 + Math.floor(Math.random() * 900000));
+          if (!(await this.agenciesRepo.exist({ where: { publicId: next } }))) {
+            candidate = next;
+            break;
+          }
+        }
+        if (candidate) await this.agenciesRepo.update({ id: agency.id }, { publicId: candidate });
+      }
     } catch (err) {
       this.logger.warn(`ensure agency exclusive columns: ${(err as Error).message}`);
     }
