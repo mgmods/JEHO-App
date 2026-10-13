@@ -905,6 +905,101 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
   );
 }
 
+class VanityIdsPage extends StatefulWidget {
+  const VanityIdsPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+  @override
+  State<VanityIdsPage> createState() => _VanityIdsPageState();
+}
+
+class _VanityIdsPageState extends State<VanityIdsPage> {
+  List<Map<String, dynamic>> _ids = const [];
+  Map<String, dynamic>? _mine;
+  bool _loading = true;
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void initState() { super.initState(); _load(); }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final ids = await widget.apiClient.getVanityIds();
+      Map<String, dynamic>? mine;
+      try {
+        final response = await widget.apiClient.getMyVanityId(widget.accessToken);
+        if (response['item'] is Map<String, dynamic>) mine = response['item'] as Map<String, dynamic>;
+      } on JehoApiException { /* catalog remains usable if account has no current ID */ }
+      if (mounted) setState(() { _ids = ids; _mine = mine; });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _buy(Map<String, dynamic> item) async {
+    final publicId = (item['publicId'] ?? '').toString();
+    if (publicId.isEmpty || widget.accessToken.isEmpty) {
+      setState(() => _error = 'تعذر تحديد الآي دي أو جلسة الدخول.');
+      return;
+    }
+    final price = item['priceCoins'] ?? 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('شراء الآي دي $publicId'),
+        content: Text('السعر: $price عملة. مدة الإيجار 30 يومًا، ويخصم السعر من رصيد العملات عند تأكيد الخادم.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تأكيد الشراء')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() { _busy = true; _error = null; });
+    try {
+      await widget.apiClient.reserveVanityId(widget.accessToken, publicId);
+      await widget.apiClient.purchaseVanityId(widget.accessToken, publicId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم شراء الآي دي وتحديثه في حسابك.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('الآي دي المميز'), actions: [IconButton(onPressed: _loading || _busy ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(
+      padding: const EdgeInsets.all(14),
+      children: [
+        if (_mine != null) Card(child: ListTile(leading: const Icon(Icons.verified_rounded, color: _featureGold), title: Text('آي دي حسابك: ${_mine!['publicId'] ?? '—'}'), subtitle: Text('ينتهي: ${_mine!['expiresAt'] ?? 'غير محدد'}'))),
+        if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        const Text('الآي دي المميز', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+        const SizedBox(height: 8),
+        if (_ids.isEmpty) const Text('لا توجد أرقام متاحة حاليًا.'),
+        for (final item in _ids) Card(child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.tag_rounded)),
+          title: Text((item['publicId'] ?? '—').toString(), style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('مدة 30 يومًا · ${item['renewPriceCoins'] ?? item['priceCoins'] ?? '—'} عملة للتجديد'),
+          trailing: FilledButton(
+            onPressed: _busy || widget.accessToken.isEmpty ? null : () => _buy(item),
+            child: Text(_busy ? 'جارٍ التنفيذ' : '${item['priceCoins'] ?? '—'} عملة'),
+          ),
+        )),
+        const SizedBox(height: 10),
+        const Text('الشراء يغيّر المعرّف العام بعد تأكيد الخادم. لا يتم تعديل الرصيد محليًا.', style: TextStyle(color: Colors.black54, height: 1.5)),
+      ],
+    ),
+  );
+}
+
 class CosmeticsPage extends StatefulWidget {
   const CosmeticsPage({
     required this.apiClient,
