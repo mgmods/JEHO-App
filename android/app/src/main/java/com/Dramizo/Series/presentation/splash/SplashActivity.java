@@ -421,6 +421,13 @@ public class SplashActivity extends ThemedActivity {
                 finish();
                 return;
             }
+            if ("room".equals(type) || "agency".equals(type) || "user".equals(type)) {
+                navigated = true;
+                mainHandler.removeCallbacks(hardTimeout);
+                openMainForSplashRoute(null);
+                finish();
+                return;
+            }
             if ("home".equals(type) || "messages".equals(type) || "drama".equals(type)
                     || "create_room".equals(type)) {
                 navigated = true;
@@ -515,7 +522,7 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
-    private void openMainForSplashRoute(@Nullable String route) {
+    private void openMainForSplashRoute(String route) {
         Intent i = new Intent(this, MainActivity.class);
         if ("home".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
         else if ("messages".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
