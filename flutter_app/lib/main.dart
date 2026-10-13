@@ -21,6 +21,11 @@ const String apiBaseUrl = String.fromEnvironment(
   defaultValue: 'https://jeho-own-backend.mgs.blitz.cloud/api/v1/',
 );
 
+/// Only definitive authentication rejection should invalidate a stored session.
+/// Network errors, rate limits and server failures must not erase valid credentials.
+bool shouldClearSessionForError(JehoApiException error) =>
+    error.statusCode == 401 || error.statusCode == 403;
+
 String resolveSectionWallpaper(Map<String, dynamic> backgrounds, String sectionKey) {
   // Section-specific background must override the shared wallpaper.
   final section = (backgrounds[sectionKey] ?? '').toString().trim();
@@ -61,11 +66,13 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
       setState(() {
         _session = {'accessToken': token, 'user': profile};
       });
-    } on JehoApiException {
-      try {
-        await _apiClient.clearSession();
-      } catch (_) {
-        // A storage plugin may not be available in widget-test environments.
+    } on JehoApiException catch (error) {
+      if (shouldClearSessionForError(error)) {
+        try {
+          await _apiClient.clearSession();
+        } catch (_) {
+          // A storage plugin may not be available in widget-test environments.
+        }
       }
     } catch (_) {
       // Keep the login screen usable if secure storage is unavailable.
