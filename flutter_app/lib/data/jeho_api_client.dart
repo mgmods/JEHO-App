@@ -443,8 +443,11 @@ class JehoApiClient {
     final normalized = provider.trim().toLowerCase().replaceAll('_', '-');
     final routes = <String, String>{
       'stripe': 'payments/stripe/checkout',
+      'stripe/checkout': 'payments/stripe/checkout',
       'fourthwall': 'payments/fourthwall/checkout',
+      'fourthwall/checkout': 'payments/fourthwall/checkout',
       'paypal': 'payments/paypal/create',
+      'paypal/create': 'payments/paypal/create',
       'google-play': 'payments/google-play/verify',
       'googleplay': 'payments/google-play/verify',
       'crypto': 'payments/crypto/orders',
