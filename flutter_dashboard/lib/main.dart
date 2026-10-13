@@ -115,6 +115,9 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/users'))return [('حظر المستخدم','ban',Icons.block),('إلغاء الحظر','unban',Icons.check_circle_outline)];
   if(path.startsWith('admin/agencies/applications'))return [('قبول الطلب','agency-approve',Icons.check_circle),('رفض الطلب','agency-reject',Icons.cancel)];
   if(path.startsWith('admin/reports'))return [('حل البلاغ','report-resolve',Icons.done_all),('رفض البلاغ','report-dismiss',Icons.remove_circle_outline)];
+  if(path.startsWith('admin/wallet/withdraws'))return [('الموافقة على السحب','withdraw-approve',Icons.check_circle),('رفض السحب','withdraw-reject',Icons.cancel)];
+  if(path.startsWith('admin/wallet/recharges'))return [('تأكيد الشحنة','recharge-complete',Icons.verified),('إلغاء الشحنة','recharge-cancel',Icons.cancel)];
+  if(path.startsWith('admin/gender-verifications'))return [('قبول التحقق','gender-approve',Icons.verified_user),('رفض التحقق','gender-reject',Icons.cancel)];
   return const [];
  }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
@@ -129,7 +132,13 @@ class AdminContent extends StatelessWidget {
    case 'agency-approve': endpoint='admin/agencies/applications/$id/approve'; break;
    case 'agency-reject': endpoint='admin/agencies/applications/$id/reject'; break;
    case 'report-resolve': endpoint='admin/reports/$id/resolve'; break;
-   default: endpoint='admin/reports/$id/dismiss';
+   case 'report-dismiss': endpoint='admin/reports/$id/dismiss'; break;
+   case 'withdraw-approve': endpoint='admin/wallet/withdraws/$id/approve'; break;
+   case 'withdraw-reject': endpoint='admin/wallet/withdraws/$id/reject'; body={'reason':'رفض من لوحة الإدارة'}; break;
+   case 'recharge-complete': endpoint='admin/wallet/recharges/$id/complete'; break;
+   case 'recharge-cancel': endpoint='admin/wallet/recharges/$id/cancel'; break;
+   case 'gender-approve': endpoint='admin/gender-verifications/$id/approve'; break;
+   default: endpoint='admin/gender-verifications/$id/reject';
   }
   try{await api.post(endpoint,body);if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم تنفيذ: '+action.$1)));reload();}}
   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
