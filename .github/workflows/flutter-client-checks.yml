@@ -8,7 +8,7 @@ on:
       - "flutter_dashboard/**"
       - ".github/workflows/flutter-client-checks.yml"
   push:
-    branches: [jeho-own]
+    branches: [jeho-own, flutter-migration-jeho-own-2026-10-13]
     paths:
       - "flutter_app/**"
       - "flutter_dashboard/**"
