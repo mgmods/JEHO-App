@@ -7,7 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
 import 'presentation/conversation_page.dart';
-import 'presentation/feature_pages.dart' hide Center;
+import 'presentation/feature_pages.dart';
 import 'presentation/feature_hub_page.dart';
 import 'presentation/discovery_hub_page.dart';
 import 'presentation/drama_page.dart';
@@ -51,15 +51,6 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
   late final JehoApiClient _apiClient;
   Map<String, dynamic>? _session;
   bool _isRestoringSession = true;
-
-  List<Map<String, dynamic>> get _visibleRooms {
-    if (_homeRoomFilter == 'شائع') return _rooms;
-    final target = _homeRoomFilter == 'سوريا' ? 'سوريا' : _homeRoomFilter == 'مصر' ? 'مصر' : 'المملكة العربية السعودية';
-    return _rooms.where((room) {
-      final country = (room['countryName'] ?? room['country'] ?? room['region'] ?? '').toString();
-      return country.contains(target) || (target == 'المملكة العربية السعودية' && (country.contains('السعودية') || country.contains('Saudi')));
-    }).toList();
-  }
 
   @override
   void initState() {
@@ -275,6 +266,16 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   Map<String, dynamic> _theme = const {};
   List<Map<String, dynamic>> _conversations = const [];
   Map<String, dynamic>? _profile;
+
+  List<Map<String, dynamic>> get _visibleRooms {
+    if (_homeRoomFilter == 'شائع') return _rooms;
+    final target = _homeRoomFilter == 'سوريا' ? 'سوريا' : _homeRoomFilter == 'مصر' ? 'مصر' : 'المملكة العربية السعودية';
+    return _rooms.where((room) {
+      final country = (room['countryName'] ?? room['country'] ?? room['region'] ?? '').toString();
+      return country.contains(target) || (target == 'المملكة العربية السعودية' && (country.contains('السعودية') || country.contains('Saudi')));
+    }).toList();
+  }
+
 
   @override
   void initState() {
@@ -575,7 +576,6 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final section = _sections[_selectedIndex];
     final user = widget.session['user'] is Map<String, dynamic>
         ? widget.session['user'] as Map<String, dynamic>
         : <String, dynamic>{};
@@ -809,7 +809,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       height: 78,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        children: const [
+                        children: [
                           _HomeCategoryChip(label: 'شائع 🔥', selected: _homeRoomFilter == 'شائع', onTap: () => setState(() => _homeRoomFilter = 'شائع')),
                           _HomeCategoryChip(label: 'سوريا 🇸🇾', selected: _homeRoomFilter == 'سوريا', onTap: () => setState(() => _homeRoomFilter = 'سوريا')),
                           _HomeCategoryChip(label: 'مصر 🇪🇬', selected: _homeRoomFilter == 'مصر', onTap: () => setState(() => _homeRoomFilter = 'مصر')),
