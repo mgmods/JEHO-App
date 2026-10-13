@@ -266,7 +266,7 @@ export class AgenciesService implements OnModuleInit {
     }
     for (let attempt = 0; attempt < 40; attempt++) {
       // Easy 5-digit display ID (never starts with 0).
-      const id = String(10000 + Math.floor(Math.random() * 90000));
+      const id = String(100000 + Math.floor(Math.random() * 900000));
       const exists = await this.agenciesRepo.findOne({
         where: { publicId: id },
         select: ['id'],
@@ -652,7 +652,7 @@ export class AgenciesService implements OnModuleInit {
         if (!clash) break;
         activationCode = generateActivationCode();
       }
-      let publicId = String(10000 + Math.floor(Math.random() * 90000));
+      let publicId = String(100000 + Math.floor(Math.random() * 900000));
       for (let attempt = 0; attempt < 40; attempt++) {
         const clash = await manager.findOne(Agency, {
           where: { publicId },
