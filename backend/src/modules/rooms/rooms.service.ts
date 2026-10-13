@@ -1231,7 +1231,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
    */
   private isUploadedRoomImageUrl(url: string | null | undefined): boolean {
     const path = String(url || '').trim().split('?')[0];
-    return /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i.test(path);
+    // Multer's default disk filename is 32 lowercase hex characters with no extension.
+    // UploadsService returns that exact /uploads/<filename> path, so accept it as a
+    // phone-uploaded wallpaper as well as UUID filenames that already include an image extension.
+    return /^\/uploads\/(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif))$/i.test(path);
   }
 
   private async activeOwnedWearUrl(
