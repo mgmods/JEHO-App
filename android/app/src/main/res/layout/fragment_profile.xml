@@ -119,6 +119,21 @@
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/tvLevelChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginTop="4dp"
+                        android:background="@drawable/bg_chip_level"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:text="Lv.1"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:visibility="visible" />
+
+                    <TextView
                         android:id="@+id/tvStaffBadge"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -223,20 +238,7 @@
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/tvLevelChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_level"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:text="Lv.1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
+
 
                     <ImageView
                         android:id="@+id/imgVipBadge"
