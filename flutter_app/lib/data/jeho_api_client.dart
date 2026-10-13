@@ -173,6 +173,45 @@ class JehoApiClient {
     return items.whereType<Map<String, dynamic>>().toList(growable: false);
   }
 
+  Future<List<Map<String, dynamic>>> getCosmetics({String? type}) async {
+    final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
+    final payload = await _get('cosmetics$suffix');
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['cosmetics'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<List<Map<String, dynamic>>> getCosmeticInventory(String accessToken) async {
+    final payload = await _get('cosmetics/inventory', accessToken: accessToken);
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['inventory'] ?? items['data'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>> purchaseCosmetic(String accessToken, String cosmeticId) async {
+    final payload = await _post('cosmetics/purchase', {'cosmeticId': cosmeticId}, accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> equipCosmetic(String accessToken, String cosmeticId) async {
+    final payload = await _post('cosmetics/equip', {'cosmeticId': cosmeticId}, accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> unequipCosmetic(String accessToken, String cosmeticId) async {
+    final payload = await _post('cosmetics/unequip', {'cosmeticId': cosmeticId}, accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    return <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> getWallet(String accessToken) async {
     final payload = await _get('wallet', accessToken: accessToken);
     if (payload is Map<String, dynamic>) return payload;
