@@ -960,7 +960,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
               const ListTile(title: Text('نتائج البحث — أرسل طلب صداقة')),
               for (final user in users)
                 ListTile(
-                  leading: CircleAvatar(child: const Icon(Icons.person_rounded)),
+                  leading: const CircleAvatar(child: Icon(Icons.person_rounded)),
                   title: Text((user['displayName'] ?? user['username'] ?? 'مستخدم').toString()),
                   subtitle: Text((user['username'] ?? user['publicId'] ?? '').toString()),
                   trailing: IconButton(
@@ -971,12 +971,11 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       if (id.isEmpty) return;
                       try {
                         await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend');
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
-                        }
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
                       } on JehoApiException catch (error) {
-                        if (context.mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(error.message)));
+                        if (mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(error.message)));
                       }
                     },
                   ),
