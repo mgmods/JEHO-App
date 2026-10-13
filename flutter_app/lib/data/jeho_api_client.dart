@@ -214,12 +214,6 @@ class JehoApiClient {
   Future<Map<String, dynamic>> getSupportConfig() async =>
       _asMap(await _get('config/support'), 'تعذر تحميل قنوات الدعم.');
 
-  Future<List<Map<String, dynamic>>> getVipPlans() async =>
-      _asList(await _get('vip/plans'), ['items', 'results', 'plans', 'data']);
-
-  Future<Map<String, dynamic>> purchaseVip(String token, {required int level, int durationDays = 30}) async =>
-      _asMap(await _post('vip/purchase', {'level': level, 'durationDays': durationDays}, accessToken: token), 'تعذر شراء VIP.');
-
   Future<Map<String, dynamic>> changePassword(String token, {required String currentPassword, required String newPassword}) async =>
       _asMap(await _post('auth/change-password', {'currentPassword': currentPassword, 'newPassword': newPassword}, accessToken: token), 'تعذر تغيير كلمة المرور.');
 
