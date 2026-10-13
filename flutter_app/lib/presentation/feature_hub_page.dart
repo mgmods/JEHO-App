@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/jeho_api_client.dart';
 import 'drama_page.dart';
+import 'games_page.dart';
 
 class FeatureHubPage extends StatefulWidget {
   const FeatureHubPage({
@@ -328,6 +329,18 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
       appBar: AppBar(
         title: Text(_titles[_section]),
         actions: [
+          IconButton(
+            tooltip: 'الألعاب',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => GamesPage(
+                  apiClient: widget.apiClient,
+                  accessToken: widget.accessToken,
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.sports_esports_rounded),
+          ),
           IconButton(
             tooltip: 'الدراما',
             onPressed: () => Navigator.of(context).push(
