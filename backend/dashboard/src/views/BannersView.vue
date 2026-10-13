@@ -17,8 +17,8 @@
     <section class="widget-card p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
-          <h3 class="h6 mb-1">شاشة الإعلان عند تشغيل التطبيق</h3>
-          <p class="form-text mb-0">تظهر مرة واحدة عند بدء تشغيل التطبيق بالكامل. إذا تعذّر تحميل الصورة، يتابع التطبيق تلقائيًا دون تعطيل الدخول.</p>
+          <h3 class="h6 mb-1">إدارة السبلاش</h3>
+          <p class="form-text mb-0">تظهر عند بدء تشغيل التطبيق فقط. إذا تعذّر تحميل صورة صالحة، يتابع التطبيق تلقائيًا إلى الرئيسية دون تعليق.</p>
         </div>
         <button class="btn btn-aurora btn-sm" type="button" :disabled="splashSaving || splashUploading" @click="saveSplashAd">
           {{ splashSaving ? 'جارٍ الحفظ…' : 'حفظ إعلان التشغيل' }}
