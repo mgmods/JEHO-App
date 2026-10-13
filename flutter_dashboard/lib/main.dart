@@ -131,7 +131,7 @@ class AdminContent extends StatelessWidget {
   finally{controller.dispose();}
  }
  String? _editablePath(String path){
-  const allowed={'admin/paid-messages/settings':'admin/paid-messages/settings','admin/economy/settings':'admin/economy/settings','admin/games/odds':'admin/games/odds','admin/games/ads':'admin/games/ads','admin/drama/settings':'admin/drama/settings'};
+  const allowed={'admin/paid-messages/settings':'admin/paid-messages/settings','admin/economy/settings':'admin/economy/settings','admin/games/odds':'admin/games/odds','admin/games/ads':'admin/games/ads','admin/drama/settings':'admin/drama/settings','admin/recharge-agent-pricing':'admin/recharge-agent-pricing'};
   return allowed[path];
  }
  Future<void> _editSettings(BuildContext context,String endpoint,Map<String,dynamic> current) async {
