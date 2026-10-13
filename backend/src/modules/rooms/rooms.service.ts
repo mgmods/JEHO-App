@@ -1487,7 +1487,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
               }
             }
             if (!agencyPublicId) {
-              agencyPublicId = String(10000 + (Date.now() % 90000));
+              agencyPublicId = String(100000 + (Date.now() % 900000));
               await this.agenciesRepo.update(
                 { id: agency.id },
                 { publicId: agencyPublicId },
