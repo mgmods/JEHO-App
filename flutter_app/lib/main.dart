@@ -11,6 +11,7 @@ import 'presentation/feature_hub_page.dart';
 import 'presentation/discovery_hub_page.dart';
 import 'presentation/drama_page.dart';
 import 'presentation/games_page.dart';
+import 'presentation/user_search_page.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -449,6 +450,20 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
+          IconButton(
+            tooltip: 'البحث عن مستخدمين',
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => UserSearchPage(
+                    apiClient: widget.apiClient,
+                    accessToken: widget.session['accessToken']?.toString() ?? '',
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.search_rounded),
+          ),
           IconButton(
             tooltip: 'تحديث البيانات',
             onPressed: _loading ? null : _loadHomeData,
