@@ -13,6 +13,7 @@ public final class VanityDtos {
 
     public static class MineResult {
         @SerializedName("item") public VanityItem item;
+        @SerializedName("canApplyToAgency") public boolean canApplyToAgency;
         @SerializedName("leaseDays") public int leaseDays;
     }
 
