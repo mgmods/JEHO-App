@@ -6,12 +6,14 @@ class ConversationPage extends StatefulWidget {
   const ConversationPage({
     required this.apiClient,
     required this.accessToken,
+    required this.currentUserId,
     required this.conversation,
     super.key,
   });
 
   final JehoApiClient apiClient;
   final String accessToken;
+  final String currentUserId;
   final Map<String, dynamic> conversation;
 
   @override
@@ -151,7 +153,9 @@ class _ConversationPageState extends State<ConversationPage> {
                                 : <String, dynamic>{};
                             final isMine =
                                 message['isMine'] == true ||
-                                message['isOwn'] == true;
+                                message['isOwn'] == true ||
+                                (currentUserId.isNotEmpty &&
+                                  message['senderId']?.toString() == widget.currentUserId);
                             final text = content.isNotEmpty
                                 ? content
                                 : (type == 'IMAGE' ? '📷 صورة مرفقة' : 'رسالة من نوع $type');
