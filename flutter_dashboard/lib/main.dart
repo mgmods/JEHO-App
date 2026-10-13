@@ -119,6 +119,10 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/wallet/withdraws'))return [('الموافقة على السحب','withdraw-approve',Icons.check_circle),('رفض السحب','withdraw-reject',Icons.cancel)];
   if(path.startsWith('admin/wallet/recharges'))return [('تأكيد الشحنة','recharge-complete',Icons.verified),('إلغاء الشحنة','recharge-cancel',Icons.cancel)];
   if(path.startsWith('admin/gender-verifications'))return [('قبول التحقق','gender-approve',Icons.verified_user),('رفض التحقق','gender-reject',Icons.cancel)];
+  if(path.startsWith('admin/vip?'))return [('إلغاء عضوية VIP','vip-revoke',Icons.remove_circle_outline)];
+  if(path.startsWith('admin/agencies?'))return [('تعليق الوكالة','agency-suspend',Icons.pause_circle_outline)];
+  if(path.startsWith('admin/recharge-agents/applications'))return [('قبول طلب الوكيل','agent-approve',Icons.check_circle),('رفض طلب الوكيل','agent-reject',Icons.cancel)];
+  if(path.startsWith('admin/contests'))return [('إنهاء المسابقة','contest-end',Icons.flag_circle)];
   return const [];
  }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
@@ -139,7 +143,13 @@ class AdminContent extends StatelessWidget {
    case 'recharge-complete': endpoint='admin/wallet/recharges/$id/complete'; break;
    case 'recharge-cancel': endpoint='admin/wallet/recharges/$id/cancel'; break;
    case 'gender-approve': endpoint='admin/gender-verifications/$id/approve'; break;
-   default: endpoint='admin/gender-verifications/$id/reject';
+   case 'vip-revoke': endpoint='admin/vip/$id/revoke'; break;
+   case 'agency-suspend': endpoint='admin/agencies/$id/suspend'; body={'reason':'تعليق من لوحة الإدارة'}; break;
+   case 'agent-approve': endpoint='admin/recharge-agents/applications/$id/approve'; break;
+   case 'agent-reject': endpoint='admin/recharge-agents/applications/$id/reject'; body={'reason':'رفض من لوحة الإدارة'}; break;
+   case 'contest-end': endpoint='admin/contests/$id/end'; break;
+   case 'gender-reject': endpoint='admin/gender-verifications/$id/reject'; break;
+   default: throw StateError('إجراء غير معروف: '+action.$2);
   }
   try{await api.post(endpoint,body);if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تم تنفيذ: '+action.$1)));reload();}}
   catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(e.toString().replaceFirst('Exception: ',''))));}
