@@ -233,6 +233,44 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
   }
 
   Future<void> _showSeatLock() async {
+    final seat = await showModalBottomSheet<int>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            const ListTile(title: Text('اختر المقعد لقفله أو فتحه')),
+            for (var index = 0; index < ((widget.room['seatCount'] is int ? widget.room['seatCount'] as int : 11).clamp(1, 30)); index++)
+              ListTile(
+                leading: CircleAvatar(child: Text('$index')),
+                title: Text('المقعد $index'),
+                onTap: () => Navigator.pop(context, index),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (seat == null || !mounted) return;
+    final lock = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('المقعد $seat'),
+        content: const Text('اختر إذا كنت تريد قفل المقعد أو فتحه. صلاحيات المضيف والمشرف يتحقق منها الخادم.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('فتح المقعد')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('قفل المقعد')),
+        ],
+      ),
+    );
+    if (lock == null || !mounted) return;
+    await _roomAction(
+      () => widget.apiClient.lockRoomSeat(widget.accessToken, _roomId, seat, locked: lock),
+      lock ? 'تم قفل المقعد.' : 'تم فتح المقعد.',
+    );
+  }
+
+  Future<void> _showRoomPasswordLock() async {
     final passwordController = TextEditingController();
     bool lock = true;
     try {
@@ -491,6 +529,11 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           ),
           OutlinedButton.icon(
             onPressed: _roomActionBusy || !_roomEntered ? null : _showSeatLock,
+            icon: const Icon(Icons.event_seat_rounded),
+            label: const Text('قفل أو فتح مقعد'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _roomActionBusy || !_roomEntered ? null : _showRoomPasswordLock,
             icon: const Icon(Icons.lock_outline_rounded),
             label: const Text('قفل الغرفة بكلمة مرور'),
           ),
