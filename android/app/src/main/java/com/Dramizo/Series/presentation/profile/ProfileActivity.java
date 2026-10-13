@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.AlertDialog;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,6 +42,9 @@ import com.bumptech.glide.Glide;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.HashMap;
+import java.util.UUID;
 import java.text.NumberFormat;
 
 public class ProfileActivity extends ThemedActivity {
@@ -138,6 +142,10 @@ public class ProfileActivity extends ThemedActivity {
                 });
             });
         });
+        binding.btnCpRequest.setOnClickListener(v -> {
+            if (userId == null || myId == null || userId.equals(myId)) return;
+            showCpRequestDialog(userId);
+        });
         binding.btnFriend.setOnClickListener(v -> {
             if (userId == null) return;
             if (myId != null && userId.equals(myId)) {
@@ -223,6 +231,9 @@ public class ProfileActivity extends ThemedActivity {
 
         vm.getUser().observe(this, user -> {
             if (user == null) return;
+            boolean ownProfile = myId != null && myId.equals(user.id);
+            binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
+            loadPublicCpRelationship(user.id);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
@@ -548,6 +559,66 @@ public class ProfileActivity extends ThemedActivity {
             if (v != null && !v.trim().isEmpty()) return v.trim();
         }
         return null;
+    }
+
+    private void showCpRequestDialog(String recipientId) {
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(this).setTitle("اختر نوع العلاقة")
+                .setItems(labels, (dialog, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", UUID.randomUUID().toString());
+                    binding.btnCpRequest.setEnabled(false);
+                    container.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                                container.getUserApi().createProfileCpRequest(body));
+                        runOnUiThread(() -> {
+                            binding.btnCpRequest.setEnabled(true);
+                            Toast.makeText(this, result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                    : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    });
+                }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private void loadPublicCpRelationship(String targetId) {
+        if (targetId == null || targetId.isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().cpProfileRelationships(targetId));
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    binding.rowProfileCp.setVisibility(View.GONE);
+                    return;
+                }
+                Map<String, Object> relation = result.data.get(0);
+                Object partnerObj = relation.get("partner");
+                Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
+                String name = partner == null ? "" : String.valueOf(
+                        partner.get("displayName") != null ? partner.get("displayName") : partner.get("username"));
+                String avatar = partner == null || partner.get("avatarUrl") == null ? "" : String.valueOf(partner.get("avatarUrl"));
+                binding.tvProfileCpLabel.setText(cpTypeLabel(type) + (name.isEmpty() ? "" : " · " + name));
+                if (!avatar.isEmpty()) Glide.with(this).load(avatar).placeholder(R.drawable.ic_tab_me).into(binding.imgProfileCpPartner);
+                binding.rowProfileCp.setVisibility(View.VISIBLE);
+                binding.btnCpRequest.setVisibility(View.GONE);
+            });
+        });
+    }
+
+    private String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
     }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
