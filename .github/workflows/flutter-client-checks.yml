@@ -1,0 +1,41 @@
+name: Flutter Client Checks
+
+on:
+  pull_request:
+    branches: [jeho-own]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter-client-checks.yml"
+  push:
+    branches: [feat/flutter-foundation-2026-10-13]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter-client-checks.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Widget tests
+        run: flutter test
