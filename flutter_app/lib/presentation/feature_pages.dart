@@ -622,6 +622,7 @@ class _WalletPageState extends State<WalletPage> {
   Map<String, dynamic>? _wallet;
   List<Map<String, dynamic>> _transactions = const [];
   List<Map<String, dynamic>> _packages = const [];
+  List<Map<String, dynamic>> _withdrawals = const [];
   bool _loading = true;
   String? _error;
 
@@ -648,13 +649,20 @@ class _WalletPageState extends State<WalletPage> {
       try {
         packages = await widget.apiClient.getRechargePackages();
       } on JehoApiException {
-        // Packages are informational until native store billing is integrated.
+        // Package listing can fail independently of wallet balance.
+      }
+      List<Map<String, dynamic>> withdrawals = const [];
+      try {
+        withdrawals = await widget.apiClient.getMyWithdrawals(widget.accessToken);
+      } on JehoApiException {
+        // Keep balance and other wallet sections available if history is unavailable.
       }
       if (mounted) {
         setState(() {
           _wallet = result;
           _transactions = transactions;
           _packages = packages;
+          _withdrawals = withdrawals;
         });
       }
     } on JehoApiException catch (error) {
@@ -709,6 +717,60 @@ class _WalletPageState extends State<WalletPage> {
     } catch (_) {
       if (mounted) setState(() => _error = 'تعذر بدء الدفع. تحقق من إعدادات مزود الدفع ثم حاول مجددًا.');
     } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _exchangeDiamonds() async {
+    final controller = TextEditingController();
+    try {
+      final amount = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('تبديل الألماس إلى عملات'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'عدد الألماس المراد تبديله'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, int.tryParse(controller.text.trim())),
+              child: const Text('متابعة'),
+            ),
+          ],
+        ),
+      );
+      if (amount == null || !mounted) return;
+      if (amount < 1) {
+        setState(() => _error = 'أدخل كمية ألماس أكبر من صفر.');
+        return;
+      }
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('تأكيد التبديل'),
+          content: Text('سيطلب التطبيق تبديل $amount ألماس إلى عملات وفق النسبة والقواعد التي يطبقها الخادم. لا يمكن التراجع عن العملية بعد قبولها.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('رجوع')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تأكيد')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+      setState(() { _loading = true; _error = null; });
+      await widget.apiClient.exchangeDiamonds(widget.accessToken, amount);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب التبديل إلى الخادم.')));
+      await _load();
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر تبديل الرصيد.');
+    } finally {
+      controller.dispose();
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -833,10 +895,21 @@ class _WalletPageState extends State<WalletPage> {
                     _BalanceTile(label: 'العملات', value: balances['coins'] ?? balances['coinBalance'] ?? '—', icon: Icons.monetization_on_rounded),
                     _BalanceTile(label: 'تقدّم حد السحب', value: '${((double.tryParse((balances['withdrawProgress'] ?? 0).toString()) ?? 0) * 100).clamp(0, 100).toStringAsFixed(0)}%', icon: Icons.trending_up_rounded),
                     const SizedBox(height: 12),
-                    FilledButton.tonalIcon(
-                      onPressed: _loading ? null : _requestWithdrawal,
-                      icon: const Icon(Icons.payments_outlined),
-                      label: const Text('طلب سحب الألماس'),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: _loading ? null : _requestWithdrawal,
+                          icon: const Icon(Icons.payments_outlined),
+                          label: const Text('طلب سحب الألماس'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : _exchangeDiamonds,
+                          icon: const Icon(Icons.currency_exchange_rounded),
+                          label: const Text('تبديل الألماس'),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 18),
                     Text('باقات الشحن', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
@@ -858,6 +931,25 @@ class _WalletPageState extends State<WalletPage> {
                             subtitle: const Text('إنشاء طلب دفع مستضاف عبر مزود الدفع المفعّل في الخادم.'),
                             onTap: _loading ? null : () => _startCheckout(pkg),
                           ),
+                        );
+                      }),
+                    const SizedBox(height: 18),
+                    Text('طلبات السحب', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                    if (_withdrawals.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Text('لا توجد طلبات سحب سابقة.'),
+                      )
+                    else
+                      ..._withdrawals.map((item) {
+                        final status = (item['status'] ?? 'pending').toString();
+                        final amount = item['diamonds'] ?? item['amount'] ?? '—';
+                        final created = (item['createdAt'] ?? '').toString();
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.outbox_rounded),
+                          title: Text('$amount ألماس'),
+                          subtitle: Text('$status${created.isNotEmpty ? ' · $created' : ''}'),
                         );
                       }),
                     const SizedBox(height: 18),
