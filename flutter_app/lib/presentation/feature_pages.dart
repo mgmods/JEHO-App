@@ -742,7 +742,6 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
                                         size: 25,
                                       ),
                                     ),
-                              ),
                             ),
                             const SizedBox(height: 5),
                             Text(
