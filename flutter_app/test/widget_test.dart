@@ -12,6 +12,15 @@ void main() {
     expect(resolveSectionWallpaper({'allSections': '  ', 'profile': '', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/app.jpg');
   });
 
+
+  test('only definitive auth failures invalidate a saved session', () {
+    expect(shouldClearSessionForError(const JehoApiException('expired', statusCode: 401)), isTrue);
+    expect(shouldClearSessionForError(const JehoApiException('forbidden', statusCode: 403)), isTrue);
+    expect(shouldClearSessionForError(const JehoApiException('rate limited', statusCode: 429)), isFalse);
+    expect(shouldClearSessionForError(const JehoApiException('server error', statusCode: 500)), isFalse);
+    expect(shouldClearSessionForError(const JehoApiException('network unavailable')), isFalse);
+  });
+
   testWidgets('shows Arabic login and guest entry', (tester) async {
     final apiClient = JehoApiClient(
       baseUrl: 'https://example.invalid/api/v1/',
