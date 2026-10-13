@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'data/jeho_api_client.dart';
 import 'presentation/auth_page.dart';
 import 'presentation/conversation_page.dart';
+import 'presentation/feature_pages.dart';
 
 const Color _brandColor = Color(0xFFB68A35);
 
@@ -389,6 +390,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
                           child: ListTile(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => RoomDetailPage(
+                                    apiClient: widget.apiClient,
+                                    accessToken: widget.session['accessToken']?.toString() ?? '',
+                                    room: room,
+                                  ),
+                                ),
+                              ).then((_) => _loadHomeData());
+                            },
                             leading: Container(
                               width: 46,
                               height: 46,
@@ -560,8 +572,37 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       label: const Text('تعديل الملف الشخصي'),
                     ),
                     const SizedBox(height: 18),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => WalletPage(
+                                apiClient: widget.apiClient,
+                                accessToken: widget.session['accessToken']?.toString() ?? '',
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.account_balance_wallet_rounded),
+                          label: const Text('المحفظة'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => GiftCatalogPage(apiClient: widget.apiClient),
+                            ),
+                          ),
+                          icon: const Icon(Icons.card_giftcard_rounded),
+                          label: const Text('الهدايا'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
                     const Text(
-                      'الملف الشخصي المعروض من بيانات الخادم عند توفرها. بقية إعدادات الحساب ستُنقل في مراحل لاحقة.',
+                      'يمكنك تعديل الاسم والنبذة، ومراجعة رصيد المحفظة وكتالوج الهدايا. بقية وظائف الحساب تنتقل تدريجيًا.',
                       textAlign: TextAlign.center,
                     ),
                   ],
