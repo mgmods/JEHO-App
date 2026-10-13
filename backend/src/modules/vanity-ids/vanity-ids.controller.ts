@@ -17,6 +17,8 @@ import { Repository } from 'typeorm';
 import { VanityId, VanityIdStatus } from '../../database/entities/vanity-id.entity';
 import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { Room } from '../../database/entities/room.entity';
+import { Agency } from '../../database/entities/agency.entity';
 import {
   WalletTransaction,
   TransactionType,
@@ -35,6 +37,8 @@ export class VanityIdsController {
     @InjectRepository(VanityId) private readonly vanityRepo: Repository<VanityId>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
+    @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(Agency) private readonly agenciesRepo: Repository<Agency>,
     @InjectRepository(WalletTransaction)
     private readonly txRepo: Repository<WalletTransaction>,
   ) {}
@@ -50,11 +54,11 @@ export class VanityIdsController {
     if (where.status === VanityIdStatus.DISABLED) {
       return { items: [], leaseDays: VANITY_LEASE_DAYS };
     }
-    const items = await this.vanityRepo.find({
+    const items = (await this.vanityRepo.find({
       where,
       order: { priceCoins: 'ASC', publicId: 'ASC' },
       take: 200,
-    });
+    })).filter((i) => /^\\d{6}$/.test(i.publicId));
     return {
       items: items.map((i) => ({
         ...i,
@@ -95,6 +99,9 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
+    if (!/^\\d{6}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
     if (row.status === VanityIdStatus.DISABLED) {
@@ -129,6 +136,9 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
+    if (!/^\\d{6}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
     if (row.status === VanityIdStatus.DISABLED) {
@@ -185,17 +195,8 @@ export class VanityIdsController {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    if (!renew) {
-      // Capture previous public ID once when first applying this vanity.
-      if (!row.previousPublicId || user.publicId !== publicId) {
-        row.previousPublicId =
-          user.publicId && user.publicId !== publicId
-            ? user.publicId
-            : row.previousPublicId;
-      }
-      user.publicId = publicId;
-      await this.usersRepo.save(user);
-    }
+    // Purchase owns the ID but deliberately does not equip it anywhere.
+    // The user chooses account, personal room, or (if owner) agency in the apply dialog.
 
     const baseMs =
       renew && row.expiresAt && row.expiresAt.getTime() > now.getTime()
@@ -216,7 +217,66 @@ export class VanityIdsController {
       leaseDays: VANITY_LEASE_DAYS,
       expiresAt: row.expiresAt,
       userId,
+      targetType: row.targetType || null,
+      targetId: row.targetId || null,
     };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('id/:publicId/apply')
+  @ApiOperation({ summary: 'Equip a purchased six-digit ID to account, personal room, or owned agency' })
+  async apply(
+    @CurrentUser('sub') userId: string,
+    @Param('publicId') publicId: string,
+    @Body() body: { targetType?: string },
+  ) {
+    if (!/^\\d{6}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    }
+    const row = await this.vanityRepo.findOne({ where: { publicId } });
+    if (!row) throw new NotFoundException('ID not found');
+    if (row.status !== VanityIdStatus.OWNED || row.ownerUserId !== userId) {
+      throw new BadRequestException('يجب شراء هذا الآيدي أولاً');
+    }
+    if (row.expiresAt && row.expiresAt <= new Date()) {
+      throw new BadRequestException('انتهت صلاحية هذا الآيدي');
+    }
+    const targetType = String(body?.targetType || '');
+    if (!['account', 'room', 'agency'].includes(targetType)) {
+      throw new BadRequestException('وجهة الآيدي غير صحيحة');
+    }
+    if (targetType === 'account') {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (!user) throw new NotFoundException('User not found');
+      const conflict = await this.usersRepo.findOne({ where: { publicId } });
+      if (conflict && conflict.id !== userId) throw new BadRequestException('الآيدي مستخدم لحساب آخر');
+      row.previousPublicId = user.publicId && user.publicId !== publicId ? user.publicId : row.previousPublicId;
+      user.publicId = publicId;
+      await this.usersRepo.save(user);
+      row.targetType = 'account';
+      row.targetId = userId;
+    } else if (targetType === 'room') {
+      const room = await this.roomsRepo.findOne({ where: { hostId: userId, agencyId: null }, order: { createdAt: 'DESC' } });
+      if (!room) throw new BadRequestException('افتح الروم الشخصي أولاً');
+      const conflict = await this.roomsRepo.findOne({ where: { publicId } });
+      if (conflict && conflict.id !== room.id) throw new BadRequestException('الآيدي مستخدم لروم آخر');
+      room.publicId = publicId;
+      await this.roomsRepo.save(room);
+      row.targetType = 'room';
+      row.targetId = room.id;
+    } else {
+      const agency = await this.agenciesRepo.findOne({ where: { ownerId: userId } });
+      if (!agency) throw new BadRequestException('هذا الخيار متاح لصاحب الوكالة فقط');
+      const conflict = await this.agenciesRepo.findOne({ where: { publicId } });
+      if (conflict && conflict.id !== agency.id) throw new BadRequestException('الآيدي مستخدم لوكالة أخرى');
+      agency.publicId = publicId;
+      await this.agenciesRepo.save(agency);
+      row.targetType = 'agency';
+      row.targetId = agency.id;
+    }
+    await this.vanityRepo.save(row);
+    return { success: true, publicId, targetType, targetId: row.targetId };
   }
 
   // ─── Admin ────────────────────────────────────────────────────────
