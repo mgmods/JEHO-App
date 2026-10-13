@@ -60,7 +60,7 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
 
   Future<void> _restoreSession() async {
     try {
-      final token = await _apiClient.readAccessToken();
+      final token = await _apiClient.readAccessToken().timeout(const Duration(seconds: 8));
       if (token == null || token.isEmpty || !mounted) return;
       final profile = await _apiClient.getMyProfile(token).timeout(const Duration(seconds: 8));
       if (!mounted) return;
