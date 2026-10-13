@@ -315,7 +315,7 @@ class AdminContent extends StatelessWidget {
   final isGift=path=='admin/gifts';
   final initial=isGift
    ? <String,dynamic>{'name':'','iconUrl':'','coinPrice':0,'diamondValue':0,'type':'NORMAL','category':'normal','isActive':true,'sortOrder':0}
-   : <String,dynamic>{'key':'','name':'','labelAr':'','sortOrder':0,'isActive':true};
+   : <String,dynamic>{'key':'','labelAr':'','labelEn':'','sortOrder':0,'isActive':true};
   await _editAdminCatalogRow(context,path,initial,isGift?'إضافة هدية':'إضافة تصنيف هدايا',create:true);
  }
  Future<void> _editAdminCatalogRow(BuildContext context,String path,Map<String,dynamic> row,String title,{bool create=false}) async {
@@ -327,8 +327,8 @@ class AdminContent extends StatelessWidget {
    if(path=='admin/gifts'){
     if((decoded['name']??'').toString().trim().isEmpty||(decoded['iconUrl']??'').toString().trim().isEmpty)throw const FormatException('اسم الهدية ورابط الصورة مطلوبان.');
     if(num.tryParse((decoded['coinPrice']??'').toString())==null)throw const FormatException('سعر العملات غير صالح.');
-   } else if((decoded['key']??'').toString().trim().isEmpty||(decoded['name']??'').toString().trim().isEmpty) {
-    throw const FormatException('مفتاح التصنيف واسمه مطلوبان.');
+   } else if((decoded['key']??'').toString().trim().isEmpty||(decoded['labelAr']??'').toString().trim().isEmpty) {
+    throw const FormatException('مفتاح التصنيف واسمه العربي labelAr مطلوبان.');
    }
    final ok=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد الحفظ'),content:Text((create?'سيُنشأ عنصر جديد في ':'ستُحدّث بيانات ') + (path=='admin/gifts'?'كتالوج الهدايا.':'تصنيفات الهدايا.')),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('رجوع')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
    if(ok!=true)return;
