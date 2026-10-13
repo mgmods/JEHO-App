@@ -2164,6 +2164,8 @@ export class AdminService {
 
   async adminLogin(email: string, password: string) {
     await this.ensureDashboardAdminSchema();
+    await this.ensureStaffRoleColumn();
+    await this.ensureDashboardPermissionsColumn();
     await this.migrateLegacyDashboardAccounts();
     const identifier = String(email || '').trim().toLowerCase();
     if (!identifier || !password) {
