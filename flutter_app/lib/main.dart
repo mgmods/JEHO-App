@@ -52,6 +52,15 @@ class _JehoOwnAppState extends State<JehoOwnApp> {
   Map<String, dynamic>? _session;
   bool _isRestoringSession = true;
 
+  List<Map<String, dynamic>> get _visibleRooms {
+    if (_homeRoomFilter == 'شائع') return _rooms;
+    final target = _homeRoomFilter == 'سوريا' ? 'سوريا' : _homeRoomFilter == 'مصر' ? 'مصر' : 'المملكة العربية السعودية';
+    return _rooms.where((room) {
+      final country = (room['countryName'] ?? room['country'] ?? room['region'] ?? '').toString();
+      return country.contains(target) || (target == 'المملكة العربية السعودية' && (country.contains('السعودية') || country.contains('Saudi')));
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -258,6 +267,7 @@ class MigrationHomePage extends StatefulWidget {
 
 class _MigrationHomePageState extends State<MigrationHomePage> {
   int _selectedIndex = 0;
+  String _homeRoomFilter = 'شائع';
   bool _loading = true;
   String? _loadError;
   List<Map<String, dynamic>> _rooms = const [];
@@ -729,16 +739,6 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     const SizedBox(height: 12),
                   ],
                   if (_selectedIndex == 0) ...[
-                    Row(
-                      children: const [
-                        Expanded(child: _HomeFeatureTile(title: 'الثروة', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_wealth.webp')),
-                        SizedBox(width: 8),
-                        Expanded(child: _HomeFeatureTile(title: 'CP', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_cp.webp')),
-                        SizedBox(width: 8),
-                        Expanded(child: _HomeFeatureTile(title: 'حظ', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_charm.webp')),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     if (_banners.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       SizedBox(
@@ -795,15 +795,25 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       ),
                     ],
                     const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Expanded(child: _HomeFeatureTile(title: 'الثروة', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_wealth.webp')),
+                        SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(title: 'CP', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_cp.webp')),
+                        SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(title: 'حظ', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_charm.webp')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       height: 78,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: const [
-                          _HomeCategoryChip(label: 'شائع 🔥', selected: true),
-                          _HomeCategoryChip(label: 'سوريا 🇸🇾'),
-                          _HomeCategoryChip(label: 'مصر 🇪🇬'),
-                          _HomeCategoryChip(label: 'المملكة العربية 🇸🇦'),
+                          _HomeCategoryChip(label: 'شائع 🔥', selected: _homeRoomFilter == 'شائع', onTap: () => setState(() => _homeRoomFilter = 'شائع')),
+                          _HomeCategoryChip(label: 'سوريا 🇸🇾', selected: _homeRoomFilter == 'سوريا', onTap: () => setState(() => _homeRoomFilter = 'سوريا')),
+                          _HomeCategoryChip(label: 'مصر 🇪🇬', selected: _homeRoomFilter == 'مصر', onTap: () => setState(() => _homeRoomFilter = 'مصر')),
+                          _HomeCategoryChip(label: 'المملكة العربية 🇸🇦', selected: _homeRoomFilter == 'السعودية', onTap: () => setState(() => _homeRoomFilter = 'السعودية')),
                         ],
                       ),
                     ),
@@ -819,7 +829,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           ),
                         ),
                         Text(
-                          '${_rooms.length} غرفة',
+                          '${_visibleRooms.length} غرفة',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
@@ -855,7 +865,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                           ),
                         ),
                       )
-                    else if (_rooms.isEmpty)
+                    else if (_visibleRooms.isEmpty)
                       const Card(
                         child: Padding(
                           padding: EdgeInsets.all(18),
@@ -869,7 +879,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 10,
-                        children: _rooms.map((room) {
+                        children: _visibleRooms.map((room) {
                         final title = (room['title'] ??
                                 room['name'] ??
                                 room['roomName'] ??
@@ -1642,22 +1652,32 @@ class _SectionInfo {
 }
 
 class _HomeCategoryChip extends StatelessWidget {
-  const _HomeCategoryChip({required this.label, this.selected = false});
+  const _HomeCategoryChip({required this.label, this.selected = false, required this.onTap});
   final String label;
   final bool selected;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsetsDirectional.only(end: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFF19C6A5) : Colors.white.withOpacity(0.94),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: selected ? const Color(0xFF19C6A5) : const Color(0xFFE7E7E7)),
-          boxShadow: selected ? const [] : const [BoxShadow(color: Color(0x12000000), blurRadius: 5, offset: Offset(0, 2))],
-        ),
-        child: Center(
-          child: Text(label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF383838), fontWeight: FontWeight.w800)),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsetsDirectional.only(end: 8),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(28),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFF19C6A5) : Colors.white.withValues(alpha: 0.94),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: selected ? const Color(0xFF19C6A5) : const Color(0xFFE7E7E7)),
+                boxShadow: selected ? const [] : const [BoxShadow(color: Color(0x12000000), blurRadius: 5, offset: Offset(0, 2))],
+              ),
+              child: Center(
+                child: Text(label, style: TextStyle(color: selected ? Colors.white : const Color(0xFF383838), fontWeight: FontWeight.w800)),
+              ),
+            ),
+          ),
         ),
       );
 }
