@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../data/jeho_api_client.dart';
 
@@ -417,6 +418,55 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
+  Future<void> _startCheckout(Map<String, dynamic> pkg) async {
+    final sku = (pkg['sku'] ?? pkg['code'] ?? pkg['id'] ?? '').toString();
+    if (sku.isEmpty) {
+      setState(() => _error = 'هذه الباقة لا تحتوي على SKU صالح للدفع.');
+      return;
+    }
+    final provider = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('اختر طريقة الدفع')),
+            ListTile(leading: const Icon(Icons.credit_card_rounded), title: const Text('بطاقة — Stripe'), onTap: () => Navigator.pop(context, 'stripe/checkout')),
+            ListTile(leading: const Icon(Icons.shopping_bag_outlined), title: const Text('بطاقة — Fourthwall'), onTap: () => Navigator.pop(context, 'fourthwall/checkout')),
+            ListTile(leading: const Icon(Icons.paypal), title: const Text('PayPal'), onTap: () => Navigator.pop(context, 'paypal/create')),
+          ],
+        ),
+      ),
+    );
+    if (provider == null || !mounted) return;
+    try {
+      setState(() { _loading = true; _error = null; });
+      final result = await widget.apiClient.createPaymentCheckout(
+        widget.accessToken,
+        provider,
+        {'sku': sku, 'currency': 'USD'},
+      );
+      final checkout = (result['url'] ?? result['checkoutUrl'] ?? result['approvalUrl'] ?? result['redirectUrl'] ?? '').toString();
+      if (checkout.isEmpty) {
+        setState(() => _error = 'أنشأ الخادم الطلب لكن لم يرجع رابط دفع. تحقق من إعدادات مزود الدفع في الداشبورد.');
+        return;
+      }
+      final uri = Uri.tryParse(checkout);
+      if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
+        setState(() => _error = 'رابط الدفع الذي أعاده الخادم غير صالح.');
+        return;
+      }
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) setState(() => _error = 'تعذر فتح صفحة الدفع على هذا الجهاز.');
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر بدء الدفع. تحقق من إعدادات مزود الدفع ثم حاول مجددًا.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = _wallet ?? <String, dynamic>{};
@@ -455,7 +505,8 @@ class _WalletPageState extends State<WalletPage> {
                             leading: const Icon(Icons.add_card_rounded, color: _featureGold),
                             title: Text('$coins عملة${bonus is num && bonus > 0 ? ' + $bonus إضافية' : ''}'),
                             trailing: Text('$price'),
-                            subtitle: const Text('عرض فقط — الدفع داخل التطبيق غير مفعّل في نسخة Flutter التجريبية.'),
+                            subtitle: const Text('إنشاء طلب دفع مستضاف عبر مزود الدفع المفعّل في الخادم.'),
+                            onTap: _loading ? null : () => _startCheckout(pkg),
                           ),
                         );
                       }),
@@ -480,7 +531,7 @@ class _WalletPageState extends State<WalletPage> {
                         );
                       }),
                     const SizedBox(height: 12),
-                    const Text('الرصيد وسجل الحركات من الخادم الحالي. لم يتم تفعيل الشحن أو السحب في Flutter قبل ربط فوترة المتجر والتحقق منها.'),
+                    const Text('الرصيد وسجل الحركات من الخادم الحالي. الدفع يفتح صفحة مزود الدفع المستضاف؛ لا يتم إضافة الرصيد إلا بعد تأكيد الخادم للدفعة.'),
                   ],
                 ),
     );
