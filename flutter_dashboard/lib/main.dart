@@ -79,6 +79,7 @@ const modules=<Module>[
  Module('إحصائيات مباشرة','admin/dashboard/live',Icons.monitor_heart),
  Module('إحصائيات الرسائل المدفوعة','admin/paid-messages/stats',Icons.query_stats),
  Module('احتمالات الألعاب','admin/games/odds',Icons.casino),
+ Module('إعدادات إعلانات الألعاب','admin/games/ads',Icons.ads_click),
  Module('إعدادات دفع شام كاش','admin/payment-settings/sham-cash',Icons.payment),
 ];
 class AdminHome extends StatefulWidget {const AdminHome({required this.token,required this.user,super.key});final String token;final Map<String,dynamic> user;@override State<AdminHome> createState()=>_AdminHomeState();}
