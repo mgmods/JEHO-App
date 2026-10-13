@@ -56,6 +56,7 @@ public class SplashActivity extends ThemedActivity {
     private String pendingSplashTarget;
     private String pendingSplashTargetType;
     private String pendingSplashTargetId;
+    private boolean splashTargetResolving;
     private ImageView splashAdImage;
     private View splashContentView;
     private View skipSplashAd;
@@ -63,6 +64,12 @@ public class SplashActivity extends ThemedActivity {
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
+    private final Runnable splashTargetTimeout = () -> {
+        if (!splashTargetResolving || isFinishing()) return;
+        splashTargetResolving = false;
+        openMainForSplashRoute(null);
+        finish();
+    };
 
     @Override
     protected boolean wantsEdgeToEdgeWallpaper() {
@@ -473,15 +480,10 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void resolveAndOpenSplashTarget(String type, String publicId) {
-        final Runnable targetTimeout = () -> {
-            if (isFinishing()) return;
-            Log.w(TAG, "Splash target lookup timed out; falling back to home");
-            openMainForSplashRoute(null);
-            finish();
-        };
-        mainHandler.postDelayed(targetTimeout, 5000L);
         try {
             AppContainer c = ContainerProvider.from(this);
+            splashTargetResolving = true;
+            mainHandler.postDelayed(splashTargetTimeout, 8000L);
             c.getIoExecutor().execute(() -> {
                 MiscDtos.SplashTargetDto resolved = null;
                 try {
@@ -493,8 +495,9 @@ public class SplashActivity extends ThemedActivity {
                 }
                 MiscDtos.SplashTargetDto finalResolved = resolved;
                 runOnUiThread(() -> {
-                    mainHandler.removeCallbacks(targetTimeout);
-                    if (isFinishing()) return;
+                    if (isFinishing() || !splashTargetResolving) return;
+                    splashTargetResolving = false;
+                    mainHandler.removeCallbacks(splashTargetTimeout);
                     if (finalResolved == null || !finalResolved.found || finalResolved.id == null
                             || finalResolved.id.trim().isEmpty()) {
                         openMainForSplashRoute(null);
@@ -502,20 +505,15 @@ public class SplashActivity extends ThemedActivity {
                         return;
                     }
                     try {
+                        Intent i = new Intent(this, MainActivity.class);
                         if ("room".equals(type)) {
-                            Intent i = new Intent(this, VoiceRoomActivity.class);
-                            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, finalResolved.id);
-                            i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
-                            startActivity(i);
+                            i.putExtra("pending_room_id", finalResolved.id);
                         } else if ("user".equals(type)) {
-                            Intent i = new Intent(this, com.Dramizo.Series.presentation.profile.ProfileActivity.class);
-                            i.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, finalResolved.id);
-                            startActivity(i);
+                            i.putExtra(MainActivity.EXTRA_OPEN_PROFILE_USER_ID, finalResolved.id);
                         } else {
-                            Intent i = new Intent(this, com.Dramizo.Series.presentation.agency.AgencyActivity.class);
-                            i.putExtra(com.Dramizo.Series.presentation.agency.AgencyActivity.EXTRA_SPLASH_TARGET_AGENCY_ID, finalResolved.id);
-                            startActivity(i);
+                            i.putExtra(MainActivity.EXTRA_OPEN_AGENCY_ID, finalResolved.id);
                         }
+                        startActivity(i);
                     } catch (Throwable error) {
                         Log.w(TAG, "Could not open splash target", error);
                         openMainForSplashRoute(null);
@@ -524,13 +522,13 @@ public class SplashActivity extends ThemedActivity {
                 });
             });
         } catch (Throwable error) {
-            mainHandler.removeCallbacks(targetTimeout);
+            splashTargetResolving = false;
+            mainHandler.removeCallbacks(splashTargetTimeout);
             Log.w(TAG, "Splash target lookup unavailable", error);
             openMainForSplashRoute(null);
             finish();
         }
     }
-
     private void openMainForSplashRoute(String route) {
         Intent i = new Intent(this, MainActivity.class);
         if ("home".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
