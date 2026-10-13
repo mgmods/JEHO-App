@@ -699,6 +699,22 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                         alignment: Alignment.centerRight,
                         child: Text('ادخل إلى المجتمعات وتواصل مع أصدقائك', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: const Color(0xFF88775D))),
                       ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_home.webp', fallback: Icons.home_rounded, onTap: () {}),
+                          const SizedBox(width: 8),
+                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_search_home.png', fallback: Icons.search_rounded, onTap: () {
+                            setState(() => _selectedIndex = 1);
+                          }),
+                          const Spacer(),
+                          const Text('حفلة', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: Color(0xFF18795D))),
+                          const SizedBox(width: 12),
+                          const Text('ملكي', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF777777))),
+                          const SizedBox(width: 12),
+                          const Text('الفعاليات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF999999))),
+                        ],
+                      ),
                     ] else ...[
                       Align(
                         alignment: Alignment.centerRight,
@@ -713,8 +729,18 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     const SizedBox(height: 12),
                   ],
                   if (_selectedIndex == 0) ...[
+                    Row(
+                      children: const [
+                        Expanded(child: _HomeFeatureTile(title: 'الثروة', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_wealth.webp')),
+                        SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(title: 'CP', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_cp.webp')),
+                        SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(title: 'حظ', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_charm.webp')),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     if (_banners.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 4),
                       SizedBox(
                         height: 190,
                         child: ListView.separated(
@@ -1634,3 +1660,4 @@ class _HomeCategoryChip extends StatelessWidget {
         ),
       );
 }
+
