@@ -20,6 +20,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
+import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -29,6 +30,7 @@ import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AppFeatures;
+import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.engine.DiskCacheStrategy;
@@ -50,6 +52,7 @@ public class SplashActivity extends ThemedActivity {
     private boolean splashAdShowing;
     private boolean sessionPrepared;
     private boolean sessionLoggedIn;
+    private boolean targetResolving;
     private AppContainer pendingContainer;
     private AuthDtos.UserDto pendingUser;
     private MiscDtos.SplashItemDto displayedSplashItem;
@@ -61,6 +64,12 @@ public class SplashActivity extends ThemedActivity {
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable hardTimeout = this::forceLeaveSplash;
+    private final Runnable targetResolveTimeout = () -> {
+        if (!targetResolving || navigated || isFinishing()) return;
+        targetResolving = false;
+        pendingSplashTarget = null;
+        continueStartupNavigation();
+    };
 
     @Override
     protected boolean wantsEdgeToEdgeWallpaper() {
@@ -270,7 +279,11 @@ public class SplashActivity extends ThemedActivity {
                 finish();
                 return;
             }
-            openDestination();
+            if (isIdSplashTarget(pendingSplashTarget)) {
+                openIdSplashTarget(pendingContainer, pendingSplashTarget);
+            } else {
+                openDestination();
+            }
         } else {
             openProfileSetup();
         }
@@ -385,10 +398,79 @@ public class SplashActivity extends ThemedActivity {
         });
     }
 
+    private boolean isIdSplashTarget(String target) {
+        return target != null && target.matches("(?i)^(room|agency|user):.+$");
+    }
+
+    /** Resolve public IDs with existing APIs. Invalid IDs fall back to home. */
+    private void openIdSplashTarget(AppContainer container, String target) {
+        if (targetResolving || navigated || container == null) return;
+        String[] parts = target.split(":", 2);
+        if (parts.length != 2 || parts[1].trim().isEmpty()) {
+            pendingSplashTarget = null;
+            continueStartupNavigation();
+            return;
+        }
+        final String kind = parts[0].trim().toLowerCase(java.util.Locale.ROOT);
+        final String publicId = parts[1].trim();
+        targetResolving = true;
+        mainHandler.removeCallbacks(hardTimeout);
+        mainHandler.postDelayed(targetResolveTimeout, 8000L);
+        container.getIoExecutor().execute(() -> {
+            Intent destination = null;
+            try {
+                if ("room".equals(kind)) {
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result = ApiCall.execute(container.getRoomApi().list(1, publicId));
+                    if (result != null && result.success && result.data != null && result.data.items != null) {
+                        for (RoomDtos.RoomDto room : result.data.items) {
+                            if (room != null && room.id != null && (publicId.equals(room.publicId) || publicId.equals(room.id))) {
+                                destination = new Intent(this, MainActivity.class).putExtra("pending_room_id", room.id);
+                                break;
+                            }
+                        }
+                    }
+                } else if ("user".equals(kind)) {
+                    Result<MiscDtos.ListResult<AuthDtos.UserDto>> result = ApiCall.execute(container.getUserApi().search(publicId, 1));
+                    if (result != null && result.success && result.data != null && result.data.items != null) {
+                        for (AuthDtos.UserDto user : result.data.items) {
+                            if (user != null && user.id != null && (publicId.equals(user.publicId) || publicId.equals(user.id))) {
+                                destination = new Intent(this, MainActivity.class).putExtra(MainActivity.EXTRA_OPEN_PROFILE_USER_ID, user.id);
+                                break;
+                            }
+                        }
+                    }
+                } else if ("agency".equals(kind)) {
+                    Result<MiscDtos.AgencyDto> result = ApiCall.execute(container.getAgencyApi().get(publicId));
+                    if (result != null && result.success && result.data != null && result.data.id != null) {
+                        destination = new Intent(this, MainActivity.class).putExtra(MainActivity.EXTRA_OPEN_AGENCY_ID, publicId);
+                    }
+                }
+            } catch (Throwable error) {
+                Log.w(TAG, "Splash ID target could not be resolved; falling back to home", error);
+            }
+            final Intent resolved = destination;
+            runOnUiThread(() -> {
+                if (!targetResolving || navigated || isFinishing()) return;
+                targetResolving = false;
+                mainHandler.removeCallbacks(targetResolveTimeout);
+                if (resolved == null) {
+                    pendingSplashTarget = null;
+                    continueStartupNavigation();
+                    return;
+                }
+                navigated = true;
+                mainHandler.removeCallbacks(hardTimeout);
+                startActivity(resolved);
+                finish();
+            });
+        });
+    }
+
     private void openDestination() {
         if (navigated || isFinishing()) return;
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
+        mainHandler.removeCallbacks(targetResolveTimeout);
         // Resume voice room after process death / launcher reopen when still in a room.
         String activeRoom = null;
         try {
