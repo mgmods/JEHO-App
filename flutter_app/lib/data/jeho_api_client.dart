@@ -173,6 +173,62 @@ class JehoApiClient {
     return items.whereType<Map<String, dynamic>>().toList(growable: false);
   }
 
+  // Notifications, rankings, events and games use existing backend routes.
+  Future<List<Map<String, dynamic>>> getNotifications(String token) async =>
+      _asList(await _get('notifications?page=1&limit=30', accessToken: token), ['items', 'results', 'data']);
+
+  Future<Map<String, dynamic>> getUnreadNotificationCount(String token) async =>
+      _asMap(await _get('notifications/unread-count', accessToken: token), 'تعذر تحميل عدد الإشعارات.');
+
+  Future<Map<String, dynamic>> markNotificationRead(String token, String notificationId) async =>
+      _asMap(await _patch('notifications/$notificationId/read', const {}, accessToken: token), 'تعذر تعليم الإشعار كمقروء.');
+
+  Future<Map<String, dynamic>> markAllNotificationsRead(String token) async =>
+      _asMap(await _post('notifications/read-all', const {}, accessToken: token), 'تعذر تعليم الإشعارات كمقروءة.');
+
+  Future<List<Map<String, dynamic>>> getRanking(String period, String category) async =>
+      _asList(await _get('ranking/$period/$category?limit=50'), ['items', 'results', 'data', 'users']);
+
+  Future<List<Map<String, dynamic>>> getEvents(String token, {bool mine = false}) async =>
+      _asList(await _get('events?tab=${mine ? 'mine' : 'square'}', accessToken: token), ['items', 'results', 'data', 'events']);
+
+  Future<Map<String, dynamic>> subscribeEvent(String token, String eventId, {required bool subscribe}) async {
+    final result = subscribe
+        ? await _post('events/$eventId/subscribe', const {}, accessToken: token)
+        : await _delete('events/$eventId/subscribe', accessToken: token);
+    return _asMap(result, 'تعذر تحديث متابعة الفعالية.');
+  }
+
+  Future<List<Map<String, dynamic>>> getContests(String token) async =>
+      _asList(await _get('contests', accessToken: token), ['items', 'results', 'data', 'contests']);
+
+  Future<Map<String, dynamic>> joinContest(String token, String contestId) async =>
+      _asMap(await _post('contests/$contestId/join', const {}, accessToken: token), 'تعذر الانضمام إلى المسابقة.');
+
+  Future<Map<String, dynamic>> getAppFeatures() async =>
+      _asMap(await _get('config/features'), 'تعذر تحميل إعدادات الميزات.');
+
+  Future<List<Map<String, dynamic>>> getHomeBanners() async =>
+      _asList(await _get('config/banners?lang=ar'), ['items', 'results', 'data', 'banners']);
+
+  Future<Map<String, dynamic>> getLuckyWheelState(String token) async =>
+      _asMap(await _get('games/lucky-wheel', accessToken: token), 'تعذر تحميل عجلة الحظ.');
+
+  Future<Map<String, dynamic>> spinLuckyWheel(String token, Map<String, Object?> data) async =>
+      _asMap(await _post('games/lucky-wheel/spin', data, accessToken: token), 'تعذر تنفيذ اللفة.');
+
+  Future<Map<String, dynamic>> getDailyBossStatus(String token) async =>
+      _asMap(await _get('casual-games/boss/status', accessToken: token), 'تعذر تحميل حالة تحدي الزعيم.');
+
+  Future<Map<String, dynamic>> attackDailyBoss(String token) async =>
+      _asMap(await _post('casual-games/boss/attack', const {}, accessToken: token), 'تعذر تنفيذ الهجوم.');
+
+  Future<Map<String, dynamic>> startRoomGame(String token, String roomId, {String type = 'tic_tac_toe', String? opponentId}) async =>
+      _asMap(await _post('rooms/$roomId/games', {'type': type, if (opponentId != null) 'opponentId': opponentId}, accessToken: token), 'تعذر بدء اللعبة.');
+
+  Future<Map<String, dynamic>> makeRoomGameMove(String token, String roomId, String gameId, int cell) async =>
+      _asMap(await _post('rooms/$roomId/games/$gameId/move', {'cell': cell}, accessToken: token), 'تعذر تنفيذ الحركة.');
+
   Future<List<Map<String, dynamic>>> getCosmetics({String? type}) async {
     final suffix = type == null ? '' : '?type=${Uri.encodeQueryComponent(type)}';
     final payload = await _get('cosmetics$suffix');
