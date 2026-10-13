@@ -1,0 +1,721 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../data/jeho_api_client.dart';
+
+class ConversationPage extends StatefulWidget {
+  const ConversationPage({
+    required this.apiClient,
+    required this.accessToken,
+    required this.currentUserId,
+    required this.conversation,
+    super.key,
+  });
+
+  final JehoApiClient apiClient;
+  final String accessToken;
+  final String currentUserId;
+  final Map<String, dynamic> conversation;
+
+  @override
+  State<ConversationPage> createState() => _ConversationPageState();
+}
+
+class _ConversationPageState extends State<ConversationPage> {
+  final _composer = TextEditingController();
+  final _scrollController = ScrollController();
+  List<Map<String, dynamic>> _messages = [];
+  bool _loading = true;
+  bool _sending = false;
+  bool _uploadingAttachment = false;
+  String? _error;
+
+  String get _conversationId => widget.conversation['id']?.toString() ?? '';
+  String get _title => (widget.conversation['title'] ??
+      (widget.conversation['peer'] is Map<String, dynamic>
+          ? (widget.conversation['peer'] as Map<String, dynamic>)['displayName']
+          : null) ??
+      'محادثة').toString();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+  }
+
+  @override
+  void dispose() {
+    _composer.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  String _formatMessageTime(Map<String, dynamic> message) {
+    final raw = message['createdAt'] ??
+        message['created_at'] ??
+        message['sentAt'] ??
+        message['timestamp'];
+    if (raw == null) return '';
+    DateTime? date;
+    if (raw is num) {
+      final value = raw > 1000000000000 ? raw.toInt() : (raw * 1000).toInt();
+      date = DateTime.fromMillisecondsSinceEpoch(value).toLocal();
+    } else {
+      date = DateTime.tryParse(raw.toString())?.toLocal();
+    }
+    if (date == null) return '';
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  String _resolveMediaUrl(String value) {
+    if (value.startsWith('https://') || value.startsWith('http://')) return value;
+    final base = Uri.parse(widget.apiClient.baseUrl.endsWith('/') ? widget.apiClient.baseUrl : '${widget.apiClient.baseUrl}/');
+    final origin = Uri(scheme: base.scheme, host: base.host, port: base.hasPort ? base.port : null);
+    final normalized = value.replaceFirst(RegExp(r'^/uploads/'), 'uploads/');
+    if (normalized.startsWith('uploads/')) return origin.resolve('/$normalized').toString();
+    return origin.resolve(value.startsWith('/') ? value : '/$value').toString();
+  }
+
+  Future<void> _loadMessages() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await widget.apiClient.getConversationMessages(
+        widget.accessToken,
+        _conversationId,
+      );
+      if (!mounted) return;
+      setState(() => _messages = items);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    final content = _composer.text.trim();
+    if (content.isEmpty || _sending) return;
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    try {
+      final sent = await widget.apiClient.sendTextMessage(
+        widget.accessToken,
+        _conversationId,
+        content,
+      );
+      if (!mounted) return;
+      _composer.clear();
+      setState(() {
+        _messages = [..._messages, sent];
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _sendFileAttachment() async {
+    if (_uploadingAttachment || _sending) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'webm', 'mp3', 'm4a', 'aac', 'wav', 'pdf'],
+        allowMultiple: false,
+        withData: false,
+      );
+      if (result == null || result.files.isEmpty || !mounted) return;
+      final picked = result.files.single;
+      final path = picked.path;
+      if (path == null || path.isEmpty) {
+        setState(() => _error = 'تعذر الوصول إلى الملف المختار.');
+        return;
+      }
+      final extension = (picked.extension ?? '').toLowerCase();
+      final mimeType = switch (extension) {
+        'jpg' || 'jpeg' => 'image/jpeg',
+        'png' => 'image/png',
+        'gif' => 'image/gif',
+        'webp' => 'image/webp',
+        'mp4' || 'mov' || 'webm' => 'video/$extension',
+        'mp3' || 'm4a' || 'aac' || 'wav' => 'audio/$extension',
+        'pdf' => 'application/pdf',
+        _ => 'application/octet-stream',
+      };
+      final type = mimeType.startsWith('image/')
+          ? 'image'
+          : mimeType.startsWith('video/')
+              ? 'video'
+              : mimeType.startsWith('audio/')
+                  ? 'audio'
+                  : 'file';
+      setState(() { _uploadingAttachment = true; _error = null; });
+      final file = File(path);
+      final url = await widget.apiClient.uploadImage(widget.accessToken, file);
+      final size = picked.size > 0 ? picked.size : await file.length();
+      final sent = await widget.apiClient.sendMessageAttachment(
+        widget.accessToken,
+        _conversationId,
+        url,
+        mimeType: mimeType,
+        size: size,
+        type: type,
+      );
+      if (!mounted) return;
+      setState(() => _messages = [..._messages, sent]);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر رفع الملف وإرساله.');
+    } finally {
+      if (mounted) setState(() => _uploadingAttachment = false);
+    }
+  }
+
+  Future<void> _sendImageAttachment() async {
+    if (_uploadingAttachment || _sending) return;
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+      if (picked == null || !mounted) return;
+      setState(() {
+        _uploadingAttachment = true;
+        _error = null;
+      });
+      final file = File(picked.path);
+      final url = await widget.apiClient.uploadImage(widget.accessToken, file);
+      final size = await file.length();
+      final sent = await widget.apiClient.sendMessageAttachment(
+        widget.accessToken,
+        _conversationId,
+        url,
+        mimeType: 'image/${picked.path.toLowerCase().endsWith('.png') ? 'png' : picked.path.toLowerCase().endsWith('.webp') ? 'webp' : 'jpeg'}',
+        size: size,
+        type: 'image',
+      );
+      if (!mounted) return;
+      setState(() => _messages = [..._messages, sent]);
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'تعذر رفع الصورة وإرسالها.');
+    } finally {
+      if (mounted) setState(() => _uploadingAttachment = false);
+    }
+  }
+
+  Future<void> _manageMessage(Map<String, dynamic> message, {required bool isMine}) async {
+    final messageId = (message['id'] ?? message['messageId'] ?? '').toString();
+    if (!isMine || messageId.isEmpty) return;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('تعديل الرسالة'),
+              onTap: () => Navigator.pop(sheetContext, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.undo_rounded),
+              title: const Text('سحب الرسالة'),
+              onTap: () => Navigator.pop(sheetContext, 'unsend'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'edit') {
+      final controller = TextEditingController(text: (message['content'] ?? '').toString());
+      try {
+        final content = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('تعديل الرسالة'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 5,
+              maxLength: 4000,
+              decoration: const InputDecoration(labelText: 'نص الرسالة'),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(onPressed: () => Navigator.pop(dialogContext, controller.text.trim()), child: const Text('حفظ')),
+            ],
+          ),
+        );
+        if (content == null || content.isEmpty || !mounted) return;
+        final updated = await widget.apiClient.editMessage(widget.accessToken, messageId, content);
+        if (!mounted) return;
+        setState(() {
+          final index = _messages.indexWhere((item) => (item['id'] ?? item['messageId']).toString() == messageId);
+          if (index >= 0) _messages[index] = {..._messages[index], ...updated, 'content': content};
+        });
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تعديل الرسالة.')));
+      } on JehoApiException catch (error) {
+        if (mounted) setState(() => _error = error.message);
+      } finally {
+        controller.dispose();
+      }
+    } else {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('سحب الرسالة؟'),
+          content: const Text('سيطلب التطبيق من الخادم سحب الرسالة وفق صلاحياته وسياساته.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('سحب')),
+          ],
+        ),
+      );
+      if (confirm != true || !mounted) return;
+      try {
+        await widget.apiClient.unsendMessage(widget.accessToken, messageId);
+        if (!mounted) return;
+        await _loadMessages();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم طلب سحب الرسالة.')));
+      } on JehoApiException catch (error) {
+        if (mounted) setState(() => _error = error.message);
+      }
+    }
+  }
+
+  Future<void> _manageConversation(String action) async {
+    final token = widget.accessToken;
+    if (_conversationId.isEmpty || token.isEmpty) return;
+    if (action == 'archive' || action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(action == 'archive' ? 'أرشفة المحادثة؟' : 'حذف المحادثة من قائمتك؟'),
+          content: Text(action == 'archive'
+              ? 'يمكنك الرجوع للمحادثة لاحقًا حسب إعدادات الخادم.'
+              : 'سيؤثر الحذف على قائمتك فقط وفق سياسة الخادم.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تأكيد')),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    try {
+      switch (action) {
+        case 'mute':
+          await widget.apiClient.setConversationMuted(token, _conversationId, muted: true);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم كتم إشعارات المحادثة.')));
+          break;
+        case 'pin':
+          await widget.apiClient.setConversationPinned(token, _conversationId, pinned: true);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تثبيت المحادثة.')));
+          break;
+        case 'archive':
+          await widget.apiClient.setConversationArchived(token, _conversationId, archived: true);
+          if (mounted) Navigator.of(context).pop();
+          break;
+        case 'delete':
+          await widget.apiClient.deleteConversationForMe(token, _conversationId);
+          if (mounted) Navigator.of(context).pop();
+          break;
+      }
+    } on JehoApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تنفيذ الإجراء على المحادثة.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 72,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [Color(0xFFE5B45D), Color(0xFFFFEFD0)]),
+              ),
+              child: CircleAvatar(
+                radius: 22,
+                backgroundColor: const Color(0xFFFFF0D1),
+                backgroundImage: (() {
+                  final peer = widget.conversation['peer'] is Map<String, dynamic>
+                      ? widget.conversation['peer'] as Map<String, dynamic>
+                      : <String, dynamic>{};
+                  final avatar = (peer['avatarUrl'] ?? peer['avatar'] ?? widget.conversation['avatarUrl'] ?? '').toString().trim();
+                  return avatar.isEmpty ? null : NetworkImage(_resolveMediaUrl(avatar)) as ImageProvider;
+                })(),
+                child: (() {
+                  final peer = widget.conversation['peer'] is Map<String, dynamic>
+                      ? widget.conversation['peer'] as Map<String, dynamic>
+                      : <String, dynamic>{};
+                  final avatar = (peer['avatarUrl'] ?? peer['avatar'] ?? widget.conversation['avatarUrl'] ?? '').toString().trim();
+                  return avatar.isEmpty ? const Icon(Icons.person_rounded, color: Color(0xFF8C641D)) : null;
+                })(),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 3),
+                  const Text('محادثة خاصة', style: TextStyle(fontSize: 11, color: Color(0xFF8C641D), fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'خيارات المحادثة',
+            onSelected: _manageConversation,
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'mute', child: ListTile(leading: Icon(Icons.notifications_off_outlined), title: Text('كتم الإشعارات'), dense: true)),
+              PopupMenuItem(value: 'pin', child: ListTile(leading: Icon(Icons.push_pin_outlined), title: Text('تثبيت المحادثة'), dense: true)),
+              PopupMenuItem(value: 'archive', child: ListTile(leading: Icon(Icons.archive_outlined), title: Text('أرشفة المحادثة'), dense: true)),
+              PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text('حذف من قائمتي'), dense: true)),
+            ],
+          ),
+          IconButton(
+            tooltip: 'تحديث الرسائل',
+            onPressed: _loading ? null : _loadMessages,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF8EC), Color(0xFFFFFCF7), Color(0xFFFFF4E3)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+            if (_error != null)
+              MaterialBanner(
+                content: Text(_error!),
+                actions: [
+                  TextButton(
+                    onPressed: _loadMessages,
+                    child: const Text('إعادة المحاولة'),
+                  ),
+                ],
+              ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _messages.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              'لا توجد رسائل بعد. ابدأ المحادثة برسالة نصية.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            final content = (message['content'] ?? '').toString();
+                            final type = (message['type'] ?? 'text').toString().toLowerCase();
+                            final sender = message['sender'] is Map<String, dynamic>
+                                ? message['sender'] as Map<String, dynamic>
+                                : <String, dynamic>{};
+                            final isMine =
+                                message['isMine'] == true ||
+                                message['isOwn'] == true ||
+                                (widget.currentUserId.isNotEmpty &&
+                                  message['senderId']?.toString() == widget.currentUserId);
+                            final text = content.isNotEmpty
+                                ? content
+                                : (type == 'image' ? '📷 صورة مرفقة' : 'رسالة من نوع $type');
+                            return Align(
+                              alignment: isMine
+                                  ? Alignment.centerLeft
+                                  : Alignment.centerRight,
+                              child: GestureDetector(
+                                onLongPress: isMine ? () => _manageMessage(message, isMine: isMine) : null,
+                                child: Container(
+                                constraints: const BoxConstraints(maxWidth: 320),
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isMine
+                                      ? const Color(0xFFFFE7B0)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft: Radius.circular(isMine ? 18 : 5),
+                                    bottomRight: Radius.circular(isMine ? 5 : 18),
+                                  ),
+                                  border: Border.all(
+                                    color: isMine
+                                        ? const Color(0xFFE8CC8B)
+                                        : const Color(0xFFE8DCC5),
+                                  ),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color(0x08000000),
+                                      blurRadius: 5,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (sender['displayName'] != null)
+                                      Text(
+                                        sender['displayName'].toString(),
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    if (message['media'] is Map<String, dynamic>) ...[
+                                      Builder(builder: (context) {
+                                        final media = message['media'] as Map<String, dynamic>;
+                                        final mediaUrl = (media['url'] ?? '').toString();
+                                        if (mediaUrl.isEmpty) return const SizedBox.shrink();
+                                        final resolved = _resolveMediaUrl(mediaUrl);
+                                        if (type == 'image') {
+                                          return Padding(
+                                            padding: const EdgeInsets.only(bottom: 6),
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: GestureDetector(
+                                              onTap: () => showDialog<void>(
+                                                context: context,
+                                                barrierColor: Colors.black87,
+                                                builder: (dialogContext) => Dialog(
+                                                  backgroundColor: Colors.transparent,
+                                                  insetPadding: const EdgeInsets.all(12),
+                                                  child: Stack(
+                                                    alignment: Alignment.topRight,
+                                                    children: [
+                                                      InteractiveViewer(
+                                                        minScale: 0.7,
+                                                        maxScale: 4,
+                                                        child: Image.network(
+                                                          resolved,
+                                                          fit: BoxFit.contain,
+                                                          errorBuilder: (_, __, ___) => const Padding(
+                                                            padding: EdgeInsets.all(24),
+                                                            child: Text('تعذر عرض الصورة المرفقة', style: TextStyle(color: Colors.white)),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      IconButton.filledTonal(
+                                                        onPressed: () => Navigator.pop(dialogContext),
+                                                        icon: const Icon(Icons.close_rounded),
+                                                        tooltip: 'إغلاق الصورة',
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Image.network(
+                                                resolved,
+                                                width: 230,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) => const Text('تعذر عرض الصورة المرفقة'),
+                                              ),
+                                            ),
+                                            ),
+                                          );
+                                        }
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 8),
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(maxWidth: 250),
+                                            child: OutlinedButton.icon(
+                                              onPressed: () async {
+                                                final uri = Uri.tryParse(resolved);
+                                                if (uri == null ||
+                                                    (uri.scheme != 'https' &&
+                                                        uri.scheme != 'http')) {
+                                                  if (context.mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('رابط المرفق غير صالح.')),
+                                                    );
+                                                  }
+                                                  return;
+                                                }
+                                                final opened = await launchUrl(
+                                                  uri,
+                                                  mode: LaunchMode.externalApplication,
+                                                );
+                                                if (!opened && context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    const SnackBar(content: Text('تعذر فتح المرفق.')),
+                                                  );
+                                                }
+                                              },
+                                              icon: Icon(
+                                                type == 'video'
+                                                    ? Icons.play_circle_outline_rounded
+                                                    : type == 'audio'
+                                                        ? Icons.audio_file_rounded
+                                                        : Icons.attach_file_rounded,
+                                              ),
+                                              label: Flexible(
+                                                child: Text(
+                                                  'فتح المرفق · ${media['mimeType'] ?? type}',
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                    if (content.isNotEmpty || message['media'] == null)
+                                      Text(
+                                        text,
+                                        style: TextStyle(
+                                          height: 1.4,
+                                          color: const Color(0xFF342A1C),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    const SizedBox(height: 5),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        if (message['editedAt'] != null ||
+                                            message['edited_at'] != null)
+                                          const Padding(
+                                            padding: EdgeInsets.only(left: 5),
+                                            child: Text(
+                                              'معدّلة',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                color: Color(0xFF8B7C64),
+                                              ),
+                                            ),
+                                          ),
+                                        Text(
+                                          _formatMessageTime(message),
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Color(0xFF8B7C64),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'إرفاق صورة',
+                    onPressed: _uploadingAttachment ? null : _sendImageAttachment,
+                    icon: _uploadingAttachment
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.image_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'إرفاق ملف أو فيديو',
+                    onPressed: _uploadingAttachment ? null : _sendFileAttachment,
+                    icon: const Icon(Icons.attach_file_rounded),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _composer,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: const InputDecoration(
+                        hintText: 'اكتب رسالة نصية…',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(22)),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: 'إرسال',
+                    onPressed: _sending ? null : _sendMessage,
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send_rounded),
+                  ),
+                ],
+              ),
+            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
