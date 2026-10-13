@@ -390,6 +390,10 @@ class JehoApiClient {
   Future<Map<String, dynamic>> sendAllMicGift(String token, {required String giftId, required List<String> receiverIds, required String roomId, int quantity = 1}) async =>
       _asMap(await _post('gifts/send-all-mic', {'giftId': giftId, 'receiverIds': receiverIds, 'roomId': roomId, 'quantity': quantity}, accessToken: token), 'تعذر إرسال الهدية الجماعية.');
 
+  /// Categories configured by the original backend for the gift-sheet tabs.
+  Future<List<Map<String, dynamic>>> getGiftCategories() async =>
+      _asList(await _get('gifts/categories'), ['items', 'results', 'categories', 'data']);
+
   Future<List<Map<String, dynamic>>> getGiftHistory(String token) async =>
       _asList(await _get('gifts/history?page=1&limit=30', accessToken: token), ['items', 'results', 'history', 'data']);
 
