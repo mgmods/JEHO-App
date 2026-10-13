@@ -208,12 +208,67 @@ class _ConversationPageState extends State<ConversationPage> {
     }
   }
 
+  Future<void> _manageConversation(String action) async {
+    final token = widget.accessToken;
+    if (_conversationId.isEmpty || token.isEmpty) return;
+    if (action == 'archive' || action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(action == 'archive' ? 'أرشفة المحادثة؟' : 'حذف المحادثة من قائمتك؟'),
+          content: Text(action == 'archive'
+              ? 'يمكنك الرجوع للمحادثة لاحقًا حسب إعدادات الخادم.'
+              : 'سيؤثر الحذف على قائمتك فقط وفق سياسة الخادم.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('تأكيد')),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    try {
+      switch (action) {
+        case 'mute':
+          await widget.apiClient.setConversationMuted(token, _conversationId, muted: true);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم كتم إشعارات المحادثة.')));
+          break;
+        case 'pin':
+          await widget.apiClient.setConversationPinned(token, _conversationId, pinned: true);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تثبيت المحادثة.')));
+          break;
+        case 'archive':
+          await widget.apiClient.setConversationArchived(token, _conversationId, archived: true);
+          if (mounted) Navigator.of(context).pop();
+          break;
+        case 'delete':
+          await widget.apiClient.deleteConversationForMe(token, _conversationId);
+          if (mounted) Navigator.of(context).pop();
+          break;
+      }
+    } on JehoApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تعذر تنفيذ الإجراء على المحادثة.')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(_title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: 'خيارات المحادثة',
+            onSelected: _manageConversation,
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'mute', child: ListTile(leading: Icon(Icons.notifications_off_outlined), title: Text('كتم الإشعارات'), dense: true)),
+              PopupMenuItem(value: 'pin', child: ListTile(leading: Icon(Icons.push_pin_outlined), title: Text('تثبيت المحادثة'), dense: true)),
+              PopupMenuItem(value: 'archive', child: ListTile(leading: Icon(Icons.archive_outlined), title: Text('أرشفة المحادثة'), dense: true)),
+              PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline_rounded), title: Text('حذف من قائمتي'), dense: true)),
+            ],
+          ),
           IconButton(
             tooltip: 'تحديث الرسائل',
             onPressed: _loading ? null : _loadMessages,
