@@ -159,11 +159,26 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/recharge-agents/applications'))return [('قبول طلب الوكيل','agent-approve',Icons.check_circle),('رفض طلب الوكيل','agent-reject',Icons.cancel)];
   if(path.startsWith('admin/contests'))return [('إنهاء المسابقة','contest-end',Icons.flag_circle)];
   if(path.startsWith('admin/streams'))return [('إنهاء البث','stream-end',Icons.stop_circle)];
+  if(path=='admin/gift-categories')return [('تعديل التصنيف','gift-category-edit',Icons.edit)];
   return const [];
+ }
+ Future<void> _editGiftCategory(BuildContext context,String id,Map<String,dynamic> row) async {
+  final controller=TextEditingController(text:const JsonEncoder.withIndent('  ').convert(row));
+  try{
+   final raw=await showDialog<String>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تعديل تصنيف الهدية'),content:SizedBox(width:600,child:TextField(controller:controller,minLines:8,maxLines:18,keyboardType:TextInputType.multiline,decoration:const InputDecoration(helperText:'عدّل حقول التصنيف مع الإبقاء على الحقول المطلوبة ومعرّف العنصر.'),style:const TextStyle(fontFamily:'monospace'))),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,controller.text),child:const Text('متابعة'))]));
+   if(raw==null||!context.mounted)return;
+   final decoded=jsonDecode(raw);if(decoded is! Map<String,dynamic>)throw const FormatException('يجب إدخال كائن JSON صالح.');
+   final confirmed=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:const Text('تأكيد تعديل التصنيف'),content:Text('سيتم تحديث تصنيف الهدية رقم '+id+'.'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('رجوع')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('حفظ'))]));
+   if(confirmed!=true)return;
+   await api.patch('admin/gift-categories/'+id,decoded);
+   if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('تم تحديث تصنيف الهدية.')));reload();}
+  }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تحديث التصنيف: '+e.toString().replaceFirst('Exception: ',''))));}
+  finally{controller.dispose();}
  }
  Future<void> _runAction(BuildContext context,Map row,(String,String,IconData) action) async {
   final id=(row['id']??row['applicationId']??row['reportId']??row['streamId']??row['userId']??'').toString();
   if(id.isEmpty){ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('لا يوجد معرّف واضح لهذا العنصر.')));return;}
+  if(action.$2=='gift-category-edit'){await _editGiftCategory(context,id,row);return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
   String endpoint;Map<String,dynamic> body=const {};
