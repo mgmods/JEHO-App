@@ -301,8 +301,8 @@ class AdminContent extends StatelessWidget {
   if(path.startsWith('admin/gender-verifications'))return [('قبول التحقق','gender-approve',Icons.verified_user),('رفض التحقق','gender-reject',Icons.cancel)];
   if(path.startsWith('admin/vip/plans'))return [('منح هذه الخطة لمستخدم','vip-assign',Icons.workspace_premium)];
   if(path.startsWith('admin/vip?'))return [('إلغاء عضوية VIP','vip-revoke',Icons.remove_circle_outline)];
-  if(path.startsWith('admin/cosmetics'))return [('تفعيل/تعطيل المظهر','cosmetic-toggle',Icons.toggle_on),('إهداء هذا المظهر','cosmetic-grant',Icons.card_giftcard)];
-  if(path.startsWith('vanity-ids/admin/all'))return [('إهداء الآي دي','vanity-grant',Icons.card_giftcard),('تفعيل الآي دي','vanity-enable',Icons.check_circle),('تعطيل الآي دي','vanity-disable',Icons.pause_circle_outline),('سحب الآي دي','vanity-revoke',Icons.remove_circle_outline)];
+  if(path.startsWith('admin/cosmetics'))return [('تفعيل/تعطيل المظهر','cosmetic-toggle',Icons.toggle_on)];
+  if(path.startsWith('vanity-ids/admin/all'))return [('تفعيل الآي دي','vanity-enable',Icons.check_circle),('تعطيل الآي دي','vanity-disable',Icons.pause_circle_outline),('تحرير الآي دي من مالكه','vanity-revoke',Icons.remove_circle_outline)];
   if(path.startsWith('admin/agencies?'))return [('تعليق الوكالة','agency-suspend',Icons.pause_circle_outline)];
   if(path.startsWith('admin/recharge-agents/applications'))return [('قبول طلب الوكيل','agent-approve',Icons.check_circle),('رفض طلب الوكيل','agent-reject',Icons.cancel)];
   if(path.startsWith('admin/contests'))return [('إنهاء المسابقة','contest-end',Icons.flag_circle)];
@@ -448,7 +448,7 @@ class AdminContent extends StatelessWidget {
    return;
   }
   if(['user-access','wallet-adjust','room-edit'].contains(action.$2)){await _editAdminRow(context,row,action.$2,id);return;}
-  if(['vanity-grant','cosmetic-grant','vip-assign'].contains(action.$2)){await _grantAction(context,row,action.$2,id);return;}
+  if(action.$2=='vip-assign'){await _grantAction(context,row,action.$2,id);return;}
   final confirm=await showDialog<bool>(context:context,builder:(ctx)=>AlertDialog(title:Text(action.$1),content:Text('تأكيد تنفيذ «'+action.$1+'» للعنصر '+id+'؟'),actions:[TextButton(onPressed:()=>Navigator.pop(ctx,false),child:const Text('إلغاء')),FilledButton(onPressed:()=>Navigator.pop(ctx,true),child:const Text('تأكيد'))]));
   if(confirm!=true)return;
   String endpoint;Map<String,dynamic> body=const {};
@@ -468,7 +468,7 @@ class AdminContent extends StatelessWidget {
    case 'room-close': endpoint='admin/rooms/$id/close'; break;
    case 'vanity-enable': endpoint='vanity-ids/admin/$id/enable'; break;
    case 'vanity-disable': endpoint='vanity-ids/admin/$id/disable'; break;
-   case 'vanity-revoke': endpoint='vanity-ids/admin/$id/revoke'; break;
+   case 'vanity-revoke': endpoint='vanity-ids/admin/$id/release'; break;
    case 'cosmetic-toggle': endpoint='admin/cosmetics/$id'; body={'isActive': !(row['isActive']==true)}; break;
    case 'agency-suspend': endpoint='admin/agencies/$id/suspend'; body={'reason':'تعليق من لوحة الإدارة'}; break;
    case 'agent-approve': endpoint='admin/recharge-agents/applications/$id/approve'; break;
