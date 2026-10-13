@@ -915,9 +915,10 @@ class _RoomDetailPageState extends State<RoomDetailPage> {
           const SizedBox(height: 12),
           const Text(
             'الدخول والمقاعد وطلب المايك هنا تتعامل مع واجهات الغرفة فقط. لم يتم تغيير نظام الصوت أو ZEGO؛ الاتصال الصوتي الحالي يبقى كما هو.',
-            style: TextStyle(height: 1.5, color: Colors.black54),
+            style: TextStyle(height: 1.5, color: Color(0xFFD2E9E1)),
           ),
         ],
+      ),
       ),
     );
   }
