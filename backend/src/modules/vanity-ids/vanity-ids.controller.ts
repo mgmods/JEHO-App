@@ -243,6 +243,20 @@ export class VanityIdsController {
     if (!['account', 'room', 'agency'].includes(targetType)) {
       throw new BadRequestException('وجهة الآيدي غير صحيحة');
     }
+
+    // Move the ID rather than copy it: restore the old target before equipping another.
+    // This also repairs legacy rows where the vanity ID was left on both account and room.
+    if (row.targetType && row.targetType !== targetType) {
+      await this.restoreAppliedTarget(row);
+    }
+    if (targetType !== 'account') {
+      const user = await this.usersRepo.findOne({ where: { id: userId } });
+      if (user?.publicId === publicId) {
+        user.publicId = row.previousPublicId || user.id.replace(/-/g, '').slice(0, 8);
+        await this.usersRepo.save(user);
+        row.previousPublicId = null;
+      }
+    }
     if (targetType === 'account') {
       const user = await this.usersRepo.findOne({ where: { id: userId } });
       if (!user) throw new NotFoundException('User not found');
@@ -258,6 +272,9 @@ export class VanityIdsController {
       if (!room) throw new BadRequestException('افتح الروم الشخصي أولاً');
       const conflict = await this.roomsRepo.findOne({ where: { publicId } });
       if (conflict && conflict.id !== room.id) throw new BadRequestException('الآيدي مستخدم لروم آخر');
+      if (row.targetType !== 'room' || row.targetId !== room.id) {
+        row.previousTargetPublicId = room.publicId && room.publicId !== publicId ? room.publicId : null;
+      }
       room.publicId = publicId;
       await this.roomsRepo.save(room);
       row.targetType = 'room';
@@ -267,6 +284,9 @@ export class VanityIdsController {
       if (!agency) throw new BadRequestException('هذا الخيار متاح لصاحب الوكالة فقط');
       const conflict = await this.agenciesRepo.findOne({ where: { publicId } });
       if (conflict && conflict.id !== agency.id) throw new BadRequestException('الآيدي مستخدم لوكالة أخرى');
+      if (row.targetType !== 'agency' || row.targetId !== agency.id) {
+        row.previousTargetPublicId = agency.publicId && agency.publicId !== publicId ? agency.publicId : null;
+      }
       agency.publicId = publicId;
       await this.agenciesRepo.save(agency);
       row.targetType = 'agency';
@@ -520,18 +540,50 @@ export class VanityIdsController {
     row.ownerUserId = null;
     row.expiresAt = null;
     row.previousPublicId = null;
+    row.previousTargetPublicId = null;
+    row.targetType = null;
+    row.targetId = null;
     row.purchasedAt = null;
     row.reservedUntil = null;
   }
 
-  /** If the owner currently displays this vanity, restore their previous publicId. */
+  /** Restore the previous target identity before this vanity ID is moved or released. */
+  private async restoreAppliedTarget(row: VanityId) {
+    if (!row.ownerUserId || !row.targetType || !row.targetId) return;
+    if (row.targetType === 'account') {
+      const user = await this.usersRepo.findOne({ where: { id: row.targetId } });
+      if (user?.publicId === row.publicId) {
+        user.publicId = row.previousPublicId || user.id.replace(/-/g, '').slice(0, 8);
+        await this.usersRepo.save(user);
+      }
+      row.previousPublicId = null;
+    } else if (row.targetType === 'room') {
+      const room = await this.roomsRepo.findOne({ where: { id: row.targetId } });
+      if (room?.publicId === row.publicId) {
+        room.publicId = row.previousTargetPublicId || null;
+        await this.roomsRepo.save(room);
+      }
+      row.previousTargetPublicId = null;
+    } else if (row.targetType === 'agency') {
+      const agency = await this.agenciesRepo.findOne({ where: { id: row.targetId } });
+      if (agency?.publicId === row.publicId) {
+        agency.publicId = row.previousTargetPublicId || null;
+        await this.agenciesRepo.save(agency);
+      }
+      row.previousTargetPublicId = null;
+    }
+    row.targetType = null;
+    row.targetId = null;
+  }
+
+  /** If the owner currently displays this vanity, restore their previous account ID. */
   private async restoreOwnerPublicId(row: VanityId) {
+    await this.restoreAppliedTarget(row);
     if (!row.ownerUserId) return;
     const user = await this.usersRepo.findOne({ where: { id: row.ownerUserId } });
     if (!user) return;
     if (user.publicId === row.publicId) {
-      user.publicId =
-        row.previousPublicId || user.id.replace(/-/g, '').slice(0, 8);
+      user.publicId = row.previousPublicId || user.id.replace(/-/g, '').slice(0, 8);
       await this.usersRepo.save(user);
     }
   }
