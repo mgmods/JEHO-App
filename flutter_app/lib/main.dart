@@ -259,6 +259,7 @@ class MigrationHomePage extends StatefulWidget {
 class _MigrationHomePageState extends State<MigrationHomePage> {
   int _selectedIndex = 0;
   String _homeRoomFilter = 'شائع';
+  String _homeTab = 'حفلة';
   bool _loading = true;
   String? _loadError;
   List<Map<String, dynamic>> _rooms = const [];
@@ -268,9 +269,25 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   Map<String, dynamic>? _profile;
 
   List<Map<String, dynamic>> get _visibleRooms {
-    if (_homeRoomFilter == 'شائع') return _rooms;
+    var rooms = _rooms;
+    if (_homeTab == 'ملكي') {
+      final sessionUser = widget.session['user'] is Map
+          ? widget.session['user'] as Map
+          : const <String, dynamic>{};
+      final userId = (_profile?['id'] ?? sessionUser['id'] ?? '').toString();
+      if (userId.isNotEmpty) {
+        rooms = rooms.where((room) {
+          final nestedOwner = room['owner'] is Map ? room['owner'] as Map : room['host'] is Map ? room['host'] as Map : const <String, dynamic>{};
+          final ownerId = (room['ownerId'] ?? room['hostId'] ?? room['creatorId'] ?? room['userId'] ?? nestedOwner['id'] ?? '').toString();
+          return ownerId == userId;
+        }).toList();
+      } else {
+        rooms = const [];
+      }
+    }
+    if (_homeRoomFilter == 'شائع') return rooms;
     final target = _homeRoomFilter == 'سوريا' ? 'سوريا' : _homeRoomFilter == 'مصر' ? 'مصر' : 'المملكة العربية السعودية';
-    return _rooms.where((room) {
+    return rooms.where((room) {
       final country = (room['countryName'] ?? room['country'] ?? room['region'] ?? '').toString();
       return country.contains(target) || (target == 'المملكة العربية السعودية' && (country.contains('السعودية') || country.contains('Saudi')));
     }).toList();
@@ -712,17 +729,46 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_tab_party.webp', fallback: Icons.home_rounded, onTap: () {}),
+                          _HomeHeaderIcon(
+                            asset: 'assets/original/android-res/drawable-xxhdpi/ic_tab_party.webp',
+                            fallback: Icons.add_home_work_rounded,
+                            onTap: _loading ? () {} : _createRoom,
+                          ),
                           const SizedBox(width: 8),
-                          _HomeHeaderIcon(asset: 'assets/original/android-res/drawable-xxhdpi/ic_search_home.png', fallback: Icons.search_rounded, onTap: () {
-                            setState(() => _selectedIndex = 1);
-                          }),
+                          _HomeHeaderIcon(
+                            asset: 'assets/original/android-res/drawable-xxhdpi/ic_search_home.png',
+                            fallback: Icons.search_rounded,
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => UserSearchPage(
+                                  apiClient: widget.apiClient,
+                                  accessToken: widget.session['accessToken']?.toString() ?? '',
+                                ),
+                              ),
+                            ),
+                          ),
                           const Spacer(),
-                          const Text('حفلة', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: Color(0xFF18795D))),
+                          InkWell(
+                            onTap: () => setState(() => _homeTab = 'حفلة'),
+                            child: Text('حفلة', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900, color: _homeTab == 'حفلة' ? const Color(0xFF18795D) : const Color(0xFF999999))),
+                          ),
                           const SizedBox(width: 12),
-                          const Text('ملكي', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF777777))),
+                          InkWell(
+                            onTap: () => setState(() => _homeTab = 'ملكي'),
+                            child: Text('ملكي', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _homeTab == 'ملكي' ? const Color(0xFF18795D) : const Color(0xFF777777))),
+                          ),
                           const SizedBox(width: 12),
-                          const Text('الفعاليات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF999999))),
+                          InkWell(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => DiscoveryHubPage(
+                                  apiClient: widget.apiClient,
+                                  accessToken: widget.session['accessToken']?.toString() ?? '',
+                                ),
+                              ),
+                            ),
+                            child: const Text('الفعاليات', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF999999))),
+                          ),
                         ],
                       ),
                     ] else ...[
