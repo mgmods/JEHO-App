@@ -1261,12 +1261,12 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       if (id.isEmpty) return;
                       try {
                         await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend');
-                        if (!mounted || !sheetContext.mounted || !pageContext.mounted) return;
+                        if (!mounted || !sheetContext.mounted || !mounted) return;
                         Navigator.of(sheetContext).pop();
-                        ScaffoldMessenger.of(pageContext).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
                         await _load();
                       } on JehoApiException catch (error) {
-                        if (mounted && pageContext.mounted) ScaffoldMessenger.of(pageContext).showSnackBar(SnackBar(content: Text(error.message)));
+                        if (mounted && mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
                       }
                     },
                   ),
