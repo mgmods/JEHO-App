@@ -69,6 +69,12 @@ const routes = [
         meta: { titleKey: 'routes.banners' },
       },
       {
+        path: 'splash-management',
+        name: 'splash-management',
+        component: () => import('@/views/SplashManagementView.vue'),
+        meta: { title: 'إدارة السبلاش' },
+      },
+      {
         path: 'nav-icons',
         name: 'nav-icons',
         component: () => import('@/views/NavIconsView.vue'),
