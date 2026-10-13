@@ -230,8 +230,6 @@ class _RoomRealtimeChatState extends State<RoomRealtimeChat> {
                   final message = _messages[index];
                   final name = (message['displayName'] ?? message['name'] ?? 'عضو').toString();
                   final text = (message['text'] ?? '').toString();
-                  final mine = message['userId'] != null &&
-                      message['userId'].toString().isNotEmpty;
                   return Align(
                     alignment: AlignmentDirectional.centerStart,
                     child: Container(
