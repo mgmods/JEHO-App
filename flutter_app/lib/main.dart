@@ -20,6 +20,14 @@ const String apiBaseUrl = String.fromEnvironment(
   defaultValue: 'https://jeho-own-backend.mgs.blitz.cloud/api/v1/',
 );
 
+String resolveSectionWallpaper(Map<String, dynamic> backgrounds, String sectionKey) {
+  final shared = (backgrounds['allSections'] ?? '').toString().trim();
+  if (shared.isNotEmpty) return shared;
+  final section = (backgrounds[sectionKey] ?? '').toString().trim();
+  if (section.isNotEmpty) return section;
+  return (backgrounds['app'] ?? '').toString().trim();
+}
+
 void main() {
   runApp(const JehoOwnApp());
 }
@@ -441,14 +449,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
         ? _theme['backgrounds'] as Map<String, dynamic>
         : <String, dynamic>{};
     final sectionKey = _selectedIndex == 0 ? 'home' : _selectedIndex == 1 ? 'chat' : 'profile';
-    final sharedWallpaper = (backgrounds['allSections'] ?? '').toString().trim();
-    final sectionWallpaper = (backgrounds[sectionKey] ?? '').toString().trim();
-    final appWallpaper = (backgrounds['app'] ?? '').toString().trim();
-    final wallpaper = sharedWallpaper.isNotEmpty
-        ? sharedWallpaper
-        : sectionWallpaper.isNotEmpty
-            ? sectionWallpaper
-            : appWallpaper;
+    final wallpaper = resolveSectionWallpaper(backgrounds, sectionKey);
 
     return Scaffold(
       appBar: AppBar(
