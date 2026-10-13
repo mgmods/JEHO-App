@@ -115,6 +115,15 @@ class JehoApiClient {
     return payload;
   }
 
+  Future<List<Map<String, dynamic>>> searchUsers(String query, {String? accessToken}) async {
+    final encoded = Uri.encodeQueryComponent(query.trim());
+    final payload = await _get('users/search?q=$encoded&page=1&limit=30', accessToken: accessToken);
+    return _asList(payload, ['items', 'results', 'users', 'data']);
+  }
+
+  Future<Map<String, dynamic>> getPublicUser(String userId, {String? accessToken}) async =>
+      _asMap(await _get('users/${Uri.encodeComponent(userId)}', accessToken: accessToken), 'تعذر تحميل الملف الشخصي.');
+
   Future<Map<String, dynamic>> getMyProfile(String accessToken) async {
     final payload = await _get('users/me', accessToken: accessToken);
     if (payload is Map<String, dynamic>) return payload;
