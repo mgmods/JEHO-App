@@ -70,6 +70,96 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
     }
   }
 
+  Future<void> _showAgencyApplication() async {
+    final name = TextEditingController();
+    final description = TextEditingController();
+    final plan = TextEditingController();
+    final country = TextEditingController();
+    final email = TextEditingController();
+    final phone = TextEditingController();
+    final experience = TextEditingController();
+    final hosts = TextEditingController(text: '5');
+    bool accepted = false;
+    try {
+      final payload = await showDialog<Map<String, Object?>>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('طلب إنشاء وكالة'),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم الوكالة')),
+                    TextField(controller: description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'وصف الوكالة')),
+                    TextField(controller: plan, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'خطة العمل')),
+                    TextField(controller: country, decoration: const InputDecoration(labelText: 'الدولة')),
+                    TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'البريد الإلكتروني للتواصل')),
+                    TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'رقم الهاتف')),
+                    TextField(controller: experience, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'الخبرة السابقة')),
+                    TextField(controller: hosts, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'عدد المضيفين المتوقع')),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: accepted,
+                      onChanged: (value) => setDialogState(() => accepted = value ?? false),
+                      title: const Text('أوافق على الشروط'),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                    const Text('أدخل بيانات صحيحة؛ سيخضع الطلب لمراجعة إدارة التطبيق.', style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, {
+                  'proposedName': name.text.trim(),
+                  'description': description.text.trim(),
+                  'businessPlan': plan.text.trim(),
+                  'country': country.text.trim(),
+                  'contactEmail': email.text.trim(),
+                  'contactPhone': phone.text.trim(),
+                  'experience': experience.text.trim(),
+                  'expectedHostCount': int.tryParse(hosts.text.trim()) ?? 1,
+                  'documentUrls': <String>[],
+                  'termsAccepted': accepted,
+                }),
+                child: const Text('إرسال الطلب'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (payload == null || !mounted) return;
+      if ((payload['proposedName'] as String).length < 3 ||
+          (payload['description'] as String).length < 20 ||
+          (payload['businessPlan'] as String).length < 50 ||
+          (payload['country'] as String).length < 2 ||
+          (payload['contactEmail'] as String).isEmpty ||
+          (payload['contactPhone'] as String).length < 6 ||
+          (payload['experience'] as String).length < 10 ||
+          payload['termsAccepted'] != true) {
+        setState(() => _error = 'أكمل الحقول المطلوبة ووافق على الشروط. خطة العمل 50 حرفًا على الأقل.');
+        return;
+      }
+      await _runAction(() async {
+        await widget.apiClient.applyForAgency(widget.accessToken, payload);
+      }, 'تم إرسال طلب الوكالة للمراجعة.');
+    } finally {
+      name.dispose();
+      description.dispose();
+      plan.dispose();
+      country.dispose();
+      email.dispose();
+      phone.dispose();
+      experience.dispose();
+      hosts.dispose();
+    }
+  }
+
   Future<void> _runAction(Future<void> Function() action, String success) async {
     try {
       await action();
@@ -116,6 +206,18 @@ class _FeatureHubPageState extends State<FeatureHubPage> {
               )),
             ),
           ),
+          if (_section == 2)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _loading ? null : _showAgencyApplication,
+                  icon: const Icon(Icons.add_business_rounded),
+                  label: const Text('تقديم طلب إنشاء وكالة'),
+                ),
+              ),
+            ),
           if (_section == 0)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
