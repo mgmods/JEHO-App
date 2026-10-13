@@ -16,7 +16,7 @@ flutter test
 flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
 ```
 
-CI generates the Android platform scaffold in its workspace, runs analysis and widget tests, builds a debug APK, and uploads the artifact. The latest successful run at the time of this update is documented in the pull request checks. A debug APK is a test build, not a signed production release.
+CI generates the Android platform scaffold in its workspace, runs analysis and widget tests, builds a debug APK, and uploads the artifact. CI must be green on the latest branch commit before treating this checkpoint as validated. A debug APK is a test build, not a signed production release.
 
 ## Current partial Flutter flows (not production parity)
 
@@ -24,6 +24,7 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 - Public room listing, room creation, room details, room entry/leave, password prompts, seat requests and selection, seat locking, room password lock, moderator actions, room follow, gift-to-host UI, room cover/background uploads, and room display controls where exposed by the existing API.
 - Profile display name/bio editing and avatar upload.
 - Direct-message list, message history, text sending, image/file attachment upload and sending, media rendering, message edit/unsend, mute/pin/archive/delete-for-me controls.
+- Initial Flutter drama catalog connected to the existing `drama/config`, `drama/series`, series detail, view, like, and episode playback routes. This is a partial port; player reward timing, all native player behaviors, and remaining app screens still require parity work.
 - Wallet balances and transaction history, recharge packages and hosted checkout launch, withdrawal request submission, and withdrawal-status API support.
 - Gift catalog, sending gifts, gift history API, and room gift-to-host flow.
 - Cosmetics catalog/inventory, purchase/equip/unequip API and UI.
