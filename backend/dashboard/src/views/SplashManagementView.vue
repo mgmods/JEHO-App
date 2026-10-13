@@ -55,6 +55,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { settingsApi, uploadsApi } from '@/api'
+import apiClient from '@/api/client'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
@@ -142,8 +143,15 @@ async function save() {
     next.version = (Number(next.version) || 1) + 1; next.updatedAt = new Date().toISOString()
     const { error: err } = await settingsApi.update({ app_theme: JSON.stringify(next) })
     if (err) throw new Error(err.message || 'تعذّر حفظ إعدادات السبلاش')
+    const response = await apiClient.get('/config/theme', { params: { splash_verify: Date.now() } })
+    const published = response.data?.data || response.data
+    const publishedItem = published?.splash?.items?.[0]
+    const fileName = (url) => String(url || '').split('?')[0].split('/').pop()
+    if (!publishedItem || fileName(publishedItem.url) !== fileName(items[0].url)) {
+      throw new Error('تم إرسال الحفظ لكن لم نستطع تأكيد الإعدادات من واجهة API العامة.')
+    }
     theme = next; previewUrl.value = versioned(imageUrl.value); error.value = false
-    message.value = 'تم حفظ ونشر إعدادات السبلاش. سيجلب التطبيق الإعدادات الجديدة عند بدء التشغيل التالي.'
+    message.value = 'تم حفظ ونشر إعدادات السبلاش والتحقق من وصولها إلى API التطبيق. ستُطبّق عند بدء التشغيل التالي.'
   } catch (e) { error.value = true; message.value = e?.message || 'تعذّر حفظ إعدادات السبلاش' }
   finally { saving.value = false }
 }
