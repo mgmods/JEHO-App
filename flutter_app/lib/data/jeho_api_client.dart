@@ -396,6 +396,18 @@ class JehoApiClient {
   Future<List<Map<String, dynamic>>> getAgencies() async =>
       _asList(await _get('agencies?page=1&limit=30'), ['items', 'results', 'agencies', 'data']);
 
+  Future<List<Map<String, dynamic>>> getAgencyJoinRequests(String token, String agencyId) async =>
+      _asList(await _get('agencies/$agencyId/join-requests', accessToken: token), ['items', 'results', 'requests', 'data']);
+
+  Future<Map<String, dynamic>> respondAgencyJoinRequest(String token, String agencyId, String userId, {required bool approve}) async =>
+      _asMap(
+        await _post('agencies/$agencyId/join-requests/$userId/${approve ? 'approve' : 'reject'}', const {}, accessToken: token),
+        'تعذر تحديث طلب الانضمام للوكالة.',
+      );
+
+  Future<Map<String, dynamic>> getAgencyEarnings(String token, String agencyId) async =>
+      _asMap(await _get('agencies/$agencyId/earnings', accessToken: token), 'تعذر تحميل أرباح الوكالة.');
+
   Future<Map<String, dynamic>> getMyAgency(String token) async =>
       _asMap(await _get('agencies/mine', accessToken: token), 'لا توجد وكالة مرتبطة بالحساب أو تعذر تحميلها.');
 
