@@ -120,6 +120,45 @@ class JehoApiClient {
     throw const JehoApiException('تعذر قراءة بيانات الملف الشخصي.');
   }
 
+  Future<List<Map<String, dynamic>>> getConversationMessages(
+    String accessToken,
+    String conversationId,
+  ) async {
+    final payload = await _get(
+      'chat/conversations/$conversationId/messages?page=1&limit=50',
+      accessToken: accessToken,
+    );
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['data'] ?? items['messages'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: true);
+  }
+
+  Future<Map<String, dynamic>> sendTextMessage(
+    String accessToken,
+    String conversationId,
+    String content,
+  ) async {
+    final payload = await _post(
+      'chat/conversations/$conversationId/messages',
+      {'type': 'TEXT', 'content': content},
+      accessToken: accessToken,
+    );
+    if (payload is Map<String, dynamic>) return payload;
+    throw const JehoApiException('لم يرجع الخادم بيانات الرسالة المرسلة.');
+  }
+
+  Future<Map<String, dynamic>> updateMyProfile(
+    String accessToken,
+    Map<String, Object?> changes,
+  ) async {
+    final payload = await _patch('users/me', changes, accessToken: accessToken);
+    if (payload is Map<String, dynamic>) return payload;
+    throw const JehoApiException('تعذر تحديث الملف الشخصي.');
+  }
+
   Future<List<Map<String, dynamic>>> getConversations(String accessToken) async {
     final payload = await _get(
       'chat/conversations?page=1&limit=20',
@@ -141,6 +180,67 @@ class JehoApiClient {
     }
     if (items is! List) return const [];
     return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
+  Future<dynamic> _post(
+    String endpoint,
+    Map<String, Object?> body, {
+    String? accessToken,
+  }) async {
+    final base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/');
+    final uri = base.resolve(endpoint);
+    http.Response response;
+    try {
+      response = await _client.post(uri, headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        if (accessToken != null && accessToken.isNotEmpty)
+          'Authorization': 'Bearer $accessToken',
+      }, body: jsonEncode(body)).timeout(const Duration(seconds: 20));
+    } on Exception {
+      throw const JehoApiException('تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.');
+    }
+    return _decodeResponse(response);
+  }
+
+  Future<dynamic> _patch(
+    String endpoint,
+    Map<String, Object?> body, {
+    String? accessToken,
+  }) async {
+    final base = Uri.parse(baseUrl.endsWith('/') ? baseUrl : '$baseUrl/');
+    final uri = base.resolve(endpoint);
+    http.Response response;
+    try {
+      response = await _client.patch(uri, headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        if (accessToken != null && accessToken.isNotEmpty)
+          'Authorization': 'Bearer $accessToken',
+      }, body: jsonEncode(body)).timeout(const Duration(seconds: 20));
+    } on Exception {
+      throw const JehoApiException('تعذّر الاتصال بالخادم. تحقق من الإنترنت وحاول مرة أخرى.');
+    }
+    return _decodeResponse(response);
+  }
+
+  dynamic _decodeResponse(http.Response response) {
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      throw const JehoApiException('استجابة الخادم غير مفهومة.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = decoded is Map<String, dynamic>
+          ? (decoded['message'] ?? decoded['error'])
+          : null;
+      throw JehoApiException(_safeMessage(message, response.statusCode));
+    }
+    if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+      return decoded['data'];
+    }
+    return decoded;
   }
 
   Future<dynamic> _get(String endpoint, {String? accessToken}) async {
