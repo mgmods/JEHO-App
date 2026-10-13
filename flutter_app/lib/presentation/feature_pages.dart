@@ -854,6 +854,75 @@ class _SocialHubPageState extends State<SocialHubPage> {
     return (partner['avatarUrl'] ?? row['avatarUrl'] ?? '').toString();
   }
 
+  Future<void> _searchAndRequestFriend() async {
+    final query = TextEditingController();
+    try {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('البحث عن مستخدم'),
+          content: TextField(
+            controller: query,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'اسم المستخدم أو جزء منه'),
+            textInputAction: TextInputAction.search,
+            onSubmitted: (value) => Navigator.pop(context, value.trim()),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('إلغاء')),
+            FilledButton(onPressed: () => Navigator.pop(context, query.text.trim()), child: const Text('بحث')),
+          ],
+        ),
+      );
+      if (value == null || value.trim().isEmpty || !mounted) return;
+      final users = await widget.apiClient.searchUsers(value.trim());
+      if (!mounted) return;
+      if (users.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لم يتم العثور على مستخدمين.')));
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const ListTile(title: Text('نتائج البحث — أرسل طلب صداقة')),
+              for (final user in users)
+                ListTile(
+                  leading: CircleAvatar(child: const Icon(Icons.person_rounded)),
+                  title: Text((user['displayName'] ?? user['username'] ?? 'مستخدم').toString()),
+                  subtitle: Text((user['username'] ?? user['publicId'] ?? '').toString()),
+                  trailing: IconButton(
+                    tooltip: 'إرسال طلب صداقة',
+                    icon: const Icon(Icons.person_add_alt_1_rounded),
+                    onPressed: () async {
+                      final id = (user['id'] ?? '').toString();
+                      if (id.isEmpty) return;
+                      try {
+                        await widget.apiClient.socialRequest(widget.accessToken, id, type: 'friend');
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب الصداقة.')));
+                        }
+                      } on JehoApiException catch (error) {
+                        if (context.mounted) ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(error.message)));
+                      }
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    } on JehoApiException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      query.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     const tabs = ['CP', 'الأصدقاء', 'الزوار', 'العلاقات'];
@@ -865,7 +934,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
     final score = _cp['intimacyScore'] ?? _cp['score'] ?? _cp['intimacy'] ?? 0;
     final level = _cp['level'] ?? _cp['cpLevel'] ?? 0;
     return Scaffold(
-      appBar: AppBar(title: const Text('CP والعلاقات'), actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
+      appBar: AppBar(title: const Text('CP والعلاقات'), actions: [IconButton(tooltip: 'إضافة صديق', onPressed: _searchAndRequestFriend, icon: const Icon(Icons.person_add_alt_1_rounded)), IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
       body: Column(children: [
         SizedBox(
           height: 54,
