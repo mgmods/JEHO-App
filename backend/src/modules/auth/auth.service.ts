@@ -446,22 +446,21 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  /** 8-digit numeric ID, unique & permanent (app-facing). */
+  /** Six-digit numeric account ID, unique within the account namespace. */
   async allocatePublicId(): Promise<string> {
     for (let i = 0; i < 64; i++) {
-      const id = String(randomInt(10_000_000, 99_999_999));
+      const id = String(randomInt(100_000, 1_000_000));
       const exists = await this.usersRepo.exist({ where: { publicId: id } });
       if (!exists) return id;
     }
-    // Extremely unlikely fallback
-    return String(Date.now()).slice(-8);
+    throw new ConflictException('تعذر إنشاء آيدي حساب فريد من ستة أرقام، حاول مرة أخرى');
   }
 
   /** Backfill numeric publicId for users who still use login/store name as ID. */
   async ensureAllPublicIds(): Promise<{ updated: number }> {
     const missing = await this.usersRepo
       .createQueryBuilder('u')
-      .where(`u.publicId IS NULL OR u.publicId = ''`)
+      .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{6}$'")
       .getMany();
     let updated = 0;
     for (const u of missing) {
@@ -470,11 +469,10 @@ export class AuthService implements OnModuleInit {
       updated += 1;
     }
     if (updated > 0) {
-      this.logger.log(`Allocated publicId for ${updated} existing user(s)`);
+      this.logger.log(`Allocated six-digit publicId for ${updated} existing user(s)`);
     }
     return { updated };
   }
-
   private async issueTokens(user: User) {
     if (user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Account is restricted');

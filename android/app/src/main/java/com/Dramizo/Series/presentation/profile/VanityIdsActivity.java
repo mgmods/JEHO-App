@@ -53,6 +53,7 @@ public class VanityIdsActivity extends ThemedActivity {
     @Nullable private VanityDtos.VanityItem myLease;
     private long coinsBal;
     @Nullable private String userPublicId;
+    private boolean canApplyToAgency;
 
     @Override
     protected boolean wantsRemoteThemeChrome() {
@@ -159,6 +160,7 @@ public class VanityIdsActivity extends ThemedActivity {
                 AppLoadingOverlay.hide(this);
                 coinsBal = (w.success && w.data != null) ? w.data.coins : 0;
                 myLease = mine.success && mine.data != null ? mine.data.item : null;
+                canApplyToAgency = mine.success && mine.data != null && mine.data.canApplyToAgency;
 
                 allItems.clear();
                 if (cat.success && cat.data != null && cat.data.items != null) {
@@ -227,6 +229,9 @@ public class VanityIdsActivity extends ThemedActivity {
                                             ? getString(R.string.vanity_renewed_toast, days)
                                             : getString(R.string.vanity_purchased_toast, days),
                                     Toast.LENGTH_SHORT).show();
+                            if (r.data != null && r.data.publicId != null) {
+                                showApplyTargetDialog(r.data.publicId, r.data.canApplyToAgency);
+                            }
                             load();
                         } else {
                             com.Dramizo.Series.util.BalanceRedirect.handle(this, r.error);
@@ -235,6 +240,50 @@ public class VanityIdsActivity extends ThemedActivity {
                 }),
                 getString(android.R.string.cancel),
                 null);
+    }
+
+
+    private void showApplyTargetDialog(String publicId, boolean canApplyToAgency) {
+        List<String> labels = new ArrayList<>();
+        List<String> targets = new ArrayList<>();
+        labels.add("الروم الشخصي");
+        targets.add("room");
+        if (canApplyToAgency) {
+            labels.add("الوكالة");
+            targets.add("agency");
+        }
+        labels.add("الحساب الشخصي");
+        targets.add("account");
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("أين تريد استخدام الآيدي " + publicId + "؟")
+                .setItems(labels.toArray(new String[0]), (dialog, which) -> {
+                    String target = targets.get(which);
+                    AppLoadingOverlay.showUntilReady(this);
+                    c.getIoExecutor().execute(() -> {
+                        java.util.Map<String, String> body = new java.util.HashMap<>();
+                        body.put("targetType", target);
+                        Result<VanityDtos.ApplyResult> result =
+                                ApiCall.execute(c.getVanityApi().apply(publicId, body));
+                        runOnUiThread(() -> {
+                            if (isFinishing() || isDestroyed()) return;
+                            AppLoadingOverlay.hide(this);
+                            if (result.success && result.data != null && result.data.success) {
+                                String label = "account".equals(target) ? "الحساب الشخصي"
+                                        : "room".equals(target) ? "الروم الشخصي" : "الوكالة";
+                                Toast.makeText(this, "تم تطبيق الآيدي على " + label,
+                                        Toast.LENGTH_LONG).show();
+                                load();
+                            } else {
+                                Toast.makeText(this,
+                                        result.error != null ? result.error
+                                                : "تعذر تطبيق الآيدي، تأكد من امتلاك الروم أو الوكالة",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    });
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private static String formatExpires(String iso) {
@@ -298,7 +347,24 @@ public class VanityIdsActivity extends ThemedActivity {
             }
             h.tvMeta.setText(meta);
             h.btnBuy.setText(renew ? R.string.vanity_renew : R.string.vanity_buy);
-            h.btnBuy.setOnClickListener(v -> purchase(item));
+            h.btnBuy.setOnClickListener(v -> {
+                if (renew) {
+                    new androidx.appcompat.app.AlertDialog.Builder(VanityIdsActivity.this)
+                            .setTitle("الآيدي " + pid)
+                            .setItems(new String[]{"تطبيق الآيدي", "تجديد الآيدي 30 يوم"}, (dialog, which) -> {
+                                if (which == 0) showApplyTargetDialog(pid, canApplyToAgency);
+                                else purchase(item);
+                            })
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show();
+                } else {
+                    purchase(item);
+                }
+            });
+            h.tvPublicId.setOnClickListener(v -> {
+                if (renew) showApplyTargetDialog(pid, canApplyToAgency);
+                else purchase(item);
+            });
         }
 
         @Override
