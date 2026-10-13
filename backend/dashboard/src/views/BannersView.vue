@@ -144,6 +144,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
+import api from '@/api/client'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -160,7 +161,8 @@ const splashOnly = computed(() => route.name === 'splash')
 // Static promo assets may still live on the Adnova content host; uploads and API
 // requests must use the exact API origin configured for this dashboard.
 const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
-const API_ORIGIN = (import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1')
+const API_ORIGIN = String(api.defaults.baseURL || '')
+  .trim()
   .replace(/\/$/, '')
   .replace(/\/api\/v\d+$/i, '')
 const PROMO = `${ORIGIN}/promos`
