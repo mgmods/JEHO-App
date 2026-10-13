@@ -439,6 +439,12 @@ public final class MiscDtos {
         @SerializedName("targetId") public String targetId;
     }
 
+    public static class SplashTargetDto {
+        @SerializedName("found") public boolean found;
+        @SerializedName("type") public String type;
+        @SerializedName("id") public String id;
+    }
+
     public static class ThemeBrand {
         @SerializedName("appName") public String appName;
         @SerializedName("logoUrl") public String logoUrl;
