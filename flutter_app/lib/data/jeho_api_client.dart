@@ -120,6 +120,19 @@ class JehoApiClient {
     throw const JehoApiException('تعذر قراءة بيانات الملف الشخصي.');
   }
 
+  Future<List<Map<String, dynamic>>> getConversations(String accessToken) async {
+    final payload = await _get(
+      'chat/conversations?page=1&limit=20',
+      accessToken: accessToken,
+    );
+    dynamic items = payload;
+    if (items is Map<String, dynamic>) {
+      items = items['items'] ?? items['results'] ?? items['data'] ?? items['conversations'];
+    }
+    if (items is! List) return const [];
+    return items.whereType<Map<String, dynamic>>().toList(growable: false);
+  }
+
   Future<List<Map<String, dynamic>>> getPublicRooms() async {
     final payload = await _get('rooms?page=1&limit=20');
     dynamic items = payload;
