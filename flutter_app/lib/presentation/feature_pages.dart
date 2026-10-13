@@ -433,7 +433,7 @@ class _WalletPageState extends State<WalletPage> {
             const ListTile(title: Text('اختر طريقة الدفع')),
             ListTile(leading: const Icon(Icons.credit_card_rounded), title: const Text('بطاقة — Stripe'), onTap: () => Navigator.pop(context, 'stripe/checkout')),
             ListTile(leading: const Icon(Icons.shopping_bag_outlined), title: const Text('بطاقة — Fourthwall'), onTap: () => Navigator.pop(context, 'fourthwall/checkout')),
-            ListTile(leading: const Icon(Icons.paypal), title: const Text('PayPal'), onTap: () => Navigator.pop(context, 'paypal/create')),
+            ListTile(leading: const Icon(Icons.account_balance_wallet_rounded), title: const Text('PayPal'), onTap: () => Navigator.pop(context, 'paypal/create')),
           ],
         ),
       ),
