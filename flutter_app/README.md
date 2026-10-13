@@ -47,3 +47,12 @@ CI generates the Android platform scaffold in its workspace, runs analysis and w
 3. Do not change ZEGO, voice-room behavior, audio credentials/tokens, or Redis dependencies.
 4. Do not rotate encryption keys or change secrets during this migration.
 5. Do not merge or switch production until CI succeeds and representative device and live-server acceptance tests pass.
+
+
+## Safety checkpoints (2026-10-13)
+
+- `jeho-own-backup-2026-10-13` is a preserved branch copied from the current `jeho-own` production branch before further Flutter migration work. It must not receive migration commits.
+- `jeho-own-flutter-checkpoint-2026-10-13` preserves the Flutter migration state at commit `d9f85cdc6f366e85c54066a96d7f07348d417db0`.
+- Continue migration only on `flutter-migration-jeho-own-2026-10-13`. Keep PR #8 as a draft until parity and validation are complete.
+- To recover the app source baseline, use the `jeho-own-backup-2026-10-13` branch as the comparison/restore source; do not reset or force-push `jeho-own`.
+- Never modify ZEGO, LiveKit, voice-room connection behavior, Redis, production secrets, encryption keys, or database state as part of the Flutter UI migration without a separate, explicit approval.
