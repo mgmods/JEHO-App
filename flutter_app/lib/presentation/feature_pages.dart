@@ -1841,6 +1841,151 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   );
 }
 
+class VipCatalogPage extends StatefulWidget {
+  const VipCatalogPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+  @override
+  State<VipCatalogPage> createState() => _VipCatalogPageState();
+}
+
+class _VipCatalogPageState extends State<VipCatalogPage> {
+  bool _loading = true;
+  bool _purchasing = false;
+  String? _error;
+  List<Map<String, dynamic>> _plans = const [];
+  Map<String, dynamic> _me = const {};
+  @override
+  void initState() { super.initState(); _load(); }
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final results = await Future.wait([widget.apiClient.getVipPlans(), widget.apiClient.getMyProfile(widget.accessToken)]);
+      if (!mounted) return;
+      setState(() { _plans = results[0] as List<Map<String, dynamic>>; _me = results[1] as Map<String, dynamic>; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString().replaceFirst('Exception: ', ''); _loading = false; });
+    }
+  }
+  Future<void> _purchase(Map<String, dynamic> plan) async {
+    final rawLevel = plan['level'] ?? plan['vipLevel'] ?? plan['tier'];
+    final level = rawLevel is num ? rawLevel.toInt() : int.tryParse(rawLevel?.toString() ?? '');
+    if (level == null || level < 1) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('مستوى VIP في هذه الخطة غير صالح.'))); return; }
+    final name = (plan['name'] ?? plan['title'] ?? 'VIP $level').toString();
+    final price = (plan['priceCoins'] ?? plan['price'] ?? plan['coinPrice'] ?? 'حسب الخطة').toString();
+    final days = await showDialog<int>(context: context, builder: (ctx) => AlertDialog(
+      title: Text('شراء $name'),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('السعر المعروض: $price'), const SizedBox(height: 12), const Text('اختر مدة العضوية'),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          OutlinedButton(onPressed: () => Navigator.pop(ctx, 7), child: const Text('7 أيام')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 30), child: const Text('30 يومًا')),
+          OutlinedButton(onPressed: () => Navigator.pop(ctx, 40), child: const Text('40 يومًا')),
+        ]),
+      ]),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء'))],
+    ));
+    if (days == null || !mounted) return;
+    final confirm = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('تأكيد شراء VIP'),
+      content: Text('سيُرسل طلب شراء $name لمدة $days يومًا إلى الخادم. الرصيد والسعر النهائي يحددهما الخادم.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('رجوع')), FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('تأكيد الشراء'))],
+    ));
+    if (confirm != true) return;
+    setState(() => _purchasing = true);
+    try {
+      await widget.apiClient.purchaseVip(widget.accessToken, level: level, durationDays: days);
+      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم إرسال طلب شراء VIP.'))); await _load(); }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر شراء VIP: '+e.toString().replaceFirst('Exception: ', ''))));
+    } finally { if (mounted) setState(() => _purchasing = false); }
+  }
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('عضوية VIP'), actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث')]),
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12),
+          FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+        ])))
+      : ListView(padding: const EdgeInsets.all(16), children: [
+          Container(padding: const EdgeInsets.all(18), decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [Color(0xFF382A5C), Color(0xFF9D6CC6)]), borderRadius: BorderRadius.circular(20)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD978), size: 42), const SizedBox(height: 8),
+              Text('مستواك الحالي: VIP ${_me['vipLevel'] ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 5), const Text('المزايا والخطط المعروضة من خادم JEHO الأصلي.', style: TextStyle(color: Colors.white70)),
+            ]),
+          ),
+          const SizedBox(height: 14),
+          if (_plans.isEmpty) const Card(child: Padding(padding: EdgeInsets.all(20), child: Text('لا توجد خطط VIP متاحة حاليًا.'))),
+          ..._plans.map((plan) {
+            final level = plan['level'] ?? plan['vipLevel'] ?? plan['tier'] ?? '—';
+            final title = (plan['name'] ?? plan['title'] ?? 'VIP $level').toString();
+            final price = (plan['priceCoins'] ?? plan['price'] ?? plan['coinPrice'] ?? '—').toString();
+            final description = (plan['description'] ?? plan['benefits'] ?? '').toString();
+            final active = plan['isActive'] != false && plan['enabled'] != false;
+            return Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                Container(width: 48, height: 48, decoration: BoxDecoration(color: const Color(0xFFFFF0CC), borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.workspace_premium_rounded, color: _featureGold, size: 30)),
+                const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+                  Text('المستوى $level · السعر $price', style: const TextStyle(color: Colors.black54)),
+                ])),
+              ]),
+              if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(description)),
+              const SizedBox(height: 12),
+              FilledButton.icon(onPressed: !active || _purchasing ? null : () => _purchase(plan), icon: const Icon(Icons.shopping_bag_outlined), label: Text(active ? 'شراء العضوية' : 'الخطة غير متاحة')),
+            ])));
+          }),
+          if (_purchasing) const LinearProgressIndicator(),
+        ]),
+  );
+}
+
+class StoreHubPage extends StatelessWidget {
+  const StoreHubPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('متجر JEHO')),
+    body: ListView(padding: const EdgeInsets.all(16), children: [
+      Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFFFF0CC), Color(0xFFFFFAF0)]), borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFE8D4A5))),
+        child: const Row(children: [
+          Icon(Icons.storefront_rounded, size: 44, color: _featureGold), SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('المتجر والمزايا', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            Text('الهدايا، الإطارات، الزينة، الآي دي وعضوية VIP'),
+          ])),
+        ]),
+      ),
+      const SizedBox(height: 14),
+      _StoreEntry(icon: Icons.card_giftcard_rounded, title: 'كتالوج الهدايا', subtitle: 'الهدايا والفئات والإرسال', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => GiftCatalogPage(apiClient: apiClient, accessToken: accessToken)))),
+      _StoreEntry(icon: Icons.auto_awesome_rounded, title: 'المول والإطارات والزينة', subtitle: 'بطاقات الغرف وخلفياتها وتأثيرات الدخول', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => CosmeticsPage(apiClient: apiClient, accessToken: accessToken)))),
+      _StoreEntry(icon: Icons.workspace_premium_rounded, title: 'عضوية VIP', subtitle: 'خطط VIP وشراء العضوية من الخادم', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VipCatalogPage(apiClient: apiClient, accessToken: accessToken)))),
+      _StoreEntry(icon: Icons.tag_rounded, title: 'الآي دي المميز', subtitle: 'استعراض وشراء معرّف خاص', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => VanityIdsPage(apiClient: apiClient, accessToken: accessToken)))),
+      _StoreEntry(icon: Icons.history_rounded, title: 'سجل الهدايا', subtitle: 'الهدايا المرسلة وسجلها', onTap: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => GiftHistoryPage(apiClient: apiClient, accessToken: accessToken)))),
+    ]),
+  );
+}
+
+class _StoreEntry extends StatelessWidget {
+  const _StoreEntry({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 10), child: ListTile(
+    leading: CircleAvatar(backgroundColor: const Color(0xFFFFF0CC), child: Icon(icon, color: _featureGold)),
+    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+    subtitle: Text(subtitle), trailing: const Icon(Icons.chevron_left_rounded), onTap: onTap,
+  ));
+}
+
 class VanityIdsPage extends StatefulWidget {
   const VanityIdsPage({required this.apiClient, required this.accessToken, super.key});
   final JehoApiClient apiClient;
