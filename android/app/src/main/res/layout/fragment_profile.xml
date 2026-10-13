@@ -722,7 +722,7 @@
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_mikoo_card"
                 android:orientation="vertical"
-                android:paddingHorizontal="15dp"
+                android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp">
 
                 <LinearLayout
