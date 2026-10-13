@@ -16,6 +16,7 @@ class _DramaPageState extends State<DramaPage> {
   String? _error;
   List<Map<String, dynamic>> _series = const [];
   Map<String, dynamic> _config = const {};
+  String _wallpaper = '';
 
   @override
   void initState() {
@@ -29,11 +30,17 @@ class _DramaPageState extends State<DramaPage> {
       final results = await Future.wait<Object>([
         widget.apiClient.getDramaSeries(),
         widget.apiClient.getDramaConfig(),
+        widget.apiClient.getAppTheme(),
       ]);
       if (!mounted) return;
       setState(() {
         _series = results[0] as List<Map<String, dynamic>>;
         _config = results[1] as Map<String, dynamic>;
+        final theme = results[2] as Map<String, dynamic>;
+        final backgrounds = theme['backgrounds'] is Map<String, dynamic>
+            ? theme['backgrounds'] as Map<String, dynamic>
+            : <String, dynamic>{};
+        _wallpaper = (backgrounds['allSections'] ?? backgrounds['home'] ?? backgrounds['app'] ?? '').toString().trim();
       });
     } on JehoApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -153,7 +160,15 @@ class _DramaPageState extends State<DramaPage> {
         title: const Text('الدراما والمسلسلات'),
         actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded))],
       ),
-      body: RefreshIndicator(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_wallpaper.startsWith('https://') || _wallpaper.startsWith('http://'))
+            Positioned.fill(
+              child: Image.network(_wallpaper, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+            ),
+          RefreshIndicator(
         onRefresh: _load,
         child: _loading
             ? const ListView(children: [SizedBox(height: 280, child: Center(child: CircularProgressIndicator()))])
@@ -216,6 +231,8 @@ class _DramaPageState extends State<DramaPage> {
                               );
                             },
                           ),
+          ),
+        ],
       ),
     );
   }
