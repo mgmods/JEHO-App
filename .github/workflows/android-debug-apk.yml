@@ -2,7 +2,7 @@ name: Android Debug APK
 
 on:
   push:
-    branches: [jeho-own]
+    branches: [jeho-own, MG-JEHO]
     paths:
       - ".github/workflows/android-debug-apk.yml"
       - "android/**"
