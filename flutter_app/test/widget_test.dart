@@ -5,8 +5,9 @@ import 'package:jeho_own_flutter/main.dart';
 import 'package:jeho_own_flutter/presentation/auth_page.dart';
 
 void main() {
-  test('dashboard wallpaper prefers shared, then section, then app fallback', () {
-    expect(resolveSectionWallpaper({'allSections': 'https://cdn.example/shared.jpg', 'profile': 'https://cdn.example/profile.jpg'}, 'profile'), 'https://cdn.example/shared.jpg');
+  test('section wallpaper overrides shared wallpaper and falls back safely', () {
+    expect(resolveSectionWallpaper({'allSections': 'https://cdn.example/shared.jpg', 'profile': 'https://cdn.example/profile.jpg'}, 'profile'), 'https://cdn.example/profile.jpg');
+    expect(resolveSectionWallpaper({'allSections': 'https://cdn.example/shared.jpg', 'profile': '', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/shared.jpg');
     expect(resolveSectionWallpaper({'allSections': '', 'profile': 'https://cdn.example/profile.jpg', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/profile.jpg');
     expect(resolveSectionWallpaper({'allSections': '  ', 'profile': '', 'app': 'https://cdn.example/app.jpg'}, 'profile'), 'https://cdn.example/app.jpg');
   });
