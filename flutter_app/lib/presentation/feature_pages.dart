@@ -1388,23 +1388,40 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
   }
 
   Widget _giftArtwork(Map<String, dynamic> gift) {
-    final raw = [
-      gift['assetKey'], gift['slug'], gift['code'], gift['key'],
-      gift['name'], gift['title'], gift['id'],
-    ].whereType<Object>().map((value) => value.toString().trim()).firstWhere(
-      (value) => value.isNotEmpty,
-      orElse: () => '',
-    );
-    final normalized = raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
-    final candidates = <String, String>{
+    const candidates = <String, String>{
       'rose': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
+      'gift-rose': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
       'flower': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
+      'gift-flower': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
       'heart': 'assets/original/android-res/drawable-xxhdpi/gift_heart.webp',
+      'gift-heart': 'assets/original/android-res/drawable-xxhdpi/gift_heart.webp',
       'car': 'assets/original/android-res/drawable-xxhdpi/gift_car.webp',
+      'gift-car': 'assets/original/android-res/drawable-xxhdpi/gift_car.webp',
     };
-    final asset = candidates[normalized];
+    // Prefer a recognizable code/name over a UUID or database ID. The original
+    // Android catalog may expose these fields in different orders.
+    final keys = [
+      gift['assetKey'], gift['slug'], gift['code'], gift['key'],
+      gift['name'], gift['title'], gift['iconUrl'], gift['imageUrl'],
+    ].whereType<Object>().map((value) => value.toString().trim()).where((value) => value.isNotEmpty);
+    String? asset;
+    for (final value in keys) {
+      final normalized = value
+          .split('/')
+          .last
+          .replaceFirst(RegExp(r'\\.[a-zA-Z0-9]{2,5}$'), '')
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+      asset = candidates[normalized];
+      if (asset != null) break;
+    }
     if (asset != null) {
-      return Image.asset(asset, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
+      return Image.asset(
+        asset,
+        fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold),
+      );
     }
     return const Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
   }
