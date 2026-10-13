@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart' as flutter_widgets;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1198,9 +1197,9 @@ class _WalletPageState extends State<WalletPage> {
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded))],
       ),
       body: _loading
-          ? const flutter_widgets.Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
@@ -1410,7 +1409,8 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
       final normalized = value
           .split('/')
           .last
-          .replaceFirst(RegExp(r'\.[a-zA-Z0-9]{2,5}
+          .replaceFirst(RegExp(r'\.[a-zA-Z0-9]{2,5}$'), '')
+          .toLowerCase()
           .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
           .replaceAll(RegExp(r'^-+|-+$'), '');
       asset = candidates[normalized];
@@ -1423,7 +1423,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
         errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold),
       );
     }
-    return const flutter_widgets.Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
+    return const Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
   }
 
   String _resolveGiftImage(String value) {
@@ -1461,7 +1461,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
         ],
       ),
       body: _loading
-          ? const flutter_widgets.Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 if (_error != null)
@@ -1504,7 +1504,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                 ),
                 Expanded(
                   child: _gifts.isEmpty
-                      ? const flutter_widgets.Center(
+                      ? const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1595,7 +1595,7 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
                                               ),
                                             ),
                                           ),
-                                          flutter_widgets.Center(
+                                          Center(
                                             child: imageUrl.isNotEmpty
                                                 ? Image.network(
                                                     imageUrl,
@@ -1744,15 +1744,15 @@ class _GiftHistoryPageState extends State<GiftHistoryPage> {
       IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث'),
     ]),
     body: _loading
-      ? const flutter_widgets.Center(child: CircularProgressIndicator())
+      ? const Center(child: CircularProgressIndicator())
       : _error != null
-        ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
           ])))
         : _items.isEmpty
-          ? const flutter_widgets.Center(child: Text('لا يوجد سجل هدايا لعرضه حاليًا.'))
+          ? const Center(child: Text('لا يوجد سجل هدايا لعرضه حاليًا.'))
           : ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: _items.length,
@@ -1874,8 +1874,8 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('الأمان والخصوصية')),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : _error != null
-      ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
@@ -1974,8 +1974,8 @@ class _VipCatalogPageState extends State<VipCatalogPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('عضوية VIP'), actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث')]),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : _error != null
-      ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12),
           FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
         ])))
@@ -2127,7 +2127,7 @@ class _VanityIdsPageState extends State<VanityIdsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('الآي دي المميز'), actions: [IconButton(onPressed: _loading || _busy ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : ListView(
+    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(
       padding: const EdgeInsets.all(14),
       children: [
         if (_mine != null) Card(child: ListTile(leading: const Icon(Icons.verified_rounded, color: _featureGold), title: Text('آي دي حسابك: ${_mine!['publicId'] ?? '—'}'), subtitle: Text('ينتهي: ${_mine!['expiresAt'] ?? 'غير محدد'}'))),
@@ -2270,11 +2270,11 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
         ]),
         body: _loading
-            ? const flutter_widgets.Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
                 : _catalog.isEmpty
-                    ? const flutter_widgets.Center(child: Text('لا توجد عناصر زينة متاحة حاليًا.'))
+                    ? const Center(child: Text('لا توجد عناصر زينة متاحة حاليًا.'))
                     : GridView.builder(
                         padding: const EdgeInsets.all(12),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -2607,7 +2607,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
         if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
         Expanded(
           child: _loading
-              ? const flutter_widgets.Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : _tab == 0
                   ? ListView(
                       padding: const EdgeInsets.all(16),
@@ -2642,7 +2642,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       ],
                     )
                   : list.isEmpty
-                      ? flutter_widgets.Center(child: Text(_tab == 1 ? 'لا يوجد أصدقاء لعرضهم.' : _tab == 2 ? 'لا يوجد زوار لعرضهم.' : 'لا توجد علاقات مقبولة لعرضها.'))
+                      ? Center(child: Text(_tab == 1 ? 'لا يوجد أصدقاء لعرضهم.' : _tab == 2 ? 'لا يوجد زوار لعرضهم.' : 'لا توجد علاقات مقبولة لعرضها.'))
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -2821,7 +2821,7 @@ class _SocialPageState extends State<SocialPage> {
         Expanded(
           child: Builder(builder: (context) {
             final items = _tab == 0 ? _results : _tab == 1 ? _friends : _relations;
-            if (items.isEmpty) return flutter_widgets.Center(child: Text(_tab == 0 ? 'ابحث عن مستخدم لإرسال طلب صداقة أو بدء محادثة.' : _tab == 1 ? 'لا توجد صداقات للعرض حاليًا.' : 'لا توجد علاقات نشطة للعرض حاليًا.'));
+            if (items.isEmpty) return Center(child: Text(_tab == 0 ? 'ابحث عن مستخدم لإرسال طلب صداقة أو بدء محادثة.' : _tab == 1 ? 'لا توجد صداقات للعرض حاليًا.' : 'لا توجد علاقات نشطة للعرض حاليًا.'));
             return ListView.builder(
               padding: const EdgeInsets.all(10),
               itemCount: items.length,
@@ -2905,9 +2905,9 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
         ],
       ),
       body: _loading
-          ? const flutter_widgets.Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? flutter_widgets.Center(
+              ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
@@ -2925,7 +2925,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
                   ),
                 )
               : _people.isEmpty
-                  ? flutter_widgets.Center(child: Text(widget.visitors ? 'لا يوجد زوار لعرضهم حاليًا.' : 'قائمة الأصدقاء فارغة حاليًا.'))
+                  ? Center(child: Text(widget.visitors ? 'لا يوجد زوار لعرضهم حاليًا.' : 'قائمة الأصدقاء فارغة حاليًا.'))
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView.separated(
@@ -2977,7 +2977,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
         errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold),
       );
     }
-    return const flutter_widgets.Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
+    return const Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
   }
 
   String _resolveGiftImage(String value) {
@@ -3015,7 +3015,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
         ],
       ),
       body: _loading
-          ? const flutter_widgets.Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
                 if (_error != null)
@@ -3058,7 +3058,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
                 ),
                 Expanded(
                   child: _gifts.isEmpty
-                      ? const flutter_widgets.Center(
+                      ? const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -3149,7 +3149,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
                                               ),
                                             ),
                                           ),
-                                          flutter_widgets.Center(
+                                          Center(
                                             child: imageUrl.isNotEmpty
                                                 ? Image.network(
                                                     imageUrl,
@@ -3298,15 +3298,15 @@ class _GiftHistoryPageState extends State<GiftHistoryPage> {
       IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث'),
     ]),
     body: _loading
-      ? const flutter_widgets.Center(child: CircularProgressIndicator())
+      ? const Center(child: CircularProgressIndicator())
       : _error != null
-        ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
           ])))
         : _items.isEmpty
-          ? const flutter_widgets.Center(child: Text('لا يوجد سجل هدايا لعرضه حاليًا.'))
+          ? const Center(child: Text('لا يوجد سجل هدايا لعرضه حاليًا.'))
           : ListView.separated(
               padding: const EdgeInsets.all(12),
               itemCount: _items.length,
@@ -3428,8 +3428,8 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('الأمان والخصوصية')),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : _error != null
-      ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(_error!, textAlign: TextAlign.center),
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
@@ -3528,8 +3528,8 @@ class _VipCatalogPageState extends State<VipCatalogPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('عضوية VIP'), actions: [IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث')]),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : _error != null
-      ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+    body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
+      ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text(_error!, textAlign: TextAlign.center), const SizedBox(height: 12),
           FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
         ])))
@@ -3681,7 +3681,7 @@ class _VanityIdsPageState extends State<VanityIdsPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('الآي دي المميز'), actions: [IconButton(onPressed: _loading || _busy ? null : _load, icon: const Icon(Icons.refresh_rounded))]),
-    body: _loading ? const flutter_widgets.Center(child: CircularProgressIndicator()) : ListView(
+    body: _loading ? const Center(child: CircularProgressIndicator()) : ListView(
       padding: const EdgeInsets.all(14),
       children: [
         if (_mine != null) Card(child: ListTile(leading: const Icon(Icons.verified_rounded, color: _featureGold), title: Text('آي دي حسابك: ${_mine!['publicId'] ?? '—'}'), subtitle: Text('ينتهي: ${_mine!['expiresAt'] ?? 'غير محدد'}'))),
@@ -3824,11 +3824,11 @@ class _CosmeticsPageState extends State<CosmeticsPage> {
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded)),
         ]),
         body: _loading
-            ? const flutter_widgets.Center(child: CircularProgressIndicator())
+            ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? flutter_widgets.Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
+                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!, textAlign: TextAlign.center)))
                 : _catalog.isEmpty
-                    ? const flutter_widgets.Center(child: Text('لا توجد عناصر زينة متاحة حاليًا.'))
+                    ? const Center(child: Text('لا توجد عناصر زينة متاحة حاليًا.'))
                     : GridView.builder(
                         padding: const EdgeInsets.all(12),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -4161,7 +4161,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
         if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
         Expanded(
           child: _loading
-              ? const flutter_widgets.Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : _tab == 0
                   ? ListView(
                       padding: const EdgeInsets.all(16),
@@ -4196,7 +4196,7 @@ class _SocialHubPageState extends State<SocialHubPage> {
                       ],
                     )
                   : list.isEmpty
-                      ? flutter_widgets.Center(child: Text(_tab == 1 ? 'لا يوجد أصدقاء لعرضهم.' : _tab == 2 ? 'لا يوجد زوار لعرضهم.' : 'لا توجد علاقات مقبولة لعرضها.'))
+                      ? Center(child: Text(_tab == 1 ? 'لا يوجد أصدقاء لعرضهم.' : _tab == 2 ? 'لا يوجد زوار لعرضهم.' : 'لا توجد علاقات مقبولة لعرضها.'))
                       : ListView.separated(
                           itemCount: list.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
@@ -4375,7 +4375,7 @@ class _SocialPageState extends State<SocialPage> {
         Expanded(
           child: Builder(builder: (context) {
             final items = _tab == 0 ? _results : _tab == 1 ? _friends : _relations;
-            if (items.isEmpty) return flutter_widgets.Center(child: Text(_tab == 0 ? 'ابحث عن مستخدم لإرسال طلب صداقة أو بدء محادثة.' : _tab == 1 ? 'لا توجد صداقات للعرض حاليًا.' : 'لا توجد علاقات نشطة للعرض حاليًا.'));
+            if (items.isEmpty) return Center(child: Text(_tab == 0 ? 'ابحث عن مستخدم لإرسال طلب صداقة أو بدء محادثة.' : _tab == 1 ? 'لا توجد صداقات للعرض حاليًا.' : 'لا توجد علاقات نشطة للعرض حاليًا.'));
             return ListView.builder(
               padding: const EdgeInsets.all(10),
               itemCount: items.length,
@@ -4459,9 +4459,9 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
         ],
       ),
       body: _loading
-          ? const flutter_widgets.Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? flutter_widgets.Center(
+              ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Column(
@@ -4479,7 +4479,7 @@ class _ProfilePeoplePageState extends State<ProfilePeoplePage> {
                   ),
                 )
               : _people.isEmpty
-                  ? flutter_widgets.Center(child: Text(widget.visitors ? 'لا يوجد زوار لعرضهم حاليًا.' : 'قائمة الأصدقاء فارغة حاليًا.'))
+                  ? Center(child: Text(widget.visitors ? 'لا يوجد زوار لعرضهم حاليًا.' : 'قائمة الأصدقاء فارغة حاليًا.'))
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: ListView.separated(
