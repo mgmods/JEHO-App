@@ -1073,54 +1073,85 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
 
   Widget _giftArtwork(Map<String, dynamic> gift) {
     final raw = [
-      gift['assetKey'],
-      gift['slug'],
-      gift['code'],
-      gift['key'],
-      gift['name'],
-      gift['title'],
-      gift['id'],
+      gift['assetKey'], gift['slug'], gift['code'], gift['key'],
+      gift['name'], gift['title'], gift['id'],
     ].whereType<Object>().map((value) => value.toString().trim()).firstWhere(
       (value) => value.isNotEmpty,
       orElse: () => '',
     );
-    final normalized = raw
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'^-+|-+
-    body: _loading ? const Center(child: CircularProgressIndicator()) : Column(children: [
-      if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
-      if (_sending) const LinearProgressIndicator(),
-      Expanded(child: _gifts.isEmpty ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.')) : GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2, childAspectRatio: .78, crossAxisSpacing: 10, mainAxisSpacing: 10),
-        itemCount: _gifts.length,
-        itemBuilder: (context, index) {
-          final gift = _gifts[index];
-          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
-          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
-          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
-          return Card(clipBehavior: Clip.antiAlias, child: Padding(padding: const EdgeInsets.all(10), child: Column(children: [
-            Expanded(
-              child: image.startsWith('http')
-                  ? Image.network(
-                      image,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => _giftArtwork(gift),
-                    )
-                  : _giftArtwork(gift),
-            ),
-            const SizedBox(height: 8),
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 4),
-            Text('السعر: $cost'),
-            const SizedBox(height: 6),
-            SizedBox(width: double.infinity, child: FilledButton.tonalIcon(onPressed: _sending ? null : () => _sendGift(gift), icon: const Icon(Icons.send_rounded, size: 16), label: const Text('إرسال'))),
-          ])));
-        },
-      )),
-    ]),
-  );
+    final normalized = raw.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    final candidates = <String, String>{
+      'rose': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
+      'flower': 'assets/original/android-res/drawable-xxhdpi/gift_rose.webp',
+      'heart': 'assets/original/android-res/drawable-xxhdpi/gift_heart.webp',
+      'car': 'assets/original/android-res/drawable-xxhdpi/gift_car.webp',
+    };
+    final asset = candidates[normalized];
+    if (asset != null) {
+      return Image.asset(asset, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
+    }
+    return const Center(child: Icon(Icons.card_giftcard_rounded, size: 56, color: _featureGold));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('الهدايا'),
+        actions: [IconButton(onPressed: _loading || _sending ? null : _load, icon: const Icon(Icons.refresh_rounded))],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(children: [
+              if (_error != null)
+                Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+              if (_sending) const LinearProgressIndicator(),
+              Expanded(
+                child: _gifts.isEmpty
+                    ? const Center(child: Text('لا توجد هدايا متاحة حاليًا.'))
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(12),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2, childAspectRatio: .78, crossAxisSpacing: 10, mainAxisSpacing: 10,
+                        ),
+                        itemCount: _gifts.length,
+                        itemBuilder: (context, index) {
+                          final gift = _gifts[index];
+                          final title = (gift['name'] ?? gift['title'] ?? 'هدية').toString();
+                          final cost = gift['price'] ?? gift['coinCost'] ?? gift['cost'] ?? '—';
+                          final image = (gift['imageUrl'] ?? gift['image'] ?? gift['mediaUrl'] ?? '').toString();
+                          return Card(
+                            clipBehavior: Clip.antiAlias,
+                            child: Padding(
+                              padding: const EdgeInsets.all(10),
+                              child: Column(children: [
+                                Expanded(
+                                  child: image.startsWith('http')
+                                      ? Image.network(image, fit: BoxFit.contain, errorBuilder: (_, __, ___) => _giftArtwork(gift))
+                                      : _giftArtwork(gift),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text('السعر: $cost'),
+                                const SizedBox(height: 6),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.tonalIcon(
+                                    onPressed: _sending ? null : () => _sendGift(gift),
+                                    icon: const Icon(Icons.send_rounded, size: 16),
+                                    label: const Text('إرسال'),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ]),
+    );
+  }
 }
 
 class VanityIdsPage extends StatefulWidget {
