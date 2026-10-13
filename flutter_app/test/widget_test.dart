@@ -89,7 +89,7 @@ void main() {
       ),
     );
 
-    expect(find.text('أهلًا بك في JEHO-OWN'), findsOneWidget);
+    expect(find.text('تواصل مع أصدقائك، واكتشف الغرف والمجتمعات في JEHO'), findsOneWidget);
     expect(find.text('تسجيل الدخول'), findsOneWidget);
     expect(find.text('الدخول كضيف'), findsOneWidget);
     apiClient.dispose();
@@ -103,7 +103,9 @@ void main() {
     // Session restoration is asynchronous and initially shows the branded
     // startup splash. Advance the test clock without waiting on its spinner.
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+    // Secure-storage plugins may not be registered in widget tests. The
+    // startup restore has a bounded timeout, after which login must render.
+    await tester.pump(const Duration(seconds: 9));
     await tester.pump();
 
     expect(find.byType(AuthPage), findsOneWidget);
