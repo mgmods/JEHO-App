@@ -238,17 +238,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
   static const _sections = <_SectionInfo>[
     _SectionInfo(
       title: 'الرئيسية',
-      subtitle: 'تم تسجيل الدخول بنجاح. سيتم نقل واجهة الصفحة الرئيسية وربط بياناتها في المرحلة التالية.',
+      subtitle: 'تصفح الغرف العامة وتابع عدد الموجودين فيها.',
       icon: Icons.home_rounded,
     ),
     _SectionInfo(
       title: 'الرسائل',
-      subtitle: 'سيتم ربط المحادثات وواجهاتها مع API الحالي بعد تدقيق العقود.',
+      subtitle: 'افتح محادثاتك وأرسل الرسائل النصية عبر الخادم الحالي.',
       icon: Icons.chat_bubble_rounded,
     ),
     _SectionInfo(
       title: 'أنا',
-      subtitle: 'سيتم نقل الملف الشخصي والإطارات والإعدادات تدريجيًا.',
+      subtitle: 'راجع بيانات حسابك وعدّل الاسم الظاهر والنبذة.',
       icon: Icons.person_rounded,
     ),
   ];
@@ -528,7 +528,7 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                       }),
                     const SizedBox(height: 8),
                     const Text(
-                      'عرض المحادثات فقط في هذه المرحلة؛ فتح المحادثة وإرسال الرسائل سيأتيان بعده.',
+                      'يمكنك فتح المحادثة من القائمة وإرسال الرسائل النصية. الوسائط والميزات المتقدمة لم تُنقل بعد.',
                       textAlign: TextAlign.center,
                     ),
                   ] else ...[
@@ -542,6 +542,17 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     const SizedBox(height: 8),
                     Text('اسم المستخدم: ${activeUser['username'] ?? '—'}'),
                     Text('المعرّف: ${activeUser['publicId'] ?? '—'}'),
+                    if ((activeUser['bio'] ?? '').toString().trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        activeUser['bio'].toString(),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.black54,
+                              height: 1.5,
+                            ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     FilledButton.icon(
                       onPressed: _loading ? null : () => _editProfile(activeUser),
