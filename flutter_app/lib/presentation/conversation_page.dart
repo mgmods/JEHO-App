@@ -319,10 +319,7 @@ class _ConversationPageState extends State<ConversationPage> {
                                         }
                                         return Padding(
                                           padding: const EdgeInsets.only(bottom: 6),
-                                          child: InkWell(
-                                            onTap: () {},
-                                            child: Text('مرفق: ${media['mimeType'] ?? type}\\n$resolved', style: const TextStyle(decoration: TextDecoration.underline)),
-                                          ),
+                                          child: SelectableText('مرفق: ${media['mimeType'] ?? type}\\n$resolved'),
                                         );
                                       }),
                                     ],
