@@ -54,6 +54,8 @@ public class SplashActivity extends ThemedActivity {
     private AuthDtos.UserDto pendingUser;
     private MiscDtos.SplashItemDto displayedSplashItem;
     private String pendingSplashTarget;
+    private String pendingSplashTargetType;
+    private String pendingSplashTargetId;
     private ImageView splashAdImage;
     private View splashContentView;
     private View skipSplashAd;
@@ -294,8 +296,7 @@ public class SplashActivity extends ThemedActivity {
                         try {
                             Glide.with(SplashActivity.this)
                                     .load(item.url)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                                    .skipMemoryCache(true)
+                                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                                     .into(new CustomTarget<Drawable>() {
                                         @Override
                                         public void onResourceReady(
@@ -352,8 +353,19 @@ public class SplashActivity extends ThemedActivity {
             String target = displayedSplashItem.target;
             if (target == null || target.trim().isEmpty()) target = displayedSplashItem.targetUrl;
             pendingSplashTarget = target != null ? target.trim() : null;
+            pendingSplashTargetType = displayedSplashItem.targetType;
+            pendingSplashTargetId = displayedSplashItem.targetId;
+            if (pendingSplashTargetType == null || pendingSplashTargetType.trim().isEmpty()) {
+                if (pendingSplashTarget != null && pendingSplashTarget.matches("(?i)^https?://.+")) {
+                    pendingSplashTargetType = "external";
+                } else if (pendingSplashTarget != null && pendingSplashTarget.matches("(?i)^(home|messages|drama|create_room)$")) {
+                    pendingSplashTargetType = pendingSplashTarget;
+                }
+            }
         } else {
             pendingSplashTarget = null;
+            pendingSplashTargetType = null;
+            pendingSplashTargetId = null;
         }
         splashDecisionResolved = true;
         splashAdShowing = false;
@@ -387,6 +399,37 @@ public class SplashActivity extends ThemedActivity {
 
     private void openDestination() {
         if (navigated || isFinishing()) return;
+        if (pendingSplashTargetType != null && !pendingSplashTargetType.trim().isEmpty()) {
+            String type = pendingSplashTargetType.trim().toLowerCase(java.util.Locale.ROOT);
+            if (("room".equals(type) || "agency".equals(type) || "user".equals(type))
+                    && pendingSplashTargetId != null && !pendingSplashTargetId.trim().isEmpty()) {
+                navigated = true;
+                mainHandler.removeCallbacks(hardTimeout);
+                resolveAndOpenSplashTarget(type, pendingSplashTargetId.trim());
+                return;
+            }
+            if ("external".equals(type) && pendingSplashTarget != null
+                    && pendingSplashTarget.matches("(?i)^https?://.+")) {
+                navigated = true;
+                mainHandler.removeCallbacks(hardTimeout);
+                openMainForSplashRoute(null);
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pendingSplashTarget)));
+                } catch (Throwable error) {
+                    Log.w(TAG, "Could not open splash ad destination", error);
+                }
+                finish();
+                return;
+            }
+            if ("home".equals(type) || "messages".equals(type) || "drama".equals(type)
+                    || "create_room".equals(type)) {
+                navigated = true;
+                mainHandler.removeCallbacks(hardTimeout);
+                openMainForSplashRoute(type);
+                finish();
+                return;
+            }
+        }
         navigated = true;
         mainHandler.removeCallbacks(hardTimeout);
         // Resume voice room after process death / launcher reopen when still in a room.
@@ -420,6 +463,66 @@ public class SplashActivity extends ThemedActivity {
             }
         }
         finish();
+    }
+
+    private void resolveAndOpenSplashTarget(String type, String publicId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                MiscDtos.SplashTargetDto resolved = null;
+                try {
+                    Result<MiscDtos.SplashTargetDto> result =
+                            com.Dramizo.Series.util.ApiCall.execute(c.getConfigApi().resolveSplashTarget(type, publicId));
+                    if (result != null && result.success) resolved = result.data;
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash target resolution failed", error);
+                }
+                MiscDtos.SplashTargetDto finalResolved = resolved;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (finalResolved == null || !finalResolved.found || finalResolved.id == null
+                            || finalResolved.id.trim().isEmpty()) {
+                        openMainForSplashRoute(null);
+                        finish();
+                        return;
+                    }
+                    try {
+                        if ("room".equals(type)) {
+                            Intent i = new Intent(this, VoiceRoomActivity.class);
+                            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, finalResolved.id);
+                            i.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+                            startActivity(i);
+                        } else if ("user".equals(type)) {
+                            Intent i = new Intent(this, com.Dramizo.Series.presentation.profile.ProfileActivity.class);
+                            i.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, finalResolved.id);
+                            startActivity(i);
+                        } else {
+                            Intent i = new Intent(this, com.Dramizo.Series.presentation.agency.AgencyActivity.class);
+                            i.putExtra("splash_target_agency_id", finalResolved.id);
+                            startActivity(i);
+                        }
+                    } catch (Throwable error) {
+                        Log.w(TAG, "Could not open splash target", error);
+                        openMainForSplashRoute(null);
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash target lookup unavailable", error);
+            openMainForSplashRoute(null);
+            finish();
+        }
+    }
+
+    private void openMainForSplashRoute(@Nullable String route) {
+        Intent i = new Intent(this, MainActivity.class);
+        if ("home".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
+        else if ("messages".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+        else if ("drama".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_DRAMA, true);
+        else if ("create_room".equals(route)) i.putExtra(MainActivity.EXTRA_OPEN_CREATE_ROOM, true);
+        putPendingExtras(i);
+        startActivity(i);
     }
 
     private void openProfileSetup() {
