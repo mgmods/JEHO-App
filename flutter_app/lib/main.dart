@@ -21,10 +21,11 @@ const String apiBaseUrl = String.fromEnvironment(
 );
 
 String resolveSectionWallpaper(Map<String, dynamic> backgrounds, String sectionKey) {
-  final shared = (backgrounds['allSections'] ?? '').toString().trim();
-  if (shared.isNotEmpty) return shared;
+  // Section-specific background must override the shared wallpaper.
   final section = (backgrounds[sectionKey] ?? '').toString().trim();
   if (section.isNotEmpty) return section;
+  final shared = (backgrounds['allSections'] ?? '').toString().trim();
+  if (shared.isNotEmpty) return shared;
   return (backgrounds['app'] ?? '').toString().trim();
 }
 
