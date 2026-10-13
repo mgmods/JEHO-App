@@ -152,7 +152,7 @@ export class AgenciesService implements OnModuleInit {
       // Normalize existing agency display IDs to six digits without deleting agency data.
       const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
       for (const agency of agencies) {
-        if (agency.publicId && /^\\d{6}$/.test(String(agency.publicId))) continue;
+        if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
         let candidate = '';
         for (let attempt = 0; attempt < 40; attempt++) {
           const next = String(100000 + Math.floor(Math.random() * 900000));
