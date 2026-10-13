@@ -1628,6 +1628,98 @@ class _GiftCatalogPageState extends State<GiftCatalogPage> {
   }
 }
 
+class GiftHistoryPage extends StatefulWidget {
+  const GiftHistoryPage({required this.apiClient, required this.accessToken, super.key});
+  final JehoApiClient apiClient;
+  final String accessToken;
+
+  @override
+  State<GiftHistoryPage> createState() => _GiftHistoryPageState();
+}
+
+class _GiftHistoryPageState extends State<GiftHistoryPage> {
+  bool _loading = true;
+  String? _error;
+  List<Map<String, dynamic>> _items = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final items = await widget.apiClient.getGiftHistory(widget.accessToken);
+      if (mounted) setState(() { _items = items; _loading = false; });
+    } on JehoApiException catch (error) {
+      if (mounted) setState(() { _error = error.message; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() { _error = 'تعذر تحميل سجل الهدايا.'; _loading = false; });
+    }
+  }
+
+  String _first(Map<String, dynamic> item, List<String> keys, [String fallback = '—']) {
+    for (final key in keys) {
+      final value = item[key];
+      if (value != null && value.toString().trim().isNotEmpty) return value.toString();
+    }
+    return fallback;
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('سجل الهدايا'), actions: [
+      IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh_rounded), tooltip: 'تحديث'),
+    ]),
+    body: _loading
+      ? const Center(child: CircularProgressIndicator())
+      : _error != null
+        ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            FilledButton.icon(onPressed: _load, icon: const Icon(Icons.refresh_rounded), label: const Text('إعادة المحاولة')),
+          ])))
+        : _items.isEmpty
+          ? const Center(child: Text('لا يوجد سجل هدايا لعرضه حاليًا.'))
+          : ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: _items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final item = _items[index];
+                final gift = item['gift'] is Map<String, dynamic> ? item['gift'] as Map<String, dynamic> : <String, dynamic>{};
+                final receiver = item['receiver'] is Map<String, dynamic> ? item['receiver'] as Map<String, dynamic> : <String, dynamic>{};
+                final sender = item['sender'] is Map<String, dynamic> ? item['sender'] as Map<String, dynamic> : <String, dynamic>{};
+                return Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(
+                        width: 54, height: 54,
+                        decoration: BoxDecoration(color: const Color(0xFFFFF0CC), borderRadius: BorderRadius.circular(15)),
+                        child: const Icon(Icons.card_giftcard_rounded, color: _featureGold, size: 30),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_first(item, ['giftName', 'name'], _first(gift, ['name', 'title'], 'هدية')), style: const TextStyle(fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        Text('إلى: ' + _first(receiver, ['displayName', 'username'], _first(item, ['receiverName', 'receiverId']))),
+                        Text('من: ' + _first(sender, ['displayName', 'username'], _first(item, ['senderName'], 'أنت'))),
+                        Text('الكمية: ' + _first(item, ['quantity', 'count'], '1') + ' · القيمة: ' + _first(item, ['totalPrice', 'price', 'coins'], '—')),
+                        const SizedBox(height: 4),
+                        Text(_first(item, ['createdAt', 'sentAt', 'timestamp']), style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                      ])),
+                    ]),
+                  ),
+                );
+              },
+            ),
+  );
+}
+
 class VanityIdsPage extends StatefulWidget {
   const VanityIdsPage({required this.apiClient, required this.accessToken, super.key});
   final JehoApiClient apiClient;
