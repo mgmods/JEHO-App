@@ -81,6 +81,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'game-ads': 'gameAds',
   drama: 'drama',
   banners: 'banners',
+  'splash-management': 'banners',
   'nav-icons': 'navIcons',
   'seat-stickers': 'seatStickers',
   reports: 'reports',
