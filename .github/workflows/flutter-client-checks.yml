@@ -42,6 +42,18 @@ jobs:
       - name: Generate Android platform scaffold
         run: flutter create --platforms=android --project-name jeho_own_flutter --org com.jehoown .
 
+      # Keep the original app identity so the migration target is the existing
+      # com.Dramizo.Series app, not a separate com.jehoown.* application.
+      # This affects only the generated CI Flutter scaffold, not android/ production files.
+      - name: Set original Android package identity
+        shell: bash
+        run: |
+          grep -rl 'com.jehoown.jeho_own_flutter' android | xargs -r sed -i 's/com\.jehoown\.jeho_own_flutter/com.Dramizo.Series/g'
+          if ! grep -q 'applicationId "com.Dramizo.Series"' android/app/build.gradle && ! grep -q 'applicationId = "com.Dramizo.Series"' android/app/build.gradle.kts 2>/dev/null; then
+            echo "Flutter scaffold did not receive the original applicationId" >&2
+            exit 1
+          fi
+
       # file_picker / flutter_plugin_android_lifecycle currently require Android API 36.
       # Only the generated CI scaffold is changed; no production Android files are overwritten.
       - name: Set Android compile SDK
