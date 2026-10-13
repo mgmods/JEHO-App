@@ -145,6 +145,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     try {
       await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
+      );
+      await this.dataSource.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_rooms_publicId" ON rooms ("publicId") WHERE "publicId" IS NOT NULL`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "liveSessionStartedAt" TIMESTAMPTZ`,
       );
       await this.dataSource.query(
@@ -663,6 +669,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return `/assets/${card}.png?v=20260730c`;
   }
 
+  private async allocateRoomPublicId(): Promise<string> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
+      const exists = await this.roomsRepo.exist({ where: { publicId: candidate } });
+      if (!exists) return candidate;
+    }
+    throw new ConflictException('تعذر إنشاء آيدي روم فريد، حاول مرة أخرى');
+  }
+
   async create(hostId: string, dto: CreateRoomDto) {
     const host = await this.usersRepo.findOne({
       where: { id: hostId },
@@ -750,6 +765,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const hostCard =
       (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
     const room = this.roomsRepo.create({
+      publicId: await this.allocateRoomPublicId(),
       title,
       description: dto.description || null,
       coverUrl,
@@ -870,6 +886,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const hostCard =
       (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
     const room = this.roomsRepo.create({
+      publicId: await this.allocateRoomPublicId(),
       title,
       description: dto.description || null,
       coverUrl,
