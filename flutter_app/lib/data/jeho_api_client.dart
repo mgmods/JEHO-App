@@ -228,6 +228,15 @@ class JehoApiClient {
   Future<Map<String, dynamic>> leaveSeat(String token, String roomId) async =>
       _asMap(await _post('rooms/$roomId/seats/leave', const {}, accessToken: token), 'تعذر مغادرة المقعد.');
 
+  Future<Map<String, dynamic>> kickRoomUser(String token, String roomId, String userId) async =>
+      _asMap(await _post('rooms/$roomId/kick', {'userId': userId}, accessToken: token), 'تعذر إخراج المستخدم.');
+
+  Future<Map<String, dynamic>> banRoomUser(String token, String roomId, String userId, {int durationMinutes = 30}) async =>
+      _asMap(await _post('rooms/$roomId/ban', {'userId': userId, 'durationMinutes': durationMinutes}, accessToken: token), 'تعذر حظر المستخدم.');
+
+  Future<Map<String, dynamic>> lockRoomSeat(String token, String roomId, int seatIndex, {bool locked = true}) async =>
+      _asMap(await _post('rooms/$roomId/seats/lock', {'seatIndex': seatIndex, 'locked': locked}, accessToken: token), 'تعذر تحديث قفل المقعد.');
+
   Future<Map<String, dynamic>> raiseHand(String token, String roomId, {bool raised = true, int? seatIndex}) async =>
       _asMap(await _post('rooms/$roomId/raise-hand', {'raised': raised, if (seatIndex != null) 'seatIndex': seatIndex}, accessToken: token), 'تعذر إرسال طلب المايك.');
 
