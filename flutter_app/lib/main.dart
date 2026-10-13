@@ -842,12 +842,30 @@ class _MigrationHomePageState extends State<MigrationHomePage> {
                     ],
                     const SizedBox(height: 12),
                     Row(
-                      children: const [
-                        Expanded(child: _HomeFeatureTile(title: 'الثروة', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_wealth.webp')),
-                        SizedBox(width: 8),
-                        Expanded(child: _HomeFeatureTile(title: 'CP', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_cp.webp')),
-                        SizedBox(width: 8),
-                        Expanded(child: _HomeFeatureTile(title: 'حظ', asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_charm.webp')),
+                      children: [
+                        Expanded(child: _HomeFeatureTile(
+                          title: 'الثروة',
+                          asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_wealth.webp',
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => WalletPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
+                          )),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(
+                          title: 'CP',
+                          asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_cp.webp',
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => SocialHubPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
+                          )),
+                        )),
+                        const SizedBox(width: 8),
+                        Expanded(child: _HomeFeatureTile(
+                          title: 'حظ',
+                          asset: 'assets/original/android-res/drawable-xxhdpi/home_bg_charm.webp',
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                            builder: (_) => DiscoveryHubPage(apiClient: widget.apiClient, accessToken: widget.session['accessToken']?.toString() ?? ''),
+                          )),
+                        )),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -1755,31 +1773,42 @@ class _HomeHeaderIcon extends StatelessWidget {
 }
 
 class _HomeFeatureTile extends StatelessWidget {
-  const _HomeFeatureTile({required this.title, required this.asset});
+  const _HomeFeatureTile({required this.title, required this.asset, required this.onTap});
   final String title;
   final String asset;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => AspectRatio(
         aspectRatio: 1.05,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(asset, fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF45B9A0))),
-              DecoratedBox(decoration: BoxDecoration(
-                border: Border.all(color: Colors.white.withValues(alpha: 0.65), width: 1.4),
-                borderRadius: BorderRadius.circular(18),
-              )),
-              Positioned(
-                left: 6, right: 6, bottom: 8,
-                child: Text(title, textAlign: TextAlign.center, maxLines: 1,
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900,
-                    shadows: [Shadow(color: Color(0xAA000000), blurRadius: 5)])),
+          child: Material(
+            color: const Color(0xFF38233A),
+            child: InkWell(
+              onTap: onTap,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(asset, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFF45B9A0))),
+                  const DecoratedBox(decoration: BoxDecoration(
+                    gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                      colors: [Color(0x00000000), Color(0x77000000)]),
+                  )),
+                  DecoratedBox(decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.65), width: 1.4),
+                    borderRadius: BorderRadius.circular(18),
+                  )),
+                  Positioned(
+                    left: 6, right: 6, bottom: 8,
+                    child: Text(title, textAlign: TextAlign.center, maxLines: 1,
+                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900,
+                        shadows: [Shadow(color: Color(0xAA000000), blurRadius: 5)])),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );
