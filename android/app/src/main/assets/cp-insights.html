@@ -58,10 +58,10 @@ body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){return Number(v||0).toLocaleString('en-US')}
-function safeImage(v){const s=String(v||'').trim();if(/^https?:\/\//i.test(s))return s;if(s.startsWith('/')&&!s.startsWith('//'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;return ''}
+function safeImage(v){const s=String(v||'').trim();if(s.startsWith('https://')||s.startsWith('http://'))return s;if(s.startsWith('/')&&!s.startsWith('//'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;return ''}
 function frameUrl(person){const p=person||{};return safeImage(p.hostBadgeUrl)||safeImage(p.vipBadgeUrl)}
-function frameMarkup(person){const src=frameUrl(person);if(!src)return '';const clean=src.split('?')[0].toLowerCase();if(/\.(mp4|webm|mov)$/.test(clean))return '<video class="real-frame-video" autoplay muted loop playsinline aria-hidden="true"><source src="'+esc(src)+'"></video>';if(/\.(png|jpe?g|gif|webp|svg|avif)$/.test(clean)||! /\.[a-z0-9]{2,5}$/.test(clean))return '<img class="real-frame" src="'+esc(src)+'" alt="" aria-hidden="true" referrerpolicy="no-referrer">';return ''}
-function avatarHtml(person,cls,label){const p=person||{},src=safeImage(p.avatarUrl),face=src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>';return '<span class="avatar-stack '+cls+'">'+face+frameMarkup(p)+'</span>'}
+function frameMarkup(person,allowMotion){const src=frameUrl(person);if(!src)return '';const clean=src.split('?')[0].toLowerCase();if(clean.endsWith('.mp4')||clean.endsWith('.webm')||clean.endsWith('.mov'))return allowMotion?'<video class="real-frame-video" muted loop playsinline preload="none" aria-hidden="true"><source src="'+esc(src)+'"></video>':'';if(['.png','.jpg','.jpeg','.gif','.webp','.svg','.avif'].some(ext=>clean.endsWith(ext))||!clean.slice(clean.lastIndexOf('/')+1).includes('.'))return '<img class="real-frame" src="'+esc(src)+'" alt="" aria-hidden="true" loading="lazy" decoding="async" referrerpolicy="no-referrer">';return ''}
+function avatarHtml(person,cls,label){const p=person||{},src=safeImage(p.avatarUrl),face=src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" loading="lazy" decoding="async" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>';return '<span class="avatar-stack '+cls+'">'+face+frameMarkup(p,true)+'</span>'}
 function renderCpData(d){
  renderCpRanking(d&&d.cpRanking,!!(d&&d.cpRankingError));
  const rel=d&&d.relationship,box=document.getElementById('relationship'),couple=document.getElementById('couple'),me=d&&d.user||{};
@@ -84,13 +84,13 @@ function showCpError(){document.getElementById('relationship').innerHTML='<div c
 function cpPersonHtml(person, fallback){
  const p=person||{}, name=p.displayName||p.username||fallback||'اسم غير متوفر', avatar=safeImage(p.avatarUrl);
  const face=avatar?'<img class="cp-rank-avatar" src="'+esc(avatar)+'" alt="" referrerpolicy="no-referrer">':'<div class="cp-rank-avatar couple-placeholder">♡</div>';
- const img='<span class="cp-rank-avatar-stack">'+face+frameMarkup(p)+'</span>';
+ const img='<span class="cp-rank-avatar-stack">'+face+frameMarkup(p,false)+'</span>';
  const id=String(p.id||'');
  return '<div class="cp-rank-person">'+img+'<div style="min-width:0"><div class="cp-rank-name">'+esc(name)+'</div><div class="cp-rank-meta">LV '+esc(p.level==null?'—':num(p.level))+'</div></div></div>';
 }
 function renderCpRanking(rows,hasError){
  const podium=document.getElementById('cpPodium'),box=document.getElementById('cpRanking'),count=document.getElementById('cpRankCount');
- const data=Array.isArray(rows)?rows:[]; podium.innerHTML=''; box.innerHTML='';
+ const data=Array.isArray(rows)?rows.slice(0,30):[]; podium.innerHTML=''; box.innerHTML='';
  count.textContent=hasError?'تعذّر التحميل':data.length+' علاقة';
  if(hasError){podium.innerHTML='<div class="cp-ranking-empty">تعذّر تحميل ترتيب العلاقات من الخادم.</div><button class="action secondary" onclick="JehoApp.refreshData()">إعادة المحاولة</button>';return;}
  if(!data.length){podium.innerHTML='<div class="cp-ranking-empty">لا توجد علاقات فعّالة للترتيب حاليًا. ستظهر العلاقات الحقيقية هنا عند تفعيلها في النظام.</div>';return}
