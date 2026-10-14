@@ -46,7 +46,7 @@ public class SplashActivity extends ThemedActivity {
     private static final String TAG = "SplashActivity";
     /** Show the branded fallback briefly, then bypass a slow/unavailable ad request. */
     private static final long SPLASH_MIN_MS = 350L;
-    private static final long SPLASH_MAX_MS = 4000L;
+    private static final long SPLASH_MAX_MS = 15000L;
 
     private boolean navigated;
     private boolean splashDecisionResolved;
@@ -296,6 +296,13 @@ public class SplashActivity extends ThemedActivity {
                             finishSplashAd(false);
                             return;
                         }
+                        // Keep the ad surface and Skip control available while a real
+                        // uploaded image is downloading. Previously the 4-second startup
+                        // timeout could navigate away before the API/image request finished.
+                        displayedSplashItem = item;
+                        splashContentVisibilityGone();
+                        splashAdImage.setVisibility(View.VISIBLE);
+                        skipSplashAd.setVisibility(View.VISIBLE);
                         try {
                             Glide.with(SplashActivity.this)
                                     .load(item.url)
