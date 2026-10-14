@@ -27,5 +27,5 @@ export function isGameEnabled(gameId: string): boolean {
 
 export function getGameWinRate(gameId: string): number | undefined {
   const value = live.gameWinRates?.[String(gameId || '').trim().toLowerCase()];
-  return Number.isFinite(value) ? Math.min(100, Math.max(0, Number(value))) : undefined;
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : undefined;
 }
