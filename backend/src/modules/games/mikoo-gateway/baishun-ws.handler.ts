@@ -6,7 +6,7 @@ import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds } from '../game-odds-runtime';
+import { getGameOdds, isGameEnabled } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -131,6 +131,10 @@ export class BaishunWsHandler {
   ) {}
 
   handle(ws: WebSocket, gameSlug: string, rawUrl = '') {
+    if (!isGameEnabled(gameSlug)) {
+      ws.close(1013, 'Game disabled by administrator');
+      return;
+    }
     const protocol = this.protocolFor(gameSlug);
     if (protocol === 'packer') {
       this.handlePacker(ws, gameSlug, rawUrl);
