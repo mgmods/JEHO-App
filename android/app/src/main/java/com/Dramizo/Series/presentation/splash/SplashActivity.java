@@ -289,82 +289,104 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
+    private int splashImageLoadGeneration;
+    private volatile boolean splashThemeRefreshFinished;
+
     private void startSplashAdLoad() {
         try {
             AppContainer c = ContainerProvider.from(this);
             c.getIoExecutor().execute(() -> {
+                MiscDtos.SplashItemDto cachedItem = null;
                 try {
-                    // The public theme endpoint is refreshed before choosing the next ad.
-                    // RemoteTheme keeps its last good cache if the request fails.
+                    // Paint a previously saved splash immediately; do not wait for the network.
+                    cachedItem = RemoteTheme.nextSplash(getApplicationContext());
+                } catch (Throwable ignored) {
+                }
+                final MiscDtos.SplashItemDto firstItem = cachedItem;
+                if (firstItem != null && firstItem.url != null && !firstItem.url.trim().isEmpty()) {
+                    runOnUiThread(() -> loadSplashImage(firstItem));
+                }
+
+                try {
+                    // Refresh dashboard configuration in parallel with displaying the cached image.
                     RemoteTheme.refreshFromApi(getApplicationContext(), c.getConfigApi());
-                    MiscDtos.SplashItemDto item = RemoteTheme.nextSplash(getApplicationContext());
-                    runOnUiThread(() -> {
-                        if (isFinishing() || splashDecisionResolved) return;
-                        if (item == null || item.url == null || item.url.trim().isEmpty()) {
-                            finishSplashAd(false);
-                            return;
+                    java.util.List<MiscDtos.SplashItemDto> latestItems =
+                            RemoteTheme.activeSplashItems(getApplicationContext());
+                    MiscDtos.SplashItemDto latest = null;
+                    if (firstItem != null && firstItem.id != null) {
+                        for (MiscDtos.SplashItemDto candidate : latestItems) {
+                            if (candidate != null && firstItem.id.equals(candidate.id)) {
+                                latest = candidate;
+                                break;
+                            }
                         }
-                        // Keep the ad surface and Skip control available while a real
-                        // uploaded image is downloading. Previously the 4-second startup
-                        // timeout could navigate away before the API/image request finished.
-                        displayedSplashItem = item;
-                        // Treat a valid configured ad as active before starting the image
-                        // request, so the startup timeout cannot navigate away while Glide
-                        // is still downloading the uploaded image.
-                        splashAdShowing = true;
-                        splashContentVisibilityGone();
-                        splashAdImage.setVisibility(View.VISIBLE);
-                        skipSplashAd.setVisibility(View.VISIBLE);
-                        try {
-                            String imageUrl = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url.trim());
-                            Glide.with(SplashActivity.this)
-                                    .load(imageUrl)
-                                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                                    .skipMemoryCache(true)
-                                    .into(new CustomTarget<Drawable>() {
-                                        @Override
-                                        public void onResourceReady(
-                                                Drawable resource,
-                                                Transition<? super Drawable> transition) {
-                                            if (isFinishing() || splashDecisionResolved) return;
-                                            splashAdImage.setImageDrawable(resource);
-                                            showSplashAd(item);
-                                        }
-
-                                        @Override
-                                        public void onLoadCleared(Drawable placeholder) {
-                                        }
-
-                                        @Override
-                                        public void onLoadFailed(Drawable errorDrawable) {
-                                            finishSplashAd(false);
-                                        }
-                                    });
-                        } catch (Throwable imageError) {
-                            Log.w(TAG, "Splash ad image could not be started", imageError);
-                            finishSplashAd(false);
-                        }
-                    });
+                    }
+                    if (latest == null && !latestItems.isEmpty()) latest = latestItems.get(0);
+                    if (latest == null) latest = RemoteTheme.nextSplash(getApplicationContext());
+                    final MiscDtos.SplashItemDto freshItem = latest;
+                    splashThemeRefreshFinished = true;
+                    if (freshItem != null && freshItem.url != null && !freshItem.url.trim().isEmpty()) {
+                        boolean changed = firstItem == null
+                                || !freshItem.url.trim().equals(firstItem.url.trim());
+                        if (changed) runOnUiThread(() -> loadSplashImage(freshItem));
+                    } else if (firstItem == null) {
+                        runOnUiThread(() -> finishSplashAd(false));
+                    }
                 } catch (Throwable error) {
-                    Log.w(TAG, "Splash ad config unavailable; continuing startup", error);
-                    runOnUiThread(() -> finishSplashAd(false));
+                    splashThemeRefreshFinished = true;
+                    Log.w(TAG, "Splash ad config unavailable; using cached image when available", error);
+                    if (firstItem == null) runOnUiThread(() -> finishSplashAd(false));
                 }
             });
         } catch (Throwable error) {
+            splashThemeRefreshFinished = true;
             Log.w(TAG, "Splash ad setup unavailable; continuing startup", error);
             finishSplashAd(false);
         }
     }
 
-    private void showSplashAd(MiscDtos.SplashItemDto item) {
-        if (splashDecisionResolved || isFinishing()) return;
+    private void loadSplashImage(MiscDtos.SplashItemDto item) {
+        if (item == null || item.url == null || item.url.trim().isEmpty()
+                || isFinishing() || splashDecisionResolved) return;
         displayedSplashItem = item;
         splashAdShowing = true;
-        mainHandler.removeCallbacks(hardTimeout);
         splashContentVisibilityGone();
         splashAdImage.setVisibility(View.VISIBLE);
         skipSplashAd.setVisibility(View.VISIBLE);
-        mainHandler.postDelayed(() -> finishSplashAd(false), RemoteTheme.splashDurationMs(item));
+        final int generation = ++splashImageLoadGeneration;
+        try {
+            String imageUrl = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url.trim());
+            Glide.with(SplashActivity.this)
+                    .load(imageUrl)
+                    // Use Glide's memory + disk caches so repeat launches paint immediately.
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .skipMemoryCache(false)
+                    .into(new CustomTarget<Drawable>() {
+                        @Override
+                        public void onResourceReady(
+                                Drawable resource,
+                                Transition<? super Drawable> transition) {
+                            if (generation != splashImageLoadGeneration
+                                    || isFinishing() || splashDecisionResolved) return;
+                            splashAdImage.setImageDrawable(resource);
+                            showSplashAd(item);
+                        }
+
+                        @Override
+                        public void onLoadCleared(Drawable placeholder) {
+                        }
+
+                        @Override
+                        public void onLoadFailed(Drawable errorDrawable) {
+                            if (generation == splashImageLoadGeneration && splashThemeRefreshFinished) {
+                                finishSplashAd(false);
+                            }
+                        }
+                    });
+        } catch (Throwable imageError) {
+            Log.w(TAG, "Splash ad image could not be started", imageError);
+            if (splashThemeRefreshFinished) finishSplashAd(false);
+        }
     }
 
     private void splashContentVisibilityGone() {
