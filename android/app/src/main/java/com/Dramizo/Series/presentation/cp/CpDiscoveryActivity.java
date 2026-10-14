@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -186,8 +187,8 @@ public class CpDiscoveryActivity extends ThemedActivity {
         LinearLayout people = new LinearLayout(this);
         people.setGravity(Gravity.CENTER);
         people.setPadding(0, dp(14), 0, dp(10));
-        ImageView avatarA = avatar(String.valueOf(a.getOrDefault("avatarUrl", "")));
-        ImageView avatarB = avatar(String.valueOf(b.getOrDefault("avatarUrl", "")));
+        FrameLayout avatarA = framedAvatar(a, dp(58));
+        FrameLayout avatarB = framedAvatar(b, dp(58));
         people.addView(avatarA, new LinearLayout.LayoutParams(dp(58), dp(58)));
         TextView symbol = text(symbolFor(type), 28, Color.rgb(208, 151, 54), true);
         symbol.setGravity(Gravity.CENTER);
@@ -295,6 +296,23 @@ public class CpDiscoveryActivity extends ThemedActivity {
                 }))
                 .setNegativeButton("إلغاء", null)
                 .show();
+    }
+
+    @SuppressWarnings("unchecked")
+    private FrameLayout framedAvatar(Map<String, Object> user, int size) {
+        FrameLayout frame = new FrameLayout(this);
+        ImageView photo = avatar(String.valueOf(user.getOrDefault("avatarUrl", "")));
+        frame.addView(photo, new FrameLayout.LayoutParams(-1, -1));
+        ImageView equippedFrame = new ImageView(this);
+        equippedFrame.setScaleType(ImageView.ScaleType.FIT_XY);
+        frame.addView(equippedFrame, new FrameLayout.LayoutParams(-1, -1));
+        Object frameUrl = user.get("vipBadgeUrl");
+        if (frameUrl != null && !String.valueOf(frameUrl).trim().isEmpty()) {
+            com.Dramizo.Series.util.AvatarCosmetics.applyFrame(equippedFrame, String.valueOf(frameUrl).trim());
+        } else {
+            equippedFrame.setVisibility(View.GONE);
+        }
+        return frame;
     }
 
     private ImageView avatar(String url) {
