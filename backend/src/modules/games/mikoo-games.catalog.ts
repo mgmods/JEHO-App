@@ -18,7 +18,7 @@ export type MikooGameDef = {
   sortOrder: number;
 };
 
-const ORIGIN = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+const ORIGIN = process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud';
 
 export const MIKOO_GAMES: MikooGameDef[] = [
   { id: '7updown', title: '٧ فوق تحت', titleEn: '7 Up Down', entry: 'index.html', bridge: 'hash', gameType: 1, sortOrder: 10 },
