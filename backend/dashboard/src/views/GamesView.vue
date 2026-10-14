@@ -302,7 +302,7 @@ const coveredGames = ref([])
 const disabledGames = ref([])
 const manageableGames = [
   ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
-  { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' },
+  { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
 ]
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
