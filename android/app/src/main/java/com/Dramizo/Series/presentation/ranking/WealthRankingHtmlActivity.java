@@ -17,6 +17,7 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.util.AssetCatalog;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -58,7 +59,27 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                 new ViewModelFactory(ContainerProvider.from(this))).get(RankingViewModel.class);
         viewModel.getEntries().observe(this, entries -> {
             if (!pageReady || entries == null) return;
-            String json = gson.toJson(entries);
+            List<java.util.Map<String, Object>> safeEntries = new ArrayList<>();
+            for (MiscDtos.RankingEntryDto entry : entries) {
+                if (entry == null) continue;
+                java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("rank", entry.rank);
+                row.put("userId", entry.userId);
+                row.put("targetId", entry.targetId);
+                row.put("targetName", entry.targetName);
+                row.put("score", entry.score);
+                java.util.Map<String, Object> user = new java.util.LinkedHashMap<>();
+                if (entry.user != null) {
+                    user.put("id", entry.user.id);
+                    user.put("username", entry.user.username);
+                    user.put("displayName", entry.user.displayName);
+                    user.put("avatarUrl", AssetCatalog.absoluteUrl(entry.user.avatarUrl));
+                    user.put("vipBadgeUrl", AssetCatalog.absoluteUrl(entry.user.vipBadgeUrl));
+                }
+                row.put("user", user);
+                safeEntries.add(row);
+            }
+            String json = gson.toJson(safeEntries);
             web.evaluateJavascript("window.renderJehoRankings(" + JSONObjectQuote(json) + ")", null);
         });
         viewModel.getError().observe(this, error -> {
