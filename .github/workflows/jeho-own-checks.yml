@@ -13,6 +13,10 @@ on:
       - ".github/workflows/**"
   workflow_dispatch:
 
+concurrency:
+  group: jeho-checks-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
