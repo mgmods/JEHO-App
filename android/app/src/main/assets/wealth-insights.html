@@ -15,9 +15,19 @@ main{max-width:640px;padding:15px;padding-bottom:max(26px,env(safe-area-inset-bo
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:18px}.stat{min-width:0;padding:14px;border-radius:17px;background:#ffffff08;border:1px solid #ffffff0c}.statTop{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12px}.statIcon{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#f7d37e15;font-size:16px}.stat strong{display:block;font-size:21px;color:var(--gold);margin-top:9px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .infoRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}.infoRow:last-child{border-bottom:0}.infoLabel{font-size:13px;color:var(--muted)}.infoValue{font-size:13px;font-weight:750;overflow-wrap:anywhere;text-align:left;direction:ltr}
 .action{width:100%;margin-top:15px;padding:13px;border:1px solid #f7d37e45;border-radius:15px;background:#f7d37e14;color:#ffe7ae;font-weight:750}.status{text-align:center;color:var(--muted);font-size:13px;line-height:1.9;padding:20px 10px}
+.rank-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 0 12px;scrollbar-width:none}.rank-tabs::-webkit-scrollbar{display:none}
+.rank-chip{white-space:nowrap;padding:9px 13px;border-radius:15px;background:#ffffff0b;color:#d9d2ec;border:1px solid #ffffff12;font-size:12px;flex:0 0 auto}
+.rank-chip.active{background:linear-gradient(120deg,#f5d58a,#bd853d);color:#27162b;font-weight:800}
+.rank-podium{display:grid;grid-template-columns:1fr 1.12fr 1fr;gap:7px;align-items:end;margin:0 0 12px}.rank-podium:empty{display:none}
+.rank-card{min-width:0;text-align:center;padding:11px 5px;border-radius:16px;background:linear-gradient(180deg,#2a2444,#1a172c);border:1px solid #ffffff12}.rank-card.first{border-color:#e9c46b99;background:linear-gradient(180deg,#59452f,#29203d)}
+.rank-photo{width:52px;height:52px;display:block;margin:0 auto 7px;border-radius:50%;object-fit:cover;background:#383047;border:2px solid #eac36e}.rank-card.first .rank-photo{width:62px;height:62px}
+.rank-name{font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rank-score{font-size:11px;color:var(--gold);margin-top:6px}.rank-no{font-size:12px;color:var(--gold);margin-bottom:6px;font-weight:800}
+.rank-list{display:grid;gap:8px}.rank-row{display:flex;align-items:center;gap:10px;padding:11px;border-radius:15px;background:linear-gradient(110deg,#24203a,#1a172c);border:1px solid #ffffff0d;min-width:0}
+.rank-row .rank-photo{width:43px;height:43px;margin:0;flex-shrink:0}.rank-copy{min-width:0;flex:1}.rank-row .rank-name{text-align:right;font-size:13px}.rank-id{font-size:10px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rank-row .rank-score{font-size:12px;white-space:nowrap;font-weight:800}
+.rank-empty{color:var(--muted);text-align:center;padding:18px 8px;font-size:12px}
 </style></head>
 <body>
-<header><button class="back" aria-label="رجوع" onclick="goBack()">‹</button><div><h1>الثروة</h1><div class="sub">ملخص ثروتك وبيانات حسابك</div></div></header>
+<header><div><h1>الثروة</h1><div class="sub">إحصائيات الثروة وترتيب الحسابات الفعلية</div></div></header>
 <main>
 <section class="card">
  <div class="identity">
@@ -38,13 +48,25 @@ main{max-width:640px;padding:15px;padding-bottom:max(26px,env(safe-area-inset-bo
  <div class="infoRow"><span class="infoLabel">اسم المستخدم</span><span class="infoValue" id="username">—</span></div>
  <div class="infoRow"><span class="infoLabel">مستوى VIP</span><span class="infoValue" id="vipLevel">—</span></div>
 </section>
+<div class="sectionHead"><div><h2>ترتيب الثروة</h2><p>المتصدرون حسب بيانات الحسابات الفعلية، مع تقسيمات اليوم والأسبوع والشهر.</p></div></div>
+<section class="card" style="margin-top:0">
+ <nav class="rank-tabs" id="wealthPeriods" aria-label="فترة ترتيب الثروة">
+  <button class="rank-chip active" data-wealth-period="daily">اليوم</button>
+  <button class="rank-chip" data-wealth-period="weekly">هذا الأسبوع</button>
+  <button class="rank-chip" data-wealth-period="monthly">هذا الشهر</button>
+ </nav>
+ <div id="rankStatus" class="rank-empty">جارٍ تحميل ترتيب الثروة الفعلي…</div>
+ <div id="wealthPodium" class="rank-podium"></div>
+ <div id="wealthRankRows" class="rank-list"></div>
+ <button class="action" id="refreshRanking" onclick="refreshWealthRanking()">↻ تحديث ترتيب الثروة</button>
+</section>
 <div id="pageStatus" class="status" hidden></div>
 </main>
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){if(v==null||v==='')return '—';const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-US'):'—'}
 function safeImage(v){const s=String(v||'').trim();if(s.startsWith('https://')||s.startsWith('http://'))return s;if(s.startsWith('//'))return 'https:'+s;if(s.startsWith('/'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;if(s&&!s.includes(':'))return 'https://jeho-own-backend.mgs.blitz.cloud/'+s;return ''}
-function goBack(){if(window.JehoApp&&typeof JehoApp.goBack==='function')JehoApp.goBack()}
+// Back navigation is intentionally native-only; use the phone's system back button.
 function refreshWealthData(){const b=document.getElementById('refresh');b.disabled=true;b.textContent='جارٍ تحديث البيانات…';if(window.JehoApp&&typeof JehoApp.refreshData==='function')JehoApp.refreshData();else showWealthError()}
 function renderWealthData(d){
  const u=d&&d.user||{};
@@ -64,7 +86,39 @@ function renderWealthData(d){
  if(frame){const clean=frame.split('?')[0].toLowerCase();let el;if(/\.(mp4|webm|mov)$/.test(clean)){el=document.createElement('video');el.className='real-frame-video';el.autoplay=true;el.muted=true;el.loop=true;el.playsInline=true;el.preload='none';const source=document.createElement('source');source.src=frame;el.appendChild(source)}else{el=document.createElement('img');el.className='real-frame';el.alt='';el.onerror=()=>{el.hidden=true};el.src=frame}el.id='meFrame';el.setAttribute('aria-hidden','true');stack.appendChild(el);if(el.tagName==='VIDEO')el.play().catch(()=>{})}
  const b=document.getElementById('refresh');b.disabled=false;b.textContent='↻ تحديث بيانات الحساب';
  const s=document.getElementById('pageStatus');s.hidden=true;
+ renderWealthRanking(d&&Array.isArray(d.ranking)?d.ranking:[],!!(d&&d.rankingError));
+}
+function refreshWealthRanking(){
+ const b=document.getElementById('refreshRanking');if(b){b.disabled=true;b.textContent='جارٍ تحديث الترتيب…'}
+ if(window.JehoApp&&typeof window.JehoApp.loadWealthPeriod==='function')window.JehoApp.loadWealthPeriod(currentWealthPeriod);
+ else if(window.JehoApp&&typeof window.JehoApp.refreshData==='function')window.JehoApp.refreshData();
+ else showWealthError();
+}
+let currentWealthPeriod='daily';
+document.querySelectorAll('[data-wealth-period]').forEach(button=>button.addEventListener('click',()=>{
+ currentWealthPeriod=button.dataset.wealthPeriod;
+ document.querySelectorAll('[data-wealth-period]').forEach(item=>item.classList.toggle('active',item===button));
+ const status=document.getElementById('rankStatus');status.hidden=false;status.textContent='جارٍ تحميل ترتيب الثروة…';
+ document.getElementById('wealthPodium').innerHTML='';document.getElementById('wealthRankRows').innerHTML='';
+ if(window.JehoApp&&typeof window.JehoApp.loadWealthPeriod==='function')window.JehoApp.loadWealthPeriod(currentWealthPeriod);
+}));
+function renderWealthRanking(entries,failed){
+ const status=document.getElementById('rankStatus'),podium=document.getElementById('wealthPodium'),rows=document.getElementById('wealthRankRows'),refresh=document.getElementById('refreshRanking');
+ if(refresh){refresh.disabled=false;refresh.textContent='↻ تحديث ترتيب الثروة'}
+ const list=Array.isArray(entries)?entries:[];
+ if(!list.length){status.hidden=false;status.textContent=failed?'تعذّر تحميل ترتيب الثروة. اضغط تحديث ترتيب الثروة للمحاولة مجدداً.':'لا توجد نتائج ثروة فعلية متاحة لهذه الفترة حالياً.';podium.innerHTML='';rows.innerHTML='';return}
+ status.hidden=true;
+ const nameOf=e=>(e&&e.user&&(e.user.displayName||e.user.username))||e.targetName||'—';
+ const idOf=e=>(e&&e.user&&e.user.id)||e.userId||e.targetId||'';
+ const imageOf=e=>safeImage(e&&e.user&&e.user.avatarUrl);
+ const scoreOf=e=>num(e&&e.score);
+ const photo=e=>imageOf(e)?'<img class="rank-photo" loading="eager" decoding="async" alt="" src="'+esc(imageOf(e))+'">':'<span class="rank-photo" aria-hidden="true"></span>';
+ const card=(e)=>'<div class="rank-card'+(Number(e.rank)===1?' first':'')+'" '+(idOf(e)?'data-rank-user="'+esc(idOf(e))+'" role="button" tabindex="0"':'')+'><div class="rank-no">'+(Number(e.rank)===1?'♛ ':'#')+esc(e.rank==null?'—':e.rank)+'</div>'+photo(e)+'<div class="rank-name">'+esc(nameOf(e))+'</div><div class="rank-score">'+esc(scoreOf(e))+'</div></div>';
+ podium.innerHTML=list.slice(0,3).map(card).reverse().join('');
+ rows.innerHTML=list.slice(3).map(e=>'<div class="rank-row" '+(idOf(e)?'data-rank-user="'+esc(idOf(e))+'" role="button" tabindex="0"':'')+'><div class="rank-no">#'+esc(e.rank==null?'—':e.rank)+'</div>'+photo(e)+'<div class="rank-copy"><div class="rank-name">'+esc(nameOf(e))+'</div><div class="rank-id">'+esc(e.user&&e.user.username||(idOf(e)?'ID: '+idOf(e):'حساب JEHO'))+'</div></div><div class="rank-score">'+esc(scoreOf(e))+'</div></div>').join('');
+ [podium,rows].forEach(root=>root.querySelectorAll('[data-rank-user]').forEach(el=>{el.addEventListener('click',()=>{if(window.JehoApp&&typeof window.JehoApp.openUserProfile==='function')window.JehoApp.openUserProfile(el.dataset.rankUser)});el.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();if(window.JehoApp&&typeof window.JehoApp.openUserProfile==='function')window.JehoApp.openUserProfile(el.dataset.rankUser)}})}));
+ [podium,rows].forEach(root=>root.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{img.style.visibility='hidden'},{once:true})));
 }
 function showWealthError(){const b=document.getElementById('refresh');b.disabled=false;b.textContent='↻ إعادة المحاولة';const s=document.getElementById('pageStatus');s.hidden=false;s.textContent='تعذّر تحديث بيانات الحساب من الخادم. اضغط إعادة المحاولة.'}
-window.renderWealthData=renderWealthData;window.showWealthError=showWealthError;window.refreshWealthData=refreshWealthData;
+window.renderWealthData=renderWealthData;window.showWealthError=showWealthError;window.refreshWealthData=refreshWealthData;window.renderWealthRanking=renderWealthRanking;window.refreshWealthRanking=refreshWealthRanking;
 </script></body></html>
