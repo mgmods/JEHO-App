@@ -47,7 +47,7 @@ body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){return Number(v||0).toLocaleString('en-US')}
-function safeImage(v){const s=String(v||'');return /^https?:\\/\\//i.test(s)?s:''}
+function safeImage(v){const s=String(v||'');return /^https?:\/\//i.test(s)?s:''}
 function avatarHtml(url,cls,label){const src=safeImage(url);return src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>'}
 function renderCpData(d){
  const rel=d&&d.relationship,box=document.getElementById('relationship'),couple=document.getElementById('couple'),me=d&&d.user||{};
