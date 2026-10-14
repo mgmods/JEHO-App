@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="light">
+<title>مساحة CP</title>
+<style>
+:root{--ink:#442b35;--muted:#927783;--rose:#c94d78;--gold:#d8a64d;--paper:#fff9f6;--line:#f0dce4;--shadow:0 8px 24px #6b294d12}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(155deg,#fff9f3,#fff0f5 55%,#f8f0ff);font-family:system-ui,-apple-system,"Noto Sans Arabic",sans-serif;color:var(--ink);min-height:100vh}
+button,input{font:inherit}button{cursor:pointer;border:0;touch-action:manipulation}button:disabled{opacity:.55;cursor:default}
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top) + 10px) 16px 12px;background:#fffaf5f2;backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.iconbtn{width:42px;height:42px;border-radius:15px;background:#fbe8ef;color:var(--rose);font-size:24px;flex:none}.headtext{flex:1}.headtext h1{font-size:20px;margin:0;font-weight:850}.headtext p{margin:3px 0 0;color:var(--muted);font-size:12px}
+main{max-width:760px;margin:auto;padding:14px 14px 34px}.hero{border-radius:25px;padding:22px 18px;background:linear-gradient(120deg,#a82f65,#e46b8d 58%,#e8b967);color:#fff;box-shadow:var(--shadow);position:relative;overflow:hidden}.hero:after{content:"♡";position:absolute;left:12px;top:-30px;font-size:130px;opacity:.13}.hero h2{font-size:23px;margin:0 0 8px}.hero p{font-size:13px;line-height:1.8;margin:0;max-width:90%;opacity:.95}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.stat{background:#fff;border:1px solid var(--line);border-radius:17px;text-align:center;padding:12px 5px;box-shadow:var(--shadow)}.stat b{display:block;font-size:19px;color:var(--rose)}.stat span{font-size:11px;color:var(--muted)}
+.tabs{display:flex;gap:7px;overflow:auto;padding:3px 0 12px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.chip{white-space:nowrap;padding:10px 15px;border-radius:22px;background:#fff;border:1px solid var(--line);color:var(--ink);font-size:13px;font-weight:750}.chip.active{background:var(--rose);color:#fff;border-color:var(--rose)}
+.sectionhead{display:flex;align-items:center;justify-content:space-between;margin:16px 2px 10px}.sectionhead h3{font-size:17px;margin:0}.smallbtn{background:#f9e4ec;color:#a63260;padding:8px 12px;border-radius:13px;font-size:12px;font-weight:800}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px;margin:10px 0;box-shadow:var(--shadow)}.row{display:flex;align-items:center;gap:12px}.avatar{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#f6dce6;flex:none}.info{flex:1;min-width:0}.name{font-weight:850;font-size:14px;overflow-wrap:anywhere}.sub{font-size:12px;color:var(--muted);margin-top:4px}.badge{display:inline-block;background:#fff0d5;color:#96611c;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:800;margin-top:6px}.score{color:#a63260;font-weight:850;font-size:13px;white-space:nowrap}
+.actions{display:flex;gap:8px;margin-top:12px}.btn{border-radius:14px;padding:11px 13px;font-size:13px;font-weight:850;flex:1}.primary{background:linear-gradient(110deg,#bd3c70,#df648c);color:white}.secondary{background:#fbe8ef;color:#a63260}.danger{background:#fcebea;color:#ad3c38}.quiet{background:#f5f1f4;color:#76606c}
+form{display:flex;gap:8px;margin-top:12px}input{min-width:0;flex:1;padding:12px;border:1px solid #e9cdd9;border-radius:14px;background:#fff;color:var(--ink);outline:none}input:focus{border-color:var(--rose);box-shadow:0 0 0 3px #c94d781c}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.typecard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px 10px;text-align:center;box-shadow:var(--shadow);color:var(--ink)}.typecard .symbol{font-size:26px;display:block;margin-bottom:6px}.typecard strong{display:block;font-size:14px}.typecard small{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+.empty,.state{padding:28px 16px;text-align:center;color:var(--muted);line-height:1.9;background:#fff;border:1px dashed #eacbd7;border-radius:18px;font-size:13px}.hidden{display:none!important}.notice{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:14px;right:14px;z-index:20;max-width:620px;margin:auto;padding:14px 16px;border-radius:16px;background:#34202d;color:#fff;box-shadow:0 10px 35px #32101e40;font-size:13px}.request-actions{display:flex;gap:8px;margin-top:12px}.request-actions button{flex:1}
+@media(min-width:560px){main{padding:20px}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header><button class="iconbtn" id="back" aria-label="رجوع">‹</button><div class="headtext"><h1 id="pageTitle">مساحة CP</h1><p>العلاقات والطلبات والتواصل بين الطرفين</p></div><button class="iconbtn" id="refresh" aria-label="تحديث">↻</button></header>
+<main>
+<section class="hero"><h2 id="heroTitle">روابط تبنى بالقبول المتبادل ♡</h2><p id="heroText">اختر نوع العلاقة، أرسل طلباً مباشراً من دون هدية، وتابع الطلبات الواردة والمرسلة من مكان واحد.</p></section>
+<div class="stats"><div class="stat"><b id="activeCount">—</b><span>علاقاتك النشطة</span></div><div class="stat"><b id="incomingCount">—</b><span>طلبات واردة</span></div><div class="stat"><b id="sentCount">—</b><span>طلبات مرسلة</span></div></div>
+<nav class="tabs" aria-label="أقسام مساحة CP"><button class="chip active" data-view="home">الرئيسية</button><button class="chip" data-view="send">إرسال طلب</button><button class="chip" data-view="incoming">الطلبات الواردة</button><button class="chip" data-view="sent">الطلبات المرسلة</button><button class="chip" data-view="discover">العلاقات النشطة</button></nav>
+<section id="view-home">
+<div class="sectionhead"><h3>اختر نوع العلاقة</h3></div>
+<div class="grid">
+<button class="typecard" data-type="brotherhood"><span class="symbol">♛</span><strong>الأخوّة</strong><small>رابطة أخوية</small></button>
+<button class="typecard" data-type="friendship"><span class="symbol">✦</span><strong>الصداقة</strong><small>رابطة صداقة</small></button>
+<button class="typecard" data-type="love"><span class="symbol">♥</span><strong>علاقة حب</strong><small>رابطة عاطفية</small></button>
+<button class="typecard" data-type="engagement"><span class="symbol">💍</span><strong>الخطوبة</strong><small>طلب ارتباط رسمي</small></button>
+<button class="typecard" data-type="marriage"><span class="symbol">💞</span><strong>الزواج</strong><small>رابطة زواج</small></button>
+<button class="typecard" data-view="incoming"><span class="symbol">✉</span><strong>طلبات العلاقة</strong><small>قبول أو رفض</small></button>
+</div>
+<div class="sectionhead"><h3>علاقتك الحالية</h3><button class="smallbtn" data-view="discover">عرض الكل</button></div><div id="homeRelationships" class="state">جارٍ تحميل بياناتك…</div>
+</section>
+<section id="view-send" class="hidden">
+<div class="sectionhead"><h3>إرسال طلب ارتباط مباشر</h3></div><div class="panel"><div class="sub" style="font-size:13px;line-height:1.8">أدخل معرّف المستخدم المستهدف واختر نوع العلاقة. سيصل للطرف الآخر إشعار بطلبك ليقبله أو يرفضه. لا تحتاج لإرسال هدية.</div>
+<div class="tabs" id="sendTypes"><button class="chip active" data-send-type="love">الحب</button><button class="chip" data-send-type="marriage">الزواج</button><button class="chip" data-send-type="engagement">الخطوبة</button><button class="chip" data-send-type="friendship">الصداقة</button><button class="chip" data-send-type="brotherhood">الأخوّة</button></div>
+<form id="sendForm"><input id="recipientId" autocomplete="off" placeholder="معرّف المستخدم (ID)" required><button class="btn primary" type="submit" style="flex:0 0 auto">إرسال الطلب</button></form></div>
+</section>
+<section id="view-incoming" class="hidden"><div class="sectionhead"><h3>الطلبات الواردة</h3><button class="smallbtn" id="reloadIncoming">تحديث</button></div><div id="incomingList" class="state">جارٍ تحميل الطلبات…</div></section>
+<section id="view-sent" class="hidden"><div class="sectionhead"><h3>الطلبات المرسلة</h3><button class="smallbtn" id="reloadSent">تحديث</button></div><div id="sentList" class="state">جارٍ تحميل الطلبات…</div></section>
+<section id="view-discover" class="hidden"><div class="sectionhead"><h3>العلاقات النشطة</h3></div><div class="tabs" id="discoverTypes"><button class="chip active" data-discover-type="">الكل</button><button class="chip" data-discover-type="love">الحب</button><button class="chip" data-discover-type="marriage">الزواج</button><button class="chip" data-discover-type="engagement">الخطوبة</button><button class="chip" data-discover-type="friendship">الصداقة</button><button class="chip" data-discover-type="brotherhood">الأخوّة</button></div><div id="discoverList" class="state">جارٍ تحميل العلاقات…</div></section>
+<div id="globalState" class="state hidden" role="status"></div>
+</main><div id="notice" class="notice hidden" role="status"></div>
+<script>
+const TYPES={brotherhood:["الأخوّة","♛"],friendship:["الصداقة","✦"],love:["الحب","♥"],engagement:["الخطوبة","💍"],marriage:["الزواج","💞"]};
+let currentView="home",sendType="love",discoverType="",homeData=[],incomingData=[],sentData=[],activeData=[];
+const $=id=>document.getElementById(id);
+function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function label(t){return TYPES[t]?.[0]||"علاقة CP";}
+function personName(u){return u?.displayName||u?.username||"عضو";}
+function avatar(u){return u?.avatarUrl?'<img class="avatar" src="'+esc(u.avatarUrl)+'" alt="">':'<div class="avatar"></div>';}
+function safeStatus(s){return ({pending:"بانتظار الرد",accepted:"تم القبول",rejected:"مرفوض",expired:"انتهت المهلة",cancelled:"ملغي"})[s]||s||"—";}
+function toast(msg){const n=$("notice");n.textContent=msg;n.classList.remove("hidden");clearTimeout(toast.timer);toast.timer=setTimeout(()=>n.classList.add("hidden"),3600);}
+function showView(view){if(!["home","send","incoming","sent","discover"].includes(view))view="home";currentView=view;document.querySelectorAll("[id^=view-]").forEach(s=>s.classList.toggle("hidden",s.id!=="view-"+view));document.querySelectorAll("[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));document.querySelectorAll(".chip[data-view]").forEach(b=>b.classList.toggle("active",b.dataset.view===view));if(view==="incoming"||view==="sent")JehoCP.loadRequests();if(view==="discover")JehoCP.loadDiscover(discoverType);if(view==="home")JehoCP.loadHome();}
+function relationshipCard(r){const a=r.userA||{},b=r.userB||{},type=r.type;return '<article class="panel"><div class="row">'+avatar(a)+'<div class="info"><div class="name">'+esc(personName(a))+' ♥ '+esc(personName(b))+'</div><div class="sub">'+esc(label(type))+' · المستوى '+esc(r.level||1)+'</div><span class="badge">رابطة نشطة</span></div><div class="score">'+esc(Number(r.points||0).toLocaleString("ar"))+' نقطة</div></div></article>';}
+function homeRelationships(rows){homeData=Array.isArray(rows)?rows:[];$("activeCount").textContent=homeData.filter(x=>x.status==="active"||x.userA||x.partner).length.toLocaleString("ar");const active=homeData.filter(x=>x.status==="active"||x.userA||x.partner);$("homeRelationships").className=active.length?"":"state";$("homeRelationships").innerHTML=active.length?active.slice(0,5).map(r=>{if(r.partner){const p=r.partner;return '<article class="panel"><div class="row">'+avatar(p)+'<div class="info"><div class="name">'+esc(personName(p))+'</div><div class="sub">'+esc(label(r.type))+' · المستوى '+esc(r.level||1)+' · '+esc(Number(r.points||0).toLocaleString("ar"))+' نقطة</div></div><button class="smallbtn" onclick="JehoCP.openProfile(\''+esc(p.id)+'\')">الملف</button></div><div class="actions"><button class="btn danger" onclick="confirmEnd(\''+esc(r.id)+'\')">إنهاء العلاقة</button></div></article>';}return relationshipCard(r);}).join(""):'<div class="state">ما عندك علاقة نشطة حالياً. اختَر النوع وأرسل طلباً للطرف الآخر.</div>'; }
+function confirmEnd(id){if(confirm("هل تريد إنهاء العلاقة؟"))JehoCP.endRelationship(id);}
+function renderRequests(incoming,sent){incomingData=Array.isArray(incoming)?incoming:[];sentData=Array.isArray(sent)?sent:[];$("incomingCount").textContent=incomingData.length.toLocaleString("ar");$("sentCount").textContent=sentData.filter(r=>r.status==="pending").length.toLocaleString("ar");$("incomingList").className=incomingData.length?"":"state";$("incomingList").innerHTML=incomingData.length?incomingData.map(r=>{const u=r.sender||{};return '<article class="panel"><div class="row">'+avatar(u)+'<div class="info"><div class="name">'+esc(personName(u))+'</div><div class="sub">طلب '+esc(label(r.type))+' · '+esc(safeStatus(r.status))+'</div><span class="badge">طلب مباشر · دون هدية</span></div></div><div class="request-actions"><button class="btn primary" onclick="JehoCP.respondRequest(\''+esc(r.id)+'\',true)">قبول العلاقة</button><button class="btn danger" onclick="JehoCP.respondRequest(\''+esc(r.id)+'\',false)">رفض</button></div></article>';}).join(""):'<div class="state">لا توجد طلبات واردة معلّقة.</div>';$("sentList").className=sentData.length?"":"state";$("sentList").innerHTML=sentData.length?sentData.map(r=>{const u=r.recipient||{};return '<article class="panel"><div class="row">'+avatar(u)+'<div class="info"><div class="name">'+esc(personName(u))+'</div><div class="sub">'+esc(label(r.type))+' · '+esc(safeStatus(r.status))+'</div></div></div>'+(r.status==="pending"?'<div class="actions"><button class="btn secondary" onclick="JehoCP.cancelRequest(\''+esc(r.id)+'\')">إلغاء الطلب</button></div>':"")+'</article>';}).join(""):'<div class="state">لم ترسل طلبات بعد.</div>';}
+function renderDiscover(rows){activeData=Array.isArray(rows)?rows:[];$("discoverList").className=activeData.length?"":"state";$("discoverList").innerHTML=activeData.length?activeData.map(relationshipCard).join(""):'<div class="state">لا توجد علاقات نشطة في هذا القسم بعد.</div>';}
+window.renderCpHome=homeRelationships;window.renderCpRequests=renderRequests;window.renderCpDiscover=renderDiscover;
+window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
+document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+document.querySelectorAll("[data-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.type;document.querySelectorAll("[data-send-type]").forEach(x=>x.classList.toggle("active",x.dataset.sendType===sendType));showView("send");}));
+document.querySelectorAll("[data-send-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.sendType;document.querySelectorAll("[data-send-type]").forEach(x=>x.classList.toggle("active",x===b));}));
+document.querySelectorAll("[data-discover-type]").forEach(b=>b.addEventListener("click",()=>{discoverType=b.dataset.discoverType;document.querySelectorAll("[data-discover-type]").forEach(x=>x.classList.toggle("active",x===b));JehoCP.loadDiscover(discoverType);}));
+$("sendForm").addEventListener("submit",e=>{e.preventDefault();const id=$("recipientId").value.trim();if(!id){toast("أدخل معرّف المستخدم أولاً");return;}JehoCP.sendRequest(id,sendType);});
+$("back").addEventListener("click",()=>JehoCP.back());$("refresh").addEventListener("click",()=>{if(currentView==="incoming"||currentView==="sent")JehoCP.loadRequests();else if(currentView==="discover")JehoCP.loadDiscover(discoverType);else JehoCP.loadHome();});
+$("reloadIncoming").addEventListener("click",()=>JehoCP.loadRequests());$("reloadSent").addEventListener("click",()=>JehoCP.loadRequests());
+window.setCpView=(view,type)=>{if(TYPES[type]){sendType=type;document.querySelectorAll("[data-send-type]").forEach(b=>b.classList.toggle("active",b.dataset.sendType===type));}showView(view||"home");};
+window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}});
+</script></body></html>
