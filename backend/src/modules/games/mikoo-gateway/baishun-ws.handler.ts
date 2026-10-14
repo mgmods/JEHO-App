@@ -6,7 +6,7 @@ import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds, getGameWinRate, isGameEnabled } from '../game-odds-runtime';
+import { getGameOdds, getGameRtp, getGameWinRate, isGameEnabled } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -1047,7 +1047,7 @@ export class BaishunWsHandler {
 
       const p = pIn || (await ensurePlayer());
       // Same house RTP as other multi-area boards (dashboard playerRtp).
-      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameOdds().playerRtp);
+      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameRtp('greedy-lion') ?? getGameOdds().playerRtp);
       const odds = GREEDY_LION_ODDS[winner] || 2;
       const stakeOnWin = greedyAreaBets[winner] || 0;
       let win = Math.floor(stakeOnWin * odds);
