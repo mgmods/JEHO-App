@@ -1,6 +1,10 @@
 package com.Dramizo.Series.presentation.home;
 
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.widget.Toast;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -161,6 +165,19 @@ public class HomeMeFragment extends Fragment {
 
         binding.imgProfileAvatar.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
+        binding.btnCopyProfileId.setOnClickListener(v -> {
+            AuthDtos.UserDto current = ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+            String id = current != null ? current.displayPublicId() : "";
+            if (id == null || id.trim().isEmpty()) {
+                Toast.makeText(requireContext(), "المعرف غير متاح", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("JEHO ID", id));
+                Toast.makeText(requireContext(), "تم نسخ ID", Toast.LENGTH_SHORT).show();
+            }
+        });
         binding.tvProfileName.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
         binding.btnProfileSettings.setOnClickListener(v ->
