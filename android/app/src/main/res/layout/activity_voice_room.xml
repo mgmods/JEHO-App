@@ -1500,6 +1500,7 @@
             android:id="@+id/btnRoomSideMusic"
             android:layout_width="34dp"
             android:layout_height="34dp"
+            android:translationY="-2dp"
             android:contentDescription="الموسيقى"
             android:padding="1dp"
             android:scaleType="fitCenter"
