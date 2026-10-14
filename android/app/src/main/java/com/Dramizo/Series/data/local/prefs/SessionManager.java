@@ -90,6 +90,9 @@ public class SessionManager {
 
     public void updateCachedUser(AuthDtos.UserDto user) {
         if (user == null) return;
+        String identifier = user.username != null ? user.username
+                : (user.email != null ? user.email : user.publicId);
+        user = restoreSavedAccountProfile(user, identifier);
         prefs.edit()
                 .putString("user_json", gson.toJson(user))
                 .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
