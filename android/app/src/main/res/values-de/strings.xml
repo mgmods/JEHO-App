@@ -708,7 +708,7 @@
 <string name="support_invalid_whatsapp">Ungültige WhatsApp-Nummer</string>
 <string name="support_open_failed">Dieser Kanal konnte nicht geöffnet werden</string>
 <string name="level_number">Level %1$d</string>
-<string name="level_xp_progress">%,d / %,d XP</string>
+<string name="level_xp_progress">%1$,d / %2$,d XP</string>
 <string name="level_xp_remaining">%1$,d XP zum nächsten Level</string>
 <string name="level_xp_hint">Fahren Sie fort, um den nächsten Rang freizuschalten</string>
 <string name="level_how_title">So verdienen Sie XP</string>
