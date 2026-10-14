@@ -47,6 +47,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         settings.setDomStorageEnabled(false);
         settings.setLoadsImagesAutomatically(true);
         settings.setBlockNetworkImage(false);
+        settings.setBlockNetworkLoads(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
@@ -124,6 +125,9 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
     }
 
     private final class RankingBridge {
+        @JavascriptInterface public String resolveImageUrl(String pathOrUrl) {
+            return webImageUrl(pathOrUrl);
+        }
         @JavascriptInterface public void load(String nextPeriod, String nextCategory) {
             runOnUiThread(() -> {
                 period = safePeriod(nextPeriod);
