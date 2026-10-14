@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppSetting } from '../../database/entities/app-setting.entity';
@@ -13,8 +13,9 @@ import {
 import { setGameOdds } from './game-odds-runtime';
 
 @Injectable()
-export class GameOddsSettingsService implements OnModuleInit {
+export class GameOddsSettingsService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(GameOddsSettingsService.name);
+  private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(
     @InjectRepository(AppSetting)
@@ -32,6 +33,15 @@ export class GameOddsSettingsService implements OnModuleInit {
       );
       setGameOdds(DEFAULT_GAME_ODDS);
     }
+    // Keep each running backend instance in sync with dashboard changes stored in AppSetting.
+    this.refreshTimer = setInterval(() => {
+      void this.reload().catch((e) => this.log.warn(`game settings refresh failed: ${e instanceof Error ? e.message : String(e)}`));
+    }, 5000);
+    this.refreshTimer.unref?.();
+  }
+
+  onModuleDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
   async reload(): Promise<GameOddsConfig> {
