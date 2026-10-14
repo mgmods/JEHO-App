@@ -32,14 +32,20 @@ import java.util.Map;
 
 /** HTML presentation backed only by authenticated app API responses. */
 public final class ProfileInsightsActivity extends ThemedActivity {
+    public static final String EXTRA_MODE = "profile_insights_mode";
+    public static final String MODE_CP = "cp";
+    public static final String MODE_WEALTH = "wealth";
     private WebView webView;
     private AppContainer container;
     private boolean pageReady;
+    private String mode = MODE_WEALTH;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         container = ContainerProvider.from(this);
+        String requestedMode = getIntent().getStringExtra(EXTRA_MODE);
+        mode = MODE_CP.equals(requestedMode) ? MODE_CP : MODE_WEALTH;
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.rgb(16, 16, 32));
         webView = new WebView(this);
@@ -66,7 +72,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
-        webView.loadUrl("file:///android_asset/profile-insights.html");
+        webView.loadUrl("file:///android_asset/" + (MODE_CP.equals(mode) ? "cp-insights.html" : "wealth-insights.html"));
     }
 
     @Override protected boolean wantsContentSystemPadding() { return false; }
@@ -134,8 +140,10 @@ public final class ProfileInsightsActivity extends ThemedActivity {
             final String json = payload.toString();
             runOnUiThread(() -> {
                 if (webView == null || isFinishing()) return;
-                webView.evaluateJavascript("window.renderData && window.renderData(" + json + ");", null);
-                if (!userResult.success) webView.evaluateJavascript("window.showError && window.showError();", null);
+                String renderFunction = MODE_CP.equals(mode) ? "renderCpData" : "renderWealthData";
+                String errorFunction = MODE_CP.equals(mode) ? "showCpError" : "showWealthError";
+                webView.evaluateJavascript("window." + renderFunction + " && window." + renderFunction + "(" + json + ");", null);
+                if (!userResult.success) webView.evaluateJavascript("window." + errorFunction + " && window." + errorFunction + "();", null);
             });
         });
     }
