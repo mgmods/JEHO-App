@@ -1331,22 +1331,24 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@android:color/transparent"
-        android:elevation="28dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="32dp"
         android:gravity="center_vertical"
         android:layoutDirection="ltr"
-        android:minHeight="56dp"
+        android:minHeight="60dp"
         android:orientation="horizontal"
         android:paddingHorizontal="4dp"
         android:paddingVertical="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintLeft_toRightOf="@id/roomSideShortcuts">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/roomSideShortcuts">
 
         <!-- Messages, stickers, gifts, mic, then the text composer. -->
         <FrameLayout
             android:id="@+id/btnPrivateMsg"
-            android:layout_width="30dp"
-            android:layout_height="36dp"
+            android:layout_width="34dp"
+            android:layout_height="40dp"
             android:layout_marginStart="1dp"
             android:visibility="visible"
             android:background="@android:color/transparent"
@@ -1382,8 +1384,8 @@
 
         <FrameLayout
             android:id="@+id/btnGift"
-            android:layout_width="32dp"
-            android:layout_height="36dp"
+            android:layout_width="36dp"
+            android:layout_height="40dp"
             android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/send_gift"
