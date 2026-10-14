@@ -277,7 +277,12 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         @JavascriptInterface public void refreshData() { runOnUiThread(ProfileInsightsActivity.this::loadLiveData); }
         @JavascriptInterface public void goBack() { runOnUiThread(ProfileInsightsActivity.this::finish); }
         @JavascriptInterface public void openWealthRanking() {
-            runOnUiThread(() -> loadLiveData(wealthPeriod));
+            runOnUiThread(() -> {
+                if (MODE_WEALTH.equals(mode) && !destroyed) {
+                    startActivity(new Intent(ProfileInsightsActivity.this,
+                            com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.class));
+                }
+            });
         }
         @JavascriptInterface public void loadWealthPeriod(String period) {
             if (!"daily".equals(period) && !"weekly".equals(period) && !"monthly".equals(period)) return;
