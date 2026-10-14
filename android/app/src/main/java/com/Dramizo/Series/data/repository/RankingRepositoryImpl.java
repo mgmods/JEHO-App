@@ -17,7 +17,7 @@ public class RankingRepositoryImpl implements RankingRepository {
     public Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> list(String period, String type) {
         String category = mapCategory(type);
         String p = period == null || period.isEmpty() ? "daily" : period;
-        return ApiCall.execute(api.list(p, category, 50));
+        return ApiCall.execute(api.list(p, category, 200));
     }
 
     private static String mapCategory(String type) {
