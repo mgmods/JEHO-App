@@ -132,6 +132,7 @@ const sections = computed(() => [
     label: t('nav.memberships'),
     items: [
       { name: 'vip', icon: 'bi-diamond', label: t('nav.vip') },
+      { name: 'badges', icon: 'bi-award', label: 'الشارات' },
       { name: 'vanity-ids', icon: 'bi-hash', label: t('nav.vanityIds') },
       { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
       { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
