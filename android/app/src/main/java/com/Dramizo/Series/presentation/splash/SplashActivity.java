@@ -232,7 +232,15 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void forceLeaveSplash() {
-        if (navigated || isFinishing() || splashAdShowing) return;
+        if (navigated || isFinishing()) return;
+        // A configured ad can take time to download, but must never trap startup.
+        // If its image has not arrived by the deadline, leave the splash normally.
+        if (splashAdShowing) {
+            if (splashAdImage == null || splashAdImage.getDrawable() == null) {
+                finishSplashAd(false);
+            }
+            return;
+        }
         splashDecisionResolved = true;
         if (sessionPrepared) {
             continueStartupNavigation();
