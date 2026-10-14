@@ -89,6 +89,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         setContentView(root);
         // Keep the HTML page inside the Android status/navigation safe areas.
         // Navigation is handled by the native device back gesture/button.
+        EdgeToEdgeHelper.apply(this);
         EdgeToEdgeHelper.padSystemBars(root);
         webView.loadUrl("file:///android_asset/" + (MODE_CP.equals(mode) ? "cp-insights.html" : "wealth-insights.html"));
     }
