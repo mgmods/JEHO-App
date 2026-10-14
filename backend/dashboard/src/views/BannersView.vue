@@ -255,7 +255,9 @@ async function onSplashFile(event) {
     if (!url) throw new Error('تم الرفع دون الحصول على رابط الصورة')
     const accessibleUrl = splashAssetAbsUrl(url)
     await verifySplashImage(accessibleUrl)
-    splashImageUrl.value = url
+    // Persist the absolute URL that the Android app can request directly.
+    // The upload API may return a relative path (with or without a leading slash).
+    splashImageUrl.value = accessibleUrl
     splashPreviewUrl.value = URL.createObjectURL(file)
     splashError.value = false
     splashMessage.value = 'تم رفع الصورة والتحقق من إمكانية الوصول إليها. اضغط «حفظ إعلان التشغيل» للنشر.'
