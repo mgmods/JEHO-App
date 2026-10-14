@@ -136,6 +136,24 @@
                             android:textSize="11sp"
                             android:textStyle="bold" />
 
+                        <ImageView
+                            android:id="@+id/imgProfileLevelBadge"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginStart="4dp"
+                            android:contentDescription="شارة المستوى"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <ImageView
+                            android:id="@+id/imgProfileVipBadge"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_marginStart="4dp"
+                            android:contentDescription="شارة VIP"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
                         <TextView
                             android:id="@+id/tvProfileRoleBadge"
                             android:layout_width="wrap_content"
@@ -156,6 +174,8 @@
                             android:layout_height="24dp"
                             android:layout_marginStart="5dp"
                             android:background="@drawable/bg_profile_lux_chip"
+                            android:clickable="true"
+                            android:focusable="true"
                             android:gravity="center"
                             android:paddingHorizontal="8dp"
                             android:text="🏅 الميداليات"
