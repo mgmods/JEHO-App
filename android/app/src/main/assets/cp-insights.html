@@ -6,13 +6,65 @@
 header{display:flex;align-items:center;gap:12px;padding:16px;background:#160f22dd;border-bottom:1px solid #ffffff14;position:sticky;top:0;z-index:2;backdrop-filter:blur(12px)}button{font:inherit;cursor:pointer}.back{width:42px;height:42px;border:1px solid #ffffff1a;border-radius:14px;color:#fff;background:#ffffff10;font-size:24px}h1{font-size:19px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:3px}
 main{max-width:620px;padding:18px;margin:auto}.hero{text-align:center;padding:22px 16px 18px;border-radius:26px;background:linear-gradient(145deg,#6b315c,#2a2045 72%);border:1px solid #f7b8d52b;box-shadow:0 16px 36px #0003}.heart{font-size:42px;color:#ff7eb4;display:inline-block;animation:pulse 1.15s ease-in-out infinite;filter:drop-shadow(0 0 12px #ff6caa70)}@keyframes pulse{0%,100%{transform:scale(.9)}50%{transform:scale(1.14)}}.hero h2{font-size:20px;margin:8px 0 5px}.hero p{font-size:12px;color:#f3dbea;margin:0}
 .card{margin-top:14px;padding:17px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(150deg,#29213d,#1a182d);box-shadow:0 12px 28px #0002}.person{display:flex;align-items:center;gap:13px}.avatar{width:78px;height:78px;object-fit:cover;border-radius:24px;background:#383047;border:2px solid #f4b5d5}.personInfo{min-width:0;flex:1}.name{font-size:17px;font-weight:800;overflow-wrap:anywhere}.meta{font-size:12px;color:var(--muted);margin-top:5px}.pill{display:inline-block;color:#ffd4e6;background:#ff6caa18;border:1px solid #ff6caa44;padding:5px 9px;border-radius:30px;font-size:11px;margin-top:8px}.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.stat{padding:13px;border-radius:16px;background:#ffffff08;border:1px solid #ffffff0c}.stat label{display:block;font-size:11px;color:var(--muted)}.stat strong{display:block;font-size:19px;color:var(--gold);margin-top:5px;overflow-wrap:anywhere}.action{width:100%;margin-top:14px;padding:13px;border:1px solid #ff9bc64d;border-radius:15px;background:#ff6caa16;color:#ffd5e8;font-weight:750}.empty,.status{text-align:center;color:var(--muted);font-size:13px;line-height:1.9;padding:22px 10px}.note{text-align:center;color:#8c819f;font-size:11px;padding:20px}
+
+/* CP-only relationship styling: intentionally distinct from the gold wealth page. */
+:root{--line:#70405e;--pink:#ff79b7;--rose:#ffc1dc;--lilac:#c6a5ff;--muted:#c4b1c9}
+body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1c 100%)}
+.hero{position:relative;overflow:hidden;background:linear-gradient(145deg,#783957 0%,#432b55 54%,#282044 100%);border-color:#ffc0df40;border-radius:28px}
+.couple{display:flex;align-items:center;justify-content:center;gap:10px;margin:18px auto 14px;direction:rtl;position:relative}
+.couple-person{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;width:35%}
+.couple-avatar{display:block;object-fit:cover;background:#392a46;border-radius:23px;border:2px solid #ffd0e4;box-shadow:0 8px 20px #120a1c66}
+.couple-avatar.me{width:76px;height:76px;border-radius:25px;border-color:#ffe0a0;box-shadow:0 0 0 4px #ffe0a01a,0 8px 20px #120a1c66}
+.couple-avatar.partner{width:62px;height:62px;border-radius:21px;border-color:#ffacd0}
+.couple-placeholder{display:grid;place-items:center;color:#d9bddb;background:linear-gradient(145deg,#4a3554,#2b213b);font-size:23px}
+.couple-name{max-width:100%;font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.couple-caption{font-size:10px;color:#e8c9dc}
+.heart-wrap{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:48px;height:54px;position:relative}
+.heart{font-size:35px;line-height:1;color:#ff7eb8;display:inline-block;animation:heartBeat 1.15s ease-in-out infinite;filter:drop-shadow(0 0 12px #ff5fa888)}
+.heart-wrap:after{content:"";position:absolute;width:42px;height:42px;border:1px solid #ffb4d733;border-radius:50%;animation:heartRing 2.2s ease-out infinite}
+@keyframes heartBeat{0%,100%{transform:scale(.9)}14%{transform:scale(1.14)}28%{transform:scale(.98)}42%{transform:scale(1.1)}}
+@keyframes heartRing{0%{transform:scale(.55);opacity:.7}100%{transform:scale(1.45);opacity:0}}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:13px}
+.stats{gap:10px}.stat{background:linear-gradient(145deg,#ffffff0b,#ff91c009);border-color:#ffffff10}.stat strong{color:var(--rose)}
+.partner-meta{display:flex;align-items:center;gap:10px;padding:12px;border-radius:17px;background:#ff91c00a;border:1px solid #ffb4d31c;margin-bottom:13px}
+.mini-avatar{width:43px;height:43px;border-radius:15px;object-fit:cover;background:#392a46;border:1px solid #ffb4d377;flex-shrink:0}
+.partner-meta-info{min-width:0;flex:1}.partner-meta-name{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.action{border-color:#ff9bc64d;background:linear-gradient(100deg,#ff79b71c,#c6a5ff12);color:#ffe0ee}
+@media(max-width:360px){main{padding:12px}.hero{padding:18px 10px}.couple{gap:5px}.couple-avatar.me{width:68px;height:68px}.couple-avatar.partner{width:56px;height:56px}.heart-wrap{width:39px}.heart{font-size:30px}.couple-name{font-size:12px}}
+
 </style></head><body>
 <header><button class="back" onclick="JehoApp.goBack()" aria-label="رجوع">‹</button><div><h1>علاقة CP</h1><div class="sub">بيانات العلاقة الفعلية المرتبطة بحسابك</div></div></header>
-<main><section class="hero"><div class="heart">♥</div><h2 id="heroTitle">رابطك الخاص</h2><p id="heroSubtitle">المعلومات تُحمّل من حساب JEHO الحقيقي</p></section><section id="relationship" class="card"><div class="status">جارٍ تحميل بيانات العلاقة…</div></section><div class="note">تُعرض بيانات الشريك الفعلية فقط. لا تُنشأ أسماء أو صور بديلة.</div></main>
+<main>
+<section class="hero">
+  <div class="eyebrow">♡ رابطكما في JEHO</div>
+  <div class="couple" id="couple"><div class="status">جارٍ تحميل بيانات العلاقة…</div></div>
+  <h2 id="heroTitle">رابطك الخاص</h2>
+  <p id="heroSubtitle">تظهر هنا العلاقة الفعّالة المرتبطة بحسابك</p>
+</section>
+<section id="relationship" class="card"><div class="status">جارٍ تحميل بيانات العلاقة…</div></section>
+<div class="note">نعرض الاسم والصورة والمستوى والنقاط من بيانات الحساب والخادم فقط، ولا ننشئ بيانات شريك افتراضية.</div>
+</main>
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){return Number(v||0).toLocaleString('en-US')}
-function renderCpData(d){const rel=d&&d.relationship,box=document.getElementById('relationship');if(!rel||!rel.partner){document.getElementById('heroTitle').textContent='لا توجد علاقة فعّالة';document.getElementById('heroSubtitle').textContent='عند قبول علاقة CP ستظهر بياناتها هنا';box.innerHTML='<div class="empty">لا توجد علاقة CP فعّالة مرتبطة بحسابك حاليًا.</div><button class="action" onclick="JehoApp.openCpCenter()">اكتشاف علاقة CP</button>';return}const p=rel.partner;const name=p.displayName||p.username||'';document.getElementById('heroTitle').textContent=name?'أنت و'+name:'علاقة CP فعّالة';document.getElementById('heroSubtitle').textContent=rel.typeLabel||rel.type||'علاقة CP';const avatar=p.avatarUrl?'<img class="avatar" src="'+esc(p.avatarUrl)+'" alt="صورة الشريك" referrerpolicy="no-referrer">':'';box.innerHTML='<div class="person">'+avatar+'<div class="personInfo"><div class="name">'+esc(name||'اسم غير متوفر في بيانات الخادم')+'</div><div class="meta">مستوى الشريك: '+esc(p.level==null?'—':num(p.level))+' · VIP: '+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</div><span class="pill">♥ '+esc(rel.typeLabel||rel.type||'علاقة CP')+'</span></div></div><div class="stats"><div class="stat"><label>مستوى العلاقة</label><strong>'+esc(rel.level==null?'—':num(rel.level))+'</strong></div><div class="stat"><label>نقاط العلاقة</label><strong>'+esc(rel.points==null?'—':num(rel.points))+'</strong></div><div class="stat"><label>مستوى الشريك</label><strong>'+esc(p.level==null?'—':num(p.level))+'</strong></div><div class="stat"><label>VIP الشريك</label><strong>'+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</strong></div></div><button class="action" onclick="JehoApp.openCpCenter()">إدارة علاقة CP</button>'}
+function safeImage(v){const s=String(v||'');return /^https?:\\/\\//i.test(s)?s:''}
+function avatarHtml(url,cls,label){const src=safeImage(url);return src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>'}
+function renderCpData(d){
+ const rel=d&&d.relationship,box=document.getElementById('relationship'),couple=document.getElementById('couple'),me=d&&d.user||{};
+ if(!rel||!rel.partner){
+  document.getElementById('heroTitle').textContent='لا توجد علاقة فعّالة';
+  document.getElementById('heroSubtitle').textContent='عند وجود علاقة CP فعّالة ستظهر بياناتها هنا';
+  couple.innerHTML='<div class="empty">لا توجد علاقة حالية</div>';
+  box.innerHTML='<div class="empty">لا توجد علاقة CP فعّالة مرتبطة بحسابك حاليًا.</div><button class="action" onclick="JehoApp.openCpCenter()">اكتشاف علاقة CP</button>';
+  return;
+ }
+ const p=rel.partner,name=p.displayName||p.username||'',myName=me.displayName||me.username||'أنت',type=rel.typeLabel||rel.type||'علاقة CP';
+ couple.innerHTML='<div class="couple-person">'+avatarHtml(me.avatarUrl,'me','صورتك')+'<div class="couple-name">'+esc(myName)+'</div><div class="couple-caption">أنت</div></div><div class="heart-wrap"><span class="heart" aria-label="قلب متحرك">♥</span></div><div class="couple-person">'+avatarHtml(p.avatarUrl,'partner','صورة الشريك')+'<div class="couple-name">'+esc(name||'اسم غير متوفر')+'</div><div class="couple-caption">الشريك</div></div>';
+ document.getElementById('heroTitle').textContent=name?'أنت و'+name:'علاقة CP فعّالة';
+ document.getElementById('heroSubtitle').textContent=type+' · رابط يجمعكما';
+ const partnerImage=safeImage(p.avatarUrl),mini=partnerImage?'<img class="mini-avatar" src="'+esc(partnerImage)+'" alt="" referrerpolicy="no-referrer">':'<div class="mini-avatar couple-placeholder">♡</div>';
+ box.innerHTML='<div class="card-head"><h3>تفاصيل العلاقة</h3><span class="pill">♥ '+esc(type)+'</span></div><div class="partner-meta">'+mini+'<div class="partner-meta-info"><div class="partner-meta-name">'+esc(name||'اسم غير متوفر في بيانات الخادم')+'</div><div class="meta">مستوى الشريك: '+esc(p.level==null?'—':num(p.level))+' · VIP: '+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</div></div></div><div class="stats"><div class="stat"><label>مستوى العلاقة</label><strong>'+esc(rel.level==null?'—':num(rel.level))+'</strong><small>المستوى الحالي</small></div><div class="stat"><label>نقاط العلاقة</label><strong>'+esc(rel.points==null?'—':num(rel.points))+'</strong><small>النقاط المسجلة فعليًا</small></div><div class="stat"><label>مستوى الشريك</label><strong>'+esc(p.level==null?'—':num(p.level))+'</strong><small>من ملف الشريك</small></div><div class="stat"><label>مستوى VIP</label><strong>'+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</strong><small>من ملف الشريك</small></div></div><button class="action" onclick="JehoApp.openCpCenter()">إدارة علاقة CP ←</button>';
+}
 function showCpError(){document.getElementById('relationship').innerHTML='<div class="empty">تعذّر تحميل البيانات الآن. تحقق من اتصال التطبيق ثم أعد المحاولة.</div><button class="action" onclick="JehoApp.refreshData()">إعادة المحاولة</button>'}
 window.renderCpData=renderCpData;window.showCpError=showCpError;if(window.JehoApp)JehoApp.refreshData();
 </script></body></html>
