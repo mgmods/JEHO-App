@@ -2183,17 +2183,44 @@ export class AdminService {
       if (!admin.isActive || !(await bcrypt.compare(password, admin.passwordHash))) {
         throw new UnauthorizedException('Invalid admin credentials');
       }
-      // Older dashboard owners may have role='super' while staffRole still
-      // carries its legacy default ('operator'). Treat either authoritative
-      // Super marker as full access; only limited admins require module grants.
-      const isSuperAdmin =
+
+      // Repair an older dashboard copy only when its linked legacy account
+      // independently proves Super Admin status with the same password.
+      // This is additive and does not alter any user, wallet, or room data.
+      let isSuperAdmin =
         admin.role === AdminRole.SUPER ||
         normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
-      if (!isSuperAdmin) {
-        const perms = normalizePermissions(admin.dashboardPermissions);
-        if (!hasAnyPermission(perms)) {
-          throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
+      let perms = normalizePermissions(admin.dashboardPermissions);
+      if (!isSuperAdmin && !hasAnyPermission(perms)) {
+        const legacyQuery = this.usersRepo
+          .createQueryBuilder('u')
+          .addSelect('u.passwordHash');
+        if (admin.linkedUserId) {
+          legacyQuery.where('u.id = :linkedUserId', { linkedUserId: admin.linkedUserId });
+        } else {
+          legacyQuery.where(
+            '(LOWER(u.email) = :identifier OR LOWER(u.username) = :identifier)',
+            { identifier },
+          );
         }
+        const legacy = await legacyQuery.getOne();
+        if (
+          legacy &&
+          legacy.passwordHash &&
+          isDashboardSuper(legacy) &&
+          (await bcrypt.compare(password, legacy.passwordHash))
+        ) {
+          admin.role = AdminRole.SUPER;
+          admin.staffRole = 'super';
+          admin.dashboardPermissions = fullPermissions() as Record<string, string>;
+          await this.adminUsersRepo.save(admin);
+          isSuperAdmin = true;
+          perms = normalizePermissions(admin.dashboardPermissions);
+        }
+      }
+
+      if (!isSuperAdmin && !hasAnyPermission(perms)) {
+        throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
       }
       return this.issueDashboardToken(admin);
     }
