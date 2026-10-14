@@ -18,3 +18,9 @@ export function setGameOdds(raw: unknown): GameOddsConfig {
   live = sanitizeGameOdds(raw);
   return live;
 }
+
+/** Central server-side availability gate; never rely on client visibility alone. */
+export function isGameEnabled(gameId: string): boolean {
+  const id = String(gameId || '').trim().toLowerCase();
+  return !!id && !live.disabledGames.includes(id);
+}
