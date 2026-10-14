@@ -173,8 +173,8 @@ public class ProfileFragment extends Fragment {
         binding.statFans.setTag(2);
         binding.statFollowing.setOnClickListener(openFriends);
         binding.statFans.setOnClickListener(openFriends);
-        binding.tvWealthChip.setOnClickListener(v -> openProfileInsights());
-        if (binding.rowMyProfileCp != null) binding.rowMyProfileCp.setOnClickListener(v -> openProfileInsights());
+        binding.tvWealthChip.setOnClickListener(v -> openProfileInsights(ProfileInsightsActivity.MODE_WEALTH));
+        if (binding.rowMyProfileCp != null) binding.rowMyProfileCp.setOnClickListener(v -> openProfileInsights(ProfileInsightsActivity.MODE_CP));
         binding.tvCharmChip.setOnClickListener(v -> openRanking("popular"));
 
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
@@ -361,8 +361,10 @@ public class ProfileFragment extends Fragment {
         startActivity(new Intent(requireContext(), AgencyActivity.class));
     }
 
-    private void openProfileInsights() {
-        startActivity(new Intent(requireContext(), ProfileInsightsActivity.class));
+    private void openProfileInsights(String mode) {
+        Intent intent = new Intent(requireContext(), ProfileInsightsActivity.class);
+        intent.putExtra(ProfileInsightsActivity.EXTRA_MODE, mode);
+        startActivity(intent);
     }
 
     private void openRanking(String category) {
