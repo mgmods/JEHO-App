@@ -110,6 +110,7 @@ public class CpCenterActivity extends ThemedActivity {
                     found.username = valueOf(peer.get("username"));
                     found.displayName = valueOf(peer.get("displayName"));
                     found.avatarUrl = valueOf(peer.get("avatarUrl"));
+                    found.vipBadgeUrl = valueOf(peer.get("vipBadgeUrl"));
                     relationId = valueOf(row.get("id"));
                     relationType = valueOf(row.get("type"));
                     score = longOf(row.get("points"));
@@ -156,6 +157,7 @@ public class CpCenterActivity extends ThemedActivity {
                     : (partner.username != null ? partner.username : "شريك");
             binding.tvCpPartnerName.setText(name);
             AvatarImageLoader.load(binding.imgCpPartner, partner.avatarUrl);
+            com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgCpPartnerFrame, partner.vipBadgeUrl);
             binding.tvCpHeroTitle.setText("مساحة CP");
             binding.tvCpHint.setText("علاقة " + cpLabel(activeRelationshipType)
                     + " · المستوى LV." + bondLevel + "\nنقاط العلاقة: " + bondScore
