@@ -17,6 +17,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { DiceRollDto } from './dto/dice.dto';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { isGameEnabled } from './game-odds-runtime';
 
 /** Display multipliers ≈ fair × 0.75 house (true 2-dice outcomes). Peaks soft-clamped by guard. */
 export const DICE_ODDS: Record<number, number> = {
@@ -89,6 +90,7 @@ export class DiceService {
   }
 
   async roll(userId: string, dto: DiceRollDto, roomId?: string) {
+    if (!isGameEnabled('dice')) throw new BadRequestException('لعبة النرد متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Dice game disabled');
