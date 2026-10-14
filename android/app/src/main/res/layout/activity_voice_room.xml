@@ -741,6 +741,28 @@
             android:textStyle="bold" />
     </LinearLayout>
 
+    <!-- Reserved throne seat: intentionally visual-only and disabled until explicitly enabled later. -->
+    <TextView
+        android:id="@+id/tvThroneSeatPlaceholder"
+        android:layout_width="wrap_content"
+        android:layout_height="30dp"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="5dp"
+        android:background="@drawable/bg_room_cup_chip"
+        android:clickable="false"
+        android:contentDescription="كرسي العرش غير مفعّل"
+        android:enabled="false"
+        android:focusable="false"
+        android:gravity="center"
+        android:paddingHorizontal="12dp"
+        android:text="♛ كرسي العرش · قريبًا"
+        android:textColor="#FFE9B53C"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:alpha="0.72"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerSeats"
         android:layout_width="0dp"
@@ -754,7 +776,7 @@
         android:paddingBottom="14dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+        app:layout_constraintTop_toBottomOf="@id/tvThroneSeatPlaceholder" />
 
     <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles.
          Extra top margin so avatars clear seat 9/10 number badges. -->
