@@ -1,6 +1,10 @@
 package com.Dramizo.Series.presentation.home;
 
 import android.content.Intent;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.widget.Toast;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -58,6 +62,7 @@ public class HomeMeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         applySectionWallpaper();
         bindProfileDashboard();
+        keepOnlyMyRoomActivityAndRoomLists();
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(HomeViewModel.class);
@@ -132,6 +137,45 @@ public class HomeMeFragment extends Fragment {
     }
 
 
+    /** Keep Home > أنا focused on the user's room, activity, and recent/followed rooms.
+     * Profile identity, avatar, edit-profile, wallet, VIP, and settings remain available
+     * from their dedicated sections and are intentionally not shown in this feed tab.
+     */
+    private void keepOnlyMyRoomActivityAndRoomLists() {
+        if (binding == null) return;
+        // This top-level Home > أنا tab is a room/activity feed, not the profile page.
+        // Hide the identity row explicitly so the avatar and gear can never leak into this tab.
+        binding.profileIdentityHeader.setVisibility(View.GONE);
+        binding.imgProfileAvatar.setVisibility(View.GONE);
+        binding.btnProfileSettings.setVisibility(View.GONE);
+        binding.actionEditProfileTop.setVisibility(View.GONE);
+        keepOnlyAllowedHomeMeViews(binding.profileScroll);
+    }
+
+    private boolean keepOnlyAllowedHomeMeViews(View view) {
+        if (view == null) return false;
+        int id = view.getId();
+        if (id == R.id.myRoomCardMe
+                || id == R.id.actionActivities
+                || id == R.id.subRecentWrap || id == R.id.tvSubRecent || id == R.id.dotSubRecent
+                || id == R.id.subFollowingWrap || id == R.id.tvSubFollowing || id == R.id.dotSubFollowing
+                || id == R.id.recyclerMeRooms || id == R.id.tvMeEmpty) {
+            view.setVisibility(View.VISIBLE);
+            return true;
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            boolean containsAllowed = false;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (keepOnlyAllowedHomeMeViews(group.getChildAt(i))) containsAllowed = true;
+            }
+            view.setVisibility(containsAllowed ? View.VISIBLE : View.GONE);
+            return containsAllowed;
+        }
+        view.setVisibility(View.GONE);
+        return false;
+    }
+
     private void bindProfileDashboard() {
         if (binding == null || !isAdded()) return;
         AppContainer c = ContainerProvider.from(requireActivity());
@@ -149,6 +193,17 @@ public class HomeMeFragment extends Fragment {
             binding.tvProfileDiamonds.setText(String.valueOf(Math.max(0L, me.totalReceivedDiamonds)));
             binding.tvProfileGold.setText(String.valueOf(Math.max(0L, me.totalSentCoins)));
             binding.tvProfileVip.setText("VIP " + Math.max(0, me.vipLevel));
+            binding.tvProfileLevelBadge.setText("Lv. " + Math.max(1, me.level));
+            bindProfileImageBadge(binding.imgProfileLevelBadge, me.levelBadgeUrl);
+            if (me.vipLevel > 0) {
+                bindProfileImageBadge(binding.imgProfileVipBadge, me.vipBadgeUrl);
+            } else {
+                binding.imgProfileVipBadge.setVisibility(View.GONE);
+            }
+            bindProfileRoleBadge(c, me);
+            binding.tvProfileMedals.setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(),
+                            com.Dramizo.Series.presentation.profile.MedalActivity.class)));
             binding.tvProfileVerified.setVisibility(me.genderVerified
                     ? View.VISIBLE : View.GONE);
             if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
@@ -161,6 +216,19 @@ public class HomeMeFragment extends Fragment {
 
         binding.imgProfileAvatar.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
+        binding.btnCopyProfileId.setOnClickListener(v -> {
+            AuthDtos.UserDto current = ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+            String id = current != null ? current.displayPublicId() : "";
+            if (id == null || id.trim().isEmpty()) {
+                Toast.makeText(requireContext(), "المعرف غير متاح", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("JEHO ID", id));
+                Toast.makeText(requireContext(), "تم نسخ ID", Toast.LENGTH_SHORT).show();
+            }
+        });
         binding.tvProfileName.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class)));
         binding.btnProfileSettings.setOnClickListener(v ->
@@ -183,6 +251,64 @@ public class HomeMeFragment extends Fragment {
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.MyEventsActivity.class)));
         binding.actionSupport.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.CustomerSupportActivity.class)));
+    }
+
+    private void bindProfileImageBadge(android.widget.ImageView target, String url) {
+        if (target == null) return;
+        if (url == null || url.trim().isEmpty()) {
+            target.setVisibility(View.GONE);
+            return;
+        }
+        target.setVisibility(View.VISIBLE);
+        String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url);
+        Glide.with(this).load(resolved).placeholder(R.drawable.ic_medal_default)
+                .error(R.drawable.ic_medal_default).into(target);
+    }
+
+    /** Role labels must come from server-authoritative permissions, never from the shortcut itself. */
+    private void bindProfileRoleBadge(AppContainer c, AuthDtos.UserDto me) {
+        String staffRole = me.staffRole == null ? "" :
+                me.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("super".equals(staffRole) || me.isAdmin) {
+            binding.tvProfileRoleBadge.setText("سوبر أدمن");
+            binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+            return;
+        }
+        binding.tvProfileRoleBadge.setVisibility(View.GONE);
+        c.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<java.util.Map<String, Object>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(c.getWalletApi().rechargeAgentMe());
+            boolean activeAgent = false;
+            if (result.success && result.data != null) {
+                Object rawAgent = result.data.get("agent");
+                if (rawAgent instanceof java.util.Map) {
+                    Object status = ((java.util.Map<?, ?>) rawAgent).get("status");
+                    activeAgent = status != null &&
+                            "active".equalsIgnoreCase(String.valueOf(status));
+                }
+            }
+            final boolean showAgent = activeAgent;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                // Super-admin always takes precedence if the session refreshed meanwhile.
+                AuthDtos.UserDto current = ContainerProvider.from(requireActivity())
+                        .getSessionManager().getUser();
+                String currentRole = current == null || current.staffRole == null ? "" :
+                        current.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+                if (current != null && ("super".equals(currentRole) || current.isAdmin)) {
+                    binding.tvProfileRoleBadge.setText("سوبر أدمن");
+                    binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+                } else if (showAgent) {
+                    binding.tvProfileRoleBadge.setText("وكيل شحن");
+                    binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+                } else {
+                    binding.tvProfileRoleBadge.setVisibility(View.GONE);
+                }
+            });
+        });
+        // Keep identity/profile shortcuts hidden after asynchronous badge updates.
+        keepOnlyMyRoomActivityAndRoomLists();
     }
 
     private void applySectionWallpaper() {

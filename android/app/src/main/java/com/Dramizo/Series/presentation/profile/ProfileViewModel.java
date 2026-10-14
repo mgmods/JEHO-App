@@ -26,6 +26,34 @@ public class ProfileViewModel extends ViewModel {
         loadMe(false);
     }
 
+    /**
+     * Profile setup must decide from the server's current profile, not an incomplete
+     * cached login DTO. If the request fails, fall back to the saved snapshot so a
+     * previously completed account can still enter the app while offline.
+     */
+    public void loadMeForSetup() {
+        c.getIoExecutor().execute(() -> {
+            try {
+                Result<AuthDtos.UserDto> r = c.getProfileUseCase.me();
+                if (r != null && r.success && r.data != null) {
+                    c.getSessionManager().updateCachedUser(r.data);
+                    lastLoadMeAtMs = System.currentTimeMillis();
+                    user.postValue(r.data);
+                    return;
+                }
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue(r != null && r.error != null
+                        ? r.error : "تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
+            } catch (Throwable failure) {
+                // Never leave onboarding transparent with its progress indicator stuck.
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue("تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
+            }
+        });
+    }
+
     /** @param force true after edits / pull when fresh data is required */
     public void loadMe(boolean force) {
         // Paint cached profile only once so tab re-entry does not rebuild the whole header.

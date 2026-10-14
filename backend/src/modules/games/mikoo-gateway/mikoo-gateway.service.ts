@@ -108,7 +108,7 @@ import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { biasedCrashAt, multiAreaMultipliers, pickWeightedAreaId, pickWeightedAreaIndex, spinPayout, crashCashoutRake } from './mikoo-house-edge.util';
 import { GREEDY_BOX_RATIOS, LUCK_CAR_RATIOS } from './mikoo-game-economy';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds } from '../game-odds-runtime';
+import { getGameOdds, getGameRtp } from '../game-odds-runtime';
 
 type GameKind = 'crash' | 'multi' | 'spin';
 
@@ -508,7 +508,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     if (!room) return;
     room.phase = 'over';
     // House-safe land: inverse-weight multi-area from live dashboard RTP (all boards).
-    const targetRtp = getGameOdds().playerRtp;
+    const targetRtp = getGameRtp(gameId) ?? getGameOdds().playerRtp;
     const sevenMults = [multiAreaMultipliers()[1], multiAreaMultipliers()[2], multiAreaMultipliers()[3]];
     // Lucky77: pick icon 0/1/2 by inverse ratio weight, then a matching board position.
     const lucky77Icon = pickWeightedAreaIndex(LUCKY77_RATIOS, targetRtp);
@@ -1860,7 +1860,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     try {
       let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
-      const { win, mult } = spinPayout(amount);
+      const { win, mult } = spinPayout(amount, { gameId: gameSlug });
       if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
       player.balance = bal;
       if (style === 'fortune') {
@@ -1934,7 +1934,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     try {
       let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
-      const { win, mult } = spinPayout(amount);
+      const { win, mult } = spinPayout(amount, { gameId: gameSlug });
       if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
       player.balance = bal;
       if (style === 'sugar') {

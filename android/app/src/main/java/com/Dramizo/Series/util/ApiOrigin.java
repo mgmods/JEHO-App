@@ -3,8 +3,8 @@ package com.Dramizo.Series.util;
 import com.Dramizo.Series.BuildConfig;
 
 /**
- * JEHO-OWN is isolated from the legacy JEHO-CHAT backend.
- * A build-time override is supported, with production defaulting to the new Blitz API.
+ * JEHO CHAT's canonical API is the isolated JEHO-OWN backend deployed on Blitz Cloud.
+ * The admin dashboard is served by the same backend host under /admin/.
  */
 public final class ApiOrigin {
     private static final String CANONICAL_API = "https://jeho-own-backend.mgs.blitz.cloud";

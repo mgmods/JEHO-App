@@ -154,23 +154,43 @@ public final class RemoteTheme {
     /** Selects the next configured splash once per launcher process start. */
     public static MiscDtos.SplashItemDto nextSplash(Context context) {
         java.util.List<MiscDtos.SplashItemDto> items = activeSplashItems(context);
-        if (items.isEmpty()) return null;
-        try {
-            Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
-            if (storage == null) return items.get(0);
-            android.content.SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            int index = prefs.getInt("splash_index", 0);
-            int selected = Math.floorMod(index, items.size());
-            prefs.edit().putInt("splash_index", selected + 1).apply();
-            return items.get(selected);
-        } catch (Throwable ignored) {
-            return items.get(0);
+        if (!items.isEmpty()) {
+            try {
+                Context storage = com.Dramizo.Series.AuraLiveApp.storageContext(context);
+                if (storage == null) return items.get(0);
+                android.content.SharedPreferences prefs = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                int index = prefs.getInt("splash_index", 0);
+                int selected = Math.floorMod(index, items.size());
+                prefs.edit().putInt("splash_index", selected + 1).apply();
+                return items.get(selected);
+            } catch (Throwable ignored) {
+                return items.get(0);
+            }
         }
+
+        // Older dashboard builds save a single uploaded splash in brand.splashUrl
+        // or backgrounds.splash instead of splash.items. Keep those uploads visible
+        // to the Android launcher without requiring the admin to upload them again.
+        MiscDtos.ThemeDto theme = getCached(context);
+        if (theme == null || theme.splash == null || !theme.splash.enabled) return null;
+        String legacyUrl = brandSplashUrl(context);
+        if (!notEmpty(legacyUrl)) legacyUrl = backgroundUrl(context, "splash");
+        if (!notEmpty(legacyUrl) && theme.assets != null) legacyUrl = theme.assets.get("splash");
+        if (!notEmpty(legacyUrl)) return null;
+
+        MiscDtos.SplashItemDto fallback = new MiscDtos.SplashItemDto();
+        fallback.id = "dashboard-splash";
+        fallback.url = AssetCatalog.absoluteUrl(legacyUrl.trim());
+        fallback.active = true;
+        fallback.durationSeconds = 5;
+        fallback.sortOrder = 0;
+        fallback.targetType = "home";
+        return fallback;
     }
 
     public static long splashDurationMs(@Nullable MiscDtos.SplashItemDto item) {
         if (item == null) return 5000L;
-        int seconds = Math.max(1, Math.min(120, item.durationSeconds));
+        int seconds = Math.max(1, Math.min(5, item.durationSeconds));
         return seconds * 1000L;
     }
 

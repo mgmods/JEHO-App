@@ -17,6 +17,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { LuckyWheelSpinDto } from './dto/lucky-wheel.dto';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 export type LuckyWheelSector = 'red' | 'orange' | 'seven' | 'lose';
 
@@ -92,6 +93,7 @@ export class LuckyWheelService {
   }
 
   async spin(userId: string, dto: LuckyWheelSpinDto, roomId?: string) {
+    if (!isGameEnabled('lucky-wheel')) throw new BadRequestException('عجلة الحظ متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
@@ -129,7 +131,12 @@ export class LuckyWheelService {
         }),
       );
 
-      const outcome = this.pickOutcome(cfg);
+      const configuredWinRate = getGameWinRate('lucky-wheel');
+      const outcome = configuredWinRate === undefined
+        ? this.pickOutcome(cfg)
+        : Math.random() * 100 < configuredWinRate
+          ? (Math.random() < 0.1 ? 'x8' : 'x2')
+          : 'lose';
       const sectorIndex = this.pickSectorIndex(outcome);
       const sector = WHEEL_SECTORS[sectorIndex];
       const multiplier = sector.multiplier;

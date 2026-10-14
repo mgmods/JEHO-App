@@ -149,6 +149,20 @@ export class AgenciesService implements OnModuleInit {
         CREATE UNIQUE INDEX IF NOT EXISTS "IDX_agencies_publicId"
         ON agencies ("publicId") WHERE "publicId" IS NOT NULL
       `);
+      // Normalize existing agency display IDs to six digits without deleting agency data.
+      const agencies = await this.agenciesRepo.find({ select: ['id', 'publicId'] });
+      for (const agency of agencies) {
+        if (agency.publicId && /^\d{6}$/.test(String(agency.publicId))) continue;
+        let candidate = '';
+        for (let attempt = 0; attempt < 40; attempt++) {
+          const next = String(100000 + Math.floor(Math.random() * 900000));
+          if (!(await this.agenciesRepo.exist({ where: { publicId: next } }))) {
+            candidate = next;
+            break;
+          }
+        }
+        if (candidate) await this.agenciesRepo.update({ id: agency.id }, { publicId: candidate });
+      }
     } catch (err) {
       this.logger.warn(`ensure agency exclusive columns: ${(err as Error).message}`);
     }
@@ -266,7 +280,7 @@ export class AgenciesService implements OnModuleInit {
     }
     for (let attempt = 0; attempt < 40; attempt++) {
       // Easy 5-digit display ID (never starts with 0).
-      const id = String(10000 + Math.floor(Math.random() * 90000));
+      const id = String(100000 + Math.floor(Math.random() * 900000));
       const exists = await this.agenciesRepo.findOne({
         where: { publicId: id },
         select: ['id'],
@@ -652,14 +666,14 @@ export class AgenciesService implements OnModuleInit {
         if (!clash) break;
         activationCode = generateActivationCode();
       }
-      let publicId = String(10000 + Math.floor(Math.random() * 90000));
+      let publicId = String(100000 + Math.floor(Math.random() * 900000));
       for (let attempt = 0; attempt < 40; attempt++) {
         const clash = await manager.findOne(Agency, {
           where: { publicId },
           select: ['id'],
         });
         if (!clash) break;
-        publicId = String(10000 + Math.floor(Math.random() * 90000));
+        publicId = String(100000 + Math.floor(Math.random() * 900000));
       }
       const agency = await manager.save(
         manager.create(Agency, {
@@ -1149,7 +1163,7 @@ export class AgenciesService implements OnModuleInit {
       return agency;
     }
     for (let attempt = 0; attempt < 48; attempt++) {
-      const candidate = String(10000 + Math.floor(Math.random() * 90000));
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
       const clash = await this.agenciesRepo.findOne({
         where: { publicId: candidate },
         select: ['id'],

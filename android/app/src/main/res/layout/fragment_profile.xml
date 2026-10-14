@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F4F6F3">
+    android:background="#F4F5F5">
 
     <ImageView
         android:id="@+id/imgThemeBg"
@@ -118,19 +118,6 @@
                         android:textSize="18sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/tvStaffBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="4dp"
-                        android:textColor="@android:color/white"
-                        android:textSize="11sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-
                     <LinearLayout
                         android:id="@+id/rowUserId"
                         android:layout_width="wrap_content"
@@ -157,6 +144,18 @@
                             android:src="@drawable/ic_copy"
                             app:tint="@color/text_hint" />
                     </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvStaffBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="@android:color/white"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
 
                     <LinearLayout
                         android:id="@+id/rowCountry"
@@ -196,6 +195,65 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
+            <!-- Own-profile relationship summary: keep the main avatar as the only self photo. -->
+            <LinearLayout
+                android:id="@+id/rowMyProfileCp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="14dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_mikoo_card"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:layoutDirection="rtl"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="9dp"
+                android:visibility="gone">
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/imgMyProfileCpPartner"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/tvMyProfileCpLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/tvMyProfileCpType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/imgMyProfileCpHeart"
+                    android:layout_width="36dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="♥"
+                    android:textColor="#FFFF5277"
+                    android:textSize="25sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
             <!-- Compact stats under profile (age / level / VIP / wealth / charm) -->
             <HorizontalScrollView
                 android:layout_width="match_parent"
@@ -224,19 +282,7 @@
                         android:textSize="10sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/tvLevelChip"
-                        android:layout_width="wrap_content"
-                        android:layout_height="20dp"
-                        android:layout_marginStart="5dp"
-                        android:background="@drawable/bg_chip_level"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:paddingHorizontal="8dp"
-                        android:text="Lv.1"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
+
 
                     <ImageView
                         android:id="@+id/imgVipBadge"
@@ -297,6 +343,21 @@
                         android:textColor="@color/white"
                         android:textSize="10sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvLevelChip"
+                        android:layout_width="wrap_content"
+                        android:layout_height="20dp"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/bg_chip_level"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:paddingHorizontal="8dp"
+                        android:text="Lv.1"
+                        android:textColor="@color/white"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:visibility="visible" />
 
                     <TextView
                         android:id="@+id/tvDiamondChip"
@@ -478,9 +539,9 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="94dp"
+                    android:minHeight="64dp"
                     android:orientation="horizontal"
-                    android:padding="12dp">
+                    android:padding="8dp">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -511,7 +572,7 @@
                             android:maxLines="1"
                             android:text="—"
                             android:textColor="#B8860B"
-                            android:textSize="16sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -527,9 +588,9 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="94dp"
+                    android:minHeight="64dp"
                     android:orientation="horizontal"
-                    android:padding="12dp">
+                    android:padding="8dp">
 
                     <ImageView
                         android:layout_width="32dp"
@@ -540,7 +601,7 @@
                     <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:layout_weight="1"
                         android:orientation="vertical">
 
@@ -555,48 +616,38 @@
                             android:id="@+id/tvWalletDiamonds"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:text="—"
                             android:textColor="#8B5CF6"
-                            android:textSize="16sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Level + VIP cards (Mikoo art) -->
+            <!-- Hidden legacy Level/VIP cards; actions are available in the quick row below. -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="8dp"
-                android:baselineAligned="false"
+                android:layout_height="0dp"
+                android:visibility="gone"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/levelCard"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
-                    android:layout_marginEnd="6dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/user_level"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/ic_me_level_card" />
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:contentDescription="@string/user_level" />
 
                 <ImageView
                     android:id="@+id/vipCard"
                     android:layout_width="0dp"
-                    android:layout_height="78dp"
-                    android:layout_weight="1"
-                    android:contentDescription="@string/vip"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:scaleType="fitXY"
-                    android:src="@drawable/ic_me_vip_card" />
+                    android:layout_height="0dp"
+                    android:visibility="gone"
+                    android:contentDescription="@string/vip" />
 
-                <!-- Compatibility stubs for old binding IDs -->
                 <include
                     android:id="@+id/btnUserLevel"
                     layout="@layout/item_profile_service_row"
@@ -678,6 +729,33 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/btnQuickVip"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_horizontal"
+                    android:orientation="vertical"
+                    android:paddingVertical="4dp">
+
+                    <ImageView
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:contentDescription="@string/vip"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_feat_vip" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="@string/vip"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:id="@+id/btnQuickAgency"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
@@ -727,6 +805,7 @@
 
                 <LinearLayout
                     android:id="@+id/btnVisitors"
+                    android:visibility="gone"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:foreground="?attr/selectableItemBackground"

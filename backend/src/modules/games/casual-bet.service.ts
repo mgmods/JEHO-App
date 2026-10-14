@@ -16,6 +16,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 type CasualGameId =
   | 'slots'
@@ -89,13 +90,14 @@ export class CasualBetService {
     if (!ALL_CASUAL.includes(gameId)) {
       throw new BadRequestException('Unknown game');
     }
+    if (!isGameEnabled(gameId)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(body?.roomId, userId);
     const amount = Math.floor(Number(body?.amount));
     if (!Number.isFinite(amount) || amount < 50 || amount > Math.min(20_000, GAME_PAYOUT.maxBet)) {
       throw new BadRequestException(`Bet must be between 50 and ${Math.min(20_000, GAME_PAYOUT.maxBet)} coins`);
     }
 
-    const outcome = this.resolveOutcome(gameId, body?.choice);
+    const outcome = this.resolveOutcomeWithConfiguredRate(gameId, body?.choice);
     const result = await this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
@@ -157,7 +159,7 @@ export class CasualBetService {
         gameId,
         bet: amount,
         payout,
-        won: payout > 0,
+        won: payout > amount,
         net: payout - amount,
         multiplier: outcome.multiplier,
         detail: outcome.detail,
@@ -179,6 +181,21 @@ export class CasualBetService {
     }
 
     return { ...result, displayName: name };
+  }
+
+  private resolveOutcomeWithConfiguredRate(
+    gameId: CasualGameId,
+    choice?: string | number,
+  ): { multiplier: number; detail: Record<string, unknown> } {
+    const configured = getGameWinRate(gameId);
+    if (configured === undefined) return this.resolveOutcome(gameId, choice);
+    const wantWin = Math.random() * 100 < configured;
+    let last = this.resolveOutcome(gameId, choice);
+    for (let i = 0; i < 500; i++) {
+      if ((last.multiplier > 1) === wantWin) return last;
+      last = this.resolveOutcome(gameId, choice);
+    }
+    return last;
   }
 
   private resolveOutcome(

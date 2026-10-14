@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="light">
+<title>لوحة الترتيب</title>
+<style>
+:root{--bg:#100e20;--panel:#1c1931;--panel2:#282341;--gold:#f2c36d;--muted:#b8b2d0;--white:#fff}
+*{box-sizing:border-box}html,body{max-width:100%;overflow-x:hidden}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#46305e 0,#17142a 44%,var(--bg) 100%);color:var(--white);font-family:Arial,"Noto Sans Arabic",sans-serif;min-height:100vh}
+header{display:flex;align-items:center;gap:12px;padding:14px 16px 10px;position:sticky;top:0;background:#151227f2;backdrop-filter:blur(12px);z-index:3;border-bottom:1px solid #ffffff12}
+button{font:inherit;border:0;cursor:pointer}#back{background:#ffffff12;color:white;width:40px;height:40px;border-radius:14px;font-size:24px}h1{font-size:20px;margin:0;flex:1}#refresh{background:#ffffff12;color:var(--gold);width:40px;height:40px;border-radius:14px;font-size:22px}
+.hero{margin:14px 14px 10px;padding:18px 16px;border:1px solid #f2c36d50;border-radius:22px;background:linear-gradient(125deg,#3c2854,#241f40 60%,#352a4d);position:relative;overflow:hidden}.hero:after{content:"♛";position:absolute;left:14px;top:-18px;font-size:105px;color:#f2c36d18}.eyebrow{color:var(--gold);font-size:12px;font-weight:bold}.hero h2{font-size:22px;margin:8px 0}.hero p{margin:0;color:#d3cde4;font-size:13px;line-height:1.6}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding:5px 14px 12px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.chip{white-space:nowrap;padding:10px 15px;border-radius:18px;background:var(--panel2);color:#d9d2ec;border:1px solid #ffffff10;font-size:13px}.chip.active{background:linear-gradient(120deg,#f5d58a,#bd853d);color:#27162b;font-weight:bold}
+.section-label{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 12px;color:#e8e1f4;font-size:14px}.section-label small{color:var(--muted);font-size:12px}
+#state{margin:12px 16px;color:var(--muted);text-align:center;padding:18px}.podium{display:grid;grid-template-columns:1fr 1.12fr 1fr;gap:8px;align-items:end;margin:0 12px 16px}.podium-card{cursor:pointer;min-width:0;text-align:center;background:linear-gradient(180deg,#2a2444,#1a172c);border:1px solid #ffffff12;border-radius:18px;padding:12px 5px 10px}.podium-card.first{padding-top:17px;border-color:#e9c46b99;background:linear-gradient(180deg,#59452f,#29203d)}.rank{font-weight:bold;color:var(--gold);font-size:13px;margin-bottom:8px}.photo-wrap{width:58px;height:58px;margin:0 auto 8px;position:relative}.first .photo-wrap{width:70px;height:70px}.photo{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;border:2px solid #eac36e;background:#322b48}.photo-wrap .frame{position:absolute;inset:-18%;width:136%;height:136%;object-fit:fill;pointer-events:none;z-index:2}.crown{position:absolute;top:-15px;left:50%;transform:translateX(-50%);color:#ffe49b;font-size:22px}.person{font-size:12px;font-weight:bold;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}.score{font-size:12px;color:var(--gold);margin-top:7px}.rows{display:flex;flex-direction:column;gap:8px;padding:0 14px 28px}.entry{cursor:pointer;display:flex;align-items:center;gap:12px;padding:12px;border-radius:17px;background:linear-gradient(110deg,#24203a,#1a172c);border:1px solid #ffffff0d;min-width:0}.num{width:27px;text-align:center;color:#c8c1dc;font-weight:bold;font-size:14px}.entry:nth-child(1) .num,.entry:nth-child(2) .num,.entry:nth-child(3) .num{color:var(--gold)}.entry .photo-wrap{flex:0 0 48px;width:48px;height:48px;margin:0}.info{min-width:0;flex:1}.name{font-size:14px;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sub{font-size:11px;color:var(--muted);margin-top:5px}.points{font-size:13px;color:var(--gold);font-weight:bold;white-space:nowrap}.empty{color:var(--muted);text-align:center;padding:25px 12px}.foot{text-align:center;color:#827b9e;font-size:11px;padding:0 16px 22px}
+</style>
+</head>
+<body>
+<header><h1>لوحة الترتيب</h1><button id="refresh" aria-label="تحديث">↻</button></header>
+<section class="hero"><div class="eyebrow">JEHO · لوحة الثروة والترتيب</div><h2 id="heroTitle">أصحاب الثروة</h2><p id="heroDesc">ترتيب حقيقي من بيانات التطبيق، يتحدث حسب الفترة والقسم المختار.</p></section>
+<nav class="tabs" id="periods"><button class="chip active" data-period="daily">اليوم</button><button class="chip" data-period="weekly">هذا الأسبوع</button><button class="chip" data-period="monthly">هذا الشهر</button></nav>
+<nav class="tabs" id="categories"><button class="chip active" data-category="popular">الشعبية</button><button class="chip" data-category="gifts">الهدايا</button><button class="chip" data-category="host">المضيفون</button><button class="chip" data-category="agency">الوكالات</button><button class="chip" data-category="room">الغرف</button></nav>
+<div class="section-label"><span id="listTitle">الأعلى ترتيبًا</span><small id="count">—</small></div><div id="state">جارٍ تحميل بيانات الترتيب الفعلية…</div><div id="podium" class="podium" hidden></div><div id="rows" class="rows"></div><div class="foot">الصور والأسماء والنقاط من بيانات الحسابات الفعلية فقط.</div>
+<script>
+'use strict';
+const labels = {
+  rich: ["الثروة", "ترتيب المستخدمين حسب الثروة"],
+  popular: ["الشعبية", "ترتيب المستخدمين حسب الشعبية"],
+  gifts: ["الهدايا", "ترتيب الهدايا المرسلة"],
+  host: ["المضيفون", "ترتيب المضيفين"],
+  agency: ["الوكالات", "ترتيب الوكالات"],
+  room: ["الغرف", "ترتيب الغرف"]
+};
+let period = "daily";
+let category = "popular";
+let data = [];
+
+function esc(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+function isUserCategory() {
+  return ["rich", "popular", "gifts", "host"].includes(category);
+}
+function getName(entry) {
+  const user = entry && entry.user ? entry.user : {};
+  return user.displayName || user.username || entry.targetName || "—";
+}
+function makePhoto(user) {
+  const url = user && user.avatarUrl ? user.avatarUrl : "";
+  return url
+    ? '<img class="photo" loading="eager" decoding="async" alt="" src="' + esc(url) + '">'
+    : '<span class="photo" aria-hidden="true"></span>';
+}
+function card(entry, top) {
+  const user = entry && entry.user ? entry.user : {};
+  const rank = entry && entry.rank != null ? Number(entry.rank) : "—";
+  const score = entry && entry.score != null && entry.score !== ""
+    ? Number(entry.score).toLocaleString("ar") : "—";
+  const name = getName(entry);
+  const targetId = isUserCategory() ? (entry.userId || user.id || entry.targetId || "") : "";
+  const rankMarkup = top
+    ? '<div class="rank">' + (Number(rank) === 1 ? "♛ " : "#") + esc(rank) + '</div>'
+    : '<div class="num">' + esc(rank) + '</div>';
+  const details = top
+    ? '<div class="person">' + esc(name) + '</div>'
+    : '<div class="info"><div class="name">' + esc(name) + '</div><div class="sub">' +
+      esc(user.username || (entry.targetId ? "ID: " + entry.targetId : "—")) + '</div></div>';
+  const frame = user.frameUrl
+    ? '<img class="frame" loading="eager" decoding="async" alt="" src="' + esc(user.frameUrl) + '">'
+    : "";
+  const profileAttr = targetId ? ' data-user-id="' + esc(targetId) + '" role="button" tabindex="0"' : "";
+  return '<div class="' + (top ? 'podium-card' + (Number(rank) === 1 ? ' first' : '') : 'entry') +
+    '"' + profileAttr + '>' + rankMarkup +
+    '<div class="photo-wrap">' + (top && Number(rank) === 1 ? '<span class="crown">♛</span>' : '') +
+    makePhoto(user) + frame + '</div>' + details +
+    '<div class="points">' + esc(score) + '</div></div>';
+}
+function render() {
+  const state = document.getElementById("state");
+  const podium = document.getElementById("podium");
+  const rows = document.getElementById("rows");
+  document.getElementById("heroTitle").textContent = labels[category][0];
+  document.getElementById("heroDesc").textContent = labels[category][1] + " · " +
+    ({daily: "اليوم", weekly: "هذا الأسبوع", monthly: "هذا الشهر"}[period]);
+  document.getElementById("listTitle").textContent = labels[category][0];
+  document.getElementById("count").textContent = data.length.toLocaleString("ar") + " نتيجة";
+  if (!data.length) {
+    state.hidden = false;
+    state.textContent = "لا توجد نتائج فعلية متاحة لهذه الفترة حالياً.";
+    podium.hidden = true;
+    podium.innerHTML = "";
+    rows.innerHTML = "";
+    return;
+  }
+  state.hidden = true;
+  podium.hidden = false;
+  podium.innerHTML = data.slice(0, 3).map(entry => card(entry, true)).reverse().join("");
+  rows.innerHTML = data.slice(3).map(entry => card(entry, false)).join("");
+  [podium, rows].forEach(container => {
+    container.querySelectorAll("img").forEach(img => {
+      img.addEventListener("error", () => {
+        if (img.classList.contains("photo")) img.style.visibility = "hidden";
+        else img.remove();
+      }, {once: true});
+    });
+  });
+}
+function load() {
+  const state = document.getElementById("state");
+  state.hidden = false;
+  state.textContent = "جارٍ تحميل بيانات الترتيب الفعلية…";
+  if (window.JehoRanking && typeof window.JehoRanking.load === "function") {
+    window.JehoRanking.load(period, category);
+  } else {
+    state.textContent = "تعذر الاتصال بواجهة الترتيب داخل التطبيق.";
+  }
+}
+document.querySelectorAll("[data-period]").forEach(button => {
+  button.addEventListener("click", () => {
+    period = button.dataset.period;
+    document.querySelectorAll("[data-period]").forEach(item =>
+      item.classList.toggle("active", item === button));
+    load();
+  });
+});
+document.querySelectorAll("[data-category]").forEach(button => {
+  button.addEventListener("click", () => {
+    category = button.dataset.category;
+    document.querySelectorAll("[data-category]").forEach(item =>
+      item.classList.toggle("active", item === button));
+    load();
+  });
+});
+document.getElementById("refresh").addEventListener("click", load);
+document.getElementById("podium").addEventListener("click", openProfileFromCard);
+document.getElementById("rows").addEventListener("click", openProfileFromCard);
+document.getElementById("podium").addEventListener("keydown", openProfileFromKeyboard);
+document.getElementById("rows").addEventListener("keydown", openProfileFromKeyboard);
+function openProfileFromCard(event) {
+  const cardElement = event.target.closest("[data-user-id]");
+  if (!cardElement || !window.JehoRanking || typeof window.JehoRanking.openProfile !== "function") return;
+  window.JehoRanking.openProfile(cardElement.dataset.userId);
+}
+function openProfileFromKeyboard(event) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const cardElement = event.target.closest("[data-user-id]");
+  if (!cardElement) return;
+  event.preventDefault();
+  if (window.JehoRanking && typeof window.JehoRanking.openProfile === "function") {
+    window.JehoRanking.openProfile(cardElement.dataset.userId);
+  }
+}
+window.setInitialRanking = function(nextPeriod, nextCategory) {
+  period = ["daily", "weekly", "monthly"].includes(nextPeriod) ? nextPeriod : "daily";
+  category = Object.prototype.hasOwnProperty.call(labels, nextCategory) && nextCategory !== "rich" ? nextCategory : "popular";
+  document.querySelectorAll("[data-period]").forEach(button =>
+    button.classList.toggle("active", button.dataset.period === period));
+  document.querySelectorAll("[data-category]").forEach(button =>
+    button.classList.toggle("active", button.dataset.category === category));
+};
+window.renderJehoRankings = function(json) {
+  try {
+    const parsed = JSON.parse(json || "[]");
+    data = Array.isArray(parsed) ? parsed : [];
+    render();
+  } catch (error) {
+    data = [];
+    window.showJehoRankingError("تعذر قراءة بيانات الترتيب.");
+  }
+};
+window.showJehoRankingError = function(message) {
+  data = [];
+  const state = document.getElementById("state");
+  state.hidden = false;
+  state.textContent = message || "تعذر تحميل الترتيب";
+  document.getElementById("podium").hidden = true;
+  document.getElementById("podium").innerHTML = "";
+  document.getElementById("rows").innerHTML = "";
+  document.getElementById("count").textContent = "—";
+};
+</script></body></html>

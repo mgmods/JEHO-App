@@ -6,7 +6,7 @@ import { MikooSessionService, MikooPlayerContext } from './mikoo-session.service
 import { MikooEconomyNotifyService } from './mikoo-economy-notify.service';
 import { pickWeightedAreaIndex, spinPayout } from './mikoo-house-edge.util';
 import { clampBetAmount, clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds } from '../game-odds-runtime';
+import { getGameOdds, getGameRtp, getGameWinRate, isGameEnabled } from '../game-odds-runtime';
 import { Wallet } from '../../../database/entities/wallet.entity';
 import {
   CurrencyType,
@@ -131,6 +131,10 @@ export class BaishunWsHandler {
   ) {}
 
   handle(ws: WebSocket, gameSlug: string, rawUrl = '') {
+    if (!isGameEnabled(gameSlug)) {
+      ws.close(1013, 'Game disabled by administrator');
+      return;
+    }
     const protocol = this.protocolFor(gameSlug);
     if (protocol === 'packer') {
       this.handlePacker(ws, gameSlug, rawUrl);
@@ -388,7 +392,7 @@ export class BaishunWsHandler {
                 `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${betAmount} user=${player.userId} bal=${player.balance}`,
               );
               const afterBet = await this.debit(player.userId, betAmount, gameSlug);
-              const { win, mult } = spinPayout(betAmount);
+              const { win, mult } = spinPayout(betAmount, { gameId: gameSlug });
               let balance = afterBet;
               if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               player.balance = balance;
@@ -853,7 +857,7 @@ export class BaishunWsHandler {
               let win = 0;
               if (!isFree) {
                 balance = await this.debit(player.userId, betAmount, gameSlug);
-                win = spinPayout(betAmount).win;
+                win = spinPayout(betAmount, { gameId: gameSlug }).win;
                 if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               }
               player.balance = balance;
@@ -1043,7 +1047,7 @@ export class BaishunWsHandler {
 
       const p = pIn || (await ensurePlayer());
       // Same house RTP as other multi-area boards (dashboard playerRtp).
-      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameOdds().playerRtp);
+      const winner = pickWeightedAreaIndex(GREEDY_LION_ODDS, getGameRtp('greedy-lion') ?? getGameOdds().playerRtp);
       const odds = GREEDY_LION_ODDS[winner] || 2;
       const stakeOnWin = greedyAreaBets[winner] || 0;
       let win = Math.floor(stakeOnWin * odds);
@@ -1382,7 +1386,8 @@ export class BaishunWsHandler {
                     const odds = areaOdds[winner] || 1.85;
                     const stake = royalMyBet || chip;
                     // Pay gate from dashboard → keeps royal house-positive on ~1.85 sides.
-                    const payGate = getGameOdds().royalBattlePayGate;
+                    const configuredRoyalRate = getGameWinRate('royal-battle');
+                    const payGate = configuredRoyalRate === undefined ? getGameOdds().royalBattlePayGate : configuredRoyalRate / 100;
                     const win = Math.floor(
                       stake * odds * (Math.random() < payGate ? 1 : 0),
                     );
@@ -1513,13 +1518,14 @@ export class BaishunWsHandler {
             const fields = decodeFields(body);
             const selectType = Number(fields[1] ?? 0); // 1 lower, 2 higher
             const prev = hiloCard.id;
-            const next = randCard();
-            const won =
-              selectType === 2
-                ? next.id > prev
-                : selectType === 1
-                  ? next.id < prev
-                  : next.id !== prev;
+            const configuredHiloRate = getGameWinRate('hilo');
+            const wantHiloWin = configuredHiloRate === undefined ? null : Math.random() * 100 < configuredHiloRate;
+            const didHiloWin = (card: { id: number }) => selectType === 2 ? card.id > prev : selectType === 1 ? card.id < prev : card.id !== prev;
+            let next = randCard();
+            if (wantHiloWin !== null) {
+              for (let attempt = 0; attempt < 80 && didHiloWin(next) !== wantHiloWin; attempt++) next = randCard();
+            }
+            const won = didHiloWin(next);
             hiloCard = next;
             let showBet = hiloBet;
             let bal = p ? await this.sessions.refreshBalance(p) : 0;
@@ -1979,7 +1985,7 @@ export class BaishunWsHandler {
         return;
       }
       // Fishing hit rate from dashboard (harder than lobby slots by default).
-      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate });
+      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate, gameId: gameSlug });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
         bal = await this.credit(player.userId, win, gameSlug, stake);

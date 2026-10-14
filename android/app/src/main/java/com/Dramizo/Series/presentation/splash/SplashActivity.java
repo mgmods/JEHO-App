@@ -3,6 +3,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,11 +12,14 @@ import android.util.Log;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
+import android.widget.ImageView;
+import android.view.View;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.databinding.ActivitySplashBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -23,8 +27,16 @@ import com.Dramizo.Series.presentation.auth.LoginActivity;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
+import com.Dramizo.Series.presentation.profile.ProfileActivity;
+import com.Dramizo.Series.presentation.agency.AgencyActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
+import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppFeatures;
+import com.Dramizo.Series.util.RemoteTheme;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.engine.DiskCacheStrategy;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import com.Dramizo.Series.util.GenderVerificationGate;
 import com.Dramizo.Series.util.InviteReferralHelper;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
@@ -32,11 +44,25 @@ import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends ThemedActivity {
     private static final String TAG = "SplashActivity";
-    /** Keep splash short — never wait on network gates. */
+    /** Show the branded fallback briefly, then bypass a slow/unavailable ad request. */
     private static final long SPLASH_MIN_MS = 350L;
-    private static final long SPLASH_MAX_MS = 1800L;
+    private static final long SPLASH_MAX_MS = 15000L;
 
     private boolean navigated;
+    private boolean profileCheckInProgress;
+    private boolean splashDecisionResolved;
+    private boolean splashAdShowing;
+    private boolean sessionPrepared;
+    private boolean sessionLoggedIn;
+    private AppContainer pendingContainer;
+    private AuthDtos.UserDto pendingUser;
+    private MiscDtos.SplashItemDto displayedSplashItem;
+    private String pendingSplashTarget;
+    private String pendingSplashTargetType;
+    private String pendingSplashTargetId;
+    private ImageView splashAdImage;
+    private View splashContentView;
+    private View skipSplashAd;
     private String pendingRoomId;
     private String pendingInviteCode;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -56,6 +82,11 @@ public class SplashActivity extends ThemedActivity {
             parseDeepLink(getIntent());
             ActivitySplashBinding binding = ActivitySplashBinding.inflate(getLayoutInflater());
             setContentView(binding.getRoot());
+            splashAdImage = binding.imgSplashAd;
+            splashContentView = binding.splashContent;
+            skipSplashAd = binding.btnSkipSplashAd;
+            splashAdImage.setOnClickListener(v -> finishSplashAd(true));
+            skipSplashAd.setOnClickListener(v -> finishSplashAd(false));
             EdgeToEdgeHelper.apply(this);
             EdgeToEdgeHelper.padStatusOnly(binding.splashContent);
             EdgeToEdgeHelper.padBottom(binding.splashContent);
@@ -84,6 +115,7 @@ public class SplashActivity extends ThemedActivity {
                 binding.tvSplashTagline.startAnimation(tagFade);
             }
 
+            startSplashAdLoad();
             mainHandler.postDelayed(this::prepareSession, SPLASH_MIN_MS);
             mainHandler.postDelayed(hardTimeout, SPLASH_MAX_MS);
         } catch (Throwable t) {
@@ -154,6 +186,15 @@ public class SplashActivity extends ThemedActivity {
             i.putExtra(InviteReferralHelper.EXTRA_PENDING_INVITE, invite);
             i.putExtra(InviteReferralHelper.EXTRA_OPEN_INVITE, true);
         }
+        if ("messages".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_MESSAGES, true);
+        } else if ("drama".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_DRAMA, true);
+        } else if ("create_room".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_CREATE_ROOM, true);
+        } else if ("home".equals(pendingSplashTarget)) {
+            i.putExtra(MainActivity.EXTRA_OPEN_HOME, true);
+        }
     }
 
     private void prepareSession() {
@@ -166,13 +207,12 @@ public class SplashActivity extends ThemedActivity {
                 } catch (Throwable ignored) {}
             });
             boolean loggedIn = c.getSessionManager().isLoggedIn();
-            if (!loggedIn) {
-                openLogin();
-                return;
-            }
-            AuthDtos.UserDto cached = c.getSessionManager().getUser();
-            routeLoggedIn(c, cached);
-            refreshSessionInBackground(c);
+            sessionPrepared = true;
+            sessionLoggedIn = loggedIn;
+            pendingContainer = c;
+            pendingUser = loggedIn ? c.getSessionManager().getUser() : null;
+            if (loggedIn) refreshSessionInBackground(c);
+            if (splashDecisionResolved) continueStartupNavigation();
         } catch (Throwable t) {
             Log.e(TAG, "Session prepare failed", t);
             if (!tryResumeLoggedInSession()) openLogin();
@@ -194,32 +234,312 @@ public class SplashActivity extends ThemedActivity {
 
     private void forceLeaveSplash() {
         if (navigated || isFinishing()) return;
-        try {
-            AppContainer c = ContainerProvider.from(this);
-            if (c.getSessionManager().isLoggedIn()) {
-                routeLoggedIn(c, c.getSessionManager().getUser());
-            } else {
-                openLogin();
+        // A configured ad can take time to download, but must never trap startup.
+        // If its image has not arrived by the deadline, leave the splash normally.
+        if (splashAdShowing) {
+            if (splashAdImage == null || splashAdImage.getDrawable() == null) {
+                finishSplashAd(false);
             }
-        } catch (Throwable t) {
-            openLogin();
+            return;
         }
+        splashDecisionResolved = true;
+        if (sessionPrepared) {
+            continueStartupNavigation();
+            return;
+        }
+        if (!tryResumeLoggedInSession()) openLogin();
+    }
+
+    private void continueStartupNavigation() {
+        if (!splashDecisionResolved || !sessionPrepared || navigated || isFinishing()) return;
+        if (pendingContainer == null) {
+            if (!tryResumeLoggedInSession()) openLogin();
+            return;
+        }
+        if (!sessionLoggedIn) {
+            openLogin();
+            return;
+        }
+        routeLoggedInNow(pendingContainer, pendingUser);
     }
 
     private void routeLoggedIn(AppContainer c, AuthDtos.UserDto user) {
-        if (navigated || isFinishing()) return;
-        if (ProfileSetupActivity.isProfileComplete(user)) {
-            if (GenderVerificationGate.needsVerification(user, c.getSessionManager())) {
-                navigated = true;
-                mainHandler.removeCallbacks(hardTimeout);
-                startActivity(GenderVerificationGate.blockingIntent(this));
-                finish();
-                return;
-            }
-            openDestination();
-        } else {
-            openProfileSetup();
+        if (!splashDecisionResolved) {
+            sessionPrepared = true;
+            sessionLoggedIn = true;
+            pendingContainer = c;
+            pendingUser = user;
+            return;
         }
+        routeLoggedInNow(c, user);
+    }
+
+    private void routeLoggedInNow(AppContainer c, AuthDtos.UserDto user) {
+        if (navigated || isFinishing() || profileCheckInProgress) return;
+
+        // Restore this account's saved profile before making an onboarding decision.
+        // Partial login/cache DTOs must not erase an already-created profile.
+        final String savedIdentifier = user != null && user.username != null
+                ? user.username
+                : (user != null && user.email != null ? user.email
+                        : (user != null ? user.publicId : null));
+        if (user != null) {
+            user = c.getSessionManager().restoreSavedAccountProfile(user, savedIdentifier);
+            c.getSessionManager().updateCachedUser(user);
+        }
+
+        // Do not send an established account to onboarding based only on a partial
+        // login/cache DTO. Login responses can omit profile fields that /users/me
+        // returns, especially after logout and a fresh login.
+        if (ProfileSetupActivity.isProfileComplete(user)) {
+            continueWithKnownUser(c, user);
+            return;
+        }
+
+        profileCheckInProgress = true;
+        c.getIoExecutor().execute(() -> {
+            AuthDtos.UserDto resolved = null;
+            try {
+                Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
+                if (me != null && me.success && me.data != null) {
+                    resolved = c.getSessionManager()
+                            .restoreSavedAccountProfile(me.data, savedIdentifier);
+                    c.getSessionManager().updateCachedUser(resolved);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Profile state check failed; using saved account snapshot", t);
+            }
+
+            final AuthDtos.UserDto resolvedUser = resolved;
+            runOnUiThread(() -> {
+                profileCheckInProgress = false;
+                if (navigated || isFinishing()) return;
+                AuthDtos.UserDto current = resolvedUser != null
+                        ? resolvedUser : c.getSessionManager().getUser();
+                if (ProfileSetupActivity.isProfileComplete(current)
+                        || hasSavedProfileEvidence(current)) {
+                    continueWithKnownUser(c, current);
+                } else if (resolvedUser != null) {
+                    // Only show onboarding after the server successfully confirmed
+                    // that this account has no completed profile.
+                    openProfileSetup();
+                } else {
+                    // A network failure is not proof that a profile is missing.
+                    // Keep the user in the app instead of forcing duplicate signup.
+                    continueWithKnownUser(c, current);
+                }
+            });
+        });
+    }
+
+    private boolean hasSavedProfileEvidence(AuthDtos.UserDto user) {
+        return user != null && (nonEmptyProfileValue(user.bio)
+                || nonEmptyProfileValue(user.birthday)
+                || nonEmptyProfileValue(user.country)
+                || nonEmptyProfileValue(user.avatarUrl)
+                || nonEmptyProfileValue(user.coverUrl)
+                || nonEmptyProfileValue(user.city)
+                || (user.interests != null && !user.interests.isEmpty()));
+    }
+
+    private boolean nonEmptyProfileValue(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private void continueWithKnownUser(AppContainer c, AuthDtos.UserDto user) {
+        if (navigated || isFinishing()) return;
+        if (GenderVerificationGate.needsVerification(user, c.getSessionManager())) {
+            navigated = true;
+            mainHandler.removeCallbacks(hardTimeout);
+            startActivity(GenderVerificationGate.blockingIntent(this));
+            finish();
+            return;
+        }
+        openDestination();
+    }
+
+    private int splashImageLoadGeneration;
+    private volatile boolean splashThemeRefreshFinished;
+
+    private void startSplashAdLoad() {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                MiscDtos.SplashItemDto cachedItem = null;
+                try {
+                    // Paint a previously saved splash immediately; do not wait for the network.
+                    cachedItem = RemoteTheme.nextSplash(getApplicationContext());
+                } catch (Throwable ignored) {
+                }
+                final MiscDtos.SplashItemDto firstItem = cachedItem;
+                if (firstItem != null && firstItem.url != null && !firstItem.url.trim().isEmpty()) {
+                    runOnUiThread(() -> loadSplashImage(firstItem));
+                }
+
+                try {
+                    // Refresh dashboard configuration in parallel with displaying the cached image.
+                    RemoteTheme.refreshFromApi(getApplicationContext(), c.getConfigApi());
+                    java.util.List<MiscDtos.SplashItemDto> latestItems =
+                            RemoteTheme.activeSplashItems(getApplicationContext());
+                    MiscDtos.SplashItemDto latest = null;
+                    if (firstItem != null && firstItem.id != null) {
+                        for (MiscDtos.SplashItemDto candidate : latestItems) {
+                            if (candidate != null && firstItem.id.equals(candidate.id)) {
+                                latest = candidate;
+                                break;
+                            }
+                        }
+                    }
+                    if (latest == null && !latestItems.isEmpty()) latest = latestItems.get(0);
+                    if (latest == null) latest = RemoteTheme.nextSplash(getApplicationContext());
+                    final MiscDtos.SplashItemDto freshItem = latest;
+                    splashThemeRefreshFinished = true;
+                    if (freshItem != null && freshItem.url != null && !freshItem.url.trim().isEmpty()) {
+                        boolean changed = firstItem == null
+                                || !freshItem.url.trim().equals(firstItem.url.trim());
+                        if (changed) {
+                            runOnUiThread(() -> loadSplashImage(freshItem));
+                        } else {
+                            // If the cached file was missing/corrupt, retry once after config refresh.
+                            runOnUiThread(() -> {
+                                if (!splashDecisionResolved && splashAdImage != null
+                                        && splashAdImage.getDrawable() == null) {
+                                    loadSplashImage(freshItem);
+                                }
+                            });
+                        }
+                    } else if (firstItem == null) {
+                        runOnUiThread(() -> finishSplashAd(false));
+                    }
+                } catch (Throwable error) {
+                    splashThemeRefreshFinished = true;
+                    Log.w(TAG, "Splash ad config unavailable; using cached image when available", error);
+                    if (firstItem == null) runOnUiThread(() -> finishSplashAd(false));
+                }
+            });
+        } catch (Throwable error) {
+            splashThemeRefreshFinished = true;
+            Log.w(TAG, "Splash ad setup unavailable; continuing startup", error);
+            finishSplashAd(false);
+        }
+    }
+
+    private void loadSplashImage(MiscDtos.SplashItemDto item) {
+        if (item == null || item.url == null || item.url.trim().isEmpty()
+                || isFinishing() || splashDecisionResolved) return;
+        displayedSplashItem = item;
+        splashAdShowing = true;
+        splashContentVisibilityGone();
+        splashAdImage.setVisibility(View.VISIBLE);
+        skipSplashAd.setVisibility(View.VISIBLE);
+        final int generation = ++splashImageLoadGeneration;
+        try {
+            String imageUrl = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url.trim());
+            Glide.with(SplashActivity.this)
+                    .load(imageUrl)
+                    // Use Glide's memory + disk caches so repeat launches paint immediately.
+                    .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                    .skipMemoryCache(false)
+                    .into(new CustomTarget<Drawable>() {
+                        @Override
+                        public void onResourceReady(
+                                Drawable resource,
+                                Transition<? super Drawable> transition) {
+                            if (generation != splashImageLoadGeneration
+                                    || isFinishing() || splashDecisionResolved) return;
+                            splashAdImage.setImageDrawable(resource);
+                            showSplashAd(item);
+                        }
+
+                        @Override
+                        public void onLoadCleared(Drawable placeholder) {
+                        }
+
+                        @Override
+                        public void onLoadFailed(Drawable errorDrawable) {
+                            if (generation == splashImageLoadGeneration && splashThemeRefreshFinished) {
+                                finishSplashAd(false);
+                            }
+                        }
+                    });
+        } catch (Throwable imageError) {
+            Log.w(TAG, "Splash ad image could not be started", imageError);
+            if (splashThemeRefreshFinished) finishSplashAd(false);
+        }
+    }
+
+    /** Display the loaded dashboard splash ad and respect its configured duration. */
+    private void showSplashAd(MiscDtos.SplashItemDto item) {
+        if (item == null || splashAdImage == null || splashDecisionResolved
+                || isFinishing() || !splashAdShowing) return;
+
+        splashAdImage.setAlpha(0f);
+        splashAdImage.animate().alpha(1f).setDuration(220L).start();
+
+        // Replace any prior auto-dismiss callback when the dashboard image changes.
+        mainHandler.removeCallbacks(autoDismissSplashAd);
+        int seconds = item.durationSeconds > 0 ? item.durationSeconds : 5;
+        long durationMs = Math.min(seconds * 1000L, SPLASH_MAX_MS);
+        autoDismissSplashAd = () -> {
+            if (!splashDecisionResolved && splashAdShowing
+                    && displayedSplashItem == item && !isFinishing()) {
+                finishSplashAd(false);
+            }
+        };
+        mainHandler.postDelayed(autoDismissSplashAd, durationMs);
+    }
+
+    private Runnable autoDismissSplashAd = () -> finishSplashAd(false);
+
+    private void splashContentVisibilityGone() {
+        if (splashContentView != null) splashContentView.setVisibility(View.GONE);
+    }
+
+    private void finishSplashAd(boolean clicked) {
+        if (splashDecisionResolved || isFinishing()) return;
+        if (clicked && displayedSplashItem != null) {
+            String target = displayedSplashItem.target;
+            if (target == null || target.trim().isEmpty()) target = displayedSplashItem.targetUrl;
+            String type = displayedSplashItem.targetType;
+            if (type == null || type.trim().isEmpty()) {
+                if (target != null && target.trim().matches("(?i)^https?://.+")) type = "external";
+                else type = target;
+            }
+            pendingSplashTargetType = type != null ? type.trim().toLowerCase(java.util.Locale.ROOT) : "home";
+            pendingSplashTargetId = displayedSplashItem.targetId != null
+                    ? displayedSplashItem.targetId.trim() : "";
+            if ("external".equals(pendingSplashTargetType)) {
+                String url = displayedSplashItem.targetUrl;
+                if (url == null || url.trim().isEmpty()) url = target;
+                pendingSplashTarget = url != null ? url.trim() : null;
+            } else {
+                pendingSplashTarget = pendingSplashTargetType;
+            }
+            if ("room".equals(pendingSplashTargetType)) {
+                if (!pendingSplashTargetId.isEmpty()) pendingRoomId = pendingSplashTargetId;
+                else { pendingSplashTargetType = "home"; pendingSplashTarget = "home"; }
+            }
+            if ("person".equals(pendingSplashTargetType) && pendingSplashTargetId.isEmpty()) {
+                pendingSplashTargetType = "home"; pendingSplashTarget = "home";
+            }
+            if ("agency".equals(pendingSplashTargetType) && pendingSplashTargetId.isEmpty()) {
+                pendingSplashTargetType = "home"; pendingSplashTarget = "home";
+            }
+        } else {
+            pendingSplashTarget = null;
+            pendingSplashTargetType = null;
+            pendingSplashTargetId = null;
+        }
+        splashDecisionResolved = true;
+        splashAdShowing = false;
+        mainHandler.removeCallbacks(hardTimeout);
+        if (splashAdImage != null) splashAdImage.setVisibility(View.GONE);
+        if (skipSplashAd != null) skipSplashAd.setVisibility(View.GONE);
+        continueStartupNavigation();
+    }
+
+    private void finishSplashAd() {
+        finishSplashAd(false);
     }
 
     /** Refresh tokens + profile without holding the splash. */
@@ -254,6 +574,21 @@ public class SplashActivity extends ThemedActivity {
                 && activeRoom != null && !activeRoom.isEmpty()) {
             pendingRoomId = activeRoom;
         }
+        if ("person".equals(pendingSplashTargetType) && pendingSplashTargetId != null
+                && !pendingSplashTargetId.isEmpty()) {
+            openSplashPersonTarget(pendingSplashTargetId);
+            return;
+        }
+        if ("agency".equals(pendingSplashTargetType) && pendingSplashTargetId != null
+                && !pendingSplashTargetId.isEmpty()) {
+            openAgencySplashTarget(pendingSplashTargetId);
+            return;
+        }
+        if ("room".equals(pendingSplashTargetType) && pendingRoomId != null
+                && !pendingRoomId.isEmpty()) {
+            openSplashRoomTarget(pendingRoomId);
+            return;
+        }
         if (pendingRoomId != null && !pendingRoomId.isEmpty()) {
             Intent i = new Intent(this, VoiceRoomActivity.class);
             i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoomId);
@@ -266,7 +601,125 @@ public class SplashActivity extends ThemedActivity {
             putPendingExtras(i);
             startActivity(i);
         }
+        if (pendingSplashTarget != null && pendingSplashTarget.matches("(?i)^https?://.+")) {
+            try {
+                Intent external = new Intent(Intent.ACTION_VIEW, Uri.parse(pendingSplashTarget));
+                startActivity(external);
+            } catch (Throwable error) {
+                Log.w(TAG, "Could not open splash ad destination", error);
+            }
+        }
         finish();
+    }
+
+    /** Validate a splash user ID before navigating; invalid targets fall back home. */
+    private void openSplashPersonTarget(String userId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean found = false;
+                try {
+                    Result<AuthDtos.UserDto> result = ApiCall.execute(c.getUserApi().getUser(userId));
+                    found = result != null && result.success && result.data != null;
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash person target lookup failed", error);
+                }
+                final boolean valid = found;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (valid) {
+                        Intent profile = new Intent(this, ProfileActivity.class);
+                        profile.putExtra(ProfileActivity.EXTRA_USER_ID, userId);
+                        putPendingExtras(profile);
+                        startActivity(profile);
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash person target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
+    }
+
+    /** Validate a splash room ID before entering it; invalid targets fall back home. */
+    private void openSplashRoomTarget(String roomId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean found = false;
+                try {
+                    Result<com.Dramizo.Series.data.remote.dto.RoomDtos.RoomDto> result =
+                            ApiCall.execute(c.getRoomApi().get(roomId));
+                    found = result != null && result.success && result.data != null;
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash room target lookup failed", error);
+                }
+                final boolean valid = found;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (valid) {
+                        Intent room = new Intent(this, VoiceRoomActivity.class);
+                        room.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId);
+                        room.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+                        putPendingExtras(room);
+                        startActivity(room);
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash room target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
+    }
+
+    /** Resolve a selected agency ID through the existing API; open its live room when available. */
+    private void openAgencySplashTarget(String agencyId) {
+        try {
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                String liveRoomId = null;
+                boolean found = false;
+                try {
+                    Result<MiscDtos.AgencyDto> result = ApiCall.execute(c.getAgencyApi().get(agencyId));
+                    if (result != null && result.success && result.data != null) {
+                        found = true;
+                        liveRoomId = result.data.openRoomId;
+                    }
+                } catch (Throwable error) {
+                    Log.w(TAG, "Splash agency target lookup failed", error);
+                }
+                final boolean agencyFound = found;
+                final String roomId = liveRoomId;
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    if (roomId != null && !roomId.trim().isEmpty()) {
+                        Intent room = new Intent(this, VoiceRoomActivity.class);
+                        room.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, roomId.trim());
+                        room.putExtra(VoiceRoomActivity.EXTRA_IS_HOST, false);
+                        startActivity(room);
+                    } else if (agencyFound) {
+                        // Existing app destination for agency management/discovery.
+                        startActivity(new Intent(this, AgencyActivity.class)
+                                .putExtra("splash_target_agency_id", agencyId));
+                    } else {
+                        startActivity(new Intent(this, MainActivity.class));
+                    }
+                    finish();
+                });
+            });
+        } catch (Throwable error) {
+            Log.w(TAG, "Splash agency target unavailable; returning home", error);
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+        }
     }
 
     private void openProfileSetup() {

@@ -442,6 +442,8 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
 
       const billable = type !== MessageType.GIFT && type !== MessageType.SYSTEM;
       // The free allowance belongs to the sender account, not each conversation.
+      // The dashboard configures the free allowance per direct conversation.
+      // Gift/system messages do not consume the allowance.
       const priorBillableMessages = billable
         ? await manager.getRepository(ChatMessage)
             .createQueryBuilder('m')
@@ -481,8 +483,10 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
         paidConfig.maxPriceCoins,
         paidConfig.basePrice + Math.floor(paidCount / paidConfig.priceStepEvery) * paidConfig.priceStepCoins,
       );
+      // Enforce the paid-message setting after the configured free quota even for mutual follows.
+      // The one-way follow discount is applied below; mutual follows pay the normal configured price.
       const isPaidMessage =
-        paidConfig.enabled && billable && !mutualFollow &&
+        paidConfig.enabled && billable &&
         priorBillableMessages >= paidConfig.freeCount && tierPrice > 0;
       const effectivePrice = oneWayFollow
         ? Math.round(tierPrice * (1 - paidConfig.discountPercent / 100))

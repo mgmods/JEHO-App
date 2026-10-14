@@ -91,6 +91,9 @@ public class AuthRepositoryImpl implements AuthRepository {
 
     @Override
     public Result<Object> logout() {
+        // Save the latest profile before clearing tokens/cache so a transient /me failure
+        // on the next login cannot make an established account look like a new account.
+        sessionManager.saveAccountSnapshot();
         Result<Object> result = ApiCall.execute(api.logout());
         sessionManager.clearAuth();
         io.execute(userDao::clear);

@@ -21,6 +21,7 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 import { findMikooGame } from './mikoo-games.catalog';
+import { isGameEnabled } from './game-odds-runtime';
 
 
 
@@ -130,11 +131,13 @@ export class SlotGamesService {
 
     const secret = await this.readSetting('games.bsgame.code_secret', 'jeho-slot-local');
 
-    const origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+    const origin = (process.env.PUBLIC_API_ORIGIN?.trim() && !/api\.adnova\.bbs\.tr/i.test(process.env.PUBLIC_API_ORIGIN) ? process.env.PUBLIC_API_ORIGIN.trim().replace(/\/+$/, '') : 'https://jeho-own-backend.mgs.blitz.cloud');
 
     const defaultWs = `${this.toWsBase(origin)}/games/ws`;
 
-    const wsBase = await this.readSetting('games.bsgame.ws_base', defaultWs);
+    const configuredWsBase = await this.readSetting('games.bsgame.ws_base', defaultWs);
+    // Existing settings may still contain the retired legacy host; normalize in memory only.
+    const wsBase = /api\.adnova\.bbs\.tr/i.test(configuredWsBase) ? defaultWs : configuredWsBase;
 
     return {
 
@@ -324,6 +327,7 @@ export class SlotGamesService {
     const game = findMikooGame(gameId);
 
     if (!game) throw new BadRequestException('Unknown slot game');
+    if (!isGameEnabled(game.id)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
 
 
 
@@ -342,7 +346,7 @@ export class SlotGamesService {
 
     const code = `${this.signCode(codePayload, cfg.secret)}${nonce}`;
 
-    const origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+    const origin = (process.env.PUBLIC_API_ORIGIN?.trim() && !/api\.adnova\.bbs\.tr/i.test(process.env.PUBLIC_API_ORIGIN) ? process.env.PUBLIC_API_ORIGIN.trim().replace(/\/+$/, '') : 'https://jeho-own-backend.mgs.blitz.cloud');
 
     const currencyIcon = `${origin}/assets/pack/ic_pass_card_coin.png`;
 

@@ -9,6 +9,7 @@ import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.contests.ContestsActivity;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
+import com.Dramizo.Series.presentation.notifications.NotificationsActivity;
 import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 
@@ -21,6 +22,7 @@ public final class NotificationRouter {
     public static Intent build(Context context, String type, Map<String, ?> data) {
         String t = type != null ? type.toLowerCase() : "system";
         String nested = first(data, "type");
+        String notificationKind = first(data, "notificationKind", "eventType");
         if (nested != null) {
             String n = nested.toLowerCase();
             // Push/inbox may wrap room-open as LIVE with data.type=room
@@ -30,6 +32,16 @@ public final class NotificationRouter {
         String conversationId = first(data, "conversation_id", "conversationId");
         String roomId = first(data, "room_id", "roomId");
         String userId = first(data, "user_id", "userId", "senderId", "fromUserId", "actorUserId");
+
+        if ("cp_relationship_request".equalsIgnoreCase(nested)
+                || "cp_relationship_request".equalsIgnoreCase(notificationKind)) {
+            Intent i = new Intent(context, NotificationsActivity.class);
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_ID, first(data, "requestId"));
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_TITLE, first(data, "title"));
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_BODY, first(data, "body"));
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            return i;
+        }
 
         if (("chat".equals(t) || "message".equals(t)) && !TextUtils.isEmpty(conversationId)) {
             Intent i = new Intent(context, ChatConversationActivity.class);

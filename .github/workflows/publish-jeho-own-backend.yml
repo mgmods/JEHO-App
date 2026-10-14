@@ -1,9 +1,10 @@
-name: Publish JEHO-OWN backend image
+name: Publish JEHO-OWN backend image (jeho-own and mg-jeho)
 
 on:
   push:
     branches:
       - jeho-own
+      - MG-JEHO
     paths:
       - "backend/**"
       - ".github/workflows/publish-jeho-own-backend.yml"
@@ -42,4 +43,6 @@ jobs:
           push: true
           tags: |
             ghcr.io/mgmods/jeho-own-backend:jeho-own
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-roomcup-fix
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}

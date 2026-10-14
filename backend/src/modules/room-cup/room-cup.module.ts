@@ -9,6 +9,7 @@ import { WalletTransaction } from '../../database/entities/wallet-transaction.en
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { User } from '../../database/entities/user.entity';
+import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
@@ -21,6 +22,7 @@ import { AuthModule } from '../auth/auth.module';
       Wallet,
       WalletTransaction,
       User,
+      AdminUser,
       VipPlan,
       UserVip,
     ]),

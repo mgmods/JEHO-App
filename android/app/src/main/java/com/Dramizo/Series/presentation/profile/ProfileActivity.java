@@ -5,6 +5,10 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.AlertDialog;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -41,12 +45,16 @@ import com.bumptech.glide.Glide;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 import java.text.NumberFormat;
 
 public class ProfileActivity extends ThemedActivity {
     public static final String EXTRA_USER_ID = "user_id";
     private ActivityProfileBinding binding;
+    private AppContainer container;
     private boolean isFollowingTarget;
+    private AnimatorSet cpHeartAnimator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,7 +70,7 @@ public class ProfileActivity extends ThemedActivity {
             return insets;
         });
         EdgeToEdgeHelper.padBottom(binding.contentRoot);
-        AppContainer container = ContainerProvider.from(this);
+        container = ContainerProvider.from(this);
         ProfileViewModel vm = new ViewModelProvider(this, new ViewModelFactory(container))
                 .get(ProfileViewModel.class);
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
@@ -137,6 +145,10 @@ public class ProfileActivity extends ThemedActivity {
                     }
                 });
             });
+        });
+        binding.btnCpRequest.setOnClickListener(v -> {
+            if (userId == null || myId == null || userId.equals(myId)) return;
+            showCpRequestDialog(userId);
         });
         binding.btnFriend.setOnClickListener(v -> {
             if (userId == null) return;
@@ -223,6 +235,9 @@ public class ProfileActivity extends ThemedActivity {
 
         vm.getUser().observe(this, user -> {
             if (user == null) return;
+            boolean ownProfile = myId != null && myId.equals(user.id);
+            binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
+            loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
@@ -550,6 +565,129 @@ public class ProfileActivity extends ThemedActivity {
         return null;
     }
 
+    private void showCpRequestDialog(String recipientId) {
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(this).setTitle("اختر نوع العلاقة")
+                .setItems(labels, (dialog, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", UUID.randomUUID().toString());
+                    binding.btnCpRequest.setEnabled(false);
+                    container.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = com.Dramizo.Series.util.ApiCall.execute(
+                                container.getUserApi().createProfileCpRequest(body));
+                        runOnUiThread(() -> {
+                            binding.btnCpRequest.setEnabled(true);
+                            Toast.makeText(this, result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                    : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                    Toast.LENGTH_LONG).show();
+                        });
+                    });
+                }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
+        if (targetId == null || targetId.trim().isEmpty()) {
+            hideProfileCpRelationship();
+            return;
+        }
+        container.getIoExecutor().execute(() -> {
+            Result<List<Map<String, Object>>> result = com.Dramizo.Series.util.ApiCall.execute(
+                    container.getUserApi().cpProfileRelationships(targetId));
+            runOnUiThread(() -> {
+                if (isFinishing() || binding == null) return;
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                Map<String, Object> relation = result.data.get(0);
+                Object partnerObj = relation.get("partner");
+                Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                String name = "";
+                String avatar = "";
+                String partnerFrameUrl = "";
+                String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
+                if (partner != null) {
+                    Object displayName = partner.get("displayName");
+                    Object username = partner.get("username");
+                    name = displayName != null && !String.valueOf(displayName).trim().isEmpty()
+                            ? String.valueOf(displayName).trim()
+                            : username != null ? String.valueOf(username).trim() : "";
+                    Object avatarValue = partner.get("avatarUrl");
+                    avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
+                    Object frameValue = partner.get("vipBadgeUrl");
+                    partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
+                }
+                // Render only a real active relationship returned by the API; never synthesize a name or photo.
+                if (partner == null || name.isEmpty()) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                binding.tvProfileCpLabel.setText(cpTypeLabel(type) + " · " + name);
+                bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+                bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
+                // Only render the frame URLs actually returned by the server; never synthesize cosmetics.
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
+                binding.rowProfileCp.setVisibility(View.VISIBLE);
+                binding.btnCpRequest.setVisibility(View.GONE);
+                startProfileCpHeartAnimation();
+            });
+        });
+    }
+
+    private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
+        if (imageView == null) return;
+        if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+            imageView.setImageDrawable(null);
+            imageView.setVisibility(View.GONE);
+            return;
+        }
+        imageView.setVisibility(View.VISIBLE);
+        // Shared loader normalizes relative API paths, retries failed placeholders correctly,
+        // and preserves animated GIF/WebP profile photos.
+        com.Dramizo.Series.util.AvatarImageLoader.load(imageView, avatarUrl.trim());
+    }
+
+    private void startProfileCpHeartAnimation() {
+        if (binding == null || binding.tvProfileCpHeart == null) return;
+        if (cpHeartAnimator != null) cpHeartAnimator.cancel();
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f);
+        for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY, alpha}) {
+            animator.setDuration(900L);
+            animator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.RESTART);
+        }
+        cpHeartAnimator = new AnimatorSet();
+        cpHeartAnimator.playTogether(scaleX, scaleY, alpha);
+        cpHeartAnimator.start();
+    }
+
+    private void hideProfileCpRelationship() {
+        if (binding == null) return;
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
+        binding.rowProfileCp.setVisibility(View.GONE);
+    }
+
+    private String cpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
+    }
+
     private void sendSocialRequest(String targetId, String type, String labelAr) {
         AppContainer container = ContainerProvider.from(this);
         container.getIoExecutor().execute(() -> {
@@ -580,6 +718,10 @@ public class ProfileActivity extends ThemedActivity {
 
     @Override
     protected void onDestroy() {
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
         if (binding != null && binding.webProfileHostSignal != null) {
             binding.webProfileHostSignal.destroy();
         }

@@ -121,13 +121,16 @@ public class ProfileSetupActivity extends ThemedActivity {
             saving = false;
             binding.progress.setVisibility(View.GONE);
             binding.btnContinue.setEnabled(true);
+            // Do not leave onboarding fully transparent when /me fails; the user
+            // must always see a recoverable screen instead of an apparently blank page.
+            binding.getRoot().setAlpha(1f);
             if (error != null) Toast.makeText(this, error, Toast.LENGTH_LONG).show();
         });
 
         binding.progress.setVisibility(View.VISIBLE);
         // Hide form until we know setup is actually required (avoids flash after splash).
         binding.getRoot().setAlpha(0f);
-        viewModel.loadMe();
+        viewModel.loadMeForSetup();
     }
 
     public static boolean isProfileComplete(AuthDtos.UserDto user) {
@@ -135,9 +138,16 @@ public class ProfileSetupActivity extends ThemedActivity {
         // Profile photos are optional. Do not force a personal photo just to
         // finish onboarding or to open a voice room; the backend supplies a
         // neutral/default avatar when avatarUrl is empty.
-        return nonEmpty(user.country)
+        boolean requiredIdentityFieldsPresent = nonEmpty(user.country)
                 && nonEmpty(user.gender)
                 && !"unspecified".equalsIgnoreCase(user.gender);
+        // Some older login responses omit country/gender even though /me or the
+        // saved account snapshot proves that the profile was already created.
+        // Persisted profile fields are evidence of an existing profile, not a new signup.
+        boolean hasPreviouslySavedProfile = nonEmpty(user.bio)
+                || nonEmpty(user.birthday)
+                || nonEmpty(user.country);
+        return requiredIdentityFieldsPresent || hasPreviouslySavedProfile;
     }
 
     private void bindExisting(AuthDtos.UserDto user) {

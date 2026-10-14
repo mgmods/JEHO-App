@@ -348,7 +348,7 @@ export class ConfigController {
 
   @Public()
   @Get('theme')
-  @ApiOperation({ summary: 'Remote app theme/assets managed from server settings' })
+  @ApiOperation({ summary: 'Public remote app theme/assets for pre-login splash and app screens' })
   async theme() {
     const row = await this.settingsRepo.findOne({ where: { key: 'app_theme' } });
     const defaults = {
@@ -399,6 +399,9 @@ export class ConfigController {
         let url = raw;
         if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
           url = apiBase + raw;
+        } else if (/^uploads\//i.test(raw)) {
+          // Older uploads may be stored without the leading slash.
+          url = apiBase + '/' + raw;
         } else if (/^https?:\/\//i.test(raw)) {
           // Older dashboard settings may contain an absolute /uploads URL
           // from the legacy host. Uploaded files are owned by this deployment,

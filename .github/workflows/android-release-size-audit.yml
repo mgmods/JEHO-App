@@ -61,11 +61,11 @@ jobs:
 
       - name: Validate API URL
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1' }}
+          JEHO_OWN_API_URL: https://api.adnova.bbs.tr/api/v1
         shell: bash
         run: |
           if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
-            echo "::error::Using canonical JEHO-CHAT production API unless JEHO_OWN_API_URL is explicitly configured."
+            echo "::error::The release build must use the confirmed Adnova API URL."
             exit 1
           fi
 
@@ -92,7 +92,7 @@ jobs:
       - name: Build release APKs for size measurement only
         working-directory: android
         env:
-          JEHO_OWN_API_URL: ${{ vars.JEHO_OWN_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1' }}
+          JEHO_OWN_API_URL: https://api.adnova.bbs.tr/api/v1
         run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleRelease
 
       - name: Report APK sizes

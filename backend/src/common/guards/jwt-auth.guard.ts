@@ -9,8 +9,9 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { IS_PUBLIC_KEY } from '../decorators';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { User, UserStatus } from '../../database/entities/user.entity';
+import { AdminRole, AdminUser } from '../../database/entities/admin-user.entity';
 import {
   hasDashboardAccess,
   isDashboardSuper,
@@ -28,6 +29,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -65,6 +67,44 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.configService.get<string>('app.jwt.secret'),
       });
+      // Dashboard sessions are backed by admin_users, not app users.
+      // Resolve this repository from the root TypeORM DataSource so guarded
+      // feature modules do not each need to register AdminUser in forFeature.
+      // Accept older signed dashboard sessions that predate tokenType, but only when
+      // the token explicitly identifies itself as an admin session. The admin must
+      // still exist in admin_users and be active; ordinary app-user tokens are not promoted.
+      if (
+        payload.tokenType === 'dashboard' ||
+        (payload.role === 'admin' && payload.isAdmin === true)
+      ) {
+        const admin = await this.dataSource.getRepository(AdminUser).findOne({
+          where: { id: payload.sub },
+        });
+        if (!admin || !admin.isActive) {
+          if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
+          return false;
+        }
+        const staffRole = String(admin.staffRole || (admin.role === AdminRole.SUPER ? 'super' : 'operator'));
+        const superAdmin = staffRole === 'super' || admin.role === 'super';
+        const permissions = superAdmin
+          ? fullPermissions()
+          : normalizePermissions(admin.dashboardPermissions);
+        request.user = {
+          ...payload,
+          sub: admin.id,
+          username: admin.username,
+          email: admin.email,
+          isAdmin: true,
+          isSuperAdmin: superAdmin,
+          staffRole: superAdmin ? 'super' : 'operator',
+          permissions,
+          role: 'admin',
+          isGuest: false,
+          authSource: 'dashboard',
+        };
+        return true;
+      }
+
       const user = await this.usersRepo.findOne({ where: { id: payload.sub } });
       if (!user || user.status !== UserStatus.ACTIVE) {
         if (required) {

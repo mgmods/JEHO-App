@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Mikoo home_act_banner_layout: ثروة قلاب + CP + نشاط -->
+<!-- Home rankings: wealth HTML + CP HTML + popularity ranking -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/actBannerLayout"
     android:layout_width="match_parent"
@@ -13,7 +13,7 @@
         android:id="@+id/rankBannerFlip"
         android:layout_width="0dp"
         android:layout_height="64dp"
-        android:layout_weight="1.7"
+        android:layout_weight="1"
         android:autoStart="true"
         android:flipInterval="3000"
         android:inAnimation="@android:anim/fade_in"

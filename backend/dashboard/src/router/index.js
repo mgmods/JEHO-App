@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { i18n } from '@/i18n'
+import GamesView from '@/views/GamesView.vue'
 
 const routes = [
   {
@@ -67,6 +68,12 @@ const routes = [
         name: 'banners',
         component: () => import('@/views/BannersView.vue'),
         meta: { titleKey: 'routes.banners' },
+      },
+      {
+        path: 'splash',
+        name: 'splash',
+        component: () => import('@/views/BannersView.vue'),
+        meta: { title: 'إدارة السبلاش' },
       },
       {
         path: 'nav-icons',
@@ -151,7 +158,7 @@ const routes = [
       {
         path: 'games',
         name: 'games',
-        component: () => import('@/views/GamesView.vue'),
+        component: GamesView,
         meta: { titleKey: 'routes.games' },
       },
       {

@@ -386,13 +386,36 @@ public class EditProfileActivity extends ThemedActivity {
                 MultipartBody.Part part = AvatarImageLoader.multipartFromUri(
                         getContentResolver(), uri, cover ? "cover" : "avatar");
                 Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
-                if (resp.isSuccessful() && resp.body() != null && resp.body().success && resp.body().data != null) {
+                if (resp.isSuccessful() && resp.body() != null && resp.body().success
+                        && resp.body().data != null && resp.body().data.url != null
+                        && !resp.body().data.url.trim().isEmpty()) {
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
+                    // Uploading the file alone is not enough: persist the selected image URL
+                    // before telling the user it is applied. Send only the changed image field
+                    // so unsaved name/bio edits in this form are not overwritten.
+                    MiscDtos.UpdateProfileRequest imagePatch = new MiscDtos.UpdateProfileRequest();
+                    if (cover) imagePatch.coverUrl = url;
+                    else imagePatch.avatarUrl = url;
+                    Response<ApiResponse<AuthDtos.UserDto>> saved =
+                            c.getUserApi().updateProfile(imagePatch).execute();
+                    if (!saved.isSuccessful() || saved.body() == null || !saved.body().success) {
+                        throw new IllegalStateException(
+                                UploadApi.errorMessage(saved, "تم رفع الصورة لكن تعذر تطبيقها على الملف الشخصي"));
+                    }
                     runOnUiThread(() -> {
+                        if (isFinishing() || binding == null) return;
                         binding.progress.setVisibility(View.GONE);
-                        if (cover) binding.etCover.setText(url);
-                        else binding.etAvatar.setText(url);
-                        Toast.makeText(this, "تم رفع الصورة — اضغط حفظ", Toast.LENGTH_SHORT).show();
+                        if (cover) {
+                            binding.etCover.setText(url);
+                            Glide.with(EditProfileActivity.this).load(url)
+                                    .placeholder(ImagePlaceholder.cover()).centerCrop()
+                                    .into(binding.imgCoverPreview);
+                        } else {
+                            binding.etAvatar.setText(url);
+                            AvatarImageLoader.load(binding.imgAvatarPreview, url);
+                        }
+                        Toast.makeText(EditProfileActivity.this, "تم رفع الصورة وتطبيقها بنجاح",
+                                Toast.LENGTH_SHORT).show();
                     });
                 } else {
                     runOnUiThread(() -> {

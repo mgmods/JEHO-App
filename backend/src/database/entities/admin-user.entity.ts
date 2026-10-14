@@ -27,14 +27,24 @@ export class AdminUser {
   @Column({ type: 'varchar', length: 48 })
   username: string;
 
+  @Column({ type: 'varchar', length: 120, default: 'Dashboard Admin' })
+  displayName: string;
+
   @Column({ type: 'varchar', length: 255, select: false })
   passwordHash: string;
 
   @Column({ type: 'enum', enum: AdminRole, default: AdminRole.MODERATOR })
   role: AdminRole;
 
+  /** Optional migration reference only; never used to authorize dashboard access. */
   @Column({ type: 'uuid', nullable: true })
   linkedUserId: string | null;
+
+  @Column({ type: 'varchar', length: 16, default: 'operator' })
+  staffRole: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  dashboardPermissions: Record<string, string> | null;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;

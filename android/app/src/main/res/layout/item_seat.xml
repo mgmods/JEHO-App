@@ -13,16 +13,16 @@
     android:paddingHorizontal="2dp">
 
     <FrameLayout
-        android:layout_width="100dp"
-        android:layout_height="100dp"
+        android:layout_width="76dp"
+        android:layout_height="76dp"
         android:clipChildren="false"
         android:clipToPadding="false">
 
         <!-- Speak waves: larger than avatar so rings expand around the seat -->
         <com.Dramizo.Series.widget.SeatSpeakLightningView
             android:id="@+id/seatSpeakAura"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
+            android:layout_width="76dp"
+            android:layout_height="76dp"
             android:layout_gravity="center"
             android:clickable="false"
             android:focusable="false"
@@ -79,8 +79,8 @@
 
         <ImageView
             android:id="@+id/imgFrame"
-            android:layout_width="76dp"
-            android:layout_height="76dp"
+            android:layout_width="68dp"
+            android:layout_height="68dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:scaleType="fitCenter"

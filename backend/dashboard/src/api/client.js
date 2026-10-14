@@ -3,9 +3,10 @@ import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
 const api = axios.create({
-  // Set VITE_API_URL in the environment for the independent JEHO-OWN backend.
-  // Never silently send dashboard requests to the previous production server.
-  baseURL: import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1',
+  // Dashboard is hosted by the JEHO-OWN backend at /admin/, so use the
+  // same origin's /api/v1 by default and avoid stale production API data.
+  // VITE_API_URL remains available for explicit deployment overrides.
+  baseURL: import.meta.env.VITE_API_URL || '/api/v1',
   timeout: 120000,
   headers: {
     'Content-Type': 'application/json',

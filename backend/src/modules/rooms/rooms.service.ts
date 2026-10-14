@@ -145,6 +145,12 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     try {
       await this.dataSource.query(
+        `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "publicId" VARCHAR(6)`,
+      );
+      await this.dataSource.query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_rooms_publicId" ON rooms ("publicId") WHERE "publicId" IS NOT NULL`,
+      );
+      await this.dataSource.query(
         `ALTER TABLE rooms ADD COLUMN IF NOT EXISTS "liveSessionStartedAt" TIMESTAMPTZ`,
       );
       await this.dataSource.query(
@@ -663,6 +669,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return `/assets/${card}.png?v=20260730c`;
   }
 
+  private async allocateRoomPublicId(): Promise<string> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
+      const exists = await this.roomsRepo.exist({ where: { publicId: candidate } });
+      if (!exists) return candidate;
+    }
+    throw new ConflictException('تعذر إنشاء آيدي روم فريد، حاول مرة أخرى');
+  }
+
   async create(hostId: string, dto: CreateRoomDto) {
     const host = await this.usersRepo.findOne({
       where: { id: hostId },
@@ -750,6 +765,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const hostCard =
       (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
     const room = this.roomsRepo.create({
+      publicId: await this.allocateRoomPublicId(),
       title,
       description: dto.description || null,
       coverUrl,
@@ -870,6 +886,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const hostCard =
       (host.profile as { roomCardUrl?: string | null } | undefined)?.roomCardUrl || null;
     const room = this.roomsRepo.create({
+      publicId: await this.allocateRoomPublicId(),
       title,
       description: dto.description || null,
       coverUrl,
@@ -1225,6 +1242,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return anim || url || null;
   }
 
+  /**
+   * Phone-uploaded room wallpapers are private upload assets, not Mall cosmetics.
+   * Keep their server-generated UUID paths when decorating GET /rooms responses.
+   */
+  private isUploadedRoomImageUrl(url: string | null | undefined): boolean {
+    const path = String(url || '').trim().split('?')[0];
+    // Multer's default disk filename is 32 lowercase hex characters with no extension.
+    // UploadsService returns that exact /uploads/<filename> path, so accept it as a
+    // phone-uploaded wallpaper as well as UUID filenames that already include an image extension.
+    return /^\/uploads\/(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif))$/i.test(path);
+  }
+
   private async activeOwnedWearUrl(
     userId: string,
     url: string | null,
@@ -1346,14 +1375,18 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       else if (s.user?.id) userIds.push(s.user.id);
     }
     const vipMap = await this.vipMapForUsers(userIds);
-    const [equippedBackground] =
-      await Promise.all([
-        this.activeOwnedWearUrl(
-          room.backgroundEquippedById || room.hostId,
-          room.backgroundUrl,
-          false,
-        ),
-      ]);
+    const uploadedRoomBackground = this.isUploadedRoomImageUrl(room.backgroundUrl)
+      ? String(room.backgroundUrl).trim()
+      : null;
+    const [equippedBackground] = await Promise.all([
+      uploadedRoomBackground
+        ? Promise.resolve(uploadedRoomBackground)
+        : this.activeOwnedWearUrl(
+            room.backgroundEquippedById || room.hostId,
+            room.backgroundUrl,
+            false,
+          ),
+    ]);
     // Prefer room-level frame; fall back to host profile / host DTO (mall equip).
     const fromRoom =
       typeof room.roomCardUrl === 'string' && room.roomCardUrl.trim()
@@ -1380,6 +1413,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         : null;
     const roomCardUrl = fromRoom || fromHostProfile || fromHostDto || null;
     let finalRoomCardUrl = roomCardUrl;
+    if (!room.publicId) {
+      try {
+        room.publicId = await this.allocateRoomPublicId();
+        await this.roomsRepo.update({ id: room.id }, { publicId: room.publicId });
+      } catch {
+        // Keep the room visible even if ID allocation temporarily fails.
+      }
+    }
     const decorated = {
       ...room,
       roomCardUrl: finalRoomCardUrl,
@@ -1431,7 +1472,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
           if (!agencyPublicId) {
             // Lazy-assign GID so room UI never falls back to owner user id.
             for (let i = 0; i < 12; i++) {
-              const candidate = String(10000 + Math.floor(Math.random() * 90000));
+              const candidate = String(100000 + Math.floor(Math.random() * 900000));
               const clash = await this.agenciesRepo.findOne({
                 where: { publicId: candidate },
               });
@@ -1446,7 +1487,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
               }
             }
             if (!agencyPublicId) {
-              agencyPublicId = String(10000 + (Date.now() % 90000));
+              agencyPublicId = String(100000 + (Date.now() % 900000));
               await this.agenciesRepo.update(
                 { id: agency.id },
                 { publicId: agencyPublicId },
@@ -1477,10 +1518,8 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       backgroundUrl: equippedBackground,
       roomLabel: isSupport ? 'support' : isAgency ? 'agency' : 'personal',
       isSupport,
-      // Agency: show agency GID. Personal/support: host publicId.
-      displayRoomId: isAgency
-        ? agencyPublicId || decorated.host?.publicId || null
-        : decorated.host?.publicId || null,
+      // Room ID is independent from both the host account ID and agency ID.
+      displayRoomId: decorated.publicId || null,
       agencyPublicId,
       agencyLogoUrl,
       agencyLevel,
@@ -3519,10 +3558,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       // Room owners may upload a private wallpaper from their phone. Only accept
       // server-generated /uploads UUID image paths here; catalog URLs still need
       // to pass the existing owned/free cosmetic check.
-      const uploadedImagePath = next.split('?')[0];
-      const isUploadedRoomImage =
-        /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|gif)$/i.test(uploadedImagePath);
-      if (!isUploadedRoomImage) {
+      if (!this.isUploadedRoomImageUrl(next)) {
         await this.assertOwnedRoomCosmetic(actorId, 'room_background', next);
       }
     }

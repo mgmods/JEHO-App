@@ -30,9 +30,10 @@ export class AdminGuard implements CanActivate {
       isAdmin?: boolean;
       isSuperAdmin?: boolean;
       permissions?: PermissionsMap | null;
+      authSource?: string;
     } | null;
 
-    if (!user || !hasDashboardAccess(user)) {
+    if (!user || user.authSource !== 'dashboard' || !hasDashboardAccess(user)) {
       throw new ForbiddenException(
         'Dashboard access required — Super or limited admin only',
       );

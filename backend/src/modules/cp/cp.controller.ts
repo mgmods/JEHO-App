@@ -49,6 +49,15 @@ export class CpController {
     return this.cp.createRequest(userId, body);
   }
 
+  @Post('profile-requests')
+  @ApiOperation({ summary: 'Send a relationship request directly from a user profile without a room gift' })
+  createProfileRequest(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { recipientId: string; type: CpType; idempotencyKey: string },
+  ) {
+    return this.cp.createProfileRequest(userId, body);
+  }
+
   @Get('sent-requests')
   sentRequests(@CurrentUser('sub') userId: string) {
     return this.cp.sentRequests(userId);

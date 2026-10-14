@@ -756,39 +756,39 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         switch (scaleMode) {
             case SCALE_COMPACT -> {
                 // Mikoo 20-mic: container 64dp, avatar 48dp
-                frame = 64;
-                avatar = 48;
-                ring = 50;
-                reaction = 50;
+                frame = 60;
+                avatar = 45;
+                ring = 47;
+                reaction = 47;
                 muted = 14;
-                nameMax = 60;
-                nameSp = 10f;
+                nameMax = 56;
+                nameSp = 9.5f;
                 padTop = 1;
                 padBottom = 2;
                 hostMark = 11;
             }
             case SCALE_MEDIUM -> {
                 // Between normal and compact (15 mics / 3 rows)
-                frame = 70;
-                avatar = 52;
-                ring = 54;
-                reaction = 54;
+                frame = 66;
+                avatar = 49;
+                ring = 51;
+                reaction = 51;
                 muted = 15;
-                nameMax = 66;
-                nameSp = 10.5f;
+                nameMax = 62;
+                nameSp = 10f;
                 padTop = 2;
                 padBottom = 3;
                 hostMark = 12;
             }
             default -> {
-                // Mikoo default item_rv_multi_audio_micro: 80 / 55
-                frame = 80;
-                avatar = 55;
-                ring = 55;
-                reaction = 56;
+                // Slightly compacted normal room seats to preserve spacing around room controls.
+                frame = 74;
+                avatar = 51;
+                ring = 53;
+                reaction = 53;
                 muted = 16;
-                nameMax = 72;
-                nameSp = 11f;
+                nameMax = 68;
+                nameSp = 10.5f;
                 padTop = 2;
                 padBottom = 4;
                 hostMark = 12;

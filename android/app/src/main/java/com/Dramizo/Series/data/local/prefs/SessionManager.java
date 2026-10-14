@@ -90,10 +90,58 @@ public class SessionManager {
 
     public void updateCachedUser(AuthDtos.UserDto user) {
         if (user == null) return;
+        String identifier = user.username != null ? user.username
+                : (user.email != null ? user.email : user.publicId);
+        user = restoreSavedAccountProfile(user, identifier);
         prefs.edit()
                 .putString("user_json", gson.toJson(user))
                 .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
                 .commit();
+        // Keep the per-account snapshot fresh so logout/login never loses profile fields.
+        saveAccountSnapshot();
+    }
+
+    /**
+     * Restore fields omitted by a partial login /me response from this same account's
+     * last saved snapshot. Non-empty values returned by the server always win.
+     */
+    public AuthDtos.UserDto restoreSavedAccountProfile(AuthDtos.UserDto incoming, String identifier) {
+        if (incoming == null || identifier == null || identifier.trim().isEmpty()) return incoming;
+        AuthDtos.UserDto saved = getSavedAccountUser(identifier);
+        if (saved == null || incoming.id == null || saved.id == null
+                || !incoming.id.equals(saved.id)) return incoming;
+        try {
+            for (java.lang.reflect.Field field : AuthDtos.UserDto.class.getFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                Object fresh = field.get(incoming);
+                Object old = field.get(saved);
+                if (old == null) continue;
+                boolean restore = fresh == null;
+                if (fresh instanceof String) {
+                    restore = ((String) fresh).trim().isEmpty();
+                } else if (fresh instanceof java.util.Collection) {
+                    restore = ((java.util.Collection<?>) fresh).isEmpty();
+                } else if (fresh instanceof java.util.Map) {
+                    restore = ((java.util.Map<?, ?>) fresh).isEmpty();
+                } else if (field.getType().isPrimitive()) {
+                    if (field.getType() == boolean.class) {
+                        restore = !((Boolean) fresh) && ((Boolean) old);
+                    } else if (field.getType() == int.class) {
+                        restore = ((Integer) fresh) == 0 && ((Integer) old) != 0;
+                    } else if (field.getType() == long.class) {
+                        restore = ((Long) fresh) == 0L && ((Long) old) != 0L;
+                    } else if (field.getType() == double.class) {
+                        restore = ((Double) fresh) == 0d && ((Double) old) != 0d;
+                    } else if (field.getType() == float.class) {
+                        restore = ((Float) fresh) == 0f && ((Float) old) != 0f;
+                    }
+                }
+                if (restore) field.set(incoming, old);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not merge saved account profile", e);
+        }
+        return incoming;
     }
 
     public String getAccessToken() { return prefs.getString("access_token", null); }
@@ -174,6 +222,8 @@ public class SessionManager {
     }
 
     public void clearAuth() {
+        // Logout ends authentication only; preserve the complete account snapshot first.
+        saveAccountSnapshot();
         prefs.edit()
                 .remove("access_token")
                 .remove("refresh_token")
@@ -319,6 +369,22 @@ public class SessionManager {
         return new java.util.ArrayList<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
     }
 
+    /**
+     * Returns the last saved profile snapshot for the same login account.
+     * Used only as a fallback when /me is temporarily unavailable after login.
+     */
+    public AuthDtos.UserDto getSavedAccountUser(String username) {
+        if (username == null || username.trim().isEmpty()) return null;
+        String blob = prefs.getString("acc_" + username.trim(), null);
+        if (blob == null || blob.isEmpty()) return null;
+        try {
+            SavedAccount account = gson.fromJson(blob, SavedAccount.class);
+            return account != null ? account.user : null;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     /** Full saved account cards (display name, avatar, frame, public ID). */
     public java.util.List<SavedAccountInfo> listSavedAccountDetails() {
         java.util.ArrayList<SavedAccountInfo> out = new java.util.ArrayList<>();
@@ -353,6 +419,30 @@ public class SessionManager {
                 .putString("user_id", a.user != null ? a.user.id : null)
                 .commit();
         return true;
+    }
+
+    /** Return the last saved server profile for an account after logout or a transient /me failure. */
+    public AuthDtos.UserDto getSavedAccountUser(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) return null;
+        String key = identifier.trim();
+        for (String username : listSavedAccounts()) {
+            if (username == null) continue;
+            String blob = prefs.getString("acc_" + username, null);
+            if (blob == null) continue;
+            try {
+                SavedAccount account = gson.fromJson(blob, SavedAccount.class);
+                AuthDtos.UserDto user = account != null ? account.user : null;
+                if (user == null) continue;
+                if (username.equalsIgnoreCase(key)
+                        || (user.username != null && user.username.equalsIgnoreCase(key))
+                        || (user.email != null && user.email.equalsIgnoreCase(key))
+                        || (user.publicId != null && user.publicId.equalsIgnoreCase(key))) {
+                    return user;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
     }
 
     public void removeSavedAccount(String username) {

@@ -3,6 +3,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -131,7 +132,6 @@ import java.io.InputStream;
 import com.Dramizo.Series.rtc.LiveKitEngineManager;
 import com.Dramizo.Series.rtc.RoomRtcEngine;
 import com.Dramizo.Series.zego.ZegoEngineManager;
-import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.gson.JsonObject;
 
@@ -411,6 +411,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        applyRoomBottomSafeArea();
+        initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
@@ -813,6 +815,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnPrivateMsg.setOnClickListener(v ->
                     RoomPrivateMsgSheet.showSheet(getSupportFragmentManager()));
         }
+        if (binding.btnWriteMessage != null) {
+            binding.btnWriteMessage.setOnClickListener(v -> openRoomChatComposer(true));
+            binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        }
         binding.btnTools.setOnClickListener(v -> showOtherTools());
         binding.btnHeaderMore.setOnClickListener(v -> openRoomSharePicker());
         if (binding.btnHeaderHome != null) {
@@ -833,7 +839,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnSeatSticker.setOnClickListener(v -> showEmojiPicker());
         }
         binding.btnGames.setOnClickListener(v -> showRoomGames());
+
+        // Keep the room's bottom action row present after room/UI rebinding.
+        // The microphone remains governed exclusively by seated state in syncMicUi().
+        if (binding.bottomBar != null && !roomComposerOpen) {
+            binding.bottomBar.setVisibility(View.VISIBLE);
+        }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        if (binding.tvChatInputTips != null && !roomComposerOpen) {
+            binding.tvChatInputTips.setVisibility(View.VISIBLE);
+        }
+        if (binding.bottomBar != null && !roomComposerOpen) binding.bottomBar.bringToFront();
+
+        // Room side shortcuts. Keep the music shortcut on the existing music flow;
+        // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
+        View sideMusic = findViewById(R.id.btnRoomSideMusic);
+        View sideGames = findViewById(R.id.btnRoomSideGames);
+        View sideSettings = findViewById(R.id.btnRoomSideSettings);
+        if (sideMusic != null) {
+            sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
+        }
+        if (sideGames != null) {
+            sideGames.setOnClickListener(v -> showRoomGames());
+        }
+        if (sideSettings != null) {
+            sideSettings.setOnClickListener(v -> showOtherTools());
+        }
+
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
+        if (binding.btnSendChatInline != null) {
+            binding.btnSendChatInline.setOnClickListener(v -> openRoomChatComposer(true));
+        }
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setOnClickListener(v -> openRoomChatComposer(true));
         }
@@ -1791,7 +1830,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Restore gift/games/settings row under the tip pill.
         if (binding.bottomBar != null) {
             binding.bottomBar.setVisibility(View.VISIBLE);
+            // Keep the bottom actions above chat/effect overlays after the composer closes.
+            binding.bottomBar.bringToFront();
         }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        // The mic button is intentionally controlled only by syncMicUi() and seat state.
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
         }
@@ -2066,6 +2112,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             rowLl.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             rowLl.setGravity(android.view.Gravity.START);
         }
+        // Tag each rendered row so the three feed tabs can filter without touching RTC.
+        row.setTag(gameCel ? "event" : (giftIconUrl != null && !giftIconUrl.isEmpty()
+                ? "gift" : (system ? "event" : "chat")));
+        row.setVisibility(activeRoomFeed == 0
+                || (activeRoomFeed == 1 && "chat".equals(row.getTag()))
+                || (activeRoomFeed == 2 && "gift".equals(row.getTag()))
+                ? View.VISIBLE : View.GONE);
         binding.chatLog.addView(row);
         // Keep all live-session messages — never drop mid-broadcast (only end live clears).
         if (roomId != null && !restoringRoomChat) {
@@ -3166,12 +3219,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null) return;
         // "منطقة الدردشة" = أيقونة الرسائل الخاصة (btnPrivateMsg) فقط —
         // لا تخفي بث الشات العام ولا صندوق "اكتب…".
-        roomChatZoneVisible = enabled;
-        int vis = enabled ? View.VISIBLE : View.GONE;
+        // Keep the private-message shortcut available in the room toolbar.
+        // The room chat-zone setting controls the chat panel, not the bottom action button.
+        roomChatZoneVisible = true;
         if (binding.btnPrivateMsg != null) {
-            binding.btnPrivateMsg.setVisibility(vis);
-            binding.btnPrivateMsg.setEnabled(enabled);
-            binding.btnPrivateMsg.setClickable(enabled);
+            binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+            binding.btnPrivateMsg.setEnabled(true);
+            binding.btnPrivateMsg.setClickable(true);
         }
         // Ensure public room chat UI stays available.
         if (binding.chatPanel != null && binding.chatPanel.getVisibility() != View.VISIBLE) {
@@ -6481,6 +6535,37 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private void showRoomCardCpRequest(String recipientId, AppContainer cpContainer) {
+        if (recipientId == null || recipientId.isEmpty() || recipientId.equals(myUserId)) return;
+        final String[] types = {"friendship", "brotherhood", "love", "engagement", "marriage"};
+        final String[] labels = {"الصداقة", "الأخوّة", "الحب", "الخطوبة", "الزواج"};
+        new AlertDialog.Builder(this).setTitle("اختر نوع علاقة CP")
+                .setItems(labels, (d, which) -> {
+                    Map<String, String> body = new HashMap<>();
+                    body.put("recipientId", recipientId);
+                    body.put("type", types[which]);
+                    body.put("idempotencyKey", java.util.UUID.randomUUID().toString());
+                    cpContainer.getIoExecutor().execute(() -> {
+                        Result<Map<String, Object>> result = ApiCall.execute(cpContainer.getUserApi().createProfileCpRequest(body));
+                        runOnUiThread(() -> Toast.makeText(this,
+                                result.success ? "تم إرسال طلب " + labels[which] + " ✓"
+                                        : (result.error != null ? result.error : "تعذر إرسال الطلب"),
+                                Toast.LENGTH_LONG).show());
+                    });
+                }).setNegativeButton("إلغاء", null).show();
+    }
+
+    private String roomCpTypeLabel(String type) {
+        switch (type) {
+            case "friendship": return "✦ علاقة صداقة";
+            case "brotherhood": return "♛ علاقة أخوّة";
+            case "love": return "♥ علاقة حب";
+            case "engagement": return "💍 علاقة خطوبة";
+            case "marriage": return "💞 علاقة زواج";
+            default: return "علاقة CP";
+        }
+    }
+
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
                               int vipLevel, int userLevel) {
         showUserCard(userId, name, avatarUrl, frameUrl, null, vipLevel, userLevel);
@@ -6637,6 +6722,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView chipFirstDay = sheet.findViewById(R.id.chipFirstDay);
         TextView btnHi = sheet.findViewById(R.id.btnHi);
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
+        View actCpRequest = sheet.findViewById(R.id.actCpRequest);
+        View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
@@ -6649,7 +6738,39 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             com.Dramizo.Series.presentation.common.UserSocialNav.wireUserCard(
                     this, sheet, userId, myUserId, dialog::dismiss);
         }
-        com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
+        // CP requests are profile-level and independent of the room gift request flow.
+        if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        AppContainer cpContainer = ContainerProvider.from(this);
+        if (actCpRequest != null) {
+            actCpRequest.setVisibility(userId != null && !userId.equals(myUserId) ? View.VISIBLE : View.GONE);
+            actCpRequest.setOnClickListener(v -> showRoomCardCpRequest(userId, cpContainer));
+        }
+        if (userId != null && !userId.equals(myUserId)) {
+            cpContainer.getIoExecutor().execute(() -> {
+                Result<List<Map<String, Object>>> cpResult = ApiCall.execute(cpContainer.getUserApi().cpProfileRelationships(userId));
+                if (!cpResult.success || cpResult.data == null || cpResult.data.isEmpty()) return;
+                Map<String, Object> rel = cpResult.data.get(0);
+                Object partnerObject = rel.get("partner");
+                Map<?, ?> cpPartner = partnerObject instanceof Map ? (Map<?, ?>) partnerObject : null;
+                String type = String.valueOf(rel.get("type") == null ? "" : rel.get("type"));
+                String cpName = cpPartner == null ? "" : String.valueOf(cpPartner.get("displayName") != null
+                        ? cpPartner.get("displayName") : cpPartner.get("username"));
+                String cpAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? ""
+                        : String.valueOf(cpPartner.get("avatarUrl"));
+                runOnUiThread(() -> {
+                    if (rowCpRelationship == null || dialog.getWindow() == null) return;
+                    rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(type)
+                            + (cpName.isEmpty() ? "" : " · " + cpName));
+                    if (imgCpPartnerAvatar != null && !cpAvatar.isEmpty()) {
+                        Glide.with(VoiceRoomActivity.this).load(cpAvatar)
+                                .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
+                });
+            });
+        }
+                com.Dramizo.Series.util.AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, vipLevel);
         bindVipUserCardMedal(imgVipMedal, vipLevel, null);
         ImageView hostBadge = sheet.findViewById(R.id.imgUserHostBadge);
         HostSignalView userCardHostSignal = sheet.findViewById(R.id.userCardHostSignal);
@@ -7328,6 +7449,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
+    /**
+     * The room is edge-to-edge so its background stays full bleed, but the bottom
+     * action row must sit above Android's transparent navigation/gesture bar.
+     */
+    private void applyRoomBottomSafeArea() {
+        if (binding == null || binding.bottomBar == null) return;
+        ViewGroup.LayoutParams initial = binding.bottomBar.getLayoutParams();
+        final int originalBottomMargin = initial instanceof ConstraintLayout.LayoutParams
+                ? ((ConstraintLayout.LayoutParams) initial).bottomMargin : 0;
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (root, insets) -> {
+            Insets navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            ViewGroup.LayoutParams raw = binding.bottomBar.getLayoutParams();
+            if (raw instanceof ConstraintLayout.LayoutParams) {
+                ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) raw;
+                int safeBottomMargin = Math.max(originalBottomMargin, navBars.bottom);
+                if (lp.bottomMargin != safeBottomMargin) {
+                    lp.bottomMargin = safeBottomMargin;
+                    binding.bottomBar.setLayoutParams(lp);
+                }
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(binding.getRoot());
+    }
+
     private void syncMicUi() {
         if (binding == null || binding.imgMicIcon == null) return;
         // Mic control only while seated (TikTok-style: viewers don't get a mic button).
@@ -7955,6 +8101,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && y >= loc[1] && y <= loc[1] + view.getHeight();
     }
 
+    // Room feed tabs filter presentation only; they do not change room events or audio state.
+    private int activeRoomFeed = 0; // 0 = all activity, 1 = text chat, 2 = gifts only
+
+    private void initRoomFeedTabs() {
+        View all = findViewById(R.id.tabRoomAll);
+        View chat = findViewById(R.id.tabRoomChat);
+        View gifts = findViewById(R.id.tabRoomGifts);
+        if (all != null) all.setOnClickListener(v -> applyRoomFeedFilter(0));
+        if (chat != null) chat.setOnClickListener(v -> applyRoomFeedFilter(1));
+        if (gifts != null) gifts.setOnClickListener(v -> applyRoomFeedFilter(2));
+        applyRoomFeedFilter(0);
+    }
+
+    private void applyRoomFeedFilter(int filter) {
+        activeRoomFeed = Math.max(0, Math.min(2, filter));
+        setRoomFeedTabSelected(R.id.tabRoomAll, activeRoomFeed == 0);
+        setRoomFeedTabSelected(R.id.tabRoomChat, activeRoomFeed == 1);
+        setRoomFeedTabSelected(R.id.tabRoomGifts, activeRoomFeed == 2);
+        if (binding == null || binding.chatLog == null) return;
+        for (int i = 0; i < binding.chatLog.getChildCount(); i++) {
+            View row = binding.chatLog.getChildAt(i);
+            Object value = row.getTag();
+            String kind = value instanceof String ? (String) value : "event";
+            boolean visible = activeRoomFeed == 0
+                    || (activeRoomFeed == 1 && "chat".equals(kind))
+                    || (activeRoomFeed == 2 && "gift".equals(kind));
+            row.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+        if (binding.scrollChat != null) binding.scrollChat.post(() -> {
+            if (binding != null && binding.scrollChat != null) binding.scrollChat.scrollTo(0, 0);
+        });
+    }
+
+    private void setRoomFeedTabSelected(int id, boolean selected) {
+        View view = findViewById(id);
+        if (view instanceof TextView) {
+            TextView tab = (TextView) view;
+            tab.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            tab.setTextColor(selected ? 0xFFFFFFFF : 0xFFD6E6DF);
+            tab.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+    }
+
     private void switchRoomFeed(int direction) {
         if (isHost || roomId == null || switchingRoom || hoppingRoom || exiting) return;
         switchingRoom = true;
@@ -8100,7 +8289,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.luckyFloatWrap.setScaleX(shortScreen ? 0.84f : 1f);
         binding.luckyFloatWrap.setScaleY(shortScreen ? 0.84f : 1f);
 
-        binding.btnTools.setVisibility(View.VISIBLE);
+        binding.btnTools.setVisibility(View.GONE);
+        binding.btnGames.setVisibility(View.GONE);
         int controlMargin = narrow ? 3 : 6;
         setStartMargin(binding.btnMic, controlMargin);
         setStartMargin(binding.btnGift, controlMargin);

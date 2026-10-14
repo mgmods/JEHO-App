@@ -12,6 +12,10 @@
     </PageHeader>
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+    <div v-if="pageRuntimeError" class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+      <span>تعذّر عرض جزء من صفحة الألعاب: {{ pageRuntimeError }}</span>
+      <button class="btn btn-sm btn-outline-light" type="button" @click="retryPage">إعادة تحميل بيانات الألعاب</button>
+    </div>
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
     <div class="glass p-3 mb-3 small text-muted">
@@ -95,8 +99,11 @@
     </div>
 
     <div class="glass p-3">
-      <LoadingSpinner v-if="loading" />
-      <div v-else-if="!games.length" class="empty-state p-5 text-center">{{ t('games.noGames') }}</div>
+      <LoadingSpinner v-if="loading && !games.length" />
+      <div v-else-if="!games.length" class="empty-state p-5 text-center">
+        {{ t('games.noGames') }}
+        <button class="btn btn-outline-light btn-sm mt-3" type="button" @click="load">إعادة المحاولة</button>
+      </div>
       <div v-else class="catalog-grid widget-grid">
         <article
           v-for="(g, idx) in games"
@@ -151,6 +158,52 @@
           </div>
         </article>
       </div>
+    </div>
+
+    <div class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div><h3 class="h6 mb-1">التحكم الفعلي بتشغيل الألعاب</h3><p class="small text-muted mb-0">إلغاء التحديد يعطّل اللعبة من الخادم لجميع المستخدمين، وليس إخفاءها فقط.</p></div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input v-model="disabledGames" class="form-check-input" type="checkbox" :value="game.id" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+          <h3 class="h6 mb-1">نسبة الفوز لكل لعبة</h3>
+          <p class="small text-muted mb-0">نسبة موحّدة لكل المستخدمين. هذه الإعدادات لا تُطبّق على نتائج يحسمها مزوّد خارجي ما لم يدعم المزوّد التحكم بها.</p>
+        </div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ نسب الفوز</button>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-label small mb-1">{{ game.label }} — نسبة الفوز %</label>
+          <input :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
+          <div class="small mt-1" :class="supportsDirectWinRate(game.id) ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'تُطبّق من الخادم' : 'نتيجة مشتركة/محرك خارجي؛ يلزم ضبط منفصل' }}</div>
+        </div>
+      </div>
+      <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
+    </div>
+
+    <div class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+          <h3 class="h6 mb-1">نسبة العائد للألعاب ذات النتيجة المشتركة</h3>
+          <p class="small text-muted mb-0">تؤثر على اختيار نتيجة الجولة المشتركة، وليست ضمانًا أن يربح أو يخسر كل لاعب في الجولة نفسها.</p>
+        </div>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames.filter(g => supportsSharedRtp(game.id))" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-label small mb-1">{{ game.label }} — عائد اللاعب %</label>
+          <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
+        </div>
+      </div>
+      <div class="small text-muted mt-2">يُحفظ هذا الإعداد مع زر «حفظ نسب الفوز» أعلاه. ألعاب Crash لها إعدادات مستقلة لخصم السحب وحدّ المضاعف في القسم الأول.</div>
     </div>
 
     <div v-if="editIdx !== null && editDraft" class="edit-overlay" @click.self="closeEdit">
@@ -251,7 +304,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onErrorCaptured, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
 import { toast } from '@/composables/useToast'
@@ -271,6 +324,7 @@ const savingStore = ref(false)
 const savingOdds = ref(false)
 const error = ref('')
 const success = ref('')
+const pageRuntimeError = ref('')
 const coverBroken = reactive({})
 const editIdx = ref(null)
 const editDraft = ref(null)
@@ -287,6 +341,23 @@ const odds = reactive({
   maxCrashRatio: 8,
 })
 const coveredGames = ref([])
+const disabledGames = ref([])
+const gameWinRates = reactive({})
+const gameRtpRates = reactive({})
+const manageableGames = [
+  ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
+  { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
+]
+const directWinRateGameIds = new Set([
+  'slots','roulette','plinko','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction',
+  'dice','lucky-wheel','cleopatra-slot','cleopatra-slots','fishing','football-plinko','fortune-slot',
+  'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
+  'royal-battle',
+])
+function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
+const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
+function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
+
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
   coveredGames.value.length ? coveredGames.value.join(' · ') : t('games.oddsCoverageAll'),
@@ -311,21 +382,28 @@ function applyOddsPayload(data) {
     if (data[k] != null && Number.isFinite(Number(data[k]))) odds[k] = Number(data[k])
   })
   if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
+  if (Array.isArray(data.disabledGames)) disabledGames.value = data.disabledGames.map(String)
+  if (data.gameWinRates && typeof data.gameWinRates === 'object') Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
+  if (data.gameRtpRates && typeof data.gameRtpRates === 'object') Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
 }
 
 async function loadOdds() {
-  const { data, error: err } = await gameOddsApi.get()
-  if (err) {
-    error.value = err.message
-    return
+  try {
+    const { data, error: err } = await gameOddsApi.get()
+    if (err) {
+      error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + err.message
+      return
+    }
+    applyOddsPayload(data?.data ?? data)
+  } catch (err) {
+    error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + (err?.message || String(err))
   }
-  applyOddsPayload(data?.data ?? data)
 }
 
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), gameRtpRates: Object.fromEntries(manageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
@@ -352,7 +430,11 @@ async function applyOddsPreset(preset) {
   toast().success(success.value)
 }
 
-const ORIGIN = 'https://api.adnova.bbs.tr'
+const ORIGIN = (() => {
+  const configured = String(import.meta.env.VITE_API_BASE_URL || '').trim()
+  const fallback = typeof window !== 'undefined' ? window.location.origin : ''
+  return (configured || fallback).replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '')
+})()
 const MIKOO = [
   ['7updown', '٧ فوق تحت', '7 Up Down'],
   ['bounty-football', 'كرة القدم الجوائز', 'Bounty Football'],
@@ -407,10 +489,28 @@ function buildDefaults() {
 }
 
 const defaults = buildDefaults()
+// Render the known catalog immediately; slow settings requests must not look like an empty route.
+games.value = defaults.map((game) => ({ ...game }))
 
 function normalizeGame(g) {
+  const normalizeGameUrl = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return ''
+    // Old saved catalog rows still contain the retired API host; keep their game
+    // IDs/settings but resolve bundled cover/play assets through the current backend.
+    if (/^https?:\/\/api\.adnova\.bbs\.tr(?=\/|$)/i.test(raw)) {
+      return raw.replace(/^https?:\/\/api\.adnova\.bbs\.tr/i, ORIGIN)
+    }
+    if (raw.startsWith('/')) return `${ORIGIN}${raw}`
+    if (!/^https?:\/\//i.test(raw) && !raw.startsWith('data:')) {
+      return `${ORIGIN}/${raw.replace(/^\/+/, '')}`
+    }
+    return raw
+  }
   return {
     ...g,
+    coverUrl: normalizeGameUrl(g.coverUrl),
+    playUrl: normalizeGameUrl(g.playUrl),
     enabled: g.enabled !== false && g.visible !== false,
     mode: g.mode || 'mikoo_slot',
   }
@@ -517,10 +617,10 @@ function resetDefaults() {
 async function load() {
   loading.value = true
   error.value = ''
+  try {
   const { data, error: err } = await settingsApi.get()
-  loading.value = false
   if (err) {
-    error.value = err.message
+    error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تظهر القائمة الافتراضية مؤقتاً. ' + err.message
     games.value = defaults.map(normalizeGame)
     return
   }
@@ -549,20 +649,42 @@ async function load() {
     } catch (_) { /* fallthrough */ }
   }
   games.value = defaults.map(normalizeGame)
+  } catch (err) {
+    error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تظهر القائمة الافتراضية مؤقتاً. ' + (err?.message || String(err))
+    games.value = defaults.map(normalizeGame)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadStore() {
   loadingStore.value = true
-  const { data, error: err } = await gameStoreApi.catalog()
-  loadingStore.value = false
-  if (err) {
-    error.value = err.message
+  try {
+    const { data, error: err } = await gameStoreApi.catalog()
+    if (err) {
+      error.value = 'تعذّر تحميل متجر الألعاب: ' + err.message
+      storeItems.value = []
+      return
+    }
+    const payload = data?.data ?? data ?? {}
+    storeItems.value = (Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : [])).map((i) => ({ ...i }))
+  } catch (err) {
+    error.value = 'تعذّر تحميل متجر الألعاب: ' + (err?.message || String(err))
     storeItems.value = []
-    return
+  } finally {
+    loadingStore.value = false
   }
-  const payload = data?.data ?? data ?? {}
-  storeItems.value = (Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : [])).map((i) => ({ ...i }))
 }
+
+async function retryPage() {
+  pageRuntimeError.value = ''
+  await Promise.all([load(), loadStore(), loadOdds()])
+}
+
+onErrorCaptured((err) => {
+  pageRuntimeError.value = err?.message || String(err || 'خطأ غير معروف')
+  return false
+})
 
 async function saveStore() {
   savingStore.value = true

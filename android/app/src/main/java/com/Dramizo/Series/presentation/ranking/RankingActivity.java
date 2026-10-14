@@ -37,6 +37,8 @@ public class RankingActivity extends ThemedActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        String incomingCategory = getIntent().getStringExtra(EXTRA_CATEGORY);
+        if (incomingCategory != null && !incomingCategory.isEmpty()) category = incomingCategory;
         binding = ActivityRankingBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());

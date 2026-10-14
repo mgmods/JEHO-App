@@ -24,6 +24,12 @@ export type GameOddsConfig = {
   maxWinMult: number;
   maxWinAbsolute: number;
   maxCrashRatio: number;
+  /** Server-enforced disabled game IDs, shared by all users. */
+  disabledGames: string[];
+  /** Published per-game win chance, 0–100; applied only by game engines that resolve outcomes on our server. */
+  gameWinRates: Record<string, number>;
+  /** Per-game player return target for shared-outcome betting games. */
+  gameRtpRates: Record<string, number>;
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -38,6 +44,9 @@ export const DEFAULT_GAME_ODDS: GameOddsConfig = {
   maxWinMult: 12,
   maxWinAbsolute: 80_000,
   maxCrashRatio: 8,
+  disabledGames: [],
+  gameWinRates: {},
+  gameRtpRates: {},
 };
 
 /** Presets for big-app style one-click tuning (always house-positive). */
@@ -108,6 +117,23 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     maxWinMult: Math.floor(clamp(obj.maxWinMult, 3, 25, d.maxWinMult)),
     maxWinAbsolute: Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)),
     maxCrashRatio: Math.floor(clamp(obj.maxCrashRatio, 3, 20, d.maxCrashRatio)),
+    disabledGames: Array.isArray(obj.disabledGames)
+      ? [...new Set<string>((obj.disabledGames as unknown[]).map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
+      : [...d.disabledGames],
+    gameWinRates: obj.gameWinRates && typeof obj.gameWinRates === 'object' && !Array.isArray(obj.gameWinRates)
+      ? Object.fromEntries(Object.entries(obj.gameWinRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          const n = Number(value);
+          return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(100, Math.max(0, n))]] : [];
+        }))
+      : { ...d.gameWinRates },
+    gameRtpRates: obj.gameRtpRates && typeof obj.gameRtpRates === 'object' && !Array.isArray(obj.gameRtpRates)
+      ? Object.fromEntries(Object.entries(obj.gameRtpRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          const n = Number(value);
+          return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(0.82, Math.max(0.55, n))]] : [];
+        }))
+      : { ...d.gameRtpRates },
   };
 }
 
@@ -156,7 +182,10 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     coveredGames: GAME_ODDS_COVERED_GAMES.map((g) => g.id),
     coveredCount: GAME_ODDS_COVERED_GAMES.length,
     presets: Object.keys(GAME_ODDS_PRESETS),
+    gameWinRates: cfg.gameWinRates,
+    gameRtpRates: cfg.gameRtpRates,
     hints: {
+      gameWinRates: 'نسبة الفوز المعلنة لكل لعبة من 0 إلى 100. لا تُطبّق إلا على الألعاب التي يحسم خادم JEHO نتيجتها؛ ألعاب المزوّد الخارجي تحتاج دعمًا منه.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
       spinHitRate: 'فرصة فوز كل السلوتات / بلينكو / حفلة السباحة',
       fishingHitRate: 'فرصة صيد السمك (أصعب من السلوت)',

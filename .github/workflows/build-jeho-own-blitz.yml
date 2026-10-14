@@ -1,0 +1,49 @@
+name: Build JEHO-OWN image for Blitz Cloud
+
+on:
+  push:
+    branches:
+      - MG-JEHO
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-jeho-own-blitz-image
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout MG-JEHO
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish backend plus dashboard
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-latest
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=JEHO-OWN backend and dashboard
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -45,6 +45,7 @@ import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
+import { AdminUser } from './database/entities/admin-user.entity';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -129,7 +130,7 @@ const entityList = Object.values(entities).filter(
         return appDataSource;
       },
     }),
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, AdminUser]),
     RedisModule,
     SecurityModule,
     // Registered early — @Global(), so all downstream modules can inject EconomySettingsService.
@@ -162,6 +163,7 @@ const entityList = Object.values(entities).filter(
     HostTargetModule,
     InvitesModule,
     RoomCupModule,
+    CpModule,
     PromotionsModule,
     VanityIdsModule,
     ModerationModule,

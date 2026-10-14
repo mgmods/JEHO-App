@@ -29,11 +29,11 @@ export class CpRequest {
   @Column({ type: 'varchar', length: 16, default: CpRequestStatus.PENDING })
   status: CpRequestStatus;
 
-  @Column({ type: 'uuid' })
-  roomId: string;
+  @Column({ type: 'uuid', nullable: true })
+  roomId: string | null;
 
-  @Column({ type: 'bigint' })
-  priceCoins: string;
+  @Column({ type: 'bigint', nullable: true })
+  priceCoins: string | null;
 
   @Column({ type: 'uuid', nullable: true })
   giftId: string | null;

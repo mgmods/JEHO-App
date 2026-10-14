@@ -2,28 +2,30 @@ name: Android Debug APK
 
 on:
   push:
-    branches: [jeho-own]
+    branches: [jeho-own, MG-JEHO]
     paths:
       - ".github/workflows/android-debug-apk.yml"
       - "android/**"
-      # Rebuild the APK when API configuration or upload contracts change.
+      - "backend/src/modules/config/**"
+      - "backend/src/modules/uploads/**"
+  pull_request:
+    branches: [jeho-own, MG-JEHO]
+    paths:
+      - ".github/workflows/android-debug-apk.yml"
+      - "android/**"
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
   workflow_dispatch:
+
+concurrency:
+  group: jeho-android-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  api-url-required:
-    if: ${{ false }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Explain required configuration
-        run: echo '::notice::APK build is intentionally skipped until the repository variable JEHO_OWN_API_URL points to the deployed JEHO-OWN API ending in /api/v1.'
-
   build-debug-apk:
-    if: ${{ true }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Android project only
@@ -69,13 +71,13 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Validate independent API URL
+      - name: Validate JEHO-OWN Blitz API URL
         env:
           JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
         shell: bash
         run: |
-          if [[ ! "$JEHO_OWN_API_URL" =~ ^https://[^[:space:]]+/api/v1/?$ ]]; then
-            echo "::error::Using canonical JEHO-CHAT production API unless JEHO_OWN_API_URL is explicitly configured."
+          if [[ "$JEHO_OWN_API_URL" != "https://jeho-own-backend.mgs.blitz.cloud/api/v1" ]]; then
+            echo "::error::The APK must target the JEHO-OWN Blitz Cloud API."
             exit 1
           fi
 
@@ -84,13 +86,13 @@ jobs:
       - name: Restore stable CI debug keystore
         uses: actions/cache@v4
         with:
-          path: ~/.config/.android/debug.keystore
-          key: jeho-own-android-debug-keystore-v1
+          path: ~/.android/debug.keystore
+          key: jeho-android-debug-keystore-v2
 
       - name: Create temporary Android debug keystore
         shell: bash
         run: |
-          KEYSTORE="$HOME/.config/.android/debug.keystore"
+          KEYSTORE="$HOME/.android/debug.keystore"
           mkdir -p "$(dirname "$KEYSTORE")"
           if [[ ! -f "$KEYSTORE" ]]; then
             keytool -genkeypair -v \
@@ -108,8 +110,7 @@ jobs:
 
       - name: Print Android signing fingerprints
         working-directory: android
-        run: |
-          gradle --no-daemon signingReport
+        run: gradle --no-daemon signingReport
 
       - name: Build debug APK
         working-directory: android
@@ -120,9 +121,9 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: JEHO-App-debug-apk
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: JEHO-MG-JEHO-Update-APK
+          path: android/app/build/outputs/apk/debug/*universal*.apk
           if-no-files-found: error
           retention-days: 7
 
-# The stable debug keystore is cached across runs so the Google OAuth SHA-1 does not change.
+# The stable debug keystore is cached across ephemeral GitHub runners.

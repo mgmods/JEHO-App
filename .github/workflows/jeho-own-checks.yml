@@ -2,16 +2,20 @@ name: JEHO-OWN Backend and Dashboard Checks
 
 on:
   push:
-    branches: [jeho-own, jeho-own-working-2026-10-05]
+    branches: [jeho-own, jeho-own-working-2026-10-05, MG-JEHO]
     paths:
       - "backend/**"
       - ".github/workflows/**"
   pull_request:
-    branches: [jeho-own]
+    branches: [jeho-own, MG-JEHO]
     paths:
       - "backend/**"
       - ".github/workflows/**"
   workflow_dispatch:
+
+concurrency:
+  group: jeho-checks-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

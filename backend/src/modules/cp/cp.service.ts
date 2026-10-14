@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
+import { NotificationType } from '../../database/entities/notification.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
@@ -12,9 +14,16 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 export class CpService implements OnModuleInit, OnModuleDestroy {
   private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly dataSource: DataSource, private readonly realtime: RealtimeGateway) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
+  ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
+    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "roomId" DROP NOT NULL').catch(() => undefined);
+    await this.dataSource.query('ALTER TABLE cp_requests ALTER COLUMN "priceCoins" DROP NOT NULL').catch(() => undefined);
     // Expiry processing only touches CP requests and their wallet ledger rows.
     this.expiryTimer = setInterval(() => {
       void this.expireDueRequests().catch(() => undefined);
@@ -42,8 +51,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
-      const enabled = settings[`cp.enabled.${type}`] === 'true'
-        && Number.isSafeInteger(price) && price > 0 && !!gift;
+      // CP types are available automatically; only a valid configured price and active gift
+      // are required for paid room requests. The legacy dashboard enabled flag is not a blocker.
+      const enabled = Number.isSafeInteger(price) && price > 0 && !!gift;
       catalog.push({
         type, enabled, priceCoins: enabled ? price : null,
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
@@ -59,10 +69,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const args = type ? [type] : [];
     const rows = await this.dataSource.query(
       `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
-        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl") AS "userA",
-        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl") AS "userB"
+        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level,
+          'vipBadgeUrl', pa."vipBadgeUrl", 'hostBadgeUrl', pa."hostBadgeUrl", 'levelBadgeUrl', pa."levelBadgeUrl") AS "userA",
+        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level,
+          'vipBadgeUrl', pb."vipBadgeUrl", 'hostBadgeUrl', pb."hostBadgeUrl", 'levelBadgeUrl', pb."levelBadgeUrl") AS "userB"
        FROM cp_relationships r
        JOIN users a ON a.id = r."userAId" JOIN users b ON b.id = r."userBId"
+       LEFT JOIN user_profiles pa ON pa."userId" = a.id
+       LEFT JOIN user_profiles pb ON pb."userId" = b.id
        WHERE r.status = 'active' ${where}
        ORDER BY r.points DESC, r."startedAt" ASC LIMIT 100`,
       args,
@@ -103,9 +117,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async profileRelationships(userId: string) {
     return this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
-       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl") AS partner
+       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
+         'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
+       LEFT JOIN user_profiles pp ON pp."userId" = p.id
        WHERE (r."userAId"=$1 OR r."userBId"=$1) AND r.status='active'
        ORDER BY r.points DESC,r."startedAt" ASC`,
       [userId],
@@ -114,15 +130,110 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   async forUser(userId: string) {
     return this.dataSource.query(
-      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl") AS partner
+      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl", 'level', p.level,
+         'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id = CASE WHEN r."userAId" = $1 THEN r."userBId" ELSE r."userAId" END
+       LEFT JOIN user_profiles pp ON pp."userId" = p.id
        WHERE (r."userAId" = $1 OR r."userBId" = $1)
        ORDER BY (r.status = 'active') DESC, r."startedAt" DESC`,
       [userId],
     );
   }
 
+
+  async createProfileRequest(userId: string, input: { recipientId: string; type: CpType; idempotencyKey: string }) {
+    const recipientId = String(input?.recipientId || '');
+    const key = String(input?.idempotencyKey || '').trim();
+    const type = input?.type;
+    if (!UUID_REGEX.test(recipientId) || !key || key.length > 128 || !TYPES.has(type)) {
+      throw new BadRequestException('بيانات طلب العلاقة غير مكتملة');
+    }
+    if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء علاقة مع حسابك');
+    const outcome = await this.dataSource.transaction(async manager => {
+      const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
+      const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE', [key]);
+      if (existing.length) {
+        if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type) {
+          throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
+        }
+        return { request: existing[0], created: false };
+      }
+      const [recipient] = await manager.query('SELECT id FROM users WHERE id=$1 AND status=$2', [recipientId, 'active']);
+      if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
+      const [active] = await manager.query(
+        `SELECT id FROM cp_relationships WHERE status='active'
+         AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1)) LIMIT 1 FOR UPDATE`,
+        [userId, recipientId],
+      );
+      if (active) throw new ConflictException('توجد علاقة نشطة بينكما بالفعل');
+      const [pending] = await manager.query(
+        `SELECT id FROM cp_requests WHERE
+         (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
+         AND type=$3 AND status='pending' AND "expiresAt">now() LIMIT 1 FOR UPDATE`,
+        [userId, recipientId, type],
+      );
+      if (pending) throw new ConflictException('يوجد طلب معلّق بينكما لهذا النوع');
+      const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', ['cp.policy.request_expiry_minutes']);
+      const configuredExpiry = Number(expiryRow?.value);
+      const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
+        ? configuredExpiry : EXPIRY_MINUTES;
+      const [request] = await manager.query(
+        `INSERT INTO cp_requests ("fromUserId","toUserId",type,status,"roomId","priceCoins","idempotencyKey","expiresAt","createdAt","updatedAt")
+         VALUES ($1,$2,$3,'pending',NULL,0,$4,now()+($5 || ' minutes')::interval,now(),now()) RETURNING *`,
+        [userId, recipientId, type, key, String(expiryMinutes)],
+      );
+      return { request, created: true };
+    });
+
+    // Notify only after the transaction commits. This stores an inbox notification,
+    // emits notification:new to an online recipient, and sends FCM when available.
+    if (outcome.created) {
+      const [sender] = await this.dataSource.query(
+        'SELECT "displayName", username FROM users WHERE id=$1',
+        [userId],
+      );
+      const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
+      await this.notifications.notifyUser(
+        recipientId,
+        NotificationType.SYSTEM,
+        'طلب ارتباط جديد',
+        `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
+        {
+          type: 'cp_relationship_request',
+          notificationKind: 'cp_relationship_request',
+          requestId: outcome.request.id,
+          relationshipType: type,
+          senderId: userId,
+          recipientId,
+          route: 'cp',
+          actions: ['accept', 'reject'],
+        },
+      );
+      this.realtime.emitToUser(recipientId, 'cp:request', {
+        requestId: outcome.request.id,
+        senderId: userId,
+        senderName,
+        relationshipType: type,
+        title: 'طلب ارتباط جديد',
+        body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
+        actions: ['accept', 'reject'],
+      });
+    }
+    return outcome.request;
+  }
+
+  private cpTypeLabel(type: CpType): string {
+    switch (type) {
+      case CpType.BROTHERHOOD: return 'الأخوّة';
+      case CpType.FRIENDSHIP: return 'الصداقة';
+      case CpType.LOVE: return 'الحب';
+      case CpType.ENGAGEMENT: return 'الخطوبة';
+      case CpType.MARRIAGE: return 'الزواج';
+      default: return 'علاقة CP';
+    }
+  }
 
   async sentRequests(userId: string) {
     await this.expireDueRequests();
@@ -168,7 +279,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
-    return this.dataSource.transaction(async manager => {
+    const outcome = await this.dataSource.transaction(async manager => {
       const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey" = $1 FOR UPDATE', [key]);
@@ -176,7 +287,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type || existing[0].roomId !== roomId) {
           throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
         }
-        return existing[0];
+        return { request: existing[0], created: false };
       }
       const [room] = await manager.query('SELECT id, type, status, "hostId" FROM rooms WHERE id = $1 FOR SHARE', [roomId]);
       if (!room || room.type !== 'voice' || room.status === 'closed') {
@@ -193,10 +304,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!presentIds.has(userId) || !presentIds.has(recipientId)) {
         throw new BadRequestException('يجب أن يكون الطرفان جالسين داخل الغرفة نفسها عند إرسال طلب CP');
       }
-      const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
-      if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
-        throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
-      }
+      // CP types are enabled by default; do not block room requests on a dashboard toggle.
       const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', ['cp.policy.request_expiry_minutes']);
       const configuredExpiry = Number(expiryRow?.value);
       const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
@@ -243,8 +351,42 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
         [userId, -price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, roomId, giftId: gift.id, giftName: gift.name })],
       );
-      return request;
+      return { request, created: true };
     });
+    if (outcome.created) {
+      const [sender] = await this.dataSource.query(
+        'SELECT "displayName", username FROM users WHERE id=$1',
+        [userId],
+      );
+      const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
+      await this.notifications.notifyUser(
+        recipientId,
+        NotificationType.SYSTEM,
+        'طلب ارتباط جديد',
+        `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
+        {
+          type: 'cp_relationship_request',
+          notificationKind: 'cp_relationship_request',
+          requestId: outcome.request.id,
+          relationshipType: type,
+          senderId: userId,
+          recipientId,
+          route: 'cp',
+          actions: ['accept', 'reject'],
+          requestSource: 'room_gift',
+        },
+      );
+      this.realtime.emitToUser(recipientId, 'cp:request', {
+        requestId: outcome.request.id,
+        senderId: userId,
+        senderName,
+        relationshipType: type,
+        title: 'طلب ارتباط جديد',
+        body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
+        actions: ['accept', 'reject'],
+      });
+    }
+    return outcome.request;
   }
 
   async respond(userId: string, requestId: string, accept: boolean) {
@@ -400,10 +542,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   private async refund(manager: any, request: any) {
     if (request.refundedAt) return;
+    const amount = Math.max(0, Number(request.priceCoins) || 0);
+    if (amount === 0) {
+      await manager.query('UPDATE cp_requests SET "refundedAt"=now(),"updatedAt"=now() WHERE id=$1 AND "refundedAt" IS NULL', [request.id]);
+      return;
+    }
     const [wallet] = await manager.query('SELECT coins FROM wallets WHERE "userId"=$1 FOR UPDATE', [request.fromUserId]);
     if (!wallet) throw new NotFoundException('محفظة صاحب الطلب غير موجودة');
     const balance = Number(wallet.coins);
-    const amount = Number(request.priceCoins);
     const inserted = await manager.query(
       `INSERT INTO wallet_transactions ("userId",type,currency,amount,"balanceAfter","referenceType","referenceId",description,metadata,"createdAt")
        VALUES ($1,'refund','coins',$2,$3,'cp_request_refund',$4,'استرداد هدية CP',$5,now())
