@@ -658,12 +658,14 @@ public class ProfileActivity extends ThemedActivity {
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f);
         ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f);
         ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f);
+        for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY, alpha}) {
+            animator.setDuration(900L);
+            animator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.RESTART);
+        }
         cpHeartAnimator = new AnimatorSet();
         cpHeartAnimator.playTogether(scaleX, scaleY, alpha);
-        cpHeartAnimator.setDuration(900L);
-        cpHeartAnimator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        cpHeartAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        cpHeartAnimator.setRepeatMode(ValueAnimator.RESTART);
         cpHeartAnimator.start();
     }
 
