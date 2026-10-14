@@ -16,6 +16,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { isGameEnabled } from './game-odds-runtime';
 
 type CasualGameId =
   | 'slots'
@@ -89,6 +90,7 @@ export class CasualBetService {
     if (!ALL_CASUAL.includes(gameId)) {
       throw new BadRequestException('Unknown game');
     }
+    if (!isGameEnabled(gameId)) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(body?.roomId, userId);
     const amount = Math.floor(Number(body?.amount));
     if (!Number.isFinite(amount) || amount < 50 || amount > Math.min(20_000, GAME_PAYOUT.maxBet)) {
