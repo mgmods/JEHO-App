@@ -347,7 +347,6 @@ export class ConfigController {
   }
 
   @Public()
-  @Public()
   @Get('theme')
   @ApiOperation({ summary: 'Public remote app theme/assets for pre-login splash and app screens' })
   async theme() {
