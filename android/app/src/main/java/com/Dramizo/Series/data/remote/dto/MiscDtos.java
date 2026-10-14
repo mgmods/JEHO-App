@@ -7,6 +7,17 @@ import java.util.Map;
 public final class MiscDtos {
     private MiscDtos() {}
 
+    public static class BadgeDto {
+        @SerializedName("id") public String id;
+        @SerializedName("code") public String code;
+        @SerializedName("name") public String name;
+        @SerializedName("description") public String description;
+        @SerializedName("imageUrl") public String imageUrl;
+        @SerializedName("earned") public boolean earned;
+        @SerializedName("awardedAt") public String awardedAt;
+        @SerializedName("source") public String source;
+    }
+
     public static class VipPlanDto {
         @SerializedName("id") public String id;
         @SerializedName("level") public int level;
