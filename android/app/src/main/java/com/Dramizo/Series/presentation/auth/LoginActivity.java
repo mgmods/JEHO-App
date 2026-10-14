@@ -163,8 +163,21 @@ public class LoginActivity extends ThemedActivity {
                     // Keep a successful login usable if /me is temporarily unavailable.
                 }
                 if (resolvedUser == null) {
-                    resolvedUser = result.user != null
-                            ? result.user : container.getSessionManager().getUser();
+                    // A previous logout stores a per-account profile snapshot. Prefer
+                    // that richer snapshot over a partial login DTO when /me is unavailable.
+                    AuthDtos.UserDto loginUser = result.user;
+                    AuthDtos.UserDto savedUser = loginUser != null
+                            ? container.getSessionManager().getSavedAccountUser(loginUser.username)
+                            : null;
+                    if (savedUser != null && loginUser != null
+                            && loginUser.id != null && loginUser.id.equals(savedUser.id)
+                            && ProfileSetupActivity.isProfileComplete(savedUser)) {
+                        resolvedUser = savedUser;
+                        container.getSessionManager().updateCachedUser(savedUser);
+                    } else {
+                        resolvedUser = loginUser != null
+                                ? loginUser : container.getSessionManager().getUser();
+                    }
                 }
                 final AuthDtos.UserDto user = resolvedUser;
                 runOnUiThread(() -> continueAfterAuth(result, user));
