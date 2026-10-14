@@ -371,6 +371,30 @@ public class SessionManager {
         return true;
     }
 
+    /** Return the last saved server profile for an account after logout or a transient /me failure. */
+    public AuthDtos.UserDto getSavedAccountUser(String identifier) {
+        if (identifier == null || identifier.trim().isEmpty()) return null;
+        String key = identifier.trim();
+        for (String username : listSavedAccounts()) {
+            if (username == null) continue;
+            String blob = prefs.getString("acc_" + username, null);
+            if (blob == null) continue;
+            try {
+                SavedAccount account = gson.fromJson(blob, SavedAccount.class);
+                AuthDtos.UserDto user = account != null ? account.user : null;
+                if (user == null) continue;
+                if (username.equalsIgnoreCase(key)
+                        || (user.username != null && user.username.equalsIgnoreCase(key))
+                        || (user.email != null && user.email.equalsIgnoreCase(key))
+                        || (user.publicId != null && user.publicId.equalsIgnoreCase(key))) {
+                    return user;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return null;
+    }
+
     public void removeSavedAccount(String username) {
         if (username == null) return;
         java.util.HashSet<String> set = new java.util.HashSet<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
