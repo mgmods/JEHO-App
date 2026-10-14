@@ -52,8 +52,9 @@ function num(v){return Number(v||0).toLocaleString('en-US')}
 function safeImage(v){const s=String(v||'');return /^https?:\/\//i.test(s)?s:''}
 function avatarHtml(url,cls,label){const src=safeImage(url);return src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>'}
 function renderCpData(d){
- renderCpRanking(d&&d.cpRanking);
+ renderCpRanking(d&&d.cpRanking,!!(d&&d.cpRankingError));
  const rel=d&&d.relationship,box=document.getElementById('relationship'),couple=document.getElementById('couple'),me=d&&d.user||{};
+ if(d&&d.relationshipError){document.getElementById('heroTitle').textContent='تعذّر تحميل العلاقة';document.getElementById('heroSubtitle').textContent='لم نتمكن من جلب بيانات العلاقة من الخادم';couple.innerHTML='<div class="empty">تعذّر تحميل بيانات العلاقة الآن.</div>';box.innerHTML='<div class="empty">لم يتم تأكيد حالة العلاقة بسبب مشكلة اتصال.</div><button class="action" onclick="JehoApp.refreshData()">إعادة المحاولة</button>';return;}
  if(!rel||!rel.partner){
   document.getElementById('heroTitle').textContent='لا توجد علاقة فعّالة';
   document.getElementById('heroSubtitle').textContent='عند وجود علاقة CP فعّالة ستظهر بياناتها هنا';
@@ -75,10 +76,11 @@ function cpPersonHtml(person, fallback){
  const id=String(p.id||'');
  return '<div class="cp-rank-person">'+img+'<div style="min-width:0"><div class="cp-rank-name">'+esc(name)+'</div><div class="cp-rank-meta">LV '+esc(p.level==null?'—':num(p.level))+'</div></div></div>';
 }
-function renderCpRanking(rows){
+function renderCpRanking(rows,hasError){
  const box=document.getElementById('cpRanking'),count=document.getElementById('cpRankCount');
  const data=Array.isArray(rows)?rows:[];
- count.textContent=data.length+' علاقة';
+ count.textContent=hasError?'تعذّر التحميل':data.length+' علاقة';
+ if(hasError){box.innerHTML='<div class="cp-ranking-empty">تعذّر تحميل ترتيب العلاقات من الخادم.</div><button class="action secondary" onclick="JehoApp.refreshData()">إعادة المحاولة</button>';return;}
  if(!data.length){box.innerHTML='<div class="cp-ranking-empty">لا توجد علاقات فعّالة للترتيب حاليًا. ستظهر العلاقات الحقيقية هنا عند تفعيلها في النظام.</div>';return}
  box.innerHTML=data.map((r,i)=>{
   const a=r.userA||{},b=r.userB||{},rank=Number(r.rank)||i+1,points=r.points==null?'0':r.points,level=r.level==null?'—':r.level;
