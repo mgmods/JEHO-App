@@ -741,27 +741,43 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Reserved throne seat: intentionally visual-only and disabled until explicitly enabled later. -->
-    <TextView
+    <!-- Reserved throne seat: gold throne icon is visible, but remains disabled until enabled later. -->
+    <FrameLayout
         android:id="@+id/tvThroneSeatPlaceholder"
         android:layout_width="wrap_content"
-        android:layout_height="30dp"
+        android:layout_height="42dp"
         android:layout_marginStart="10dp"
         android:layout_marginTop="5dp"
         android:background="@drawable/bg_room_cup_chip"
-        android:clickable="false"
         android:contentDescription="كرسي العرش غير مفعّل"
         android:enabled="false"
-        android:focusable="false"
-        android:gravity="center"
-        android:paddingHorizontal="12dp"
-        android:text="♛ كرسي العرش · قريبًا"
-        android:textColor="#FFE9B53C"
-        android:textSize="11sp"
-        android:textStyle="bold"
-        android:alpha="0.72"
+        android:alpha="0.82"
+        android:paddingStart="5dp"
+        android:paddingEnd="10dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip" />
+        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <ImageView
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_room_throne"
+                android:scaleType="fitCenter" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:text="كرسي العرش · قريبًا"
+                android:textColor="#FFE9B53C"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerSeats"
@@ -1251,6 +1267,54 @@
         android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Side shortcuts: music, games, settings. Music opens the room music library without changing audio configuration. -->
+    <LinearLayout
+        android:id="@+id/roomSideShortcuts"
+        android:layout_width="54dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginBottom="104dp"
+        android:background="#9900160F"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingVertical="6dp"
+        android:elevation="24dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/btnRoomSideMusic"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:contentDescription="الموسيقى"
+            android:gravity="center"
+            android:text="♫"
+            android:textColor="#FFF0D28A"
+            android:textSize="28sp"
+            android:background="@drawable/bg_room_official_chip" />
+        <TextView
+            android:id="@+id/btnRoomSideGames"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:contentDescription="الألعاب"
+            android:gravity="center"
+            android:text="🎮"
+            android:textSize="22sp"
+            android:background="@drawable/bg_room_official_chip" />
+        <TextView
+            android:id="@+id/btnRoomSideSettings"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="6dp"
+            android:contentDescription="الإعدادات"
+            android:gravity="center"
+            android:text="⚙"
+            android:textColor="#FFFFFFFF"
+            android:textSize="25sp"
+            android:background="@drawable/bg_room_official_chip" />
+    </LinearLayout>
 
     <!-- Feed tabs above the room conversation. -->
     <LinearLayout
