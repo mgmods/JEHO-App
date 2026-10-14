@@ -121,6 +121,14 @@ export const walletApi = {
   adjustUser: (userId, data) => safeRequest(() => api.post(`/admin/wallet/${userId}/adjust`, data)),
 }
 
+export const badgesApi = {
+  list: () => safeRequest(() => api.get('/admin/badges')),
+  create: (data) => safeRequest(() => api.post('/admin/badges', data)),
+  update: (id, data) => safeRequest(() => api.patch(`/admin/badges/${id}`, data)),
+  grant: (userId, badgeId, data = {}) => safeRequest(() => api.post(`/admin/badges/users/${userId}/${badgeId}/grant`, data)),
+  revoke: (userId, badgeId) => safeRequest(() => api.post(`/admin/badges/users/${userId}/${badgeId}/revoke`)),
+}
+
 export const vipApi = {
   list: (params) => safeRequest(() => api.get('/admin/vip', { params })),
   plans: () => safeRequest(() => api.get('/admin/vip/plans')),
