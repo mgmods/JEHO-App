@@ -7,9 +7,9 @@ import android.text.TextUtils;
 import com.Dramizo.Series.presentation.agency.AgencyManageActivity;
 import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.contests.ContestsActivity;
-import com.Dramizo.Series.presentation.cp.CpCenterActivity;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
+import com.Dramizo.Series.presentation.notifications.NotificationsActivity;
 import com.Dramizo.Series.presentation.profile.ProfileActivity;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 
@@ -35,9 +35,11 @@ public final class NotificationRouter {
 
         if ("cp_relationship_request".equalsIgnoreCase(nested)
                 || "cp_relationship_request".equalsIgnoreCase(notificationKind)) {
-            Intent i = new Intent(context, CpCenterActivity.class);
-            i.putExtra(CpCenterActivity.EXTRA_VIEW, "incoming");
-            i.putExtra(CpCenterActivity.EXTRA_TYPE, first(data, "relationshipType"));
+            Intent i = new Intent(context, NotificationsActivity.class);
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_ID, first(data, "requestId"));
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_TITLE, first(data, "title"));
+            put(i, NotificationsActivity.EXTRA_CP_REQUEST_BODY, first(data, "body"));
+            i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             return i;
         }
 
