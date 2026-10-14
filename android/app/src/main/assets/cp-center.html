@@ -75,6 +75,6 @@ document.querySelectorAll("[data-discover-type]").forEach(b=>b.addEventListener(
 $("sendForm").addEventListener("submit",e=>{e.preventDefault();const id=$("recipientId").value.trim();if(!id){toast("أدخل معرّف المستخدم أولاً");return;}JehoCP.sendRequest(id,sendType);});
 $("back").addEventListener("click",()=>JehoCP.back());$("refresh").addEventListener("click",()=>{if(currentView==="incoming"||currentView==="sent")JehoCP.loadRequests();else if(currentView==="discover")JehoCP.loadDiscover(discoverType);else JehoCP.loadHome();});
 $("reloadIncoming").addEventListener("click",()=>JehoCP.loadRequests());$("reloadSent").addEventListener("click",()=>JehoCP.loadRequests());
-window.setCpView=(view,type)=>{if(TYPES[type]){sendType=type;document.querySelectorAll("[data-send-type]").forEach(b=>b.classList.toggle("active",b.dataset.sendType===type));}showView(view||"home");};
+window.setCpView=(view,type)=>{if(TYPES[type]){sendType=type;discoverType=type;document.querySelectorAll("[data-send-type]").forEach(b=>b.classList.toggle("active",b.dataset.sendType===type));document.querySelectorAll("[data-discover-type]").forEach(b=>b.classList.toggle("active",b.dataset.discoverType===type));}showView(view||"home");if((view||"home")==="discover")JehoCP.loadDiscover(discoverType);};
 window.addEventListener("load",()=>{if(window.JehoCP){JehoCP.loadHome();JehoCP.loadRequests();}});
 </script></body></html>
