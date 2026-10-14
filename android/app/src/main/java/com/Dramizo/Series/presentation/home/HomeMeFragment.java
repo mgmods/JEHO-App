@@ -143,6 +143,12 @@ public class HomeMeFragment extends Fragment {
      */
     private void keepOnlyMyRoomActivityAndRoomLists() {
         if (binding == null) return;
+        // This top-level Home > أنا tab is a room/activity feed, not the profile page.
+        // Hide the identity row explicitly so the avatar and gear can never leak into this tab.
+        binding.profileIdentityHeader.setVisibility(View.GONE);
+        binding.imgProfileAvatar.setVisibility(View.GONE);
+        binding.btnProfileSettings.setVisibility(View.GONE);
+        binding.actionEditProfileTop.setVisibility(View.GONE);
         keepOnlyAllowedHomeMeViews(binding.profileScroll);
     }
 
