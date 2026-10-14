@@ -300,12 +300,17 @@ public class SplashActivity extends ThemedActivity {
                         // uploaded image is downloading. Previously the 4-second startup
                         // timeout could navigate away before the API/image request finished.
                         displayedSplashItem = item;
+                        // Treat a valid configured ad as active before starting the image
+                        // request, so the startup timeout cannot navigate away while Glide
+                        // is still downloading the uploaded image.
+                        splashAdShowing = true;
                         splashContentVisibilityGone();
                         splashAdImage.setVisibility(View.VISIBLE);
                         skipSplashAd.setVisibility(View.VISIBLE);
                         try {
+                            String imageUrl = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(item.url.trim());
                             Glide.with(SplashActivity.this)
-                                    .load(item.url)
+                                    .load(imageUrl)
                                     .diskCacheStrategy(DiskCacheStrategy.NONE)
                                     .skipMemoryCache(true)
                                     .into(new CustomTarget<Drawable>() {
