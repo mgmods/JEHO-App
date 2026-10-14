@@ -8083,8 +8083,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View view = findViewById(id);
         if (view instanceof TextView) {
             TextView tab = (TextView) view;
-            tab.setBackgroundResource(selected ? R.drawable.bg_room_official_chip : android.R.color.transparent);
-            tab.setTextColor(selected ? 0xFFFFD778 : 0xFFD6E6DF);
+            tab.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+            tab.setTextColor(selected ? 0xFFFFFFFF : 0xFFD6E6DF);
             tab.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         }
     }
