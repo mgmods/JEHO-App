@@ -180,7 +180,7 @@ public class ProfileFragment extends Fragment {
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
             if (user == null) return;
             myId = user.id;
-            bindMyCpRelationship(user.id, user.avatarUrl);
+            bindMyCpRelationship(user.id);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
             bindStaffUi(user);
@@ -498,7 +498,7 @@ public class ProfileFragment extends Fragment {
         });
     }
 
-    private void bindMyCpRelationship(String userId, String ownAvatarUrl) {
+    private void bindMyCpRelationship(String userId) {
         if (userId == null || userId.trim().isEmpty() || binding == null) {
             hideMyCpRelationship();
             return;
@@ -534,8 +534,14 @@ public class ProfileFragment extends Fragment {
                 String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type"));
                 Object avatarValue = partner.get("avatarUrl");
                 String partnerAvatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
-                binding.tvMyProfileCpLabel.setText(myCpTypeLabel(type) + " · " + partnerName);
-                bindMyCpAvatar(binding.imgMyProfileCpSelf, ownAvatarUrl);
+                binding.tvMyProfileCpLabel.setText(partnerName);
+                if (binding.tvMyProfileCpType != null) {
+                    binding.tvMyProfileCpType.setText(myCpTypeLabel(type));
+                }
+                if (binding.imgMyProfileCpHeart != null) {
+                    binding.imgMyProfileCpHeart.setText(myCpTypeSymbol(type));
+                    binding.imgMyProfileCpHeart.setContentDescription(myCpTypeLabel(type));
+                }
                 bindMyCpAvatar(binding.imgMyProfileCpPartner, partnerAvatar);
                 binding.rowMyProfileCp.setVisibility(View.VISIBLE);
                 startMyCpHeartAnimation();
@@ -556,12 +562,23 @@ public class ProfileFragment extends Fragment {
 
     private String myCpTypeLabel(String type) {
         switch (type) {
-            case "friendship": return "✦ علاقة صداقة";
-            case "brotherhood": return "♛ علاقة أخوّة";
-            case "love": return "♥ علاقة حب";
-            case "engagement": return "💍 علاقة خطوبة";
-            case "marriage": return "💞 علاقة زواج";
+            case "friendship": return "علاقة صداقة";
+            case "brotherhood": return "علاقة أخوّة";
+            case "love": return "علاقة حب";
+            case "engagement": return "علاقة خطوبة";
+            case "marriage": return "علاقة زواج";
             default: return "علاقة";
+        }
+    }
+
+    private String myCpTypeSymbol(String type) {
+        switch (type) {
+            case "friendship": return "🤝";
+            case "brotherhood": return "🤝";
+            case "engagement": return "💍";
+            case "marriage": return "💞";
+            case "love":
+            default: return "♥";
         }
     }
 
