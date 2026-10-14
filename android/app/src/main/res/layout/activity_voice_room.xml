@@ -1488,52 +1488,52 @@
     </LinearLayout>
 
 
-    <!-- Side shortcuts: music, games, settings. Music opens the room music library without changing audio configuration. -->
+    <!-- Transparent side shortcuts: music, games, settings; aligned beside the bottom composer. -->
     <LinearLayout
         android:id="@+id/roomSideShortcuts"
-        android:layout_width="54dp"
+        android:layout_width="40dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginBottom="78dp"
-        android:background="#9900160F"
+        android:layout_marginBottom="8dp"
+        android:background="@android:color/transparent"
         android:gravity="center"
         android:orientation="vertical"
-        android:paddingVertical="6dp"
+        android:padding="0dp"
         android:elevation="24dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toBottomOf="@id/bottomBar"
         app:layout_constraintStart_toStartOf="parent">
 
-        <TextView
+        <ImageView
             android:id="@+id/btnRoomSideMusic"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:contentDescription="الموسيقى"
-            android:gravity="center"
-            android:text="♫"
-            android:textColor="#FFF0D28A"
-            android:textSize="28sp"
-            android:background="@drawable/bg_room_official_chip" />
-        <TextView
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_music_more"
+            android:background="@android:color/transparent" />
+
+        <ImageView
             android:id="@+id/btnRoomSideGames"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginTop="6dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="8dp"
             android:contentDescription="الألعاب"
-            android:gravity="center"
-            android:text="🎮"
-            android:textSize="22sp"
-            android:background="@drawable/bg_room_official_chip" />
-        <TextView
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_games"
+            android:background="@android:color/transparent" />
+
+        <ImageView
             android:id="@+id/btnRoomSideSettings"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginTop="6dp"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="8dp"
             android:contentDescription="الإعدادات"
-            android:gravity="center"
-            android:text="⚙"
-            android:textColor="#FFF0D28A"
-            android:textSize="25sp"
-            android:background="@drawable/bg_room_official_chip" />
+            android:padding="2dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_settings"
+            android:background="@android:color/transparent" />
     </LinearLayout>
 
     <!-- Mikoo MultiInputMsgView: full-screen overlay; white send box only (above keyboard) -->
