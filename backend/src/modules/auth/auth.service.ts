@@ -509,6 +509,15 @@ export class AuthService implements OnModuleInit {
     await this.usersRepo.update(user.id, { refreshTokenHash });
 
     const now = new Date();
+    // Include the persisted profile snapshot in the login response. The app must
+    // not mistake a returning account for a new account when /users/me is briefly
+    // unavailable immediately after authentication.
+    let profile = await this.profilesRepo.findOne({ where: { userId: user.id } });
+    if (!profile) {
+      profile = await this.profilesRepo.save(
+        this.profilesRepo.create({ userId: user.id }),
+      );
+    }
     const vip = await this.userVipsRepo.findOne({
       where: { userId: user.id, isActive: true },
       order: { level: 'DESC' },
@@ -528,6 +537,20 @@ export class AuthService implements OnModuleInit {
         publicId: user.publicId,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        coverUrl: profile.coverUrl,
+        bio: profile.bio,
+        gender: user.gender,
+        birthday: user.birthday,
+        country: profile.country,
+        countryChangedAt: profile.countryChangedAt,
+        city: profile.city,
+        language: profile.language,
+        interests: profile.interests || [],
+        albumUrls: profile.albumUrls || [],
+        showOnlineStatus: profile.showOnlineStatus,
+        allowDmFromStrangers: profile.allowDmFromStrangers,
+        dmGiftGateEnabled: profile.dmGiftGateEnabled,
+        dmRequiredGiftId: profile.dmRequiredGiftId,
         level: user.level,
         vipLevel,
         isGuest: user.isGuest,
