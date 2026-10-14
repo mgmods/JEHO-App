@@ -12,6 +12,10 @@
     </PageHeader>
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+    <div v-if="pageRuntimeError" class="alert alert-danger d-flex flex-wrap justify-content-between align-items-center gap-2" role="alert">
+      <span>تعذّر عرض جزء من صفحة الألعاب: {{ pageRuntimeError }}</span>
+      <button class="btn btn-sm btn-outline-light" type="button" @click="retryPage">إعادة تحميل بيانات الألعاب</button>
+    </div>
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
     <div class="glass p-3 mb-3 small text-muted">
@@ -95,8 +99,11 @@
     </div>
 
     <div class="glass p-3">
-      <LoadingSpinner v-if="loading" />
-      <div v-else-if="!games.length" class="empty-state p-5 text-center">{{ t('games.noGames') }}</div>
+      <LoadingSpinner v-if="loading && !games.length" />
+      <div v-else-if="!games.length" class="empty-state p-5 text-center">
+        {{ t('games.noGames') }}
+        <button class="btn btn-outline-light btn-sm mt-3" type="button" @click="load">إعادة المحاولة</button>
+      </div>
       <div v-else class="catalog-grid widget-grid">
         <article
           v-for="(g, idx) in games"
@@ -297,7 +304,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onErrorCaptured, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
 import { toast } from '@/composables/useToast'
@@ -317,6 +324,7 @@ const savingStore = ref(false)
 const savingOdds = ref(false)
 const error = ref('')
 const success = ref('')
+const pageRuntimeError = ref('')
 const coverBroken = reactive({})
 const editIdx = ref(null)
 const editDraft = ref(null)
@@ -380,12 +388,16 @@ function applyOddsPayload(data) {
 }
 
 async function loadOdds() {
-  const { data, error: err } = await gameOddsApi.get()
-  if (err) {
-    error.value = err.message
-    return
+  try {
+    const { data, error: err } = await gameOddsApi.get()
+    if (err) {
+      error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + err.message
+      return
+    }
+    applyOddsPayload(data?.data ?? data)
+  } catch (err) {
+    error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + (err?.message || String(err))
   }
-  applyOddsPayload(data?.data ?? data)
 }
 
 async function saveOdds() {
@@ -473,6 +485,8 @@ function buildDefaults() {
 }
 
 const defaults = buildDefaults()
+// Render the known catalog immediately; slow settings requests must not look like an empty route.
+games.value = defaults.map((game) => ({ ...game }))
 
 function normalizeGame(g) {
   return {
@@ -583,10 +597,10 @@ function resetDefaults() {
 async function load() {
   loading.value = true
   error.value = ''
+  try {
   const { data, error: err } = await settingsApi.get()
-  loading.value = false
   if (err) {
-    error.value = err.message
+    error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تظهر القائمة الافتراضية مؤقتاً. ' + err.message
     games.value = defaults.map(normalizeGame)
     return
   }
@@ -615,20 +629,42 @@ async function load() {
     } catch (_) { /* fallthrough */ }
   }
   games.value = defaults.map(normalizeGame)
+  } catch (err) {
+    error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تظهر القائمة الافتراضية مؤقتاً. ' + (err?.message || String(err))
+    games.value = defaults.map(normalizeGame)
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadStore() {
   loadingStore.value = true
-  const { data, error: err } = await gameStoreApi.catalog()
-  loadingStore.value = false
-  if (err) {
-    error.value = err.message
+  try {
+    const { data, error: err } = await gameStoreApi.catalog()
+    if (err) {
+      error.value = 'تعذّر تحميل متجر الألعاب: ' + err.message
+      storeItems.value = []
+      return
+    }
+    const payload = data?.data ?? data ?? {}
+    storeItems.value = (Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : [])).map((i) => ({ ...i }))
+  } catch (err) {
+    error.value = 'تعذّر تحميل متجر الألعاب: ' + (err?.message || String(err))
     storeItems.value = []
-    return
+  } finally {
+    loadingStore.value = false
   }
-  const payload = data?.data ?? data ?? {}
-  storeItems.value = (Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : [])).map((i) => ({ ...i }))
 }
+
+async function retryPage() {
+  pageRuntimeError.value = ''
+  await Promise.all([load(), loadStore(), loadOdds()])
+}
+
+onErrorCaptured((err) => {
+  pageRuntimeError.value = err?.message || String(err || 'خطأ غير معروف')
+  return false
+})
 
 async function saveStore() {
   savingStore.value = true
