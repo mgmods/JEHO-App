@@ -1345,10 +1345,12 @@
         <!-- Messages, stickers, gifts, mic, then the text composer. -->
         <FrameLayout
             android:id="@+id/btnPrivateMsg"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="gone"
+            android:layout_width="30dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="1dp"
+            android:visibility="visible"
             android:background="@android:color/transparent"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/chat">
             <ImageView
                 android:id="@+id/imgPrivateMsg"
@@ -1485,7 +1487,7 @@
         android:layout_width="40dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="14dp"
         android:background="@android:color/transparent"
         android:gravity="center"
         android:orientation="vertical"
@@ -1507,11 +1509,11 @@
 
         <ImageView
             android:id="@+id/btnRoomSideGames"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:layout_marginTop="6dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="2dp"
             android:contentDescription="الألعاب"
-            android:padding="2dp"
+            android:padding="1dp"
             android:scaleType="fitCenter"
             android:src="@drawable/ic_asset_games"
             android:background="@android:color/transparent" />
