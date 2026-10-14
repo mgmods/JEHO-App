@@ -159,7 +159,7 @@ export class CasualBetService {
         gameId,
         bet: amount,
         payout,
-        won: payout > 0,
+        won: payout > amount,
         net: payout - amount,
         multiplier: outcome.multiplier,
         detail: outcome.detail,
