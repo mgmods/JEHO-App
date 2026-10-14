@@ -121,6 +121,9 @@ public class ProfileSetupActivity extends ThemedActivity {
             saving = false;
             binding.progress.setVisibility(View.GONE);
             binding.btnContinue.setEnabled(true);
+            // Do not leave onboarding fully transparent when /me fails; the user
+            // must always see a recoverable screen instead of an apparently blank page.
+            binding.getRoot().setAlpha(1f);
             if (error != null) Toast.makeText(this, error, Toast.LENGTH_LONG).show();
         });
 
