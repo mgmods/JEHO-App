@@ -85,15 +85,15 @@ export class BadgesService {
       const rows = await this.dataSource.query(
         `UPDATE badge_definitions SET name=$2, description=$3, "imageUrl"=$4,
           "isActive"=COALESCE($5, "isActive"), "sortOrder"=COALESCE($6, "sortOrder"),
-          "conditionType"=COALESCE($7, "conditionType"),
-          "conditionTarget"=COALESCE($8, "conditionTarget"), "updatedAt"=NOW()
+          "conditionType"=$7,
+          "conditionTarget"=$8, "updatedAt"=NOW()
          WHERE id=$1 RETURNING *`,
         [
           id, name, description, imageUrl,
           input.isActive === undefined ? null : input.isActive,
           input.sortOrder === undefined ? null : Number(input.sortOrder),
-          input.conditionType === undefined ? null : input.conditionType,
-          input.conditionTarget === undefined ? null : Number(input.conditionTarget),
+          input.conditionType || null,
+          input.conditionTarget == null ? null : Number(input.conditionTarget),
         ],
       );
       return rows[0];
