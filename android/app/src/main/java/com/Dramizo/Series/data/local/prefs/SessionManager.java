@@ -94,6 +94,51 @@ public class SessionManager {
                 .putString("user_json", gson.toJson(user))
                 .putString("user_id", user.id != null ? user.id : prefs.getString("user_id", null))
                 .commit();
+        // Keep the per-account snapshot fresh so logout/login never loses profile fields.
+        saveAccountSnapshot();
+    }
+
+    /**
+     * Restore fields omitted by a partial login /me response from this same account's
+     * last saved snapshot. Non-empty values returned by the server always win.
+     */
+    public AuthDtos.UserDto restoreSavedAccountProfile(AuthDtos.UserDto incoming, String identifier) {
+        if (incoming == null || identifier == null || identifier.trim().isEmpty()) return incoming;
+        AuthDtos.UserDto saved = getSavedAccountUser(identifier);
+        if (saved == null || incoming.id == null || saved.id == null
+                || !incoming.id.equals(saved.id)) return incoming;
+        try {
+            for (java.lang.reflect.Field field : AuthDtos.UserDto.class.getFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) continue;
+                Object fresh = field.get(incoming);
+                Object old = field.get(saved);
+                if (old == null) continue;
+                boolean restore = fresh == null;
+                if (fresh instanceof String) {
+                    restore = ((String) fresh).trim().isEmpty();
+                } else if (fresh instanceof java.util.Collection) {
+                    restore = ((java.util.Collection<?>) fresh).isEmpty();
+                } else if (fresh instanceof java.util.Map) {
+                    restore = ((java.util.Map<?, ?>) fresh).isEmpty();
+                } else if (field.getType().isPrimitive()) {
+                    if (field.getType() == boolean.class) {
+                        restore = !((Boolean) fresh) && ((Boolean) old);
+                    } else if (field.getType() == int.class) {
+                        restore = ((Integer) fresh) == 0 && ((Integer) old) != 0;
+                    } else if (field.getType() == long.class) {
+                        restore = ((Long) fresh) == 0L && ((Long) old) != 0L;
+                    } else if (field.getType() == double.class) {
+                        restore = ((Double) fresh) == 0d && ((Double) old) != 0d;
+                    } else if (field.getType() == float.class) {
+                        restore = ((Float) fresh) == 0f && ((Float) old) != 0f;
+                    }
+                }
+                if (restore) field.set(incoming, old);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not merge saved account profile", e);
+        }
+        return incoming;
     }
 
     public String getAccessToken() { return prefs.getString("access_token", null); }
@@ -174,6 +219,8 @@ public class SessionManager {
     }
 
     public void clearAuth() {
+        // Logout ends authentication only; preserve the complete account snapshot first.
+        saveAccountSnapshot();
         prefs.edit()
                 .remove("access_token")
                 .remove("refresh_token")
