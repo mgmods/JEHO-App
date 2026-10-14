@@ -241,7 +241,14 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 || "host".equals(value) || "agency".equals(value) || "room".equals(value);
     }
 
-    private static Object firstNonBlank(Object... values) {\n        for (Object value : values) {\n            if (value != null && !String.valueOf(value).trim().isEmpty()) return value;\n        }\n        return null;\n    }\n\n    private static void put(JSONObject obj, String key, Object value) {
+    private static Object firstNonBlank(Object... values) {
+        for (Object value : values) {
+            if (value != null && !String.valueOf(value).trim().isEmpty()) return value;
+        }
+        return null;
+    }
+
+    private static void put(JSONObject obj, String key, Object value) {
         try { if (value != null) obj.put(key, value); } catch (Exception ignored) { }
     }
 
