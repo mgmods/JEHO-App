@@ -17,7 +17,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npm run build
+# Never let a copied or cached compilation artifact survive into this build.
+RUN rm -rf dist && npm run build
 
 FROM node:20-alpine AS runner
 
