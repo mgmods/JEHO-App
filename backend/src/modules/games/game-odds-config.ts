@@ -118,7 +118,7 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     maxWinAbsolute: Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)),
     maxCrashRatio: Math.floor(clamp(obj.maxCrashRatio, 3, 20, d.maxCrashRatio)),
     disabledGames: Array.isArray(obj.disabledGames)
-      ? [...new Set(obj.disabledGames.map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
+      ? [...new Set<string>((obj.disabledGames as unknown[]).map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
       : [...d.disabledGames],
     gameWinRates: obj.gameWinRates && typeof obj.gameWinRates === 'object' && !Array.isArray(obj.gameWinRates)
       ? Object.fromEntries(Object.entries(obj.gameWinRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
