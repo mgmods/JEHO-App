@@ -16,7 +16,7 @@ import { User } from '../../database/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
-import { isGameEnabled } from './game-odds-runtime';
+import { getGameWinRate, isGameEnabled } from './game-odds-runtime';
 
 type CasualGameId =
   | 'slots'
@@ -97,7 +97,7 @@ export class CasualBetService {
       throw new BadRequestException(`Bet must be between 50 and ${Math.min(20_000, GAME_PAYOUT.maxBet)} coins`);
     }
 
-    const outcome = this.resolveOutcome(gameId, body?.choice);
+    const outcome = this.resolveOutcomeWithConfiguredRate(gameId, body?.choice);
     const result = await this.dataSource.transaction(async (manager) => {
       let wallet = await manager.findOne(Wallet, {
         where: { userId },
