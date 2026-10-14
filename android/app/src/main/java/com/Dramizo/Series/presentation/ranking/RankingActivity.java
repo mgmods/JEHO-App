@@ -37,6 +37,12 @@ public class RankingActivity extends ThemedActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        String incomingCategory = getIntent().getStringExtra(EXTRA_CATEGORY);
+        if (incomingCategory == null || incomingCategory.isEmpty() || "rich".equals(incomingCategory)) {
+            startActivity(new Intent(this, WealthRankingHtmlActivity.class));
+            finish();
+            return;
+        }
         binding = ActivityRankingBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());
@@ -78,6 +84,11 @@ public class RankingActivity extends ThemedActivity {
             @Override public void onTabSelected(TabLayout.Tab tab) {
                 int i = tab.getPosition();
                 if (i >= 0 && i < CATEGORIES.length) category = CATEGORIES[i];
+                if ("rich".equals(category)) {
+                    startActivity(new Intent(RankingActivity.this, WealthRankingHtmlActivity.class));
+                    finish();
+                    return;
+                }
                 adapter.setCategory(category);
                 binding.tvCategoryDescription.setText(descriptionFor(category));
                 viewModel.load(period, category);
