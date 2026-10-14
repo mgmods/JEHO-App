@@ -237,7 +237,7 @@ public class ProfileActivity extends ThemedActivity {
             if (user == null) return;
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
-            loadPublicCpRelationship(user.id, user.avatarUrl);
+            loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
@@ -588,7 +588,7 @@ public class ProfileActivity extends ThemedActivity {
                 }).setNegativeButton("إلغاء", null).show();
     }
 
-    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl) {
+    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
         if (targetId == null || targetId.trim().isEmpty()) {
             hideProfileCpRelationship();
             return;
@@ -607,6 +607,7 @@ public class ProfileActivity extends ThemedActivity {
                 Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
                 String name = "";
                 String avatar = "";
+                String partnerFrameUrl = "";
                 String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
                 if (partner != null) {
                     Object displayName = partner.get("displayName");
@@ -616,6 +617,8 @@ public class ProfileActivity extends ThemedActivity {
                             : username != null ? String.valueOf(username).trim() : "";
                     Object avatarValue = partner.get("avatarUrl");
                     avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
+                    Object frameValue = partner.get("vipBadgeUrl");
+                    partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
                 }
                 // Render only a real active relationship returned by the API; never synthesize a name or photo.
                 if (partner == null || name.isEmpty()) {
@@ -625,6 +628,9 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvProfileCpLabel.setText(cpTypeLabel(type) + " · " + name);
                 bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
                 bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
+                // Only render the frame URLs actually returned by the server; never synthesize cosmetics.
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
                 binding.rowProfileCp.setVisibility(View.VISIBLE);
                 binding.btnCpRequest.setVisibility(View.GONE);
                 startProfileCpHeartAnimation();
@@ -640,7 +646,9 @@ public class ProfileActivity extends ThemedActivity {
             return;
         }
         imageView.setVisibility(View.VISIBLE);
-        Glide.with(this).load(AssetCatalog.absoluteUrl(avatarUrl.trim())).into(imageView);
+        // Shared loader normalizes relative API paths, retries failed placeholders correctly,
+        // and preserves animated GIF/WebP profile photos.
+        com.Dramizo.Series.util.AvatarImageLoader.load(imageView, avatarUrl.trim());
     }
 
     private void startProfileCpHeartAnimation() {
