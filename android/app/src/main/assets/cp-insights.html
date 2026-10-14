@@ -58,9 +58,9 @@ body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){return Number(v||0).toLocaleString('en-US')}
-function safeImage(v){const s=String(v||'');return /^https?:\/\//i.test(s)?s:''}
+function safeImage(v){const s=String(v||'').trim();if(/^https?:\/\//i.test(s))return s;if(s.startsWith('/')&&!s.startsWith('//'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;return ''}
 function frameUrl(person){const p=person||{};return safeImage(p.hostBadgeUrl)||safeImage(p.vipBadgeUrl)}
-function frameMarkup(person){const src=frameUrl(person);if(!src)return '';const clean=src.split('?')[0].toLowerCase();if(/\\.(mp4|webm|mov)$/.test(clean))return '<video class="real-frame-video" autoplay muted loop playsinline aria-hidden="true"><source src="'+esc(src)+'"></video>';if(/\\.(png|jpe?g|gif|webp|svg|avif)$/.test(clean)||! /\\.[a-z0-9]{2,5}$/.test(clean))return '<img class="real-frame" src="'+esc(src)+'" alt="" aria-hidden="true" referrerpolicy="no-referrer">';return ''}
+function frameMarkup(person){const src=frameUrl(person);if(!src)return '';const clean=src.split('?')[0].toLowerCase();if(/\.(mp4|webm|mov)$/.test(clean))return '<video class="real-frame-video" autoplay muted loop playsinline aria-hidden="true"><source src="'+esc(src)+'"></video>';if(/\.(png|jpe?g|gif|webp|svg|avif)$/.test(clean)||! /\.[a-z0-9]{2,5}$/.test(clean))return '<img class="real-frame" src="'+esc(src)+'" alt="" aria-hidden="true" referrerpolicy="no-referrer">';return ''}
 function avatarHtml(person,cls,label){const p=person||{},src=safeImage(p.avatarUrl),face=src?'<img class="couple-avatar '+cls+'" src="'+esc(src)+'" alt="'+esc(label)+'" referrerpolicy="no-referrer">':'<div class="couple-avatar '+cls+' couple-placeholder" role="img" aria-label="'+esc(label)+'">♡</div>';return '<span class="avatar-stack '+cls+'">'+face+frameMarkup(p)+'</span>'}
 function renderCpData(d){
  renderCpRanking(d&&d.cpRanking,!!(d&&d.cpRankingError));
