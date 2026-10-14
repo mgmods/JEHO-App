@@ -399,6 +399,9 @@ export class ConfigController {
         let url = raw;
         if (raw.startsWith('/uploads/') && !raw.startsWith('//')) {
           url = apiBase + raw;
+        } else if (/^uploads\//i.test(raw)) {
+          // Older uploads may be stored without the leading slash.
+          url = apiBase + '/' + raw;
         } else if (/^https?:\/\//i.test(raw)) {
           // Older dashboard settings may contain an absolute /uploads URL
           // from the legacy host. Uploaded files are owned by this deployment,
