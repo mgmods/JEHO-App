@@ -33,6 +33,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CasualActionDto } from './dto/casual.dto';
 import { TasksService } from '../tasks/tasks.service';
 import { RoomGameAccessService } from './room-game-access.service';
+import { isGameEnabled } from './game-odds-runtime';
 
 
 
@@ -70,6 +71,7 @@ export class CasualMatchService {
 
   async enqueue(userId: string, kind: CasualGameKind, roomId?: string) {
 
+    if (!isGameEnabled(String(kind))) throw new BadRequestException('هذه اللعبة متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     await this.cancelStaleForUser(userId, kind);
 
