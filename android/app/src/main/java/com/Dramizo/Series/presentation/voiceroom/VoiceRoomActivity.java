@@ -835,6 +835,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         binding.btnGames.setOnClickListener(v -> showRoomGames());
 
+        // Keep the room's bottom action row present after room/UI rebinding.
+        // The microphone remains governed exclusively by seated state in syncMicUi().
+        if (binding.bottomBar != null && !roomComposerOpen) {
+            binding.bottomBar.setVisibility(View.VISIBLE);
+        }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        if (binding.tvChatInputTips != null && !roomComposerOpen) {
+            binding.tvChatInputTips.setVisibility(View.VISIBLE);
+        }
+
         // Room side shortcuts. Keep the music shortcut on the existing music flow;
         // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
         View sideMusic = findViewById(R.id.btnRoomSideMusic);
