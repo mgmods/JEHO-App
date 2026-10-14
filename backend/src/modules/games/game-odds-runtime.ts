@@ -24,3 +24,8 @@ export function isGameEnabled(gameId: string): boolean {
   const id = String(gameId || '').trim().toLowerCase();
   return !!id && !live.disabledGames.includes(id);
 }
+
+export function getGameWinRate(gameId: string): number | undefined {
+  const value = live.gameWinRates?.[String(gameId || '').trim().toLowerCase()];
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, Number(value))) : undefined;
+}
