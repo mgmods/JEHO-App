@@ -16,10 +16,10 @@ button{font:inherit;border:0;cursor:pointer}#back{background:#ffffff12;color:whi
 </style>
 </head>
 <body>
-<header><button id="back" aria-label="رجوع">‹</button><h1>لوحة الترتيب</h1><button id="refresh" aria-label="تحديث">↻</button></header>
+<header><h1>لوحة الترتيب</h1><button id="refresh" aria-label="تحديث">↻</button></header>
 <section class="hero"><div class="eyebrow">JEHO · لوحة الثروة والترتيب</div><h2 id="heroTitle">أصحاب الثروة</h2><p id="heroDesc">ترتيب حقيقي من بيانات التطبيق، يتحدث حسب الفترة والقسم المختار.</p></section>
 <nav class="tabs" id="periods"><button class="chip active" data-period="daily">اليوم</button><button class="chip" data-period="weekly">هذا الأسبوع</button><button class="chip" data-period="monthly">هذا الشهر</button></nav>
-<nav class="tabs" id="categories"><button class="chip active" data-category="rich">الثروة</button><button class="chip" data-category="popular">الشعبية</button><button class="chip" data-category="gifts">الهدايا</button><button class="chip" data-category="host">المضيفون</button><button class="chip" data-category="agency">الوكالات</button><button class="chip" data-category="room">الغرف</button></nav>
+<nav class="tabs" id="categories"><button class="chip" data-category="popular">الشعبية</button><button class="chip" data-category="gifts">الهدايا</button><button class="chip" data-category="host">المضيفون</button><button class="chip" data-category="agency">الوكالات</button><button class="chip" data-category="room">الغرف</button></nav>
 <div class="section-label"><span id="listTitle">الأعلى ترتيبًا</span><small id="count">—</small></div><div id="state">جارٍ تحميل بيانات الترتيب الفعلية…</div><div id="podium" class="podium" hidden></div><div id="rows" class="rows"></div><div class="foot">الصور والأسماء والنقاط من بيانات الحسابات الفعلية فقط.</div>
 <script>
 'use strict';
@@ -32,7 +32,7 @@ const labels = {
   room: ["الغرف", "ترتيب الغرف"]
 };
 let period = "daily";
-let category = "rich";
+let category = "popular";
 let data = [];
 
 function esc(value) {
@@ -50,7 +50,7 @@ function getName(entry) {
 function makePhoto(user) {
   const url = user && user.avatarUrl ? user.avatarUrl : "";
   return url
-    ? '<img class="photo" alt="" src="' + esc(url) + '">'
+    ? '<img class="photo" loading="eager" decoding="async" alt="" src="' + esc(url) + '">'
     : '<span class="photo" aria-hidden="true"></span>';
 }
 function card(entry, top) {
@@ -68,7 +68,7 @@ function card(entry, top) {
     : '<div class="info"><div class="name">' + esc(name) + '</div><div class="sub">' +
       esc(user.username || (entry.targetId ? "ID: " + entry.targetId : "—")) + '</div></div>';
   const frame = user.frameUrl
-    ? '<img class="frame" alt="" src="' + esc(user.frameUrl) + '">'
+    ? '<img class="frame" loading="eager" decoding="async" alt="" src="' + esc(user.frameUrl) + '">'
     : "";
   const profileAttr = targetId ? ' data-user-id="' + esc(targetId) + '" role="button" tabindex="0"' : "";
   return '<div class="' + (top ? 'podium-card' + (Number(rank) === 1 ? ' first' : '') : 'entry') +
@@ -134,11 +134,6 @@ document.querySelectorAll("[data-category]").forEach(button => {
   });
 });
 document.getElementById("refresh").addEventListener("click", load);
-document.getElementById("back").addEventListener("click", () => {
-  if (window.JehoRanking && typeof window.JehoRanking.back === "function") {
-    window.JehoRanking.back();
-  }
-});
 document.getElementById("podium").addEventListener("click", openProfileFromCard);
 document.getElementById("rows").addEventListener("click", openProfileFromCard);
 document.getElementById("podium").addEventListener("keydown", openProfileFromKeyboard);
@@ -159,7 +154,7 @@ function openProfileFromKeyboard(event) {
 }
 window.setInitialRanking = function(nextPeriod, nextCategory) {
   period = ["daily", "weekly", "monthly"].includes(nextPeriod) ? nextPeriod : "daily";
-  category = Object.prototype.hasOwnProperty.call(labels, nextCategory) ? nextCategory : "rich";
+  category = Object.prototype.hasOwnProperty.call(labels, nextCategory) && nextCategory !== "rich" ? nextCategory : "popular";
   document.querySelectorAll("[data-period]").forEach(button =>
     button.classList.toggle("active", button.dataset.period === period));
   document.querySelectorAll("[data-category]").forEach(button =>
