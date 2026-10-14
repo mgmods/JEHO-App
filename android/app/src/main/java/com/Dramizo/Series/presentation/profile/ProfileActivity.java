@@ -6,6 +6,9 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.app.AlertDialog;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -51,6 +54,16 @@ public class ProfileActivity extends ThemedActivity {
     private ActivityProfileBinding binding;
     private AppContainer container;
     private boolean isFollowingTarget;
+    private AnimatorSet cpHeartAnimator;
+
+    @Override
+    protected void onDestroy() {
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
+        super.onDestroy();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -233,7 +246,7 @@ public class ProfileActivity extends ThemedActivity {
             if (user == null) return;
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
-            loadPublicCpRelationship(user.id);
+            loadPublicCpRelationship(user.id, user.avatarUrl);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
@@ -584,30 +597,83 @@ public class ProfileActivity extends ThemedActivity {
                 }).setNegativeButton("إلغاء", null).show();
     }
 
-    private void loadPublicCpRelationship(String targetId) {
-        if (targetId == null || targetId.isEmpty()) return;
+    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl) {
+        if (targetId == null || targetId.trim().isEmpty()) {
+            hideProfileCpRelationship();
+            return;
+        }
         container.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> result = com.Dramizo.Series.util.ApiCall.execute(
                     container.getUserApi().cpProfileRelationships(targetId));
             runOnUiThread(() -> {
                 if (isFinishing() || binding == null) return;
                 if (!result.success || result.data == null || result.data.isEmpty()) {
-                    binding.rowProfileCp.setVisibility(View.GONE);
+                    hideProfileCpRelationship();
                     return;
                 }
                 Map<String, Object> relation = result.data.get(0);
                 Object partnerObj = relation.get("partner");
                 Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
-                String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
-                String name = partner == null ? "" : String.valueOf(
-                        partner.get("displayName") != null ? partner.get("displayName") : partner.get("username"));
-                String avatar = partner == null || partner.get("avatarUrl") == null ? "" : String.valueOf(partner.get("avatarUrl"));
-                binding.tvProfileCpLabel.setText(cpTypeLabel(type) + (name.isEmpty() ? "" : " · " + name));
-                if (!avatar.isEmpty()) Glide.with(this).load(avatar).placeholder(R.drawable.ic_tab_me).into(binding.imgProfileCpPartner);
+                String name = "";
+                String avatar = "";
+                String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
+                if (partner != null) {
+                    Object displayName = partner.get("displayName");
+                    Object username = partner.get("username");
+                    name = displayName != null && !String.valueOf(displayName).trim().isEmpty()
+                            ? String.valueOf(displayName).trim()
+                            : username != null ? String.valueOf(username).trim() : "";
+                    Object avatarValue = partner.get("avatarUrl");
+                    avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
+                }
+                // Render only a real active relationship returned by the API; never synthesize a name or photo.
+                if (partner == null || name.isEmpty()) {
+                    hideProfileCpRelationship();
+                    return;
+                }
+                binding.tvProfileCpLabel.setText(cpTypeLabel(type) + " · " + name);
+                bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+                bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
                 binding.rowProfileCp.setVisibility(View.VISIBLE);
                 binding.btnCpRequest.setVisibility(View.GONE);
+                startProfileCpHeartAnimation();
             });
         });
+    }
+
+    private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
+        if (imageView == null) return;
+        if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+            imageView.setImageDrawable(null);
+            imageView.setVisibility(View.GONE);
+            return;
+        }
+        imageView.setVisibility(View.VISIBLE);
+        Glide.with(this).load(AssetCatalog.absoluteUrl(avatarUrl.trim())).into(imageView);
+    }
+
+    private void startProfileCpHeartAnimation() {
+        if (binding == null || binding.tvProfileCpHeart == null) return;
+        if (cpHeartAnimator != null) cpHeartAnimator.cancel();
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.tvProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f);
+        cpHeartAnimator = new AnimatorSet();
+        cpHeartAnimator.playTogether(scaleX, scaleY, alpha);
+        cpHeartAnimator.setDuration(900L);
+        cpHeartAnimator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+        cpHeartAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        cpHeartAnimator.setRepeatMode(ValueAnimator.RESTART);
+        cpHeartAnimator.start();
+    }
+
+    private void hideProfileCpRelationship() {
+        if (binding == null) return;
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
+        binding.rowProfileCp.setVisibility(View.GONE);
     }
 
     private String cpTypeLabel(String type) {
