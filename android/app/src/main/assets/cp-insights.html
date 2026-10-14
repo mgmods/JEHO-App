@@ -29,6 +29,7 @@ body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1
 .partner-meta{display:flex;align-items:center;gap:10px;padding:12px;border-radius:17px;background:#ff91c00a;border:1px solid #ffb4d31c;margin-bottom:13px}
 .mini-avatar{width:43px;height:43px;border-radius:15px;object-fit:cover;background:#392a46;border:1px solid #ffb4d377;flex-shrink:0}
 .partner-meta-info{min-width:0;flex:1}.partner-meta-name{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.cp-ranking-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:22px 3px 10px}.cp-ranking-head h2{font-size:16px;margin:0}.cp-rank-list{display:grid;gap:10px}.cp-rank{position:relative;padding:13px;border-radius:19px;background:linear-gradient(145deg,#2a203b,#1c192d);border:1px solid #ffffff12}.cp-rank.top1{border-color:#f6d48b66;background:linear-gradient(145deg,#57452d,#30223e 78%)}.cp-rank.top2{border-color:#d5d8ef45}.cp-rank.top3{border-color:#c9957045}.cp-rank-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}.cp-rank-no{font-size:12px;font-weight:850;padding:6px 10px;border-radius:12px;background:#ff79b71c;color:#ffd1e4}.cp-rank.top1 .cp-rank-no{background:#f6d48b24;color:#ffe5a5}.cp-rank-points{font-size:12px;color:#ffe1a3;font-weight:800}.cp-rank-couple{display:flex;align-items:center;gap:8px;direction:rtl}.cp-rank-person{display:flex;align-items:center;gap:7px;min-width:0;flex:1}.cp-rank-avatar{width:43px;height:43px;object-fit:cover;border-radius:15px;background:#392a46;border:1px solid #ffb4d377;flex-shrink:0}.cp-rank-name{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cp-rank-meta{font-size:10px;color:var(--muted);margin-top:4px}.cp-rank-heart{color:#ff79b7;font-size:20px;animation:heartBeat 1.15s ease-in-out infinite;flex-shrink:0}.cp-rank-actions{display:flex;gap:7px;margin-top:12px}.cp-rank-actions button{flex:1;margin:0;padding:9px 6px;font-size:11px}.action.secondary{border-color:#c6a5ff30;background:#c6a5ff0d;color:#e4d5ff}.cp-rank-loading{padding:22px;text-align:center;color:var(--muted);font-size:13px}.cp-ranking-empty{padding:22px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8}
 .action{border-color:#ff9bc64d;background:linear-gradient(100deg,#ff79b71c,#c6a5ff12);color:#ffe0ee}
 @media(max-width:360px){main{padding:12px}.hero{padding:18px 10px}.couple{gap:5px}.couple-avatar.me{width:68px;height:68px}.couple-avatar.partner{width:56px;height:56px}.heart-wrap{width:39px}.heart{font-size:30px}.couple-name{font-size:12px}}
 
@@ -42,6 +43,7 @@ body{background:radial-gradient(ellipse at 50% -12%,#713657 0,#30203d 40%,#100d1
   <p id="heroSubtitle">تظهر هنا العلاقة الفعّالة المرتبطة بحسابك</p>
 </section>
 <section id="relationship" class="card"><div class="status">جارٍ تحميل بيانات العلاقة…</div></section>
+<div class="cp-ranking-head"><h2>🏆 أقوى علاقات CP</h2><span class="pill" id="cpRankCount">ترتيب فعلي</span></div><section class="card"><div id="cpRanking" class="cp-rank-list"><div class="cp-rank-loading">جارٍ تحميل ترتيب العلاقات الفعلي…</div></div><button class="action" onclick="JehoApp.openCpDiscovery()">اكتشاف العلاقات وعرض الكل ←</button><button class="action secondary" onclick="JehoApp.refreshData()">↻ تحديث البيانات</button></section>
 <div class="note">نعرض الاسم والصورة والمستوى والنقاط من بيانات الحساب والخادم فقط، ولا ننشئ بيانات شريك افتراضية.</div>
 </main>
 <script>
@@ -66,5 +68,25 @@ function renderCpData(d){
  box.innerHTML='<div class="card-head"><h3>تفاصيل العلاقة</h3><span class="pill">♥ '+esc(type)+'</span></div><div class="partner-meta">'+mini+'<div class="partner-meta-info"><div class="partner-meta-name">'+esc(name||'اسم غير متوفر في بيانات الخادم')+'</div><div class="meta">مستوى الشريك: '+esc(p.level==null?'—':num(p.level))+' · VIP: '+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</div></div></div><div class="stats"><div class="stat"><label>مستوى العلاقة</label><strong>'+esc(rel.level==null?'—':num(rel.level))+'</strong><small>المستوى الحالي</small></div><div class="stat"><label>نقاط العلاقة</label><strong>'+esc(rel.points==null?'—':num(rel.points))+'</strong><small>النقاط المسجلة فعليًا</small></div><div class="stat"><label>مستوى الشريك</label><strong>'+esc(p.level==null?'—':num(p.level))+'</strong><small>من ملف الشريك</small></div><div class="stat"><label>مستوى VIP</label><strong>'+esc(p.vipLevel==null?'—':num(p.vipLevel))+'</strong><small>من ملف الشريك</small></div></div><button class="action" onclick="JehoApp.openCpCenter()">إدارة علاقة CP ←</button>';
 }
 function showCpError(){document.getElementById('relationship').innerHTML='<div class="empty">تعذّر تحميل البيانات الآن. تحقق من اتصال التطبيق ثم أعد المحاولة.</div><button class="action" onclick="JehoApp.refreshData()">إعادة المحاولة</button>'}
+function cpPersonHtml(person, fallback){
+ const p=person||{}, name=p.displayName||p.username||fallback||'اسم غير متوفر', avatar=safeImage(p.avatarUrl);
+ const img=avatar?'<img class="cp-rank-avatar" src="'+esc(avatar)+'" alt="" referrerpolicy="no-referrer">':'<div class="cp-rank-avatar couple-placeholder">♡</div>';
+ const id=String(p.id||'');
+ return '<div class="cp-rank-person">'+img+'<div style="min-width:0"><div class="cp-rank-name">'+esc(name)+'</div><div class="cp-rank-meta">LV '+esc(p.level==null?'—':num(p.level))+'</div></div></div>';
+}
+function renderCpRanking(rows){
+ const box=document.getElementById('cpRanking'),count=document.getElementById('cpRankCount');
+ const data=Array.isArray(rows)?rows:[];
+ count.textContent=data.length+' علاقة';
+ if(!data.length){box.innerHTML='<div class="cp-ranking-empty">لا توجد علاقات فعّالة للترتيب حاليًا. ستظهر العلاقات الحقيقية هنا عند تفعيلها في النظام.</div>';return}
+ box.innerHTML=data.map((r,i)=>{
+  const a=r.userA||{},b=r.userB||{},rank=Number(r.rank)||i+1,points=r.points==null?'0':r.points,level=r.level==null?'—':r.level;
+  const cls=rank===1?'top1':rank===2?'top2':rank===3?'top3':'';
+  const medal=rank===1?'🥇 المركز الأول':rank===2?'🥈 المركز الثاني':rank===3?'🥉 المركز الثالث':'المركز '+rank;
+  const type=r.typeLabel||({'love':'الحب','friendship':'الصداقة','brotherhood':'الأخوّة','engagement':'الخطوبة','marriage':'الزواج'}[r.type]||'علاقة CP');
+  return '<article class="cp-rank '+cls+'"><div class="cp-rank-title"><span class="cp-rank-no">'+medal+'</span><span class="cp-rank-points">♥ '+esc(num(points))+' نقطة</span></div><div class="cp-rank-couple">'+cpPersonHtml(a,'الطرف الأول')+'<span class="cp-rank-heart">♥</span>'+cpPersonHtml(b,'الطرف الثاني')+'</div><div class="cp-rank-meta" style="margin-top:10px">'+esc(type)+' · مستوى العلاقة '+esc(level)+' · '+esc(num(r.durationDays||0))+' يوم</div><div class="cp-rank-actions"><button class="action secondary" onclick="JehoApp.openUserProfile(\''+esc(a.id||'')+'\')">ملف الطرف الأول</button><button class="action secondary" onclick="JehoApp.openUserProfile(\''+esc(b.id||'')+'\')">ملف الطرف الثاني</button></div></article>';
+ }).join('');
+}
+
 window.renderCpData=renderCpData;window.showCpError=showCpError;if(window.JehoApp)JehoApp.refreshData();
 </script></body></html>
