@@ -93,6 +93,43 @@ main{max-width:620px;padding:14px 15px 26px}
 @keyframes floatCpHeart{0%{transform:translateY(0) rotate(-10deg) scale(.7);opacity:0}12%{opacity:.65}75%{opacity:.4}100%{transform:translateY(-210px) rotate(18deg) scale(1.15);opacity:0}}
 @media(max-width:360px){main{padding:12px 10px}.cp-type{gap:8px;padding:10px}.cp-type-icon{width:38px;height:38px}.cp-type-name{font-size:12px}.hero h2{font-size:20px}.couple{gap:7px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
+
+/* Final CP palette: romantic rose pink, without purple accents. */
+:root{color-scheme:dark;--bg:#1b0d13;--card:#2a111c;--line:#7b354f;--pink:#ff5c98;--rose:#ffd1e0;--lilac:#ff9fbe;--gold:#ffe0b2;--muted:#e1b9c7}
+body{background:radial-gradient(ellipse at 12% 0%,#713044 0,transparent 40%),radial-gradient(ellipse at 95% 25%,#512333 0,transparent 36%),linear-gradient(160deg,#2b111b,#170b11 68%,#241019)}
+header{background:#241018ed;border-bottom-color:#ff9fbe30}
+header:before{background:linear-gradient(145deg,#ff79a9,#df477f);box-shadow:0 6px 18px #f45eaa38}
+.hero{background:radial-gradient(circle at 50% 15%,#a94b70 0,#71324f 37%,transparent 72%),linear-gradient(145deg,#6d263f,#451c31 65%,#2c1422);border-color:#ffd0e55a}
+.hero:after{background:radial-gradient(circle,#ff83b522 0,transparent 70%)}
+.card{background:linear-gradient(145deg,#351725ed,#24111bf2);border-color:#ffb6d526}
+.stat{background:linear-gradient(145deg,#ffffff0b,#ff91c011);border-color:#ffb7d51c}
+.stat:after{background:#ff7db218}
+.stat strong{color:#ffd3e5}
+.pill{color:#ffe1ef;background:linear-gradient(110deg,#ff72b51e,#e84b8018);border-color:#ff9bc650}
+.action{background:linear-gradient(105deg,#ff72b533,#e84b801f);border-color:#ff9bc65c;color:#ffe4f0}
+.action.secondary{border-color:#ff9fbe42;background:linear-gradient(105deg,#ff9fbe18,#e84b8010);color:#ffd6e4}
+.partner-meta{background:linear-gradient(110deg,#ff8fbd14,#e85d8810);border-color:#ffbad52b}
+.cp-type{background:linear-gradient(145deg,#3a1a2a,#25121d);border-color:#ffb5d21f}
+.cp-type-icon{background:#ff83b51f;border-color:#ffb2d536}
+.cp-type.love{border-color:#ff80b849}
+.cp-type.love .cp-type-icon{background:linear-gradient(145deg,#ff6cae42,#c34c8b25);color:#ff9ac8}
+.cp-type.friend .cp-type-icon{background:#ff9fbe24;color:#ffc0d5}
+.cp-type.engage .cp-type-icon{background:#ffd17b24;color:#ffe1a0}
+.cp-type.marriage .cp-type-icon{background:#ff8dca27;color:#ffb4da}
+.cp-type.brother .cp-type-icon{background:#ff9fbe20;color:#ffc0d5}
+.cp-type-desc,.cp-section-kicker{color:#e2b9c8}
+.cp-section-title h2{color:#fff1f7}
+.cp-rank{background:linear-gradient(145deg,#381a2a,#25121d);border-color:#ffb5d21f}
+.cp-rank.top1{background:linear-gradient(145deg,#70404a,#3d1c2d 80%);border-color:#ffe09a78}
+.cp-rank.top2,.cp-rank.top3{border-color:#ffb5d238}
+.cp-rank-no{background:#ff79b724;color:#ffd1e4}
+.cp-rank-points{color:#ffe1b0}
+.cp-rank-heart{color:#ff79ad}
+.cp-ranking-empty,.empty,.status{color:#e1b9c7}
+.note{color:#cda6b5}
+.floating-hearts span{color:#ffd1e0;text-shadow:0 0 12px #ff6cae88}
+.heart{color:#ff75a8;filter:drop-shadow(0 0 12px #ff65b8b8)}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
 </style></head><body>
 <header><div><h1>علاقة CP</h1><div class="sub">بيانات العلاقة الفعلية المرتبطة بحسابك</div></div></header>
 <main>
@@ -161,7 +198,7 @@ function renderCpRanking(rows,hasError){
   const cls=rank===1?'top1':rank===2?'top2':rank===3?'top3':'';
   const medal=rank===1?'🥇 المركز الأول':rank===2?'🥈 المركز الثاني':rank===3?'🥉 المركز الثالث':'المركز '+rank;
   const type=r.typeLabel||({'love':'الحب','friendship':'الصداقة','brotherhood':'الأخوّة','engagement':'الخطوبة','marriage':'الزواج'}[r.type]||'علاقة CP');
-  return '<article class="cp-rank '+cls+'"><div class="cp-rank-title"><span class="cp-rank-no">'+medal+'</span><span class="cp-rank-points">♥ '+esc(num(points))+' نقطة</span></div><div class="cp-rank-couple">'+cpPersonHtml(a,'الطرف الأول')+'<span class="cp-rank-heart">♥</span>'+cpPersonHtml(b,'الطرف الثاني')+'</div><div class="cp-rank-meta" style="margin-top:10px">'+esc(type)+' · مستوى العلاقة '+esc(level)+' · '+esc(num(r.durationDays||0))+' يوم</div><div class="cp-rank-actions"><button class="action secondary" onclick="JehoApp.openUserProfile(\''+esc(a.id||'')+'\')">ملف الطرف الأول</button><button class="action secondary" onclick="JehoApp.openUserProfile(\''+esc(b.id||'')+'\')">ملف الطرف الثاني</button></div></article>';
+  return '<article class="cp-rank '+cls+'"><div class="cp-rank-title"><span class="cp-rank-no">'+medal+'</span><span class="cp-rank-points">♥ '+esc(num(points))+' نقطة</span></div><div class="cp-rank-couple">'+cpPersonHtml(a,'الطرف الأول')+'<span class="cp-rank-heart">♥</span>'+cpPersonHtml(b,'الطرف الثاني')+'</div><div class="cp-rank-meta" style="margin-top:10px">'+esc(type)+' · مستوى العلاقة '+esc(level)+' · '+esc(num(r.durationDays||0))+' يوم</div></article>';
  }
  const top=data.slice(0,3);
  podium.innerHTML=top.map((r,i)=>card(r,i)).join('');
