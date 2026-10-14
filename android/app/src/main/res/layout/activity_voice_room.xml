@@ -16,7 +16,6 @@
         android:contentDescription="@null"
         android:scaleType="centerCrop"
         android:src="@drawable/voice_room_bg"
-        android:scaleType="centerCrop"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
