@@ -33,16 +33,24 @@ public class ProfileViewModel extends ViewModel {
      */
     public void loadMeForSetup() {
         c.getIoExecutor().execute(() -> {
-            Result<AuthDtos.UserDto> r = c.getProfileUseCase.me();
-            if (r.success && r.data != null) {
-                c.getSessionManager().updateCachedUser(r.data);
-                lastLoadMeAtMs = System.currentTimeMillis();
-                user.postValue(r.data);
-                return;
+            try {
+                Result<AuthDtos.UserDto> r = c.getProfileUseCase.me();
+                if (r != null && r.success && r.data != null) {
+                    c.getSessionManager().updateCachedUser(r.data);
+                    lastLoadMeAtMs = System.currentTimeMillis();
+                    user.postValue(r.data);
+                    return;
+                }
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue(r != null && r.error != null
+                        ? r.error : "تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
+            } catch (Throwable failure) {
+                // Never leave onboarding transparent with its progress indicator stuck.
+                AuthDtos.UserDto cached = c.getSessionManager().getUser();
+                if (cached != null) user.postValue(cached);
+                else error.postValue("تعذر تحميل بيانات الحساب، تحقق من الاتصال ثم أعد المحاولة");
             }
-            AuthDtos.UserDto cached = c.getSessionManager().getUser();
-            if (cached != null) user.postValue(cached);
-            else error.postValue(r.error);
         });
     }
 
