@@ -20,6 +20,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
 import com.google.gson.Gson;
 
 import java.util.ArrayList;
@@ -100,11 +101,34 @@ public class CpCenterActivity extends ThemedActivity {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private Object normalizeUrls(Object value) {
+        if (value instanceof Map) {
+            Map<String, Object> normalized = new HashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                Object item = entry.getValue();
+                if ("avatarUrl".equals(key) && item != null) {
+                    normalized.put(key, AssetCatalog.absoluteUrl(String.valueOf(item)));
+                } else {
+                    normalized.put(key, normalizeUrls(item));
+                }
+            }
+            return normalized;
+        }
+        if (value instanceof List) {
+            List<Object> normalized = new ArrayList<>();
+            for (Object item : (List<?>) value) normalized.add(normalizeUrls(item));
+            return normalized;
+        }
+        return value;
+    }
+
     private void loadHome() {
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().myCpRelationships());
             if (r.success && r.data != null) {
-                js("window.renderCpHome && window.renderCpHome(" + gson.toJson(r.data) + ")");
+                js("window.renderCpHome && window.renderCpHome(" + gson.toJson(normalizeUrls(r.data)) + ")");
             } else {
                 js("window.renderCpHome && window.renderCpHome([])");
                 if (r.error != null) message(r.error);
