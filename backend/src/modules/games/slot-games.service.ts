@@ -130,7 +130,7 @@ export class SlotGamesService {
 
     const secret = await this.readSetting('games.bsgame.code_secret', 'jeho-slot-local');
 
-    const origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+    const origin = process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud';
 
     const defaultWs = `${this.toWsBase(origin)}/games/ws`;
 
@@ -342,7 +342,7 @@ export class SlotGamesService {
 
     const code = `${this.signCode(codePayload, cfg.secret)}${nonce}`;
 
-    const origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr';
+    const origin = process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud';
 
     const currencyIcon = `${origin}/assets/pack/ic_pass_card_coin.png`;
 
