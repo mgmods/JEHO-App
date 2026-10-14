@@ -38,11 +38,7 @@ public class RankingActivity extends ThemedActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         String incomingCategory = getIntent().getStringExtra(EXTRA_CATEGORY);
-        if (incomingCategory == null || incomingCategory.isEmpty() || "rich".equals(incomingCategory)) {
-            startActivity(new Intent(this, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class).putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
-            finish();
-            return;
-        }
+        if (incomingCategory != null && !incomingCategory.isEmpty()) category = incomingCategory;
         binding = ActivityRankingBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         binding.btnBack.setOnClickListener(v -> navigateUp());
@@ -84,11 +80,6 @@ public class RankingActivity extends ThemedActivity {
             @Override public void onTabSelected(TabLayout.Tab tab) {
                 int i = tab.getPosition();
                 if (i >= 0 && i < CATEGORIES.length) category = CATEGORIES[i];
-                if ("rich".equals(category)) {
-                    startActivity(new Intent(RankingActivity.this, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class).putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
-                    finish();
-                    return;
-                }
                 adapter.setCategory(category);
                 binding.tvCategoryDescription.setText(descriptionFor(category));
                 viewModel.load(period, category);

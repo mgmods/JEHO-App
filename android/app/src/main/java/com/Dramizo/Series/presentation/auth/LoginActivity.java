@@ -21,6 +21,8 @@ import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.profile.ProfileSetupActivity;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.di.AppContainer;
+import com.Dramizo.Series.domain.model.Result;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -130,37 +132,57 @@ public class LoginActivity extends ThemedActivity {
         });
         viewModel.getAuthSuccess().observe(this, result -> {
             if (result == null) return;
-            AuthDtos.UserDto user = result.user != null
-                    ? result.user
-                    : ContainerProvider.from(this).getSessionManager().getUser();
-            Intent next;
-            if (ProfileSetupActivity.isProfileComplete(user)) {
-                String pendingRoom = getIntent() != null
-                        ? getIntent().getStringExtra("pending_room_id") : null;
-                if (pendingRoom == null || pendingRoom.isEmpty()) {
-                    pendingRoom = com.Dramizo.Series.util.InviteReferralHelper.peekPendingRoom(this);
+            AppContainer container = ContainerProvider.from(this);
+            // Login DTOs can omit country/gender for an existing account. Resolve /me first
+            // so returning users are not sent through profile creation again.
+            container.getIoExecutor().execute(() -> {
+                AuthDtos.UserDto resolvedUser = null;
+                try {
+                    Result<AuthDtos.UserDto> fresh = container.getProfileUseCase.me();
+                    if (fresh != null && fresh.success && fresh.data != null) {
+                        resolvedUser = fresh.data;
+                        container.getSessionManager().updateCachedUser(resolvedUser);
+                    }
+                } catch (Exception ignored) {
+                    // Keep a successful login usable if /me is temporarily unavailable.
                 }
-                if (pendingRoom != null && !pendingRoom.isEmpty()) {
-                    next = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
-                    next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoom);
-                    next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_IS_HOST, false);
-                    com.Dramizo.Series.util.InviteReferralHelper.takePendingRoom(this);
-                } else {
-                    next = new Intent(this, MainActivity.class);
+                if (resolvedUser == null) {
+                    resolvedUser = result.user != null
+                            ? result.user : container.getSessionManager().getUser();
                 }
-            } else {
-                next = new Intent(this, ProfileSetupActivity.class);
-            }
-            copyPendingDeepLink(getIntent(), next);
-            // Also carry Play Install Referrer code saved before login.
-            String stored = com.Dramizo.Series.util.InviteReferralHelper.peekPendingCode(this);
-            if (stored != null && !stored.isEmpty()) {
-                next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_PENDING_INVITE, stored);
-                next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_OPEN_INVITE, true);
-            }
-            startActivity(next);
-            finish();
+                final AuthDtos.UserDto user = resolvedUser;
+                runOnUiThread(() -> continueAfterAuth(result, user));
+            });
         });
+    }
+
+    private void continueAfterAuth(AuthDtos.AuthResult result, AuthDtos.UserDto user) {
+        Intent next;
+        if (ProfileSetupActivity.isProfileComplete(user)) {
+            String pendingRoom = getIntent() != null
+                    ? getIntent().getStringExtra("pending_room_id") : null;
+            if (pendingRoom == null || pendingRoom.isEmpty()) {
+                pendingRoom = com.Dramizo.Series.util.InviteReferralHelper.peekPendingRoom(this);
+            }
+            if (pendingRoom != null && !pendingRoom.isEmpty()) {
+                next = new Intent(this, com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.class);
+                next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_ROOM_ID, pendingRoom);
+                next.putExtra(com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity.EXTRA_IS_HOST, false);
+                com.Dramizo.Series.util.InviteReferralHelper.takePendingRoom(this);
+            } else {
+                next = new Intent(this, MainActivity.class);
+            }
+        } else {
+            next = new Intent(this, ProfileSetupActivity.class);
+        }
+        copyPendingDeepLink(getIntent(), next);
+        String stored = com.Dramizo.Series.util.InviteReferralHelper.peekPendingCode(this);
+        if (stored != null && !stored.isEmpty()) {
+            next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_PENDING_INVITE, stored);
+            next.putExtra(com.Dramizo.Series.util.InviteReferralHelper.EXTRA_OPEN_INVITE, true);
+        }
+        startActivity(next);
+        finish();
     }
 
     private void setRegisterMode(boolean register) {

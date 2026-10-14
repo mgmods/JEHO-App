@@ -301,6 +301,8 @@ public class HomeMeFragment extends Fragment {
                 }
             });
         });
+        // Keep identity/profile shortcuts hidden after asynchronous badge updates.
+        keepOnlyMyRoomActivityAndRoomLists();
     }
 
     private void applySectionWallpaper() {

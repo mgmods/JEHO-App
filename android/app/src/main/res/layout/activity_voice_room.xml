@@ -1341,8 +1341,8 @@
         android:paddingHorizontal="4dp"
         android:paddingVertical="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/roomSideShortcuts">
+        app:layout_constraintLeft_toRightOf="@id/roomSideShortcuts"
+        app:layout_constraintRight_toRightOf="parent">
 
         <!-- Messages, stickers, gifts, mic, then the text composer. -->
         <FrameLayout
@@ -1383,24 +1383,6 @@
         </FrameLayout>
 
         <FrameLayout
-            android:id="@+id/btnGift"
-            android:layout_width="36dp"
-            android:layout_height="40dp"
-            android:layout_marginStart="1dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/send_gift"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:id="@+id/imgRoomGift"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@drawable/ic_room_send_gift" />
-        </FrameLayout>
-
-        <FrameLayout
             android:id="@+id/btnMic"
             android:layout_width="30dp"
             android:layout_height="36dp"
@@ -1416,6 +1398,41 @@
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_pro_mic" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnWriteMessage"
+            android:layout_width="30dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="1dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="كتابة رسالة"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@android:drawable/ic_menu_edit" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/btnGift"
+            android:layout_width="36dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="1dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/send_gift"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+            <ImageView
+                android:id="@+id/imgRoomGift"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_room_send_gift" />
         </FrameLayout>
 
         <TextView

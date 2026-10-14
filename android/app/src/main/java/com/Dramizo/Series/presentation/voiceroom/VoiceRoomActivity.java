@@ -814,6 +814,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnPrivateMsg.setOnClickListener(v ->
                     RoomPrivateMsgSheet.showSheet(getSupportFragmentManager()));
         }
+        if (binding.btnWriteMessage != null) {
+            binding.btnWriteMessage.setOnClickListener(v -> openRoomChatComposer(true));
+            binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        }
         binding.btnTools.setOnClickListener(v -> showOtherTools());
         binding.btnHeaderMore.setOnClickListener(v -> openRoomSharePicker());
         if (binding.btnHeaderHome != null) {
@@ -842,10 +846,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
         if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
         if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
         if (binding.tvChatInputTips != null && !roomComposerOpen) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
         }
+        if (binding.bottomBar != null && !roomComposerOpen) binding.bottomBar.bringToFront();
 
         // Room side shortcuts. Keep the music shortcut on the existing music flow;
         // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
@@ -1825,6 +1831,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
         if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
         if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
         // The mic button is intentionally controlled only by syncMicUi() and seat state.
         if (binding.tvChatInputTips != null) {

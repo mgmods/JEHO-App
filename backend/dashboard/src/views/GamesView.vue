@@ -430,7 +430,11 @@ async function applyOddsPreset(preset) {
   toast().success(success.value)
 }
 
-const ORIGIN = 'https://api.adnova.bbs.tr'
+const ORIGIN = (() => {
+  const configured = String(import.meta.env.VITE_API_BASE_URL || '').trim()
+  const fallback = typeof window !== 'undefined' ? window.location.origin : ''
+  return (configured || fallback).replace(/\/api\/v1\/?$/i, '').replace(/\/+$/, '')
+})()
 const MIKOO = [
   ['7updown', '٧ فوق تحت', '7 Up Down'],
   ['bounty-football', 'كرة القدم الجوائز', 'Bounty Football'],
