@@ -399,25 +399,19 @@ public class HomeFragment extends Fragment {
             ((ImageView) wealth.findViewById(R.id.imgRankCover)).setImageResource(R.drawable.home_bg_wealth);
             ((android.widget.TextView) wealth.findViewById(R.id.tvRankTitle))
                     .setText(R.string.ranking_wealth);
-            wealth.setOnClickListener(v -> openRanking("rich"));
+            wealth.setOnClickListener(v -> openInsights(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
             act.rankBannerFlip.addView(wealth);
-
-            View charm = inflater.inflate(R.layout.item_home_rank_flip, act.rankBannerFlip, false);
-            ((ImageView) charm.findViewById(R.id.imgRankCover)).setImageResource(R.drawable.home_bg_charm);
-            ((android.widget.TextView) charm.findViewById(R.id.tvRankTitle))
-                    .setText(R.string.ranking_charm);
-            charm.setOnClickListener(v -> openRanking("popular"));
-            act.rankBannerFlip.addView(charm);
-            act.rankBannerFlip.startFlipping();
         }
-        act.cpBannerCard.setOnClickListener(v -> {
-            Intent intent = new Intent(requireContext(),
-                    com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class);
-            intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE,
-                    com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_CP);
-            startActivity(intent);
-        });
+        act.cpBannerCard.setOnClickListener(v ->
+                openInsights(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_CP));
         applyTasksFeatureVisibility();
+    }
+
+    private void openInsights(String mode) {
+        Intent intent = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, mode);
+        startActivity(intent);
     }
 
     private boolean isTasksEnabled() {
@@ -457,18 +451,10 @@ public class HomeFragment extends Fragment {
             }
             AvatarImageLoader.load(avatars[i], url);
         }
-        // CP pair uses top rich #1 and #2 as decorative placeholders.
-        if (pageIndex == 0 && binding.homeActBanners.imgCpLeft != null) {
-            String left = null;
-            String right = null;
-            if (list != null && !list.isEmpty() && list.get(0) != null && list.get(0).user != null) {
-                left = list.get(0).user.avatarUrl;
-            }
-            if (list != null && list.size() > 1 && list.get(1) != null && list.get(1).user != null) {
-                right = list.get(1).user.avatarUrl;
-            }
-            AvatarImageLoader.load(binding.homeActBanners.imgCpLeft, left);
-            AvatarImageLoader.load(binding.homeActBanners.imgCpRight, right);
+        // Never present unrelated wealth leaders as a CP couple.
+        if (binding.homeActBanners.imgCpLeft != null) {
+            binding.homeActBanners.imgCpLeft.setImageResource(R.drawable.ic_tab_me);
+            binding.homeActBanners.imgCpRight.setImageResource(R.drawable.ic_tab_me);
         }
     }
 
