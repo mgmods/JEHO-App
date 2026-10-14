@@ -87,6 +87,8 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         container.getIoExecutor().execute(() -> {
             Result<AuthDtos.UserDto> userResult = ApiCall.execute(container.getUserApi().me());
             Result<List<Map<String, Object>>> relationResult = ApiCall.execute(container.getUserApi().myCpRelationships());
+            Result<List<Map<String, Object>>> cpRankingResult = MODE_CP.equals(mode)
+                    ? ApiCall.execute(container.getUserApi().discoverCp(null)) : null;
             Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rankingResult =
                     container.getRankingsUseCase.execute("daily", "rich");
             JSONObject payload = new JSONObject();
@@ -136,6 +138,38 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                     }
                 }
                 payload.put("ranking", ranks);
+                if (MODE_CP.equals(mode)) {
+                    JSONArray cpRanks = new JSONArray();
+                    if (cpRankingResult != null && cpRankingResult.success && cpRankingResult.data != null) {
+                        int cpRank = 1;
+                        for (Map<String, Object> row : cpRankingResult.data) {
+                            if (row == null) continue;
+                            JSONObject item = new JSONObject();
+                            put(item, "rank", cpRank++);
+                            put(item, "id", row.get("id")); put(item, "type", row.get("type"));
+                            put(item, "level", row.get("level")); put(item, "points", row.get("points"));
+                            put(item, "durationDays", row.get("durationDays"));
+                            Map<?, ?> a = row.get("userA") instanceof Map ? (Map<?, ?>) row.get("userA") : null;
+                            Map<?, ?> b = row.get("userB") instanceof Map ? (Map<?, ?>) row.get("userB") : null;
+                            if (a != null) {
+                                JSONObject ua = new JSONObject();
+                                put(ua, "id", a.get("id")); put(ua, "username", a.get("username"));
+                                put(ua, "displayName", a.get("displayName")); put(ua, "avatarUrl", a.get("avatarUrl"));
+                                put(ua, "level", a.get("level"));
+                                item.put("userA", ua);
+                            }
+                            if (b != null) {
+                                JSONObject ub = new JSONObject();
+                                put(ub, "id", b.get("id")); put(ub, "username", b.get("username"));
+                                put(ub, "displayName", b.get("displayName")); put(ub, "avatarUrl", b.get("avatarUrl"));
+                                put(ub, "level", b.get("level"));
+                                item.put("userB", ub);
+                            }
+                            cpRanks.put(item);
+                        }
+                    }
+                    payload.put("cpRanking", cpRanks);
+                }
             } catch (Exception ignored) { }
             final String json = payload.toString();
             runOnUiThread(() -> {
@@ -183,6 +217,13 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         }
         @JavascriptInterface public void openCpCenter() {
             runOnUiThread(() -> startActivity(new Intent(ProfileInsightsActivity.this, CpCenterActivity.class)));
+        }
+        @JavascriptInterface public void openCpDiscovery() {
+            runOnUiThread(() -> startActivity(new Intent(ProfileInsightsActivity.this, com.Dramizo.Series.presentation.cp.CpDiscoveryActivity.class)));
+        }
+        @JavascriptInterface public void openUserProfile(String userId) {
+            if (userId == null || userId.trim().isEmpty()) return;
+            runOnUiThread(() -> com.Dramizo.Series.presentation.common.UserProfileCardSheet.show(ProfileInsightsActivity.this, userId));
         }
     }
 }
