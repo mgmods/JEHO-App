@@ -152,8 +152,8 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         Map<?, ?> p = (Map<?, ?>) raw;
                         JSONObject partner = new JSONObject();
                         put(partner, "id", p.get("id")); put(partner, "username", p.get("username"));
-                        put(partner, "displayName", p.get("displayName")); put(partner, "avatarUrl", p.get("avatarUrl"));
-                        put(partner, "vipBadgeUrl", p.get("vipBadgeUrl")); put(partner, "hostBadgeUrl", p.get("hostBadgeUrl")); put(partner, "frameUrl", firstNonBlank(p.get("frameUrl"), p.get("hostBadgeUrl"), p.get("vipBadgeUrl"))); put(partner, "levelBadgeUrl", p.get("levelBadgeUrl"));
+                        put(partner, "displayName", p.get("displayName")); put(partner, "avatarUrl", webImageUrl(p.get("avatarUrl")));
+                        put(partner, "vipBadgeUrl", webImageUrl(p.get("vipBadgeUrl"))); put(partner, "hostBadgeUrl", webImageUrl(p.get("hostBadgeUrl"))); put(partner, "frameUrl", webImageUrl(firstNonBlank(p.get("frameUrl"), p.get("hostBadgeUrl"), p.get("vipBadgeUrl")))); put(partner, "levelBadgeUrl", webImageUrl(p.get("levelBadgeUrl")));
                         put(partner, "level", p.get("level")); put(partner, "vipLevel", p.get("vipLevel"));
                         JSONObject relation = new JSONObject();
                         relation.put("partner", partner);
@@ -174,7 +174,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         if (e.user != null) {
                             JSONObject ru = new JSONObject();
                             put(ru, "id", e.user.id); put(ru, "username", e.user.username);
-                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", e.user.avatarUrl); put(ru, "frameUrl", firstNonBlank(e.user.hostBadgeUrl, e.user.vipBadgeUrl)); put(ru, "hostBadgeUrl", e.user.hostBadgeUrl); put(ru, "vipBadgeUrl", e.user.vipBadgeUrl);
+                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", webImageUrl(e.user.avatarUrl)); put(ru, "frameUrl", webImageUrl(firstNonBlank(e.user.hostBadgeUrl, e.user.vipBadgeUrl))); put(ru, "hostBadgeUrl", webImageUrl(e.user.hostBadgeUrl)); put(ru, "vipBadgeUrl", webImageUrl(e.user.vipBadgeUrl));
                             item.put("user", ru);
                         }
                         ranks.put(item);
@@ -201,16 +201,16 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                             if (a != null) {
                                 JSONObject ua = new JSONObject();
                                 put(ua, "id", a.get("id")); put(ua, "username", a.get("username"));
-                                put(ua, "displayName", a.get("displayName")); put(ua, "avatarUrl", a.get("avatarUrl"));
-                                put(ua, "vipBadgeUrl", a.get("vipBadgeUrl")); put(ua, "hostBadgeUrl", a.get("hostBadgeUrl")); put(ua, "frameUrl", firstNonBlank(a.get("frameUrl"), a.get("hostBadgeUrl"), a.get("vipBadgeUrl"))); put(ua, "levelBadgeUrl", a.get("levelBadgeUrl"));
+                                put(ua, "displayName", a.get("displayName")); put(ua, "avatarUrl", webImageUrl(a.get("avatarUrl")));
+                                put(ua, "vipBadgeUrl", webImageUrl(a.get("vipBadgeUrl"))); put(ua, "hostBadgeUrl", webImageUrl(a.get("hostBadgeUrl"))); put(ua, "frameUrl", webImageUrl(firstNonBlank(a.get("frameUrl"), a.get("hostBadgeUrl"), a.get("vipBadgeUrl")))); put(ua, "levelBadgeUrl", webImageUrl(a.get("levelBadgeUrl")));
                                 put(ua, "level", a.get("level"));
                                 item.put("userA", ua);
                             }
                             if (b != null) {
                                 JSONObject ub = new JSONObject();
                                 put(ub, "id", b.get("id")); put(ub, "username", b.get("username"));
-                                put(ub, "displayName", b.get("displayName")); put(ub, "avatarUrl", b.get("avatarUrl"));
-                                put(ub, "vipBadgeUrl", b.get("vipBadgeUrl")); put(ub, "hostBadgeUrl", b.get("hostBadgeUrl")); put(ub, "frameUrl", firstNonBlank(b.get("frameUrl"), b.get("hostBadgeUrl"), b.get("vipBadgeUrl"))); put(ub, "levelBadgeUrl", b.get("levelBadgeUrl"));
+                                put(ub, "displayName", b.get("displayName")); put(ub, "avatarUrl", webImageUrl(b.get("avatarUrl")));
+                                put(ub, "vipBadgeUrl", webImageUrl(b.get("vipBadgeUrl"))); put(ub, "hostBadgeUrl", webImageUrl(b.get("hostBadgeUrl"))); put(ub, "frameUrl", webImageUrl(firstNonBlank(b.get("frameUrl"), b.get("hostBadgeUrl"), b.get("vipBadgeUrl")))); put(ub, "levelBadgeUrl", webImageUrl(b.get("levelBadgeUrl")));
                                 put(ub, "level", b.get("level"));
                                 item.put("userB", ub);
                             }
@@ -245,8 +245,11 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 || "host".equals(value) || "agency".equals(value) || "room".equals(value);
     }
 
-    private static String webImageUrl(String pathOrUrl) {
-        String resolved = AssetCatalog.absoluteUrl(pathOrUrl);
+    private static String webImageUrl(Object pathOrUrl) {
+        if (pathOrUrl == null) return null;
+        String raw = String.valueOf(pathOrUrl).trim();
+        if (raw.isEmpty() || "null".equalsIgnoreCase(raw)) return null;
+        String resolved = AssetCatalog.absoluteUrl(raw);
         if (resolved == null) return null;
         if (resolved.startsWith("http://")) return "https://" + resolved.substring("http://".length());
         return resolved;
