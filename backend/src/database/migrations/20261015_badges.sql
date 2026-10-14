@@ -8,8 +8,14 @@ CREATE TABLE IF NOT EXISTS badge_definitions (
   "imageUrl" varchar(2048),
   "isActive" boolean NOT NULL DEFAULT true,
   "sortOrder" integer NOT NULL DEFAULT 0,
+  "conditionType" varchar(32),
+  "conditionTarget" integer,
   "createdAt" timestamptz NOT NULL DEFAULT now(),
-  "updatedAt" timestamptz NOT NULL DEFAULT now()
+  "updatedAt" timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT chk_badge_condition_type CHECK (
+    "conditionType" IS NULL OR "conditionType" IN ('account_age_days', 'messages_sent', 'followers_count', 'diamonds_received')
+  ),
+  CONSTRAINT chk_badge_condition_target CHECK ("conditionTarget" IS NULL OR "conditionTarget" > 0)
 );
 
 CREATE TABLE IF NOT EXISTS user_badges (
