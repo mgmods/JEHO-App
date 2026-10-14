@@ -410,9 +410,13 @@ public class HomeFragment extends Fragment {
             act.rankBannerFlip.addView(charm);
             act.rankBannerFlip.startFlipping();
         }
-        act.cpBannerCard.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(),
-                        com.Dramizo.Series.presentation.cp.CpCenterActivity.class)));
+        act.cpBannerCard.setOnClickListener(v -> {
+            Intent intent = new Intent(requireContext(),
+                    com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class);
+            intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE,
+                    com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_CP);
+            startActivity(intent);
+        });
         applyTasksFeatureVisibility();
     }
 
