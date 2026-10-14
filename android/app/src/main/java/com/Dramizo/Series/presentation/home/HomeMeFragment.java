@@ -154,14 +154,16 @@ public class HomeMeFragment extends Fragment {
             binding.tvProfileGold.setText(String.valueOf(Math.max(0L, me.totalSentCoins)));
             binding.tvProfileVip.setText("VIP " + Math.max(0, me.vipLevel));
             binding.tvProfileLevelBadge.setText("Lv. " + Math.max(1, me.level));
-            String staffRole = me.staffRole == null ? "" : me.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
-            boolean superAdmin = "super".equals(staffRole) || me.isAdmin;
-            if (superAdmin) {
-                binding.tvProfileRoleBadge.setText("سوبر أدمن");
-                binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+            bindProfileImageBadge(binding.imgProfileLevelBadge, me.levelBadgeUrl);
+            if (me.vipLevel > 0) {
+                bindProfileImageBadge(binding.imgProfileVipBadge, me.vipBadgeUrl);
             } else {
-                binding.tvProfileRoleBadge.setVisibility(View.GONE);
+                binding.imgProfileVipBadge.setVisibility(View.GONE);
             }
+            bindProfileRoleBadge(c, me);
+            binding.tvProfileMedals.setOnClickListener(v ->
+                    startActivity(new Intent(requireContext(),
+                            com.Dramizo.Series.presentation.profile.MedalActivity.class)));
             binding.tvProfileVerified.setVisibility(me.genderVerified
                     ? View.VISIBLE : View.GONE);
             if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
@@ -209,6 +211,62 @@ public class HomeMeFragment extends Fragment {
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.profile.MyEventsActivity.class)));
         binding.actionSupport.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.settings.CustomerSupportActivity.class)));
+    }
+
+    private void bindProfileImageBadge(android.widget.ImageView target, String url) {
+        if (target == null) return;
+        if (url == null || url.trim().isEmpty()) {
+            target.setVisibility(View.GONE);
+            return;
+        }
+        target.setVisibility(View.VISIBLE);
+        String resolved = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(url);
+        Glide.with(this).load(resolved).placeholder(R.drawable.ic_medal_default)
+                .error(R.drawable.ic_medal_default).into(target);
+    }
+
+    /** Role labels must come from server-authoritative permissions, never from the shortcut itself. */
+    private void bindProfileRoleBadge(AppContainer c, AuthDtos.UserDto me) {
+        String staffRole = me.staffRole == null ? "" :
+                me.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+        if ("super".equals(staffRole) || me.isAdmin) {
+            binding.tvProfileRoleBadge.setText("سوبر أدمن");
+            binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+            return;
+        }
+        binding.tvProfileRoleBadge.setVisibility(View.GONE);
+        c.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<java.util.Map<String, Object>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(c.getWalletApi().rechargeAgentMe());
+            boolean activeAgent = false;
+            if (result.success && result.data != null) {
+                Object rawAgent = result.data.get("agent");
+                if (rawAgent instanceof java.util.Map) {
+                    Object status = ((java.util.Map<?, ?>) rawAgent).get("status");
+                    activeAgent = status != null &&
+                            "active".equalsIgnoreCase(String.valueOf(status));
+                }
+            }
+            final boolean showAgent = activeAgent;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                // Super-admin always takes precedence if the session refreshed meanwhile.
+                AuthDtos.UserDto current = ContainerProvider.from(requireActivity())
+                        .getSessionManager().getUser();
+                String currentRole = current == null || current.staffRole == null ? "" :
+                        current.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+                if (current != null && ("super".equals(currentRole) || current.isAdmin)) {
+                    binding.tvProfileRoleBadge.setText("سوبر أدمن");
+                    binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+                } else if (showAgent) {
+                    binding.tvProfileRoleBadge.setText("وكيل شحن");
+                    binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+                } else {
+                    binding.tvProfileRoleBadge.setVisibility(View.GONE);
+                }
+            });
+        });
     }
 
     private void applySectionWallpaper() {
