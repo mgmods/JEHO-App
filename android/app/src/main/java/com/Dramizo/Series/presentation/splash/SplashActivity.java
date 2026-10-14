@@ -328,7 +328,17 @@ public class SplashActivity extends ThemedActivity {
                     if (freshItem != null && freshItem.url != null && !freshItem.url.trim().isEmpty()) {
                         boolean changed = firstItem == null
                                 || !freshItem.url.trim().equals(firstItem.url.trim());
-                        if (changed) runOnUiThread(() -> loadSplashImage(freshItem));
+                        if (changed) {
+                            runOnUiThread(() -> loadSplashImage(freshItem));
+                        } else {
+                            // If the cached file was missing/corrupt, retry once after config refresh.
+                            runOnUiThread(() -> {
+                                if (!splashDecisionResolved && splashAdImage != null
+                                        && splashAdImage.getDrawable() == null) {
+                                    loadSplashImage(freshItem);
+                                }
+                            });
+                        }
                     } else if (firstItem == null) {
                         runOnUiThread(() -> finishSplashAd(false));
                     }
