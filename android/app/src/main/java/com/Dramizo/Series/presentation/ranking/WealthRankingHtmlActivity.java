@@ -47,6 +47,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         settings.setDomStorageEnabled(false);
         settings.setLoadsImagesAutomatically(true);
         settings.setBlockNetworkImage(false);
+        settings.setBlockNetworkLoads(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
@@ -65,6 +66,8 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         });
         web.addJavascriptInterface(new RankingBridge(), "JehoRanking");
         FrameLayout root = new FrameLayout(this);
+        root.setClipToPadding(true);
+        root.setClipChildren(true);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         EdgeToEdgeHelper.apply(this);
@@ -122,6 +125,9 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
     }
 
     private final class RankingBridge {
+        @JavascriptInterface public String resolveImageUrl(String pathOrUrl) {
+            return webImageUrl(pathOrUrl);
+        }
         @JavascriptInterface public void load(String nextPeriod, String nextCategory) {
             runOnUiThread(() -> {
                 period = safePeriod(nextPeriod);
@@ -149,6 +155,10 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         return "popular";
     }
 
+    // This HTML WebView applies its own system-bar insets to the WebView host.
+    // Prevent ThemedActivity from re-applying transparent edge-to-edge/theme chrome later.
+    @Override protected boolean wantsEdgeToEdgeWallpaper() { return false; }
+    @Override protected boolean wantsRemoteThemeChrome() { return false; }
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
     @Override public void onBackPressed() {
