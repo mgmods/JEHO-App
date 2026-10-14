@@ -157,6 +157,12 @@ public class LoginActivity extends ThemedActivity {
                     Result<AuthDtos.UserDto> fresh = container.getProfileUseCase.me();
                     if (fresh != null && fresh.success && fresh.data != null) {
                         resolvedUser = fresh.data;
+                        String identifier = result.user != null && result.user.username != null
+                                ? result.user.username
+                                : (result.user != null && result.user.email != null
+                                        ? result.user.email : resolvedUser.username);
+                        resolvedUser = container.getSessionManager()
+                                .restoreSavedAccountProfile(resolvedUser, identifier);
                         container.getSessionManager().updateCachedUser(resolvedUser);
                     }
                 } catch (Exception ignored) {
@@ -176,7 +182,13 @@ public class LoginActivity extends ThemedActivity {
                         container.getSessionManager().updateCachedUser(savedUser);
                     } else {
                         resolvedUser = loginUser != null
-                                ? loginUser : container.getSessionManager().getUser();
+                                ? container.getSessionManager().restoreSavedAccountProfile(
+                                        loginUser, loginUser.username != null
+                                                ? loginUser.username : loginUser.email)
+                                : container.getSessionManager().getUser();
+                        if (resolvedUser != null) {
+                            container.getSessionManager().updateCachedUser(resolvedUser);
+                        }
                     }
                 }
                 final AuthDtos.UserDto user = resolvedUser;
