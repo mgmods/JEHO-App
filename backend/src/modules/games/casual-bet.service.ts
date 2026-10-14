@@ -183,6 +183,21 @@ export class CasualBetService {
     return { ...result, displayName: name };
   }
 
+  private resolveOutcomeWithConfiguredRate(
+    gameId: CasualGameId,
+    choice?: string | number,
+  ): { multiplier: number; detail: Record<string, unknown> } {
+    const configured = getGameWinRate(gameId);
+    if (configured === undefined) return this.resolveOutcome(gameId, choice);
+    const wantWin = Math.random() * 100 < configured;
+    let last = this.resolveOutcome(gameId, choice);
+    for (let i = 0; i < 500; i++) {
+      if ((last.multiplier > 1) === wantWin) return last;
+      last = this.resolveOutcome(gameId, choice);
+    }
+    return last;
+  }
+
   private resolveOutcome(
     gameId: CasualGameId,
     choice?: string | number,
