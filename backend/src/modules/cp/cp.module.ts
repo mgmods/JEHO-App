@@ -15,11 +15,13 @@ import { RoomSeat } from '../../database/entities/room-seat.entity';
 import { User } from '../../database/entities/user.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
+import { AuthModule } from '../auth/auth.module';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule],
+  imports: [TypeOrmModule.forFeature([CpRequest, CpRelationship, CpAuditLog, CpPointEvent, Wallet, WalletTransaction, Room, RoomSeat, User, AppSetting]), RealtimeModule, AuthModule],
   controllers: [CpController, CpAdminController],
-  providers: [CpService],
+  providers: [CpService, JwtAuthGuard],
   exports: [CpService],
 })
 export class CpModule {}
