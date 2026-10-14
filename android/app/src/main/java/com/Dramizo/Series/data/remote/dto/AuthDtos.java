@@ -140,6 +140,7 @@ public final class AuthDtos {
         @SerializedName("wealthLevel") public int wealthLevel;
         @SerializedName("totalReceivedDiamonds") public long totalReceivedDiamonds;
         @SerializedName("totalSentCoins") public long totalSentCoins;
+        @SerializedName("earnedBadges") public java.util.List<MiscDtos.BadgeDto> earnedBadges;
         @SerializedName("country") public String country;
         /** ISO time of last country change (server). */
         @SerializedName("countryChangedAt") public String countryChangedAt;
