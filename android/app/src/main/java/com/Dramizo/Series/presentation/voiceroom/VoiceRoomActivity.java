@@ -1820,7 +1820,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Restore gift/games/settings row under the tip pill.
         if (binding.bottomBar != null) {
             binding.bottomBar.setVisibility(View.VISIBLE);
+            // Keep the bottom actions above chat/effect overlays after the composer closes.
+            binding.bottomBar.bringToFront();
         }
+        if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+        if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
+        if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
+        // The mic button is intentionally controlled only by syncMicUi() and seat state.
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
         }
