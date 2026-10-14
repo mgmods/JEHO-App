@@ -2998,7 +2998,14 @@ export class AdminService {
       }
 
       application.reviewNote = note || null;
-      application.reviewedById = adminId;
+      // Dashboard staff IDs belong to admin_users, while agency_applications.reviewedById
+      // references users(id). Only persist the reviewer when that ID exists in users;
+      // otherwise PostgreSQL rejects the approval with an agency_applications FK error.
+      const reviewerUser = await manager.findOne(User, {
+        where: { id: adminId },
+        select: ['id'],
+      });
+      application.reviewedById = reviewerUser?.id ?? null;
       application.reviewedAt = new Date();
       if (action === 'reject' || action === 'request_changes') {
         application.status =
