@@ -67,6 +67,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         FrameLayout root = new FrameLayout(this);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        EdgeToEdgeHelper.apply(this);
         EdgeToEdgeHelper.padSystemBars(root);
         viewModel = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(RankingViewModel.class);
