@@ -45,8 +45,9 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         'SELECT id,name,"iconUrl","animationUrl" FROM gifts WHERE id=$1 AND "isActive"=true',
         [giftId],
       ) : [];
-      const enabled = settings[`cp.enabled.${type}`] === 'true'
-        && Number.isSafeInteger(price) && price > 0 && !!gift;
+      // CP types are available automatically; only a valid configured price and active gift
+      // are required for paid room requests. The legacy dashboard enabled flag is not a blocker.
+      const enabled = Number.isSafeInteger(price) && price > 0 && !!gift;
       catalog.push({
         type, enabled, priceCoins: enabled ? price : null,
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
@@ -147,10 +148,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       }
       const [recipient] = await manager.query('SELECT id FROM users WHERE id=$1 AND status=$2', [recipientId, 'active']);
       if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
-      const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key=$1', [`cp.enabled.${type}`]);
-      if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
-        throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
-      }
+      // CP types are enabled by default; do not block profile-origin requests on a dashboard toggle.
       const [active] = await manager.query(
         `SELECT id FROM cp_relationships WHERE status='active'
          AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1)) LIMIT 1 FOR UPDATE`,
@@ -246,10 +244,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!presentIds.has(userId) || !presentIds.has(recipientId)) {
         throw new BadRequestException('يجب أن يكون الطرفان جالسين داخل الغرفة نفسها عند إرسال طلب CP');
       }
-      const [enabledRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', [`cp.enabled.${type}`]);
-      if (String(enabledRow?.value || '').toLowerCase() !== 'true') {
-        throw new BadRequestException('هذا النوع غير مفعّل من لوحة التحكم بعد');
-      }
+      // CP types are enabled by default; do not block room requests on a dashboard toggle.
       const [expiryRow] = await manager.query('SELECT value FROM app_settings WHERE key = $1', ['cp.policy.request_expiry_minutes']);
       const configuredExpiry = Number(expiryRow?.value);
       const expiryMinutes = Number.isInteger(configuredExpiry) && configuredExpiry >= 5 && configuredExpiry <= 1440
