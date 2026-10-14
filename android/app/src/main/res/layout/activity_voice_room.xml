@@ -741,45 +741,6 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Reserved throne seat: anchored to the physical right edge, opposite the room cup; disabled for now. -->
-    <FrameLayout
-        android:id="@+id/tvThroneSeatPlaceholder"
-        android:layout_width="wrap_content"
-        android:layout_height="30dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginTop="4dp"
-        android:layoutDirection="ltr"
-        android:background="@drawable/bg_room_cup_chip"
-        android:contentDescription="كرسي العرش"
-        android:enabled="false"
-        android:alpha="0.82"
-        android:paddingStart="5dp"
-        android:paddingEnd="5dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/headerRoom">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="horizontal">
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_room_throne"
-                android:scaleType="fitCenter" />
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="2dp"
-                android:text="كرسي العرش"
-                android:textColor="#FFE9B53C"
-                android:textSize="9sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-    </FrameLayout>
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerSeats"
         android:layout_width="0dp"
@@ -793,7 +754,7 @@
         android:paddingBottom="14dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvThroneSeatPlaceholder" />
+        app:layout_constraintTop_toBottomOf="@id/headerRoom" />
 
     <!-- Top supporters under seats — Mikoo cascade: count + overlapping circles.
          Extra top margin so avatars clear seat 9/10 number badges. -->
