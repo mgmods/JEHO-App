@@ -265,6 +265,22 @@ export class UsersService {
     };
   }
 
+  private async earnedBadges(userId: string) {
+    try {
+      return await this.dataSource.query(
+        `SELECT b.id, b.code, b.name, b.description, b."imageUrl", ub."awardedAt"
+         FROM user_badges ub
+         INNER JOIN badge_definitions b ON b.id = ub."badgeId"
+         WHERE ub."userId" = $1 AND ub."isRevoked" = false AND b."isActive" = true
+         ORDER BY ub."awardedAt" ASC`,
+        [userId],
+      );
+    } catch {
+      // Keep profile APIs working before the additive badge migration is applied.
+      return [];
+    }
+  }
+
   async getMe(userId: string) {
     const user = await this.usersRepo.findOne({
       where: { id: userId },
@@ -292,6 +308,7 @@ export class UsersService {
           vipLevel,
           genderVerified: verification.genderVerified,
           genderVerificationStatus: verification.genderVerificationStatus,
+          earnedBadges: await this.earnedBadges(userId),
           agency,
         },
         vipLevel,
@@ -349,6 +366,7 @@ export class UsersService {
           ...this.flatten(user),
           vipLevel,
           isFollowing,
+          earnedBadges: await this.earnedBadges(id),
           agency,
           visitorsCount,
           isOnline,
@@ -365,7 +383,7 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withWearMeta(this.flatten(user));
+    return this.withWearMeta({ ...this.flatten(user), earnedBadges: await this.earnedBadges(user.id) });
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
