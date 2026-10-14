@@ -17,6 +17,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { LuckyWheelSpinDto } from './dto/lucky-wheel.dto';
 import { RoomGameAccessService } from './room-game-access.service';
 import { clampGamePayout, GAME_PAYOUT } from './game-payout-guard';
+import { isGameEnabled } from './game-odds-runtime';
 
 export type LuckyWheelSector = 'red' | 'orange' | 'seven' | 'lose';
 
@@ -92,6 +93,7 @@ export class LuckyWheelService {
   }
 
   async spin(userId: string, dto: LuckyWheelSpinDto, roomId?: string) {
+    if (!isGameEnabled('lucky-wheel')) throw new BadRequestException('عجلة الحظ متوقفة حالياً من الإدارة');
     await this.roomAccess.assertParticipant(roomId, userId);
     const cfg = await this.cfg();
     if (!cfg.enabled) throw new BadRequestException('Lucky wheel disabled');
