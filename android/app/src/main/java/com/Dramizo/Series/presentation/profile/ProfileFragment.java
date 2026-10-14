@@ -173,7 +173,8 @@ public class ProfileFragment extends Fragment {
         binding.statFans.setTag(2);
         binding.statFollowing.setOnClickListener(openFriends);
         binding.statFans.setOnClickListener(openFriends);
-        binding.tvWealthChip.setOnClickListener(v -> openRanking("rich"));
+        binding.tvWealthChip.setOnClickListener(v -> openProfileInsights());
+        if (binding.rowMyProfileCp != null) binding.rowMyProfileCp.setOnClickListener(v -> openProfileInsights());
         binding.tvCharmChip.setOnClickListener(v -> openRanking("popular"));
 
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
@@ -358,6 +359,10 @@ public class ProfileFragment extends Fragment {
 
     private void openAgencyHub() {
         startActivity(new Intent(requireContext(), AgencyActivity.class));
+    }
+
+    private void openProfileInsights() {
+        startActivity(new Intent(requireContext(), ProfileInsightsActivity.class));
     }
 
     private void openRanking(String category) {
