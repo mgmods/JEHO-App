@@ -39,6 +39,10 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     private WebView webView;
     private AppContainer container;
     private boolean pageReady;
+    private volatile boolean destroyed;
+    private boolean dataLoadInFlight;
+    private boolean dataLoadPending;
+    private String pendingPeriod = "daily";
     private String mode = MODE_WEALTH;
     private volatile String wealthPeriod = "daily";
 
@@ -60,6 +64,10 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         webView.setBackgroundColor(Color.rgb(16, 16, 32));
+        webView.setOverScrollMode(android.view.View.OVER_SCROLL_NEVER);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new PageBridge(), "JehoApp");
         webView.setWebViewClient(new WebViewClient() {
@@ -92,10 +100,19 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     }
 
     private void loadLiveData(String requestedPeriod) {
-        if (container == null) return;
+        if (container == null || destroyed) return;
         final String period = "weekly".equals(requestedPeriod) || "monthly".equals(requestedPeriod)
                 ? requestedPeriod : "daily";
         if (MODE_WEALTH.equals(mode)) wealthPeriod = period;
+        synchronized (this) {
+            if (destroyed) return;
+            if (dataLoadInFlight) {
+                dataLoadPending = true;
+                pendingPeriod = period;
+                return;
+            }
+            dataLoadInFlight = true;
+        }
         container.getIoExecutor().execute(() -> {
             Result<AuthDtos.UserDto> userResult = ApiCall.execute(container.getUserApi().me());
             Result<List<Map<String, Object>>> relationResult = ApiCall.execute(container.getUserApi().myCpRelationships());
@@ -197,6 +214,13 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 String errorFunction = MODE_CP.equals(mode) ? "showCpError" : "showWealthError";
                 webView.evaluateJavascript("window." + renderFunction + " && window." + renderFunction + "(" + json + ");", null);
                 if (!userResult.success) webView.evaluateJavascript("window." + errorFunction + " && window." + errorFunction + "();", null);
+                String nextPeriod = null;
+                synchronized (ProfileInsightsActivity.this) {
+                    dataLoadInFlight = false;
+                    if (dataLoadPending && !destroyed) nextPeriod = pendingPeriod;
+                    dataLoadPending = false;
+                }
+                if (nextPeriod != null) loadLiveData(nextPeriod);
             });
         });
     }
@@ -215,6 +239,8 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     }
 
     @Override protected void onDestroy() {
+        destroyed = true;
+        synchronized (this) { dataLoadPending = false; }
         if (webView != null) {
             webView.removeJavascriptInterface("JehoApp");
             webView.stopLoading();
