@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NotificationsActivity extends ThemedActivity {
+    public static final String EXTRA_CP_REQUEST_ID = "cp_notification_request_id";
+    public static final String EXTRA_CP_REQUEST_TITLE = "cp_notification_request_title";
+    public static final String EXTRA_CP_REQUEST_BODY = "cp_notification_request_body";
     private ActivityNotificationsBinding binding;
     private NotificationsViewModel vm;
     private NotificationAdapter adapter;
@@ -73,6 +76,13 @@ public class NotificationsActivity extends ThemedActivity {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
         });
         vm.load();
+        String cpRequestId = getIntent().getStringExtra(EXTRA_CP_REQUEST_ID);
+        if (cpRequestId != null && !cpRequestId.trim().isEmpty()) {
+            String cpTitle = getIntent().getStringExtra(EXTRA_CP_REQUEST_TITLE);
+            String cpBody = getIntent().getStringExtra(EXTRA_CP_REQUEST_BODY);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                    () -> showCpRequestPrompt(cpRequestId, cpTitle, cpBody), 350);
+        }
     }
 
     private void showCpRequestPrompt(MiscDtos.NotificationDto notification) {
@@ -83,15 +93,23 @@ public class NotificationsActivity extends ThemedActivity {
             startActivity(target);
             return;
         }
-        String requestId = String.valueOf(rawId);
-        String body = notification.body == null ? "لديك طلب ارتباط جديد. هل تريد قبول العلاقة أم رفضها؟" : notification.body;
+        showCpRequestPrompt(
+                String.valueOf(rawId),
+                notification.title,
+                notification.body);
+    }
+
+    private void showCpRequestPrompt(String requestId, String title, String body) {
+        if (isFinishing() || requestId == null || requestId.trim().isEmpty()) return;
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(notification.title == null ? "طلب ارتباط جديد" : notification.title)
-                .setMessage(body)
+                .setTitle(title == null || title.trim().isEmpty() ? "طلب ارتباط جديد" : title)
+                .setMessage(body == null || body.trim().isEmpty()
+                        ? "لديك طلب ارتباط جديد. هل تريد قبول العلاقة أم رفضها؟" : body)
                 .setPositiveButton("قبول العلاقة", (dialog, which) -> respondToCpRequest(requestId, true))
                 .setNegativeButton("رفض الطلب", (dialog, which) -> respondToCpRequest(requestId, false))
                 .setNeutralButton("لاحقاً", (dialog, which) -> {
-                    Intent target = NotificationRouter.build(this, notification.type, notification.data);
+                    Intent target = new Intent(this, com.Dramizo.Series.presentation.cp.CpCenterActivity.class);
+                    target.putExtra(com.Dramizo.Series.presentation.cp.CpCenterActivity.EXTRA_VIEW, "incoming");
                     startActivity(target);
                 })
                 .show();
