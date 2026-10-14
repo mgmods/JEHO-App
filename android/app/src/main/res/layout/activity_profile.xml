@@ -229,14 +229,21 @@
                         android:scaleType="fitCenter"
                         android:visibility="gone" />
 
-                    <LinearLayout
+                    <HorizontalScrollView
                         android:id="@+id/rowEarnedBadges"
-                        android:layout_width="wrap_content"
+                        android:layout_width="104dp"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="6dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:visibility="gone" />
+                        android:fillViewport="false"
+                        android:scrollbars="none"
+                        android:visibility="gone">
+                        <LinearLayout
+                            android:id="@+id/earnedBadgesContainer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
 
                     <TextView
                         android:id="@+id/tvLevelChip"
