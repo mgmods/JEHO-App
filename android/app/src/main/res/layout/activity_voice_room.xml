@@ -741,40 +741,40 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <!-- Reserved throne seat: gold throne icon is visible, but remains disabled until enabled later. -->
+    <!-- Reserved throne seat: moved to the opposite side of the room cup; remains disabled for now. -->
     <FrameLayout
         android:id="@+id/tvThroneSeatPlaceholder"
         android:layout_width="wrap_content"
-        android:layout_height="42dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="5dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginTop="4dp"
         android:background="@drawable/bg_room_cup_chip"
-        android:contentDescription="كرسي العرش غير مفعّل"
+        android:contentDescription="كرسي العرش"
         android:enabled="false"
         android:alpha="0.82"
-        android:paddingStart="5dp"
-        android:paddingEnd="10dp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rowRoomCupChip">
+        android:paddingStart="7dp"
+        android:paddingEnd="7dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerRoom">
 
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:gravity="center_vertical"
+            android:gravity="center"
             android:orientation="horizontal">
             <ImageView
-                android:layout_width="38dp"
-                android:layout_height="38dp"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_room_throne"
                 android:scaleType="fitCenter" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:text="كرسي العرش · قريبًا"
+                android:layout_marginStart="3dp"
+                android:text="كرسي العرش"
                 android:textColor="#FFE9B53C"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
