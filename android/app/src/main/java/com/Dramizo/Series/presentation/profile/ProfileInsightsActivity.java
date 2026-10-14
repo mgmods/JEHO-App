@@ -170,7 +170,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         if (e.user != null) {
                             JSONObject ru = new JSONObject();
                             put(ru, "id", e.user.id); put(ru, "username", e.user.username);
-                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", e.user.avatarUrl); put(ru, "frameUrl", e.user.frameUrl); put(ru, "hostBadgeUrl", e.user.hostBadgeUrl); put(ru, "vipBadgeUrl", e.user.vipBadgeUrl);
+                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", e.user.avatarUrl); put(ru, "frameUrl", firstNonBlank(e.user.hostBadgeUrl, e.user.vipBadgeUrl)); put(ru, "hostBadgeUrl", e.user.hostBadgeUrl); put(ru, "vipBadgeUrl", e.user.vipBadgeUrl);
                             item.put("user", ru);
                         }
                         ranks.put(item);
