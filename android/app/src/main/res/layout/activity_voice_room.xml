@@ -4,7 +4,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ios_grouped_bg"
+    android:background="#001B15"
     android:clipChildren="false"
     android:clipToPadding="false"
     android:fitsSystemWindows="false">
@@ -16,6 +16,7 @@
         android:contentDescription="@null"
         android:scaleType="centerCrop"
         android:src="@drawable/voice_room_bg"
+        android:scaleType="centerCrop"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
