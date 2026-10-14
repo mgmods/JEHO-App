@@ -760,20 +760,41 @@
                     android:background="@drawable/bg_user_card_stat_cell"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
+                    android:layoutDirection="rtl"
                     android:padding="10dp"
                     android:visibility="gone">
-                    <ImageView
-                        android:id="@+id/imgProfileCpPartner"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/imgProfileCpSelf"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
                         android:contentDescription="@null"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/ic_tab_me" />
+                        android:visibility="gone"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                    <TextView
+                        android:id="@+id/tvProfileCpHeart"
+                        android:layout_width="32dp"
+                        android:layout_height="40dp"
+                        android:gravity="center"
+                        android:includeFontPadding="false"
+                        android:text="♥"
+                        android:textColor="#FFFF5277"
+                        android:textSize="26sp"
+                        android:textStyle="bold" />
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/imgProfileCpPartner"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginEnd="2dp"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
                     <TextView
                         android:id="@+id/tvProfileCpLabel"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="12dp"
+                        android:layout_marginStart="10dp"
                         android:layout_weight="1"
                         android:textColor="#FFFFFFFF"
                         android:textSize="14sp"
