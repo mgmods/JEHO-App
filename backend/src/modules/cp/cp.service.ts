@@ -3,6 +3,8 @@ import { DataSource } from 'typeorm';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CpType } from '../../database/entities/cp-relationship.entity';
 import { CpRequestStatus } from '../../database/entities/cp-request.entity';
+import { NotificationType } from '../../database/entities/notification.entity';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const TYPES = new Set<string>(Object.values(CpType));
 const EXPIRY_MINUTES = 30;
@@ -12,7 +14,11 @@ const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-
 export class CpService implements OnModuleInit, OnModuleDestroy {
   private expiryTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly dataSource: DataSource, private readonly realtime: RealtimeGateway) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly realtime: RealtimeGateway,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async onModuleInit() {
     // Backward-compatible schema adjustment: profile-origin CP requests have no room/payment.
@@ -144,7 +150,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب العلاقة غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء علاقة مع حسابك');
-    return this.dataSource.transaction(async manager => {
+    const outcome = await this.dataSource.transaction(async manager => {
       const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey"=$1 FOR UPDATE', [key]);
@@ -152,11 +158,10 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type) {
           throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
         }
-        return existing[0];
+        return { request: existing[0], created: false };
       }
       const [recipient] = await manager.query('SELECT id FROM users WHERE id=$1 AND status=$2', [recipientId, 'active']);
       if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
-      // CP types are enabled by default; do not block profile-origin requests on a dashboard toggle.
       const [active] = await manager.query(
         `SELECT id FROM cp_relationships WHERE status='active'
          AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1)) LIMIT 1 FOR UPDATE`,
@@ -179,8 +184,54 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          VALUES ($1,$2,$3,'pending',NULL,0,$4,now()+($5 || ' minutes')::interval,now(),now()) RETURNING *`,
         [userId, recipientId, type, key, String(expiryMinutes)],
       );
-      return request;
+      return { request, created: true };
     });
+
+    // Notify only after the transaction commits. This stores an inbox notification,
+    // emits notification:new to an online recipient, and sends FCM when available.
+    if (outcome.created) {
+      const [sender] = await this.dataSource.query(
+        'SELECT "displayName", username FROM users WHERE id=$1',
+        [userId],
+      );
+      const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
+      await this.notifications.notifyUser(
+        recipientId,
+        NotificationType.SYSTEM,
+        'طلب ارتباط جديد',
+        `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
+        {
+          type: 'cp_relationship_request',
+          requestId: outcome.request.id,
+          relationshipType: type,
+          senderId: userId,
+          recipientId,
+          route: 'cp',
+          actions: ['accept', 'reject'],
+        },
+      );
+      this.realtime.emitToUser(recipientId, 'cp:request', {
+        requestId: outcome.request.id,
+        senderId: userId,
+        senderName,
+        relationshipType: type,
+        title: 'طلب ارتباط جديد',
+        body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
+        actions: ['accept', 'reject'],
+      });
+    }
+    return outcome.request;
+  }
+
+  private cpTypeLabel(type: CpType): string {
+    switch (type) {
+      case CpType.BROTHERHOOD: return 'الأخوّة';
+      case CpType.FRIENDSHIP: return 'الصداقة';
+      case CpType.LOVE: return 'الحب';
+      case CpType.ENGAGEMENT: return 'الخطوبة';
+      case CpType.MARRIAGE: return 'الزواج';
+      default: return 'علاقة CP';
+    }
   }
 
   async sentRequests(userId: string) {
