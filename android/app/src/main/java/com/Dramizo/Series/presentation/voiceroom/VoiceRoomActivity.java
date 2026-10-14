@@ -870,6 +870,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
+        if (binding.btnSendChatInline != null) {
+            binding.btnSendChatInline.setOnClickListener(v -> openRoomChatComposer(true));
+        }
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setOnClickListener(v -> openRoomChatComposer(true));
         }
