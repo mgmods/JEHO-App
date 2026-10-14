@@ -17,6 +17,10 @@ on:
       - "backend/src/modules/uploads/**"
   workflow_dispatch:
 
+concurrency:
+  group: jeho-android-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
