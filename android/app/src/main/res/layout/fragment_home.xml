@@ -26,9 +26,9 @@
             android:gravity="center_vertical"
             android:layoutDirection="rtl"
             android:orientation="horizontal"
-            android:paddingHorizontal="18dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="8dp">
+            android:paddingHorizontal="14dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="6dp">
 
             <HorizontalScrollView
                 android:layout_width="0dp"
@@ -234,14 +234,14 @@
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="18dp"
+                    android:layout_marginHorizontal="10dp"
                     android:layout_marginTop="2dp"
-                    android:layout_marginBottom="14dp">
+                    android:layout_marginBottom="10dp">
 
                     <androidx.viewpager2.widget.ViewPager2
                         android:id="@+id/pagerBanners"
                         android:layout_width="match_parent"
-                        android:layout_height="120dp"
+                        android:layout_height="132dp"
                         android:clipChildren="false"
                         android:clipToPadding="false"
                         android:overScrollMode="never" />
