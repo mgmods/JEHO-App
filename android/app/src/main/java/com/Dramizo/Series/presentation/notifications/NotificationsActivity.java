@@ -85,6 +85,19 @@ public class NotificationsActivity extends ThemedActivity {
         }
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent == null) return;
+        String requestId = intent.getStringExtra(EXTRA_CP_REQUEST_ID);
+        if (requestId == null || requestId.trim().isEmpty()) return;
+        String title = intent.getStringExtra(EXTRA_CP_REQUEST_TITLE);
+        String body = intent.getStringExtra(EXTRA_CP_REQUEST_BODY);
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                () -> showCpRequestPrompt(requestId, title, body), 250);
+    }
+
     private void showCpRequestPrompt(MiscDtos.NotificationDto notification) {
         if (notification == null || notification.data == null) return;
         Object rawId = notification.data.get("requestId");
