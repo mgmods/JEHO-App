@@ -62,6 +62,7 @@ public class HomeMeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         applySectionWallpaper();
         bindProfileDashboard();
+        keepOnlyMyRoomActivityAndRoomLists();
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
                 .get(HomeViewModel.class);
@@ -135,6 +136,39 @@ public class HomeMeFragment extends Fragment {
         bindList();
     }
 
+
+    /** Keep Home > أنا focused on the user's room, activity, and recent/followed rooms.
+     * Profile identity, avatar, edit-profile, wallet, VIP, and settings remain available
+     * from their dedicated sections and are intentionally not shown in this feed tab.
+     */
+    private void keepOnlyMyRoomActivityAndRoomLists() {
+        if (binding == null) return;
+        keepOnlyAllowedHomeMeViews(binding.profileScroll);
+    }
+
+    private boolean keepOnlyAllowedHomeMeViews(View view) {
+        if (view == null) return false;
+        int id = view.getId();
+        if (id == R.id.myRoomCardMe
+                || id == R.id.actionActivities
+                || id == R.id.subRecentWrap || id == R.id.tvSubRecent || id == R.id.dotSubRecent
+                || id == R.id.subFollowingWrap || id == R.id.tvSubFollowing || id == R.id.dotSubFollowing
+                || id == R.id.recyclerMeRooms || id == R.id.tvMeEmpty) {
+            view.setVisibility(View.VISIBLE);
+            return true;
+        }
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) view;
+            boolean containsAllowed = false;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                if (keepOnlyAllowedHomeMeViews(group.getChildAt(i))) containsAllowed = true;
+            }
+            view.setVisibility(containsAllowed ? View.VISIBLE : View.GONE);
+            return containsAllowed;
+        }
+        view.setVisibility(View.GONE);
+        return false;
+    }
 
     private void bindProfileDashboard() {
         if (binding == null || !isAdded()) return;
