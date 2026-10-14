@@ -45,6 +45,7 @@ import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
+import { BadgesModule } from './modules/badges/badges.module';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -136,6 +137,7 @@ const entityList = Object.values(entities).filter(
     EconomyModule,
     AuthModule,
     UsersModule,
+    BadgesModule,
     RoomsModule,
     ZegoModule,
     LiveKitModule,
