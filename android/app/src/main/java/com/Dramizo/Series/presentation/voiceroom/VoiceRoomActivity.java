@@ -8084,7 +8084,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (view instanceof TextView) {
             TextView tab = (TextView) view;
             tab.setBackgroundResource(selected ? R.drawable.bg_room_official_chip : android.R.color.transparent);
-            tab.setTextColor(selected ? Color.WHITE : 0xCCFFFFFF);
+            tab.setTextColor(selected ? 0xFFFFD778 : 0xFFD6E6DF);
             tab.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
         }
     }
@@ -8234,7 +8234,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.luckyFloatWrap.setScaleX(shortScreen ? 0.84f : 1f);
         binding.luckyFloatWrap.setScaleY(shortScreen ? 0.84f : 1f);
 
-        binding.btnTools.setVisibility(View.VISIBLE);
+        binding.btnTools.setVisibility(View.GONE);
+        binding.btnGames.setVisibility(View.GONE);
         int controlMargin = narrow ? 3 : 6;
         setStartMargin(binding.btnMic, controlMargin);
         setStartMargin(binding.btnGift, controlMargin);
