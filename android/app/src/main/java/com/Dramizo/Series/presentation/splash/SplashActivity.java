@@ -399,6 +399,29 @@ public class SplashActivity extends ThemedActivity {
         }
     }
 
+    /** Display the loaded dashboard splash ad and respect its configured duration. */
+    private void showSplashAd(MiscDtos.SplashItemDto item) {
+        if (item == null || splashAdImage == null || splashDecisionResolved
+                || isFinishing() || !splashAdShowing) return;
+
+        splashAdImage.setAlpha(0f);
+        splashAdImage.animate().alpha(1f).setDuration(220L).start();
+
+        // Replace any prior auto-dismiss callback when the dashboard image changes.
+        mainHandler.removeCallbacks(autoDismissSplashAd);
+        int seconds = item.durationSeconds > 0 ? item.durationSeconds : 5;
+        long durationMs = Math.min(seconds * 1000L, SPLASH_MAX_MS);
+        autoDismissSplashAd = () -> {
+            if (!splashDecisionResolved && splashAdShowing
+                    && displayedSplashItem == item && !isFinishing()) {
+                finishSplashAd(false);
+            }
+        };
+        mainHandler.postDelayed(autoDismissSplashAd, durationMs);
+    }
+
+    private Runnable autoDismissSplashAd = () -> finishSplashAd(false);
+
     private void splashContentVisibilityGone() {
         if (splashContentView != null) splashContentView.setVisibility(View.GONE);
     }
