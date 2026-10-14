@@ -698,8 +698,8 @@
 <string name="agency_kpi_commission">Agency profit (USD)</string>
 <string name="agency_host_kpi_earned">Host profit (USD)</string>
 <string name="agency_earn_usd_format">$%,.2f</string>
-<string name="agency_earn_usd_diamonds_sub">%,d diamonds · $%,.2f</string>
-<string name="agency_host_wallet_format">Available: %,d diamonds ≈ $%,.2f</string>
+<string name="agency_earn_usd_diamonds_sub">%1$,d diamonds · $%2$,.2f</string>
+<string name="agency_host_wallet_format">Available: %1$,d diamonds ≈ $%2$,.2f</string>
 <string name="agency_available_balance_line">Available: %1$,d diamonds · %2$s</string>
 <string name="agency_payout_requests">Host payout requests</string>
 <string name="agency_host_request_payout">Withdraw agency-room earnings</string>
@@ -756,7 +756,7 @@
 <string name="agency_earn_hosts">Est. hosts</string>
 <string name="agency_earn_platform">Est. platform</string>
 <string name="agency_earn_agent">Est. agent</string>
-<string name="agency_earn_percents_format">Your commission %.0f%% · host share ≈ %.0f%%</string>
+<string name="agency_earn_percents_format">Your commission %1$.0f%% · host share ≈ %2$.0f%%</string>
 <string name="agency_earn_owner_only">Commission panel is for the agency owner / manager</string>
 <string name="agency_host_earnings_help">Agency-room profits show as diamonds + USD. Cash out to platform admin (Withdraw agency-room earnings). No agency approval. Do not use recharge-agent mall for this balance.</string>
 <string name="agency_host_view_earnings">Earnings record</string>
