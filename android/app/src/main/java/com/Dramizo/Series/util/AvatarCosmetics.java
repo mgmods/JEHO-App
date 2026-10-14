@@ -42,7 +42,8 @@ public final class AvatarCosmetics {
             frameView.bringToFront();
         } catch (Exception ignored) {
         }
-        // ImageView frames stay static. Live-style motion lives only in HostSignalView.
+        // Still artwork stays still; animated GIF/WebP drawables keep native playback.
+        // GIF/video/SVGA wear uses HostSignalView through bindWear on shared surfaces.
     }
 
     /** Decode frames at view size — huge PNGs otherwise freeze lists/profile. */
@@ -471,12 +472,11 @@ public final class AvatarCosmetics {
 
     private static boolean isAnimatedWearMedia(@Nullable String url) {
         if (url == null || url.trim().isEmpty()) return false;
-        CosmeticMedia.Kind kind = CosmeticMedia.kind(url);
-        // GIF, video and SVGA require a playback-capable view. WebP stays on Glide,
-        // which preserves animation only when the source actually contains frames.
-        return kind == CosmeticMedia.Kind.GIF
-                || kind == CosmeticMedia.Kind.VIDEO
-                || kind == CosmeticMedia.Kind.SVGA;
+        // Use the same playback-capable renderer for every supported moving wear
+        // format across profile, chat, ranking, friends, recipients and room lists.
+        // In particular, WebP must not take a different path just because its
+        // extension is also used by still images; HostSignalView handles it safely.
+        return CosmeticMedia.isAnimatedWear(url);
     }
 
     @Nullable
