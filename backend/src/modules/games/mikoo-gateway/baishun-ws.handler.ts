@@ -392,7 +392,7 @@ export class BaishunWsHandler {
                 `GAME_PROBE BAISHUN_SPIN game=${gameSlug} msgId=${msgId} bet=${betAmount} user=${player.userId} bal=${player.balance}`,
               );
               const afterBet = await this.debit(player.userId, betAmount, gameSlug);
-              const { win, mult } = spinPayout(betAmount);
+              const { win, mult } = spinPayout(betAmount, { gameId: gameSlug });
               let balance = afterBet;
               if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               player.balance = balance;
@@ -1983,7 +1983,7 @@ export class BaishunWsHandler {
         return;
       }
       // Fishing hit rate from dashboard (harder than lobby slots by default).
-      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate });
+      const { win } = spinPayout(stake, { hitRate: getGameOdds().fishingHitRate, gameId: gameSlug });
       let bal = await this.sessions.refreshBalance(player);
       if (win > 0) {
         bal = await this.credit(player.userId, win, gameSlug, stake);
