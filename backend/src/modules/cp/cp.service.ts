@@ -278,7 +278,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException('بيانات طلب CP غير مكتملة');
     }
     if (recipientId === userId) throw new BadRequestException('لا يمكنك إنشاء CP مع حسابك');
-    return this.dataSource.transaction(async manager => {
+    const outcome = await this.dataSource.transaction(async manager => {
       const pairKey = [userId, recipientId].sort().join(':') + ':' + type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const existing = await manager.query('SELECT * FROM cp_requests WHERE "idempotencyKey" = $1 FOR UPDATE', [key]);
@@ -286,7 +286,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         if (existing[0].fromUserId !== userId || existing[0].toUserId !== recipientId || existing[0].type !== type || existing[0].roomId !== roomId) {
           throw new ConflictException('مفتاح العملية مستخدم لطلب آخر');
         }
-        return existing[0];
+        return { request: existing[0], created: false };
       }
       const [room] = await manager.query('SELECT id, type, status, "hostId" FROM rooms WHERE id = $1 FOR SHARE', [roomId]);
       if (!room || room.type !== 'voice' || room.status === 'closed') {
@@ -350,8 +350,41 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
          VALUES ($1,'gift_send','coins',$2,$3,'cp_request',$4,$5,$6,now())`,
         [userId, -price, balance - price, request.id, `هدية بدء CP - ${type}`, JSON.stringify({ type, recipientId, roomId, giftId: gift.id, giftName: gift.name })],
       );
-      return request;
+      return { request, created: true };
     });
+    if (outcome.created) {
+      const [sender] = await this.dataSource.query(
+        'SELECT "displayName", username FROM users WHERE id=$1',
+        [userId],
+      );
+      const senderName = String(sender?.displayName || sender?.username || 'أحد المستخدمين');
+      await this.notifications.notifyUser(
+        recipientId,
+        NotificationType.SYSTEM,
+        'طلب ارتباط جديد',
+        `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
+        {
+          type: 'cp_relationship_request',
+          requestId: outcome.request.id,
+          relationshipType: type,
+          senderId: userId,
+          recipientId,
+          route: 'cp',
+          actions: ['accept', 'reject'],
+          requestSource: 'room_gift',
+        },
+      );
+      this.realtime.emitToUser(recipientId, 'cp:request', {
+        requestId: outcome.request.id,
+        senderId: userId,
+        senderName,
+        relationshipType: type,
+        title: 'طلب ارتباط جديد',
+        body: `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}.`,
+        actions: ['accept', 'reject'],
+      });
+    }
+    return outcome.request;
   }
 
   async respond(userId: string, requestId: string, accept: boolean) {
