@@ -22,6 +22,7 @@ public final class NotificationRouter {
     public static Intent build(Context context, String type, Map<String, ?> data) {
         String t = type != null ? type.toLowerCase() : "system";
         String nested = first(data, "type");
+        String notificationKind = first(data, "notificationKind", "eventType");
         if (nested != null) {
             String n = nested.toLowerCase();
             // Push/inbox may wrap room-open as LIVE with data.type=room
@@ -32,7 +33,8 @@ public final class NotificationRouter {
         String roomId = first(data, "room_id", "roomId");
         String userId = first(data, "user_id", "userId", "senderId", "fromUserId", "actorUserId");
 
-        if ("cp_relationship_request".equalsIgnoreCase(nested)) {
+        if ("cp_relationship_request".equalsIgnoreCase(nested)
+                || "cp_relationship_request".equalsIgnoreCase(notificationKind)) {
             Intent i = new Intent(context, CpCenterActivity.class);
             i.putExtra(CpCenterActivity.EXTRA_VIEW, "incoming");
             i.putExtra(CpCenterActivity.EXTRA_TYPE, first(data, "relationshipType"));
