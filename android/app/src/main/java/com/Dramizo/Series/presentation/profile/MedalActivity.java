@@ -1,6 +1,5 @@
 package com.Dramizo.Series.presentation.profile;
 
-import android.app.AlertDialog;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -32,6 +31,10 @@ public class MedalActivity extends ThemedActivity {
     private TextView emptyText;
     private TextView tabBadge;
     private TextView tabMine;
+    private View detailPanel;
+    private TextView detailTitle;
+    private TextView detailDescription;
+    private TextView detailStatus;
     private final List<MedalRow> catalog = new ArrayList<>();
     private final List<MedalRow> mine = new ArrayList<>();
     private boolean showingMine;
@@ -49,6 +52,11 @@ public class MedalActivity extends ThemedActivity {
         emptyText = findViewById(R.id.tvEmptyMedal);
         tabBadge = findViewById(R.id.tvBadgeTab);
         tabMine = findViewById(R.id.tvMineTab);
+        detailPanel = findViewById(R.id.badgeDetailPanel);
+        detailTitle = findViewById(R.id.tvBadgeDetailTitle);
+        detailDescription = findViewById(R.id.tvBadgeDetailDescription);
+        detailStatus = findViewById(R.id.tvBadgeDetailStatus);
+        findViewById(R.id.tvBadgeDetailClose).setOnClickListener(v -> detailPanel.setVisibility(View.GONE));
         rv.setLayoutManager(new GridLayoutManager(this, 3));
         rv.setAdapter(new Adapter());
         tabBadge.setOnClickListener(v -> showTab(false));
@@ -136,17 +144,16 @@ public class MedalActivity extends ThemedActivity {
     private List<MedalRow> currentRows() { return showingMine ? mine : catalog; }
 
     private void showDetails(MedalRow row) {
-        String description = row.description == null || row.description.trim().isEmpty()
+        detailTitle.setText(row.title);
+        detailDescription.setText(row.description == null || row.description.trim().isEmpty()
                 ? "لا توجد تفاصيل إضافية لهذه الشارة."
-                : row.description.trim();
+                : row.description.trim());
         String status = row.earned ? "الحالة: مكتسبة" : "الحالة: غير مكتسبة";
-        String when = row.awardedAt == null || row.awardedAt.isEmpty()
-                ? "" : "\nتاريخ الاكتساب: " + row.awardedAt;
-        new AlertDialog.Builder(this)
-                .setTitle(row.title)
-                .setMessage(description + "\n\n" + status + when)
-                .setPositiveButton("حسنًا", null)
-                .show();
+        if (row.awardedAt != null && !row.awardedAt.isEmpty()) {
+            status += " · تاريخ الاكتساب: " + row.awardedAt;
+        }
+        detailStatus.setText(status);
+        detailPanel.setVisibility(View.VISIBLE);
     }
 
     private static final class MedalRow {
