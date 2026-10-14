@@ -493,8 +493,24 @@ const defaults = buildDefaults()
 games.value = defaults.map((game) => ({ ...game }))
 
 function normalizeGame(g) {
+  const normalizeGameUrl = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return ''
+    // Old saved catalog rows still contain the retired API host; keep their game
+    // IDs/settings but resolve bundled cover/play assets through the current backend.
+    if (/^https?:\/\/api\.adnova\.bbs\.tr(?=\/|$)/i.test(raw)) {
+      return raw.replace(/^https?:\/\/api\.adnova\.bbs\.tr/i, ORIGIN)
+    }
+    if (raw.startsWith('/')) return `${ORIGIN}${raw}`
+    if (!/^https?:\/\//i.test(raw) && !raw.startsWith('data:')) {
+      return `${ORIGIN}/${raw.replace(/^\/+/, '')}`
+    }
+    return raw
+  }
   return {
     ...g,
+    coverUrl: normalizeGameUrl(g.coverUrl),
+    playUrl: normalizeGameUrl(g.playUrl),
     enabled: g.enabled !== false && g.visible !== false,
     mode: g.mode || 'mikoo_slot',
   }
