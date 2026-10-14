@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class WealthRankingHtmlActivity extends ThemedActivity {
+    public static final String EXTRA_PERIOD = "wealth_ranking_period";
+    public static final String EXTRA_CATEGORY = "wealth_ranking_category";
     private WebView web;
     private RankingViewModel viewModel;
     private final Gson gson = new Gson();
@@ -34,6 +36,8 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        period = safePeriod(getIntent().getStringExtra(EXTRA_PERIOD));
+        category = safeCategory(getIntent().getStringExtra(EXTRA_CATEGORY));
         web = new WebView(this);
         web.setBackgroundColor(0xFF100E20);
         WebSettings settings = web.getSettings();
@@ -50,6 +54,7 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
             }
             @Override public void onPageFinished(WebView view, String url) {
                 pageReady = true;
+                web.evaluateJavascript("window.setInitialRanking && window.setInitialRanking(" + gson.toJson(period) + "," + gson.toJson(category) + ")", null);
                 loadRanking();
             }
         });
@@ -74,7 +79,9 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                     user.put("username", entry.user.username);
                     user.put("displayName", entry.user.displayName);
                     user.put("avatarUrl", AssetCatalog.absoluteUrl(entry.user.avatarUrl));
+                    user.put("hostBadgeUrl", AssetCatalog.absoluteUrl(entry.user.hostBadgeUrl));
                     user.put("vipBadgeUrl", AssetCatalog.absoluteUrl(entry.user.vipBadgeUrl));
+                    user.put("frameUrl", AssetCatalog.absoluteUrl(entry.user.hostBadgeUrl != null && !entry.user.hostBadgeUrl.trim().isEmpty() ? entry.user.hostBadgeUrl : entry.user.vipBadgeUrl));
                 }
                 row.put("user", user);
                 safeEntries.add(row);
