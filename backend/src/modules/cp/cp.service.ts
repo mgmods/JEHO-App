@@ -107,7 +107,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async profileRelationships(userId: string) {
     return this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
-       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl") AS partner
+       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,'vipLevel',p."vipLevel") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
        WHERE (r."userAId"=$1 OR r."userBId"=$1) AND r.status='active'
@@ -118,7 +118,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   async forUser(userId: string) {
     return this.dataSource.query(
-      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl") AS partner
+      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl", 'level', p.level, 'vipLevel', p."vipLevel") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id = CASE WHEN r."userAId" = $1 THEN r."userBId" ELSE r."userAId" END
        WHERE (r."userAId" = $1 OR r."userBId" = $1)
