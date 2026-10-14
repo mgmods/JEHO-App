@@ -40,6 +40,7 @@ function esc(value) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
 }
+document.addEventListener('error',function(event){const img=event.target;if(!img||img.tagName!=='IMG')return;const src=img.dataset.jehoOriginalSrc||img.getAttribute('src')||'';const tries=Number(img.dataset.jehoImageRetries||0);if(!/^https?:\/\//i.test(src)||tries>=2)return;event.stopImmediatePropagation();img.dataset.jehoOriginalSrc=src;img.dataset.jehoImageRetries=String(tries+1);setTimeout(()=>{if(img.isConnected)img.src=src},500*(tries+1));},true);
 function isUserCategory() {
   return ["rich", "popular", "gifts", "host"].includes(category);
 }
