@@ -277,6 +277,17 @@ public class SplashActivity extends ThemedActivity {
     private void routeLoggedInNow(AppContainer c, AuthDtos.UserDto user) {
         if (navigated || isFinishing() || profileCheckInProgress) return;
 
+        // Restore this account's saved profile before making an onboarding decision.
+        // Partial login/cache DTOs must not erase an already-created profile.
+        final String savedIdentifier = user != null && user.username != null
+                ? user.username
+                : (user != null && user.email != null ? user.email
+                        : (user != null ? user.publicId : null));
+        if (user != null) {
+            user = c.getSessionManager().restoreSavedAccountProfile(user, savedIdentifier);
+            c.getSessionManager().updateCachedUser(user);
+        }
+
         // Do not send an established account to onboarding based only on a partial
         // login/cache DTO. Login responses can omit profile fields that /users/me
         // returns, especially after logout and a fresh login.
@@ -291,7 +302,8 @@ public class SplashActivity extends ThemedActivity {
             try {
                 Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
                 if (me != null && me.success && me.data != null) {
-                    resolved = me.data;
+                    resolved = c.getSessionManager()
+                            .restoreSavedAccountProfile(me.data, savedIdentifier);
                     c.getSessionManager().updateCachedUser(resolved);
                 }
             } catch (Throwable t) {
