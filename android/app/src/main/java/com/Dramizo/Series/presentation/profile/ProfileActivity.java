@@ -20,6 +20,7 @@ import com.Dramizo.Series.R;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
+import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import android.widget.ImageView;
 
 import com.Dramizo.Series.presentation.common.AgencyFamilyInfoSheet;
