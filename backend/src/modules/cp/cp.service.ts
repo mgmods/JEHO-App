@@ -124,9 +124,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
 
   async forUser(userId: string) {
     return this.dataSource.query(
-      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl", 'level', p.level) AS partner
+      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl", 'level', p.level,
+         'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id = CASE WHEN r."userAId" = $1 THEN r."userBId" ELSE r."userAId" END
+       LEFT JOIN user_profiles pp ON pp."userId" = p.id
        WHERE (r."userAId" = $1 OR r."userBId" = $1)
        ORDER BY (r.status = 'active') DESC, r."startedAt" DESC`,
       [userId],
