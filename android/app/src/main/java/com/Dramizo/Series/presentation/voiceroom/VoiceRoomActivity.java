@@ -834,6 +834,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnSeatSticker.setOnClickListener(v -> showEmojiPicker());
         }
         binding.btnGames.setOnClickListener(v -> showRoomGames());
+
+        // Room side shortcuts. Keep the music shortcut on the existing music flow;
+        // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
+        View sideMusic = findViewById(R.id.btnRoomSideMusic);
+        View sideGames = findViewById(R.id.btnRoomSideGames);
+        View sideSettings = findViewById(R.id.btnRoomSideSettings);
+        if (sideMusic != null) {
+            sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
+        }
+        if (sideGames != null) {
+            sideGames.setOnClickListener(v -> showRoomGames());
+        }
+        if (sideSettings != null) {
+            sideSettings.setOnClickListener(v -> showOtherTools());
+        }
+
         binding.btnSendChat.setOnClickListener(v -> appendChatFromInput());
         if (binding.tvChatInputTips != null) {
             binding.tvChatInputTips.setOnClickListener(v -> openRoomChatComposer(true));
