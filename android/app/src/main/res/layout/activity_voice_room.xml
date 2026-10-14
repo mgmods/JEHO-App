@@ -1345,12 +1345,11 @@
         <!-- Messages, stickers, gifts, mic, then the text composer. -->
         <FrameLayout
             android:id="@+id/btnPrivateMsg"
-            android:layout_width="30dp"
-            android:layout_height="36dp"
-            android:layout_marginStart="0dp"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"
             android:background="@android:color/transparent"
-            android:contentDescription="@string/chat"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
+            android:contentDescription="@string/chat">
             <ImageView
                 android:id="@+id/imgPrivateMsg"
                 android:layout_width="26dp"
@@ -1420,6 +1419,7 @@
             android:layout_width="0dp"
             android:layout_height="35dp"
             android:layout_marginStart="4dp"
+            android:layout_marginEnd="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_room_chat_input_tips"
             android:clickable="true"
