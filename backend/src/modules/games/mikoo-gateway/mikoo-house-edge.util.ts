@@ -3,7 +3,7 @@
  * Live knobs come from dashboard → game.house_odds (see game-odds-runtime).
  */
 import { clampGamePayout, gamePayoutLimits } from '../game-payout-guard';
-import { getGameOdds } from '../game-odds-runtime';
+import { getGameOdds, getGameWinRate } from '../game-odds-runtime';
 import { MIKOO_WIN_MULTS } from './mikoo-game-economy';
 
 /** @deprecated use getGameOdds().playerRtp — kept for import compatibility */
@@ -17,7 +17,7 @@ export function MULTI_AREA_TARGET_RTP(): number {
  */
 export function spinPayout(
   betAmount: number,
-  opts?: { hitRate?: number },
+  opts?: { hitRate?: number; gameId?: string },
 ): { win: number; mult: number } {
   const bet = Math.max(1, Math.floor(betAmount || 0));
   const odds = getGameOdds();
@@ -25,7 +25,9 @@ export function spinPayout(
     0.25,
     Math.max(0.05, Number(opts?.hitRate) || odds.spinHitRate || 0.115),
   );
-  if (Math.random() >= hitRate) {
+  const configuredRate = opts?.gameId ? getGameWinRate(opts.gameId) : undefined;
+  const effectiveHitRate = configuredRate === undefined ? hitRate : configuredRate / 100;
+  if (Math.random() >= effectiveHitRate) {
     return { win: 0, mult: 0 };
   }
   const roll = Math.random();
