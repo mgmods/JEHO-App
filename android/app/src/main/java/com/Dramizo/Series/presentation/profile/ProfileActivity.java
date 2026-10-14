@@ -293,29 +293,27 @@ public class ProfileActivity extends ThemedActivity {
 
             // Earned achievement badges are independent from VIP and sit beside the country flag.
             if (binding.rowEarnedBadges != null) {
-                binding.rowEarnedBadges.removeAllViews();
+                binding.earnedBadgesContainer.removeAllViews();
                 java.util.List<MiscDtos.BadgeDto> earned = user.earnedBadges;
                 if (earned != null && !earned.isEmpty()) {
                     binding.rowEarnedBadges.setVisibility(View.VISIBLE);
                     int badgeSize = (int) (20 * getResources().getDisplayMetrics().density);
                     int gap = (int) (3 * getResources().getDisplayMetrics().density);
-                    int shown = 0;
                     for (MiscDtos.BadgeDto badge : earned) {
                         if (badge == null || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
-                        if (shown++ >= 5) break;
-                        ImageView badgeIcon = new ImageView(this);
+                                            ImageView badgeIcon = new ImageView(this);
                         badgeIcon.setContentDescription(badge.name != null ? badge.name : "شارة");
                         badgeIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
                         LinearLayout.LayoutParams badgeParams = new LinearLayout.LayoutParams(badgeSize, badgeSize);
                         badgeParams.setMarginStart(gap);
-                        binding.rowEarnedBadges.addView(badgeIcon, badgeParams);
+                        binding.earnedBadgesContainer.addView(badgeIcon, badgeParams);
                         Glide.with(this)
                                 .load(AssetCatalog.absoluteUrl(badge.imageUrl))
                                 .placeholder(R.drawable.ic_medal_default)
                                 .error(R.drawable.ic_medal_default)
                                 .into(badgeIcon);
                     }
-                    if (binding.rowEarnedBadges.getChildCount() == 0) {
+                    if (binding.earnedBadgesContainer.getChildCount() == 0) {
                         binding.rowEarnedBadges.setVisibility(View.GONE);
                     }
                 } else {
