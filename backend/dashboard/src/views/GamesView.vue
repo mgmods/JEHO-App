@@ -176,7 +176,7 @@
       <div class="row g-2">
         <div v-for="game in manageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
           <label class="form-label small mb-1">{{ game.label }} — نسبة الفوز %</label>
-          <input v-model.number="gameWinRates[game.id]" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
+          <input :value="gameWinRates[game.id] ?? ''" @input="gameWinRates[game.id] = $event.target.value === '' ? undefined : Math.max(0, Math.min(100, Number($event.target.value)))" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
           <div class="small mt-1" :class="supportsDirectWinRate(game.id) ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'تُطبّق من الخادم' : 'نتيجة مشتركة/محرك خارجي؛ يلزم ضبط منفصل' }}</div>
         </div>
       </div>
@@ -391,7 +391,7 @@ async function loadOdds() {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id)).map(g => [g.id, Number.isFinite(Number(gameWinRates[g.id])) ? Math.max(0, Math.min(100, Number(gameWinRates[g.id]))) : 30])), gameRtpRates: Object.fromEntries(manageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id) && gameWinRates[g.id] !== undefined && gameWinRates[g.id] !== '').map(g => [g.id, Math.max(0, Math.min(100, Number(gameWinRates[g.id])))])), gameRtpRates: Object.fromEntries(manageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
