@@ -50,7 +50,8 @@ export class CpAdminController {
         giftInteractionPoints: settings[`cp.points.gift_send.${type}`] ?? 0,
         maxLevel: settings[`cp.max_level.${type}`] ?? null,
         levels: settings[`cp.levels.${type}`] ?? [],
-        enabled: settings[`cp.enabled.${type}`] === true && Number.isSafeInteger(price) && price > 0 && !!gift,
+        // CP types are enabled automatically; price and an active gift determine purchase readiness.
+        enabled: Number.isSafeInteger(price) && price > 0 && !!gift,
         rules: settings[`cp.rules.${type}`] ?? {},
       });
     }
