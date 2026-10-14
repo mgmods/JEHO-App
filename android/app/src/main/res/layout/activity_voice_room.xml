@@ -1339,8 +1339,8 @@
         android:paddingHorizontal="4dp"
         android:paddingVertical="4dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/roomSideShortcuts">
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintLeft_toRightOf="@id/roomSideShortcuts">
 
         <!-- Messages, stickers, gifts, mic, then the text composer. -->
         <FrameLayout
@@ -1486,7 +1486,7 @@
         android:id="@+id/roomSideShortcuts"
         android:layout_width="40dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
+        android:layout_marginLeft="8dp"
         android:layout_marginBottom="14dp"
         android:background="@android:color/transparent"
         android:gravity="center"
@@ -1494,7 +1494,7 @@
         android:padding="0dp"
         android:elevation="24dp"
         app:layout_constraintBottom_toBottomOf="@id/bottomBar"
-        app:layout_constraintStart_toStartOf="parent">
+        app:layout_constraintLeft_toLeftOf="parent">
 
         <ImageView
             android:id="@+id/btnRoomSideMusic"
