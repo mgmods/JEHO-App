@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { i18n } from '@/i18n'
+import GamesView from '@/views/GamesView.vue'
 
 const routes = [
   {
@@ -157,7 +158,7 @@ const routes = [
       {
         path: 'games',
         name: 'games',
-        component: () => import('@/views/GamesView.vue'),
+        component: GamesView,
         meta: { titleKey: 'routes.games' },
       },
       {
