@@ -76,6 +76,7 @@ public class CpCenterActivity extends ThemedActivity {
         FrameLayout root = new FrameLayout(this);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        EdgeToEdgeHelper.apply(this);
         EdgeToEdgeHelper.padSystemBars(root);
         web.loadUrl("file:///android_asset/cp-center.html");
     }
