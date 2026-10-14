@@ -147,6 +147,8 @@ public final class AuthDtos {
         @SerializedName("countryChangeAvailableAt") public String countryChangeAvailableAt;
         @SerializedName("birthday") public String birthday;
         @SerializedName("city") public String city;
+        @SerializedName("language") public String language;
+        @SerializedName("interests") public java.util.List<String> interests;
         @SerializedName("albumUrls") public java.util.List<String> albumUrls;
         @SerializedName("showOnlineStatus") public Boolean showOnlineStatus;
         @SerializedName("allowDmFromStrangers") public Boolean allowDmFromStrangers;
