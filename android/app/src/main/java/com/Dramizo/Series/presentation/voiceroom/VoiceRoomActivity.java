@@ -3190,12 +3190,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding == null) return;
         // "منطقة الدردشة" = أيقونة الرسائل الخاصة (btnPrivateMsg) فقط —
         // لا تخفي بث الشات العام ولا صندوق "اكتب…".
-        roomChatZoneVisible = enabled;
-        int vis = enabled ? View.VISIBLE : View.GONE;
+        // Keep the private-message shortcut available in the room toolbar.
+        // The room chat-zone setting controls the chat panel, not the bottom action button.
+        roomChatZoneVisible = true;
         if (binding.btnPrivateMsg != null) {
-            binding.btnPrivateMsg.setVisibility(vis);
-            binding.btnPrivateMsg.setEnabled(enabled);
-            binding.btnPrivateMsg.setClickable(enabled);
+            binding.btnPrivateMsg.setVisibility(View.VISIBLE);
+            binding.btnPrivateMsg.setEnabled(true);
+            binding.btnPrivateMsg.setClickable(true);
         }
         // Ensure public room chat UI stays available.
         if (binding.chatPanel != null && binding.chatPanel.getVisibility() != View.VISIBLE) {
