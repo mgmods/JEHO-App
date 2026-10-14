@@ -49,6 +49,7 @@ public class SplashActivity extends ThemedActivity {
     private static final long SPLASH_MAX_MS = 15000L;
 
     private boolean navigated;
+    private boolean profileCheckInProgress;
     private boolean splashDecisionResolved;
     private boolean splashAdShowing;
     private boolean sessionPrepared;
@@ -274,19 +275,75 @@ public class SplashActivity extends ThemedActivity {
     }
 
     private void routeLoggedInNow(AppContainer c, AuthDtos.UserDto user) {
-        if (navigated || isFinishing()) return;
+        if (navigated || isFinishing() || profileCheckInProgress) return;
+
+        // Do not send an established account to onboarding based only on a partial
+        // login/cache DTO. Login responses can omit profile fields that /users/me
+        // returns, especially after logout and a fresh login.
         if (ProfileSetupActivity.isProfileComplete(user)) {
-            if (GenderVerificationGate.needsVerification(user, c.getSessionManager())) {
-                navigated = true;
-                mainHandler.removeCallbacks(hardTimeout);
-                startActivity(GenderVerificationGate.blockingIntent(this));
-                finish();
-                return;
-            }
-            openDestination();
-        } else {
-            openProfileSetup();
+            continueWithKnownUser(c, user);
+            return;
         }
+
+        profileCheckInProgress = true;
+        c.getIoExecutor().execute(() -> {
+            AuthDtos.UserDto resolved = null;
+            try {
+                Result<AuthDtos.UserDto> me = c.getUserRepository().getMe();
+                if (me != null && me.success && me.data != null) {
+                    resolved = me.data;
+                    c.getSessionManager().updateCachedUser(resolved);
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "Profile state check failed; using saved account snapshot", t);
+            }
+
+            final AuthDtos.UserDto resolvedUser = resolved;
+            runOnUiThread(() -> {
+                profileCheckInProgress = false;
+                if (navigated || isFinishing()) return;
+                AuthDtos.UserDto current = resolvedUser != null
+                        ? resolvedUser : c.getSessionManager().getUser();
+                if (ProfileSetupActivity.isProfileComplete(current)
+                        || hasSavedProfileEvidence(current)) {
+                    continueWithKnownUser(c, current);
+                } else if (resolvedUser != null) {
+                    // Only show onboarding after the server successfully confirmed
+                    // that this account has no completed profile.
+                    openProfileSetup();
+                } else {
+                    // A network failure is not proof that a profile is missing.
+                    // Keep the user in the app instead of forcing duplicate signup.
+                    continueWithKnownUser(c, current);
+                }
+            });
+        });
+    }
+
+    private boolean hasSavedProfileEvidence(AuthDtos.UserDto user) {
+        return user != null && (nonEmptyProfileValue(user.bio)
+                || nonEmptyProfileValue(user.birthday)
+                || nonEmptyProfileValue(user.country)
+                || nonEmptyProfileValue(user.avatarUrl)
+                || nonEmptyProfileValue(user.coverUrl)
+                || nonEmptyProfileValue(user.city)
+                || (user.interests != null && !user.interests.isEmpty()));
+    }
+
+    private boolean nonEmptyProfileValue(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private void continueWithKnownUser(AppContainer c, AuthDtos.UserDto user) {
+        if (navigated || isFinishing()) return;
+        if (GenderVerificationGate.needsVerification(user, c.getSessionManager())) {
+            navigated = true;
+            mainHandler.removeCallbacks(hardTimeout);
+            startActivity(GenderVerificationGate.blockingIntent(this));
+            finish();
+            return;
+        }
+        openDestination();
     }
 
     private int splashImageLoadGeneration;
