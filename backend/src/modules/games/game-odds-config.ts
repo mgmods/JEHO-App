@@ -26,6 +26,8 @@ export type GameOddsConfig = {
   maxCrashRatio: number;
   /** Server-enforced disabled game IDs, shared by all users. */
   disabledGames: string[];
+  /** Published per-game win chance, 0–100; applied only by game engines that resolve outcomes on our server. */
+  gameWinRates: Record<string, number>;
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -41,6 +43,7 @@ export const DEFAULT_GAME_ODDS: GameOddsConfig = {
   maxWinAbsolute: 80_000,
   maxCrashRatio: 8,
   disabledGames: [],
+  gameWinRates: {},
 };
 
 /** Presets for big-app style one-click tuning (always house-positive). */
@@ -114,6 +117,13 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     disabledGames: Array.isArray(obj.disabledGames)
       ? [...new Set(obj.disabledGames.map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
       : [...d.disabledGames],
+    gameWinRates: obj.gameWinRates && typeof obj.gameWinRates === 'object' && !Array.isArray(obj.gameWinRates)
+      ? Object.fromEntries(Object.entries(obj.gameWinRates as Record<string, unknown>).slice(0, 100).flatMap(([key, value]) => {
+          const id = String(key).trim().toLowerCase();
+          const n = Number(value);
+          return /^[a-z0-9][a-z0-9-]{0,63}$/.test(id) && Number.isFinite(n) ? [[id, Math.min(100, Math.max(0, n))]] : [];
+        }))
+      : { ...d.gameWinRates },
   };
 }
 
@@ -162,7 +172,9 @@ export function gameOddsClientPayload(cfg: GameOddsConfig) {
     coveredGames: GAME_ODDS_COVERED_GAMES.map((g) => g.id),
     coveredCount: GAME_ODDS_COVERED_GAMES.length,
     presets: Object.keys(GAME_ODDS_PRESETS),
+    gameWinRates: cfg.gameWinRates,
     hints: {
+      gameWinRates: 'نسبة الفوز المعلنة لكل لعبة من 0 إلى 100. لا تُطبّق إلا على الألعاب التي يحسم خادم JEHO نتيجتها؛ ألعاب المزوّد الخارجي تحتاج دعمًا منه.',
       playerRtp: 'نسبة ما يعود للاعب على المدى الطويل (الباقي ربح التطبيق) — لوحات الرهان المتعددة',
       spinHitRate: 'فرصة فوز كل السلوتات / بلينكو / حفلة السباحة',
       fishingHitRate: 'فرصة صيد السمك (أصعب من السلوت)',
