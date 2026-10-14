@@ -116,6 +116,53 @@
                             android:textSize="18sp" />
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:id="@+id/rowProfileRoleLevel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvProfileLevelBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="24dp"
+                            android:background="@drawable/bg_profile_lux_chip"
+                            android:gravity="center"
+                            android:paddingHorizontal="8dp"
+                            android:text="Lv. 1"
+                            android:textColor="#6F4A14"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvProfileRoleBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="5dp"
+                            android:background="@drawable/bg_profile_lux_chip"
+                            android:gravity="center"
+                            android:paddingHorizontal="8dp"
+                            android:text="سوبر أدمن"
+                            android:textColor="#6F4A14"
+                            android:textSize="11sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvProfileMedals"
+                            android:layout_width="wrap_content"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="5dp"
+                            android:background="@drawable/bg_profile_lux_chip"
+                            android:gravity="center"
+                            android:paddingHorizontal="8dp"
+                            android:text="🏅 الميداليات"
+                            android:textColor="#6F4A14"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
                     <TextView
                         android:id="@+id/tvProfileBio"
                         android:layout_width="match_parent"
