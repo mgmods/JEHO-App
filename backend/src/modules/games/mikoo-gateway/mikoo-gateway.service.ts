@@ -1860,7 +1860,7 @@ export class MikooGatewayService implements OnModuleDestroy {
     }
     try {
       let bal = await this.debit(player.userId, amount, gameSlug, player.publicId);
-      const { win, mult } = spinPayout(amount);
+      const { win, mult } = spinPayout(amount, { gameId: gameSlug });
       if (win > 0) bal = await this.credit(player.userId, win, gameSlug, mult, amount);
       player.balance = bal;
       if (style === 'fortune') {
