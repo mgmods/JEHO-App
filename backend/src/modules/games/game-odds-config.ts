@@ -24,6 +24,8 @@ export type GameOddsConfig = {
   maxWinMult: number;
   maxWinAbsolute: number;
   maxCrashRatio: number;
+  /** Server-enforced disabled game IDs, shared by all users. */
+  disabledGames: string[];
 };
 
 export const DEFAULT_GAME_ODDS: GameOddsConfig = {
@@ -38,6 +40,7 @@ export const DEFAULT_GAME_ODDS: GameOddsConfig = {
   maxWinMult: 12,
   maxWinAbsolute: 80_000,
   maxCrashRatio: 8,
+  disabledGames: [],
 };
 
 /** Presets for big-app style one-click tuning (always house-positive). */
@@ -108,6 +111,9 @@ export function sanitizeGameOdds(raw: unknown): GameOddsConfig {
     maxWinMult: Math.floor(clamp(obj.maxWinMult, 3, 25, d.maxWinMult)),
     maxWinAbsolute: Math.floor(clamp(obj.maxWinAbsolute, 1_000, 500_000, d.maxWinAbsolute)),
     maxCrashRatio: Math.floor(clamp(obj.maxCrashRatio, 3, 20, d.maxCrashRatio)),
+    disabledGames: Array.isArray(obj.disabledGames)
+      ? [...new Set(obj.disabledGames.map((x: unknown) => String(x).trim().toLowerCase()).filter((x: string) => /^[a-z0-9][a-z0-9-]{0,63}$/.test(x)))].slice(0, 200)
+      : [...d.disabledGames],
   };
 }
 
