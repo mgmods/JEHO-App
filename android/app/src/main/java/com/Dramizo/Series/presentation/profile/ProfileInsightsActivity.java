@@ -23,6 +23,7 @@ import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.cp.CpCenterActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.util.ApiCall;
+import com.Dramizo.Series.util.AssetCatalog;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,6 +61,8 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(false);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -135,7 +138,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                     JSONObject user = new JSONObject();
                     put(user, "id", u.id); put(user, "publicId", u.publicId);
                     put(user, "username", u.username); put(user, "displayName", u.displayName);
-                    put(user, "avatarUrl", u.avatarUrl); put(user, "vipBadgeUrl", u.vipBadgeUrl); put(user, "hostBadgeUrl", u.hostBadgeUrl); put(user, "frameUrl", firstNonBlank(u.hostBadgeUrl, u.vipBadgeUrl)); put(user, "levelBadgeUrl", u.levelBadgeUrl); put(user, "level", u.level);
+                    put(user, "avatarUrl", AssetCatalog.absoluteUrl(u.avatarUrl)); put(user, "vipBadgeUrl", AssetCatalog.absoluteUrl(u.vipBadgeUrl)); put(user, "hostBadgeUrl", AssetCatalog.absoluteUrl(u.hostBadgeUrl)); put(user, "frameUrl", absoluteIfPresent(firstNonBlank(u.hostBadgeUrl, u.vipBadgeUrl))); put(user, "levelBadgeUrl", u.levelBadgeUrl); put(user, "level", u.level);
                     put(user, "wealthLevel", u.wealthLevel); put(user, "wealthScore", u.wealthScore);
                     put(user, "charmScore", u.charmScore); put(user, "vipLevel", u.vipLevel);
                     payload.put("user", user);
@@ -239,6 +242,11 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     private static boolean isRankingCategory(String value) {
         return "rich".equals(value) || "popular".equals(value) || "gifts".equals(value)
                 || "host".equals(value) || "agency".equals(value) || "room".equals(value);
+    }
+
+    private static String absoluteIfPresent(Object value) {
+        if (value == null || String.valueOf(value).trim().isEmpty()) return null;
+        return AssetCatalog.absoluteUrl(String.valueOf(value).trim());
     }
 
     private static Object firstNonBlank(Object... values) {
