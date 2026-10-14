@@ -82,13 +82,29 @@ public class LoginActivity extends ThemedActivity {
                 .get(AuthViewModel.class);
 
         if (ContainerProvider.from(this).getSessionManager().isLoggedIn()) {
-            AuthDtos.UserDto cached = ContainerProvider.from(this).getSessionManager().getUser();
-            Intent next = ProfileSetupActivity.isProfileComplete(cached)
-                    ? new Intent(this, MainActivity.class)
-                    : new Intent(this, ProfileSetupActivity.class);
-            copyPendingDeepLink(getIntent(), next);
-            startActivity(next);
-            finish();
+            AppContainer container = ContainerProvider.from(this);
+            container.getIoExecutor().execute(() -> {
+                AuthDtos.UserDto resolved = null;
+                try {
+                    Result<AuthDtos.UserDto> fresh = container.getProfileUseCase.me();
+                    if (fresh != null && fresh.success && fresh.data != null) {
+                        resolved = fresh.data;
+                        container.getSessionManager().updateCachedUser(resolved);
+                    }
+                } catch (Exception ignored) {
+                    // Use the last saved profile if the server cannot be reached.
+                }
+                if (resolved == null) resolved = container.getSessionManager().getUser();
+                final AuthDtos.UserDto user = resolved;
+                runOnUiThread(() -> {
+                    Intent next = ProfileSetupActivity.isProfileComplete(user)
+                            ? new Intent(LoginActivity.this, MainActivity.class)
+                            : new Intent(LoginActivity.this, ProfileSetupActivity.class);
+                    copyPendingDeepLink(getIntent(), next);
+                    startActivity(next);
+                    finish();
+                });
+            });
             return;
         }
 
