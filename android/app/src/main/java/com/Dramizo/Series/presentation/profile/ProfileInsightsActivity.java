@@ -18,6 +18,7 @@ import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.cp.CpCenterActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
@@ -72,6 +73,9 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
+        // Keep the HTML page inside the Android status/navigation safe areas.
+        // Navigation is handled by the native device back gesture/button.
+        EdgeToEdgeHelper.padSystemBars(root);
         webView.loadUrl("file:///android_asset/" + (MODE_CP.equals(mode) ? "cp-insights.html" : "wealth-insights.html"));
     }
 
