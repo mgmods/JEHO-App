@@ -127,7 +127,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                     JSONObject user = new JSONObject();
                     put(user, "id", u.id); put(user, "publicId", u.publicId);
                     put(user, "username", u.username); put(user, "displayName", u.displayName);
-                    put(user, "avatarUrl", u.avatarUrl); put(user, "vipBadgeUrl", u.vipBadgeUrl); put(user, "hostBadgeUrl", u.hostBadgeUrl); put(user, "levelBadgeUrl", u.levelBadgeUrl); put(user, "level", u.level);
+                    put(user, "avatarUrl", u.avatarUrl); put(user, "vipBadgeUrl", u.vipBadgeUrl); put(user, "hostBadgeUrl", u.hostBadgeUrl); put(user, "frameUrl", firstNonBlank(u.hostBadgeUrl, u.vipBadgeUrl)); put(user, "levelBadgeUrl", u.levelBadgeUrl); put(user, "level", u.level);
                     put(user, "wealthLevel", u.wealthLevel); put(user, "wealthScore", u.wealthScore);
                     put(user, "charmScore", u.charmScore); put(user, "vipLevel", u.vipLevel);
                     payload.put("user", user);
@@ -141,7 +141,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         JSONObject partner = new JSONObject();
                         put(partner, "id", p.get("id")); put(partner, "username", p.get("username"));
                         put(partner, "displayName", p.get("displayName")); put(partner, "avatarUrl", p.get("avatarUrl"));
-                        put(partner, "vipBadgeUrl", p.get("vipBadgeUrl")); put(partner, "hostBadgeUrl", p.get("hostBadgeUrl")); put(partner, "levelBadgeUrl", p.get("levelBadgeUrl"));
+                        put(partner, "vipBadgeUrl", p.get("vipBadgeUrl")); put(partner, "hostBadgeUrl", p.get("hostBadgeUrl")); put(partner, "frameUrl", firstNonBlank(p.get("frameUrl"), p.get("hostBadgeUrl"), p.get("vipBadgeUrl"))); put(partner, "levelBadgeUrl", p.get("levelBadgeUrl"));
                         put(partner, "level", p.get("level")); put(partner, "vipLevel", p.get("vipLevel"));
                         JSONObject relation = new JSONObject();
                         relation.put("partner", partner);
@@ -162,7 +162,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         if (e.user != null) {
                             JSONObject ru = new JSONObject();
                             put(ru, "id", e.user.id); put(ru, "username", e.user.username);
-                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", e.user.avatarUrl);
+                            put(ru, "displayName", e.user.displayName); put(ru, "avatarUrl", e.user.avatarUrl); put(ru, "frameUrl", e.user.frameUrl); put(ru, "hostBadgeUrl", e.user.hostBadgeUrl); put(ru, "vipBadgeUrl", e.user.vipBadgeUrl);
                             item.put("user", ru);
                         }
                         ranks.put(item);
@@ -188,7 +188,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                                 JSONObject ua = new JSONObject();
                                 put(ua, "id", a.get("id")); put(ua, "username", a.get("username"));
                                 put(ua, "displayName", a.get("displayName")); put(ua, "avatarUrl", a.get("avatarUrl"));
-                                put(ua, "vipBadgeUrl", a.get("vipBadgeUrl")); put(ua, "hostBadgeUrl", a.get("hostBadgeUrl")); put(ua, "levelBadgeUrl", a.get("levelBadgeUrl"));
+                                put(ua, "vipBadgeUrl", a.get("vipBadgeUrl")); put(ua, "hostBadgeUrl", a.get("hostBadgeUrl")); put(ua, "frameUrl", firstNonBlank(a.get("frameUrl"), a.get("hostBadgeUrl"), a.get("vipBadgeUrl"))); put(ua, "levelBadgeUrl", a.get("levelBadgeUrl"));
                                 put(ua, "level", a.get("level"));
                                 item.put("userA", ua);
                             }
@@ -196,7 +196,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                                 JSONObject ub = new JSONObject();
                                 put(ub, "id", b.get("id")); put(ub, "username", b.get("username"));
                                 put(ub, "displayName", b.get("displayName")); put(ub, "avatarUrl", b.get("avatarUrl"));
-                                put(ub, "vipBadgeUrl", b.get("vipBadgeUrl")); put(ub, "hostBadgeUrl", b.get("hostBadgeUrl")); put(ub, "levelBadgeUrl", b.get("levelBadgeUrl"));
+                                put(ub, "vipBadgeUrl", b.get("vipBadgeUrl")); put(ub, "hostBadgeUrl", b.get("hostBadgeUrl")); put(ub, "frameUrl", firstNonBlank(b.get("frameUrl"), b.get("hostBadgeUrl"), b.get("vipBadgeUrl"))); put(ub, "levelBadgeUrl", b.get("levelBadgeUrl"));
                                 put(ub, "level", b.get("level"));
                                 item.put("userB", ub);
                             }
@@ -209,7 +209,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
             } catch (Exception ignored) { }
             final String json = payload.toString();
             runOnUiThread(() -> {
-                if (webView == null || isFinishing()) return;
+                if (destroyed || webView == null || isFinishing() || isDestroyed()) return;
                 String renderFunction = MODE_CP.equals(mode) ? "renderCpData" : "renderWealthData";
                 String errorFunction = MODE_CP.equals(mode) ? "showCpError" : "showWealthError";
                 webView.evaluateJavascript("window." + renderFunction + " && window." + renderFunction + "(" + json + ");", null);
@@ -225,7 +225,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         });
     }
 
-    private static void put(JSONObject obj, String key, Object value) {
+    private static Object firstNonBlank(Object... values) {\n        for (Object value : values) {\n            if (value != null && !String.valueOf(value).trim().isEmpty()) return value;\n        }\n        return null;\n    }\n\n    private static void put(JSONObject obj, String key, Object value) {
         try { if (value != null) obj.put(key, value); } catch (Exception ignored) { }
     }
 
