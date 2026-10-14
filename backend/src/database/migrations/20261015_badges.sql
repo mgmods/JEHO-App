@@ -1,5 +1,7 @@
 -- Additive badge system. Run manually after reviewing the target database/schema.
 -- Does not modify VIP tables or existing user/profile data.
+CREATE SCHEMA IF NOT EXISTS "jeho_own";
+SET search_path TO "jeho_own";
 CREATE TABLE IF NOT EXISTS badge_definitions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code varchar(64) NOT NULL UNIQUE,
