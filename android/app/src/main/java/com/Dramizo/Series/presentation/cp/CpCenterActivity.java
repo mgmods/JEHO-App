@@ -1,370 +1,233 @@
 package com.Dramizo.Series.presentation.cp;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
-import com.Dramizo.Series.databinding.ActivityCpCenterBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
-import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
-import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.util.ApiCall;
-import com.Dramizo.Series.util.AuraDialogHelper;
-import com.Dramizo.Series.util.AvatarImageLoader;
+import com.google.gson.Gson;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
-/** Full CP hub: request / accept path / intimacy / end bond / invite code. */
+/** All CP screens are rendered in the local HTML page; API and identity remain native-side. */
 public class CpCenterActivity extends ThemedActivity {
-    private ActivityCpCenterBinding binding;
+    public static final String EXTRA_VIEW = "cp_html_view";
+    public static final String EXTRA_TYPE = "cp_html_type";
+    private WebView web;
     private AppContainer c;
-    @Nullable private AuthDtos.UserDto partner;
-    private long bondScore;
-    private int bondLevel;
-    private String activeRelationshipId;
-    private String activeRelationshipType;
+    private final Gson gson = new Gson();
+    private boolean pageReady;
+    private String initialView = "home";
+    private String initialType = "";
 
-    @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    @SuppressLint("SetJavaScriptEnabled")
+    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        binding = ActivityCpCenterBinding.inflate(getLayoutInflater());
-        setContentView(binding.getRoot());
-        // Ensure toolbar clears status bar (root contentRoot is padded by ThemedActivity;
-        // extra explicit pad is safe and covers any race before onPostCreate).
-        EdgeToEdgeHelper.padSystemBars(binding.contentRoot);
         c = ContainerProvider.from(this);
-
-        binding.btnBack.setOnClickListener(v -> navigateUp());
-        binding.btnDiscoverCp.setOnClickListener(v -> startActivity(new Intent(this, CpDiscoveryActivity.class)));
-        binding.btnCpBrotherhood.setOnClickListener(v -> openCpCategory("brotherhood"));
-        binding.btnCpFriendship.setOnClickListener(v -> openCpCategory("friendship"));
-        binding.btnCpLove.setOnClickListener(v -> openCpCategory("love"));
-        binding.btnCpEngagement.setOnClickListener(v -> openCpCategory("engagement"));
-        binding.btnCpMarriage.setOnClickListener(v -> openCpCategory("marriage"));
-        binding.btnCpRequests.setOnClickListener(v -> showCpRequestsDialog());
-        binding.btnBecomeCp.setOnClickListener(v -> {
-            if (partner != null) {
-                confirmEndCp();
-            } else {
-                startActivity(new Intent(this, CpDiscoveryActivity.class));
+        initialView = safeView(getIntent().getStringExtra(EXTRA_VIEW));
+        initialType = safeType(getIntent().getStringExtra(EXTRA_TYPE));
+        web = new WebView(this);
+        web.setBackgroundColor(0xFFFFF7F5);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(false);
+        settings.setAllowFileAccessFromFileURLs(false);
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        web.setWebChromeClient(new WebChromeClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return true;
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                pageReady = true;
+                web.evaluateJavascript("window.setCpView && window.setCpView(" +
+                        gson.toJson(initialView) + "," + gson.toJson(initialType) + ")", null);
+                loadHome();
+                loadRequests();
             }
         });
-        binding.btnOpenInvite.setOnClickListener(v ->
-                startActivity(new Intent(this, InvitationActivity.class)));
-        binding.cardCpPartner.setOnClickListener(v -> {
-            if (partner == null || partner.id == null) return;
-            UserProfileCardSheet.show(
-                    this,
-                    partner.id,
-                    partner.displayName != null ? partner.displayName : partner.username,
-                    partner.avatarUrl,
-                    Math.max(0, partner.vipLevel),
-                    Math.max(1, partner.level));
-        });
-        loadPartner();
+        web.addJavascriptInterface(new CpBridge(), "JehoCP");
+        setContentView(web);
+        web.loadUrl("file:///android_asset/cp-center.html");
     }
 
-    /** Manual edge padding — avoid ThemedActivity targeting only the fixed 56dp header. */
-    @Override
-    protected boolean wantsContentSystemPadding() {
-        return false;
+    private String safeView(String value) {
+        return "send".equals(value) || "incoming".equals(value) || "sent".equals(value)
+                || "discover".equals(value) ? value : "home";
     }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        loadPartner();
-    }
-
-    private void loadPartner() {
-        c.getIoExecutor().execute(() -> {
-            Result<List<Map<String, Object>>> relationships = ApiCall.execute(c.getUserApi().myCpRelationships());
-            Result<List<Map<String, Object>>> pending = ApiCall.execute(c.getUserApi().cpRequests());
-            int pendingCount = pending.success && pending.data != null ? pending.data.size() : 0;
-            AuthDtos.UserDto found = null;
-            String relationId = null;
-            String relationType = null;
-            long score = 0;
-            int level = 1;
-            if (relationships.success && relationships.data != null) {
-                for (Map<String, Object> row : relationships.data) {
-                    if (row == null || !"active".equals(String.valueOf(row.get("status")))) continue;
-                    Object raw = row.get("partner");
-                    if (!(raw instanceof Map)) continue;
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> peer = (Map<String, Object>) raw;
-                    found = new AuthDtos.UserDto();
-                    found.id = valueOf(peer.get("id"));
-                    found.username = valueOf(peer.get("username"));
-                    found.displayName = valueOf(peer.get("displayName"));
-                    found.avatarUrl = valueOf(peer.get("avatarUrl"));
-                    found.vipBadgeUrl = valueOf(peer.get("vipBadgeUrl"));
-                    relationId = valueOf(row.get("id"));
-                    relationType = valueOf(row.get("type"));
-                    score = longOf(row.get("points"));
-                    level = Math.max(1, (int) longOf(row.get("level")));
-                    break;
-                }
-            }
-            final AuthDtos.UserDto partnerResult = found;
-            final String relationIdResult = relationId;
-            final String relationTypeResult = relationType;
-            final long scoreResult = score;
-            final int levelResult = level;
-            final int pendingResult = pendingCount;
-            runOnUiThread(() -> {
-                if (isFinishing() || binding == null) return;
-                partner = partnerResult;
-                activeRelationshipId = relationIdResult;
-                activeRelationshipType = relationTypeResult;
-                bondScore = scoreResult;
-                bondLevel = levelResult;
-                binding.btnCpRequests.setText(pendingResult > 0 ? "طلبات علاقات CP (" + pendingResult + ")" : "طلبات علاقات CP");
-                bindPartnerUi(pendingResult);
-            });
-        });
-    }
-
-    private String valueOf(Object value) {
-        return value == null ? "" : String.valueOf(value);
-    }
-
-    private long longOf(Object value) {
-        try {
-            if (value == null) return 0L;
-            if (value instanceof Number) return ((Number) value).longValue();
-            return (long) Double.parseDouble(String.valueOf(value));
-        } catch (Exception ignored) { return 0L; }
-    }
-
-    private void bindPartnerUi(int pendingIncoming) {
-        if (partner != null) {
-            binding.cardCpPartner.setVisibility(View.VISIBLE);
-            String name = partner.displayName != null && !partner.displayName.isEmpty()
-                    ? partner.displayName
-                    : (partner.username != null ? partner.username : "شريك");
-            binding.tvCpPartnerName.setText(name);
-            AvatarImageLoader.load(binding.imgCpPartner, partner.avatarUrl);
-            com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgCpPartnerFrame, partner.vipBadgeUrl);
-            binding.tvCpHeroTitle.setText("مساحة CP");
-            binding.tvCpHint.setText("علاقة " + cpLabel(activeRelationshipType)
-                    + " · المستوى LV." + bondLevel + "\nنقاط العلاقة: " + bondScore
-                    + "\nاضغط البطاقة لعرض ملف الطرف الآخر.");
-            binding.btnBecomeCp.setText("إنهاء CP");
-        } else {
-            binding.cardCpPartner.setVisibility(View.GONE);
-            binding.tvCpHeroTitle.setText("كيف تصبح CP؟");
-            String pendingHint = pendingIncoming > 0
-                    ? ("\nلديك " + pendingIncoming + " طلب CP معلّق — افتح الطلبات للقبول.")
-                    : "";
-            binding.tvCpHint.setText(
-                    "CP = زوج خاص (طلب → قبول).\n"
-                            + "1) أدخل معرّف الصديق (public ID)\n"
-                            + "2) يقبلك من «الطلبات → CP»\n"
-                            + "3) تبادلوا هدايا تبويب CP في الغرفة\n"
-                            + "يمكنكم رابطاً واحداً فقط في نفس الوقت."
-                            + pendingHint
-                            + "\n\nاضغط مطوّلاً على «رمز دعوتي» لفتح طلبات CP.");
-            binding.btnBecomeCp.setText("اكتشف العلاقات");
+    private String safeType(String value) {
+        for (String allowed : new String[]{"brotherhood", "friendship", "love", "engagement", "marriage"}) {
+            if (allowed.equals(value)) return value;
         }
+        return "";
     }
 
-    private String cpLabel(String type) {
-        if (type == null) return "CP";
-        switch (type) {
-            case "friendship": return "الصداقة";
+    private void js(String expression) {
+        runOnUiThread(() -> {
+            if (web != null && pageReady && !isFinishing()) web.evaluateJavascript(expression, null);
+        });
+    }
+    private void message(String text) { js("window.showCpMessage && window.showCpMessage(" + gson.toJson(text) + ")"); }
+    private String nameFor(String type) {
+        switch (type == null ? "" : type) {
             case "brotherhood": return "الأخوّة";
+            case "friendship": return "الصداقة";
             case "love": return "الحب";
             case "engagement": return "الخطوبة";
             case "marriage": return "الزواج";
-            default: return "CP";
+            default: return "علاقة CP";
         }
     }
 
-    private void confirmEndCp() {
-        if (partner == null || partner.id == null || activeRelationshipId == null) return;
-        String name = partner.displayName != null ? partner.displayName : "الشريك";
-        AuraDialogHelper.confirm(this,
-                "إنهاء CP",
-                "هل تريد إنهاء ارتباط CP مع " + name + "؟",
-                "إنهاء",
-                () -> c.getIoExecutor().execute(() -> {
-                    Result<Map<String, Object>> r = ApiCall.execute(
-                            c.getUserApi().endCpRelationship(activeRelationshipId));
-                    runOnUiThread(() -> {
-                        Toast.makeText(this,
-                                r.success ? "تم إنهاء CP"
-                                        : (r.error != null ? r.error : "فشل"),
-                                Toast.LENGTH_SHORT).show();
-                        if (r.success) loadPartner();
-                    });
-                }),
-                getString(android.R.string.cancel),
-                null);
-    }
-
-
-    private void showCpRequestsDialog() {
+    private void loadHome() {
         c.getIoExecutor().execute(() -> {
-            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpRequests());
-            runOnUiThread(() -> {
-                if (isFinishing()) return;
-                if (!result.success || result.data == null) {
-                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل الطلبات", Toast.LENGTH_LONG).show();
-                    return;
-                }
-                if (result.data.isEmpty()) {
-                    new androidx.appcompat.app.AlertDialog.Builder(this)
-                            .setTitle("طلبات علاقات CP")
-                            .setMessage("لا توجد طلبات واردة معلّقة حالياً.")
-                            .setNeutralButton("الطلبات المرسلة", (d, w) -> showCpSentRequestsDialog())
-                            .setPositiveButton("حسناً", null).show();
-                    return;
-                }
-                List<Map<String, Object>> rows = result.data;
-                String[] labels = new String[rows.size()];
-                for (int i = 0; i < rows.size(); i++) {
-                    Map<String, Object> row = rows.get(i);
-                    Object rawSender = row.get("sender");
-                    String senderName = "عضو";
-                    if (rawSender instanceof Map) {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> sender = (Map<String, Object>) rawSender;
-                        senderName = valueOf(sender.get("displayName"));
-                        if (senderName.isEmpty()) senderName = valueOf(sender.get("username"));
-                    }
-                    labels[i] = senderName + " — " + cpLabel(valueOf(row.get("type")))
-                            + " · " + valueOf(row.get("giftName")) + " · " + valueOf(row.get("priceCoins")) + " عملة";
-                }
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("طلبات علاقات CP")
-                        .setItems(labels, (dialog, which) -> {
-                            Map<String, Object> row = rows.get(which);
-                            String id = valueOf(row.get("id"));
-                            String senderName = labels[which];
-                            new androidx.appcompat.app.AlertDialog.Builder(this)
-                                    .setTitle("طلب علاقة جديد")
-                                    .setMessage(senderName + "\nبقبولك، ستُنشأ العلاقة. إذا رفضت أو انتهت المهلة يُعاد المبلغ كاملاً لصاحب الطلب.")
-                                    .setPositiveButton("قبول", (d, w) -> respondCpRequest(id, true))
-                                    .setNegativeButton("رفض وإرجاع المبلغ", (d, w) -> respondCpRequest(id, false))
-                                    .setNeutralButton("لاحقاً", null).show();
-                        })
-                        .setNeutralButton("الطلبات المرسلة", (d, w) -> showCpSentRequestsDialog())
-                        .setPositiveButton("إغلاق", null).show();
-            });
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().myCpRelationships());
+            if (r.success && r.data != null) {
+                js("window.renderCpHome && window.renderCpHome(" + gson.toJson(r.data) + ")");
+            } else {
+                js("window.renderCpHome && window.renderCpHome([])");
+                if (r.error != null) message(r.error);
+            }
         });
     }
 
-
-    private void showCpSentRequestsDialog() {
+    private void loadRequests() {
         c.getIoExecutor().execute(() -> {
-            Result<List<Map<String, Object>>> result = ApiCall.execute(c.getUserApi().cpSentRequests());
-            runOnUiThread(() -> {
-                if (isFinishing()) return;
-                if (!result.success || result.data == null) {
-                    Toast.makeText(this, result.error != null ? result.error : "تعذر تحميل الطلبات المرسلة", Toast.LENGTH_LONG).show();
-                    return;
-                }
-                if (result.data.isEmpty()) {
-                    new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("الطلبات المرسلة")
-                            .setMessage("لم ترسل أي طلب CP بعد.")
-                            .setPositiveButton("حسناً", null).show();
-                    return;
-                }
-                List<Map<String, Object>> rows = result.data;
-                List<Map<String, Object>> cancellable = new java.util.ArrayList<>();
-                List<String> labels = new java.util.ArrayList<>();
-                for (Map<String, Object> row : rows) {
-                    String status = valueOf(row.get("status"));
-                    String name = "عضو";
-                    Object raw = row.get("recipient");
-                    if (raw instanceof Map) {
-                        @SuppressWarnings("unchecked") Map<String, Object> peer = (Map<String, Object>) raw;
-                        name = valueOf(peer.get("displayName"));
-                        if (name.isEmpty()) name = valueOf(peer.get("username"));
-                    }
-                    String label = name + " — " + cpLabel(valueOf(row.get("type"))) + " · " + status;
-                    if ("pending".equals(status)) {
-                        label += " · إلغاء واسترداد";
-                        cancellable.add(row);
-                        labels.add(label);
-                    } else {
-                        labels.add(label);
-                        cancellable.add(null);
-                    }
-                }
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("الطلبات المرسلة")
-                        .setItems(labels.toArray(new String[0]), (d, which) -> {
-                            Map<String, Object> row = cancellable.get(which);
-                            if (row == null) return;
-                            String id = valueOf(row.get("id"));
-                            new androidx.appcompat.app.AlertDialog.Builder(this)
-                                    .setTitle("إلغاء طلب CP؟")
-                                    .setMessage("سيتم إلغاء الطلب وإرجاع المبلغ كاملاً إذا لم تتم معالجته.")
-                                    .setPositiveButton("إلغاء واسترداد", (a, b) -> cancelCpRequest(id))
-                                    .setNegativeButton("رجوع", null).show();
-                        })
-                        .setPositiveButton("إغلاق", null).show();
-            });
+            Result<List<Map<String, Object>>> incoming = ApiCall.execute(c.getUserApi().cpRequests());
+            Result<List<Map<String, Object>>> sent = ApiCall.execute(c.getUserApi().cpSentRequests());
+            List<Map<String, Object>> in = incoming.success && incoming.data != null
+                    ? incoming.data : new ArrayList<>();
+            List<Map<String, Object>> out = sent.success && sent.data != null
+                    ? sent.data : new ArrayList<>();
+            js("window.renderCpRequests && window.renderCpRequests(" +
+                    gson.toJson(in) + "," + gson.toJson(out) + ")");
+            if (!incoming.success && incoming.error != null) message(incoming.error);
+            else if (!sent.success && sent.error != null) message(sent.error);
         });
     }
 
-    private void cancelCpRequest(String id) {
+    private void loadDiscover(String type) {
+        String safe = safeType(type);
         c.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().cancelCpRequest(id));
-            runOnUiThread(() -> {
-                if (isFinishing()) return;
-                String status = result.data == null ? "" : valueOf(result.data.get("status"));
-                String message = !result.success
-                        ? (result.error != null ? result.error : "تعذر الإلغاء")
-                        : "expired".equals(status) ? "انتهت مهلة الطلب وتم إرجاع المبلغ"
-                        : "تم إلغاء الطلب وإرجاع المبلغ";
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-                if (result.success) loadPartner();
-            });
+            Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().discoverCp(safe.isEmpty() ? null : safe));
+            if (r.success && r.data != null) {
+                js("window.renderCpDiscover && window.renderCpDiscover(" + gson.toJson(r.data) + ")");
+            } else {
+                js("window.renderCpDiscover && window.renderCpDiscover([])");
+                message(r.error != null ? r.error : "تعذر تحميل العلاقات النشطة");
+            }
         });
     }
 
-    private void respondCpRequest(String requestId, boolean accept) {
-        Map<String, Boolean> body = new HashMap<>();
-        body.put("accept", accept);
-        c.getIoExecutor().execute(() -> {
-            Result<Map<String, Object>> result = ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
-            runOnUiThread(() -> {
-                if (isFinishing()) return;
-                String status = result.data == null ? "" : valueOf(result.data.get("status"));
-                String message = !result.success
-                        ? (result.error != null ? result.error : "تعذرت معالجة الطلب")
-                        : "expired".equals(status) ? "انتهت مهلة الطلب وتم إرجاع المبلغ"
-                        : accept ? "تم قبول الطلب وإنشاء العلاقة" : "تم رفض الطلب وإرجاع المبلغ";
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-                if (result.success) loadPartner();
+    private final class CpBridge {
+        @JavascriptInterface public void loadHome() { CpCenterActivity.this.loadHome(); }
+        @JavascriptInterface public void loadRequests() { CpCenterActivity.this.loadRequests(); }
+        @JavascriptInterface public void loadDiscover(String type) { CpCenterActivity.this.loadDiscover(type); }
+
+        @JavascriptInterface public void sendRequest(String recipientId, String type) {
+            String recipient = recipientId == null ? "" : recipientId.trim();
+            String relationshipType = safeType(type);
+            if (recipient.isEmpty() || relationshipType.isEmpty()) {
+                message("أدخل معرّف المستخدم واختر نوع العلاقة.");
+                return;
+            }
+            Map<String, String> body = new HashMap<>();
+            body.put("recipientId", recipient);
+            body.put("type", relationshipType);
+            body.put("idempotencyKey", UUID.randomUUID().toString());
+            c.getIoExecutor().execute(() -> {
+                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().createProfileCpRequest(body));
+                if (r.success) {
+                    message("تم إرسال طلب " + nameFor(relationshipType) + " مباشرة. سيصل للطرف الآخر إشعار للقبول أو الرفض.");
+                    js("document.getElementById('recipientId').value='';");
+                    loadRequests();
+                } else {
+                    message(r.error != null ? r.error : "تعذر إرسال طلب العلاقة");
+                }
             });
-        });
+        }
+
+        @JavascriptInterface public void respondRequest(String requestId, boolean accept) {
+            Map<String, Boolean> body = new HashMap<>();
+            body.put("accept", accept);
+            c.getIoExecutor().execute(() -> {
+                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
+                if (r.success) {
+                    String status = r.data == null ? "" : String.valueOf(r.data.get("status"));
+                    String text = "expired".equals(status) ? "انتهت مهلة الطلب."
+                            : accept ? "تم قبول العلاقة بنجاح." : "تم رفض الطلب.";
+                    message(text);
+                    loadHome();
+                    loadRequests();
+                } else message(r.error != null ? r.error : "تعذرت معالجة الطلب");
+            });
+        }
+
+        @JavascriptInterface public void cancelRequest(String requestId) {
+            c.getIoExecutor().execute(() -> {
+                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().cancelCpRequest(requestId));
+                if (r.success) {
+                    message("تم إلغاء الطلب.");
+                    loadRequests();
+                } else message(r.error != null ? r.error : "تعذر إلغاء الطلب");
+            });
+        }
+
+        @JavascriptInterface public void endRelationship(String relationshipId) {
+            c.getIoExecutor().execute(() -> {
+                Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().endCpRelationship(relationshipId));
+                if (r.success) {
+                    message("تم إنهاء العلاقة.");
+                    loadHome();
+                    loadDiscover("");
+                } else message(r.error != null ? r.error : "تعذر إنهاء العلاقة");
+            });
+        }
+
+        @JavascriptInterface public void openProfile(String userId) {
+            runOnUiThread(() -> {
+                if (userId == null || userId.trim().isEmpty()) return;
+                UserProfileCardSheet.show(CpCenterActivity.this, userId.trim());
+            });
+        }
+        @JavascriptInterface public void openInvite() {
+            runOnUiThread(() -> startActivity(new Intent(CpCenterActivity.this, InvitationActivity.class)));
+        }
+        @JavascriptInterface public void back() { runOnUiThread(CpCenterActivity.this::finish); }
     }
 
-    private void openCpCategory(String type) {
-        Intent intent = new Intent(this, CpDiscoveryActivity.class);
-        intent.putExtra(CpDiscoveryActivity.EXTRA_CP_TYPE, type);
-        startActivity(intent);
-    }
+    @Override public void onBackPressed() { finish(); }
 
-    private void openRanking(String tab) {
-        Intent i = new Intent(this, RankingActivity.class);
-        i.putExtra(RankingActivity.EXTRA_CATEGORY, tab);
-        startActivity(i);
+    @Override protected void onDestroy() {
+        pageReady = false;
+        if (web != null) {
+            web.removeJavascriptInterface("JehoCP");
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+            web = null;
+        }
+        super.onDestroy();
     }
 }
