@@ -56,6 +56,8 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         String requestedMode = getIntent().getStringExtra(EXTRA_MODE);
         mode = MODE_CP.equals(requestedMode) ? MODE_CP : MODE_WEALTH;
         FrameLayout root = new FrameLayout(this);
+        root.setClipToPadding(true);
+        root.setClipChildren(true);
         root.setBackgroundColor(Color.rgb(16, 16, 32));
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
@@ -94,6 +96,10 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         webView.loadUrl("file:///android_asset/" + (MODE_CP.equals(mode) ? "cp-insights.html" : "wealth-insights.html"));
     }
 
+    // This HTML WebView applies its own system-bar insets to the WebView host.
+    // Prevent ThemedActivity from re-applying transparent edge-to-edge/theme chrome later.
+    @Override protected boolean wantsEdgeToEdgeWallpaper() { return false; }
+    @Override protected boolean wantsRemoteThemeChrome() { return false; }
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
     @Override protected void onResume() {
