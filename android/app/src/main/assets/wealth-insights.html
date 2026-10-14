@@ -57,13 +57,11 @@ function renderWealthData(d){
  document.getElementById('wealthScore').textContent=u.wealthScore==null?'—':num(u.wealthScore);
  document.getElementById('userLevel').textContent=u.level==null?'—':num(u.level);
  document.getElementById('charmScore').textContent=u.charmScore==null?'—':num(u.charmScore);
- const av=document.getElementById('meAvatar'),fr=document.getElementById('meFrame');
+ const av=document.getElementById('meAvatar'),stack=document.getElementById('meAvatarStack');
  const avatar=safeImage(u.avatarUrl),frame=safeImage(u.frameUrl||u.hostBadgeUrl||u.vipBadgeUrl);
- if(avatar){av.src=avatar;av.hidden=false;av.onerror=()=>{av.hidden=true}}
- else {av.removeAttribute('src');av.hidden=true}
- if(fr.tagName==='VIDEO'){fr.pause();fr.remove()}
- if(frame){const clean=frame.split('?')[0].toLowerCase();if(/\.(mp4|webm|mov)$/.test(clean)){const v=document.createElement('video');v.id='meFrame';v.className='real-frame-video';v.autoplay=true;v.muted=true;v.loop=true;v.playsInline=true;v.preload='none';v.setAttribute('aria-hidden','true');const s=document.createElement('source');s.src=frame;v.appendChild(s);fr.replaceWith(v);v.play().catch(()=>{})}else{if(fr.tagName!=='IMG'){const im=document.createElement('img');im.id='meFrame';im.className='real-frame';im.alt='';im.hidden=true;fr.replaceWith(im)}const f=document.getElementById('meFrame');f.src=frame;f.hidden=false;f.onerror=()=>{f.hidden=true}}}
- else {const f=document.getElementById('meFrame');if(f){f.removeAttribute('src');f.hidden=true}}
+ if(avatar){av.src=avatar;av.hidden=false;av.onerror=()=>{av.hidden=true}}else{av.removeAttribute('src');av.hidden=true}
+ const oldFrame=document.getElementById('meFrame');if(oldFrame){if(oldFrame.tagName==='VIDEO')oldFrame.pause();oldFrame.remove()}
+ if(frame){const clean=frame.split('?')[0].toLowerCase();let el;if(/\.(mp4|webm|mov)$/.test(clean)){el=document.createElement('video');el.className='real-frame-video';el.autoplay=true;el.muted=true;el.loop=true;el.playsInline=true;el.preload='none';const source=document.createElement('source');source.src=frame;el.appendChild(source)}else{el=document.createElement('img');el.className='real-frame';el.alt='';el.onerror=()=>{el.hidden=true};el.src=frame}el.id='meFrame';el.setAttribute('aria-hidden','true');stack.appendChild(el);if(el.tagName==='VIDEO')el.play().catch(()=>{})}
  const b=document.getElementById('refresh');b.disabled=false;b.textContent='↻ تحديث بيانات الحساب';
  const s=document.getElementById('pageStatus');s.hidden=true;
 }
