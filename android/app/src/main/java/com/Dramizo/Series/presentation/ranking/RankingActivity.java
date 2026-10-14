@@ -39,7 +39,7 @@ public class RankingActivity extends ThemedActivity {
         super.onCreate(savedInstanceState);
         String incomingCategory = getIntent().getStringExtra(EXTRA_CATEGORY);
         if (incomingCategory == null || incomingCategory.isEmpty() || "rich".equals(incomingCategory)) {
-            startActivity(new Intent(this, WealthRankingHtmlActivity.class));
+            startActivity(new Intent(this, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class).putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
             finish();
             return;
         }
@@ -85,7 +85,7 @@ public class RankingActivity extends ThemedActivity {
                 int i = tab.getPosition();
                 if (i >= 0 && i < CATEGORIES.length) category = CATEGORIES[i];
                 if ("rich".equals(category)) {
-                    startActivity(new Intent(RankingActivity.this, WealthRankingHtmlActivity.class));
+                    startActivity(new Intent(RankingActivity.this, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.class).putExtra(com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.EXTRA_MODE, com.Dramizo.Series.presentation.profile.ProfileInsightsActivity.MODE_WEALTH));
                     finish();
                     return;
                 }
