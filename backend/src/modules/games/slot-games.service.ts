@@ -134,7 +134,9 @@ export class SlotGamesService {
 
     const defaultWs = `${this.toWsBase(origin)}/games/ws`;
 
-    const wsBase = await this.readSetting('games.bsgame.ws_base', defaultWs);
+    const configuredWsBase = await this.readSetting('games.bsgame.ws_base', defaultWs);
+    // Existing settings may still contain the retired legacy host; normalize in memory only.
+    const wsBase = /api\.adnova\.bbs\.tr/i.test(configuredWsBase) ? defaultWs : configuredWsBase;
 
     return {
 
