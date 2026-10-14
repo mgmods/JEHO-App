@@ -857,7 +857,7 @@ export class BaishunWsHandler {
               let win = 0;
               if (!isFree) {
                 balance = await this.debit(player.userId, betAmount, gameSlug);
-                win = spinPayout(betAmount).win;
+                win = spinPayout(betAmount, { gameId: gameSlug }).win;
                 if (win > 0) balance = await this.credit(player.userId, win, gameSlug, betAmount);
               }
               player.balance = balance;
