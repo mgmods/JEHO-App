@@ -108,7 +108,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         JSONObject relation = new JSONObject();
                         relation.put("partner", partner);
                         put(relation, "type", row.get("type"));
-                        put(relation, "typeLabel", cpLabel(String.valueOf(row.get("type")));
+                        put(relation, "typeLabel", cpLabel(String.valueOf(row.get("type"))));
                         put(relation, "level", row.get("level")); put(relation, "points", row.get("points"));
                         payload.put("relationship", relation);
                         break;
