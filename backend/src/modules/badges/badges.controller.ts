@@ -49,6 +49,8 @@ export class AdminBadgesController {
   create(@Body() body: {
     code: string; name: string; description?: string; imageUrl?: string;
     isActive?: boolean; sortOrder?: number;
+    conditionType?: 'account_age_days' | 'messages_sent' | 'followers_count' | 'diamonds_received' | null;
+    conditionTarget?: number | null;
   }) {
     return this.badges.saveDefinition(body);
   }
@@ -57,6 +59,8 @@ export class AdminBadgesController {
   update(@Param('id') id: string, @Body() body: {
     name: string; description?: string; imageUrl?: string;
     isActive?: boolean; sortOrder?: number;
+    conditionType?: 'account_age_days' | 'messages_sent' | 'followers_count' | 'diamonds_received' | null;
+    conditionTarget?: number | null;
   }) {
     return this.badges.saveDefinition(body, id);
   }
