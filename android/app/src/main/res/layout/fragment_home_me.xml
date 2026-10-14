@@ -38,6 +38,8 @@
             android:paddingTop="0dp">
 
             <LinearLayout
+                android:id="@+id/profileHeaderMe"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
@@ -125,6 +127,7 @@
 
             <LinearLayout
                 android:id="@+id/actionEditProfileTop"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_marginTop="0dp"
@@ -144,6 +147,8 @@
             </LinearLayout>
 
             <LinearLayout
+                android:id="@+id/profileStatsMe"
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
@@ -187,6 +192,7 @@
             </LinearLayout>
 
             <TextView
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -197,6 +203,7 @@
                 android:textStyle="bold" />
 
             <GridLayout
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:columnCount="4"
@@ -222,6 +229,7 @@
             </GridLayout>
 
             <TextView
+                android:visibility="gone"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -238,25 +246,25 @@
                 android:background="@drawable/bg_profile_lux_card"
                 android:paddingHorizontal="12dp">
 
-                <LinearLayout android:id="@+id/actionSecurity" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                <LinearLayout android:id="@+id/actionSecurity" android:visibility="gone" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="🛡"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="الأمان والخصوصية"/>
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
                 </LinearLayout>
-                <View style="@style/ProfileLuxuryDivider"/>
+                <View android:visibility="gone" style="@style/ProfileLuxuryDivider"/>
                 <LinearLayout android:id="@+id/actionActivities" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="✨"/>
-                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="فعالياتي ومركز المهام"/>
+                    <TextView style="@style/ProfileLuxuryMenuLabel" android:text="نشاطك"/>
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
                 </LinearLayout>
-                <View style="@style/ProfileLuxuryDivider"/>
-                <LinearLayout android:id="@+id/actionStore" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                <View android:visibility="gone" style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionStore" android:visibility="gone" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="🛍"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="المتجر"/>
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
                 </LinearLayout>
-                <View style="@style/ProfileLuxuryDivider"/>
-                <LinearLayout android:id="@+id/actionSupport" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
+                <View android:visibility="gone" style="@style/ProfileLuxuryDivider"/>
+                <LinearLayout android:id="@+id/actionSupport" android:visibility="gone" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="💬"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="الدعم والمساعدة"/>
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
@@ -268,7 +276,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="6dp"
-                android:text="غرفتك ونشاطك"
+                android:text="غرفتك"
                 android:textColor="#49371D"
                 android:textSize="16sp"
                 android:textStyle="bold" />
