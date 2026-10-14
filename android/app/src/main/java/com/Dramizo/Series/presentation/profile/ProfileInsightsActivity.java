@@ -43,8 +43,10 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     private boolean dataLoadInFlight;
     private boolean dataLoadPending;
     private String pendingPeriod = "daily";
+    private String pendingCategory = "rich";
     private String mode = MODE_WEALTH;
     private volatile String wealthPeriod = "daily";
+    private volatile String wealthCategory = "rich";
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -96,19 +98,25 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     }
 
     private void loadLiveData() {
-        loadLiveData(wealthPeriod);
+        loadLiveData(wealthPeriod, wealthCategory);
     }
 
     private void loadLiveData(String requestedPeriod) {
+        loadLiveData(requestedPeriod, wealthCategory);
+    }
+
+    private void loadLiveData(String requestedPeriod, String requestedCategory) {
         if (container == null || destroyed) return;
         final String period = "weekly".equals(requestedPeriod) || "monthly".equals(requestedPeriod)
                 ? requestedPeriod : "daily";
-        if (MODE_WEALTH.equals(mode)) wealthPeriod = period;
+        String category = MODE_WEALTH.equals(mode) && isRankingCategory(requestedCategory) ? requestedCategory : "rich";
+        if (MODE_WEALTH.equals(mode)) { wealthPeriod = period; wealthCategory = category; }
         synchronized (this) {
             if (destroyed) return;
             if (dataLoadInFlight) {
                 dataLoadPending = true;
                 pendingPeriod = period;
+                pendingCategory = category;
                 return;
             }
             dataLoadInFlight = true;
@@ -119,7 +127,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
             Result<List<Map<String, Object>>> cpRankingResult = MODE_CP.equals(mode)
                     ? ApiCall.execute(container.getUserApi().discoverCp(null)) : null;
             Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rankingResult =
-                    container.getRankingsUseCase.execute(MODE_WEALTH.equals(mode) ? period : "daily", "rich");
+                    container.getRankingsUseCase.execute(MODE_WEALTH.equals(mode) ? period : "daily", category);
             JSONObject payload = new JSONObject();
             try {
                 if (userResult.success && userResult.data != null) {
@@ -171,11 +179,13 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 payload.put("ranking", ranks);
                 payload.put("rankingError", !rankingResult.success);
                 payload.put("rankingPeriod", MODE_WEALTH.equals(mode) ? period : "daily");
+                payload.put("rankingCategory", category);
                 if (MODE_CP.equals(mode)) {
                     JSONArray cpRanks = new JSONArray();
                     if (cpRankingResult != null && cpRankingResult.success && cpRankingResult.data != null) {
                         int cpRank = 1;
                         for (Map<String, Object> row : cpRankingResult.data) {
+                            if (cpRank > 30) break;
                             if (row == null) continue;
                             JSONObject item = new JSONObject();
                             put(item, "rank", cpRank++);
@@ -215,14 +225,20 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 webView.evaluateJavascript("window." + renderFunction + " && window." + renderFunction + "(" + json + ");", null);
                 if (!userResult.success) webView.evaluateJavascript("window." + errorFunction + " && window." + errorFunction + "();", null);
                 String nextPeriod = null;
+                String nextCategory = "rich";
                 synchronized (ProfileInsightsActivity.this) {
                     dataLoadInFlight = false;
-                    if (dataLoadPending && !destroyed) nextPeriod = pendingPeriod;
+                    if (dataLoadPending && !destroyed) { nextPeriod = pendingPeriod; nextCategory = pendingCategory; }
                     dataLoadPending = false;
                 }
-                if (nextPeriod != null) loadLiveData(nextPeriod);
+                if (nextPeriod != null) loadLiveData(nextPeriod, nextCategory);
             });
         });
+    }
+
+    private static boolean isRankingCategory(String value) {
+        return "rich".equals(value) || "popular".equals(value) || "gifts".equals(value)
+                || "host".equals(value) || "agency".equals(value) || "room".equals(value);
     }
 
     private static Object firstNonBlank(Object... values) {\n        for (Object value : values) {\n            if (value != null && !String.valueOf(value).trim().isEmpty()) return value;\n        }\n        return null;\n    }\n\n    private static void put(JSONObject obj, String key, Object value) {
@@ -258,7 +274,11 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         }
         @JavascriptInterface public void loadWealthPeriod(String period) {
             if (!"daily".equals(period) && !"weekly".equals(period) && !"monthly".equals(period)) return;
-            runOnUiThread(() -> loadLiveData(period));
+            runOnUiThread(() -> loadLiveData(period, wealthCategory));
+        }
+        @JavascriptInterface public void loadWealthCategory(String category) {
+            if (!isRankingCategory(category)) return;
+            runOnUiThread(() -> loadLiveData(wealthPeriod, category));
         }
         @JavascriptInterface public void openCpCenter() {
             runOnUiThread(() -> startActivity(new Intent(ProfileInsightsActivity.this, CpCenterActivity.class)));
