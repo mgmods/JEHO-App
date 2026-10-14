@@ -72,6 +72,13 @@ export class BadgesService {
     }
     const description = input.description == null ? null : String(input.description).trim().slice(0, 1000);
     const imageUrl = input.imageUrl == null ? null : String(input.imageUrl).trim().slice(0, 2048);
+    const allowedConditions = new Set(['account_age_days', 'messages_sent', 'followers_count', 'diamonds_received']);
+    if (input.conditionType != null && !allowedConditions.has(String(input.conditionType))) {
+      throw new BadRequestException('Unsupported badge achievement condition');
+    }
+    if (input.conditionType != null && (!Number.isInteger(Number(input.conditionTarget)) || Number(input.conditionTarget) <= 0)) {
+      throw new BadRequestException('Achievement target must be a positive integer');
+    }
     if (id) {
       const exists = await this.dataSource.query('SELECT id FROM badge_definitions WHERE id = $1 LIMIT 1', [id]);
       if (!exists.length) throw new NotFoundException('Badge not found');
