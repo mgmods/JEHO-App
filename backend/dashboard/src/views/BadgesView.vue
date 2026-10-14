@@ -27,6 +27,20 @@
           <label class="form-label">الوصف / شروط الحصول</label>
           <textarea v-model.trim="form.description" class="form-control" rows="2" maxlength="1000" />
         </div>
+        <div class="col-md-6">
+          <label class="form-label">شرط الإنجاز التلقائي (اختياري)</label>
+          <select v-model="form.conditionType" class="form-select">
+            <option value="">منح يدوي فقط</option>
+            <option value="account_age_days">عمر الحساب بالأيام</option>
+            <option value="messages_sent">عدد الرسائل المرسلة</option>
+            <option value="followers_count">عدد المتابعين</option>
+            <option value="diamonds_received">الألماسات المستلمة</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">الحد المطلوب للإنجاز</label>
+          <input v-model.number="form.conditionTarget" class="form-control" type="number" min="1" :disabled="!form.conditionType" :required="!!form.conditionType" />
+        </div>
         <div class="col-12">
           <button class="btn btn-aurora" type="submit" :disabled="saving">{{ saving ? 'جارٍ الحفظ…' : 'إضافة الشارة' }}</button>
           <button class="btn btn-ghost ms-2" type="button" :disabled="loading" @click="load">تحديث القائمة</button>
@@ -87,6 +101,20 @@
         <div class="col-md-4"><label class="form-label">رابط الصورة</label><input v-model.trim="editForm.imageUrl" class="form-control" type="url" /></div>
         <div class="col-md-4"><label class="form-label">ترتيب العرض</label><input v-model.number="editForm.sortOrder" class="form-control" type="number" /></div>
         <div class="col-12"><label class="form-label">الوصف / شروط الحصول</label><textarea v-model.trim="editForm.description" class="form-control" rows="2" maxlength="1000" /></div>
+        <div class="col-md-6">
+          <label class="form-label">شرط الإنجاز التلقائي</label>
+          <select v-model="editForm.conditionType" class="form-select">
+            <option value="">منح يدوي فقط</option>
+            <option value="account_age_days">عمر الحساب بالأيام</option>
+            <option value="messages_sent">عدد الرسائل المرسلة</option>
+            <option value="followers_count">عدد المتابعين</option>
+            <option value="diamonds_received">الألماسات المستلمة</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">الحد المطلوب للإنجاز</label>
+          <input v-model.number="editForm.conditionTarget" class="form-control" type="number" min="1" :disabled="!editForm.conditionType" :required="!!editForm.conditionType" />
+        </div>
         <div class="col-12 form-check form-switch ms-2"><input id="badgeActive" v-model="editForm.isActive" class="form-check-input" type="checkbox" /><label for="badgeActive" class="form-check-label">الشارة مفعّلة</label></div>
         <div class="col-12"><button class="btn btn-aurora" type="submit" :disabled="saving">حفظ التعديل</button><button class="btn btn-ghost ms-2" type="button" @click="editing = null">إلغاء</button></div>
       </form>
@@ -108,9 +136,9 @@ const saving = ref(false)
 const error = ref('')
 const success = ref('')
 const editing = ref(null)
-const form = reactive({ code: '', name: '', imageUrl: '', description: '', sortOrder: 0 })
+const form = reactive({ code: '', name: '', imageUrl: '', description: '', sortOrder: 0, conditionType: '', conditionTarget: 1 })
 const award = reactive({ userId: '', badgeId: '', note: '' })
-const editForm = reactive({ name: '', imageUrl: '', description: '', sortOrder: 0, isActive: true })
+const editForm = reactive({ name: '', imageUrl: '', description: '', sortOrder: 0, isActive: true, conditionType: '', conditionTarget: 1 })
 
 function unwrap(data) { return data?.data ?? data }
 async function load() {
@@ -123,21 +151,21 @@ async function load() {
 }
 async function createBadge() {
   saving.value = true; error.value = ''; success.value = ''
-  const result = await badgesApi.create({ ...form, imageUrl: form.imageUrl || null, description: form.description || null })
+  const result = await badgesApi.create({ ...form, imageUrl: form.imageUrl || null, description: form.description || null, conditionType: form.conditionType || null, conditionTarget: form.conditionType ? Number(form.conditionTarget) : null })
   saving.value = false
   if (result.error) { error.value = result.error.message || 'تعذر إنشاء الشارة'; return }
   success.value = 'تمت إضافة الشارة إلى الكتالوج.'
-  Object.assign(form, { code: '', name: '', imageUrl: '', description: '', sortOrder: 0 })
+  Object.assign(form, { code: '', name: '', imageUrl: '', description: '', sortOrder: 0, conditionType: '', conditionTarget: 1 })
   await load()
 }
 function editBadge(badge) {
   editing.value = badge
-  Object.assign(editForm, { name: badge.name || '', imageUrl: badge.imageUrl || '', description: badge.description || '', sortOrder: Number(badge.sortOrder || 0), isActive: badge.isActive !== false })
+  Object.assign(editForm, { name: badge.name || '', imageUrl: badge.imageUrl || '', description: badge.description || '', sortOrder: Number(badge.sortOrder || 0), isActive: badge.isActive !== false, conditionType: badge.conditionType || '', conditionTarget: Number(badge.conditionTarget || 1) })
 }
 async function saveEdit() {
   if (!editing.value) return
   saving.value = true; error.value = ''
-  const result = await badgesApi.update(editing.value.id, { ...editForm, imageUrl: editForm.imageUrl || null, description: editForm.description || null })
+  const result = await badgesApi.update(editing.value.id, { ...editForm, imageUrl: editForm.imageUrl || null, description: editForm.description || null, conditionType: editForm.conditionType || null, conditionTarget: editForm.conditionType ? Number(editForm.conditionTarget) : null })
   saving.value = false
   if (result.error) { error.value = result.error.message || 'تعذر حفظ الشارة'; return }
   success.value = 'تم حفظ التعديل.'
