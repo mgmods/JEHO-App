@@ -1414,41 +1414,50 @@
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_pro_mic" />
         </FrameLayout>
-        <TextView
-            android:id="@+id/tvChatInputTips"
+        <LinearLayout
+            android:id="@+id/bottomComposerInline"
             android:layout_width="0dp"
-            android:layout_height="35dp"
+            android:layout_height="40dp"
             android:layout_marginStart="4dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginEnd="4dp"
             android:layout_weight="1"
-            android:background="@drawable/bg_room_chat_input_tips"
-            android:clickable="true"
-            android:ellipsize="end"
-            android:focusable="true"
-            android:gravity="center_vertical|start"
-            android:maxLines="1"
-            android:minWidth="40dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="8dp"
-            android:text="@string/room_input_tips"
-            android:textColor="#80FFFFFF"
-            android:textSize="12sp" />
-        <FrameLayout
-            android:id="@+id/btnWriteMessage"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_marginStart="1dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="كتابة رسالة"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:scaleType="fitCenter"
-                android:src="@android:drawable/ic_menu_edit" />
-        </FrameLayout>
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvChatInputTips"
+                android:layout_width="0dp"
+                android:layout_height="35dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_room_chat_input_tips"
+                android:clickable="true"
+                android:ellipsize="end"
+                android:focusable="true"
+                android:gravity="center_vertical|start"
+                android:maxLines="1"
+                android:minWidth="32dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="8dp"
+                android:text="@string/room_input_tips"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/btnSendChatInline"
+                android:layout_width="52dp"
+                android:layout_height="35dp"
+                android:layout_marginStart="5dp"
+                android:background="@drawable/bg_room_send_msg"
+                android:clickable="true"
+                android:contentDescription="@string/send_btn"
+                android:focusable="true"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="@string/send_btn"
+                android:textColor="@android:color/white"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
         <LinearLayout
             android:id="@+id/composeBar"
             android:layout_width="0dp"
