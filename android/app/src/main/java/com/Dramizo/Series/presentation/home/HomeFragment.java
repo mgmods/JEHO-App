@@ -459,8 +459,11 @@ public class HomeFragment extends Fragment {
     }
 
     private void openRanking(String category) {
-        Intent intent = new Intent(requireContext(), RankingActivity.class);
-        intent.putExtra(RankingActivity.EXTRA_CATEGORY, category);
+        Intent intent = new Intent(requireContext(),
+                com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.class);
+        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_CATEGORY,
+                category == null ? "rich" : category);
+        intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_PERIOD, "daily");
         startActivity(intent);
     }
 
@@ -1112,7 +1115,7 @@ public class HomeFragment extends Fragment {
             return;
         }
         if ("ranking".equals(link) || link.contains("rank")) {
-            startActivity(new Intent(requireContext(), RankingActivity.class));
+            openRanking("rich");
             return;
         }
         String title = banner.title != null ? banner.title : "";
