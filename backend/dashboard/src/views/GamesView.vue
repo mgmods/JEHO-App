@@ -183,6 +183,22 @@
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
     </div>
 
+    <div class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+          <h3 class="h6 mb-1">نسبة العائد للألعاب ذات النتيجة المشتركة</h3>
+          <p class="small text-muted mb-0">تؤثر على اختيار نتيجة الجولة المشتركة، وليست ضمانًا أن يربح أو يخسر كل لاعب في الجولة نفسها.</p>
+        </div>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames.filter(g => supportsSharedRtp(game.id))" :key="'rtp-'+game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-label small mb-1">{{ game.label }} — عائد اللاعب %</label>
+          <input :value="Math.round(Number(gameRtpRates[game.id] ?? odds.playerRtp) * 100)" @input="gameRtpRates[game.id] = Math.max(55, Math.min(82, Number($event.target.value) || 55)) / 100" type="number" min="55" max="82" step="1" class="form-control form-control-sm" />
+        </div>
+      </div>
+      <div class="small text-muted mt-2">يُحفظ هذا الإعداد مع زر «حفظ نسب الفوز» أعلاه. ألعاب Crash لها إعدادات مستقلة لخصم السحب وحدّ المضاعف في القسم الأول.</div>
+    </div>
+
     <div v-if="editIdx !== null && editDraft" class="edit-overlay" @click.self="closeEdit">
       <div class="glass edit-panel">
         <div class="edit-panel__head">
@@ -319,6 +335,7 @@ const odds = reactive({
 const coveredGames = ref([])
 const disabledGames = ref([])
 const gameWinRates = reactive({})
+const gameRtpRates = reactive({})
 const manageableGames = [
   ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
   { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
@@ -330,6 +347,8 @@ const directWinRateGameIds = new Set([
   'royal-battle',
 ])
 function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
+const sharedOutcomeRtpGameIds = new Set(['7updown','bounty-football','camel-racing','greedy-box','greedy-lion','luck-car','lucky77'])
+function supportsSharedRtp(gameId) { return sharedOutcomeRtpGameIds.has(String(gameId || '').toLowerCase()) }
 
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
@@ -357,6 +376,7 @@ function applyOddsPayload(data) {
   if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
   if (Array.isArray(data.disabledGames)) disabledGames.value = data.disabledGames.map(String)
   if (data.gameWinRates && typeof data.gameWinRates === 'object') Object.entries(data.gameWinRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameWinRates[id] = Math.max(0, Math.min(100, Number(value))) })
+  if (data.gameRtpRates && typeof data.gameRtpRates === 'object') Object.entries(data.gameRtpRates).forEach(([id, value]) => { if (Number.isFinite(Number(value))) gameRtpRates[id] = Math.max(0.55, Math.min(0.82, Number(value))) })
 }
 
 async function loadOdds() {
@@ -371,7 +391,7 @@ async function loadOdds() {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id)).map(g => [g.id, Number.isFinite(Number(gameWinRates[g.id])) ? Math.max(0, Math.min(100, Number(gameWinRates[g.id]))) : 30])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id)).map(g => [g.id, Number.isFinite(Number(gameWinRates[g.id])) ? Math.max(0, Math.min(100, Number(gameWinRates[g.id]))) : 30])), gameRtpRates: Object.fromEntries(manageableGames.filter(g => supportsSharedRtp(g.id)).map(g => [g.id, Number.isFinite(Number(gameRtpRates[g.id])) ? Math.max(0.55, Math.min(0.82, Number(gameRtpRates[g.id]))) : Number(odds.playerRtp)])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
