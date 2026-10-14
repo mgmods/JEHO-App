@@ -2183,7 +2183,13 @@ export class AdminService {
       if (!admin.isActive || !(await bcrypt.compare(password, admin.passwordHash))) {
         throw new UnauthorizedException('Invalid admin credentials');
       }
-      if (admin.staffRole !== 'super') {
+      // Older dashboard owners may have role='super' while staffRole still
+      // carries its legacy default ('operator'). Treat either authoritative
+      // Super marker as full access; only limited admins require module grants.
+      const isSuperAdmin =
+        admin.role === AdminRole.SUPER ||
+        normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
+      if (!isSuperAdmin) {
         const perms = normalizePermissions(admin.dashboardPermissions);
         if (!hasAnyPermission(perms)) {
           throw new UnauthorizedException('This admin has no modules enabled — contact Super admin');
