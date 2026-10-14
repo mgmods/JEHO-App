@@ -561,15 +561,17 @@ public class ProfileFragment extends Fragment {
     private void startMyCpHeartAnimation() {
         if (binding == null || binding.imgMyProfileCpHeart == null) return;
         if (myCpHeartAnimator != null) myCpHeartAnimator.cancel();
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f);
+        ObjectAnimator alpha = ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f);
+        for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY, alpha}) {
+            animator.setDuration(900L);
+            animator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.RESTART);
+        }
         myCpHeartAnimator = new AnimatorSet();
-        myCpHeartAnimator.playTogether(
-                ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.SCALE_X, 1f, 1.2f, 1f),
-                ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.SCALE_Y, 1f, 1.2f, 1f),
-                ObjectAnimator.ofFloat(binding.imgMyProfileCpHeart, View.ALPHA, 0.72f, 1f, 0.72f));
-        myCpHeartAnimator.setDuration(900L);
-        myCpHeartAnimator.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
-        myCpHeartAnimator.setRepeatCount(ValueAnimator.INFINITE);
-        myCpHeartAnimator.setRepeatMode(ValueAnimator.RESTART);
+        myCpHeartAnimator.playTogether(scaleX, scaleY, alpha);
         myCpHeartAnimator.start();
     }
 
