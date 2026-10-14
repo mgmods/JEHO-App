@@ -153,6 +153,15 @@ public class HomeMeFragment extends Fragment {
             binding.tvProfileDiamonds.setText(String.valueOf(Math.max(0L, me.totalReceivedDiamonds)));
             binding.tvProfileGold.setText(String.valueOf(Math.max(0L, me.totalSentCoins)));
             binding.tvProfileVip.setText("VIP " + Math.max(0, me.vipLevel));
+            binding.tvProfileLevelBadge.setText("Lv. " + Math.max(1, me.level));
+            String staffRole = me.staffRole == null ? "" : me.staffRole.trim().toLowerCase(java.util.Locale.ROOT);
+            boolean superAdmin = "super".equals(staffRole) || me.isAdmin;
+            if (superAdmin) {
+                binding.tvProfileRoleBadge.setText("سوبر أدمن");
+                binding.tvProfileRoleBadge.setVisibility(View.VISIBLE);
+            } else {
+                binding.tvProfileRoleBadge.setVisibility(View.GONE);
+            }
             binding.tvProfileVerified.setVisibility(me.genderVerified
                     ? View.VISIBLE : View.GONE);
             if (me.avatarUrl != null && !me.avatarUrl.trim().isEmpty()) {
