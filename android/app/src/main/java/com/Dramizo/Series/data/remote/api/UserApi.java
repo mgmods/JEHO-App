@@ -19,6 +19,12 @@ public interface UserApi {
     @GET("users/me")
     Call<ApiResponse<AuthDtos.UserDto>> me();
 
+    @GET("badges")
+    Call<ApiResponse<List<MiscDtos.BadgeDto>>> badges();
+
+    @GET("badges/me")
+    Call<ApiResponse<List<MiscDtos.BadgeDto>>> myBadges();
+
     @GET("host-target/me")
     Call<ApiResponse<Map<String, Object>>> hostTargetMe();
 
