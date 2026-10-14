@@ -65,6 +65,8 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         });
         web.addJavascriptInterface(new RankingBridge(), "JehoRanking");
         FrameLayout root = new FrameLayout(this);
+        root.setClipToPadding(true);
+        root.setClipChildren(true);
         root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
         EdgeToEdgeHelper.apply(this);
@@ -149,6 +151,10 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         return "popular";
     }
 
+    // This HTML WebView applies its own system-bar insets to the WebView host.
+    // Prevent ThemedActivity from re-applying transparent edge-to-edge/theme chrome later.
+    @Override protected boolean wantsEdgeToEdgeWallpaper() { return false; }
+    @Override protected boolean wantsRemoteThemeChrome() { return false; }
     @Override protected boolean wantsContentSystemPadding() { return false; }
 
     @Override public void onBackPressed() {
