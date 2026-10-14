@@ -176,7 +176,8 @@
       <div class="row g-2">
         <div v-for="game in manageableGames" :key="'rate-'+game.id" class="col-6 col-md-4 col-lg-3">
           <label class="form-label small mb-1">{{ game.label }} — نسبة الفوز %</label>
-          <input v-model.number="gameWinRates[game.id]" type="number" min="0" max="100" step="1" class="form-control form-control-sm" />
+          <input v-model.number="gameWinRates[game.id]" type="number" min="0" max="100" step="1" class="form-control form-control-sm" :disabled="!supportsDirectWinRate(game.id)" />
+          <div class="small mt-1" :class="supportsDirectWinRate(game.id) ? 'text-success' : 'text-muted'">{{ supportsDirectWinRate(game.id) ? 'تُطبّق من الخادم' : 'نتيجة مشتركة/محرك خارجي؛ يلزم ضبط منفصل' }}</div>
         </div>
       </div>
       <div class="small text-muted mt-2">0% = لا فوز في ألعاب الخادم التي تدعم هذا الضبط، 100% = فوز في كل محاولة مؤهلة. قد تبقى حدود الجوائز والحد الأقصى للربح مطبّقة.</div>
@@ -322,6 +323,14 @@ const manageableGames = [
   ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
   { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
 ]
+const directWinRateGameIds = new Set([
+  'slots','roulette','plinko','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction',
+  'dice','lucky-wheel','cleopatra-slot','cleopatra-slots','fishing','football-plinko','fortune-slot',
+  'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
+  'royal-battle',
+])
+function supportsDirectWinRate(gameId) { return directWinRateGameIds.has(String(gameId || '').toLowerCase()) }
+
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
   coveredGames.value.length ? coveredGames.value.join(' · ') : t('games.oddsCoverageAll'),
@@ -362,7 +371,7 @@ async function loadOdds() {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.map(g => [g.id, Number.isFinite(Number(gameWinRates[g.id])) ? Math.max(0, Math.min(100, Number(gameWinRates[g.id]))) : 30])) })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value], gameWinRates: Object.fromEntries(manageableGames.filter(g => supportsDirectWinRate(g.id)).map(g => [g.id, Number.isFinite(Number(gameWinRates[g.id])) ? Math.max(0, Math.min(100, Number(gameWinRates[g.id]))) : 30])) })
   savingOdds.value = false
   if (err) {
     error.value = err.message
