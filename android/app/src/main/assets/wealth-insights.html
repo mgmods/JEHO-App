@@ -5,7 +5,7 @@
 <meta name="color-scheme" content="dark"><title>JEHO · الثروة</title>
 <style>
 :root{color-scheme:dark;--bg:#11101d;--card:#211f30;--line:#ffffff14;--gold:#f5d17d;--muted:#aaa8bf}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;color:#fff;font-family:system-ui,-apple-system,"Noto Sans Arabic",sans-serif;background:radial-gradient(ellipse at 50% -10%,#574525 0,#282238 43%,#11101d 100%)}
+*{box-sizing:border-box}html,body{width:100%;max-width:100%;overflow-x:hidden}body{margin:0;min-height:100vh;color:#fff;font-family:system-ui,-apple-system,"Noto Sans Arabic",sans-serif;background:radial-gradient(ellipse at 50% -10%,#574525 0,#282238 43%,#11101d 100%)}
 header{display:flex;align-items:center;gap:12px;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top));background:#171522ee;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
 button{font:inherit;cursor:pointer}.back{width:40px;height:40px;border:1px solid var(--line);border-radius:14px;color:#fff;background:#ffffff10;font-size:24px}h1{font-size:19px;margin:0}.sub{font-size:12px;color:var(--muted);margin-top:3px}
 main{max-width:640px;padding:15px;padding-bottom:max(26px,env(safe-area-inset-bottom));margin:auto}
@@ -65,7 +65,7 @@ main{max-width:640px;padding:15px;padding-bottom:max(26px,env(safe-area-inset-bo
 <script>
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function num(v){if(v==null||v==='')return '—';const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-US'):'—'}
-function safeImage(v){const s=String(v||'').trim();if(s.startsWith('https://')||s.startsWith('http://'))return s;if(s.startsWith('//'))return 'https:'+s;if(s.startsWith('/'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;if(s&&!s.includes(':'))return 'https://jeho-own-backend.mgs.blitz.cloud/'+s;return ''}
+function safeImage(v){const s=String(v||'').trim();if(s.startsWith('https://'))return s;if(s.startsWith('http://'))return 'https://'+s.slice(7);if(s.startsWith('//'))return 'https:'+s;if(s.startsWith('/'))return 'https://jeho-own-backend.mgs.blitz.cloud'+s;if(s&&!s.includes(':'))return 'https://jeho-own-backend.mgs.blitz.cloud/'+s;return ''}
 // Back navigation is intentionally native-only; use the phone's system back button.
 function refreshWealthData(){const b=document.getElementById('refresh');b.disabled=true;b.textContent='جارٍ تحديث البيانات…';if(window.JehoApp&&typeof JehoApp.refreshData==='function')JehoApp.refreshData();else showWealthError()}
 function renderWealthData(d){

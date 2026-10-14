@@ -110,6 +110,13 @@ public class CpCenterActivity extends ThemedActivity {
     }
 
     @SuppressWarnings("unchecked")
+    private static String webImageUrl(String pathOrUrl) {
+        String resolved = AssetCatalog.absoluteUrl(pathOrUrl);
+        if (resolved == null) return null;
+        if (resolved.startsWith("http://")) return "https://" + resolved.substring("http://".length());
+        return resolved;
+    }
+
     private Object normalizeUrls(Object value) {
         if (value instanceof Map) {
             Map<String, Object> normalized = new HashMap<>();
@@ -117,7 +124,7 @@ public class CpCenterActivity extends ThemedActivity {
                 String key = String.valueOf(entry.getKey());
                 Object item = entry.getValue();
                 if ("avatarUrl".equals(key) && item != null) {
-                    normalized.put(key, AssetCatalog.absoluteUrl(String.valueOf(item)));
+                    normalized.put(key, webImageUrl(String.valueOf(item)));
                 } else {
                     normalized.put(key, normalizeUrls(item));
                 }

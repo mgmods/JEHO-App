@@ -87,10 +87,10 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
                     user.put("id", entry.user.id);
                     user.put("username", entry.user.username);
                     user.put("displayName", entry.user.displayName);
-                    user.put("avatarUrl", AssetCatalog.absoluteUrl(entry.user.avatarUrl));
-                    user.put("hostBadgeUrl", AssetCatalog.absoluteUrl(entry.user.hostBadgeUrl));
-                    user.put("vipBadgeUrl", AssetCatalog.absoluteUrl(entry.user.vipBadgeUrl));
-                    user.put("frameUrl", AssetCatalog.absoluteUrl(entry.user.hostBadgeUrl != null && !entry.user.hostBadgeUrl.trim().isEmpty() ? entry.user.hostBadgeUrl : entry.user.vipBadgeUrl));
+                    user.put("avatarUrl", webImageUrl(entry.user.avatarUrl));
+                    user.put("hostBadgeUrl", webImageUrl(entry.user.hostBadgeUrl));
+                    user.put("vipBadgeUrl", webImageUrl(entry.user.vipBadgeUrl));
+                    user.put("frameUrl", webImageUrl(entry.user.hostBadgeUrl != null && !entry.user.hostBadgeUrl.trim().isEmpty() ? entry.user.hostBadgeUrl : entry.user.vipBadgeUrl));
                 }
                 row.put("user", user);
                 safeEntries.add(row);
@@ -104,6 +104,13 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
             }
         });
         web.loadUrl("file:///android_asset/wealth-ranking.html");
+    }
+
+    private static String webImageUrl(String pathOrUrl) {
+        String resolved = AssetCatalog.absoluteUrl(pathOrUrl);
+        if (resolved == null) return null;
+        if (resolved.startsWith("http://")) return "https://" + resolved.substring("http://".length());
+        return resolved;
     }
 
     private void loadRanking() {

@@ -63,7 +63,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         settings.setDomStorageEnabled(false);
         settings.setLoadsImagesAutomatically(true);
         settings.setBlockNetworkImage(false);
-        settings.setAllowFileAccess(false);
+        settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
         settings.setAllowUniversalAccessFromFileURLs(false);
@@ -139,7 +139,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                     JSONObject user = new JSONObject();
                     put(user, "id", u.id); put(user, "publicId", u.publicId);
                     put(user, "username", u.username); put(user, "displayName", u.displayName);
-                    put(user, "avatarUrl", AssetCatalog.absoluteUrl(u.avatarUrl)); put(user, "vipBadgeUrl", AssetCatalog.absoluteUrl(u.vipBadgeUrl)); put(user, "hostBadgeUrl", AssetCatalog.absoluteUrl(u.hostBadgeUrl)); put(user, "frameUrl", absoluteIfPresent(firstNonBlank(u.hostBadgeUrl, u.vipBadgeUrl))); put(user, "levelBadgeUrl", u.levelBadgeUrl); put(user, "level", u.level);
+                    put(user, "avatarUrl", webImageUrl(u.avatarUrl)); put(user, "vipBadgeUrl", webImageUrl(u.vipBadgeUrl)); put(user, "hostBadgeUrl", webImageUrl(u.hostBadgeUrl)); put(user, "frameUrl", absoluteIfPresent(firstNonBlank(u.hostBadgeUrl, u.vipBadgeUrl))); put(user, "levelBadgeUrl", webImageUrl(u.levelBadgeUrl)); put(user, "level", u.level);
                     put(user, "wealthLevel", u.wealthLevel); put(user, "wealthScore", u.wealthScore);
                     put(user, "charmScore", u.charmScore); put(user, "vipLevel", u.vipLevel);
                     payload.put("user", user);
@@ -245,9 +245,16 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                 || "host".equals(value) || "agency".equals(value) || "room".equals(value);
     }
 
+    private static String webImageUrl(String pathOrUrl) {
+        String resolved = AssetCatalog.absoluteUrl(pathOrUrl);
+        if (resolved == null) return null;
+        if (resolved.startsWith("http://")) return "https://" + resolved.substring("http://".length());
+        return resolved;
+    }
+
     private static String absoluteIfPresent(Object value) {
         if (value == null || String.valueOf(value).trim().isEmpty()) return null;
-        return AssetCatalog.absoluteUrl(String.valueOf(value).trim());
+        return webImageUrl(String.valueOf(value).trim());
     }
 
     private static Object firstNonBlank(Object... values) {
