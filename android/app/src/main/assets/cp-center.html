@@ -38,7 +38,7 @@ form{display:flex;gap:8px;margin-top:12px}input{min-width:0;flex:1;padding:12px;
 <button class="typecard" data-type="marriage"><span class="symbol">💞</span><strong>الزواج</strong><small>رابطة زواج</small></button>
 <button class="typecard" data-view="incoming"><span class="symbol">✉</span><strong>طلبات العلاقة</strong><small>قبول أو رفض</small></button>
 </div>
-<div class="sectionhead"><h3>علاقتك الحالية</h3><button class="smallbtn" data-view="discover">عرض الكل</button></div><div id="homeRelationships" class="state">جارٍ تحميل بياناتك…</div>
+<div class="sectionhead"><h3>علاقتك الحالية</h3><button class="smallbtn" data-view="discover">عرض الكل</button></div><div id="homeRelationships" class="state">جارٍ تحميل بياناتك…</div><div class="actions"><button class="btn secondary" data-invite>رمز دعوتي الترويجي</button><button class="btn quiet" data-view="sent">متابعة طلباتي</button></div>
 </section>
 <section id="view-send" class="hidden">
 <div class="sectionhead"><h3>إرسال طلب ارتباط مباشر</h3></div><div class="panel"><div class="sub" style="font-size:13px;line-height:1.8">أدخل معرّف المستخدم المستهدف واختر نوع العلاقة. سيصل للطرف الآخر إشعار بطلبك ليقبله أو يرفضه. لا تحتاج لإرسال هدية.</div>
@@ -69,6 +69,7 @@ function renderDiscover(rows){activeData=Array.isArray(rows)?rows:[];$("discover
 window.renderCpHome=homeRelationships;window.renderCpRequests=renderRequests;window.renderCpDiscover=renderDiscover;
 window.showCpMessage=toast;window.showCpError=m=>toast(m||"حدث خطأ");
 document.querySelectorAll("[data-view]").forEach(b=>b.addEventListener("click",()=>showView(b.dataset.view)));
+document.querySelectorAll("[data-invite]").forEach(b=>b.addEventListener("click",()=>JehoCP.openInvite()));
 document.querySelectorAll("[data-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.type;document.querySelectorAll("[data-send-type]").forEach(x=>x.classList.toggle("active",x.dataset.sendType===sendType));showView("send");}));
 document.querySelectorAll("[data-send-type]").forEach(b=>b.addEventListener("click",()=>{sendType=b.dataset.sendType;document.querySelectorAll("[data-send-type]").forEach(x=>x.classList.toggle("active",x===b));}));
 document.querySelectorAll("[data-discover-type]").forEach(b=>b.addEventListener("click",()=>{discoverType=b.dataset.discoverType;document.querySelectorAll("[data-discover-type]").forEach(x=>x.classList.toggle("active",x===b));JehoCP.loadDiscover(discoverType);}));
