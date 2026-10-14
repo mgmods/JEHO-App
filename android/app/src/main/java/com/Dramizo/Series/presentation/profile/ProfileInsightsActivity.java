@@ -122,6 +122,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         break;
                     }
                 }
+                payload.put("relationshipError", !relationResult.success);
                 JSONArray ranks = new JSONArray();
                 if (rankingResult.success && rankingResult.data != null && rankingResult.data.items != null) {
                     for (MiscDtos.RankingEntryDto e : rankingResult.data.items) {
@@ -138,6 +139,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                     }
                 }
                 payload.put("ranking", ranks);
+                payload.put("rankingError", !rankingResult.success);
                 if (MODE_CP.equals(mode)) {
                     JSONArray cpRanks = new JSONArray();
                     if (cpRankingResult != null && cpRankingResult.success && cpRankingResult.data != null) {
@@ -169,6 +171,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
                         }
                     }
                     payload.put("cpRanking", cpRanks);
+                    payload.put("cpRankingError", cpRankingResult == null || !cpRankingResult.success);
                 }
             } catch (Exception ignored) { }
             final String json = payload.toString();
