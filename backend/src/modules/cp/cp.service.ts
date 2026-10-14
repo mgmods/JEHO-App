@@ -63,10 +63,14 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const args = type ? [type] : [];
     const rows = await this.dataSource.query(
       `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
-        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level) AS "userA",
-        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level) AS "userB"
+        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level,
+          'vipBadgeUrl', pa."vipBadgeUrl", 'hostBadgeUrl', pa."hostBadgeUrl", 'levelBadgeUrl', pa."levelBadgeUrl") AS "userA",
+        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level,
+          'vipBadgeUrl', pb."vipBadgeUrl", 'hostBadgeUrl', pb."hostBadgeUrl", 'levelBadgeUrl', pb."levelBadgeUrl") AS "userB"
        FROM cp_relationships r
        JOIN users a ON a.id = r."userAId" JOIN users b ON b.id = r."userBId"
+       LEFT JOIN user_profiles pa ON pa."userId" = a.id
+       LEFT JOIN user_profiles pb ON pb."userId" = b.id
        WHERE r.status = 'active' ${where}
        ORDER BY r.points DESC, r."startedAt" ASC LIMIT 100`,
       args,
@@ -107,9 +111,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async profileRelationships(userId: string) {
     return this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
-       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level) AS partner
+       json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
+         'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
        JOIN users p ON p.id=CASE WHEN r."userAId"=$1 THEN r."userBId" ELSE r."userAId" END
+       LEFT JOIN user_profiles pp ON pp."userId" = p.id
        WHERE (r."userAId"=$1 OR r."userBId"=$1) AND r.status='active'
        ORDER BY r.points DESC,r."startedAt" ASC`,
       [userId],
