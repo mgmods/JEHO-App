@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import com.Dramizo.Series.presentation.agency.AgencyManageActivity;
 import com.Dramizo.Series.presentation.chat.ChatConversationActivity;
 import com.Dramizo.Series.presentation.contests.ContestsActivity;
+import com.Dramizo.Series.presentation.cp.CpCenterActivity;
 import com.Dramizo.Series.presentation.main.MainActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.presentation.profile.ProfileActivity;
@@ -30,6 +31,13 @@ public final class NotificationRouter {
         String conversationId = first(data, "conversation_id", "conversationId");
         String roomId = first(data, "room_id", "roomId");
         String userId = first(data, "user_id", "userId", "senderId", "fromUserId", "actorUserId");
+
+        if ("cp_relationship_request".equalsIgnoreCase(nested)) {
+            Intent i = new Intent(context, CpCenterActivity.class);
+            i.putExtra(CpCenterActivity.EXTRA_VIEW, "incoming");
+            i.putExtra(CpCenterActivity.EXTRA_TYPE, first(data, "relationshipType"));
+            return i;
+        }
 
         if (("chat".equals(t) || "message".equals(t)) && !TextUtils.isEmpty(conversationId)) {
             Intent i = new Intent(context, ChatConversationActivity.class);
