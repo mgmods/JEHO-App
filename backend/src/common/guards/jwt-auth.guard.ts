@@ -70,7 +70,13 @@ export class JwtAuthGuard implements CanActivate {
       // Dashboard sessions are backed by admin_users, not app users.
       // Resolve this repository from the root TypeORM DataSource so guarded
       // feature modules do not each need to register AdminUser in forFeature.
-      if (payload.tokenType === 'dashboard') {
+      // Accept older signed dashboard sessions that predate tokenType, but only when
+      // the token explicitly identifies itself as an admin session. The admin must
+      // still exist in admin_users and be active; ordinary app-user tokens are not promoted.
+      if (
+        payload.tokenType === 'dashboard' ||
+        (payload.role === 'admin' && payload.isAdmin === true)
+      ) {
         const admin = await this.dataSource.getRepository(AdminUser).findOne({
           where: { id: payload.sub },
         });
