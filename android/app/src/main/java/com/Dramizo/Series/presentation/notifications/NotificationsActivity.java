@@ -53,8 +53,7 @@ public class NotificationsActivity extends ThemedActivity {
                 .get(NotificationsViewModel.class);
         adapter = new NotificationAdapter(n -> {
             if (n != null && n.id != null && !n.isRead) vm.markRead(n.id);
-            if (n != null && n.data != null
-                    && "cp_relationship_request".equals(String.valueOf(n.data.get("type")))) {
+            if (isCpRequestNotification(n)) {
                 showCpRequestPrompt(n);
                 return;
             }
@@ -160,6 +159,17 @@ public class NotificationsActivity extends ThemedActivity {
         binding.tvEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
+    private static boolean isCpRequestNotification(MiscDtos.NotificationDto n) {
+        if (n == null || n.data == null) return false;
+        return matchesCpRequest(n.data.get("type"))
+                || matchesCpRequest(n.data.get("notificationKind"))
+                || matchesCpRequest(n.data.get("eventType"));
+    }
+
+    private static boolean matchesCpRequest(Object value) {
+        return value != null && "cp_relationship_request".equalsIgnoreCase(String.valueOf(value));
+    }
+
     /** Messages, follows, gifts, live/room opens — personal. System/VIP/wallet/agency — general. */
     private static boolean isPersonal(MiscDtos.NotificationDto n) {
         if (n == null || n.type == null) return false;
@@ -171,10 +181,13 @@ public class NotificationsActivity extends ThemedActivity {
         }
         if (n.data != null) {
             Object nested = n.data.get("type");
+            Object kind = n.data.get("notificationKind");
+            Object eventType = n.data.get("eventType");
+            if (matchesCpRequest(nested) || matchesCpRequest(kind) || matchesCpRequest(eventType)) return true;
             if (nested != null) {
                 String nt = String.valueOf(nested).toLowerCase();
                 if ("room".equals(nt) || "live".equals(nt) || "chat".equals(nt)
-                        || "message".equals(nt) || "cp_relationship_request".equals(nt)) return true;
+                        || "message".equals(nt)) return true;
             }
         }
         return false;
