@@ -50,6 +50,11 @@ public class NotificationsActivity extends ThemedActivity {
                 .get(NotificationsViewModel.class);
         adapter = new NotificationAdapter(n -> {
             if (n != null && n.id != null && !n.isRead) vm.markRead(n.id);
+            if (n != null && n.data != null
+                    && "cp_relationship_request".equals(String.valueOf(n.data.get("type")))) {
+                showCpRequestPrompt(n);
+                return;
+            }
             if (n != null) {
                 Intent target = NotificationRouter.build(this, n.type, n.data);
                 if (!(target.getComponent() != null
@@ -68,6 +73,47 @@ public class NotificationsActivity extends ThemedActivity {
             if (e != null) Toast.makeText(this, e, Toast.LENGTH_SHORT).show();
         });
         vm.load();
+    }
+
+    private void showCpRequestPrompt(MiscDtos.NotificationDto notification) {
+        if (notification == null || notification.data == null) return;
+        Object rawId = notification.data.get("requestId");
+        if (rawId == null || String.valueOf(rawId).trim().isEmpty()) {
+            Intent target = NotificationRouter.build(this, notification.type, notification.data);
+            startActivity(target);
+            return;
+        }
+        String requestId = String.valueOf(rawId);
+        String body = notification.body == null ? "لديك طلب ارتباط جديد. هل تريد قبول العلاقة أم رفضها؟" : notification.body;
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(notification.title == null ? "طلب ارتباط جديد" : notification.title)
+                .setMessage(body)
+                .setPositiveButton("قبول العلاقة", (dialog, which) -> respondToCpRequest(requestId, true))
+                .setNegativeButton("رفض الطلب", (dialog, which) -> respondToCpRequest(requestId, false))
+                .setNeutralButton("لاحقاً", (dialog, which) -> {
+                    Intent target = NotificationRouter.build(this, notification.type, notification.data);
+                    startActivity(target);
+                })
+                .show();
+    }
+
+    private void respondToCpRequest(String requestId, boolean accept) {
+        java.util.Map<String, Boolean> body = new java.util.HashMap<>();
+        body.put("accept", accept);
+        com.Dramizo.Series.di.AppContainer container = ContainerProvider.from(this);
+        container.getIoExecutor().execute(() -> {
+            com.Dramizo.Series.domain.model.Result<java.util.Map<String, Object>> result =
+                    com.Dramizo.Series.util.ApiCall.execute(
+                            container.getUserApi().respondCpRequest(requestId, body));
+            runOnUiThread(() -> {
+                if (isFinishing()) return;
+                String message = !result.success
+                        ? (result.error != null ? result.error : "تعذرت معالجة طلب الارتباط")
+                        : (accept ? "تم قبول العلاقة بنجاح" : "تم رفض الطلب");
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                vm.load();
+            });
+        });
     }
 
     private void applyFilter() {
@@ -97,7 +143,7 @@ public class NotificationsActivity extends ThemedActivity {
             if (nested != null) {
                 String nt = String.valueOf(nested).toLowerCase();
                 if ("room".equals(nt) || "live".equals(nt) || "chat".equals(nt)
-                        || "message".equals(nt)) return true;
+                        || "message".equals(nt) || "cp_relationship_request".equals(nt)) return true;
             }
         }
         return false;
