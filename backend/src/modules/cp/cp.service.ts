@@ -366,6 +366,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         `أرسل لك ${senderName} طلب ${this.cpTypeLabel(type)}. افتح مساحة CP لقبول الطلب أو رفضه.`,
         {
           type: 'cp_relationship_request',
+          notificationKind: 'cp_relationship_request',
           requestId: outcome.request.id,
           relationshipType: type,
           senderId: userId,
