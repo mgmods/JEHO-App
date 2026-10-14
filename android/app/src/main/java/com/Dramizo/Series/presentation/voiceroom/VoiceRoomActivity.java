@@ -411,6 +411,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        applyRoomBottomSafeArea();
         initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
@@ -7443,6 +7444,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.tvSeatRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
             }
         }
+    }
+
+    /**
+     * The room is edge-to-edge so its background stays full bleed, but the bottom
+     * action row must sit above Android's transparent navigation/gesture bar.
+     */
+    private void applyRoomBottomSafeArea() {
+        if (binding == null || binding.bottomBar == null) return;
+        ViewGroup.LayoutParams initial = binding.bottomBar.getLayoutParams();
+        final int originalBottomMargin = initial instanceof ConstraintLayout.LayoutParams
+                ? ((ConstraintLayout.LayoutParams) initial).bottomMargin : 0;
+        ViewCompat.setOnApplyWindowInsetsListener(binding.getRoot(), (root, insets) -> {
+            Insets navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            ViewGroup.LayoutParams raw = binding.bottomBar.getLayoutParams();
+            if (raw instanceof ConstraintLayout.LayoutParams) {
+                ConstraintLayout.LayoutParams lp = (ConstraintLayout.LayoutParams) raw;
+                int safeBottomMargin = Math.max(originalBottomMargin, navBars.bottom);
+                if (lp.bottomMargin != safeBottomMargin) {
+                    lp.bottomMargin = safeBottomMargin;
+                    binding.bottomBar.setLayoutParams(lp);
+                }
+            }
+            return insets;
+        });
+        ViewCompat.requestApplyInsets(binding.getRoot());
     }
 
     private void syncMicUi() {
