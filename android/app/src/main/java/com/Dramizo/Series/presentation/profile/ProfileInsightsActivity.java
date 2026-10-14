@@ -65,6 +65,7 @@ public final class ProfileInsightsActivity extends ThemedActivity {
         settings.setDomStorageEnabled(false);
         settings.setLoadsImagesAutomatically(true);
         settings.setBlockNetworkImage(false);
+        settings.setBlockNetworkLoads(false);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -299,6 +300,9 @@ public final class ProfileInsightsActivity extends ThemedActivity {
     }
 
     private final class PageBridge {
+        @JavascriptInterface public String resolveImageUrl(String pathOrUrl) {
+            return webImageUrl(pathOrUrl);
+        }
         @JavascriptInterface public void refreshData() { runOnUiThread(ProfileInsightsActivity.this::loadLiveData); }
         @JavascriptInterface public void goBack() { runOnUiThread(ProfileInsightsActivity.this::finish); }
         @JavascriptInterface public void openWealthRanking() {
