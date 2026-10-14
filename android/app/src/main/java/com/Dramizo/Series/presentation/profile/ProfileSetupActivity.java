@@ -138,9 +138,16 @@ public class ProfileSetupActivity extends ThemedActivity {
         // Profile photos are optional. Do not force a personal photo just to
         // finish onboarding or to open a voice room; the backend supplies a
         // neutral/default avatar when avatarUrl is empty.
-        return nonEmpty(user.country)
+        boolean requiredIdentityFieldsPresent = nonEmpty(user.country)
                 && nonEmpty(user.gender)
                 && !"unspecified".equalsIgnoreCase(user.gender);
+        // Some older login responses omit country/gender even though /me or the
+        // saved account snapshot proves that the profile was already created.
+        // Persisted profile fields are evidence of an existing profile, not a new signup.
+        boolean hasPreviouslySavedProfile = nonEmpty(user.bio)
+                || nonEmpty(user.birthday)
+                || nonEmpty(user.country);
+        return requiredIdentityFieldsPresent || hasPreviouslySavedProfile;
     }
 
     private void bindExisting(AuthDtos.UserDto user) {
