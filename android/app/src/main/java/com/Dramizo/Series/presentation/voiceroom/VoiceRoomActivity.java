@@ -411,6 +411,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
@@ -2066,6 +2067,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             rowLl.setLayoutDirection(View.LAYOUT_DIRECTION_LTR);
             rowLl.setGravity(android.view.Gravity.START);
         }
+        // Tag each rendered row so the three feed tabs can filter without touching RTC.
+        row.setTag(gameCel ? "event" : (giftIconUrl != null && !giftIconUrl.isEmpty()
+                ? "gift" : (system ? "event" : "chat")));
+        row.setVisibility(activeRoomFeed == 0
+                || (activeRoomFeed == 1 && "chat".equals(row.getTag()))
+                || (activeRoomFeed == 2 && "gift".equals(row.getTag()))
+                ? View.VISIBLE : View.GONE);
         binding.chatLog.addView(row);
         // Keep all live-session messages — never drop mid-broadcast (only end live clears).
         if (roomId != null && !restoringRoomChat) {
@@ -8020,6 +8028,49 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         view.getLocationOnScreen(loc);
         return x >= loc[0] && x <= loc[0] + view.getWidth()
                 && y >= loc[1] && y <= loc[1] + view.getHeight();
+    }
+
+    // Room feed tabs filter presentation only; they do not change room events or audio state.
+    private int activeRoomFeed = 0; // 0 = all activity, 1 = text chat, 2 = gifts only
+
+    private void initRoomFeedTabs() {
+        View all = findViewById(R.id.tabRoomAll);
+        View chat = findViewById(R.id.tabRoomChat);
+        View gifts = findViewById(R.id.tabRoomGifts);
+        if (all != null) all.setOnClickListener(v -> applyRoomFeedFilter(0));
+        if (chat != null) chat.setOnClickListener(v -> applyRoomFeedFilter(1));
+        if (gifts != null) gifts.setOnClickListener(v -> applyRoomFeedFilter(2));
+        applyRoomFeedFilter(0);
+    }
+
+    private void applyRoomFeedFilter(int filter) {
+        activeRoomFeed = Math.max(0, Math.min(2, filter));
+        setRoomFeedTabSelected(R.id.tabRoomAll, activeRoomFeed == 0);
+        setRoomFeedTabSelected(R.id.tabRoomChat, activeRoomFeed == 1);
+        setRoomFeedTabSelected(R.id.tabRoomGifts, activeRoomFeed == 2);
+        if (binding == null || binding.chatLog == null) return;
+        for (int i = 0; i < binding.chatLog.getChildCount(); i++) {
+            View row = binding.chatLog.getChildAt(i);
+            Object value = row.getTag();
+            String kind = value instanceof String ? (String) value : "event";
+            boolean visible = activeRoomFeed == 0
+                    || (activeRoomFeed == 1 && "chat".equals(kind))
+                    || (activeRoomFeed == 2 && "gift".equals(kind));
+            row.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+        if (binding.scrollChat != null) binding.scrollChat.post(() -> {
+            if (binding != null && binding.scrollChat != null) binding.scrollChat.scrollTo(0, 0);
+        });
+    }
+
+    private void setRoomFeedTabSelected(int id, boolean selected) {
+        View view = findViewById(id);
+        if (view instanceof TextView) {
+            TextView tab = (TextView) view;
+            tab.setBackgroundResource(selected ? R.drawable.bg_room_official_chip : android.R.color.transparent);
+            tab.setTextColor(selected ? Color.WHITE : 0xCCFFFFFF);
+            tab.setTypeface(null, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
     }
 
     private void switchRoomFeed(int direction) {
