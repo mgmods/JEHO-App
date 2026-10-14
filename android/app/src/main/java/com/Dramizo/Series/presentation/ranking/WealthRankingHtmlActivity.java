@@ -7,13 +7,15 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
+import android.widget.FrameLayout;
+import android.view.ViewGroup;
 
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
@@ -43,6 +45,9 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(false);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -59,7 +64,10 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
             }
         });
         web.addJavascriptInterface(new RankingBridge(), "JehoRanking");
-        setContentView(web);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+        EdgeToEdgeHelper.padSystemBars(root);
         viewModel = new ViewModelProvider(this,
                 new ViewModelFactory(ContainerProvider.from(this))).get(RankingViewModel.class);
         viewModel.getEntries().observe(this, entries -> {
@@ -127,11 +135,13 @@ public class WealthRankingHtmlActivity extends ThemedActivity {
         return "weekly".equals(value) || "monthly".equals(value) ? value : "daily";
     }
     private String safeCategory(String value) {
-        for (String allowed : new String[]{"rich", "popular", "gifts", "host", "agency", "room"}) {
+        for (String allowed : new String[]{"popular", "gifts", "host", "agency", "room"}) {
             if (allowed.equals(value)) return value;
         }
-        return "rich";
+        return "popular";
     }
+
+    @Override protected boolean wantsContentSystemPadding() { return false; }
 
     @Override public void onBackPressed() {
         finish();
