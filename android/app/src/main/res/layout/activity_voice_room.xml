@@ -1568,7 +1568,7 @@
             android:contentDescription="الإعدادات"
             android:gravity="center"
             android:text="⚙"
-            android:textColor="#FFFFFFFF"
+            android:textColor="#FFF0D28A"
             android:textSize="25sp"
             android:background="@drawable/bg_room_official_chip" />
     </LinearLayout>
