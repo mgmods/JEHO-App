@@ -8,7 +8,8 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Toast;
+import android.widget.FrameLayout;
+import android.view.ViewGroup;
 
 import androidx.annotation.Nullable;
 
@@ -16,6 +17,7 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
 import com.Dramizo.Series.presentation.common.ThemedActivity;
 import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.invite.InvitationActivity;
@@ -51,6 +53,8 @@ public class CpCenterActivity extends ThemedActivity {
         WebSettings settings = web.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setLoadsImagesAutomatically(true);
+        settings.setBlockNetworkImage(false);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -69,7 +73,10 @@ public class CpCenterActivity extends ThemedActivity {
             }
         });
         web.addJavascriptInterface(new CpBridge(), "JehoCP");
-        setContentView(web);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(root);
+        EdgeToEdgeHelper.padSystemBars(root);
         web.loadUrl("file:///android_asset/cp-center.html");
     }
 
@@ -240,6 +247,8 @@ public class CpCenterActivity extends ThemedActivity {
         }
         @JavascriptInterface public void back() { runOnUiThread(CpCenterActivity.this::finish); }
     }
+
+    @Override protected boolean wantsContentSystemPadding() { return false; }
 
     @Override public void onBackPressed() { finish(); }
 
