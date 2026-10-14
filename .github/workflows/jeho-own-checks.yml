@@ -5,6 +5,7 @@ on:
     branches: [jeho-own, jeho-own-working-2026-10-05]
     paths:
       - "backend/**"
+      - "flutter_dashboard/**"
       - ".github/workflows/**"
   pull_request:
     branches: [jeho-own]
@@ -63,4 +64,4 @@ jobs:
         run: npm run build
 
       - name: Build combined API and dashboard image
-        run: docker build --tag jeho-own-api:ci ./backend
+        run: docker build --file backend/Dockerfile --tag jeho-own-api:ci .
