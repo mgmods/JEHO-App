@@ -63,8 +63,8 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
     const args = type ? [type] : [];
     const rows = await this.dataSource.query(
       `SELECT r.id, r.type, r.points::text AS points, r.level, r."startedAt",
-        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl") AS "userA",
-        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl") AS "userB"
+        json_build_object('id', a.id, 'username', a.username, 'displayName', a."displayName", 'avatarUrl', a."avatarUrl", 'level', a.level, 'vipLevel', a."vipLevel") AS "userA",
+        json_build_object('id', b.id, 'username', b.username, 'displayName', b."displayName", 'avatarUrl', b."avatarUrl", 'level', b.level, 'vipLevel', b."vipLevel") AS "userB"
        FROM cp_relationships r
        JOIN users a ON a.id = r."userAId" JOIN users b ON b.id = r."userBId"
        WHERE r.status = 'active' ${where}
