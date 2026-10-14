@@ -145,7 +145,7 @@ public class CpCenterActivity extends ThemedActivity {
             List<Map<String, Object>> out = sent.success && sent.data != null
                     ? sent.data : new ArrayList<>();
             js("window.renderCpRequests && window.renderCpRequests(" +
-                    gson.toJson(in) + "," + gson.toJson(out) + ")");
+                    gson.toJson(normalizeUrls(in)) + "," + gson.toJson(normalizeUrls(out)) + ")");
             if (!incoming.success && incoming.error != null) message(incoming.error);
             else if (!sent.success && sent.error != null) message(sent.error);
         });
