@@ -10,6 +10,7 @@ import { Room } from '../../database/entities/room.entity';
 import { Agency } from '../../database/entities/agency.entity';
 import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AuthModule } from '../auth/auth.module';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -17,6 +18,6 @@ import { AuthModule } from '../auth/auth.module';
     TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction, Room, Agency, AdminUser]),
   ],
   controllers: [VanityIdsController],
-  providers: [VanityIdsService],
+  providers: [VanityIdsService, JwtAuthGuard],
 })
 export class VanityIdsModule {}
