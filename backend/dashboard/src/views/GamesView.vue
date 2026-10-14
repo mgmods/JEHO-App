@@ -153,6 +153,18 @@
       </div>
     </div>
 
+    <div class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div><h3 class="h6 mb-1">التحكم الفعلي بتشغيل الألعاب</h3><p class="small text-muted mb-0">إلغاء التحديد يعطّل اللعبة من الخادم لجميع المستخدمين، وليس إخفاءها فقط.</p></div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input v-model="disabledGames" class="form-check-input" type="checkbox" :value="game.id" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
+        </div>
+      </div>
+    </div>
+
     <div v-if="editIdx !== null && editDraft" class="edit-overlay" @click.self="closeEdit">
       <div class="glass edit-panel">
         <div class="edit-panel__head">
@@ -287,6 +299,11 @@ const odds = reactive({
   maxCrashRatio: 8,
 })
 const coveredGames = ref([])
+const disabledGames = ref([])
+const manageableGames = [
+  ...['7updown','bounty-football','camel-racing','cleopatra-slot','cleopatra-slots','crash','fishing','football-plinko','fortune-slot','greedy-box','greedy-lion','hilo','line-slots','luck-car','lucky77','megaways-slots','olympians','pirate-king','royal-battle','slot777','sugar-rush','swimsuit-party'].map(id => ({ id, label: id })),
+  { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' },
+]
 const coveredCount = computed(() => coveredGames.value.length || 22)
 const coveredGamesLabel = computed(() =>
   coveredGames.value.length ? coveredGames.value.join(' · ') : t('games.oddsCoverageAll'),
@@ -311,6 +328,7 @@ function applyOddsPayload(data) {
     if (data[k] != null && Number.isFinite(Number(data[k]))) odds[k] = Number(data[k])
   })
   if (Array.isArray(data.coveredGames)) coveredGames.value = data.coveredGames.map(String)
+  if (Array.isArray(data.disabledGames)) disabledGames.value = data.disabledGames.map(String)
 }
 
 async function loadOdds() {
@@ -325,7 +343,7 @@ async function loadOdds() {
 async function saveOdds() {
   savingOdds.value = true
   error.value = ''
-  const { data, error: err } = await gameOddsApi.update({ ...odds })
+  const { data, error: err } = await gameOddsApi.update({ ...odds, disabledGames: [...disabledGames.value] })
   savingOdds.value = false
   if (err) {
     error.value = err.message
