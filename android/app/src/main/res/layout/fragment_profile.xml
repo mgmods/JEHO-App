@@ -195,7 +195,7 @@
                     android:src="@drawable/ic_me_setting" />
             </LinearLayout>
 
-            <!-- Real active CP relationship only: actual account photos and name from the API. -->
+            <!-- Own-profile relationship summary: keep the main avatar as the only self photo. -->
             <LinearLayout
                 android:id="@+id/rowMyProfileCp"
                 android:layout_width="match_parent"
@@ -206,43 +206,51 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
-                android:padding="10dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="9dp"
                 android:visibility="gone">
                 <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/imgMyProfileCpSelf"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:contentDescription="@null"
-                    android:scaleType="centerCrop"
-                    android:visibility="gone"
-                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-                <TextView
-                    android:id="@+id/imgMyProfileCpHeart"
-                    android:layout_width="32dp"
-                    android:layout_height="40dp"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:text="♥"
-                    android:textColor="#FFFF5277"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
-                <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgMyProfileCpPartner"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginEnd="2dp"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
                     android:contentDescription="@null"
                     android:scaleType="centerCrop"
-                    android:visibility="gone"
                     app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-                <TextView
-                    android:id="@+id/tvMyProfileCpLabel"
+                <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14sp"
+                    android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/tvMyProfileCpLabel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:id="@+id/tvMyProfileCpType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/imgMyProfileCpHeart"
+                    android:layout_width="36dp"
+                    android:layout_height="42dp"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="♥"
+                    android:textColor="#FFFF5277"
+                    android:textSize="25sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
