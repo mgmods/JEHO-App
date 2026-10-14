@@ -57,15 +57,6 @@ public class ProfileActivity extends ThemedActivity {
     private AnimatorSet cpHeartAnimator;
 
     @Override
-    protected void onDestroy() {
-        if (cpHeartAnimator != null) {
-            cpHeartAnimator.cancel();
-            cpHeartAnimator = null;
-        }
-        super.onDestroy();
-    }
-
-    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdgeHelper.apply(this);
@@ -719,6 +710,10 @@ public class ProfileActivity extends ThemedActivity {
 
     @Override
     protected void onDestroy() {
+        if (cpHeartAnimator != null) {
+            cpHeartAnimator.cancel();
+            cpHeartAnimator = null;
+        }
         if (binding != null && binding.webProfileHostSignal != null) {
             binding.webProfileHostSignal.destroy();
         }
