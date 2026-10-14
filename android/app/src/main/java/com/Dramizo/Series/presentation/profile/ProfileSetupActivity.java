@@ -127,7 +127,7 @@ public class ProfileSetupActivity extends ThemedActivity {
         binding.progress.setVisibility(View.VISIBLE);
         // Hide form until we know setup is actually required (avoids flash after splash).
         binding.getRoot().setAlpha(0f);
-        viewModel.loadMe();
+        viewModel.loadMeForSetup();
     }
 
     public static boolean isProfileComplete(AuthDtos.UserDto user) {
