@@ -671,7 +671,8 @@
                 android:layout_marginTop="12dp"
                 android:background="@drawable/bg_mikoo_card"
                 android:orientation="horizontal"
-                android:paddingVertical="15dp">
+                android:paddingVertical="15dp"
+                android:visibility="gone">
 
                 <LinearLayout
                     android:id="@+id/btnAppearance"
