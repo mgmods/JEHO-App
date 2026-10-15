@@ -559,8 +559,14 @@
       el.heroAvatar.hidden = true;
       if (kind === 'video' && wear) {
         el.heroVideo.hidden = false;
+        el.heroVideo.controls = true;
+        el.heroVideo.muted = false;
+        el.heroVideo.loop = true;
+        el.heroVideo.playsInline = true;
         el.heroVideo.src = wear;
-        el.heroVideo.play().catch(function () {});
+        el.heroVideo.play().catch(function () {
+          // Controls remain visible so the user can start playback manually.
+        });
       } else if (kind === 'svga' && wear) {
         playHeroSvga(wear).then(function (ok) {
           if (!ok && selectedItem() && selectedItem().id === item.id) {
