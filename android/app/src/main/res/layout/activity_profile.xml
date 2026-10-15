@@ -892,7 +892,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:gravity="center_vertical"
-                    android:text="@string/badges"
+                    android:text="شارة"
                     android:textColor="#E6FFFFFF"
                     android:textSize="14sp"
                     android:visibility="gone" />
