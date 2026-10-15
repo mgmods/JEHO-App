@@ -817,7 +817,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.btnWriteMessage != null) {
             binding.btnWriteMessage.setOnClickListener(v -> openRoomChatComposer(true));
-            binding.btnWriteMessage.setVisibility(View.VISIBLE);
+            binding.btnWriteMessage.setVisibility(View.GONE);
         }
         binding.btnTools.setOnClickListener(v -> showOtherTools());
         binding.btnHeaderMore.setOnClickListener(v -> openRoomSharePicker());
@@ -847,7 +847,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
         if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
-        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.GONE);
         if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
         if (binding.tvChatInputTips != null && !roomComposerOpen) {
             binding.tvChatInputTips.setVisibility(View.VISIBLE);
@@ -1835,7 +1835,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (binding.btnPrivateMsg != null) binding.btnPrivateMsg.setVisibility(View.VISIBLE);
         if (binding.btnSeatSticker != null) binding.btnSeatSticker.setVisibility(View.VISIBLE);
-        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.VISIBLE);
+        if (binding.btnWriteMessage != null) binding.btnWriteMessage.setVisibility(View.GONE);
         if (binding.btnGift != null) binding.btnGift.setVisibility(View.VISIBLE);
         // The mic button is intentionally controlled only by syncMicUi() and seat state.
         if (binding.tvChatInputTips != null) {
