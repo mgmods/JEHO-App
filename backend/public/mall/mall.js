@@ -664,7 +664,7 @@
       el.btnPrimary.className = 'btn btn-owned';
       el.btnPrimary.disabled = true;
       el.btnSecondary.hidden = false;
-      el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
+      el.btnSecondary.textContent = 'إزالة';
       el.btnSecondary.disabled = state.busy;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
@@ -1113,7 +1113,14 @@
   };
 
   el.btnPrimary.addEventListener('click', onPrimary);
-  el.btnSecondary.addEventListener('click', onSecondary);
+  el.btnSecondary.addEventListener('click', function () {
+    var item = selectedItem();
+    if (item && state.equipped[item.id] && state.type !== 'room_background') {
+      onUnequip();
+    } else {
+      onSecondary();
+    }
+  });
 
   function syncBagButton() {
     if (!el.btnBag) return;
