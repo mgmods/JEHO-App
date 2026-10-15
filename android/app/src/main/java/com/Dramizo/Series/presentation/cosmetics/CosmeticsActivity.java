@@ -172,6 +172,24 @@ public class CosmeticsActivity extends ThemedActivity {
             binding.nativeHeroFrame.bind(abs, avatar, item.meta, 1);
         } else {
             lastWearUrl = null;
+            String mediaUrl = firstNonEmpty(item.animationUrl, item.previewUrl);
+            com.Dramizo.Series.util.CosmeticMedia.Kind mediaKind =
+                    com.Dramizo.Series.util.CosmeticMedia.kind(mediaUrl);
+
+            // SVGA and video entry effects must use the native animation player,
+            // not a generated PNG sibling. HostSignalView owns one player and
+            // releases it when another item/category is selected.
+            if (mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
+                    || mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+                Glide.with(binding.heroMedia).clear(binding.heroMedia);
+                binding.heroMedia.setImageDrawable(null);
+                binding.heroMedia.setVisibility(View.GONE);
+                binding.nativeHeroFrame.setVisibility(View.VISIBLE);
+                binding.nativeHeroFrame.bind(AssetCatalog.absoluteUrl(mediaUrl),
+                        null, item.meta, 1);
+                return;
+            }
+
             binding.nativeHeroFrame.clearSignal();
             binding.heroMedia.setVisibility(View.VISIBLE);
             String still = stillPngUrl(item.previewUrl, item.animationUrl);
