@@ -43,6 +43,7 @@
     heroRoomFrame: document.getElementById('heroRoomFrame'),
     heroBg: document.getElementById('heroBg'),
     heroVideo: document.getElementById('heroVideo'),
+    wearStage: document.getElementById('wearStage'),
     btnPrimary: document.getElementById('btnPrimary'),
     btnSecondary: document.getElementById('btnSecondary'),
     btnBag: document.getElementById('btnBag'),
@@ -488,6 +489,7 @@
     el.heroBg.hidden = true;
     el.heroVideo.hidden = true;
     el.heroVideo.controls = false;
+    if (el.wearStage) el.wearStage.classList.remove('entry-effect-preview');
     el.heroAvatar.hidden = false;
     try { el.heroVideo.pause(); el.heroVideo.removeAttribute('src'); el.heroVideo.load(); } catch (e) {}
   }
@@ -556,16 +558,22 @@
       el.heroBg.hidden = false;
       el.heroBg.src = thumb || wear;
     } else if (state.type === 'entry_effect') {
-      el.heroAvatar.hidden = true;
+      // Keep the account avatar visible: entrance media is layered over it,
+      // so users can judge the effect against their actual profile photo.
+      el.heroAvatar.hidden = false;
+      if (el.wearStage) el.wearStage.classList.add('entry-effect-preview');
       if (kind === 'video' && wear) {
         el.heroVideo.hidden = false;
-        el.heroVideo.controls = true;
-        el.heroVideo.muted = false;
+        el.heroVideo.controls = false;
+        el.heroVideo.muted = true;
+        el.heroVideo.defaultMuted = true;
         el.heroVideo.loop = true;
         el.heroVideo.playsInline = true;
+        el.heroVideo.setAttribute('aria-label', 'معاينة الدخولية المتحركة');
         el.heroVideo.src = wear;
-        el.heroVideo.play().catch(function () {
-          // Controls remain visible so the user can start playback manually.
+        var videoPlay = el.heroVideo.play();
+        if (videoPlay && videoPlay.catch) videoPlay.catch(function () {
+          // Muted playback is attempted automatically; the status stays usable if blocked.
         });
       } else if (kind === 'svga' && wear) {
         playHeroSvga(wear).then(function (ok) {
