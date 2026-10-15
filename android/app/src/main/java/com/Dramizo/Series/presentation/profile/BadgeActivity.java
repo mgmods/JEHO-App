@@ -1,6 +1,8 @@
 package com.Dramizo.Series.presentation.profile;
 
 import android.app.AlertDialog;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
@@ -191,9 +193,20 @@ public class BadgeActivity extends ThemedActivity {
             String url = AssetCatalog.absoluteUrl(badge.imageUrl);
             Glide.with(BadgeActivity.this).load(url).placeholder(com.Dramizo.Series.R.drawable.ic_medal_default)
                     .error(com.Dramizo.Series.R.drawable.ic_medal_default).into(h.image);
+            if (h.pulse != null) {
+                h.pulse.cancel();
+                h.pulse = null;
+            }
             if (badge.earned) {
                 h.image.clearColorFilter();
                 h.itemView.setAlpha(1f);
+                if (badge.isAnimated) {
+                    h.pulse = ObjectAnimator.ofFloat(h.image, View.ALPHA, 1f, 0.68f, 1f);
+                    h.pulse.setDuration(1200L);
+                    h.pulse.setRepeatCount(ValueAnimator.INFINITE);
+                    h.pulse.setRepeatMode(ValueAnimator.RESTART);
+                    h.pulse.start();
+                }
             } else {
                 ColorMatrix matrix = new ColorMatrix();
                 matrix.setSaturation(0f);
@@ -205,10 +218,20 @@ public class BadgeActivity extends ThemedActivity {
 
         @Override public int getItemCount() { return badges.size(); }
 
+        @Override public void onViewRecycled(@NonNull Holder h) {
+            if (h.pulse != null) {
+                h.pulse.cancel();
+                h.pulse = null;
+            }
+            h.image.setAlpha(1f);
+            super.onViewRecycled(h);
+        }
+
         final class Holder extends RecyclerView.ViewHolder {
             final ImageView image;
             final TextView name;
             final TextView state;
+            ObjectAnimator pulse;
             Holder(View item, ImageView image, TextView name, TextView state) {
                 super(item); this.image = image; this.name = name; this.state = state;
             }
