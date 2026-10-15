@@ -270,6 +270,30 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('profile-action-icons')
+  @ApiOperation({ summary: 'Profile action tile icons managed from dashboard' })
+  async profileActionIcons() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'app_profile_action_icons' } });
+    const fallback = { version: 1, events: '', agency: '', rechargeAgent: '', tasks: '', settings: '', support: '' };
+    if (!row?.value) return fallback;
+    try {
+      const parsed = JSON.parse(row.value);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+      return {
+        version: Math.max(1, Number(parsed.version) || 1),
+        events: typeof parsed.events === 'string' ? parsed.events : '',
+        agency: typeof parsed.agency === 'string' ? parsed.agency : '',
+        rechargeAgent: typeof parsed.rechargeAgent === 'string' ? parsed.rechargeAgent : '',
+        tasks: typeof parsed.tasks === 'string' ? parsed.tasks : '',
+        settings: typeof parsed.settings === 'string' ? parsed.settings : '',
+        support: typeof parsed.support === 'string' ? parsed.support : '',
+      };
+    } catch {
+      return fallback;
+    }
+  }
+
+  @Public()
   @Get('seat-stickers')
   @ApiOperation({
     summary: 'Seat mic reaction stickers (GIF/WebP) managed from dashboard',
