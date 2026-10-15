@@ -3,6 +3,21 @@ package com.Dramizo.Series.presentation.cosmetics;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.Player;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.ui.PlayerView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -49,6 +64,10 @@ public class CosmeticsActivity extends ThemedActivity {
     private String initialType = "vip_badge";
     @Nullable private String roomId;
     @Nullable private String lastWearUrl;
+    @Nullable private Dialog entryVideoDialog;
+    @Nullable private ExoPlayer entryVideoPlayer;
+    @Nullable private PlayerView entryVideoPlayerView;
+    @Nullable private String activeEntryVideoUrl;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,6 +113,7 @@ public class CosmeticsActivity extends ThemedActivity {
                 vm.clearSelection();
                 lastWearUrl = null;
                 if (binding != null) {
+                    stopEntryVideoPreview();
                     binding.nativeHeroFrame.clearSignal();
                     binding.heroMedia.setVisibility(View.GONE);
                     Glide.with(binding.heroMedia).clear(binding.heroMedia);
@@ -117,6 +137,7 @@ public class CosmeticsActivity extends ThemedActivity {
     private void previewItem(@Nullable CosmeticDtos.CosmeticDto item) {
         if (binding == null) return;
         if (item == null) {
+            stopEntryVideoPreview();
             AuthDtos.UserDto me = session.getUser();
             if (me != null) {
                 String n = me.displayName != null && !me.displayName.isEmpty()
@@ -179,8 +200,16 @@ public class CosmeticsActivity extends ThemedActivity {
             // SVGA and video entry effects must use the native animation player,
             // not a generated PNG sibling. HostSignalView owns one player and
             // releases it when another item/category is selected.
-            if (mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
-                    || mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+            if (mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+                binding.nativeHeroFrame.clearSignal();
+                binding.heroMedia.setVisibility(View.GONE);
+                Glide.with(binding.heroMedia).clear(binding.heroMedia);
+                showEntryVideoPreview(AssetCatalog.absoluteUrl(mediaUrl),
+                        item.name != null ? item.name : "معاينة الدخولية");
+                return;
+            }
+            if (mediaKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA) {
+                stopEntryVideoPreview();
                 Glide.with(binding.heroMedia).clear(binding.heroMedia);
                 binding.heroMedia.setImageDrawable(null);
                 binding.heroMedia.setVisibility(View.GONE);
@@ -189,6 +218,7 @@ public class CosmeticsActivity extends ThemedActivity {
                         null, item.meta, 1);
                 return;
             }
+            stopEntryVideoPreview();
 
             binding.nativeHeroFrame.clearSignal();
             binding.heroMedia.setVisibility(View.VISIBLE);
@@ -205,6 +235,127 @@ public class CosmeticsActivity extends ThemedActivity {
                         .error(ImagePlaceholder.cover())
                         .into(binding.heroMedia);
             }
+        }
+    }
+
+    /**
+     * Play video entry-effect previews in a centered, non-fullscreen in-app dialog.
+     * Audio is enabled and native controls remain available to the user.
+     */
+    private void showEntryVideoPreview(@Nullable String url, String title) {
+        if (url == null || url.trim().isEmpty()) return;
+        if (url.equals(activeEntryVideoUrl) && entryVideoDialog != null
+                && entryVideoDialog.isShowing()) {
+            return;
+        }
+        stopEntryVideoPreview();
+        final Dialog dialog = new Dialog(this);
+        entryVideoDialog = dialog;
+        activeEntryVideoUrl = url;
+
+        LinearLayout shell = new LinearLayout(this);
+        shell.setOrientation(LinearLayout.VERTICAL);
+        shell.setPadding(dpMall(12), dpMall(10), dpMall(12), dpMall(12));
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(20, 24, 35));
+        background.setCornerRadius(dpMall(16));
+        shell.setBackground(background);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        TextView heading = new TextView(this);
+        heading.setText(title);
+        heading.setTextColor(Color.WHITE);
+        heading.setTextSize(15f);
+        heading.setMaxLines(1);
+        heading.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        heading.setLayoutParams(new LinearLayout.LayoutParams(0, dpMall(42), 1f));
+        TextView close = new TextView(this);
+        close.setText("✕");
+        close.setTextColor(Color.WHITE);
+        close.setTextSize(20f);
+        close.setGravity(Gravity.CENTER);
+        close.setBackgroundResource(android.R.drawable.list_selector_background);
+        header.addView(heading);
+        header.addView(close, new LinearLayout.LayoutParams(dpMall(42), dpMall(42)));
+        shell.addView(header);
+
+        PlayerView playerView = new PlayerView(this);
+        entryVideoPlayerView = playerView;
+        playerView.setUseController(true);
+        playerView.setControllerAutoShow(true);
+        playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
+        playerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+        playerView.setBackgroundColor(Color.BLACK);
+        LinearLayout.LayoutParams videoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dpMall(220));
+        videoParams.topMargin = dpMall(4);
+        shell.addView(playerView, videoParams);
+
+        dialog.setContentView(shell);
+        dialog.setCancelable(true);
+        dialog.setOnDismissListener(d -> releaseEntryVideoPlayer());
+        close.setOnClickListener(v -> dialog.dismiss());
+        dialog.setOnCancelListener(d -> releaseEntryVideoPlayer());
+
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams attrs = window.getAttributes();
+            attrs.dimAmount = 0.62f;
+            window.setAttributes(attrs);
+        }
+        dialog.show();
+        if (window != null) {
+            int width = Math.min(getResources().getDisplayMetrics().widthPixels - dpMall(32),
+                    dpMall(420));
+            window.setLayout(Math.max(dpMall(260), width), ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.setGravity(Gravity.CENTER);
+        }
+
+        try {
+            ExoPlayer player = new ExoPlayer.Builder(this).build();
+            entryVideoPlayer = player;
+            playerView.setPlayer(player);
+            player.setRepeatMode(Player.REPEAT_MODE_ONE);
+            player.setVolume(1f);
+            player.setMediaItem(MediaItem.fromUri(url));
+            player.prepare();
+            player.play();
+        } catch (Exception e) {
+            Toast.makeText(this, "تعذّر تشغيل فيديو الدخولية", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        }
+    }
+
+    private int dpMall(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void releaseEntryVideoPlayer() {
+        PlayerView view = entryVideoPlayerView;
+        entryVideoPlayerView = null;
+        ExoPlayer player = entryVideoPlayer;
+        entryVideoPlayer = null;
+        if (view != null) {
+            try { view.setPlayer(null); } catch (Exception ignored) {}
+        }
+        if (player != null) {
+            try { player.stop(); } catch (Exception ignored) {}
+            try { player.release(); } catch (Exception ignored) {}
+        }
+        activeEntryVideoUrl = null;
+    }
+
+    private void stopEntryVideoPreview() {
+        Dialog dialog = entryVideoDialog;
+        entryVideoDialog = null;
+        if (dialog != null && dialog.isShowing()) {
+            try { dialog.dismiss(); } catch (Exception ignored) {}
+        } else {
+            releaseEntryVideoPlayer();
         }
     }
 
@@ -287,6 +438,7 @@ public class CosmeticsActivity extends ThemedActivity {
 
     @Override
     protected void onDestroy() {
+        stopEntryVideoPreview();
         if (binding != null) {
             try {
                 binding.nativeHeroFrame.destroy();
