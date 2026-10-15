@@ -80,7 +80,7 @@
                 v-else
                 class="frame-overlay"
                 :class="{ pulse: mediaKind(wearSrc(item)) === 'gif' || !!item.animationUrl }"
-                :src="assetUrl(previewSrc(item) || wearSrc(item))"
+                :src="assetUrl(isPlayableMotion(wearSrc(item)) ? wearSrc(item) : (previewSrc(item) || wearSrc(item)))"
                 :alt="displayName(item)"
               />
             </template>
@@ -102,9 +102,9 @@
             </template>
             <template v-else-if="(item.type || tab) === 'entry_effect'">
               <video
-                v-if="mediaKind(item.animationUrl) === 'video'"
+                v-if="mediaKind(wearSrc(item)) === 'video'"
                 class="toast-preview"
-                :src="assetUrl(item.animationUrl)"
+                :src="assetUrl(wearSrc(item))"
                 :autoplay="playingId === item.id"
                 :muted="playingId !== item.id"
                 loop
@@ -115,7 +115,7 @@
               <img
                 v-else
                 class="toast-preview"
-                :src="assetUrl(previewSrc(item))"
+                :src="assetUrl(isPlayableMotion(wearSrc(item)) ? wearSrc(item) : previewSrc(item))"
                 :alt="displayName(item)"
                 @click="playingId = playingId === item.id ? null : item.id"
                 style="cursor:pointer"
