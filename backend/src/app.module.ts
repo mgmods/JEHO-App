@@ -43,6 +43,7 @@ import { CpModule } from './modules/cp/cp.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
 import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
+import { BadgesModule } from './modules/badges/badges.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
@@ -167,6 +168,7 @@ const entityList = Object.values(entities).filter(
     PromotionsModule,
     VanityIdsModule,
     ModerationModule,
+    BadgesModule,
   ],
   providers: [
     // JWT first so AppThrottlerGuard can key by user id (not shared carrier IP).
