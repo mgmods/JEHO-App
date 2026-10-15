@@ -97,7 +97,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
-          key: jeho-android-debug-keystore-v1
+          key: jeho-android-debug-keystore-v2
 
       - name: Create temporary Android debug keystore
         shell: bash
@@ -153,7 +153,7 @@ jobs:
           fi
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
           echo "$CERT_OUTPUT"
-          EXPECTED_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
+          EXPECTED_SHA1="376BA3CC6B418AEC37F0E931FB3A4FEA87C318B5"
           ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
             echo "::error::APK signing certificate does not match the currently installed baseline certificate. Refusing to publish an incompatible update."
