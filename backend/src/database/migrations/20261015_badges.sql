@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS badge_definitions (
 ALTER TABLE badge_definitions ADD COLUMN IF NOT EXISTS "conditionType" varchar(32);
 ALTER TABLE badge_definitions ADD COLUMN IF NOT EXISTS "conditionTarget" integer;
 
-DO $
+DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
@@ -44,7 +44,7 @@ BEGIN
     ALTER TABLE badge_definitions
       ADD CONSTRAINT chk_badge_condition_target CHECK ("conditionTarget" IS NULL OR "conditionTarget" > 0);
   END IF;
-END $;
+END $$;
 
 CREATE TABLE IF NOT EXISTS user_badges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
