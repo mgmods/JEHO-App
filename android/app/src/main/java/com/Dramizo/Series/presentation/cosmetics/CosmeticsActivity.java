@@ -178,8 +178,20 @@ public class CosmeticsActivity extends ThemedActivity {
         }
 
         String type = normalizeType(item.type != null ? item.type : vm.getFilterType());
-        String wear = firstNonEmpty(item.animationUrl, item.previewUrl);
+        String wear = animatedMediaUrl(item.animationUrl, item.previewUrl);
         String avatar = session.getAvatarUrl();
+
+        // A video uploaded into either media field must always be previewed by
+        // the audible in-app player, including video-based frames.
+        if (com.Dramizo.Series.util.CosmeticMedia.kind(wear)
+                == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+            binding.nativeHeroFrame.clearSignal();
+            binding.heroMedia.setVisibility(View.GONE);
+            Glide.with(binding.heroMedia).clear(binding.heroMedia);
+            showEntryVideoPreview(AssetCatalog.absoluteUrl(wear),
+                    item.name != null ? item.name : "معاينة المتجر");
+            return;
+        }
 
         if ("vip_badge".equals(type) || "host_badge".equals(type)) {
             binding.heroMedia.setVisibility(View.GONE);
@@ -456,18 +468,12 @@ public class CosmeticsActivity extends ThemedActivity {
 
     @Nullable
     private static String animatedMediaUrl(String animationUrl, String previewUrl) {
-        // Admin catalogs can put the playable asset in either field; don't let
-        // a static thumbnail in animationUrl mask an SVGA/video previewUrl.
-        com.Dramizo.Series.util.CosmeticMedia.Kind animationKind =
-                com.Dramizo.Series.util.CosmeticMedia.kind(animationUrl);
-        if (animationKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
-                || animationKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+        // Upload forms may put motion in either field. Prefer real playable
+        // media (SVGA/video/GIF/animated WebP) over a static thumbnail.
+        if (com.Dramizo.Series.util.CosmeticMedia.isAnimatedWear(animationUrl)) {
             return animationUrl;
         }
-        com.Dramizo.Series.util.CosmeticMedia.Kind previewKind =
-                com.Dramizo.Series.util.CosmeticMedia.kind(previewUrl);
-        if (previewKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
-                || previewKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+        if (com.Dramizo.Series.util.CosmeticMedia.isAnimatedWear(previewUrl)) {
             return previewUrl;
         }
         return firstNonEmpty(animationUrl, previewUrl);
