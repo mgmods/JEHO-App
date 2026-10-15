@@ -79,6 +79,21 @@ public class ProfileActivity extends ThemedActivity {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
 
+        // Keep achievement badges separate from the existing VIP medal screen.
+        if (binding.rowBadges != null) {
+            binding.rowBadges.setVisibility(View.VISIBLE);
+            binding.rowBadges.setOnClickListener(v -> {
+                String profileId = targetUserIdHold[0];
+                if (profileId == null || profileId.trim().isEmpty()) {
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض الشارات", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent intent = new Intent(this, BadgeActivity.class);
+                intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                startActivity(intent);
+            });
+        }
+
         // Mikoo card taps on full profile page.
         if (binding.cellProfileFollowers != null) {
             binding.cellProfileFollowers.setOnClickListener(v -> {
