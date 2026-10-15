@@ -1363,6 +1363,27 @@
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_room_msg" />
         </FrameLayout>
+        <!-- Dedicated write-message control: stays visible and opens the room composer. -->
+        <FrameLayout
+            android:id="@+id/btnWriteMessage"
+            android:layout_width="32dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="1dp"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:contentDescription="@string/room_input_tips"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:visibility="visible">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="✎"
+                android:textColor="#FFFFFFFF"
+                android:textSize="25sp"
+                android:includeFontPadding="false" />
+        </FrameLayout>
         <FrameLayout
             android:id="@+id/btnGift"
             android:layout_width="36dp"
