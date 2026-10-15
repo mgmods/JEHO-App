@@ -73,7 +73,7 @@ public final class RemoteNavIcons {
     public static void refreshBlocking(AppContainer c) {
         if (c == null) return;
         try {
-            Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons());
+            Result<MiscDtos.NavIconsDto> r = ApiCall.execute(c.getConfigApi().navIcons(System.currentTimeMillis()));
             if (!r.success || r.data == null) return;
             cached = r.data;
             c.getFeatureCache().putJson(
