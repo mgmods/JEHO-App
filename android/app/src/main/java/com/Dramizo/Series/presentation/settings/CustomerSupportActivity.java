@@ -54,6 +54,7 @@ public class CustomerSupportActivity extends ThemedActivity {
         String wa = cfg != null ? trim(cfg.whatsapp) : "";
         String tg = cfg != null ? trim(cfg.telegram) : "";
         String ig = cfg != null ? trim(cfg.instagram) : "";
+        String website = cfg != null ? trim(cfg.website) : "";
         String email = cfg != null ? trim(cfg.email) : "";
         String phone = cfg != null ? trim(cfg.phone) : "";
 
@@ -66,22 +67,25 @@ public class CustomerSupportActivity extends ThemedActivity {
                 v -> openInstagram(ig));
         any |= showRow(binding.rowEmail, binding.divEmail, binding.tvEmail, email,
                 v -> openEmail(email));
+        any |= showRow(binding.rowWebsite, binding.divWebsite, binding.tvWebsite, website,
+                v -> openWebsite(website));
         // Phone is last — no divider after it
         boolean phoneShown = showRow(binding.rowPhone, null, binding.tvPhone, phone,
                 v -> openPhone(phone));
         any |= phoneShown;
 
         // Hide trailing dividers when later rows are gone
-        refreshDividers(wa, tg, ig, email, phone);
+        refreshDividers(wa, tg, ig, email, website, phone);
 
         binding.tvEmpty.setVisibility(any ? View.GONE : View.VISIBLE);
         binding.cardChannels.setVisibility(any ? View.VISIBLE : View.GONE);
     }
 
-    private void refreshDividers(String wa, String tg, String ig, String email, String phone) {
+    private void refreshDividers(String wa, String tg, String ig, String email, String website, String phone) {
         boolean hasTg = !tg.isEmpty();
         boolean hasIg = !ig.isEmpty();
         boolean hasEmail = !email.isEmpty();
+        boolean hasWebsite = !website.isEmpty();
         boolean hasPhone = !phone.isEmpty();
         binding.divWhatsapp.setVisibility(!wa.isEmpty() && (hasTg || hasIg || hasEmail || hasPhone)
                 ? View.VISIBLE : View.GONE);
@@ -158,6 +162,17 @@ public class CustomerSupportActivity extends ThemedActivity {
         }
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.support_open_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void openWebsite(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        if (value.isEmpty()) return;
+        if (!value.matches("(?i)^https?://.*")) value = "https://" + value;
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(value)));
         } catch (Exception e) {
             Toast.makeText(this, R.string.support_open_failed, Toast.LENGTH_SHORT).show();
         }
