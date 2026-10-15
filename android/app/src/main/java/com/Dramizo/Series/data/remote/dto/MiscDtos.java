@@ -362,6 +362,7 @@ public final class MiscDtos {
         @SerializedName("games") public NavIconPairDto games;
         @SerializedName("chat") public NavIconPairDto chat;
         @SerializedName("me") public NavIconPairDto me;
+        @SerializedName("profileActions") public Map<String, String> profileActions;
     }
 
     public static class NavIconPairDto {
