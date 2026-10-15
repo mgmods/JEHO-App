@@ -371,17 +371,6 @@ public final class MiscDtos {
         @SerializedName("icon") public String icon;
     }
 
-    /** Profile action tile icons managed by the dashboard. */
-    public static class ProfileActionIconsDto {
-        @SerializedName("version") public int version;
-        @SerializedName("events") public String events;
-        @SerializedName("agency") public String agency;
-        @SerializedName("rechargeAgent") public String rechargeAgent;
-        @SerializedName("tasks") public String tasks;
-        @SerializedName("settings") public String settings;
-        @SerializedName("support") public String support;
-    }
-
     /** Seat mic stickers from GET /config/seat-stickers. */
     public static class SeatStickersDto {
         @SerializedName("version") public int version;
