@@ -62,3 +62,6 @@ export * from './cp-relationship.entity';
 export * from './cp-request.entity';
 export * from './cp-audit-log.entity';
 export * from './cp-point-event.entity';
+
+export * from './badge.entity';
+export * from './user-badge.entity';

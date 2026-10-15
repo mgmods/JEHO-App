@@ -324,3 +324,12 @@ export const rankingApi = {
     safeRequest(() => api.get(`/admin/ranking/${period}/${category}`, { params })),
 }
 
+
+export const badgesApi = {
+  list: () => safeRequest(() => api.get('/admin/badges')),
+  create: (data) => safeRequest(() => api.post('/admin/badges', data)),
+  update: (id, data) => safeRequest(() => api.put(`/admin/badges/${id}`, data)),
+  remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
+  grant: (id, userId) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, { userId })),
+  revoke: (id, userId) => safeRequest(() => api.delete(`/admin/badges/${id}/users/${encodeURIComponent(userId)}`)),
+}

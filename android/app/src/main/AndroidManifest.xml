@@ -123,6 +123,7 @@
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.profile.MedalActivity" android:exported="false" 
             android:screenOrientation="portrait" />
+        <activity android:name=".presentation.profile.BadgeActivity" android:exported="false" android:screenOrientation="portrait" />
         <activity android:name=".presentation.contests.ContestDetailActivity" android:exported="false" 
             android:screenOrientation="portrait" />
         <activity android:name=".presentation.agency.AgencyActivity" android:exported="false"

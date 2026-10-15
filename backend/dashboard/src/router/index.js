@@ -132,6 +132,12 @@ const routes = [
         redirect: { name: 'settings', query: { tab: 'zego' } },
       },
       {
+        path: 'badges',
+        name: 'badges',
+        component: () => import('@/views/BadgesView.vue'),
+        meta: { title: 'الشارات' },
+      },
+      {
         path: 'vip',
         name: 'vip',
         component: () => import('@/views/VipView.vue'),
