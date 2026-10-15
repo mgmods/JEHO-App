@@ -1,9 +1,10 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Badge } from '../../database/entities/badge.entity';
 import { UserBadge } from '../../database/entities/user-badge.entity';
 import { User } from '../../database/entities/user.entity';
+import { Follow } from '../../database/entities/follow.entity';
 
 export interface UpsertBadgeDto {
   name: string;
@@ -24,6 +25,7 @@ export class BadgesService {
     @InjectRepository(Badge) private readonly badges: Repository<Badge>,
     @InjectRepository(UserBadge) private readonly userBadges: Repository<UserBadge>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Follow) private readonly follows: Repository<Follow>,
   ) {}
 
   async catalogForIdentifier(identifier: string) {
@@ -38,6 +40,9 @@ export class BadgesService {
   }
 
   async catalog(userId: string) {
+    // Reconcile configured achievement badges against the user's real, persisted metrics.
+    // The unique user/badge index plus INSERT .. ON CONFLICT DO NOTHING makes this idempotent.
+    await this.awardEligibleAchievementBadges(userId);
     const [badges, owned] = await Promise.all([
       this.badges.find({ where: { isActive: true }, order: { sortOrder: 'ASC', name: 'ASC' } }),
       this.userBadges.find({ where: { userId }, relations: { badge: true } }),
@@ -49,6 +54,47 @@ export class BadgesService {
       grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
       source: ownedById.get(badge.id)?.source ?? null,
     }));
+  }
+
+  private async awardEligibleAchievementBadges(userId: string): Promise<void> {
+    const user = await this.users.findOne({
+      where: { id: userId },
+      select: { id: true, level: true, experience: true },
+    });
+    if (!user) return;
+
+    const followerCount = await this.follows.count({ where: { followingId: userId } });
+    const metrics: Record<string, number> = {
+      level: Number(user.level) || 0,
+      experience: Number(user.experience) || 0,
+      followers: followerCount,
+    };
+
+    const eligible = await this.badges.find({
+      where: {
+        isActive: true,
+        awardType: 'achievement',
+        achievementKey: In(Object.keys(metrics)),
+      },
+    });
+    const earned = eligible.filter((badge) =>
+      Number.isFinite(Number(badge.achievementThreshold))
+      && Number(badge.achievementThreshold) > 0
+      && metrics[badge.achievementKey || ''] !== undefined
+      && metrics[badge.achievementKey || ''] >= Number(badge.achievementThreshold),
+    );
+    if (!earned.length) return;
+
+    await this.userBadges.createQueryBuilder()
+      .insert()
+      .values(earned.map((badge) => ({
+        userId,
+        badgeId: badge.id,
+        grantedByAdminId: null,
+        source: 'achievement',
+      })))
+      .orIgnore()
+      .execute();
   }
 
   listAdmin() {
@@ -119,5 +165,13 @@ export class BadgesService {
     if (!dto.name?.trim()) throw new BadRequestException('Badge name is required');
     if (!dto.imageUrl?.trim()) throw new BadRequestException('Badge image URL is required');
     if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Badge field is too long');
+    if (dto.awardType === 'achievement') {
+      if (!dto.achievementKey || !['level', 'experience', 'followers'].includes(dto.achievementKey)) {
+        throw new BadRequestException('Achievement key must be level, experience, or followers');
+      }
+      if (!Number.isFinite(Number(dto.achievementThreshold)) || Number(dto.achievementThreshold) <= 0) {
+        throw new BadRequestException('Achievement threshold must be a positive number');
+      }
+    }
   }
 }
