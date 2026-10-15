@@ -256,6 +256,13 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
      */
     @Nullable
     static String stillPreviewUrl(@Nullable String preview, @Nullable String anim) {
+        // In the store grid, animate lightweight formats instead of masking them
+        // with a static preview thumbnail. Heavy video/SVGA stays on its native
+        // player in the selected-item preview to avoid decoding every grid cell.
+        if (anim != null) {
+            String lowerAnim = anim.toLowerCase(Locale.US).split("\\?", 2)[0];
+            if (lowerAnim.endsWith(".gif") || lowerAnim.endsWith(".webp")) return anim;
+        }
         String preferPreview = firstNonEmpty(preview, null);
         if (preferPreview != null && isStaticStill(preferPreview)) return preferPreview;
 
