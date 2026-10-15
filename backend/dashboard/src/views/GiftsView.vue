@@ -221,7 +221,6 @@
                     v-if="isVideo(form.animationUrl)"
                     :src="absUrl(form.animationUrl)"
                     controls
-                    muted
                     loop
                     playsinline
                     style="max-width: 160px; max-height: 160px; border-radius: 12px"
@@ -307,6 +306,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { giftsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { extractList, formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
@@ -320,8 +320,6 @@ import BulkCheck from '@/components/BulkCheck.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
-const API_BASE = import.meta.env.VITE_API_URL || 'https://jeho-own-backend.mgs.blitz.cloud/api/v1'
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || new URL(API_BASE, window.location.origin).origin).replace(/\/$/, '')
 
 const gifts = ref([])
 const categories = ref([])
@@ -421,9 +419,7 @@ watch(
 )
 
 function absUrl(u) {
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 
 async function load() {
@@ -575,8 +571,8 @@ async function onAnimFile(e) {
 }
 
 async function save() {
-  if (!form.iconUrl) {
-    error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أولاً'
+  if (!form.iconUrl && !form.animationUrl) {
+    error.value = t('gifts.iconRequired') || 'ارفع أيقونة الهدية أو ملف الحركة أولاً'
     toast().danger(error.value)
     return
   }
@@ -585,7 +581,7 @@ async function save() {
   success.value = ''
   const payload = {
     name: form.name,
-    iconUrl: form.iconUrl,
+    iconUrl: form.iconUrl || form.animationUrl,
     // If admin uploaded MP4 as icon only, still treat it as the play media.
     animationUrl: form.animationUrl
       || (isVideo(form.iconUrl) ? form.iconUrl : null),
