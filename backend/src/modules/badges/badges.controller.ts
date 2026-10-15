@@ -22,7 +22,7 @@ export class BadgesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get badges for a profile user' })
   userBadges(@Param('userId') userId: string) {
-    return this.service.catalog(userId);
+    return this.service.catalogForIdentifier(userId);
   }
 
   @Get('admin/badges')
