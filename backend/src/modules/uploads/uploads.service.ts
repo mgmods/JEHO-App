@@ -53,7 +53,7 @@ export class UploadsService {
         file: Express.Multer.File,
         cb: (error: Error | null, accept: boolean) => void,
       ) => {
-        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
+        const allowed = /\.(jpg|jpeg|png|gif|webp|svg|svga|mp4|mp3|m4a|aac|wav|pdf|mov|webm|json)$/i;
         if (!allowed.test(extname(file.originalname))) {
           return cb(new BadRequestException('File type not allowed') as any, false);
         }
@@ -136,6 +136,8 @@ export class UploadsService {
       '.svg': 'image/svg+xml',
       '.mp4': 'video/mp4',
       '.webm': 'video/webm',
+      '.mov': 'video/quicktime',
+      '.svga': 'application/octet-stream',
       '.pdf': 'application/pdf',
       '.json': 'application/json',
     };
