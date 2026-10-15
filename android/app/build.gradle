@@ -97,7 +97,15 @@ android {
         debug {
             minifyEnabled false
             // API_BASE_URL is shared with defaultConfig for this build.
-            // Debug uses Android debug keystore (release jks may be corrupt locally).
+            // CI supplies this exact keystore path so the APK certificate stays stable across runners.
+            def ciDebugKeystore = System.getenv('JEHO_DEBUG_KEYSTORE')
+            if (ciDebugKeystore && file(ciDebugKeystore).isFile()) {
+                signingConfig signingConfigs.debug
+                signingConfigs.debug.storeFile file(ciDebugKeystore)
+                signingConfigs.debug.storePassword 'android'
+                signingConfigs.debug.keyAlias 'AndroidDebugKey'
+                signingConfigs.debug.keyPassword 'android'
+            }
         }
     }
     bundle {
