@@ -24,7 +24,7 @@ import com.bumptech.glide.Glide;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Honour/medals (شارات) — VIP 1–7, system-bar safe. */
+/** User badges and VIP medal catalog. Keeps badge ownership tied to real /me data. */
 public class MedalActivity extends ThemedActivity {
     private static final int MAX_VIP = 7;
 
@@ -46,7 +46,6 @@ public class MedalActivity extends ThemedActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_medal);
-        // contentRoot is padded by ThemedActivity (status + nav) like the rest of the app.
         findViewById(R.id.vBack).setOnClickListener(v -> navigateUp());
         rv = findViewById(R.id.rvMedals);
         empty = findViewById(R.id.llEmpty);
@@ -76,13 +75,11 @@ public class MedalActivity extends ThemedActivity {
     }
 
     private void bindList() {
-        List<MedalRow> rows = showingMine ? mine : catalog;
-        boolean emptyList = rows == null || rows.isEmpty();
+        List<MedalRow> rows = currentRows();
+        boolean emptyList = rows.isEmpty();
         if (empty != null) empty.setVisibility(emptyList ? View.VISIBLE : View.GONE);
         if (emptyText != null && emptyList) {
-            emptyText.setText(showingMine
-                    ? R.string.have_not_yet_received_badge
-                    : R.string.have_not_yet_received_badge);
+            emptyText.setText(R.string.have_not_yet_received_badge);
         }
         if (rv != null) {
             rv.setVisibility(emptyList ? View.GONE : View.VISIBLE);
@@ -92,48 +89,55 @@ public class MedalActivity extends ThemedActivity {
 
     private void loadMedals() {
         AppContainer c = ContainerProvider.from(this);
-        // Refresh /me so vipLevel is current.
         c.getIoExecutor().execute(() -> {
             try {
                 c.getUserRepository().getMe();
             } catch (Exception ignored) {
+                // Keep the cached session profile if refresh is temporarily unavailable.
             }
             AuthDtos.UserDto me = c.getSessionManager().getUser();
             int myVip = me != null ? Math.max(0, Math.min(MAX_VIP, me.vipLevel)) : 0;
-
             Result<MiscDtos.VipPlanList> plans = c.getVipPlansUseCase.execute();
             List<MedalRow> all = new ArrayList<>();
             List<MedalRow> owned = new ArrayList<>();
 
             if (plans.success && plans.data != null) {
-                for (MiscDtos.VipPlanDto p : plans.data) {
-                    if (p == null) continue;
-                    int level = Math.max(1, p.level);
-                    if (level > MAX_VIP) continue; // skip VIP 8…100 noise
-                    MedalRow row = toRow(p.name, level, p.badgeUrl);
-                    all.add(row);
+                for (MiscDtos.VipPlanDto plan : plans.data) {
+                    if (plan == null || plan.level < 1 || plan.level > MAX_VIP) continue;
+                    all.add(toVipRow(plan.name, plan.level, plan.badgeUrl));
                 }
             }
             if (all.isEmpty()) {
-                for (int i = 1; i <= MAX_VIP; i++) {
-                    all.add(toRow(null, i, null));
+                for (int level = 1; level <= MAX_VIP; level++) {
+                    all.add(toVipRow(null, level, null));
                 }
             }
-            // خاصتي = current VIP badge only (not every lower tier).
-            if (myVip >= 1) {
-                MedalRow current = null;
-                for (MedalRow row : all) {
-                    if (row.level == myVip) {
-                        current = row;
-                        break;
-                    }
+
+            if (me != null) {
+                // Show only the current VIP tier, and only when the account really has VIP.
+                if (myVip > 0) {
+                    String vipUrl = nonEmpty(me.vipBadgeUrl) ? me.vipBadgeUrl : null;
+                    MedalRow vip = findVipRow(all, myVip);
+                    if (vip == null) vip = toVipRow(null, myVip, vipUrl);
+                    else if (vipUrl != null) vip.iconUrl = vipUrl;
+                    owned.add(vip);
                 }
-                if (current == null) current = toRow(null, myVip, null);
-                owned.add(current);
+                // These badges are shown only when the API supplies their real image URL.
+                addRemoteBadge(owned, "شارة المستوى " + Math.max(1, me.level),
+                        me.levelBadgeUrl, "level");
+                addRemoteBadge(owned, "شارة المضيف", me.hostBadgeUrl, "host");
+                // The project already contains this dedicated verified badge asset.
+                if (me.genderVerified) {
+                    MedalRow verified = new MedalRow();
+                    verified.title = "شارة التحقق";
+                    verified.iconRes = R.drawable.ic_gender_verified;
+                    verified.key = "gender-verified";
+                    owned.add(verified);
+                }
             }
 
             runOnUiThread(() -> {
-                if (isFinishing()) return;
+                if (isFinishing() || isDestroyed()) return;
                 catalog.clear();
                 catalog.addAll(all);
                 mine.clear();
@@ -143,17 +147,35 @@ public class MedalActivity extends ThemedActivity {
         });
     }
 
-    private MedalRow toRow(String name, int level, String badgeUrl) {
+    private void addRemoteBadge(List<MedalRow> rows, String title, String url, String key) {
+        if (!nonEmpty(url)) return;
+        MedalRow row = new MedalRow();
+        row.title = title;
+        row.iconUrl = url;
+        row.key = key;
+        rows.add(row);
+    }
+
+    private MedalRow findVipRow(List<MedalRow> rows, int level) {
+        for (MedalRow row : rows) {
+            if (row.level == level) return row;
+        }
+        return null;
+    }
+
+    private MedalRow toVipRow(String name, int level, String badgeUrl) {
         MedalRow row = new MedalRow();
         row.level = level;
-        row.title = name != null && !name.isEmpty()
-                ? name : getString(R.string.medal_vip_tier, level);
-        if (badgeUrl != null && !badgeUrl.isEmpty()) {
-            row.iconUrl = badgeUrl;
-        } else {
-            row.iconUrl = "/assets/visual-system/vip/vip_medal_mikoo_" + level + ".png";
-        }
+        row.key = "vip-" + level;
+        row.title = nonEmpty(name) ? name : getString(R.string.medal_vip_tier, level);
+        row.iconUrl = nonEmpty(badgeUrl)
+                ? badgeUrl
+                : "/assets/visual-system/vip/vip_medal_mikoo_" + level + ".png";
         return row;
+    }
+
+    private static boolean nonEmpty(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 
     private List<MedalRow> currentRows() {
@@ -162,8 +184,10 @@ public class MedalActivity extends ThemedActivity {
 
     private static final class MedalRow {
         int level;
+        int iconRes;
         String title;
         String iconUrl;
+        String key;
     }
 
     private final class Adapter extends RecyclerView.Adapter<Adapter.VH> {
@@ -176,15 +200,20 @@ public class MedalActivity extends ThemedActivity {
         }
 
         @Override
-        public void onBindViewHolder(@NonNull VH h, int position) {
+        public void onBindViewHolder(@NonNull VH holder, int position) {
             MedalRow row = currentRows().get(position);
-            h.title.setText(row.title);
-            String abs = AssetCatalog.absoluteUrl(row.iconUrl);
-            Glide.with(h.icon)
-                    .load(abs)
-                    .placeholder(R.drawable.ic_medal_default)
-                    .error(R.drawable.ic_medal_default)
-                    .into(h.icon);
+            holder.title.setText(row.title);
+            Glide.with(holder.icon).clear(holder.icon);
+            if (row.iconRes != 0) {
+                holder.icon.setImageResource(row.iconRes);
+            } else {
+                String url = AssetCatalog.absoluteUrl(row.iconUrl);
+                Glide.with(holder.icon)
+                        .load(url)
+                        .placeholder(R.drawable.ic_medal_default)
+                        .error(R.drawable.ic_medal_default)
+                        .into(holder.icon);
+            }
         }
 
         @Override
@@ -195,6 +224,7 @@ public class MedalActivity extends ThemedActivity {
         final class VH extends RecyclerView.ViewHolder {
             final ImageView icon;
             final TextView title;
+
             VH(View itemView) {
                 super(itemView);
                 icon = itemView.findViewById(R.id.imgMedal);
