@@ -97,7 +97,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
-          key: jeho-android-debug-keystore-v2
+          key: jeho-android-debug-keystore-v1
 
       - name: Create temporary Android debug keystore
         shell: bash
