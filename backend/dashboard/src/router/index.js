@@ -82,6 +82,12 @@ const routes = [
         meta: { titleKey: 'nav.navIcons' },
       },
       {
+        path: 'profile-action-icons',
+        name: 'profile-action-icons',
+        component: () => import('@/views/ProfileActionIconsView.vue'),
+        meta: { title: 'أيقونات قسم أنا' },
+      },
+      {
         path: 'seat-stickers',
         name: 'seat-stickers',
         component: () => import('@/views/SeatStickersView.vue'),
