@@ -32,8 +32,20 @@ function cleanUrl(raw: unknown): string {
   if (raw == null) return '';
   const s = String(raw).trim();
   if (!s) return '';
-  // Allow absolute or site-relative uploads paths.
-  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('/')) return s;
+  // Uploads belong to the active JEHO-OWN deployment. If older dashboard
+  // versions saved an absolute URL from the legacy host, retain only its
+  // /uploads path so clients resolve it against the current API origin.
+  if (s.startsWith('http://') || s.startsWith('https://')) {
+    try {
+      const parsed = new URL(s);
+      if (parsed.pathname.startsWith('/uploads/')) return parsed.pathname + parsed.search;
+    } catch {
+      // Preserve an unparseable absolute URL; the client can fall back safely.
+    }
+    return s;
+  }
+  // Allow site-relative uploads paths and other absolute URLs.
+  if (s.startsWith('/')) return s;
   if (s.startsWith('uploads/') || s.startsWith('banners/')) return `/${s}`;
   return s;
 }
@@ -57,7 +69,7 @@ export function emptyNavIconsConfig(): NavIconsConfig {
 
 /** Shipped JEHO tab SVGs under /assets/nav-icons (same art as APK assets/icons). */
 export function defaultNavIconsConfig(
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ): NavIconsConfig {
   const base = `${String(origin).replace(/\/$/, '')}/assets/nav-icons`;
   const pair = (name: string): NavIconPair => ({
@@ -107,7 +119,7 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
 export function resolveNavIconUrl(
   pair: NavIconPair | undefined | null,
   selected: boolean,
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ): string {
   if (!pair) return '';
   const base = selected
@@ -121,7 +133,7 @@ export function resolveNavIconUrl(
 
 export function navIconsClientPayload(
   cfg: NavIconsConfig,
-  origin = process.env.PUBLIC_API_ORIGIN || 'https://api.adnova.bbs.tr',
+  origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ) {
   const map = (pair?: NavIconPair) => {
     const normal = resolveNavIconUrl(pair, false, origin);
