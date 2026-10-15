@@ -126,6 +126,7 @@ const profileActionsList = [
   { key: 'support', label: 'الدعم' },
 ]
 const version = ref(1)
+const profileActions = ref({})
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -164,6 +165,7 @@ function applyConfig(cfg) {
   const next = emptyForm()
   if (cfg && typeof cfg === 'object') {
     version.value = Math.max(1, Number(cfg.version) || 1)
+    profileActions.value = cfg.profileActions && typeof cfg.profileActions === 'object' ? { ...cfg.profileActions } : {}
     for (const k of KEYS) {
       const p = cfg[k] || cfg.tabs?.[k] || {}
       next[k].normal = p.normal || p.icon || ''
@@ -266,6 +268,7 @@ async function save() {
     games: { ...form.games },
     chat: { ...form.chat },
     me: { ...form.me },
+    profileActions: { ...profileActions.value },
     profileActions: { ...profileIcons },
   }
   const { error: err } = await settingsApi.update({
