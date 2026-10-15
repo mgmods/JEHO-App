@@ -3,10 +3,10 @@
 
   var TABS = [
     { key: 'vip_badge', label: 'الإطارات', hint: 'إطارات وحركات تظهر على صورتك — عاين قبل الشراء' },
-    { key: 'entry_effect', label: 'الدخولية', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
+    { key: 'entry_effect', label: 'الدخوليات', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
     { key: 'level_badge', label: 'شارات المستوى', hint: 'شارات المستوى بجانب الاسم' },
-    { key: 'room_card', label: 'كروت الروم', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
-    { key: 'room_background', label: 'خلفيات الروم', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
+    { key: 'room_card', label: 'بطاقات الغرف', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
+    { key: 'room_background', label: 'خلفيات الغرف', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
   ];
 
   var state = {
@@ -219,6 +219,7 @@
   var heroSvgaToken = 0;
   var cardSvga = {}; // id -> { player, parser, token }
   var cardObserver = null;
+  var cardVideoObserver = null;
 
   function stopHeroSvga() {
     heroSvgaToken += 1;
@@ -682,7 +683,37 @@
     });
   }
 
+  function stopAllCardVideo() {
+    if (cardVideoObserver) {
+      try { cardVideoObserver.disconnect(); } catch (e) { /* ignore */ }
+      cardVideoObserver = null;
+    }
+    try {
+      el.grid.querySelectorAll('video.mall-video-preview').forEach(function (video) {
+        try { video.pause(); } catch (e) { /* ignore */ }
+        try { video.removeAttribute('src'); video.load(); } catch (e2) { /* ignore */ }
+      });
+    } catch (e3) { /* ignore */ }
+  }
+
+  function ensureCardVideoObserver() {
+    if (cardVideoObserver || typeof IntersectionObserver === 'undefined') return;
+    cardVideoObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var video = entry.target;
+        if (!video || !video.isConnected) return;
+        if (entry.isIntersecting && entry.intersectionRatio > 0.08) {
+          var play = video.play();
+          if (play && typeof play.catch === 'function') play.catch(function () { /* native controls remain available */ });
+        } else {
+          try { video.pause(); } catch (e) { /* ignore */ }
+        }
+      });
+    }, { root: null, rootMargin: '100px 0px', threshold: [0, 0.08, 0.25] });
+  }
+
   function renderGrid() {
+    stopAllCardVideo();
     stopAllCardSvga();
     Object.keys(cardPlayTimers).forEach(function (id) {
       clearTimeout(cardPlayTimers[id]);
@@ -701,6 +732,7 @@
     syncBagButton();
 
     var pendingSvga = [];
+    var pendingVideos = [];
     list.forEach(function (item) {
       var card = document.createElement('article');
       card.className = 'card' + (item.id === state.selectedId ? ' selected' : '');
@@ -744,7 +776,42 @@
           canvas.setAttribute('data-svga', wear);
           thumb.appendChild(canvas);
           pendingSvga.push(canvas);
+        } else if (kind === 'video' && wear) {
+          var frameVideo = document.createElement('video');
+          frameVideo.className = 'overlay mall-video-preview';
+          frameVideo.src = wear;
+          frameVideo.muted = true;
+          frameVideo.defaultMuted = true;
+          frameVideo.loop = true;
+          frameVideo.playsInline = true;
+          frameVideo.preload = 'none';
+          frameVideo.setAttribute('aria-label', (item.name || 'معاينة الإطار'));
+          frameVideo.addEventListener('error', function () { frameVideo.classList.add('media-error'); });
+          thumb.appendChild(frameVideo);
+          pendingVideos.push(frameVideo);
         }
+      } else if (kind === 'video' && wear) {
+        if (still && still !== wear) {
+          var videoFallback = document.createElement('img');
+          videoFallback.className = 'overlay still-fallback';
+          videoFallback.loading = 'lazy';
+          videoFallback.decoding = 'async';
+          videoFallback.src = still;
+          videoFallback.alt = '';
+          thumb.appendChild(videoFallback);
+        }
+        var mediaVideo = document.createElement('video');
+        mediaVideo.className = 'overlay mall-video-preview';
+        mediaVideo.src = wear;
+        mediaVideo.muted = true;
+        mediaVideo.defaultMuted = true;
+        mediaVideo.loop = true;
+        mediaVideo.playsInline = true;
+        mediaVideo.preload = 'none';
+        mediaVideo.setAttribute('aria-label', (item.name || 'معاينة الحركة'));
+        mediaVideo.addEventListener('error', function () { mediaVideo.classList.add('media-error'); });
+        thumb.appendChild(mediaVideo);
+        pendingVideos.push(mediaVideo);
       } else if (still) {
         var img = document.createElement('img');
         img.loading = 'lazy';
@@ -816,6 +883,17 @@
             canvas,
             canvas.getAttribute('data-svga')
           );
+        });
+      }
+    }
+    if (pendingVideos.length) {
+      ensureCardVideoObserver();
+      if (cardVideoObserver) {
+        pendingVideos.forEach(function (video) { cardVideoObserver.observe(video); });
+      } else {
+        pendingVideos.slice(0, 2).forEach(function (video) {
+          var play = video.play();
+          if (play && typeof play.catch === 'function') play.catch(function () {});
         });
       }
     }
