@@ -13,6 +13,12 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
@@ -68,6 +74,8 @@ public class CosmeticsActivity extends ThemedActivity {
     @Nullable private ExoPlayer entryVideoPlayer;
     @Nullable private PlayerView entryVideoPlayerView;
     @Nullable private String activeEntryVideoUrl;
+    private boolean mallHtmlReady;
+    private String activeHtmlType = "vip_badge";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,11 +97,13 @@ public class CosmeticsActivity extends ThemedActivity {
         if (roomId == null || roomId.isEmpty()) {
             roomId = getIntent().getStringExtra("roomId");
         }
+        activeHtmlType = initialType;
         vm.setBagMode(bagMode);
         refreshBagButton();
         setupTabs();
         observeVm();
-        // Show self + wear immediately (profile-style)
+        setupHtmlMall();
+        // Keep the native animation host alive for real SVGA/frames preview.
         previewItem(null);
     }
 
@@ -126,12 +136,139 @@ public class CosmeticsActivity extends ThemedActivity {
 
     private void observeVm() {
         vm.getSelectedItem().observe(this, this::previewItem);
+        vm.getCatalogPage().observe(this, page -> {
+            if (page != null && activeHtmlType != null
+                    && activeHtmlType.equals(page.type)) {
+                pushCatalogToHtml(page);
+            }
+        });
         vm.getMessage().observe(this, m -> {
+            if (mallHtmlReady && m != null && !m.isEmpty()) {
+                runOnUiThread(() -> {
+                    if (binding != null) binding.mallWebView.evaluateJavascript(
+                            "window.mallMessage && window.mallMessage(" + JSONObject.quote(m) + ")", null);
+                });
+            }
             if (m != null && !m.isEmpty()) Toast.makeText(this, m, Toast.LENGTH_SHORT).show();
         });
         vm.getError().observe(this, e -> {
             if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
+    }
+
+    /** HTML store shell. All commerce actions are forwarded to the existing ViewModel/repository. */
+    private void setupHtmlMall() {
+        WebView web = binding.mallWebView;
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(false);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        web.setWebViewClient(new WebViewClient());
+        web.addJavascriptInterface(new MallBridge(), "JEHOStore");
+        web.loadUrl("file:///android_asset/mall-store.html");
+    }
+
+    private void pushCatalogToHtml(@Nullable CosmeticsViewModel.CatalogPage page) {
+        if (!mallHtmlReady || binding == null || page == null || page.items == null) return;
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("type", page.type);
+            JSONArray rows = new JSONArray();
+            for (CosmeticDtos.CosmeticDto item : page.items) {
+                if (item == null || item.id == null) continue;
+                JSONObject row = new JSONObject();
+                row.put("id", item.id);
+                row.put("type", item.type);
+                row.put("code", item.code);
+                row.put("name", item.name);
+                row.put("description", item.description);
+                row.put("previewUrl", AssetCatalog.absoluteUrl(item.previewUrl));
+                row.put("animationUrl", AssetCatalog.absoluteUrl(item.animationUrl));
+                row.put("coinPrice", item.coinPrice);
+                row.put("minVipLevel", item.minVipLevel);
+                row.put("minUserLevel", item.minUserLevel);
+                row.put("owned", vm.isOwned(item.id));
+                row.put("equipped", vm.isEquipped(item.id));
+                Integer days = vm.daysLeft(item.id);
+                row.put("daysLeft", days != null ? days : -1);
+                rows.put(row);
+            }
+            payload.put("items", rows);
+            String serialized = payload.toString();
+            binding.mallWebView.evaluateJavascript(
+                    "window.mallRender && window.mallRender(" + JSONObject.quote(serialized) + ")", null);
+        } catch (Exception ignored) {
+            // A malformed optional catalog field must not crash the store Activity.
+        }
+    }
+
+    private final class MallBridge {
+        @JavascriptInterface public void ready() {
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing()) return;
+                mallHtmlReady = true;
+                vm.setBagMode(bagMode);
+                vm.setFilterType(activeHtmlType);
+                vm.loadForType(activeHtmlType);
+                CosmeticsViewModel.CatalogPage page = vm.getCatalogPage().getValue();
+                if (page != null && activeHtmlType.equals(page.type)) pushCatalogToHtml(page);
+            });
+        }
+
+        @JavascriptInterface public void selectType(String type) {
+            runOnUiThread(() -> {
+                if (binding == null || type == null) return;
+                activeHtmlType = normalizeType(type);
+                initialType = activeHtmlType;
+                vm.setFilterType(activeHtmlType);
+                vm.clearSelection();
+                stopEntryVideoPreview();
+                vm.loadForType(activeHtmlType);
+            });
+        }
+
+        @JavascriptInterface public void setBagMode(boolean enabled) {
+            runOnUiThread(() -> {
+                if (binding == null) return;
+                bagMode = enabled;
+                vm.setBagMode(enabled);
+                refreshBagButton();
+                vm.loadForType(activeHtmlType);
+            });
+        }
+
+        @JavascriptInterface public void select(String id) {
+            runOnUiThread(() -> {
+                if (id == null || binding == null) return;
+                CosmeticsViewModel.CatalogPage page = vm.getCatalogPage().getValue();
+                if (page == null || page.items == null) return;
+                for (CosmeticDtos.CosmeticDto item : page.items) {
+                    if (item != null && id.equals(item.id)) {
+                        vm.select(item);
+                        return;
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface public void purchase(String id) {
+            runOnUiThread(() -> { if (id != null && !id.isEmpty()) vm.purchase(id); });
+        }
+
+        @JavascriptInterface public void equip(String id) {
+            runOnUiThread(() -> { if (id != null && !id.isEmpty()) vm.equip(id); });
+        }
+
+        @JavascriptInterface public void unequip(String id) {
+            runOnUiThread(() -> { if (id != null && !id.isEmpty()) vm.unequip(id); });
+        }
+
+        @JavascriptInterface public void recharge() {
+            runOnUiThread(() -> com.Dramizo.Series.util.BalanceRedirect.openRecharge(CosmeticsActivity.this));
+        }
     }
 
     private void previewItem(@Nullable CosmeticDtos.CosmeticDto item) {
