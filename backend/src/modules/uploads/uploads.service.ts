@@ -172,15 +172,21 @@ export class UploadsService {
       if (existsSync(storedPath)) unlinkSync(storedPath);
       throw new BadRequestException('Invalid or unsupported audio file');
     }
-    try {
-      await this.moderation.assertCleanImageFile(storedPath, file.mimetype);
-    } catch (err) {
-      if (userId) {
-        try {
-          await this.moderation.recordNsfwStrike(userId);
-        } catch {}
+    // NSFW image scanning is only valid for raster images. Running the image
+    // decoder against MP4/WebM/MOV/SVGA files makes legitimate mall media uploads
+    // fail (and must never count a video/SVGA upload as an NSFW strike).
+    const rasterImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+    if (rasterImageExtensions.has(ext)) {
+      try {
+        await this.moderation.assertCleanImageFile(storedPath, file.mimetype);
+      } catch (err) {
+        if (userId) {
+          try {
+            await this.moderation.recordNsfwStrike(userId);
+          } catch {}
+        }
+        throw err;
       }
-      throw err;
     }
     if (this.storageEnabled()) {
       const uploadHeaders = this.storageHeaders({
