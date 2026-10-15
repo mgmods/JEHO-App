@@ -10,6 +10,11 @@
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
         <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" /></div>
+        <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
+        <template v-if="form.awardType === 'achievement'">
+          <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option></select></div>
+          <div class="col-md-3"><label class="form-label">الحد المطلوب</label><input v-model.number="form.achievementThreshold" type="number" min="1" step="1" class="form-control" required /></div>
+        </template>
         <div class="col-md-2"><label class="form-label">الترتيب</label><input v-model.number="form.sortOrder" type="number" class="form-control" /></div>
         <div class="col-md-2 d-flex align-items-end gap-3"><label class="form-check"><input v-model="form.isActive" class="form-check-input" type="checkbox" /> مفعلة</label><label class="form-check"><input v-model="form.isAnimated" class="form-check-input" type="checkbox" /> متحركة</label></div>
         <div class="col-12 d-flex gap-2"><button class="btn btn-aurora" :disabled="saving">{{ saving ? 'جارٍ الحفظ…' : 'حفظ الشارة' }}</button><button v-if="editingId" class="btn btn-outline-secondary" type="button" @click="reset">إلغاء التعديل</button></div>
@@ -40,7 +45,7 @@ const saving = ref(false)
 const uploadingImage = ref(false)
 const error = ref('')
 const editingId = ref('')
-const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', isActive: true, isAnimated: false, sortOrder: 0 })
+const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', achievementKey: null, achievementThreshold: 0, isActive: true, isAnimated: false, sortOrder: 0 })
 const form = reactive(blank())
 const grant = reactive({ badgeId: '', userId: '' })
 
