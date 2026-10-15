@@ -176,6 +176,14 @@ public class ProfileFragment extends Fragment {
             binding.rowMyEvents.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), MyEventsActivity.class)));
         }
+        binding.tileMyEvents.setOnClickListener(v -> binding.rowMyEvents.performClick());
+        binding.tileAgency.setOnClickListener(v -> binding.btnAgency.performClick());
+        binding.tileRechargeAgent.setOnClickListener(v -> binding.btnRechargeAgent.performClick());
+        binding.tileTaskCenter.setOnClickListener(v -> binding.btnTaskCenter.performClick());
+        binding.tileSettings.setOnClickListener(v -> binding.btnSettingsQuick.performClick());
+        binding.tileSupport.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), CustomerSupportActivity.class)));
+        loadProfileActionIcons();
         binding.btnVip.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), VipActivity.class)));
         binding.btnSettingsQuick.setOnClickListener(v ->
@@ -352,6 +360,33 @@ public class ProfileFragment extends Fragment {
         } catch (Exception e) {
             return 18;
         }
+    }
+
+
+    private void loadProfileActionIcons() {
+        AppContainer container = ContainerProvider.from(requireActivity());
+        container.getIoExecutor().execute(() -> {
+            Result<MiscDtos.ProfileActionIconsDto> result = ApiCall.execute(
+                    container.getConfigApi().profileActionIcons(System.currentTimeMillis()));
+            if (!result.success || result.data == null || !isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                bindProfileActionIcon(binding.imgTileMyEvents, result.data.events);
+                bindProfileActionIcon(binding.imgTileAgency, result.data.agency);
+                bindProfileActionIcon(binding.imgTileRechargeAgent, result.data.rechargeAgent);
+                bindProfileActionIcon(binding.imgTileTaskCenter, result.data.tasks);
+                bindProfileActionIcon(binding.imgTileSettings, result.data.settings);
+                bindProfileActionIcon(binding.imgTileSupport, result.data.support);
+            });
+        });
+    }
+
+    private void bindProfileActionIcon(@Nullable android.widget.ImageView view, @Nullable String path) {
+        if (view == null || path == null || path.trim().isEmpty() || !isAdded()) return;
+        String url = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(path.trim());
+        url = com.Dramizo.Series.util.MediaAssetSync.bust(url);
+        Glide.with(this).load(url).apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
+                .dontAnimate().fitCenter().into(view);
     }
 
     private void loadAgencyAction() {
