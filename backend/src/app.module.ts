@@ -89,7 +89,10 @@ const entityList = Object.values(entities).filter(
         schema: 'jeho_own',
         extra: { options: '-c search_path=jeho_own' },
         entities: entityList,
-        synchronize: config.get<boolean>('app.database.synchronize'),
+        synchronize:
+          process.env.NODE_ENV === 'production'
+            ? false
+            : config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
       }),
       dataSourceFactory: async (options) => {
