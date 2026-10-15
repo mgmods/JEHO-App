@@ -48,6 +48,7 @@ const actions = [
   { key: 'support', label: 'الدعم' },
 ]
 const form = reactive(Object.fromEntries(actions.map(x => [x.key, ''])))
+const baseConfig = ref({ version: 1 })
 const version = ref(1)
 const loading = ref(false)
 const saving = ref(false)
@@ -71,7 +72,7 @@ function storedUrl(value) {
 }
 function parseSetting(list) {
   const rows = Array.isArray(list) ? list : list?.items || []
-  const row = rows.find(x => x.key === 'app_profile_action_icons')
+  const row = rows.find(x => x.key === 'app_nav_icons')
   if (!row?.value) return null
   try { return typeof row.value === 'string' ? JSON.parse(row.value) : row.value } catch { return null }
 }
@@ -86,7 +87,12 @@ async function load() {
   }
   const cfg = parseSetting(data)
   version.value = Math.max(1, Number(cfg?.version) || 1)
-  for (const item of actions) form[item.key] = typeof cfg?.[item.key] === 'string' ? cfg[item.key] : ''
+  baseConfig.value = cfg && typeof cfg === 'object' ? cfg : { version: 1 }
+  const profileActions = cfg?.profileActions && typeof cfg.profileActions === 'object' ? cfg.profileActions : {}
+  for (const item of actions) {
+    const key = item.key === 'rechargeAgent' ? 'recharge' : item.key
+    form[item.key] = typeof profileActions[key] === 'string' ? profileActions[key] : ''
+  }
 }
 async function onFile(event, key) {
   const file = event.target.files?.[0]
@@ -121,9 +127,13 @@ async function save() {
   saving.value = true
   error.value = ''
   success.value = ''
-  const body = { version: version.value + 1 }
-  for (const item of actions) body[item.key] = form[item.key]
-  const { error: err } = await settingsApi.update({ app_profile_action_icons: JSON.stringify(body) })
+  const profileActions = { ...(baseConfig.value.profileActions || {}) }
+  for (const item of actions) {
+    const key = item.key === 'rechargeAgent' ? 'recharge' : item.key
+    profileActions[key] = form[item.key]
+  }
+  const body = { ...baseConfig.value, version: version.value + 1, profileActions }
+  const { error: err } = await settingsApi.update({ app_nav_icons: JSON.stringify(body) })
   saving.value = false
   if (err) {
     error.value = err.message
