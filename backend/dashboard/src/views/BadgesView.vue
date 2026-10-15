@@ -6,7 +6,8 @@
       <h5 class="mb-3">{{ editingId ? 'تعديل شارة' : 'إضافة شارة جديدة' }}</h5>
       <form class="row g-3" @submit.prevent="save">
         <div class="col-md-4"><label class="form-label">اسم الشارة</label><input v-model.trim="form.name" class="form-control" maxlength="80" required /></div>
-        <div class="col-md-8"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://..." required /></div>
+        <div class="col-md-5"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /></div>
+        <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
         <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" /></div>
         <div class="col-md-2"><label class="form-label">الترتيب</label><input v-model.number="form.sortOrder" type="number" class="form-control" /></div>
@@ -31,11 +32,12 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { badgesApi } from '@/api'
+import { badgesApi, uploadsApi } from '@/api'
 
 const badges = ref([])
 const loading = ref(false)
 const saving = ref(false)
+const uploadingImage = ref(false)
 const error = ref('')
 const editingId = ref('')
 const blank = () => ({ name: '', description: '', imageUrl: '', category: 'general', awardType: 'manual', isActive: true, isAnimated: false, sortOrder: 0 })
@@ -47,6 +49,24 @@ async function load() {
   try { const r = await badgesApi.list(); badges.value = r?.data?.data ?? r?.data ?? [] }
   catch (e) { error.value = e?.response?.data?.message || 'تعذر تحميل الشارات. تحقق من صلاحيات الداشبورد.' }
   finally { loading.value = false }
+}
+async function uploadImage(event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) { error.value = 'اختر ملف صورة صالحًا.'; event.target.value = ''; return }
+  uploadingImage.value = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    const payload = response?.data?.data ?? response?.data ?? {}
+    if (!payload.url) throw new Error('لم يُرجع الخادم رابط الصورة.')
+    form.imageUrl = payload.url
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة الشارة.'
+  } finally {
+    uploadingImage.value = false
+    event.target.value = ''
+  }
 }
 function reset() { editingId.value = ''; Object.assign(form, blank()) }
 function edit(b) { editingId.value = b.id; Object.assign(form, { ...blank(), ...b }) }
