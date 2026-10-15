@@ -170,6 +170,19 @@ export const GAME_ODDS_COVERED_GAMES = [
   { id: 'slot777', via: 'spinHitRate' },
   { id: 'sugar-rush', via: 'spinHitRate' },
   { id: 'swimsuit-party', via: 'spinHitRate' },
+  // JEHO-owned casual betting games; win rates are resolved server-side.
+  { id: 'slots', via: 'gameWinRates' },
+  { id: 'roulette', via: 'gameWinRates' },
+  { id: 'plinko', via: 'gameWinRates' },
+  { id: 'rps', via: 'gameWinRates' },
+  { id: 'witch', via: 'gameWinRates' },
+  { id: 'blackjack', via: 'gameWinRates' },
+  { id: 'poker', via: 'gameWinRates' },
+  { id: 'tarot', via: 'gameWinRates' },
+  { id: 'penalty', via: 'gameWinRates' },
+  { id: 'reaction', via: 'gameWinRates' },
+  { id: 'dice', via: 'gameWinRates' },
+  { id: 'lucky-wheel', via: 'gameWinRates' },
 ] as const;
 
 export function gameOddsClientPayload(cfg: GameOddsConfig) {
