@@ -30,6 +30,8 @@ import com.Dramizo.Series.presentation.friends.RequestsActivity;
 import com.Dramizo.Series.presentation.notifications.NotificationsActivity;
 import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.presentation.settings.SettingsActivity;
+import com.Dramizo.Series.presentation.settings.CustomerSupportActivity;
+import com.Dramizo.Series.util.RemoteNavIcons;
 import com.Dramizo.Series.presentation.vip.VipActivity;
 import com.Dramizo.Series.presentation.wallet.BagActivity;
 import com.Dramizo.Series.presentation.wallet.RechargeAgentActivity;
@@ -87,6 +89,31 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
+
+        // New profile shortcut grid: exactly six actions, arranged by the 3-column GridLayout.
+        binding.actionMyEvents.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), MyEventsActivity.class)));
+        binding.actionOpenAgency.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), AgencyActivity.class)));
+        binding.actionRechargeAgent.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), RechargeAgentActivity.class)));
+        binding.actionTaskCenter.setOnClickListener(v -> {
+            if (!com.Dramizo.Series.util.TasksFeature.isEnabled(requireContext())) return;
+            startActivity(new Intent(requireContext(), TaskCenterActivity.class));
+        });
+        binding.actionSettings.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), SettingsActivity.class)));
+        binding.actionSupport.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), CustomerSupportActivity.class)));
+
+        AppContainer iconContainer = ContainerProvider.from(requireActivity());
+        RemoteNavIcons.hydrateFromCache(iconContainer);
+        bindProfileActionIcons();
+        iconContainer.getIoExecutor().execute(() -> {
+            RemoteNavIcons.refreshBlocking(iconContainer);
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(this::bindProfileActionIcons);
+        });
 
         bindRow(binding.btnAppearance, v ->
                 startActivity(new Intent(requireContext(), StoreHubActivity.class)));
@@ -267,10 +294,10 @@ public class ProfileFragment extends Fragment {
             binding.tvLevelChip.setTextColor(0xFFFFFFFF);
             binding.tvWealthChip.setBackgroundResource(R.drawable.bg_chip_wealth);
             binding.tvWealthChip.setTextColor(0xFFFFFFFF);
-            binding.tvWealthChip.setText("❤ " + formatScore(wealth));
+            binding.tvWealthChip.setText(formatScore(wealth));
             binding.tvCharmChip.setBackgroundResource(R.drawable.bg_chip_charm);
             binding.tvCharmChip.setTextColor(0xFFFFFFFF);
-            binding.tvCharmChip.setText("🌙 " + formatScore(charm));
+            binding.tvCharmChip.setText(formatScore(charm));
             if (binding.tvDiamondChip != null) {
                 binding.tvDiamondChip.setVisibility(View.GONE);
             }
@@ -289,6 +316,16 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
+    }
+
+    private void bindProfileActionIcons() {
+        if (binding == null) return;
+        RemoteNavIcons.bindProfileAction(binding.iconMyEvents, "events", R.drawable.ic_me_living_record);
+        RemoteNavIcons.bindProfileAction(binding.iconOpenAgency, "agency", R.drawable.ic_me_agency);
+        RemoteNavIcons.bindProfileAction(binding.iconRechargeAgent, "recharge", R.drawable.ic_recharge_agent);
+        RemoteNavIcons.bindProfileAction(binding.iconTaskCenter, "tasks", R.drawable.ic_me_task);
+        RemoteNavIcons.bindProfileAction(binding.iconSettings, "settings", R.drawable.ic_me_setting);
+        RemoteNavIcons.bindProfileAction(binding.iconSupport, "support", R.drawable.ic_brand_telegram);
     }
 
     private void cLoadVisitorCount() {
