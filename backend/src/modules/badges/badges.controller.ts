@@ -15,7 +15,7 @@ export class BadgesController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get active badge catalog and current-user ownership' })
   myBadges(@CurrentUser('sub') userId: string) {
-    return this.service.catalog(userId);
+    return this.service.catalogForIdentifier(userId);
   }
 
   @Get('users/:userId/badges')
