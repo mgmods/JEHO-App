@@ -671,8 +671,7 @@
                 android:layout_marginTop="12dp"
                 android:background="@drawable/bg_mikoo_card"
                 android:orientation="horizontal"
-                android:paddingVertical="15dp"
-                android:visibility="gone">
+                android:paddingVertical="15dp">
 
                 <LinearLayout
                     android:id="@+id/btnAppearance"
@@ -793,43 +792,6 @@
                     android:orientation="vertical" />
             </LinearLayout>
 
-            <!-- Profile actions: six configurable square tiles, three per row. -->
-            <GridLayout
-                android:id="@+id/profileActionsGrid"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="12dp"
-                android:layout_marginTop="12dp"
-                android:columnCount="3"
-                android:alignmentMode="alignMargins"
-                android:useDefaultMargins="true">
-
-                <LinearLayout android:id="@+id/actionMyEvents" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconMyEvents" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_me_living_record" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/my_events" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/actionOpenAgency" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconOpenAgency" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_me_agency" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/open_agency" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/actionRechargeAgent" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconRechargeAgent" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_recharge_agent" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/recharge_agent" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/actionTaskCenter" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconTaskCenter" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_me_task" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/task_center" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/actionSettings" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconSettings" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_me_setting" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/settings" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-                <LinearLayout android:id="@+id/actionSupport" android:layout_width="0dp" android:layout_height="100dp" android:layout_columnWeight="1" android:orientation="vertical" android:gravity="center" android:background="@drawable/bg_mikoo_card" android:foreground="?attr/selectableItemBackground" android:padding="8dp">
-                    <ImageView android:id="@+id/iconSupport" android:layout_width="38dp" android:layout_height="38dp" android:scaleType="fitCenter" android:src="@drawable/ic_brand_telegram" />
-                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:gravity="center" android:maxLines="2" android:text="@string/customer_support" android:textColor="@color/text_primary" android:textSize="12sp" android:textStyle="bold" />
-                </LinearLayout>
-            </GridLayout>
-
             <!-- Mikoo services list — each row has its own unique icon (hardcoded) -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -839,8 +801,7 @@
                 android:background="@drawable/bg_mikoo_card"
                 android:orientation="vertical"
                 android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:visibility="gone">
+                android:paddingVertical="4dp">
 
                 <LinearLayout
                     android:id="@+id/btnVisitors"
