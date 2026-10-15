@@ -369,21 +369,6 @@ public class SessionManager {
         return new java.util.ArrayList<>(prefs.getStringSet("saved_accounts", new java.util.HashSet<>()));
     }
 
-    /**
-     * Returns the last saved profile snapshot for the same login account.
-     * Used only as a fallback when /me is temporarily unavailable after login.
-     */
-    public AuthDtos.UserDto getSavedAccountUser(String username) {
-        if (username == null || username.trim().isEmpty()) return null;
-        String blob = prefs.getString("acc_" + username.trim(), null);
-        if (blob == null || blob.isEmpty()) return null;
-        try {
-            SavedAccount account = gson.fromJson(blob, SavedAccount.class);
-            return account != null ? account.user : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
 
     /** Full saved account cards (display name, avatar, frame, public ID). */
     public java.util.List<SavedAccountInfo> listSavedAccountDetails() {
