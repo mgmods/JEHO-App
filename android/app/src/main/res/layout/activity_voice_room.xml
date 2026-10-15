@@ -1336,7 +1336,7 @@
         android:elevation="32dp"
         android:gravity="center_vertical"
         android:layoutDirection="ltr"
-        android:minHeight="66dp"
+        android:minHeight="72dp"
         android:orientation="horizontal"
         android:paddingHorizontal="4dp"
         android:paddingVertical="4dp"
@@ -1347,8 +1347,8 @@
         <!-- Restored bottom controls: messages, gifts, stickers, seated mic, then composer. -->
         <FrameLayout
             android:id="@+id/btnPrivateMsg"
-            android:layout_width="40dp"
-            android:layout_height="44dp"
+            android:layout_width="44dp"
+            android:layout_height="48dp"
             android:layout_marginStart="1dp"
             android:visibility="visible"
             android:background="@android:color/transparent"
@@ -1356,8 +1356,8 @@
             android:contentDescription="@string/chat">
             <ImageView
                 android:id="@+id/imgPrivateMsg"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
@@ -1386,16 +1386,16 @@
         </FrameLayout>
         <FrameLayout
             android:id="@+id/btnGift"
-            android:layout_width="42dp"
-            android:layout_height="44dp"
+            android:layout_width="46dp"
+            android:layout_height="48dp"
             android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/send_gift"
             android:foreground="?attr/selectableItemBackgroundBorderless">
             <ImageView
                 android:id="@+id/imgRoomGift"
-                android:layout_width="34dp"
-                android:layout_height="34dp"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
@@ -1403,16 +1403,16 @@
         </FrameLayout>
         <FrameLayout
             android:id="@+id/btnSeatSticker"
-            android:layout_width="38dp"
-            android:layout_height="42dp"
+            android:layout_width="42dp"
+            android:layout_height="46dp"
             android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/emoji"
             android:foreground="?attr/selectableItemBackgroundBorderless">
             <ImageView
                 android:id="@+id/imgSeatSticker"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
@@ -1420,16 +1420,16 @@
         </FrameLayout>
         <FrameLayout
             android:id="@+id/btnMic"
-            android:layout_width="38dp"
-            android:layout_height="42dp"
+            android:layout_width="42dp"
+            android:layout_height="46dp"
             android:layout_marginStart="1dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/mic_on"
             android:visibility="gone">
             <ImageView
                 android:id="@+id/imgMicIcon"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
@@ -1465,16 +1465,16 @@
 
             <TextView
                 android:id="@+id/btnSendChatInline"
-                android:layout_width="40dp"
-                android:layout_height="38dp"
-                android:layout_marginStart="5dp"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_marginStart="0dp"
                 android:background="@drawable/bg_room_send_msg"
-                android:clickable="true"
+                android:clickable="false"
                 android:contentDescription="@string/send_btn"
-                android:focusable="true"
+                android:focusable="false"
                 android:gravity="center"
                 android:includeFontPadding="false"
-                android:text="➤"
+                android:text=""
                 android:textColor="@android:color/white"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -1526,7 +1526,7 @@
     <!-- Transparent side shortcuts: music, games, settings; aligned beside the bottom composer. -->
     <LinearLayout
         android:id="@+id/roomSideShortcuts"
-        android:layout_width="48dp"
+        android:layout_width="56dp"
         android:layout_height="wrap_content"
         android:layout_marginLeft="8dp"
         android:layout_marginBottom="14dp"
@@ -1540,8 +1540,8 @@
 
         <ImageView
             android:id="@+id/btnRoomSideMusic"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:translationY="-2dp"
             android:contentDescription="الموسيقى"
             android:padding="1dp"
@@ -1552,8 +1552,8 @@
 
         <ImageView
             android:id="@+id/btnRoomSideGames"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_marginTop="2dp"
             android:translationY="-4dp"
             android:contentDescription="الألعاب"
@@ -1564,8 +1564,8 @@
 
         <ImageView
             android:id="@+id/btnRoomSideSettings"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:layout_marginTop="6dp"
             android:contentDescription="الإعدادات"
             android:padding="2dp"
