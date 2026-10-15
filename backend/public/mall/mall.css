@@ -40,7 +40,7 @@ button { color: inherit; cursor: pointer; touch-action: manipulation; }
 button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 [hidden] { display: none !important; }
 .mall-shell { width: 100%; max-width: 760px; margin: 0 auto; }
-.topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px; min-height:54px; margin:calc(-1 * max(12px, var(--safe-top))) -2px 15px; padding:max(12px, var(--safe-top)) 2px 0; background:linear-gradient(180deg,rgba(12,14,28,.98),rgba(12,14,28,.88)); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+.topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:10px; min-height:54px; margin-bottom:15px; padding:10px 0; background:linear-gradient(180deg,rgba(12,14,28,.98),rgba(12,14,28,.88)); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
 .brand-mark {
   width:43px; height:43px; flex:0 0 43px; position:relative; display:grid; place-items:center;
   border-radius:15px; color:#171326; font-size:23px; font-weight:900;
