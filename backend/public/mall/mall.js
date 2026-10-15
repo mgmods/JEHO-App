@@ -2,11 +2,11 @@
   'use strict';
 
   var TABS = [
-    { key: 'vip_badge', label: 'الإطارات', hint: 'إطارات وحركات تظهر على صورتك — عاين قبل الشراء' },
-    { key: 'entry_effect', label: 'الدخوليات', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
-    { key: 'level_badge', label: 'شارات المستوى', hint: 'شارات المستوى بجانب الاسم' },
-    { key: 'room_card', label: 'بطاقات الغرف', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
-    { key: 'room_background', label: 'خلفيات الغرف', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
+    { key: 'vip_badge', label: 'الإطارات', icon: '👑', hint: 'إطارات وحركات تظهر على صورتك — عاين قبل الشراء' },
+    { key: 'entry_effect', label: 'الدخوليات', icon: '🏎️', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
+    { key: 'level_badge', label: 'الشارات', icon: '🏅', hint: 'شارات المستوى بجانب الاسم' },
+    { key: 'room_card', label: 'بطاقات الغرف', icon: '🏰', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
+    { key: 'room_background', label: 'خلفيات الغرف', icon: '🌌', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
   ];
 
   var state = {
@@ -677,7 +677,18 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'tab' + (t.key === state.type ? ' active' : '');
-      btn.textContent = t.label;
+      btn.setAttribute('aria-selected', t.key === state.type ? 'true' : 'false');
+      btn.setAttribute('role', 'tab');
+      btn.title = t.label;
+      var icon = document.createElement('span');
+      icon.className = 'tab-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = t.icon || '✦';
+      var label = document.createElement('span');
+      label.className = 'tab-label';
+      label.textContent = t.label;
+      btn.appendChild(icon);
+      btn.appendChild(label);
       btn.addEventListener('click', function () {
         if (state.type === t.key) return;
         state.type = t.key;
