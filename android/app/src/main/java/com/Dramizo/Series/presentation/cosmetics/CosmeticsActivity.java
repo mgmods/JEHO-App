@@ -172,7 +172,7 @@ public class CosmeticsActivity extends ThemedActivity {
             binding.nativeHeroFrame.bind(abs, avatar, item.meta, 1);
         } else {
             lastWearUrl = null;
-            String mediaUrl = firstNonEmpty(item.animationUrl, item.previewUrl);
+            String mediaUrl = animatedMediaUrl(item.animationUrl, item.previewUrl);
             com.Dramizo.Series.util.CosmeticMedia.Kind mediaKind =
                     com.Dramizo.Series.util.CosmeticMedia.kind(mediaUrl);
 
@@ -300,6 +300,25 @@ public class CosmeticsActivity extends ThemedActivity {
         if (a != null && !a.isEmpty()) return a;
         if (b != null && !b.isEmpty()) return b;
         return null;
+    }
+
+    @Nullable
+    private static String animatedMediaUrl(String animationUrl, String previewUrl) {
+        // Admin catalogs can put the playable asset in either field; don't let
+        // a static thumbnail in animationUrl mask an SVGA/video previewUrl.
+        com.Dramizo.Series.util.CosmeticMedia.Kind animationKind =
+                com.Dramizo.Series.util.CosmeticMedia.kind(animationUrl);
+        if (animationKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
+                || animationKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+            return animationUrl;
+        }
+        com.Dramizo.Series.util.CosmeticMedia.Kind previewKind =
+                com.Dramizo.Series.util.CosmeticMedia.kind(previewUrl);
+        if (previewKind == com.Dramizo.Series.util.CosmeticMedia.Kind.SVGA
+                || previewKind == com.Dramizo.Series.util.CosmeticMedia.Kind.VIDEO) {
+            return previewUrl;
+        }
+        return firstNonEmpty(animationUrl, previewUrl);
     }
 
     private static String stillPngUrl(String preview, String anim) {
