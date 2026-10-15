@@ -54,6 +54,7 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .top-actions { display:flex; align-items:center; gap:7px; }
 .icon-action,.recharge-action { border:1px solid var(--stroke); border-radius:13px; min-height:38px; display:flex; align-items:center; justify-content:center; gap:6px; padding:0 10px; font-size:11px; font-weight:800; }
 .icon-action { background:rgba(255,255,255,.045); color:#e5e2fa; }
+.icon-action.is-active { border-color:rgba(243,201,105,.5); background:rgba(243,201,105,.1); color:#ffe5a1; }
 .action-glyph { font-size:15px; color:var(--gold); }
 .recharge-action { border-color:rgba(243,201,105,.3); background:linear-gradient(135deg,rgba(243,201,105,.18),rgba(243,201,105,.07)); color:#ffe5a1; }
 .recharge-action span { font-size:17px; line-height:1; }
