@@ -4,11 +4,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="6dp"
-    app:cardBackgroundColor="#FFFFF0D1"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:strokeColor="#1A000000"
+    android:layout_margin="5dp"
+    app:cardBackgroundColor="#FFFCFDFE"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="2dp"
+    app:strokeColor="#1A0E7490"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -16,12 +16,12 @@
         android:layout_height="wrap_content"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:padding="10dp">
+        android:padding="9dp">
 
         <!-- Lightweight preview: NO HostSignalView / SVGA in mall grid (OOM crash). -->
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="110dp"
+            android:layout_height="116dp"
             android:background="@drawable/bg_cosmetic_preview"
             android:clipChildren="true"
             android:clipToPadding="true">
@@ -64,7 +64,7 @@
             android:id="@+id/tvName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="10dp"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="2"
@@ -93,7 +93,7 @@
         <TextView
             android:id="@+id/btnPurchase"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
+            android:layout_height="42dp"
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_cosmetic_btn_buy"
             android:gravity="center"
@@ -105,7 +105,7 @@
         <TextView
             android:id="@+id/btnEquip"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
+            android:layout_height="42dp"
             android:layout_marginTop="10dp"
             android:background="@drawable/bg_cosmetic_btn_equip"
             android:gravity="center"
