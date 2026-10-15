@@ -3,13 +3,13 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { BadgesService } from './badges.service';
 
 @ApiTags('Badges')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+// Authentication is enforced by the application-wide APP_GUARD.
+// Do not instantiate a second JwtAuthGuard in BadgesModule.
 @Controller('badges')
 export class BadgesController {
   constructor(private readonly badges: BadgesService) {}
@@ -35,7 +35,7 @@ export class BadgesController {
 
 @ApiTags('Admin Badges')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(AdminGuard)
 @Controller('admin/badges')
 export class AdminBadgesController {
   constructor(private readonly badges: BadgesService) {}
