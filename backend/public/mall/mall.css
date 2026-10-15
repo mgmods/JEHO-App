@@ -186,3 +186,13 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .coin-price{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:var(--gold);font-weight:800}
 .coin-price-icon{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;background:rgba(243,201,105,.12);border:1px solid rgba(243,201,105,.28);font-size:13px;line-height:1;vertical-align:middle}
 @media(max-width:390px){.store-section-nav{gap:5px}.store-section-link{padding:10px 2px;border-radius:12px}.store-section-link small{font-size:8px}.store-section-link strong{font-size:11px}.store-section-icon{width:29px;height:29px}}
+
+
+/* Entry effects are previews layered on the real avatar, not a replacement screen. */
+.wear-stage.entry-effect-preview .entry-preview,
+.wear-stage.entry-effect-preview .bg-preview{z-index:3;object-fit:contain;mix-blend-mode:screen;background:transparent;pointer-events:none}
+.wear-stage.entry-effect-preview .entry-preview{border:0;outline:0}
+.apply-label{display:block;color:var(--muted);font-size:11px;margin:8px 0 5px}
+.target-select{width:100%;padding:10px;border-radius:11px;border:1px solid var(--stroke);background:#111426;color:var(--ink);font:inherit;font-size:12px;margin-bottom:7px}
+.target-select:focus{outline:1px solid var(--gold)}
+.item-card [data-apply-id]{width:100%;margin-top:2px}
