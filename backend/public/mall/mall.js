@@ -45,6 +45,10 @@
     heroVideo: document.getElementById('heroVideo'),
     btnPrimary: document.getElementById('btnPrimary'),
     btnSecondary: document.getElementById('btnSecondary'),
+    btnBag: document.getElementById('btnBag'),
+    btnRecharge: document.getElementById('btnRecharge'),
+    catalogCount: document.getElementById('catalogCount'),
+    catalogCaption: document.getElementById('catalogCaption'),
   };
 
   function qs(name) {
@@ -482,6 +486,7 @@
     el.heroRoomCard.hidden = true;
     el.heroBg.hidden = true;
     el.heroVideo.hidden = true;
+    el.heroVideo.controls = false;
     el.heroAvatar.hidden = false;
     try { el.heroVideo.pause(); el.heroVideo.removeAttribute('src'); el.heroVideo.load(); } catch (e) {}
   }
@@ -529,8 +534,10 @@
         });
       } else if (kind === 'video' && wear) {
         el.heroVideo.hidden = false;
+        el.heroVideo.controls = true;
+        el.heroVideo.muted = false;
         el.heroVideo.src = wear;
-        el.heroVideo.play().catch(function () {});
+        el.heroVideo.play().catch(function () { /* user can start playback with controls */ });
       } else if (kind === 'gif' && wear) {
         showStaticFrame(wear, false);
       } else {
@@ -689,6 +696,9 @@
     }
     el.empty.hidden = list.length > 0;
     el.empty.textContent = state.bagMode ? 'حقيبتك فارغة في هذا القسم' : 'لا توجد عناصر في هذا القسم';
+    if (el.catalogCount) el.catalogCount.textContent = list.length ? (list.length + ' عنصر') : '';
+    if (el.catalogCaption) el.catalogCaption.textContent = state.bagMode ? 'العناصر الموجودة في حقيبتك' : 'مختارات هذا القسم';
+    syncBagButton();
 
     var pendingSvga = [];
     list.forEach(function (item) {
@@ -1006,6 +1016,27 @@
 
   el.btnPrimary.addEventListener('click', onPrimary);
   el.btnSecondary.addEventListener('click', onSecondary);
+
+  function syncBagButton() {
+    if (!el.btnBag) return;
+    el.btnBag.setAttribute('aria-pressed', state.bagMode ? 'true' : 'false');
+    el.btnBag.classList.toggle('is-active', !!state.bagMode);
+    var label = el.btnBag.querySelector('.action-label');
+    if (label) label.textContent = state.bagMode ? 'المتجر' : 'حقيبتي';
+    el.btnBag.setAttribute('aria-label', state.bagMode ? 'العودة إلى المتجر' : 'حقيبتي');
+  }
+
+  if (el.btnBag) el.btnBag.addEventListener('click', function () {
+    state.bagMode = !state.bagMode;
+    state.selectedId = null;
+    syncBagButton();
+    loadCatalog();
+  });
+
+  if (el.btnRecharge) el.btnRecharge.addEventListener('click', function () {
+    openRechargeNative('افتح صفحة الشحن لإضافة رصيد إلى محفظتك');
+    if (!bridge()) setStatus('ميزة الشحن متاحة من داخل التطبيق بعد تسجيل الدخول.', 'err');
+  });
 
   // Bootstrap from query + bridge
   state.type = qs('type') || 'vip_badge';
