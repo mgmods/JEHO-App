@@ -119,8 +119,8 @@ export class BadgesService {
   async update(id: string, dto: Partial<UpsertBadgeDto>) {
     const badge = await this.badges.findOne({ where: { id } });
     if (!badge) throw new NotFoundException('Badge not found');
-    if (dto.name !== undefined && !dto.name.trim()) throw new BadRequestException('Badge name is required');
-    if (dto.imageUrl !== undefined && !dto.imageUrl.trim()) throw new BadRequestException('Badge image URL is required');
+    const merged = { ...badge, ...dto };
+    this.validate(merged);
     Object.assign(badge, dto);
     return this.badges.save(badge);
   }
