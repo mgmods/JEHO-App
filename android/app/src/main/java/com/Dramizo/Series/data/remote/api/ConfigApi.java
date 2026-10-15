@@ -27,10 +27,6 @@ public interface ConfigApi {
     @GET("config/nav-icons")
     Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons(@Query("_") long cacheBust);
 
-    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
-    @GET("config/profile-action-icons")
-    Call<ApiResponse<MiscDtos.ProfileActionIconsDto>> profileActionIcons(@Query("_") long cacheBust);
-
     @GET("config/seat-stickers")
     Call<ApiResponse<MiscDtos.SeatStickersDto>> seatStickers();
 
