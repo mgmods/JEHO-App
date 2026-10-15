@@ -640,7 +640,7 @@
         el.btnPrimary.className = 'btn btn-owned';
         el.btnPrimary.disabled = true;
         el.btnSecondary.hidden = false;
-        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+        el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
         el.btnSecondary.disabled = state.busy;
       }
       return;
@@ -656,13 +656,13 @@
       el.btnPrimary.className = 'btn btn-owned';
       el.btnPrimary.disabled = true;
       el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+      el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
       el.btnSecondary.disabled = state.busy;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
       el.btnPrimary.className = 'btn btn-primary';
       el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+      el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
       el.btnSecondary.disabled = state.busy;
     }
   }
