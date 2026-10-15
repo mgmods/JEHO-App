@@ -101,6 +101,12 @@ public class CosmeticsActivity extends ThemedActivity {
                 com.Dramizo.Series.presentation.cosmetics.CosmeticsViewModel.EXTRA_TYPE);
         if (initial != null && !initial.isEmpty()) type = normalizeType(initial);
         boolean bag = getIntent().getBooleanExtra("bag_mode", false);
+        String section = getIntent().getStringExtra("store_section");
+        if ("level".equals(section) || "badges".equals(section)
+                || "id".equals(section) || "vip".equals(section)) {
+            webView.loadUrl(mallOrigin + "/mall/" + section + ".html");
+            return;
+        }
         Uri.Builder page = Uri.parse(mallOrigin + "/mall/").buildUpon()
                 .appendQueryParameter("type", type)
                 .appendQueryParameter("bag", bag ? "1" : "0");
