@@ -303,6 +303,10 @@
                   <input v-model="form.supportInstagram" class="form-control" placeholder="@username" dir="ltr" />
                 </div>
                 <div class="col-md-6">
+                  <label class="form-label">الموقع الرسمي للدعم</label>
+                  <input v-model="form.supportWebsite" class="form-control" placeholder="https://example.com" dir="ltr" />
+                </div>
+                <div class="col-md-6">
                   <label class="form-label">{{ t('settings.supportPhone') }}</label>
                   <input v-model="form.supportPhone" class="form-control" placeholder="+90..." dir="ltr" />
                 </div>
@@ -811,6 +815,7 @@ const form = reactive({
   supportWhatsapp: '',
   supportTelegram: '',
   supportInstagram: '',
+  supportWebsite: '',
   supportPhone: '',
   defaultLocale: 'en',
   maintenanceMode: false,
@@ -915,6 +920,7 @@ async function load() {
     supportWhatsapp: map.support_whatsapp ?? map.supportWhatsapp ?? form.supportWhatsapp,
     supportTelegram: map.support_telegram ?? map.supportTelegram ?? form.supportTelegram,
     supportInstagram: map.support_instagram ?? map.supportInstagram ?? form.supportInstagram,
+    supportWebsite: map.support_website ?? map.supportWebsite ?? form.supportWebsite,
     supportPhone: map.support_phone ?? map.supportPhone ?? form.supportPhone,
     defaultLocale: map.defaultLocale ?? map.default_locale ?? form.defaultLocale,
     maintenanceMode: bool(map.maintenanceMode ?? map.maintenance_mode, form.maintenanceMode),
@@ -1002,6 +1008,7 @@ async function save() {
     support_whatsapp: String(form.supportWhatsapp ?? ''),
     support_telegram: String(form.supportTelegram ?? ''),
     support_instagram: String(form.supportInstagram ?? ''),
+    support_website: String(form.supportWebsite ?? ''),
     support_phone: String(form.supportPhone ?? ''),
     defaultLocale: String(form.defaultLocale ?? 'ar'),
     maintenanceMode: String(!!form.maintenanceMode),
