@@ -89,6 +89,7 @@ class MainActivity : ThemedActivity() {
     private var activeRoomDragConfigured: Boolean = false
     private var taskInviteListener: RealtimeClient.RoomListener? = null
     private var playInAppUpdateHelper: PlayInAppUpdateHelper? = null
+    private var hasResumedOnce: Boolean = false
 
     /** First open of each tab may show a short loader; revisits stay stable. */
     private val pageWarmed = BooleanArray(5)
@@ -496,6 +497,21 @@ class MainActivity : ThemedActivity() {
     override fun onResume() {
         super.onResume()
         val container = ContainerProvider.from(this)
+        // The initial icon fetch is started in onCreate. Refresh again whenever
+        // the user returns to the foreground so Dashboard changes appear without
+        // requiring an APK update or a manual app restart.
+        if (hasResumedOnce) {
+            container.ioExecutor.execute {
+                RemoteNavIcons.refreshBlocking(container)
+                runOnUiThread {
+                    if (binding == null) return@runOnUiThread
+                    applyNavIcons()
+                    highlightPage(currentPage)
+                }
+            }
+        } else {
+            hasResumedOnce = true
+        }
         loadAgencyAction(container)
         container.ioExecutor.execute { AppFeatures.refresh(container) }
         bindActiveRoomMini()
