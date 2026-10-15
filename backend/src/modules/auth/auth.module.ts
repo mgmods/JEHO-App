@@ -10,6 +10,7 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { OtpCode } from '../../database/entities/otp-code.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { AppSetting } from '../../database/entities/app-setting.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtAuthGuard],
+  exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

@@ -46,6 +46,7 @@ import { ModerationModule } from './modules/moderation/moderation.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { BadgesModule } from './modules/badges/badges.module';
+import { ensureBadgeTables } from './database/badges-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -89,7 +90,10 @@ const entityList = Object.values(entities).filter(
         schema: 'jeho_own',
         extra: { options: '-c search_path=jeho_own' },
         entities: entityList,
-        synchronize: config.get<boolean>('app.database.synchronize'),
+        synchronize:
+          process.env.NODE_ENV === 'production'
+            ? false
+            : config.get<boolean>('app.database.synchronize'),
         logging: config.get<boolean>('app.database.logging'),
       }),
       dataSourceFactory: async (options) => {
@@ -114,6 +118,17 @@ const entityList = Object.values(entities).filter(
         }
 
         const appDataSource = await new DataSource(options).initialize();
+
+        // Badge schema setup is additive and best-effort: a badge-only setup
+        // issue must never prevent the rest of the API from starting.
+        try {
+          await ensureBadgeTables(appDataSource);
+        } catch (error) {
+          console.error(
+            '[BadgesBootstrap] Badge setup failed; continuing API startup.',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
 
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
         const [connectionInfo] = await appDataSource.query(

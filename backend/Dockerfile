@@ -38,9 +38,8 @@ USER node
 
 EXPOSE 3000
 
-# JEHO-OWN keeps its database isolated in the "jeho_own" schema.
-# Seed first so TypeORM creates/updates all tables and default settings
-# before Nest starts serving requests. The compiled seed is in dist/.
+# JEHO-OWN production startup checks the existing isolated "jeho_own" schema.
+# It deliberately does not seed, reset, or synchronize the live database.
 COPY --from=builder /app/scripts ./scripts
 
 CMD ["node", "scripts/start-production.js"]
