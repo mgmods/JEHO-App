@@ -66,6 +66,7 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   'recharge-agent-pricing': 'rechargeAgents',
   'recharge-agent-contacts': 'rechargeAgents',
   vip: 'vip',
+  badges: 'badges',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
   offers: 'offers',
