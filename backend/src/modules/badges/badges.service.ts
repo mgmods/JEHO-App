@@ -26,6 +26,17 @@ export class BadgesService {
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
+  async catalogForIdentifier(identifier: string) {
+    const value = (identifier || '').trim();
+    if (!value) throw new BadRequestException('User ID is required');
+    const user = await this.users.findOne({
+      where: [{ id: value }, { publicId: value }],
+      select: { id: true, publicId: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return this.catalog(user.id);
+  }
+
   async catalog(userId: string) {
     const [badges, owned] = await Promise.all([
       this.badges.find({ where: { isActive: true }, order: { sortOrder: 'ASC', name: 'ASC' } }),
