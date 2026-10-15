@@ -603,6 +603,12 @@
     return Math.max(1, Math.ceil(ms / (24 * 60 * 60 * 1000)));
   }
 
+  function coinMarkup(amount) {
+    var n = Math.max(0, Number(amount) || 0);
+    return '<span class="coin-price"><span class="coin-price-icon" aria-label="كوينز">🪙</span>' +
+      n.toLocaleString('en-US') + '</span>';
+  }
+
   function syncActionButtons(item) {
     el.btnSecondary.hidden = true;
     if (!item) {
@@ -617,15 +623,15 @@
 
     if (state.type === 'room_background') {
       if (!owned) {
-        el.btnPrimary.textContent = item.coinPrice > 0
-          ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+        el.btnPrimary.innerHTML = item.coinPrice > 0
+          ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
           : 'احصل مجاناً · 30 يوم';
         el.btnPrimary.className = 'btn btn-buy';
       } else if (state.roomId) {
         el.btnPrimary.textContent = 'طبّق على الروم';
         el.btnPrimary.className = 'btn btn-primary';
         el.btnSecondary.hidden = false;
-        el.btnSecondary.textContent = 'تجديد ' + renewPrice(item.coinPrice) + ' · +30 يوم';
+        el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
         el.btnSecondary.disabled = state.busy;
       } else {
         el.btnPrimary.textContent = left != null
@@ -641,8 +647,8 @@
     }
 
     if (!owned) {
-      el.btnPrimary.textContent = item.coinPrice > 0
-        ? ('شراء ' + item.coinPrice + ' · 30 يوم')
+      el.btnPrimary.innerHTML = item.coinPrice > 0
+        ? ('شراء ' + coinMarkup(item.coinPrice) + ' · 30 يوم')
         : 'احصل مجاناً · 30 يوم';
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
@@ -841,8 +847,8 @@
           ? (left != null ? ('مُرتدى · ' + left + 'ي') : 'مُرتدى')
           : (left != null ? ('مشتراة · ' + left + 'ي') : 'مشتراة');
       } else {
-        price.textContent = item.coinPrice > 0
-          ? (item.coinPrice + ' · 30 يوم')
+        price.innerHTML = item.coinPrice > 0
+          ? (coinMarkup(item.coinPrice) + ' · 30 يوم')
           : 'مجاني · 30 يوم';
       }
       card.appendChild(price);
@@ -853,14 +859,14 @@
       var equipped = !!state.equipped[item.id];
       if (!owned) {
         action.className = 'btn btn-buy';
-        action.textContent = item.coinPrice > 0 ? ('شراء ' + item.coinPrice) : 'احصل';
+        action.innerHTML = item.coinPrice > 0 ? ('شراء ' + coinMarkup(item.coinPrice)) : 'احصل';
       } else if (state.type === 'room_background') {
         action.className = 'btn btn-owned';
         action.textContent = state.roomId ? 'طبّق' : 'مشتراة';
         if (!state.roomId) action.disabled = true;
       } else if (equipped) {
         action.className = 'btn btn-buy';
-        action.textContent = 'تجديد ' + renewPrice(item.coinPrice);
+        action.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice));
       } else {
         action.className = 'btn btn-primary';
         action.textContent = 'ارتدِ';
