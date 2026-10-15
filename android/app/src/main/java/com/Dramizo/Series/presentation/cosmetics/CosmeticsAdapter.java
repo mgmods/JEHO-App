@@ -174,7 +174,7 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
                     .error(ImagePlaceholder.cover());
             // GIF and animated WebP must stay animated in the store grid.
             // Only a generated/static PNG thumbnail is intentionally frozen.
-            String lowerStill = still.toLowerCase(java.util.Locale.US).split("\\\\?", 2)[0];
+            String lowerStill = still.toLowerCase(java.util.Locale.US).split("\\?", 2)[0];
             if (lowerStill.endsWith(".png") || lowerStill.endsWith(".jpg")
                     || lowerStill.endsWith(".jpeg")) {
                 request = request.dontAnimate();
