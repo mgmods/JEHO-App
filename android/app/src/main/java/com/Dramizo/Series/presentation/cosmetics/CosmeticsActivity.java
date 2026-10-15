@@ -285,7 +285,14 @@ public class CosmeticsActivity extends ThemedActivity {
     }
 
     private static String stillPngUrl(String preview, String anim) {
-        // Same rules as grid — so hero & cells both load room backgrounds/WebP.
+        // For a selected entry effect, let Glide play an actual GIF instead of
+        // always replacing it with a static thumbnail. The product grid remains
+        // static/lightweight; only this single hero preview can animate.
+        if (anim != null) {
+            String lower = anim.toLowerCase(java.util.Locale.US).split("\\?", 2)[0];
+            if (lower.endsWith(".gif")) return anim;
+        }
+        // Keep the grid-compatible static fallback for SVGA/video and other media.
         return CosmeticsAdapter.stillPreviewUrl(preview, anim);
     }
 
