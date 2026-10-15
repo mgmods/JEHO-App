@@ -339,6 +339,7 @@ public final class MiscDtos {
         @SerializedName("whatsapp") public String whatsapp;
         @SerializedName("telegram") public String telegram;
         @SerializedName("instagram") public String instagram;
+        @SerializedName("website") public String website;
         @SerializedName("email") public String email;
         @SerializedName("phone") public String phone;
     }
