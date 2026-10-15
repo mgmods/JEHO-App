@@ -176,12 +176,12 @@ public class ProfileFragment extends Fragment {
             binding.rowMyEvents.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), MyEventsActivity.class)));
         }
-        binding.tileMyEvents.setOnClickListener(v -> binding.rowMyEvents.performClick());
-        binding.tileAgency.setOnClickListener(v -> binding.btnAgency.performClick());
-        binding.tileRechargeAgent.setOnClickListener(v -> binding.btnRechargeAgent.performClick());
-        binding.tileTaskCenter.setOnClickListener(v -> binding.btnTaskCenter.performClick());
-        binding.tileSettings.setOnClickListener(v -> binding.btnSettingsQuick.performClick());
-        binding.tileSupport.setOnClickListener(v ->
+        binding.actionMyEvents.setOnClickListener(v -> binding.rowMyEvents.performClick());
+        binding.actionOpenAgency.setOnClickListener(v -> binding.btnAgency.performClick());
+        binding.actionRechargeAgent.setOnClickListener(v -> binding.btnRechargeAgent.performClick());
+        binding.actionTaskCenter.setOnClickListener(v -> binding.btnTaskCenter.performClick());
+        binding.actionSettings.setOnClickListener(v -> binding.btnSettingsQuick.performClick());
+        binding.actionSupport.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), CustomerSupportActivity.class)));
         loadProfileActionIcons();
         binding.btnVip.setOnClickListener(v ->
@@ -371,12 +371,12 @@ public class ProfileFragment extends Fragment {
             if (!result.success || result.data == null || !isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || !isAdded()) return;
-                bindProfileActionIcon(binding.imgTileMyEvents, result.data.events);
-                bindProfileActionIcon(binding.imgTileAgency, result.data.agency);
-                bindProfileActionIcon(binding.imgTileRechargeAgent, result.data.rechargeAgent);
-                bindProfileActionIcon(binding.imgTileTaskCenter, result.data.tasks);
-                bindProfileActionIcon(binding.imgTileSettings, result.data.settings);
-                bindProfileActionIcon(binding.imgTileSupport, result.data.support);
+                bindProfileActionIcon(binding.iconMyEvents, result.data.events);
+                bindProfileActionIcon(binding.iconOpenAgency, result.data.agency);
+                bindProfileActionIcon(binding.iconRechargeAgent, result.data.rechargeAgent);
+                bindProfileActionIcon(binding.iconTaskCenter, result.data.tasks);
+                bindProfileActionIcon(binding.iconSettings, result.data.settings);
+                bindProfileActionIcon(binding.iconSupport, result.data.support);
             });
         });
     }
