@@ -318,6 +318,7 @@ public class ProfileActivity extends ThemedActivity {
             if (binding.imgCountryFlag != null) {
                 FlagImages.bind(binding.imgCountryFlag, user.country);
             }
+            loadEarnedBadges(user.id);
 
             long charm = user.popularityLevel > 0 ? user.popularityLevel
                     : Math.max(0, Math.max(user.charmScore, user.popularityScore));
@@ -701,6 +702,52 @@ public class ProfileActivity extends ThemedActivity {
             case "marriage": return "💞 علاقة زواج";
             default: return "علاقة CP";
         }
+    }
+
+    private void loadEarnedBadges(String profileId) {
+        if (binding == null || binding.rowEarnedBadges == null || profileId == null || profileId.trim().isEmpty()) return;
+        container.getIoExecutor().execute(() -> {
+            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned = new java.util.ArrayList<>();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
+                        container.getUserApi().badges(profileId).execute();
+                if (response.isSuccessful() && response.body() != null && response.body().data != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned) earned.add(badge);
+                        if (earned.size() >= 3) break;
+                    }
+                }
+            } catch (Exception ignored) { }
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing() || isDestroyed()) return;
+                binding.rowEarnedBadges.removeAllViews();
+                binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
+                for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
+                    ImageView icon = new ImageView(this);
+                    int size = (int) (22 * getResources().getDisplayMetrics().density + 0.5f);
+                    android.widget.LinearLayout.LayoutParams lp =
+                            new android.widget.LinearLayout.LayoutParams(size, size);
+                    lp.setMargins(2, 0, 2, 0);
+                    icon.setLayoutParams(lp);
+                    icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
+                    Glide.with(this).load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default).into(icon);
+                    icon.setOnClickListener(v -> {
+                        Intent intent = new Intent(this, BadgeActivity.class);
+                        intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                        startActivity(intent);
+                    });
+                    binding.rowEarnedBadges.addView(icon);
+                }
+                binding.rowEarnedBadges.setOnClickListener(v -> {
+                    Intent intent = new Intent(this, BadgeActivity.class);
+                    intent.putExtra(BadgeActivity.EXTRA_USER_ID, profileId);
+                    startActivity(intent);
+                });
+            });
+        });
     }
 
     private void sendSocialRequest(String targetId, String type, String labelAr) {
