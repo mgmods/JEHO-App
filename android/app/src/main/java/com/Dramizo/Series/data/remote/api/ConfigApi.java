@@ -9,6 +9,7 @@ import retrofit2.http.Body;
 import retrofit2.http.GET;
 import retrofit2.http.Headers;
 import retrofit2.http.POST;
+import retrofit2.http.Query;
 
 public interface ConfigApi {
     @GET("config/banners")
@@ -20,8 +21,11 @@ public interface ConfigApi {
     @GET("config/games")
     Call<ApiResponse<List<MiscDtos.GameDto>>> games();
 
+    // Dashboard-managed icons must never be served from a stale HTTP/CDN cache.
+    // The timestamp query also gives every refresh a unique request URL.
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
     @GET("config/nav-icons")
-    Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons();
+    Call<ApiResponse<MiscDtos.NavIconsDto>> navIcons(@Query("_") long cacheBust);
 
     @GET("config/seat-stickers")
     Call<ApiResponse<MiscDtos.SeatStickersDto>> seatStickers();
