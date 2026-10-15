@@ -8,6 +8,7 @@ on:
       - "android/**"
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
+      - "backend/public/mall/**"
   pull_request:
     branches: [jeho-own, MG-JEHO]
     paths:
@@ -15,6 +16,7 @@ on:
       - "android/**"
       - "backend/src/modules/config/**"
       - "backend/src/modules/uploads/**"
+      - "backend/public/mall/**"
   workflow_dispatch:
 
 concurrency:
