@@ -62,12 +62,13 @@
             <template v-if="isFrameLike(item)">
               <img class="avatar-core" :src="avatarSvg" alt="" />
               <video
-                v-if="mediaKind(wearSrc(item)) === 'video' && playingId === item.id"
+                v-if="mediaKind(wearSrc(item)) === 'video'"
                 class="frame-overlay"
                 :src="assetUrl(wearSrc(item))"
-                muted
+                :autoplay="playingId === item.id"
+                :controls="playingId === item.id"
+                :muted="playingId !== item.id"
                 loop
-                autoplay
                 playsinline
               />
               <SvgaPreview
@@ -101,14 +102,15 @@
             </template>
             <template v-else-if="(item.type || tab) === 'entry_effect'">
               <video
-                v-if="mediaKind(item.animationUrl) === 'video' && playingId === item.id"
+                v-if="mediaKind(item.animationUrl) === 'video'"
                 class="toast-preview"
                 :src="assetUrl(item.animationUrl)"
-                muted
+                :autoplay="playingId === item.id"
+                :muted="playingId !== item.id"
                 loop
-                autoplay
                 playsinline
                 controls
+                @play="playingId = item.id"
               />
               <img
                 v-else
@@ -251,7 +253,6 @@
                     <video
                       v-if="mediaKind(formWearSrc) === 'video'"
                       :src="assetUrl(formWearSrc)"
-                      muted
                       loop
                       autoplay
                       playsinline
