@@ -1542,7 +1542,7 @@
             android:id="@+id/btnRoomSideMusic"
             android:layout_width="46dp"
             android:layout_height="46dp"
-            android:translationY="-2dp"
+            android:translationY="-6dp"
             android:contentDescription="الموسيقى"
             android:padding="1dp"
             android:scaleType="fitCenter"
@@ -1552,10 +1552,10 @@
 
         <ImageView
             android:id="@+id/btnRoomSideGames"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            android:layout_width="55dp"
+            android:layout_height="55dp"
             android:layout_marginTop="2dp"
-            android:translationY="-4dp"
+            android:translationY="-8dp"
             android:contentDescription="الألعاب"
             android:padding="1dp"
             android:scaleType="fitCenter"
