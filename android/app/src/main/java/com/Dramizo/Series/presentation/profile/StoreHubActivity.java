@@ -40,14 +40,16 @@ public class StoreHubActivity extends ThemedActivity {
         binding.btnBack.setOnClickListener(v -> navigateUp());
         binding.rowMall.setOnClickListener(v ->
                 startActivity(new Intent(this, CosmeticsActivity.class)));
-        binding.rowBadges.setOnClickListener(v ->
-                startActivity(new Intent(this, MedalActivity.class)));
-        binding.rowVip.setOnClickListener(v ->
-                startActivity(new Intent(this, VipActivity.class)));
-        binding.rowLevel.setOnClickListener(v ->
-                startActivity(new Intent(this, UserLevelActivity.class)));
-        binding.rowVanity.setOnClickListener(v ->
-                startActivity(new Intent(this, VanityIdsActivity.class)));
+        binding.rowBadges.setOnClickListener(v -> openHtmlStoreSection("badges"));
+        binding.rowVip.setOnClickListener(v -> openHtmlStoreSection("vip"));
+        binding.rowLevel.setOnClickListener(v -> openHtmlStoreSection("level"));
+        binding.rowVanity.setOnClickListener(v -> openHtmlStoreSection("id"));
+    }
+
+    private void openHtmlStoreSection(String section) {
+        Intent intent = new Intent(this, CosmeticsActivity.class);
+        intent.putExtra("store_section", section);
+        startActivity(intent);
     }
 
     @Override
