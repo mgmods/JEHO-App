@@ -1,3 +1,4 @@
+# The isolated branch publishes only a badge-fix tag; it never overwrites production tags.
 name: Publish JEHO-OWN backend image
 
 on:
