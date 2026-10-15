@@ -4,6 +4,8 @@
  */
 
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
+export const PROFILE_ACTION_KEYS = ['events', 'agency', 'recharge', 'tasks', 'settings', 'support'] as const;
+export type ProfileActionKey = typeof PROFILE_ACTION_KEYS[number];
 
 export type NavIconPair = {
   /** Default / unselected icon URL (png/jpg). */
@@ -22,6 +24,8 @@ export type NavIconsConfig = {
   games?: NavIconPair;
   chat?: NavIconPair;
   me?: NavIconPair;
+  /** Single uploaded icon for each shortcut in the profile (أنا) grid. */
+  profileActions?: Partial<Record<ProfileActionKey, string>>;
 };
 
 export const NAV_TAB_KEYS: NavTabKey[] = ['party', 'drama', 'games', 'chat', 'me'];
@@ -83,6 +87,7 @@ export function defaultNavIconsConfig(
     games: pair('game'),
     chat: pair('chat'),
     me: pair('me'),
+    profileActions: {},
   };
 }
 
@@ -112,6 +117,13 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
       (out as any)[key] = (defaults as any)[key] || {};
     }
   }
+  const rawActions = src.profileActions && typeof src.profileActions === 'object' ? src.profileActions : {};
+  const profileActions: Partial<Record<ProfileActionKey, string>> = {};
+  for (const key of PROFILE_ACTION_KEYS) {
+    const url = cleanUrl(rawActions[key]);
+    if (url) profileActions[key] = url;
+  }
+  out.profileActions = profileActions;
   return out;
 }
 
@@ -151,6 +163,9 @@ export function navIconsClientPayload(
     games: map(cfg.games),
     chat: map(cfg.chat),
     me: map(cfg.me),
+    profileActions: Object.fromEntries(
+      PROFILE_ACTION_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.profileActions?.[key] }, false, origin) || '']),
+    ),
     /** Hint for clients / docs. */
     formats: ['png', 'jpg', 'jpeg', 'webp', 'svg'],
   };
