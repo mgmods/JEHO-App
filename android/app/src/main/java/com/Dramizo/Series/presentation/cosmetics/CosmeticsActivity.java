@@ -193,6 +193,7 @@ public class CosmeticsActivity extends ThemedActivity {
             return;
         }
 
+        stopEntryVideoPreview();
         if ("vip_badge".equals(type) || "host_badge".equals(type)) {
             binding.heroMedia.setVisibility(View.GONE);
             Glide.with(binding.heroMedia).clear(binding.heroMedia);
