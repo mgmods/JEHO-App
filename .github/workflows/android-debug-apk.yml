@@ -51,6 +51,7 @@ jobs:
         run: |
           # Force Gradle/Android tooling and Actions cache to use the same debug keystore path.
           echo "ANDROID_USER_HOME=$HOME/.android" >> "$GITHUB_ENV"
+          echo "JEHO_DEBUG_KEYSTORE=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
           mkdir -p "$HOME/.android"
 
       - name: Locate Android SDK tools
@@ -150,7 +151,17 @@ jobs:
             echo "::error::apksigner was not found."
             exit 1
           fi
-          "$APKSIGNER" verify --print-certs "$APK"
+          CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
+          echo "$CERT_OUTPUT"
+          EXPECTED_SHA1="5A:63:B1:8B:D7:F1:8C:E9:14:F2:55:AA:70:91:8B:DB:91:D6:83:E4"
+          ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
+            echo "::error::APK signing certificate does not match the currently installed baseline certificate. Refusing to publish an incompatible update."
+            echo "::error::Expected SHA-1: $EXPECTED_SHA1"
+            echo "::error::Actual SHA-1: ${ACTUAL_SHA1:-not detected}"
+            exit 1
+          fi
+          echo "Verified: APK signing certificate matches the installed baseline."
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
