@@ -472,6 +472,7 @@ export class ConfigController {
       whatsapp: await pick('support_whatsapp'),
       telegram: await pick('support_telegram'),
       instagram: await pick('support_instagram'),
+      website: await pick('support_website'),
       email: await pick('supportEmail', await pick('support_email', 'support@adnova.bbs.tr')),
       phone: await pick('support_phone'),
     };
