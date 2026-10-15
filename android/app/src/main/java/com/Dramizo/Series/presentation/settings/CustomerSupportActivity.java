@@ -87,13 +87,14 @@ public class CustomerSupportActivity extends ThemedActivity {
         boolean hasEmail = !email.isEmpty();
         boolean hasWebsite = !website.isEmpty();
         boolean hasPhone = !phone.isEmpty();
-        binding.divWhatsapp.setVisibility(!wa.isEmpty() && (hasTg || hasIg || hasEmail || hasPhone)
+        binding.divWhatsapp.setVisibility(!wa.isEmpty() && (hasTg || hasIg || hasEmail || hasWebsite || hasPhone)
                 ? View.VISIBLE : View.GONE);
-        binding.divTelegram.setVisibility(hasTg && (hasIg || hasEmail || hasPhone)
+        binding.divTelegram.setVisibility(hasTg && (hasIg || hasEmail || hasWebsite || hasPhone)
                 ? View.VISIBLE : View.GONE);
-        binding.divInstagram.setVisibility(hasIg && (hasEmail || hasPhone)
+        binding.divInstagram.setVisibility(hasIg && (hasEmail || hasWebsite || hasPhone)
                 ? View.VISIBLE : View.GONE);
-        binding.divEmail.setVisibility(hasEmail && hasPhone ? View.VISIBLE : View.GONE);
+        binding.divEmail.setVisibility(hasEmail && (hasWebsite || hasPhone) ? View.VISIBLE : View.GONE);
+        binding.divWebsite.setVisibility(hasWebsite && hasPhone ? View.VISIBLE : View.GONE);
     }
 
     private boolean showRow(View row, @Nullable View divider, android.widget.TextView valueView,
