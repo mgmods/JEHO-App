@@ -84,6 +84,34 @@ public final class RemoteNavIcons {
         }
     }
 
+    /** Bind an icon uploaded for one of the profile action tiles. */
+    public static void bindProfileAction(@Nullable ImageView view, @Nullable String actionKey, int fallbackRes) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.profileActions != null && actionKey != null
+                ? cfg.profileActions.get(actionKey) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            view.setImageResource(fallbackRes);
+            return;
+        }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) {
+            loadRemoteSvg(view, url, null, null, false);
+        } else {
+            Object prev = view.getTag(R.id.tag_image_url);
+            if (prev instanceof String && url.equals(prev) && view.getDrawable() != null) return;
+            view.setTag(R.id.tag_image_url, url);
+            try {
+                Glide.with(view).load(url).apply(MediaAssetSync.requestOptions()).dontAnimate().fitCenter()
+                        .error(fallbackRes).into(view);
+            } catch (Exception ignored) {
+                view.setImageResource(fallbackRes);
+            }
+        }
+    }
+
     public static void bind(
             @Nullable ImageView view,
             @Nullable String tabKey,
