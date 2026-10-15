@@ -13,11 +13,17 @@
         android:scaleType="centerCrop"
         android:src="@drawable/bg_home_full_gradient" />
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/contentRoot"
         android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/mallNativeContent"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:visibility="invisible">
 
         <LinearLayout
             android:id="@+id/toolbar"
@@ -167,4 +173,14 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
     </LinearLayout>
+
+    <WebView
+        android:id="@+id/mallWebView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0D1020"
+        android:overScrollMode="never"
+        android:scrollbars="none" />
+
+    </FrameLayout>
 </FrameLayout>
