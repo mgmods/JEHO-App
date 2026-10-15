@@ -203,6 +203,7 @@
                 android:layout_marginHorizontal="14dp"
                 android:layout_marginTop="8dp"
                 android:background="@drawable/bg_mikoo_card"
+                android:elevation="3dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:layoutDirection="rtl"
@@ -376,7 +377,8 @@
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:paddingVertical="12dp"
-                android:background="@drawable/bg_mikoo_card">
+                android:background="@drawable/bg_mikoo_card"
+                android:elevation="3dp">
 
                 <LinearLayout
                     android:id="@+id/statFollowing"
@@ -670,6 +672,7 @@
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="12dp"
                 android:background="@drawable/bg_mikoo_card"
+                android:elevation="3dp"
                 android:orientation="horizontal"
                 android:paddingVertical="15dp">
 
@@ -799,6 +802,7 @@
                 android:layout_marginHorizontal="12dp"
                 android:layout_marginTop="10dp"
                 android:background="@drawable/bg_mikoo_card"
+                android:elevation="3dp"
                 android:orientation="vertical"
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="4dp">
