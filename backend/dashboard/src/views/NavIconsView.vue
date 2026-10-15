@@ -79,7 +79,7 @@ import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 
 const { t } = useI18n()
-const ORIGIN = (import.meta.env.VITE_API_ORIGIN || 'https://api.adnova.bbs.tr').replace(/\/$/, '')
+const ORIGIN = (import.meta.env.VITE_API_ORIGIN || window.location.origin).replace(/\/$/, '')
 
 const KEYS = ['party', 'drama', 'games', 'chat', 'me']
 
@@ -108,6 +108,19 @@ function absUrl(u) {
   if (!u) return ''
   if (/^https?:\/\//i.test(u)) return u
   return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+}
+
+// Persist upload paths, not the dashboard's preview origin. This lets the
+// mobile app resolve /uploads/... against its configured JEHO-OWN API host.
+function storedUrl(u) {
+  if (!u) return ''
+  if (/^https?:\/\//i.test(u)) {
+    try {
+      const parsed = new URL(u)
+      if (parsed.pathname.startsWith('/uploads/')) return parsed.pathname + parsed.search
+    } catch {}
+  }
+  return u
 }
 
 function parseSetting(list, key) {
@@ -170,7 +183,7 @@ async function onFile(e, tabKey, field) {
     toast().danger(err.message)
     return
   }
-  const url = absUrl(data?.url || data?.data?.url || '')
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
   if (!url) {
     toast().danger(t('app.error'))
     return
