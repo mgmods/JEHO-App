@@ -1,0 +1,99 @@
+name: Flutter Client Checks
+
+on:
+  pull_request:
+    branches: [jeho-own]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter-client-checks.yml"
+  push:
+    branches: [jeho-own]
+    paths:
+      - "flutter_app/**"
+      - ".github/workflows/flutter-client-checks.yml"
+
+permissions:
+  contents: read
+
+# Keep only the newest validation for this branch/PR; stale queued builds are wasteful.
+concurrency:
+  group: flutter-client-checks-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: flutter_app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Generate only the missing Android platform scaffold in the CI workspace.
+      # No production Android files are changed or overwritten.
+      - name: Generate Android platform scaffold
+        run: flutter create --platforms=android --project-name jeho_own_flutter --org com.jehoown .
+
+      # Keep the original app identity so the migration target is the existing
+      # com.Dramizo.Series app, not a separate com.jehoown.* application.
+      # This affects only the generated CI Flutter scaffold, not android/ production files.
+      - name: Set original Android package identity
+        shell: bash
+        run: |
+          grep -rl 'com.jehoown.jeho_own_flutter' android | xargs -r sed -i 's/com\.jehoown\.jeho_own_flutter/com.Dramizo.Series/g'
+          if ! grep -q 'applicationId "com.Dramizo.Series"' android/app/build.gradle && ! grep -q 'applicationId = "com.Dramizo.Series"' android/app/build.gradle.kts 2>/dev/null; then
+            echo "Flutter scaffold did not receive the original applicationId" >&2
+            exit 1
+          fi
+
+      # file_picker / flutter_plugin_android_lifecycle currently require Android API 36.
+      # Only the generated CI scaffold is changed; no production Android files are overwritten.
+      - name: Set Android compile SDK
+        shell: bash
+        run: |
+          if [[ -f android/app/build.gradle.kts ]]; then
+            sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
+          elif [[ -f android/app/build.gradle ]]; then
+            sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle
+          else
+            echo "Android app Gradle file not found" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Widget tests
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug --dart-define=JEHO_API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1/
+
+      - name: Verify APK package identity
+        shell: bash
+        run: |
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -f "$APK"
+          test -n "$AAPT"
+          "$AAPT" dump badging "$APK" | grep -F "package: name='com.Dramizo.Series'"
+          echo "Verified target package: com.Dramizo.Series"
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jeho-own-flutter-debug-apk
+          path: flutter_app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7

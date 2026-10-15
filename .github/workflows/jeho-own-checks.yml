@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# A PR update and its branch push should not run duplicate Docker builds.
+concurrency:
+  group: jeho-own-checks-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   checks:
     name: Backend, Dashboard and Docker checks
