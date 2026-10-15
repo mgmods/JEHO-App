@@ -46,6 +46,13 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set stable Android user home for signing
+        shell: bash
+        run: |
+          # Force Gradle/Android tooling and Actions cache to use the same debug keystore path.
+          echo "ANDROID_USER_HOME=$HOME/.android" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.android"
+
       - name: Locate Android SDK tools
         shell: bash
         run: |
@@ -110,6 +117,16 @@ jobs:
           test -s "$KEYSTORE"
           echo "Temporary CI debug keystore is ready."
 
+      - name: Verify stable debug signing key
+        shell: bash
+        run: |
+          KEYSTORE="$HOME/.android/debug.keystore"
+          if [[ ! -s "$KEYSTORE" ]]; then
+            echo "::error::Stable debug keystore is missing at $KEYSTORE. Refusing to build an APK with an ephemeral signing key."
+            exit 1
+          fi
+          keytool -list -v -keystore "$KEYSTORE" -storepass android -alias AndroidDebugKey | grep -E 'Alias name:|SHA1:|SHA256:'
+
       - name: Print Android signing fingerprints
         working-directory: android
         run: gradle --no-daemon signingReport
@@ -119,6 +136,21 @@ jobs:
         env:
           JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
         run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleDebug
+
+      - name: Verify APK certificate matches stable key
+        shell: bash
+        run: |
+          APK="$(find android/app/build/outputs/apk/debug -maxdepth 1 -type f -name '*universal*.apk' -print -quit)"
+          if [[ -z "$APK" ]]; then
+            echo "::error::Universal debug APK was not produced."
+            exit 1
+          fi
+          APKSIGNER="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          if [[ -z "$APKSIGNER" ]]; then
+            echo "::error::apksigner was not found."
+            exit 1
+          fi
+          "$APKSIGNER" verify --print-certs "$APK"
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
