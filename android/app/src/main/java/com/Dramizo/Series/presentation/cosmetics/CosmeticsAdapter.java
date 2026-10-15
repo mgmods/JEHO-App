@@ -165,15 +165,21 @@ public class CosmeticsAdapter extends RecyclerView.Adapter<CosmeticsAdapter.VH> 
         if (abs == null || abs.isEmpty()) {
             holder.b.imgPreview.setImageResource(ImagePlaceholder.cover());
         } else {
-            Glide.with(holder.b.imgPreview.getContext().getApplicationContext())
+            var request = Glide.with(holder.b.imgPreview.getContext().getApplicationContext())
                     .load(abs)
                     .override(320, 320)
                     .fitCenter()
-                    .dontAnimate()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .placeholder(ImagePlaceholder.cover())
-                    .error(ImagePlaceholder.cover())
-                    .into(holder.b.imgPreview);
+                    .error(ImagePlaceholder.cover());
+            // GIF and animated WebP must stay animated in the store grid.
+            // Only a generated/static PNG thumbnail is intentionally frozen.
+            String lowerStill = still.toLowerCase(java.util.Locale.US).split("\\\\?", 2)[0];
+            if (lowerStill.endsWith(".png") || lowerStill.endsWith(".jpg")
+                    || lowerStill.endsWith(".jpeg")) {
+                request = request.dontAnimate();
+            }
+            request.into(holder.b.imgPreview);
         }
 
         if (headwear) {
