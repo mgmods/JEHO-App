@@ -145,12 +145,12 @@
             <div class="action-btns">
               <button class="btn btn-sm btn-ghost" type="button" @click="openEdit(item)">{{ t('app.edit') }}</button>
               <button
-                v-if="(item.type || tab) === 'entry_effect' && mediaKind(item.animationUrl) === 'video'"
+                v-if="mediaKind(wearSrc(item)) === 'video'"
                 class="btn btn-sm btn-outline-primary"
                 type="button"
                 @click="playingId = playingId === item.id ? null : item.id"
               >
-                {{ playingId === item.id ? 'إيقاف' : 'تشغيل' }}
+                {{ playingId === item.id ? 'إيقاف المعاينة' : 'معاينة الفيديو' }}
               </button>
               <button class="btn btn-sm btn-outline-danger" type="button" @click="askHardDelete(item)">{{ t('app.delete') }}</button>
             </div>
