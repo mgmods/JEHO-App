@@ -66,6 +66,24 @@
         </div>
       </article>
     </div>
+
+    <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي لتظهر داخل التطبيق." />
+    <div class="nav-icons-grid">
+      <article v-for="action in profileActionsList" :key="action.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ action.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="profileIcons[action.key]" :src="absUrl(profileIcons[action.key])" alt="" />
+            <span v-else class="text-muted small">الأيقونة الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة الزر</label>
+          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onProfileFile(e, action.key)" />
+          <button v-if="profileIcons[action.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="profileIcons[action.key] = ''">إزالة الأيقونة المخصصة</button>
+        </div>
+      </article>
+    </div>
   </div>
 </template>
 
@@ -98,6 +116,15 @@ function emptyForm() {
 }
 
 const form = reactive(emptyForm())
+const profileIcons = reactive({ events: '', agency: '', recharge: '', tasks: '', settings: '', support: '' })
+const profileActionsList = [
+  { key: 'events', label: 'فعالياتي' },
+  { key: 'agency', label: 'فتح وكالة' },
+  { key: 'recharge', label: 'وكيل شحن' },
+  { key: 'tasks', label: 'مركز المهام' },
+  { key: 'settings', label: 'الإعدادات' },
+  { key: 'support', label: 'الدعم' },
+]
 const version = ref(1)
 const loading = ref(false)
 const saving = ref(false)
@@ -147,6 +174,9 @@ function applyConfig(cfg) {
     form[k].normal = next[k].normal
     form[k].selected = next[k].selected
   }
+  for (const action of profileActionsList) {
+    profileIcons[action.key] = (cfg && cfg.profileActions && cfg.profileActions[action.key]) || ''
+  }
 }
 
 async function load() {
@@ -192,6 +222,34 @@ async function onFile(e, tabKey, field) {
   toast().success(t('app.success'))
 }
 
+async function onProfileFile(e, actionKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' ||
+    file.type === 'image/webp' || file.type === 'image/svg+xml' ||
+    /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) {
+    error.value = t('navIcons.badFormat')
+    toast().danger(t('navIcons.badFormat'))
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) {
+    toast().danger(t('app.error'))
+    return
+  }
+  profileIcons[actionKey] = url
+  toast().success(t('app.success'))
+}
+
 function clearAll() {
   applyConfig(null)
   version.value = 1
@@ -208,6 +266,7 @@ async function save() {
     games: { ...form.games },
     chat: { ...form.chat },
     me: { ...form.me },
+    profileActions: { ...profileIcons },
   }
   const { error: err } = await settingsApi.update({
     app_nav_icons: JSON.stringify(body),
