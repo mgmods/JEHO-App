@@ -211,9 +211,13 @@
                     مهم: ارفع فيديو الهدية هنا (MP4) ليشتغل ملء الشاشة مثل الدخوليات — ليس في حقل الأيقونة فقط
                   </div>
                 </div>
-                <div class="col-6" v-if="form.iconUrl">
+                <div class="col-6" v-if="form.iconUrl && !isVideo(form.iconUrl)">
                   <div class="small text-muted mb-1">أيقونة</div>
                   <img :src="absUrl(form.iconUrl)" alt="" width="88" height="88" style="object-fit: contain" />
+                </div>
+                <div class="col-6" v-else-if="form.iconUrl">
+                  <div class="small text-muted mb-1">وسيط فيديو</div>
+                  <span class="badge text-bg-info">سيظهر الفيديو في المتجر</span>
                 </div>
                 <div class="col-6" v-if="form.animationUrl">
                   <div class="small text-muted mb-1">عرض الأنيميشن</div>
