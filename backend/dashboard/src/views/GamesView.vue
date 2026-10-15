@@ -349,7 +349,7 @@ const manageableGames = [
   { id: 'slots', label: 'سلوت مصغّر' }, { id: 'roulette', label: 'الروليت' }, { id: 'plinko', label: 'بلينكو مصغّر' }, { id: 'rps', label: 'حجر ورقة مقص' }, { id: 'blackjack', label: 'بلاك جاك مصغّر' }, { id: 'poker', label: 'بوكر النرد' }, { id: 'tarot', label: 'التاروت' }, { id: 'penalty', label: 'ركلة الجزاء' }, { id: 'reaction', label: 'رد الفعل' }, { id: 'witch', label: 'العرافة' }, { id: 'dice', label: 'النرد' }, { id: 'lucky-wheel', label: 'عجلة الحظ' }, { id: 'ono', label: 'أونو' }, { id: 'domino', label: 'الدومينو' }, { id: 'ludo', label: 'لودو' },
 ]
 const directWinRateGameIds = new Set([
-  'slots','roulette','plinko','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction',
+  'slots','roulette','plinko','crash','rps','hilo','witch','blackjack','poker','tarot','penalty','reaction',
   'dice','lucky-wheel','cleopatra-slot','cleopatra-slots','fishing','football-plinko','fortune-slot',
   'line-slots','megaways-slots','olympians','pirate-king','slot777','sugar-rush','swimsuit-party',
   'royal-battle',
