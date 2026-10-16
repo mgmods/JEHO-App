@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { extname, join } from 'path';
@@ -165,6 +166,14 @@ export class UploadsService {
     const ext = extname(file.originalname).toLowerCase();
     const storedName = file.filename || `${uuidv4()}${ext}`;
     const storedPath = file.path || join(this.uploadDir, storedName);
+    // Production deployments may use ephemeral container filesystems. Never report
+    // a successful upload when durable remote storage is not configured.
+    if (process.env.NODE_ENV === 'production' && !this.storageEnabled()) {
+      if (existsSync(storedPath)) unlinkSync(storedPath);
+      throw new ServiceUnavailableException(
+        'Durable media storage is not configured. Upload was rejected to prevent media loss after restart.',
+      );
+    }
     if (
       ['.mp3', '.m4a', '.aac', '.wav'].includes(ext) &&
       !this.hasAudioSignature(storedPath, ext)
