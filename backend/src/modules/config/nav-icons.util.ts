@@ -32,6 +32,12 @@ export const NAV_TAB_KEYS: NavTabKey[] = ['party', 'drama', 'games', 'chat', 'me
 
 const IMG_RE = /\.(png|jpe?g|webp|svg)(\?|$)/i;
 
+/** Public media is served at host root, not below Nest's /api/v1 prefix. */
+function publicOrigin(raw?: string): string {
+  const value = String(raw || '').trim() || 'https://jeho-own-backend.mgs.blitz.cloud';
+  return value.replace(/\\/+$/, '').replace(/\\/api\\/v\\d+$/i, '');
+}
+
 function cleanUrl(raw: unknown): string {
   if (raw == null) return '';
   const s = String(raw).trim();
@@ -75,7 +81,7 @@ export function emptyNavIconsConfig(): NavIconsConfig {
 export function defaultNavIconsConfig(
   origin = process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || process.env.PUBLIC_API_ORIGIN || 'https://jeho-own-backend.mgs.blitz.cloud',
 ): NavIconsConfig {
-  const base = `${String(origin).replace(/\/$/, '')}/assets/nav-icons`;
+  const base = `${publicOrigin(origin)}/assets/nav-icons`;
   const pair = (name: string): NavIconPair => ({
     normal: `${base}/ic_home_tab_${name}_normal.svg`,
     selected: `${base}/ic_home_tab_${name}_selected.svg`,
@@ -139,7 +145,7 @@ export function resolveNavIconUrl(
     : pair.normal || pair.icon || pair.selected || '';
   if (!base) return '';
   if (/^https?:\/\//i.test(base)) return base;
-  const o = origin.replace(/\/$/, '');
+  const o = publicOrigin(origin);
   return `${o}${base.startsWith('/') ? '' : '/'}${base}`;
 }
 
