@@ -10926,12 +10926,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         bumpRoomViewers(1);
                     }
 
-                    // Mikoo: owner does NOT see their own entry effect — only other users.
-                    if (selfJoin || myUserId == null || myUserId.isEmpty()) {
+                    // Every room member, including the joining user, renders the same equipped entry.
+                    if (myUserId == null || myUserId.isEmpty()) {
                         return;
                     }
 
-                    // Always show join entry for others so equipped rides play in-room.
+                    // Render the equipped entry for everyone receiving room:user_joined.
                     if (effectQueue != null) {
                         RoomEffectQueue.EffectType entryType;
                         if ("supporter".equals(supporterTier) || "legendary".equals(supporterTier)) {
@@ -10945,8 +10945,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         String ridePreview = entryEffectUrl;
                         String ride = firstNonEmpty(rideAnim, ridePreview);
                         long hold = durationMs > 0
-                                ? Math.min(durationMs, 5500L)
-                                : (ride != null && !ride.isEmpty() ? 4500L : 2600L);
+                                ? Math.min(durationMs, 8000L)
+                                : (ride != null && !ride.isEmpty() ? 6000L : 2600L);
                         effectQueue.enqueue(new RoomEffectQueue.Builder()
                                 .type(entryType)
                                 .displayName(name)
