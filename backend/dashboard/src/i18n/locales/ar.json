@@ -93,7 +93,8 @@
     "notifications": "الإشعارات",
     "settings": "الإعدادات العامة",
     "logs": "السجلات",
-    "policyBrochure": "سياسة المنصة PDF"
+    "policyBrochure": "سياسة المنصة PDF",
+    "cpSettings": "إعدادات علاقات CP"
   },
   "routes": {
     "login": "تسجيل الدخول",

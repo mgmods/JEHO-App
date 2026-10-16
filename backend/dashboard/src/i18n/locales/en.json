@@ -93,7 +93,8 @@
     "notifications": "Notifications",
     "settings": "General settings",
     "logs": "Logs",
-    "policyBrochure": "Platform policy PDF"
+    "policyBrochure": "Platform policy PDF",
+    "cpSettings": "CP relationship settings"
   },
   "routes": {
     "login": "Login",
