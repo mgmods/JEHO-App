@@ -782,7 +782,7 @@ public class ZegoEngineManager {
     @Nullable private im.zego.zegoexpress.ZegoMediaPlayer localMusicPlayer;
     @Nullable private String localMusicPath;
     /** Publish mix loudness 0–200 (Zego default is only 60 — too quiet for listeners). */
-    private static final int MUSIC_PUBLISH_VOLUME = 200;
+    private int musicPublishVolume = 200;
     /** Host local monitor via MediaPlayer (local files). 0–200. */
     private static final int MUSIC_PLAY_VOLUME = 160;
     private boolean musicMuteLocalMonitor;
@@ -858,7 +858,7 @@ public class ZegoEngineManager {
                     }
                     Log.i(TAG, "local music started path=" + absolutePath
                             + " seek=" + seekTo
-                            + " publishVol=" + MUSIC_PUBLISH_VOLUME
+                            + " publishVol=" + musicPublishVolume
                             + " muteLocal=" + musicMuteLocalMonitor);
                 } else {
                     Log.w(TAG, "local music load failed err=" + errorCode);
@@ -874,15 +874,21 @@ public class ZegoEngineManager {
             @Nullable im.zego.zegoexpress.ZegoMediaPlayer player) {
         if (player == null) return;
         try {
-            player.setPublishVolume(MUSIC_PUBLISH_VOLUME);
+            player.setPublishVolume(musicPublishVolume);
             // When muteLocal is used, play volume is irrelevant; otherwise host must hear.
             player.setPlayVolume(musicMuteLocalMonitor || speakerMuted ? 0 : MUSIC_PLAY_VOLUME);
         } catch (Throwable t) {
             try {
-                player.setVolume(MUSIC_PUBLISH_VOLUME);
+                player.setVolume(musicPublishVolume);
             } catch (Throwable ignored) {
             }
         }
+    }
+
+    /** Set outgoing room-music mix level from 0–200 without changing ZEGO room configuration. */
+    public void setMusicMixVolumePercent(int percent) {
+        musicPublishVolume = Math.max(0, Math.min(200, percent));
+        applyMusicMixVolumes(localMusicPlayer);
     }
 
     /** Re-apply loud mix if the player already exists (e.g. after reconnect). */
