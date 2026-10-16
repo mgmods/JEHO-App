@@ -11427,7 +11427,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (stamp > 0) RoomChatMemory.honorServerWipe(roomId, stamp);
         } else if ("room:music_volume".equals(event)) {
             sharedMusicVolume = Math.max(0f, Math.min(1f,
-                    (float) memberDouble(payload, "volume", 1.0)));
+                    memberFloat(payload, "volume", 1.0f)));
             applySharedMusicVolume();
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
