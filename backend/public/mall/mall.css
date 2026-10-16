@@ -196,3 +196,6 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .target-select{width:100%;padding:10px;border-radius:11px;border:1px solid var(--stroke);background:#111426;color:var(--ink);font:inherit;font-size:12px;margin-bottom:7px}
 .target-select:focus{outline:1px solid var(--gold)}
 .item-card [data-apply-id]{width:100%;margin-top:2px}
+
+/* Remove the explanatory preview/promo section from the mall page. */
+.mall-shell>.hero{display:none!important}

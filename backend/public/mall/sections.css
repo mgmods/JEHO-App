@@ -43,9 +43,12 @@ html[data-section="vip"] footer{color:#b8a66d}
 /* Vanity ID cards: show the actual ID inside its preview, with price and availability together. */
 .id-item-card .id-visual{height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:13px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#51432b 0%,#29233a 52%,#171b2e 100%);border:1px solid #e8c66d35;box-shadow:inset 0 0 24px #e8c66d0d}
 .id-item-card .id-visual-label{font-size:10px;font-weight:900;letter-spacing:2px;color:var(--gold);opacity:.92}
-.id-item-card .id-visual strong{max-width:100%;padding:0 6px;font-size:clamp(17px,5vw,23px);font-weight:900;letter-spacing:1.1px;line-height:1.25;color:#fff4cf;text-shadow:0 2px 12px #d9a83a2b;overflow-wrap:anywhere}
+.id-item-card .id-visual strong{max-width:100%;padding:0 6px;font-size:clamp(14px,4vw,18px);font-weight:900;letter-spacing:.7px;line-height:1.25;color:#fff4cf;text-shadow:0 2px 12px #d9a83a2b;overflow-wrap:anywhere}
 .id-item-card h3{font-size:13px;line-height:1.45}
 .id-price-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;min-height:29px}
 .id-price-row .price{font-size:13px}
 .id-price-row .tag{flex:0 0 auto}
 .id-item-card>.primary-btn{width:100%;margin-top:0}
+
+/* Remove explanatory category banners across all store sections. */
+.page-hero{display:none!important}
