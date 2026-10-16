@@ -62,6 +62,35 @@
       </div>
     </section>
 
+    <section v-if="!splashOnly" class="widget-card p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h3 class="h6 mb-1">بنر الملف الشخصي — قسم «أنا»</h3>
+          <p class="form-text mb-0">هذا البنر مستقل تمامًا عن بنرات الصفحة الرئيسية. ارفع صورة واحفظها لتظهر في صفحة الملف الشخصي فقط.</p>
+        </div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="profileBannerSaving || profileBannerUploading" @click="saveProfileBanner">
+          {{ profileBannerSaving ? 'جارٍ الحفظ…' : 'حفظ بنر الملف الشخصي' }}
+        </button>
+      </div>
+      <div class="row g-3 align-items-start">
+        <div class="col-12 col-lg-5">
+          <div class="rounded overflow-hidden bg-light d-flex align-items-center justify-content-center" style="height:110px">
+            <img v-if="profileBanner.imageUrl" :src="absUrl(profileBanner.imageUrl)" alt="معاينة بنر الملف الشخصي" style="display:block;width:100%;height:100%;object-fit:cover" />
+            <div v-else class="text-muted p-3 text-center"><i class="bi bi-image fs-2 d-block mb-1"></i>لا توجد صورة لبنر الملف الشخصي</div>
+          </div>
+          <label class="form-label small mt-3">صورة البنر (PNG / JPG / WebP)</label>
+          <input type="file" accept="image/png,image/jpeg,image/webp" class="form-control form-control-sm" :disabled="profileBannerUploading || profileBannerSaving" @change="onProfileBannerFile" />
+          <div class="form-text">{{ profileBannerUploading ? 'جارٍ رفع الصورة…' : 'يتم حفظ الصورة في إعداد مستقل، ولا يغيّر بنرات الرئيسية.' }}</div>
+        </div>
+        <div class="col-12 col-lg-7">
+          <label class="form-label small">عنوان اختياري</label>
+          <input v-model.trim="profileBanner.title" class="form-control form-control-sm mb-3" maxlength="120" placeholder="بنر الملف الشخصي" />
+          <button class="btn btn-outline-secondary btn-sm" type="button" :disabled="profileBannerSaving || profileBannerUploading" @click="profileBanner.imageUrl = ''">إزالة صورة البنر</button>
+          <div v-if="profileBannerMessage" class="alert py-2 mt-3 mb-0" :class="profileBannerError ? 'alert-warning' : 'alert-success'" role="status">{{ profileBannerMessage }}</div>
+        </div>
+      </div>
+    </section>
+
     <div v-if="!splashOnly" class="d-flex justify-content-between align-items-center mb-3">
       <h3 class="h6 mb-0">{{ t('banners.home') }}</h3>
       <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
@@ -179,6 +208,11 @@ const promoLinks = computed(() => [
 
 const known = new Set([...promoLinks.value.map((p) => p.value), 'ranking', 'wallet', 'recharge', 'vip', ''])
 
+const profileBanner = ref({ imageUrl: '', title: '' })
+const profileBannerSaving = ref(false)
+const profileBannerUploading = ref(false)
+const profileBannerMessage = ref('')
+const profileBannerError = ref(false)
 const rows = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -401,6 +435,57 @@ async function onFile(e, row) {
   toast().success(t('app.success'))
 }
 
+async function onProfileBannerFile(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
+    profileBannerError.value = true
+    profileBannerMessage.value = 'اختر صورة PNG أو JPG أو WebP صالحة.'
+    event.target.value = ''
+    return
+  }
+  profileBannerUploading.value = true
+  profileBannerMessage.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw new Error(err.message || 'فشل رفع الصورة')
+    const url = data?.url || data?.data?.url || data?.path || data?.data?.path || ''
+    if (!url) throw new Error('تم الرفع دون الحصول على رابط الصورة')
+    profileBanner.value.imageUrl = absUrl(url)
+    profileBannerError.value = false
+    profileBannerMessage.value = 'تم رفع الصورة. اضغط «حفظ بنر الملف الشخصي» لنشرها.'
+  } catch (err) {
+    profileBannerError.value = true
+    profileBannerMessage.value = err?.message || 'تعذّر رفع صورة البنر.'
+  } finally {
+    profileBannerUploading.value = false
+  }
+}
+
+async function saveProfileBanner() {
+  profileBannerSaving.value = true
+  profileBannerMessage.value = ''
+  profileBannerError.value = false
+  try {
+    const payload = {
+      profile_banner: JSON.stringify({
+        imageUrl: absUrl(profileBanner.value.imageUrl || ''),
+        title: String(profileBanner.value.title || '').trim(),
+      }),
+    }
+    const { error: err } = await settingsApi.update(payload)
+    if (err) throw new Error(err.message || 'تعذّر حفظ بنر الملف الشخصي')
+    profileBannerMessage.value = profileBanner.value.imageUrl
+      ? 'تم حفظ بنر الملف الشخصي بشكل مستقل عن بنرات الرئيسية.'
+      : 'تم حفظ الإعداد. لن يظهر بنر في الملف الشخصي حتى ترفع صورة.'
+  } catch (err) {
+    profileBannerError.value = true
+    profileBannerMessage.value = err?.message || 'تعذّر حفظ بنر الملف الشخصي.'
+  } finally {
+    profileBannerSaving.value = false
+  }
+}
+
 function parseSetting(list, key, fallback) {
   const found = (Array.isArray(list) ? list : list?.items || []).find((s) => s.key === key)
   if (!found?.value) return fallback
@@ -423,6 +508,16 @@ async function load() {
   }
   const settingsRows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : (data?.items || data?.data?.items || []))
   rows.value = parseSetting(settingsRows, 'home_banners', [])
+  const profileBannerRow = settingsRows.find((s) => s?.key === 'profile_banner')
+  try {
+    const parsedProfileBanner = profileBannerRow?.value ? JSON.parse(profileBannerRow.value) : {}
+    profileBanner.value = {
+      imageUrl: typeof parsedProfileBanner?.imageUrl === 'string' ? parsedProfileBanner.imageUrl : '',
+      title: typeof parsedProfileBanner?.title === 'string' ? parsedProfileBanner.title : '',
+    }
+  } catch {
+    profileBanner.value = { imageUrl: '', title: '' }
+  }
   const themeRow = settingsRows.find((s) => s?.key === 'app_theme')
   try {
     themeConfig = themeRow?.value ? JSON.parse(themeRow.value) : {}
