@@ -62,7 +62,7 @@
       </div>
     </section>
 
-    <section v-if="!splashOnly" class="widget-card p-3 mb-4">
+    <section v-if="!splashOnly && bannerMode === &quot;profile&quot;" class="widget-card p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h3 class="h6 mb-1">بنر الملف الشخصي — قسم «أنا»</h3>
@@ -91,15 +91,24 @@
       </div>
     </section>
 
-    <div v-if="!splashOnly" class="d-flex justify-content-between align-items-center mb-3">
+    <div v-if="!splashOnly" class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="إدارة البنرات">
+      <button class="btn btn-sm" :class="bannerMode === 'home' ? 'btn-aurora' : 'btn-outline-light'" type="button" role="tab" :aria-selected="bannerMode === 'home'" @click="bannerMode = 'home'">
+        <i class="bi bi-images me-1"></i> {{ t('banners.home') }}
+      </button>
+      <button class="btn btn-sm" :class="bannerMode === 'profile' ? 'btn-aurora' : 'btn-outline-light'" type="button" role="tab" :aria-selected="bannerMode === 'profile'" @click="bannerMode = 'profile'">
+        <i class="bi bi-person-badge me-1"></i> بنر الملف الشخصي — أنا
+      </button>
+    </div>
+
+    <div v-if="!splashOnly && bannerMode === 'home'" class="d-flex justify-content-between align-items-center mb-3">
       <h3 class="h6 mb-0">{{ t('banners.home') }}</h3>
       <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="save">
         {{ saving ? t('app.saving') : t('banners.save') }}
       </button>
     </div>
 
-    <LoadingSpinner v-if="!splashOnly && loading" />
-    <template v-else-if="!splashOnly">
+    <LoadingSpinner v-if="!splashOnly && bannerMode === 'home' && loading" />
+    <template v-else-if="!splashOnly && bannerMode === 'home'">
       <BulkActionBar
         :count="rows.length"
         :selected-count="selectedCount"
@@ -186,6 +195,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const { t } = useI18n()
 const route = useRoute()
 const splashOnly = computed(() => route.name === 'splash')
+const bannerMode = ref('home')
 
 // Static promo assets may still live on the Adnova content host; uploads and API
 // requests must use the exact API origin configured for this dashboard.
