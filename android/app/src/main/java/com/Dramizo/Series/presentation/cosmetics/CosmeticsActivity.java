@@ -42,6 +42,8 @@ public class CosmeticsActivity extends ThemedActivity {
     @Nullable private SessionManager session;
     @Nullable private String roomId;
     @Nullable private String mallOrigin;
+    @Nullable private String localFallbackUrl;
+    private boolean triedLocalFallback;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
@@ -118,6 +120,17 @@ public class CosmeticsActivity extends ThemedActivity {
                                         android.webkit.WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
+                    String failedUrl = request.getUrl() == null ? "" : request.getUrl().toString();
+                    // Prefer the HTML served by the active backend image so mall/dashboard
+                    // page updates reach the app without waiting for a new APK. If the
+                    // hosted page is unavailable, fall back to the bundled copy.
+                    if (!triedLocalFallback && localFallbackUrl != null
+                            && mallOrigin != null
+                            && failedUrl.startsWith(mallOrigin + "/mall/")) {
+                        triedLocalFallback = true;
+                        view.loadUrl(localFallbackUrl);
+                        return;
+                    }
                     Toast.makeText(CosmeticsActivity.this,
                             "تعذّر تحميل المتجر، تحقق من الاتصال وحاول مجدداً",
                             Toast.LENGTH_LONG).show();
@@ -137,16 +150,25 @@ public class CosmeticsActivity extends ThemedActivity {
         String section = getIntent().getStringExtra("store_section");
         if ("level".equals(section) || "badges".equals(section)
                 || "id".equals(section) || "vip".equals(section)) {
-            webView.loadUrl("https://appassets.androidplatform.net/assets/mall/" + section + ".html");
+            localFallbackUrl = "https://appassets.androidplatform.net/assets/mall/" + section + ".html";
+            webView.loadUrl(mallOrigin + "/mall/" + section + ".html");
             return;
         }
-        Uri.Builder page = Uri.parse("https://appassets.androidplatform.net/assets/mall/index.html")
+        Uri.Builder page = Uri.parse(mallOrigin + "/mall/index.html")
                 .buildUpon()
                 .appendQueryParameter("type", type)
                 .appendQueryParameter("bag", bag ? "1" : "0");
         if (roomId != null && !roomId.isEmpty()) {
             page.appendQueryParameter("roomId", roomId);
         }
+        Uri.Builder localPage = Uri.parse("https://appassets.androidplatform.net/assets/mall/index.html")
+                .buildUpon()
+                .appendQueryParameter("type", type)
+                .appendQueryParameter("bag", bag ? "1" : "0");
+        if (roomId != null && !roomId.isEmpty()) {
+            localPage.appendQueryParameter("roomId", roomId);
+        }
+        localFallbackUrl = localPage.build().toString();
         webView.loadUrl(page.build().toString());
     }
 
