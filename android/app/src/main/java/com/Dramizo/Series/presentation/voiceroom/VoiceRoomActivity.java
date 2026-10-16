@@ -4235,6 +4235,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (roomMusicPlayer != null) {
             roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
         }
+        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
+            int percent = Math.round(sharedMusicVolume * 100f);
+            String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
+                    + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
+                    + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
+                    + percent + ");}}";
+            musicYoutubeWebView.evaluateJavascript(js, null);
+        }
         // For device music mixed into the host's published audio, adjust only the
         // dedicated ZEGO media player; microphone capture gain remains untouched.
         if (canManageMusic && isLocalMusicUrl(currentMusicUrl)) {
@@ -4338,13 +4346,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         long startSec = Math.max(0L, positionMs / 1000L);
         String html = "<!DOCTYPE html><html><head><meta name='viewport' "
                 + "content='width=device-width,initial-scale=1,maximum-scale=1'/>"
-                + "<style>html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
-                + "iframe{border:0;width:100%;height:100%;}</style></head><body>"
-                + "<iframe src='https://www.youtube.com/embed/" + videoId
-                + "?autoplay=" + (playing ? "1" : "0")
-                + "&controls=0&playsinline=1&rel=0&modestbranding=1&fs=0&start=" + startSec
-                + "' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
-                + "</body></html>";
+                + "<style>html,body,#player{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
+                + "</style></head><body><div id='player'></div>"
+                + "<script src='https://www.youtube.com/iframe_api'></script><script>"
+                + "var musicYtPlayer;function onYouTubeIframeAPIReady(){musicYtPlayer=new YT.Player('player',"
+                + "{height:'100%',width:'100%',videoId:'" + videoId + "',playerVars:{autoplay:"
+                + (playing ? "1" : "0")
+                + ",controls:0,playsinline:1,rel:0,modestbranding:1,fs:0,start:" + startSec
+                + "},events:{onReady:function(e){var v=" + Math.round(sharedMusicVolume * 100f)
+                + ";if(v===0)e.target.mute();else{e.target.unMute();e.target.setVolume(v);}}}});}"
+                + "</script></body></html>";
         ensureMusicYoutubeWebView().loadDataWithBaseURL(
                 "https://www.youtube.com", html, "text/html", "utf-8", null);
         showMusicVideoSurface(true);
