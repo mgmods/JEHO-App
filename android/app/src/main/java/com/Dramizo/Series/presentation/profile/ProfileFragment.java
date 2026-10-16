@@ -141,6 +141,7 @@ public class ProfileFragment extends Fragment {
 
         View.OnClickListener openWallet = v ->
                 startActivity(new Intent(requireContext(), BagActivity.class));
+        binding.walletBalancesRow.setOnClickListener(openWallet);
         binding.btnWallet.setOnClickListener(openWallet);
         if (binding.btnWalletDiamondsCard != null) {
             binding.btnWalletDiamondsCard.setOnClickListener(openWallet);
