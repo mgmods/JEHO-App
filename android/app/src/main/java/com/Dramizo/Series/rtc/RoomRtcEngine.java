@@ -349,6 +349,11 @@ public final class RoomRtcEngine {
         if (!isLiveKit()) ZegoEngineManager.getInstance().boostMusicMixVolume();
     }
 
+    /** Adjust host-published local music mix (0–200); does not modify ZEGO connection settings. */
+    public void setMusicMixVolumePercent(int percent) {
+        if (!isLiveKit()) ZegoEngineManager.getInstance().setMusicMixVolumePercent(percent);
+    }
+
     public boolean isLocalMusicPlaying() {
         return !isLiveKit() && ZegoEngineManager.getInstance().isLocalMusicPlaying();
     }
