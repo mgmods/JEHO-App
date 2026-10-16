@@ -18,7 +18,7 @@ Set these server-side environment variables in Blitz for the backend service:
 
 Never put the server-side key in the Android app, Vite/public dashboard variables, source control, logs, or chat.
 
-Create a Storage bucket named `jeho-own-uploads` in that same project. A private bucket is supported because file reads are proxied through the authenticated backend using the server-side key. Set the bucket's maximum file size to at least 40 MiB if uploads of that size are required. The backend accepts image, video, SVGA, audio, PDF and JSON files within its configured size limit.
+Create a Storage bucket named `jeho-own-uploads` in that same project. A private bucket is supported because file reads are proxied through the backend using the server-side key. The current `/uploads/:filename` route does not require user authentication, matching the app's existing media URL behavior. Set the bucket's maximum file size to at least 40 MiB if uploads of that size are required. The backend accepts image, video, SVGA, audio, PDF and JSON files within its configured size limit.
 
 ## Verification checklist
 
