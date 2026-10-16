@@ -32,7 +32,6 @@ import com.Dramizo.Series.presentation.ranking.RankingActivity;
 import com.Dramizo.Series.presentation.settings.SettingsActivity;
 import com.Dramizo.Series.presentation.settings.CustomerSupportActivity;
 import com.Dramizo.Series.util.RemoteNavIcons;
-import com.Dramizo.Series.presentation.vip.VipActivity;
 import com.Dramizo.Series.presentation.wallet.BagActivity;
 import com.Dramizo.Series.presentation.wallet.RechargeAgentActivity;
 import com.Dramizo.Series.util.AppLoadingOverlay;
@@ -153,8 +152,7 @@ public class ProfileFragment extends Fragment {
             binding.rowMyEvents.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), MyEventsActivity.class)));
         }
-        binding.btnVip.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), VipActivity.class)));
+        binding.btnVip.setOnClickListener(v -> openVipHtmlPage());
         binding.btnSettingsQuick.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
         if (binding.levelCard != null) {
@@ -162,8 +160,7 @@ public class ProfileFragment extends Fragment {
                     startActivity(new Intent(requireContext(), UserLevelActivity.class)));
         }
         if (binding.vipCard != null) {
-            binding.vipCard.setOnClickListener(v ->
-                    startActivity(new Intent(requireContext(), VipActivity.class)));
+            binding.vipCard.setOnClickListener(v -> openVipHtmlPage());
         }
         View.OnClickListener openFriends = v -> {
             Intent i = new Intent(requireContext(), FriendsActivity.class);
@@ -424,6 +421,13 @@ public class ProfileFragment extends Fragment {
     private String formatScore(long value) {
         return NumberFormat.getIntegerInstance(getResources().getConfiguration().getLocales().get(0))
                 .format(Math.max(0, value));
+    }
+
+    /** Open the same data-backed VIP catalog as HTML, from the profile VIP entry only. */
+    private void openVipHtmlPage() {
+        Intent intent = new Intent(requireContext(), CosmeticsActivity.class);
+        intent.putExtra("store_section", "vip");
+        startActivity(intent);
     }
 
     private void bindRow(View row, View.OnClickListener click) {
