@@ -71,6 +71,7 @@ export const DASHBOARD_MODULES = [
   'seatStickers',
   'reports',
   'notifications',
+  'cpSettings',
   'settings',
   'logs',
   'policyBrochure',
