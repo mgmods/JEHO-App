@@ -64,7 +64,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         seatEffect: {
           enabled: effect.enabled !== false,
           url: typeof effect.url === 'string' ? effect.url : '',
-          sizeDp: Math.max(24, Math.min(160, Number(effect.sizeDp) || 56)),
+          sizeDp: Math.max(10, Math.min(36, Number(effect.sizeDp) || 18)),
           durationMs: Math.max(500, Math.min(10000, Number(effect.durationMs) || 1800)),
         },
       });
