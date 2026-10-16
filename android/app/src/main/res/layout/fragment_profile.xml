@@ -49,7 +49,7 @@
             <ImageView
                 android:id="@+id/imgCover"
                 android:layout_width="match_parent"
-                android:layout_height="118dp"
+                android:layout_height="106dp"
                 android:contentDescription="@null"
                 android:scaleType="fitXY"
                 android:src="@drawable/bg_home_full_gradient" />
@@ -549,7 +549,8 @@
                 android:foreground="?attr/selectableItemBackground"
                 android:clickable="true"
                 android:focusable="true"
-                android:padding="4dp"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="2dp"
                 android:baselineAligned="false">
 
                 <LinearLayout
@@ -558,9 +559,10 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:gravity="center_vertical"
-                    android:minHeight="64dp"
+                    android:minHeight="56dp"
                     android:orientation="horizontal"
-                    android:padding="8dp">
+                    android:paddingHorizontal="8dp"
+                    android:paddingVertical="4dp">
 
                     <ImageView
                         android:layout_width="32dp"
