@@ -293,9 +293,9 @@ public final class MikooGamesCatalog {
                         // Dashboard custom cover (/uploads/…, CDN, etc.)
                         override.coverUrl = MediaAssetSync.bust(apiCover);
                     }
-                    if (override.playUrl == null || override.playUrl.isEmpty()) {
-                        override.playUrl = def.playUrl;
-                    }
+                    // For known packaged games, ignore stale server URLs from old deployments.
+                    // The API catalog is authoritative for visibility/titles/covers, but play must use the active backend.
+                    override.playUrl = def.playUrl;
                     if (override.titleEn == null || override.titleEn.trim().isEmpty()) {
                         override.titleEn = def.titleEn;
                     }
