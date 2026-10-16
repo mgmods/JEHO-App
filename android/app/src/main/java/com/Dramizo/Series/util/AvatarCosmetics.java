@@ -550,10 +550,16 @@ public final class AvatarCosmetics {
         String wearKey = String.valueOf(avatarUrl) + '|' + String.valueOf(vipFrameUrl);
         if (hostSignal != null) {
             Object prev = hostSignal.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)
-                    && (hostSignal.getVisibility() == View.VISIBLE
-                    || (avatarView != null && avatarView.getVisibility() == View.VISIBLE))) {
-                // Already bound this wear — skip clear/reload flash on every /me refresh.
+            boolean animatedFrameReady = hostSignal.getVisibility() == View.VISIBLE
+                    && hostSignal.getAlpha() > 0.01f;
+            boolean staticFrameReady = frameView != null
+                    && frameView.getVisibility() == View.VISIBLE
+                    && frameView.getDrawable() != null;
+            boolean avatarReady = avatarView == null || avatarView.getVisibility() == View.VISIBLE;
+            if (wearKey.equals(prev) && avatarReady
+                    && (animatedFrameReady || staticFrameReady)) {
+                // Skip reload only when the actual frame is still visible; an avatar alone
+                // is not proof that the equipped frame rendered successfully.
                 return;
             }
             hostSignal.setTag(R.id.tag_wear_key, wearKey);
