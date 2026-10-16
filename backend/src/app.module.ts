@@ -47,6 +47,7 @@ import { BadgesModule } from './modules/badges/badges.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
+import { ensureBadgeTables } from './database/badges-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -115,6 +116,17 @@ const entityList = Object.values(entities).filter(
         }
 
         const appDataSource = await new DataSource(options).initialize();
+
+        // Create only the additive badge tables missing from older deployments.
+        // This never touches voice, Redis, user records, or existing badge data.
+        try {
+          await ensureBadgeTables(appDataSource);
+        } catch (error) {
+          console.error(
+            '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
 
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
         const [connectionInfo] = await appDataSource.query(
