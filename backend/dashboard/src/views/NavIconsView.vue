@@ -262,13 +262,13 @@ async function save() {
   error.value = ''
   success.value = ''
   const body = {
-    version: version.value,
+    version: Math.max(1, Number(version.value) || 1) + 1,
+    updatedAt: new Date().toISOString(),
     party: { ...form.party },
     drama: { ...form.drama },
     games: { ...form.games },
     chat: { ...form.chat },
     me: { ...form.me },
-    profileActions: { ...profileActions.value },
     profileActions: { ...profileIcons },
   }
   const { error: err } = await settingsApi.update({
