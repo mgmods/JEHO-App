@@ -1,17 +1,18 @@
 import {
   Injectable,
   Logger,
+  OnModuleInit,
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { extname, join } from 'path';
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
-export class UploadsService {
+export class UploadsService implements OnModuleInit {
   private readonly logger = new Logger(UploadsService.name);
   private readonly uploadDir: string;
   private readonly maxSizeMb: number;
@@ -45,6 +46,56 @@ export class UploadsService {
       `Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; url=${this.supabaseUrl ? 'set' : 'missing'}; bucket=${this.storageBucket}; key=${keySource}`,
     );
     if (!existsSync(this.uploadDir)) mkdirSync(this.uploadDir, { recursive: true });
+  }
+
+  async onModuleInit() {
+    if (process.env.NODE_ENV !== 'production' || !this.storageEnabled()) return;
+    try {
+      // Validate the actual bucket/key at startup, not just whether env vars exist.
+      const bucketCheck = await this.storageFetch(
+        `${this.supabaseUrl}/storage/v1/bucket/${encodeURIComponent(this.storageBucket)}`,
+        { headers: this.storageHeaders({ Accept: 'application/json' }) },
+      );
+      if (!bucketCheck.ok) {
+        const detail = await this.safeResponseText(bucketCheck);
+        throw new Error(`Supabase bucket check failed (${bucketCheck.status}): ${detail}`);
+      }
+
+      // Migrate files from the container's local uploads directory before serving
+      // traffic. Keep local copies as a rollback safety net; skip files already remote.
+      const names = readdirSync(this.uploadDir);
+      let migrated = 0;
+      for (const filename of names) {
+        if (!filename || filename.includes('..') || filename.includes('/') || filename.includes(String.fromCharCode(92))) continue;
+        const localPath = join(this.uploadDir, filename);
+        if (!statSync(localPath).isFile()) continue;
+        const objectUrl = this.storageObjectUrl(filename);
+        const exists = await this.storageFetch(objectUrl, { method: 'HEAD', headers: this.storageHeaders() });
+        if (exists.ok) continue;
+        if (exists.status !== 404) {
+          throw new Error(`Supabase object check failed (${exists.status}) for ${filename}`);
+        }
+        const uploaded = await this.storageFetch(objectUrl, {
+          method: 'POST',
+          headers: this.storageHeaders({
+            'Content-Type': 'application/octet-stream',
+            'Cache-Control': '3600',
+            'x-upsert': 'false',
+          }),
+          body: readFileSync(localPath),
+        });
+        if (!uploaded.ok) {
+          const detail = await this.safeResponseText(uploaded);
+          throw new Error(`Supabase migration failed (${uploaded.status}) for ${filename}: ${detail}`);
+        }
+        migrated += 1;
+      }
+      this.logger.log(`Durable storage verified; bucket=${this.storageBucket}; local files migrated=${migrated}`);
+    } catch (error) {
+      this.logger.error(
+        `Durable storage startup verification/migration failed; uploads may fail until configuration is corrected: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   getMulterOptions() {
