@@ -49,6 +49,7 @@ import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
 import { ensureBadgeTables } from './database/badges-bootstrap';
 import { ensureCpTables } from './database/cp-bootstrap';
+import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -137,6 +138,13 @@ const entityList = Object.values(entities).filter(
             '[CpBootstrap] Could not initialize CP tables; API startup continues.',
             error instanceof Error ? error.message : String(error),
           );
+        }
+
+        // Additive vanity-ID style columns; existing IDs, purchases and leases are preserved.
+        try {
+          await ensureVanityIdStyleColumns(appDataSource);
+        } catch (error) {
+          console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
         }
 
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
