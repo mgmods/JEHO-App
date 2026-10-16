@@ -89,6 +89,13 @@ public class ProfileFragment extends Fragment {
         };
         binding.headerProfile.setOnClickListener(openProfile);
         binding.imgAvatar.setOnClickListener(openProfile);
+        if (binding.rowProfileBadges != null) {
+            binding.rowProfileBadges.setOnClickListener(v -> {
+                Intent badges = new Intent(requireContext(), BadgeActivity.class);
+                if (myId != null) badges.putExtra(BadgeActivity.EXTRA_USER_ID, myId);
+                startActivity(badges);
+            });
+        }
 
         // Bind only views that exist in fragment_profile.xml. The former action*/icon* IDs
         // belonged to a removed shortcut grid and caused FragmentProfileBinding compilation errors.
@@ -181,6 +188,7 @@ public class ProfileFragment extends Fragment {
         viewModel.getUser().observe(getViewLifecycleOwner(), user -> {
             if (user == null) return;
             myId = user.id;
+            loadProfileBadges(user.id);
             bindMyCpRelationship(user.id);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
@@ -470,10 +478,63 @@ public class ProfileFragment extends Fragment {
         } catch (Exception ignored) {
             applyTasksFeatureVisibility();
         }
+        // Refresh earned badges on returning to the app so dashboard grants appear without
+        // requiring the user to sign out or reinstall.
+        if (myId != null && !myId.trim().isEmpty()) loadProfileBadges(myId);
         // Soft refresh only — reloading profile + wallet every entry was flashing avatar / balances.
         if (viewModel != null) viewModel.loadMe(false);
         loadAgencyAction();
         refreshWalletBalances(false);
+    }
+
+    private void loadProfileBadges(String userId) {
+        if (binding == null || binding.earnedBadgesContainer == null
+                || userId == null || userId.trim().isEmpty()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto> earned =
+                    new java.util.ArrayList<>();
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<
+                        java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
+                        c.getUserApi().badges(userId).execute();
+                if (response.isSuccessful() && response.body() != null
+                        && response.body().data != null) {
+                    for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned) earned.add(badge);
+                        if (earned.size() >= 3) break;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Keep the profile usable when the network is temporarily unavailable.
+            }
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                binding.earnedBadgesContainer.removeAllViews();
+                for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
+                    android.widget.ImageView icon = new android.widget.ImageView(requireContext());
+                    int size = (int) (24 * getResources().getDisplayMetrics().density + 0.5f);
+                    android.widget.LinearLayout.LayoutParams lp =
+                            new android.widget.LinearLayout.LayoutParams(size, size);
+                    lp.setMargins(0, 0, (int) (4 * getResources().getDisplayMetrics().density + 0.5f), 0);
+                    icon.setLayoutParams(lp);
+                    icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+                    icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
+                    Glide.with(ProfileFragment.this)
+                            .load(AssetCatalog.absoluteUrl(badge.imageUrl))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default)
+                            .into(icon);
+                    icon.setOnClickListener(v -> {
+                        Intent badges = new Intent(requireContext(), BadgeActivity.class);
+                        badges.putExtra(BadgeActivity.EXTRA_USER_ID, userId);
+                        startActivity(badges);
+                    });
+                    binding.earnedBadgesContainer.addView(icon);
+                }
+            });
+        });
     }
 
     private void applyTasksFeatureVisibility() {
