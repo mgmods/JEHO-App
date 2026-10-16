@@ -171,7 +171,7 @@ public class CpCenterActivity extends ThemedActivity {
         c.getIoExecutor().execute(() -> {
             Result<List<Map<String, Object>>> r = ApiCall.execute(c.getUserApi().discoverCp(safe.isEmpty() ? null : safe));
             if (r.success && r.data != null) {
-                js("window.renderCpDiscover && window.renderCpDiscover(" + gson.toJson(r.data) + ")");
+                js("window.renderCpDiscover && window.renderCpDiscover(" + gson.toJson(normalizeUrls(r.data)) + ")");
             } else {
                 js("window.renderCpDiscover && window.renderCpDiscover([])");
                 message(r.error != null ? r.error : "تعذر تحميل العلاقات النشطة");
