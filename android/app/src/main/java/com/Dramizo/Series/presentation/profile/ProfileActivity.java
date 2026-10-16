@@ -270,6 +270,8 @@ public class ProfileActivity extends ThemedActivity {
 
             final String publicId = user.displayPublicId();
             binding.tvUsername.setText(publicId.isEmpty() ? "ID:—" : ("ID:" + publicId));
+            com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
+                    container.getVanityApi(), publicId, user.vipLevel);
             binding.btnCopyId.setOnClickListener(v -> {
                 if (publicId.isEmpty()) {
                     Toast.makeText(this, R.string.error_generic, Toast.LENGTH_SHORT).show();
