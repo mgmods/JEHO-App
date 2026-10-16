@@ -49,3 +49,30 @@ html[data-section="vip"] footer{color:#b8a66d}
 .id-price-row .price{font-size:13px}
 .id-price-row .tag{flex:0 0 auto}
 .id-item-card>.primary-btn{width:100%;margin-top:0}
+
+/* Configurable vanity-ID previews from the dashboard */
+.id-item-card .id-visual {
+  --id-color-1: #52E8FF;
+  --id-color-2: #C084FC;
+  --id-color-3: #FF7AC8;
+  --id-glow: 1;
+  border-color: color-mix(in srgb, var(--id-color-1) 45%, transparent);
+}
+.id-item-card .id-visual strong {
+  color: var(--id-color-1);
+  text-shadow: 0 0 calc(10px * var(--id-glow)) var(--id-color-1),
+               0 0 calc(18px * var(--id-glow)) var(--id-color-2);
+}
+.id-item-card .id-visual-animated strong {
+  background: linear-gradient(100deg, var(--id-color-1), var(--id-color-2), var(--id-color-3), var(--id-color-1));
+  background-size: 260% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: jeho-id-spectrum 3s linear infinite;
+}
+.id-item-card .id-visual-animated {
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--id-color-2) 15%, transparent),
+              0 0 14px color-mix(in srgb, var(--id-color-1) 12%, transparent);
+}
+@keyframes jeho-id-spectrum { to { background-position: 260% center; } }
