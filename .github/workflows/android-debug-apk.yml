@@ -117,7 +117,18 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
           test -s "$KEYSTORE"
-          echo "Temporary CI debug keystore is ready."
+          KEY_INFO="$(keytool -list -v -keystore "$KEYSTORE" -storepass android -alias AndroidDebugKey)"
+          printf '%s\n' "$KEY_INFO" | grep -E 'Alias name:|SHA1:|SHA256:'
+          EXPECTED_BASELINE_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
+          ACTUAL_KEY_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_KEY_SHA1" != "$EXPECTED_BASELINE_SHA1" ]]; then
+            echo "::error::Refusing to build an APK that cannot update the installed JEHO baseline."
+            echo "::error::Expected baseline SHA-1: $EXPECTED_BASELINE_SHA1"
+            echo "::error::Available CI key SHA-1: ${ACTUAL_KEY_SHA1:-not detected}"
+            echo "::error::Restore the original signing keystore before building a distributable update."
+            exit 1
+          fi
+          echo "Verified: CI signing key matches the installed baseline."
 
       - name: Verify stable debug signing key
         shell: bash
@@ -154,7 +165,7 @@ jobs:
           fi
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
           echo "$CERT_OUTPUT"
-          EXPECTED_SHA1="376BA3CC6B418AEC37F0E931FB3A4FEA87C318B5"
+          EXPECTED_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
           ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
             echo "::error::APK signing certificate does not match the currently installed baseline certificate. Refusing to publish an incompatible update."
