@@ -39,3 +39,18 @@ This change does not delete existing media or modify database records. Existing 
 - The backend uses the server-side key to upload, read, and delete objects. Keep the bucket private unless a separate public-delivery design is deliberately adopted.
 - No database migration is needed for this storage change.
 - Audio/ZEGO/RTC configuration is unrelated and must remain unchanged.
+
+## Update-safe APK signing in GitHub Actions
+
+The Android APK workflow must use the same keystore certificate as the already-installed app. It intentionally fails closed if the signing key is absent or its SHA-1 differs from the expected baseline; never remove this check or generate a replacement key for a distributable update.
+
+In repository **Settings → Secrets and variables → Actions**, add these repository secrets from the original keystore (do not commit the keystore or its passwords):
+
+- `JEHO_SIGNING_KEYSTORE_BASE64`: Base64-encoded contents of the original keystore file.
+- `JEHO_SIGNING_STORE_PASSWORD`: keystore password.
+- `JEHO_SIGNING_KEY_ALIAS`: alias inside that keystore.
+- `JEHO_SIGNING_KEY_PASSWORD`: key password.
+
+The workflow verifies that the restored key fingerprint is `5A:63:B1:8B:D7:F1:8C:E9:14:F2:55:AA:70:91:8B:DB:91:D6:83:E4` before building, and verifies the APK certificate again after building. If the original key's actual fingerprint differs, stop and verify which certificate signed the installed app; do not change the expected fingerprint just to make CI pass.
+
+The secrets cannot be recovered from a SHA-1 fingerprint. Only the original keystore (or an existing backup of that same private key) can sign an install-over update.
