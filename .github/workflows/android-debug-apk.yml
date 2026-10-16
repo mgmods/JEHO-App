@@ -92,8 +92,8 @@ jobs:
             exit 1
           fi
 
-      # Use the original installed-app signing certificate. Never fall back to a newly generated key.
-      - name: Restore original JEHO signing keystore
+      # Use the one stable JEHO release signing certificate. Never generate a different key per build.
+      - name: Restore stable JEHO release signing keystore
         shell: bash
         env:
           JEHO_SIGNING_KEYSTORE_BASE64: ${{ secrets.JEHO_SIGNING_KEYSTORE_BASE64 }}
@@ -103,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${JEHO_SIGNING_KEYSTORE_BASE64:-}" || -z "${JEHO_SIGNING_STORE_PASSWORD:-}" || -z "${JEHO_SIGNING_KEY_ALIAS:-}" || -z "${JEHO_SIGNING_KEY_PASSWORD:-}" ]]; then
-            echo "::error::Original signing-key GitHub Actions secrets are not configured. Refusing to create an incompatible APK."
+            echo "::error::Stable signing-key GitHub Actions secrets are not configured. Refusing to create an APK with an unverified signature."
             exit 1
           fi
           KEYSTORE="$HOME/.android/jeho-original-signing.jks"
@@ -112,11 +112,11 @@ jobs:
           test -s "$KEYSTORE"
           KEY_INFO="$(keytool -list -v -keystore "$KEYSTORE" -storepass "$JEHO_SIGNING_STORE_PASSWORD" -alias "$JEHO_SIGNING_KEY_ALIAS")"
           printf '%s\n' "$KEY_INFO" | grep -E 'Alias name:|SHA1:|SHA256:'
-          EXPECTED_BASELINE_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
+          EXPECTED_BASELINE_SHA1="FE544713A2726865005599472B4527C62818E696"
           ACTUAL_KEY_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_KEY_SHA1" != "$EXPECTED_BASELINE_SHA1" ]]; then
-            echo "::error::Original signing key does not match the installed JEHO baseline."
-            echo "::error::Expected baseline SHA-1: $EXPECTED_BASELINE_SHA1"
+            echo "::error::Signing key does not match the newly approved JEHO release key."
+            echo "::error::Expected stable SHA-1: $EXPECTED_BASELINE_SHA1"
             echo "::error::Available key SHA-1: ${ACTUAL_KEY_SHA1:-not detected}"
             exit 1
           fi
@@ -126,7 +126,7 @@ jobs:
             echo "JEHO_DEBUG_KEY_ALIAS=$JEHO_SIGNING_KEY_ALIAS"
             echo "JEHO_DEBUG_KEY_PASSWORD=$JEHO_SIGNING_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
-          echo "Verified: original signing key matches the installed baseline."
+          echo "Verified: stable JEHO release signing key matches."
 
       - name: Verify original signing key
         shell: bash
@@ -158,15 +158,15 @@ jobs:
           fi
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
           echo "$CERT_OUTPUT"
-          EXPECTED_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
+          EXPECTED_SHA1="FE544713A2726865005599472B4527C62818E696"
           ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
-            echo "::error::APK signing certificate does not match the currently installed baseline certificate. Refusing to publish an incompatible update."
-            echo "::error::Expected SHA-1: $EXPECTED_SHA1"
+            echo "::error::APK signing certificate does not match the approved new JEHO release key. Refusing to publish."
+            echo "::error::Expected stable SHA-1: $EXPECTED_SHA1"
             echo "::error::Actual SHA-1: ${ACTUAL_SHA1:-not detected}"
             exit 1
           fi
-          echo "Verified: APK signing certificate matches the installed baseline."
+          echo "Verified: APK signing certificate matches the approved stable JEHO release key."
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
