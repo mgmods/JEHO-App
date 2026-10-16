@@ -3,11 +3,9 @@ package com.Dramizo.Series.util;
 import android.graphics.Color;
 import android.graphics.LinearGradient;
 import android.graphics.Shader;
-import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 import android.widget.TextView;
 import android.animation.ValueAnimator;
-import android.content.Context;
 
 import androidx.annotation.Nullable;
 
@@ -49,7 +47,7 @@ public final class VanityIdStyle {
             else apply(view, id, colors(cached), "animated".equals(cached.styleMode), cached.styleGlow);
             return;
         }
-        if (api == null || !id.matches("\\\\d{3,16}")) return;
+        if (api == null || !id.matches("\\d{3,16}")) return;
         if (LOADING.putIfAbsent(id, Boolean.TRUE) != null) return;
         api.style(id).enqueue(new Callback<ApiResponse<VanityDtos.Style>>() {
             @Override public void onResponse(Call<ApiResponse<VanityDtos.Style>> call, Response<ApiResponse<VanityDtos.Style>> response) {
