@@ -43,17 +43,23 @@ export class BadgesService {
     // Reconcile configured achievement badges against the user's real, persisted metrics.
     // The unique user/badge index plus INSERT .. ON CONFLICT DO NOTHING makes this idempotent.
     await this.awardEligibleAchievementBadges(userId);
-    const [badges, owned] = await Promise.all([
-      this.badges.find({ where: { isActive: true }, order: { sortOrder: 'ASC', name: 'ASC' } }),
+    const [catalog, owned] = await Promise.all([
+      // Always load the full catalogue so a badge already granted to a user does not
+      // disappear from their profile if an admin later hides it from the public catalogue.
+      this.badges.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
       this.userBadges.find({ where: { userId }, relations: { badge: true } }),
     ]);
     const ownedById = new Map(owned.map((row) => [row.badgeId, row]));
-    return badges.map((badge) => ({
-      ...badge,
-      earned: ownedById.has(badge.id),
-      grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
-      source: ownedById.get(badge.id)?.source ?? null,
-    }));
+    // Active badges are discoverable by everyone; previously granted badges remain
+    // visible to their owner even when no longer offered to new users.
+    return catalog
+      .filter((badge) => badge.isActive || ownedById.has(badge.id))
+      .map((badge) => ({
+        ...badge,
+        earned: ownedById.has(badge.id),
+        grantedAt: ownedById.get(badge.id)?.grantedAt ?? null,
+        source: ownedById.get(badge.id)?.source ?? null,
+      }));
   }
 
   private async awardEligibleAchievementBadges(userId: string): Promise<void> {
