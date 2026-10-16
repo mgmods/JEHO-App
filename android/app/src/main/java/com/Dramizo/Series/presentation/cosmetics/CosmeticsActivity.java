@@ -10,6 +10,11 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceResponse;
+
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -70,14 +75,38 @@ public class CosmeticsActivity extends ThemedActivity {
         webView.addJavascriptInterface(new MallBridge(), "MallBridge");
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
+            private static final String ASSET_HOST = "appassets.androidplatform.net";
+            private static final String ASSET_PREFIX = "/assets/mall/";
+
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (ASSET_HOST.equalsIgnoreCase(String.valueOf(uri.getHost()))
+                        && uri.getPath() != null && uri.getPath().startsWith(ASSET_PREFIX)) {
+                    String relative = Uri.decode(uri.getPath().substring(ASSET_PREFIX.length()));
+                    if (relative.isEmpty() || relative.endsWith("/")) relative += "index.html";
+                    try {
+                        InputStream stream = getAssets().open("mall/" + relative);
+                        Map<String, String> headers = new HashMap<>();
+                        headers.put("Cache-Control", "no-store");
+                        return new WebResourceResponse(mimeType(relative), "UTF-8", 200,
+                                "OK", headers, stream);
+                    } catch (Exception ignored) {
+                        // Let WebView report missing generated assets rather than crash the Activity.
+                    }
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String scheme = uri.getScheme();
                 String host = uri.getHost();
-                boolean sameHost = host != null && mallOrigin != null
+                boolean sameApiHost = host != null && mallOrigin != null
                         && host.equalsIgnoreCase(Uri.parse(mallOrigin).getHost());
-                return !("https".equalsIgnoreCase(scheme) && sameHost);
+                boolean localMallHost = host != null && host.equalsIgnoreCase(ASSET_HOST);
+                return !("https".equalsIgnoreCase(scheme) && (sameApiHost || localMallHost));
             }
 
             @Override
@@ -104,10 +133,11 @@ public class CosmeticsActivity extends ThemedActivity {
         String section = getIntent().getStringExtra("store_section");
         if ("level".equals(section) || "badges".equals(section)
                 || "id".equals(section) || "vip".equals(section)) {
-            webView.loadUrl(mallOrigin + "/mall/" + section + ".html");
+            webView.loadUrl("https://appassets.androidplatform.net/assets/mall/" + section + ".html");
             return;
         }
-        Uri.Builder page = Uri.parse(mallOrigin + "/mall/").buildUpon()
+        Uri.Builder page = Uri.parse("https://appassets.androidplatform.net/assets/mall/index.html")
+                .buildUpon()
                 .appendQueryParameter("type", type)
                 .appendQueryParameter("bag", bag ? "1" : "0");
         if (roomId != null && !roomId.isEmpty()) {
@@ -133,6 +163,23 @@ public class CosmeticsActivity extends ThemedActivity {
             try { webView.destroy(); } catch (Exception ignored) {}
         }
         super.onDestroy();
+    }
+
+    private static String mimeType(String path) {
+        String p = path.toLowerCase(java.util.Locale.ROOT);
+        if (p.endsWith(".html")) return "text/html";
+        if (p.endsWith(".js")) return "application/javascript";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".json")) return "application/json";
+        if (p.endsWith(".svg")) return "image/svg+xml";
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".jpg") || p.endsWith(".jpeg")) return "image/jpeg";
+        if (p.endsWith(".webp")) return "image/webp";
+        if (p.endsWith(".gif")) return "image/gif";
+        if (p.endsWith(".mp4")) return "video/mp4";
+        if (p.endsWith(".webm")) return "video/webm";
+        if (p.endsWith(".svga")) return "application/octet-stream";
+        return "application/octet-stream";
     }
 
     static String normalizeType(@Nullable String type) {
