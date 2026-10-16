@@ -38,8 +38,13 @@
           <div class="form-text">تجديد قبل الانتهاء: {{ renewHint }} كوينز</div>
         </div>
         <div class="col-md-3">
-          <button class="btn btn-aurora" type="submit" :disabled="saving">إضافة للبيع</button>
+          <label class="form-label">نمط العرض</label>
+          <select v-model="form.styleMode" class="form-select"><option value="static">ألوان ثابتة</option><option value="animated">ألوان متحركة</option></select>
         </div>
+        <div class="col-md-2"><label class="form-label">اللون الأول</label><input v-model="form.styleColor1" type="color" class="form-control form-control-color w-100" /></div>
+        <div class="col-md-2"><label class="form-label">اللون الثاني</label><input v-model="form.styleColor2" type="color" class="form-control form-control-color w-100" /></div>
+        <div class="col-md-2"><label class="form-label">اللون الثالث</label><input v-model="form.styleColor3" type="color" class="form-control form-control-color w-100" /></div>
+        <div class="col-md-2"><button class="btn btn-aurora" type="submit" :disabled="saving">إضافة للبيع</button></div>
       </form>
     </div>
 
@@ -60,7 +65,7 @@
       <article v-for="item in filtered" :key="item.id" class="widget-card vanity-card">
         <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-            <div class="vanity-id">{{ item.publicId }}</div>
+            <div class="vanity-id" :class="{ 'vanity-id-animated': item._styleMode === 'animated', 'vanity-id-glow': item._styleGlow }" :style="idPreviewStyle(item)">{{ item.publicId }}</div>
             <span class="badge" :class="statusClass(item.status)">{{ statusLabel(item.status) }}</span>
           </div>
           <div class="vanity-price-row mb-2">
@@ -81,6 +86,16 @@
           </div>
           <div class="small text-muted mb-1">
             تجديد ½: {{ formatNumber(Math.ceil((Number(item._priceEdit ?? item.priceCoins) || 0) / 2)) }}
+          </div>
+          <div class="vanity-style-editor mb-3">
+            <div class="row g-2">
+              <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="static">ثابت</option><option value="animated">متحرك</option></select></div>
+              <div class="col-6 d-flex align-items-end"><label class="form-check mb-2"><input v-model="item._styleGlow" class="form-check-input" type="checkbox" /><span class="form-check-label small">توهّج</span></label></div>
+              <div class="col-4"><input v-model="item._styleColor1" type="color" class="form-control form-control-color w-100" aria-label="اللون الأول" /></div>
+              <div class="col-4"><input v-model="item._styleColor2" type="color" class="form-control form-control-color w-100" aria-label="اللون الثاني" /></div>
+              <div class="col-4"><input v-model="item._styleColor3" type="color" class="form-control form-control-color w-100" aria-label="اللون الثالث" /></div>
+              <div class="col-12"><button class="btn btn-sm btn-outline-info w-100" type="button" :disabled="busyId === item.id" @click="saveStyle(item)">حفظ التصميم</button></div>
+            </div>
           </div>
           <div class="small text-muted mb-1">ينتهي: {{ formatExpiry(item.expiresAt) }}</div>
           <div class="small text-muted mb-3">المالك: {{ shortId(item.ownerUserId) }}</div>
@@ -154,7 +169,7 @@ const busyId = ref('')
 const error = ref('')
 const ok = ref('')
 const filterStatus = ref('')
-const form = reactive({ publicId: '', priceCoins: 10000 })
+const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true })
 
 const confirmOpen = ref(false)
 const confirmTitle = ref('')
@@ -211,6 +226,11 @@ function withPriceEdit(list) {
   return (list || []).map((i) => ({
     ...i,
     _priceEdit: Number(i.priceCoins) || 0,
+    _styleMode: i.styleMode === 'animated' ? 'animated' : 'static',
+    _styleColor1: /^#[0-9a-fA-F]{6}$/.test(i.styleColor1 || '') ? i.styleColor1 : '#52E8FF',
+    _styleColor2: /^#[0-9a-fA-F]{6}$/.test(i.styleColor2 || '') ? i.styleColor2 : '#C084FC',
+    _styleColor3: /^#[0-9a-fA-F]{6}$/.test(i.styleColor3 || '') ? i.styleColor3 : '#FF7AC8',
+    _styleGlow: i.styleGlow !== false,
   }))
 }
 
@@ -242,6 +262,11 @@ async function create() {
     await api.post('/vanity-ids/admin', {
       publicId: id,
       priceCoins: form.priceCoins,
+      styleMode: form.styleMode,
+      styleColor1: form.styleColor1,
+      styleColor2: form.styleColor2,
+      styleColor3: form.styleColor3,
+      styleGlow: form.styleGlow,
     })
     ok.value = `تمت إضافة ${id} بسعر ${formatNumber(form.priceCoins)} كوينز`
     toast().success(ok.value)
@@ -252,6 +277,45 @@ async function create() {
     toast().danger(error.value)
   }
   saving.value = false
+}
+
+function idPreviewStyle(item) {
+  const a = item._styleColor1 || '#52E8FF'
+  const b = item._styleColor2 || '#C084FC'
+  const c = item._styleColor3 || '#FF7AC8'
+  return {
+    color: item._styleMode === 'animated' ? 'transparent' : a,
+    backgroundImage: item._styleMode === 'animated' ? `linear-gradient(110deg, ${a}, ${b}, ${c}, ${a})` : 'none',
+    backgroundSize: '240% 100%',
+    backgroundClip: item._styleMode === 'animated' ? 'text' : 'border-box',
+    WebkitBackgroundClip: item._styleMode === 'animated' ? 'text' : 'border-box',
+    textShadow: item._styleGlow ? `0 0 10px ${a}, 0 0 18px ${b}` : 'none',
+  }
+}
+
+async function saveStyle(item) {
+  busyId.value = item.id
+  error.value = ''
+  try {
+    await api.patch(`/vanity-ids/admin/${item.id}`, {
+      styleMode: item._styleMode,
+      styleColor1: item._styleColor1,
+      styleColor2: item._styleColor2,
+      styleColor3: item._styleColor3,
+      styleGlow: item._styleGlow,
+    })
+    item.styleMode = item._styleMode
+    item.styleColor1 = item._styleColor1
+    item.styleColor2 = item._styleColor2
+    item.styleColor3 = item._styleColor3
+    item.styleGlow = item._styleGlow
+    ok.value = `تم حفظ تصميم ${item.publicId}`
+    toast().success(ok.value)
+  } catch (e) {
+    error.value = e?.message || 'فشل حفظ التصميم'
+    toast().danger(error.value)
+  }
+  busyId.value = ''
 }
 
 async function savePrice(item) {
@@ -345,7 +409,14 @@ onMounted(load)
   color: #fff;
   font-variant-numeric: tabular-nums lining-nums;
   text-shadow: 0 0 20px rgba(167, 139, 250, 0.35);
+  display: inline-block;
+  border-radius: 4px;
+  padding: 0 4px;
 }
+.vanity-id-animated { animation: vanity-id-gradient 3s linear infinite; }
+.vanity-id-glow { filter: drop-shadow(0 0 5px currentColor); }
+.vanity-style-editor { border-top: 1px solid rgba(255,255,255,.1); padding-top: .75rem; }
+@keyframes vanity-id-gradient { to { background-position: 240% center; } }
 .vanity-price-row {
   display: flex;
   gap: 0.5rem;
