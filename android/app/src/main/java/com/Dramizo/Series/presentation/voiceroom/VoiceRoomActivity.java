@@ -12889,18 +12889,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         java.util.TreeSet<String> ids = new java.util.TreeSet<>();
+        java.util.TreeMap<Integer, String> seatedByPosition = new java.util.TreeMap<>();
         for (RoomDtos.SeatDto seat : seats) {
             if (seat == null || seat.locked()) continue;
             String id = seatUserId(seat);
             if (id == null || id.trim().isEmpty()) continue;
-            ids.add(id.trim());
+            id = id.trim();
+            ids.add(id);
+            // Include seat position in the cache signature. A pair can move while the
+            // same users remain seated; rebuild their visual anchors in that case.
+            seatedByPosition.put(seat.seatIndex, id);
         }
         if (ids.size() < 2) {
-            lastRelationshipEffectsSeatSignature = ids.toString();
+            lastRelationshipEffectsSeatSignature = seatedByPosition.toString();
             if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
             return;
         }
-        String signature = android.text.TextUtils.join(",", ids);
+        String userIds = android.text.TextUtils.join(",", ids);
+        String signature = seatedByPosition.toString();
         long now = android.os.SystemClock.elapsedRealtime();
         if (signature.equals(lastRelationshipEffectsSeatSignature)
                 && now - lastRelationshipEffectsFetchMs < 15000L) return;
@@ -12918,7 +12924,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         cpContainer.getIoExecutor().execute(() -> {
             Result<Map<String, Object>> result = ApiCall.execute(
-                    cpContainer.getUserApi().cpRoomSeatEffects(signature));
+                    cpContainer.getUserApi().cpRoomSeatEffects(userIds));
             relationshipEffectsFetchInFlight = false;
             if (!result.success || result.data == null || isFinishing() || isDestroyed()) return;
             Object relationsValue = result.data.get("relationships");
