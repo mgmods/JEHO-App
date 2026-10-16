@@ -10798,6 +10798,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             } catch (Exception ignored) {
             }
         }
+        if (relationshipSeatEffectsOverlay != null) {
+            relationshipSeatEffectsOverlay.destroy();
+            relationshipSeatEffectsOverlay = null;
+        }
         if (seatAdapter != null) seatAdapter.cleanup();
         clearHostStageReaction();
         if (!minimizing) {
