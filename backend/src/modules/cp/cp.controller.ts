@@ -12,6 +12,13 @@ export class CpController {
   constructor(private readonly cp: CpService) {}
 
   @Public()
+  @Get('room-effects')
+  @ApiOperation({ summary: 'Active relationships and configured visual effects for users seated together in a room' })
+  roomSeatEffects(@Query('userIds') userIds: string) {
+    return this.cp.roomSeatEffects(userIds || '');
+  }
+
+  @Public()
   @Get('users/:id')
   @ApiOperation({ summary: 'Public active CP relationships for a profile; no financial data' })
   profileRelationships(@Param('id', ParseUUIDPipe) userId: string) {
