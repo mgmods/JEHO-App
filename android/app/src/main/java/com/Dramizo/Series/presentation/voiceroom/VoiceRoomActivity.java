@@ -331,6 +331,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
+    /** Per-device music gain (0–200%). Host also applies this to the outgoing ZEGO music mix. */
+    private int roomMusicMixVolume = 200;
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
     private String currentMusicStatus = "stopped";
@@ -3605,6 +3607,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         clipOval(binding.musicFloatWrap);
         // YouTube WebView is lazy — see ensureMusicYoutubeWebView().
         binding.btnMusicPlayPause.setOnClickListener(v -> toggleRoomMusicPlayback());
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setOnClickListener(v -> changeRoomMusicVolume(-20));
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setOnClickListener(v -> changeRoomMusicVolume(20));
+        }
+        updateRoomMusicVolumeUi();
         binding.btnMusicStop.setOnClickListener(v -> {
             // Mikoo music_list_more — open library to add/pick tracks from the player.
             if (canManageMusic) showSavedMusicLibrary();
@@ -4193,11 +4202,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /** Shared room music volume (host + guests). Honors "كتم أصوات الغرفة". */
-    private void applySharedMusicVolume() {
-        if (roomMusicPlayer == null) return;
-        roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : 1f);
+    /** Per-device music gain; the host also controls the outgoing ZEGO music mix. */
+    private void changeRoomMusicVolume(int delta) {
+        roomMusicMixVolume = Math.max(0, Math.min(200, roomMusicMixVolume + delta));
+        updateRoomMusicVolumeUi();
+        applySharedMusicVolume();
+        if (canManageMusic) {
+            RoomRtcEngine.getInstance().setMusicMixVolume(roomMusicMixVolume);
+        }
     }
 
+    private void updateRoomMusicVolumeUi() {
+        if (binding != null && binding.tvMusicVolume != null) {
+            binding.tvMusicVolume.setText(roomMusicMixVolume + "%");
+        }
+        if (binding != null) {
+            if (binding.btnMusicVolumeDown != null) {
+                binding.btnMusicVolumeDown.setEnabled(roomMusicMixVolume > 0);
+                binding.btnMusicVolumeDown.setAlpha(roomMusicMixVolume > 0 ? 1f : 0.45f);
+            }
+            if (binding.btnMusicVolumeUp != null) {
+                binding.btnMusicVolumeUp.setEnabled(roomMusicMixVolume < 200);
+                binding.btnMusicVolumeUp.setAlpha(roomMusicMixVolume < 200 ? 1f : 0.45f);
+            }
+        }
+    }
+
+    /** Shared room music volume for local playback; honors room mute. */
+    private void applySharedMusicVolume() {
+        if (roomMusicPlayer == null) return;
+        float gain = roomSpeakerMuted ? 0f : roomMusicMixVolume / 200f;
+        roomMusicPlayer.setVolume(Math.max(0f, Math.min(1f, gain)));
+    }
     /** @deprecated kept for any remaining call sites — uses shared volume. */
     private void applyHostOrGuestMusicVolume() {
         applySharedMusicVolume();
