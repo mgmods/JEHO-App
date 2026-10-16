@@ -108,15 +108,32 @@
                     android:orientation="vertical"
                     android:paddingTop="8dp">
 
-                    <TextView
-                        android:id="@+id/tvDisplayName"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="1"
-                        android:textColor="@color/text_primary"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:id="@+id/tvDisplayName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/text_primary"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvGenderIcon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginStart="5dp"
+                            android:gravity="center"
+                            android:text="♂"
+                            android:textColor="#3498DB"
+                            android:textSize="17sp"
+                            android:textStyle="bold"
+                            android:visibility="gone" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/rowUserId"
@@ -629,34 +646,127 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Hidden legacy Level/VIP cards; actions are available in the quick row below. -->
+            <!-- Dashboard-managed profile banner from the existing /config/banners feed. -->
+            <FrameLayout
+                android:id="@+id/profileBannerWrap"
+                android:layout_width="match_parent"
+                android:layout_height="108dp"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_mikoo_card"
+                android:clipToOutline="true"
+                android:visibility="gone">
+                <ImageView
+                    android:id="@+id/imgProfileBanner"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <!-- Side-by-side VIP and Level cards, retaining their existing click targets. -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:visibility="gone"
-                android:orientation="horizontal">
-
-                <ImageView
-                    android:id="@+id/levelCard"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone"
-                    android:contentDescription="@string/user_level" />
-
-                <ImageView
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <LinearLayout
                     android:id="@+id/vipCard"
                     android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone"
-                    android:contentDescription="@string/vip" />
-
+                    android:layout_height="82dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:background="@drawable/bg_mikoo_card"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="#FFFFE8C2"
+                        android:gravity="center"
+                        android:text="VIP"
+                        android:textColor="#FF9B19"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/vip"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="امتيازات VIP"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/levelCard"
+                    android:layout_width="0dp"
+                    android:layout_height="82dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_mikoo_card"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:clickable="true"
+                    android:focusable="true">
+                    <TextView
+                        android:layout_width="42dp"
+                        android:layout_height="42dp"
+                        android:background="#FFDDF1FF"
+                        android:gravity="center"
+                        android:text="Lv"
+                        android:textColor="#FF3197D4"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/user_level"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="مستواك الحالي"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
                 <include
                     android:id="@+id/btnUserLevel"
                     layout="@layout/item_profile_service_row"
                     android:layout_width="0dp"
                     android:layout_height="0dp"
                     android:visibility="gone" />
-
                 <LinearLayout
                     android:id="@+id/btnVip"
                     android:layout_width="0dp"
@@ -1230,20 +1340,7 @@
                 android:layout_height="1dp"
                 android:visibility="gone" />
 
-            <!-- Legacy banner IDs kept gone — اشحن واربح removed permanently -->
-            <FrameLayout
-                android:id="@+id/profileBannerWrap"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
-                android:visibility="gone">
 
-                <ImageView
-                    android:id="@+id/imgProfileBanner"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:contentDescription="@null"
-                    android:visibility="gone" />
-            </FrameLayout>
         </LinearLayout>
     </ScrollView>
 </FrameLayout>
