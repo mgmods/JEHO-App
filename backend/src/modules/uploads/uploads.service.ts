@@ -114,12 +114,15 @@ export class UploadsService {
       const response = await this.storageFetch(objectUrl, {
         headers: this.storageHeaders({ Accept: 'application/octet-stream' }),
       });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
-      return {
-        buffer: Buffer.from(await response.arrayBuffer()),
-        contentType: response.headers.get('content-type') || 'application/octet-stream',
-      };
+      // During rollout, serve an existing local copy if the object has not
+      // yet been copied to Supabase. This avoids breaking links during migration.
+      if (response.status !== 404) {
+        if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
+        return {
+          buffer: Buffer.from(await response.arrayBuffer()),
+          contentType: response.headers.get('content-type') || 'application/octet-stream',
+        };
+      }
     }
 
     // Dashboard uploads still succeed without Supabase, but previously their
@@ -194,6 +197,8 @@ export class UploadsService {
             await this.moderation.recordNsfwStrike(userId);
           } catch {}
         }
+        // Remove rejected uploads from the container filesystem.
+        if (existsSync(storedPath)) unlinkSync(storedPath);
         throw err;
       }
     }
