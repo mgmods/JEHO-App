@@ -210,6 +210,8 @@ public class ProfileFragment extends Fragment {
             bindMyCpRelationship(user.id);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
+            bindGenderIcon(user);
+            loadProfileBanner();
             bindStaffUi(user);
             final String publicId = user.displayPublicId();
             binding.tvUsername.setText(publicId.isEmpty() ? "ID: —" : ("ID: " + publicId));
@@ -316,6 +318,82 @@ public class ProfileFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.loadMe();
+    }
+
+    /** Loads a language-appropriate image from the dashboard's existing banner feed. */
+    private void loadProfileBanner() {
+        if (binding == null || !isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            try {
+                Result<java.util.List<MiscDtos.BannerDto>> result =
+                        com.Dramizo.Series.util.ApiCall.execute(c.getConfigApi().banners());
+                if (!result.success || result.data == null) return;
+                boolean arabic = java.util.Locale.getDefault().getLanguage().toLowerCase().startsWith("ar");
+                MiscDtos.BannerDto selected = null;
+                for (MiscDtos.BannerDto banner : result.data) {
+                    if (banner == null || banner.imageUrl == null || banner.imageUrl.trim().isEmpty()) continue;
+                    String lang = banner.lang == null ? "all" : banner.lang.trim().toLowerCase();
+                    if ("all".equals(lang) || lang.isEmpty() || (arabic && "ar".equals(lang)) || (!arabic && "en".equals(lang))) {
+                        selected = banner;
+                        break;
+                    }
+                }
+                if (selected == null) {
+                    for (MiscDtos.BannerDto banner : result.data) {
+                        if (banner != null && banner.imageUrl != null && !banner.imageUrl.trim().isEmpty()) {
+                            selected = banner;
+                            break;
+                        }
+                    }
+                }
+                if (selected == null) return;
+                final String imageUrl = AssetCatalog.absoluteUrl(selected.imageUrl);
+                if (imageUrl == null || imageUrl.trim().isEmpty() || !isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (binding == null || !isAdded()) return;
+                    binding.profileBannerWrap.setVisibility(View.VISIBLE);
+                    binding.imgProfileBanner.setVisibility(View.VISIBLE);
+                    Glide.with(ProfileFragment.this).load(imageUrl)
+                            .placeholder(R.drawable.bg_mikoo_card)
+                            .error(R.drawable.bg_mikoo_card)
+                            .centerCrop().into(binding.imgProfileBanner);
+                });
+            } catch (Throwable ignored) {
+                // An unavailable optional banner must not block the profile screen.
+            }
+        });
+    }
+
+    /** Blue male / pink female marker when gender metadata is available on the user DTO. */
+    private void bindGenderIcon(Object user) {
+        if (binding == null || binding.tvGenderIcon == null || user == null) return;
+        String gender = "";
+        for (String name : new String[]{"gender", "sex"}) {
+            try {
+                java.lang.reflect.Field field = user.getClass().getField(name);
+                Object value = field.get(user);
+                if (value != null) { gender = String.valueOf(value); break; }
+            } catch (Throwable ignored) { }
+            try {
+                java.lang.reflect.Method getter = user.getClass().getMethod(
+                        "get" + Character.toUpperCase(name.charAt(0)) + name.substring(1));
+                Object value = getter.invoke(user);
+                if (value != null) { gender = String.valueOf(value); break; }
+            } catch (Throwable ignored) { }
+        }
+        String normalized = gender.trim().toLowerCase(java.util.Locale.ROOT);
+        if (normalized.equals("male") || normalized.equals("m") || normalized.equals("1") || normalized.equals("ذكر")) {
+            binding.tvGenderIcon.setText("♂");
+            binding.tvGenderIcon.setTextColor(android.graphics.Color.rgb(52, 152, 219));
+            binding.tvGenderIcon.setVisibility(View.VISIBLE);
+        } else if (normalized.equals("female") || normalized.equals("f") || normalized.equals("2") || normalized.equals("أنثى") || normalized.equals("انثى")) {
+            binding.tvGenderIcon.setText("♀");
+            binding.tvGenderIcon.setTextColor(android.graphics.Color.rgb(232, 92, 157));
+            binding.tvGenderIcon.setVisibility(View.VISIBLE);
+        } else {
+            binding.tvGenderIcon.setVisibility(View.GONE);
+        }
     }
 
     private void bindProfileActionIcons() {
