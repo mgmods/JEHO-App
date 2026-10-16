@@ -30,6 +30,22 @@ export class VanityId {
   @Column({ type: 'int', default: 0 })
   priceCoins!: number;
 
+  /** Per-ID appearance, independent of VIP membership. */
+  @Column({ type: 'varchar', length: 16, default: 'static' })
+  styleMode!: 'static' | 'animated';
+
+  @Column({ type: 'varchar', length: 7, default: '#52E8FF' })
+  styleColor1!: string;
+
+  @Column({ type: 'varchar', length: 7, default: '#C084FC' })
+  styleColor2!: string;
+
+  @Column({ type: 'varchar', length: 7, default: '#FF7AC8' })
+  styleColor3!: string;
+
+  @Column({ type: 'boolean', default: true })
+  styleGlow!: boolean;
+
   @Column({ type: 'uuid', nullable: true })
   ownerUserId!: string | null;
 
