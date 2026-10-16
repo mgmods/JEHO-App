@@ -345,6 +345,10 @@ public final class RoomRtcEngine {
         if (!isLiveKit()) ZegoEngineManager.getInstance().seekLocalMusic(positionMs);
     }
 
+    public void setMusicMixVolume(int volume) {
+        if (!isLiveKit()) ZegoEngineManager.getInstance().setMusicMixVolume(volume);
+    }
+
     public void boostMusicMixVolume() {
         if (!isLiveKit()) ZegoEngineManager.getInstance().boostMusicMixVolume();
     }
