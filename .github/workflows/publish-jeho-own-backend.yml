@@ -1,10 +1,9 @@
-name: Publish JEHO-OWN backend image (jeho-own and mg-jeho)
+name: Publish legacy JEHO-OWN backend image
 
 on:
   push:
     branches:
       - jeho-own
-      - MG-JEHO
     paths:
       - "backend/**"
       - ".github/workflows/publish-jeho-own-backend.yml"
@@ -22,7 +21,7 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out JEHO-OWN branch
+      - name: Check out legacy JEHO-OWN branch
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -35,7 +34,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and publish backend
+      - name: Build and publish legacy backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -43,6 +42,4 @@ jobs:
           push: true
           tags: |
             ghcr.io/mgmods/jeho-own-backend:jeho-own
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho-roomcup-fix
             ghcr.io/mgmods/jeho-own-backend:sha-${{ github.sha }}
