@@ -92,42 +92,46 @@ jobs:
             exit 1
           fi
 
-      # Keep one stable debug signing certificate across ephemeral GitHub runners.
-      # Google OAuth Android clients are tied to the package name + signing SHA-1.
-      - name: Restore stable CI debug keystore
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: jeho-android-debug-keystore-v2
-
-      - name: Create temporary Android debug keystore
+      # Use the original installed-app signing certificate. Never fall back to a newly generated key.
+      - name: Restore original JEHO signing keystore
         shell: bash
+        env:
+          JEHO_SIGNING_KEYSTORE_BASE64: ${{ secrets.JEHO_SIGNING_KEYSTORE_BASE64 }}
+          JEHO_SIGNING_STORE_PASSWORD: ${{ secrets.JEHO_SIGNING_STORE_PASSWORD }}
+          JEHO_SIGNING_KEY_ALIAS: ${{ secrets.JEHO_SIGNING_KEY_ALIAS }}
+          JEHO_SIGNING_KEY_PASSWORD: ${{ secrets.JEHO_SIGNING_KEY_PASSWORD }}
         run: |
-          KEYSTORE="$HOME/.android/debug.keystore"
-          mkdir -p "$(dirname "$KEYSTORE")"
-          if [[ ! -f "$KEYSTORE" ]]; then
-            keytool -genkeypair -v \
-              -keystore "$KEYSTORE" \
-              -storepass android \
-              -alias AndroidDebugKey \
-              -keypass android \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-          test -s "$KEYSTORE"
-          echo "Temporary CI debug keystore is ready."
-
-      - name: Verify stable debug signing key
-        shell: bash
-        run: |
-          KEYSTORE="$HOME/.android/debug.keystore"
-          if [[ ! -s "$KEYSTORE" ]]; then
-            echo "::error::Stable debug keystore is missing at $KEYSTORE. Refusing to build an APK with an ephemeral signing key."
+          set -euo pipefail
+          if [[ -z "${JEHO_SIGNING_KEYSTORE_BASE64:-}" || -z "${JEHO_SIGNING_STORE_PASSWORD:-}" || -z "${JEHO_SIGNING_KEY_ALIAS:-}" || -z "${JEHO_SIGNING_KEY_PASSWORD:-}" ]]; then
+            echo "::error::Original signing-key GitHub Actions secrets are not configured. Refusing to create an incompatible APK."
             exit 1
           fi
-          keytool -list -v -keystore "$KEYSTORE" -storepass android -alias AndroidDebugKey | grep -E 'Alias name:|SHA1:|SHA256:'
+          KEYSTORE="$HOME/.android/jeho-original-signing.jks"
+          mkdir -p "$(dirname "$KEYSTORE")"
+          printf '%s' "$JEHO_SIGNING_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          test -s "$KEYSTORE"
+          KEY_INFO="$(keytool -list -v -keystore "$KEYSTORE" -storepass "$JEHO_SIGNING_STORE_PASSWORD" -alias "$JEHO_SIGNING_KEY_ALIAS")"
+          printf '%s\n' "$KEY_INFO" | grep -E 'Alias name:|SHA1:|SHA256:'
+          EXPECTED_BASELINE_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
+          ACTUAL_KEY_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_KEY_SHA1" != "$EXPECTED_BASELINE_SHA1" ]]; then
+            echo "::error::Original signing key does not match the installed JEHO baseline."
+            echo "::error::Expected baseline SHA-1: $EXPECTED_BASELINE_SHA1"
+            echo "::error::Available key SHA-1: ${ACTUAL_KEY_SHA1:-not detected}"
+            exit 1
+          fi
+          {
+            echo "JEHO_DEBUG_KEYSTORE=$KEYSTORE"
+            echo "JEHO_DEBUG_STORE_PASSWORD=$JEHO_SIGNING_STORE_PASSWORD"
+            echo "JEHO_DEBUG_KEY_ALIAS=$JEHO_SIGNING_KEY_ALIAS"
+            echo "JEHO_DEBUG_KEY_PASSWORD=$JEHO_SIGNING_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "Verified: original signing key matches the installed baseline."
+
+      - name: Verify original signing key
+        shell: bash
+        run: |
+          keytool -list -v -keystore "$JEHO_DEBUG_KEYSTORE" -storepass "$JEHO_DEBUG_STORE_PASSWORD" -alias "$JEHO_DEBUG_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:'
 
       - name: Print Android signing fingerprints
         working-directory: android
@@ -154,7 +158,7 @@ jobs:
           fi
           CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
           echo "$CERT_OUTPUT"
-          EXPECTED_SHA1="376BA3CC6B418AEC37F0E931FB3A4FEA87C318B5"
+          EXPECTED_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
           ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
             echo "::error::APK signing certificate does not match the currently installed baseline certificate. Refusing to publish an incompatible update."

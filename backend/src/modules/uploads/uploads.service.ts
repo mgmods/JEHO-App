@@ -1,15 +1,19 @@
 import {
   Injectable,
+  Logger,
+  OnModuleInit,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { extname, join } from 'path';
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 
 @Injectable()
-export class UploadsService {
+export class UploadsService implements OnModuleInit {
+  private readonly logger = new Logger(UploadsService.name);
   private readonly uploadDir: string;
   private readonly maxSizeMb: number;
   private readonly supabaseUrl: string;
@@ -38,10 +42,60 @@ export class UploadsService {
           : process.env.SUPABASE_STORAGE_KEY?.trim()
             ? 'storage_key'
             : 'missing';
-    console.log(
-      `[Uploads] Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; bucket=${this.storageBucket}; key=${keySource}`,
+    this.logger.log(
+      `Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; url=${this.supabaseUrl ? 'set' : 'missing'}; bucket=${this.storageBucket}; key=${keySource}`,
     );
     if (!existsSync(this.uploadDir)) mkdirSync(this.uploadDir, { recursive: true });
+  }
+
+  async onModuleInit() {
+    if (process.env.NODE_ENV !== 'production' || !this.storageEnabled()) return;
+    try {
+      // Validate the actual bucket/key at startup, not just whether env vars exist.
+      const bucketCheck = await this.storageFetch(
+        `${this.supabaseUrl}/storage/v1/bucket/${encodeURIComponent(this.storageBucket)}`,
+        { headers: this.storageHeaders({ Accept: 'application/json' }) },
+      );
+      if (!bucketCheck.ok) {
+        const detail = await this.safeResponseText(bucketCheck);
+        throw new Error(`Supabase bucket check failed (${bucketCheck.status}): ${detail}`);
+      }
+
+      // Migrate files from the container's local uploads directory before serving
+      // traffic. Keep local copies as a rollback safety net; skip files already remote.
+      const names = readdirSync(this.uploadDir);
+      let migrated = 0;
+      for (const filename of names) {
+        if (!filename || filename.includes('..') || filename.includes('/') || filename.includes(String.fromCharCode(92))) continue;
+        const localPath = join(this.uploadDir, filename);
+        if (!statSync(localPath).isFile()) continue;
+        const objectUrl = this.storageObjectUrl(filename);
+        const exists = await this.storageFetch(objectUrl, { method: 'HEAD', headers: this.storageHeaders() });
+        if (exists.ok) continue;
+        if (exists.status !== 404) {
+          throw new Error(`Supabase object check failed (${exists.status}) for ${filename}`);
+        }
+        const uploaded = await this.storageFetch(objectUrl, {
+          method: 'POST',
+          headers: this.storageHeaders({
+            'Content-Type': 'application/octet-stream',
+            'Cache-Control': '3600',
+            'x-upsert': 'false',
+          }),
+          body: readFileSync(localPath),
+        });
+        if (!uploaded.ok) {
+          const detail = await this.safeResponseText(uploaded);
+          throw new Error(`Supabase migration failed (${uploaded.status}) for ${filename}: ${detail}`);
+        }
+        migrated += 1;
+      }
+      this.logger.log(`Durable storage verified; bucket=${this.storageBucket}; local files migrated=${migrated}`);
+    } catch (error) {
+      this.logger.error(
+        `Durable storage startup verification/migration failed; uploads may fail until configuration is corrected: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+    }
   }
 
   getMulterOptions() {
@@ -113,12 +167,15 @@ export class UploadsService {
       const response = await this.storageFetch(objectUrl, {
         headers: this.storageHeaders({ Accept: 'application/octet-stream' }),
       });
-      if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
-      return {
-        buffer: Buffer.from(await response.arrayBuffer()),
-        contentType: response.headers.get('content-type') || 'application/octet-stream',
-      };
+      // During rollout, serve an existing local copy if the object has not
+      // yet been copied to Supabase. This avoids breaking links during migration.
+      if (response.status !== 404) {
+        if (!response.ok) throw new Error(`Supabase Storage read failed (${response.status})`);
+        return {
+          buffer: Buffer.from(await response.arrayBuffer()),
+          contentType: response.headers.get('content-type') || 'application/octet-stream',
+        };
+      }
     }
 
     // Dashboard uploads still succeed without Supabase, but previously their
@@ -165,6 +222,14 @@ export class UploadsService {
     const ext = extname(file.originalname).toLowerCase();
     const storedName = file.filename || `${uuidv4()}${ext}`;
     const storedPath = file.path || join(this.uploadDir, storedName);
+    // Production deployments may use ephemeral container filesystems. Never report
+    // a successful upload when durable remote storage is not configured.
+    if (process.env.NODE_ENV === 'production' && !this.storageEnabled()) {
+      if (existsSync(storedPath)) unlinkSync(storedPath);
+      throw new ServiceUnavailableException(
+        'Durable media storage is not configured. Upload was rejected to prevent media loss after restart.',
+      );
+    }
     if (
       ['.mp3', '.m4a', '.aac', '.wav'].includes(ext) &&
       !this.hasAudioSignature(storedPath, ext)
@@ -185,6 +250,8 @@ export class UploadsService {
             await this.moderation.recordNsfwStrike(userId);
           } catch {}
         }
+        // Remove rejected uploads from the container filesystem.
+        if (existsSync(storedPath)) unlinkSync(storedPath);
         throw err;
       }
     }
@@ -196,7 +263,7 @@ export class UploadsService {
       });
       const fileBuffer = readFileSync(storedPath);
       const upload = await this.storageFetch(this.storageObjectUrl(storedName), {
-        method: 'PUT',
+        method: 'POST',
         headers: uploadHeaders,
         body: fileBuffer,
       });
