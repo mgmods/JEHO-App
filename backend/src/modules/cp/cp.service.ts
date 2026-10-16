@@ -62,7 +62,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
         seatEffect: {
-          enabled: effect.enabled === true && typeof effect.url === 'string' && /^https?:\\/\\//i.test(effect.url),
+          enabled: effect.enabled !== false,
           url: typeof effect.url === 'string' ? effect.url : '',
           sizeDp: Math.max(24, Math.min(160, Number(effect.sizeDp) || 56)),
           durationMs: Math.max(500, Math.min(10000, Number(effect.durationMs) || 1800)),
