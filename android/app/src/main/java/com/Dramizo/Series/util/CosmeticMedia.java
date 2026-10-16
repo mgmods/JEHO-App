@@ -44,6 +44,16 @@ public final class CosmeticMedia {
                 || lower.endsWith(".jpeg")) {
             return Kind.IMAGE;
         }
+        // Mikoo/entry-effect CDN video endpoints often omit the .mp4 suffix.
+        // Only apply these hints after checking known image extensions so previews remain static.
+        if (lower.contains("echoliveapp.com/video/")
+                || lower.contains("res.echoliveapp.com/video/")
+                || lower.contains("/cosmetics/entries/")
+                || lower.contains("/entries/entry_")
+                || lower.contains("entry_mikoo")
+                || lower.contains("/entry_effect")) {
+            return Kind.VIDEO;
+        }
         // Unknown extension from CDN — allow Glide image attempt.
         if (lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("/")) {
             return Kind.IMAGE;

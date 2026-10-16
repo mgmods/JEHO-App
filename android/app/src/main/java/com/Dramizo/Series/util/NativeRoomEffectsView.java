@@ -742,9 +742,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         // Same as Mikoo entry: center-crop full stage; vapc inside MP4 controls RGB size.
         anim.setScaleType(ScaleType.CENTER_CROP);
         anim.setLoop(1);
-        // Entry gifts: play gift/MP4 audio. Room-join entry rides stay muted
-        // so a wave of joins does not drown mic chat.
-        anim.setMute(!forGift);
+        // Play the equipped entry/video audio on each room member's device.
+        // Audio focus stays disabled on the Exo fallback so Zego/LiveKit voice is not paused.
+        anim.setMute(false);
         if (forGift) {
             giftAnimView = anim;
         } else {
@@ -767,18 +767,25 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 });
                 return;
             }
-            // Gift path: plain MP4 (no vapc) → Exo fullscreen. Entry rides stay on AnimView.
-            if (giftMode && !localFileHasVapc(file)) {
+            // Plain MP4s (without VAP alpha metadata) cannot render through AnimView.
+            // Fall back to ExoPlayer for both entry rides and video gifts; this also preserves
+            // the MP4 audio track on every client receiving the room:user_joined event.
+            if (!localFileHasVapc(file)) {
                 android.util.Log.i("NativeRoomEffects",
-                        "gift mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
+                        "plain mp4 — Exo fullscreen fallback gift=" + giftMode + " url=" + mediaUrl);
                 post(() -> {
-                    if (giftAnimView != anim) return;
+                    AnimView current = giftMode ? giftAnimView : entryAnimView;
+                    if (current != anim) return;
                     try {
                         removeView(anim);
                     } catch (Exception ignored) {
                     }
-                    giftAnimView = null;
-                    View streamed = createGiftVideoStream(mediaUrl, null, null);
+                    if (giftMode) {
+                        giftAnimView = null;
+                    } else {
+                        entryAnimView = null;
+                    }
+                    View streamed = createGiftVideoStream(mediaUrl, null, null, file);
                     if (streamed != null) {
                         addView(streamed, new LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -878,6 +885,13 @@ public final class NativeRoomEffectsView extends FrameLayout {
     @Nullable
     private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
                                        @Nullable String fallbackUrl) {
+        return createGiftVideoStream(absUrl, iconUrl, fallbackUrl, null);
+    }
+
+    @Nullable
+    private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
+                                       @Nullable String fallbackUrl,
+                                       @Nullable File preloadedFile) {
         if (absUrl == null || absUrl.isEmpty()) return null;
         releaseGiftPlayer();
 
@@ -951,7 +965,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         final int token = generation;
         final String finalUrl = playUrl;
         final String altUrl = fallbackAbs;
-        File warmPrimary = peekGiftMp4Cache(getContext(), finalUrl);
+        File warmPrimary = preloadedFile != null && preloadedFile.exists()
+                && preloadedFile.length() > 8_192
+                ? preloadedFile : peekGiftMp4Cache(getContext(), finalUrl);
         File warmAlt = altUrl != null ? peekGiftMp4Cache(getContext(), altUrl) : null;
         File warm = warmPrimary != null ? warmPrimary : warmAlt;
         String warmUrl = warmPrimary != null ? finalUrl : (warmAlt != null ? altUrl : null);
