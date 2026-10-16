@@ -1,4 +1,4 @@
-name: Build JEHO-OWN image for Blitz Cloud
+name: Build and publish MG-JEHO image for Blitz Cloud
 
 on:
   push:
@@ -39,7 +39,7 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           tags: |
-            ghcr.io/mgmods/jeho-own-backend:mg-jeho-latest
+            ghcr.io/mgmods/jeho-own-backend:mg-jeho
             ghcr.io/mgmods/jeho-own-backend:mg-jeho-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/mgmods/JEHO-App
