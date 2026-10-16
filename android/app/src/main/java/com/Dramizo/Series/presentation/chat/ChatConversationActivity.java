@@ -1307,13 +1307,15 @@ public class ChatConversationActivity extends ThemedActivity {
                 try (InputStream in = new FileInputStream(file)) {
                     bytes = readAll(in);
                 }
-                //noinspection ResultOfMethodCallIgnored
-                file.delete();
                 RequestBody body = RequestBody.create(bytes, MediaType.parse("audio/mp4"));
                 MultipartBody.Part part = MultipartBody.Part.createFormData("file", "voice.m4a", body);
                 Response<ApiResponse<UploadApi.UploadResult>> resp = c.getUploadApi().upload(part).execute();
                 if (resp.isSuccessful() && resp.body() != null && resp.body().success
                         && resp.body().data != null && resp.body().data.url != null) {
+                    // Remove the local recording only after durable upload succeeds.
+                    // If upload fails or the host is temporarily unavailable, retain it for recovery.
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
                     String url = AssetCatalog.absoluteUrl(resp.body().data.url);
                     runOnUiThread(() -> viewModel.sendAudio(conversationId, url, durationSec));
                 } else {
