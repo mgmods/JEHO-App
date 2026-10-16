@@ -6,6 +6,8 @@
 export const DASHBOARD_MODULES = [
   'dashboard',
   'conversations',
+  'paidMessages',
+  'profileActionIcons',
   'users',
   'agencies',
   'rooms',
@@ -54,6 +56,8 @@ const SEGMENT_MODULE: Record<string, DashboardModule | 'super-only' | 'self'> = 
   operators: 'super-only',
   dashboard: 'dashboard',
   conversations: 'conversations',
+  'paid-messages': 'paidMessages',
+  'profile-action-icons': 'profileActionIcons',
   'policy-brochure': 'policyBrochure',
   users: 'users',
   agencies: 'agencies',

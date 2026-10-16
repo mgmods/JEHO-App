@@ -3,6 +3,9 @@
 export const ROUTE_MODULE = {
   dashboard: 'dashboard',
   conversations: 'conversations',
+  'paid-messages': 'paidMessages',
+  'profile-action-icons': 'profileActionIcons',
+  'cp-settings': 'cpSettings',
   users: 'users',
   'user-detail': 'users',
   agencies: 'agencies',
@@ -43,6 +46,8 @@ export const ROUTE_MODULE = {
 export const DASHBOARD_MODULES = [
   'dashboard',
   'conversations',
+  'paidMessages',
+  'profileActionIcons',
   'users',
   'agencies',
   'rooms',
