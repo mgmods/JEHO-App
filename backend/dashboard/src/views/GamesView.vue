@@ -22,7 +22,15 @@
       {{ t('games.hint') }}
     </div>
 
-    <div class="glass p-3 mb-4">
+    <nav class="glass p-3 mb-4 d-flex flex-wrap gap-2" aria-label="أقسام إدارة الألعاب">
+      <a class="btn btn-outline-light btn-sm" href="#game-catalog">قائمة الألعاب وإظهارها</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-odds">الإعدادات العامة وحدود الرهان</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-runtime-controls">تشغيل وإيقاف الألعاب</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-win-rates">نسب الفوز</a>
+      <a class="btn btn-outline-light btn-sm" href="#game-store">متجر الألعاب</a>
+    </nav>
+
+    <div id="game-odds" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
           <h3 class="h6 mb-1">{{ t('games.oddsTitle') }}</h3>
@@ -98,7 +106,7 @@
       </div>
     </div>
 
-    <div class="glass p-3">
+    <div id="game-catalog" class="glass p-3">
       <LoadingSpinner v-if="loading && !games.length" />
       <div v-else-if="!games.length" class="empty-state p-5 text-center">
         {{ t('games.noGames') }}
@@ -160,7 +168,7 @@
       </div>
     </div>
 
-    <div class="glass p-3 mb-4">
+    <div id="game-runtime-controls" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div><h3 class="h6 mb-1">التحكم الفعلي بتشغيل الألعاب</h3><p class="small text-muted mb-0">إلغاء التحديد يعطّل اللعبة من الخادم لجميع المستخدمين، وليس إخفاءها فقط.</p></div>
         <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button>
@@ -172,7 +180,7 @@
       </div>
     </div>
 
-    <div class="glass p-3 mb-4">
+    <div id="game-win-rates" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div>
           <h3 class="h6 mb-1">نسبة الفوز لكل لعبة</h3>
@@ -259,7 +267,7 @@
       </div>
     </div>
 
-    <div class="glass p-3 mt-4">
+    <div id="game-store" class="glass p-3 mt-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="h6 mb-0">{{ t('games.store') }}</h3>
         <div class="d-flex gap-2">
