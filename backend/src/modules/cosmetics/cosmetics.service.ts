@@ -595,7 +595,7 @@ export class CosmeticsService implements OnModuleInit {
     if (profile) {
       if (type === CosmeticType.ENTRY_EFFECT || type === CosmeticType.JOIN_TOAST) {
         // Prefer playable ride (GIF/WebP/MP4); keep preview as static fallback.
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -608,7 +608,7 @@ export class CosmeticsService implements OnModuleInit {
           : owned.cosmetic.previewUrl || null;
       }
       if (type === CosmeticType.ROOM_CARD) {
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -630,7 +630,7 @@ export class CosmeticsService implements OnModuleInit {
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -642,7 +642,7 @@ export class CosmeticsService implements OnModuleInit {
           : owned.cosmetic.previewUrl || null;
       }
       if (type === CosmeticType.VIP_BADGE) {
-        const anim = owned.cosmetic.animationUrl || '';
+        const anim = this.cosmeticAnimationUrl(owned.cosmetic);
         const lower = String(anim).toLowerCase();
         const playable =
           !!anim &&
@@ -669,6 +669,17 @@ export class CosmeticsService implements OnModuleInit {
     }
 
     return { equipped: true, cosmetic: owned.cosmetic, profile };
+  }
+
+  /**
+   * Imported Mikoo frames can store SVGA bytes at an extensionless CDN URL.
+   * Prefer that explicit URL only when the importer marks the record as SVGA.
+   */
+  private cosmeticAnimationUrl(cosmetic: Cosmetic): string {
+    const meta = (cosmetic.meta || {}) as Record<string, unknown>;
+    const cdnSvga = typeof meta.cdnSvga === 'string' ? meta.cdnSvga.trim() : '';
+    if (meta.hasSvga === true && cdnSvga.startsWith('https://')) return cdnSvga;
+    return String(cosmetic.animationUrl || '').trim();
   }
 
   /** Clear wear for this cosmetic type (frame / entry / badge / room card). */
