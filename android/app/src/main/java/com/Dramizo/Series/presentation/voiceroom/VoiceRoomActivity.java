@@ -167,6 +167,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String lastRelationshipEffectsSeatSignature;
     private RecentJoinersAdapter audienceAdapter;
     private String roomId;
+    private boolean headerRoomFollowing;
+    private boolean headerFollowRequestInFlight;
+    private String headerFollowStatusRoomId;
     private boolean micOn = false;
     /** True only after the user taps mute — survives refresh / WhatsApp return. */
     private boolean userChoseMute = false;
@@ -755,6 +758,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Mikoo: header avatar is boss mic (seat 0) — sit / leave / profile.
             binding.hostCard.setOnClickListener(v -> onHostStageClick());
         }
+        if (binding.imgRoomFollowHeart != null) {
+            binding.imgRoomFollowHeart.setVisibility(View.GONE);
+            binding.imgRoomFollowHeart.setOnClickListener(v -> toggleHeaderRoomFollow());
+        }
         if (binding.hostStage != null) {
             binding.hostStage.setVisibility(View.GONE);
             binding.hostStage.setClickable(false);
@@ -1002,6 +1009,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
+            bindHeaderRoomFollow(room);
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
             canChangeFrames = fullStaff;
@@ -13578,6 +13586,95 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             });
         });
+    }
+
+    /** Keep the compact header heart in sync with the room-follow API. */
+    private void bindHeaderRoomFollow(@NonNull RoomDtos.RoomDto room) {
+        if (binding == null || binding.imgRoomFollowHeart == null) return;
+        boolean canFollow = !isHost && !isOwner;
+        binding.imgRoomFollowHeart.setVisibility(canFollow ? View.VISIBLE : View.GONE);
+        if (!canFollow) return;
+        if (room.id == null || room.id.isEmpty()
+                || room.id.equals(headerFollowStatusRoomId)) {
+            renderHeaderRoomFollowHeart();
+            return;
+        }
+        headerFollowStatusRoomId = room.id;
+        headerRoomFollowing = false;
+        renderHeaderRoomFollowHeart();
+        AppContainer c = ContainerProvider.from(this);
+        final String targetRoomId = room.id;
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> status =
+                    ApiCall.execute(c.getRoomApi().roomFollowStatus(targetRoomId));
+            boolean following = status.success && status.data != null
+                    && Boolean.TRUE.equals(status.data.get("following"));
+            runOnUiThread(() -> {
+                if (binding == null || !targetRoomId.equals(roomId)
+                        || !targetRoomId.equals(headerFollowStatusRoomId)) return;
+                if (status.success) {
+                    headerRoomFollowing = following;
+                    renderHeaderRoomFollowHeart();
+                }
+            });
+        });
+    }
+
+    private void renderHeaderRoomFollowHeart() {
+        if (binding == null || binding.imgRoomFollowHeart == null) return;
+        binding.imgRoomFollowHeart.setImageResource(headerRoomFollowing
+                ? R.drawable.ic_room_follow_heart_filled
+                : R.drawable.ic_room_follow_heart_outline);
+        binding.imgRoomFollowHeart.setContentDescription(headerRoomFollowing
+                ? "إلغاء متابعة الغرفة" : "متابعة الغرفة");
+        binding.imgRoomFollowHeart.setSelected(headerRoomFollowing);
+    }
+
+    private void toggleHeaderRoomFollow() {
+        if (roomId == null || roomId.isEmpty() || headerFollowRequestInFlight) return;
+        final String targetRoomId = roomId;
+        AppContainer c = ContainerProvider.from(this);
+        headerFollowRequestInFlight = true;
+        binding.imgRoomFollowHeart.setEnabled(false);
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> status =
+                    ApiCall.execute(c.getRoomApi().roomFollowStatus(targetRoomId));
+            if (!status.success || status.data == null) {
+                runOnUiThread(() -> finishHeaderRoomFollowRequest(
+                        targetRoomId, false, status.error));
+                return;
+            }
+            boolean following = Boolean.TRUE.equals(status.data.get("following"));
+            Result<Object> result = following
+                    ? ApiCall.execute(c.getRoomApi().unfollowRoom(targetRoomId))
+                    : ApiCall.execute(c.getRoomApi().followRoom(targetRoomId));
+            runOnUiThread(() -> finishHeaderRoomFollowRequest(
+                    targetRoomId, result.success, result.error, !following));
+        });
+    }
+
+    private void finishHeaderRoomFollowRequest(
+            @NonNull String targetRoomId, boolean success, @Nullable String error) {
+        finishHeaderRoomFollowRequest(targetRoomId, success, error, headerRoomFollowing);
+    }
+
+    private void finishHeaderRoomFollowRequest(
+            @NonNull String targetRoomId, boolean success, @Nullable String error,
+            boolean followingAfterSuccess) {
+        headerFollowRequestInFlight = false;
+        if (binding != null && binding.imgRoomFollowHeart != null) {
+            binding.imgRoomFollowHeart.setEnabled(true);
+        }
+        if (!targetRoomId.equals(roomId)) return;
+        if (success) {
+            headerRoomFollowing = followingAfterSuccess;
+            headerFollowStatusRoomId = targetRoomId;
+            renderHeaderRoomFollowHeart();
+        } else {
+            Toast.makeText(this,
+                    error != null && !error.isEmpty() ? error : getString(R.string.error_generic),
+                    Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void openLuckyBox() {
