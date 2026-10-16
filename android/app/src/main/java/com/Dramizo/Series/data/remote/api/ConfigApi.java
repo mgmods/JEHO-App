@@ -15,6 +15,10 @@ public interface ConfigApi {
     @GET("config/banners")
     Call<ApiResponse<List<MiscDtos.BannerDto>>> banners();
 
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
+    @GET("config/profile-banner")
+    Call<ApiResponse<List<MiscDtos.BannerDto>>> profileBanner();
+
     @GET("config/offers")
     Call<ApiResponse<List<MiscDtos.OfferDto>>> offers();
 
