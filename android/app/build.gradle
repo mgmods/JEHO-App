@@ -102,9 +102,9 @@ android {
             if (ciDebugKeystore && file(ciDebugKeystore).isFile()) {
                 signingConfig signingConfigs.debug
                 signingConfigs.debug.storeFile file(ciDebugKeystore)
-                signingConfigs.debug.storePassword 'android'
-                signingConfigs.debug.keyAlias 'AndroidDebugKey'
-                signingConfigs.debug.keyPassword 'android'
+                signingConfigs.debug.storePassword(System.getenv('JEHO_DEBUG_STORE_PASSWORD') ?: 'android')
+                signingConfigs.debug.keyAlias(System.getenv('JEHO_DEBUG_KEY_ALIAS') ?: 'AndroidDebugKey')
+                signingConfigs.debug.keyPassword(System.getenv('JEHO_DEBUG_KEY_PASSWORD') ?: 'android')
             }
         }
     }
