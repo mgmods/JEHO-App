@@ -782,7 +782,7 @@ public class ZegoEngineManager {
     @Nullable private im.zego.zegoexpress.ZegoMediaPlayer localMusicPlayer;
     @Nullable private String localMusicPath;
     /** Publish mix loudness 0–200 (Zego default is only 60 — too quiet for listeners). */
-    private static final int MUSIC_PUBLISH_VOLUME = 200;
+    private int musicPublishVolume = 200;
     /** Host local monitor via MediaPlayer (local files). 0–200. */
     private static final int MUSIC_PLAY_VOLUME = 160;
     private boolean musicMuteLocalMonitor;
@@ -874,18 +874,24 @@ public class ZegoEngineManager {
             @Nullable im.zego.zegoexpress.ZegoMediaPlayer player) {
         if (player == null) return;
         try {
-            player.setPublishVolume(MUSIC_PUBLISH_VOLUME);
+            player.setPublishVolume(musicPublishVolume);
             // When muteLocal is used, play volume is irrelevant; otherwise host must hear.
             player.setPlayVolume(musicMuteLocalMonitor || speakerMuted ? 0 : MUSIC_PLAY_VOLUME);
         } catch (Throwable t) {
             try {
-                player.setVolume(MUSIC_PUBLISH_VOLUME);
+                player.setVolume(musicPublishVolume);
             } catch (Throwable ignored) {
             }
         }
     }
 
-    /** Re-apply loud mix if the player already exists (e.g. after reconnect). */
+    /** Set outgoing room music mix gain (0–200) without changing ZEGO connection/config. */
+    public void setMusicMixVolume(int volume) {
+        musicPublishVolume = Math.max(0, Math.min(200, volume));
+        applyMusicMixVolumes(localMusicPlayer);
+    }
+
+    /** Re-apply the current music mix gain if the player already exists (e.g. after reconnect). */
     public void boostMusicMixVolume() {
         applyMusicMixVolumes(localMusicPlayer);
     }
