@@ -145,6 +145,22 @@ android {
     }
 }
 
+// Bundle the exact public mall HTML/CSS/JS from the backend source into the APK.
+// This avoids a blank WebView when the deployed server is behind the app branch, while
+// keeping a single maintained source of these pages (backend/public/mall).
+def mallHtmlSource = file("${projectDir}/../../backend/public/mall")
+def mallHtmlAssets = layout.buildDirectory.dir("generated/mallAssets")
+android.sourceSets.main.assets.srcDir(mallHtmlAssets)
+
+tasks.register('syncMallHtmlAssets', Sync) {
+    from mallHtmlSource
+    into mallHtmlAssets.map { it.dir('mall') }
+}
+
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('syncMallHtmlAssets')
+}
+
 // Release size: cosmetics frames/gift SFX live on the CDN (AssetCatalog + API URLs).
 // Strip local duplicates from the store APK (~60MB). Debug keeps them for offline fallback.
 android.applicationVariants.configureEach { variant ->
