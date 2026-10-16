@@ -152,13 +152,6 @@ const sections = computed(() => [
     ],
   },
   {
-    id: 'startup-ads',
-    label: 'إعلانات التشغيل',
-    items: [
-      { name: 'splash', icon: 'bi-megaphone', label: 'إدارة السبلاش' },
-    ],
-  },
-  {
     id: 'media',
     label: t('nav.mediaGames'),
     items: [
@@ -166,6 +159,7 @@ const sections = computed(() => [
       { name: 'game-ads', icon: 'bi-badge-ad', label: t('nav.gameAds') },
       { name: 'drama', icon: 'bi-film', label: t('nav.drama') },
       { name: 'banners', icon: 'bi-images', label: t('nav.banners') },
+      { name: 'splash', icon: 'bi-megaphone', label: 'إدارة السبلاش', module: 'banners' },
       { name: 'nav-icons', icon: 'bi-grid-1x2', label: t('nav.navIcons') },
       { name: 'profile-action-icons', icon: 'bi-person-square', label: 'أيقونات قسم أنا' },
       { name: 'seat-stickers', icon: 'bi-emoji-smile', label: t('nav.seatStickers') },
