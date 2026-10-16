@@ -1,9 +1,9 @@
 package com.Dramizo.Series.presentation.voiceroom;
 
 import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
 import android.view.Gravity;
@@ -141,30 +141,20 @@ final class RelationshipSeatEffectsOverlay {
         layer.addView(effectView);
 
         AnimatorSet set = new AnimatorSet();
-        ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, x2 - x1);
-        ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, y2 - y1);
+        ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, 0f, x2 - x1);
+        ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, 0f, y2 - y1);
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(effectView, View.SCALE_X, 0.72f, 1f, 0.72f);
         ObjectAnimator scaleY = ObjectAnimator.ofFloat(effectView, View.SCALE_Y, 0.72f, 1f, 0.72f);
+        for (ObjectAnimator animator : new ObjectAnimator[] { x, y, scaleX, scaleY }) {
+            animator.setDuration(duration);
+            animator.setRepeatCount(ValueAnimator.INFINITE);
+            animator.setRepeatMode(ValueAnimator.REVERSE);
+            animator.setInterpolator(new android.view.animation.LinearInterpolator());
+        }
         set.playTogether(x, y, scaleX, scaleY);
-        set.setDuration(duration);
         set.setStartDelay(120);
-        set.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
-                if (running.contains(set) && !layer.isShown()) set.cancel();
-            }
-        });
-        set.start();
-        set.setInterpolator(new android.view.animation.LinearInterpolator());
-        set.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) {
-                if (layer.indexOfChild(effectView) >= 0) {
-                    effectView.setTranslationX(0);
-                    effectView.setTranslationY(0);
-                    set.start();
-                }
-            }
-        });
         running.add(set);
+        set.start();
     }
 
     private float[] center(View view, int[] rootLoc) {
@@ -175,10 +165,11 @@ final class RelationshipSeatEffectsOverlay {
     }
 
     void clear() {
-        for (AnimatorSet animator : running) {
+        List<AnimatorSet> toStop = new ArrayList<>(running);
+        running.clear();
+        for (AnimatorSet animator : toStop) {
             try { animator.cancel(); } catch (Exception ignored) {}
         }
-        running.clear();
         layer.removeAllViews();
     }
 
