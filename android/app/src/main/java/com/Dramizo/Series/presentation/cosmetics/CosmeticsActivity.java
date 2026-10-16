@@ -89,7 +89,11 @@ public class CosmeticsActivity extends ThemedActivity {
                         InputStream stream = getAssets().open("mall/" + relative);
                         Map<String, String> headers = new HashMap<>();
                         headers.put("Cache-Control", "no-store");
-                        return new WebResourceResponse(mimeType(relative), "UTF-8", 200,
+                        String mime = mimeType(relative);
+                        String encoding = (mime.startsWith("text/")
+                                || mime.contains("javascript") || mime.contains("json"))
+                                ? "UTF-8" : null;
+                        return new WebResourceResponse(mime, encoding, 200,
                                 "OK", headers, stream);
                     } catch (Exception ignored) {
                         // Let WebView report missing generated assets rather than crash the Activity.
