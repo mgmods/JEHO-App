@@ -858,7 +858,7 @@ public class ZegoEngineManager {
                     }
                     Log.i(TAG, "local music started path=" + absolutePath
                             + " seek=" + seekTo
-                            + " publishVol=" + MUSIC_PUBLISH_VOLUME
+                            + " publishVol=" + musicPublishVolume
                             + " muteLocal=" + musicMuteLocalMonitor);
                 } else {
                     Log.w(TAG, "local music load failed err=" + errorCode);
