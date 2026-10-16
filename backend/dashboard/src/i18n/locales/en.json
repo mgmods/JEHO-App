@@ -133,7 +133,7 @@
     "genderVerifications": "Hostess verification",
     "notifications": "Notifications",
     "cpSettings": "CP Relationship Settings",
-    "settings": "Settings",
+  "settings": "Settings",
     "logs": "Logs",
     "policyBrochure": "Platform policy PDF"
   },
@@ -769,6 +769,7 @@
     "imageUrl": "Image URL",
     "link": "Link",
     "noData": "No data yet",
+    "saved": "Saved successfully",
     "deleted": "Deleted successfully",
     "failedLoad": "Failed to load",
     "untitled": "Untitled",
