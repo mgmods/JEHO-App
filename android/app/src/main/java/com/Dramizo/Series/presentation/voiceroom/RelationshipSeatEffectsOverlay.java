@@ -182,9 +182,19 @@ final class RelationshipSeatEffectsOverlay {
                 float fromY = aLoc[1] - rootLoc[1] + anchorA.getHeight() / 2f;
                 float toX = bLoc[0] - rootLoc[0] + anchorB.getWidth() / 2f;
                 float toY = bLoc[1] - rootLoc[1] + anchorB.getHeight() / 2f;
+                // Keep particles inside the room surface during RecyclerView relayouts.
+                // This prevents a stale/out-of-bounds coordinate from reaching system bars.
+                float maxX = Math.max(0f, layer.getWidth() - size);
+                float maxY = Math.max(0f, layer.getHeight() - size);
+                fromX = Math.max(size / 2f, Math.min(maxX + size / 2f, fromX));
+                toX = Math.max(size / 2f, Math.min(maxX + size / 2f, toX));
+                fromY = Math.max(size / 2f, Math.min(maxY + size / 2f, fromY));
+                toY = Math.max(size / 2f, Math.min(maxY + size / 2f, toY));
                 float progress = (Float) animation.getAnimatedValue();
-                effectView.setX(fromX + (toX - fromX) * progress - size / 2f);
-                effectView.setY(fromY + (toY - fromY) * progress - size / 2f);
+                float x = fromX + (toX - fromX) * progress - size / 2f;
+                float y = fromY + (toY - fromY) * progress - size / 2f;
+                effectView.setX(Math.max(0f, Math.min(maxX, x)));
+                effectView.setY(Math.max(0f, Math.min(maxY, y)));
                 // Subtle breathing only; no large bursts, spins, or flashes.
                 float scale = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
                 effectView.setScaleX(scale);
