@@ -14,6 +14,9 @@ public interface VanityApi {
     @GET("vanity-ids")
     Call<ApiResponse<VanityDtos.Catalog>> list(@Query("status") String status);
 
+    @GET("vanity-ids/style/{publicId}")
+    Call<ApiResponse<VanityDtos.Style>> style(@Path("publicId") String publicId);
+
     @GET("vanity-ids/mine")
     Call<ApiResponse<VanityDtos.MineResult>> mine();
 

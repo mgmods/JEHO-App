@@ -8,4 +8,5 @@
     <item name="tag_room_cover_loaded" type="id" />
     <item name="tag_room_kenar_url" type="id" />
     <item name="tag_edge_padded" type="id" />
+    <item name="tag_vanity_id_style_key" type="id" />
 </resources>

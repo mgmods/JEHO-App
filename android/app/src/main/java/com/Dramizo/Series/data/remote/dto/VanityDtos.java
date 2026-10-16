@@ -17,6 +17,15 @@ public final class VanityDtos {
         @SerializedName("leaseDays") public int leaseDays;
     }
 
+    public static class Style {
+        @SerializedName("publicId") public String publicId;
+        @SerializedName("styleMode") public String styleMode;
+        @SerializedName("styleColor1") public String styleColor1;
+        @SerializedName("styleColor2") public String styleColor2;
+        @SerializedName("styleColor3") public String styleColor3;
+        @SerializedName("styleGlow") public boolean styleGlow;
+    }
+
     public static class VanityItem {
         @SerializedName("id") public String id;
         @SerializedName("publicId") public String publicId;
