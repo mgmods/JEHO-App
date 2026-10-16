@@ -185,7 +185,9 @@ export function classifyCatalogItem(item: Record<string, unknown>) {
     title,
     titleEn,
     coverUrl,
-    playUrl: item.playUrl || (game ? mikooPlayUrl(id) : item.playUrl),
+    // Known packaged games must always use this backend's current public origin.
+    // Saved app_games rows can contain retired hosts; preserving those URLs makes every game load a blank WebView.
+    playUrl: game ? mikooPlayUrl(id) : item.playUrl,
     mode,
     enabled,
     bridge: item.bridge ?? game?.bridge ?? null,
