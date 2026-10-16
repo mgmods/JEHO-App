@@ -296,36 +296,32 @@ public class ProfileFragment extends Fragment {
         viewModel.loadMe();
     }
 
-    /** Loads a language-appropriate image from the dashboard's existing banner feed. */
+    /** Loads the profile-only banner; home carousel banners are managed independently. */
     private void loadProfileBanner() {
         if (binding == null || !isAdded()) return;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
             try {
                 Result<java.util.List<MiscDtos.BannerDto>> result =
-                        com.Dramizo.Series.util.ApiCall.execute(c.getConfigApi().banners());
-                if (!result.success || result.data == null) return;
-                boolean arabic = java.util.Locale.getDefault().getLanguage().toLowerCase().startsWith("ar");
-                MiscDtos.BannerDto selected = null;
-                for (MiscDtos.BannerDto banner : result.data) {
-                    if (banner == null || banner.imageUrl == null || banner.imageUrl.trim().isEmpty()) continue;
-                    String lang = banner.lang == null ? "all" : banner.lang.trim().toLowerCase();
-                    if ("all".equals(lang) || lang.isEmpty() || (arabic && "ar".equals(lang)) || (!arabic && "en".equals(lang))) {
-                        selected = banner;
-                        break;
-                    }
-                }
-                if (selected == null) {
-                    for (MiscDtos.BannerDto banner : result.data) {
-                        if (banner != null && banner.imageUrl != null && !banner.imageUrl.trim().isEmpty()) {
-                            selected = banner;
-                            break;
+                        com.Dramizo.Series.util.ApiCall.execute(c.getConfigApi().profileBanner());
+                if (!result.success || result.data == null || result.data.isEmpty()) {
+                    if (isAdded()) requireActivity().runOnUiThread(() -> {
+                        if (binding != null) {
+                            binding.profileBannerWrap.setVisibility(View.GONE);
+                            binding.imgProfileBanner.setVisibility(View.GONE);
                         }
-                    }
+                    });
+                    return;
                 }
-                if (selected == null) return;
-                final String imageUrl = AssetCatalog.absoluteUrl(selected.imageUrl);
-                if (imageUrl == null || imageUrl.trim().isEmpty() || !isAdded()) return;
+                MiscDtos.BannerDto selected = result.data.get(0);
+                if (selected == null || selected.imageUrl == null || selected.imageUrl.trim().isEmpty()) {
+                    if (isAdded()) requireActivity().runOnUiThread(() -> {
+                        if (binding != null) binding.profileBannerWrap.setVisibility(View.GONE);
+                    });
+                    return;
+                }
+                final String imageUrl = AssetCatalog.absoluteUrl(selected.imageUrl.trim());
+                if (imageUrl == null || imageUrl.isEmpty() || !isAdded()) return;
                 requireActivity().runOnUiThread(() -> {
                     if (binding == null || !isAdded()) return;
                     binding.profileBannerWrap.setVisibility(View.VISIBLE);
@@ -336,7 +332,7 @@ public class ProfileFragment extends Fragment {
                             .centerCrop().into(binding.imgProfileBanner);
                 });
             } catch (Throwable ignored) {
-                // An unavailable optional banner must not block the profile screen.
+                // A missing optional profile banner must never block the profile screen.
             }
         });
     }
