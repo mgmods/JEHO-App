@@ -742,9 +742,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         // Same as Mikoo entry: center-crop full stage; vapc inside MP4 controls RGB size.
         anim.setScaleType(ScaleType.CENTER_CROP);
         anim.setLoop(1);
-        // Entry gifts: play gift/MP4 audio. Room-join entry rides stay muted
-        // so a wave of joins does not drown mic chat.
-        anim.setMute(!forGift);
+        // Entrance videos play with their original audio for everyone in the room.
+        // Do not request audio focus: the existing ZEGO room voice stays connected.
+        anim.setMute(false);
         if (forGift) {
             giftAnimView = anim;
         } else {
