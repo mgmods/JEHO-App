@@ -109,6 +109,10 @@ public interface UserApi {
     @GET("cp/catalog")
     Call<ApiResponse<List<Map<String, Object>>>> cpCatalog();
 
+    /** Public active relationships for room seats; returns only relationship ids/types and visual config. */
+    @GET("cp/room-effects")
+    Call<ApiResponse<Map<String, Object>>> cpRoomSeatEffects(@Query("userIds") String userIds);
+
     @GET("cp/discover")
     Call<ApiResponse<List<Map<String, Object>>>> discoverCp(@Query("type") String type);
 
