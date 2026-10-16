@@ -35,7 +35,7 @@ final class RelationshipSeatEffectsOverlay {
     private final ViewGroup root;
     private final RecyclerView seatsRecycler;
     private final FrameLayout layer;
-    private final List<AnimatorSet> running = new ArrayList<>();
+    private final List<Animator> running = new ArrayList<>();
 
     RelationshipSeatEffectsOverlay(@NonNull Context context, @NonNull ViewGroup root,
                                    @NonNull RecyclerView seatsRecycler) {
@@ -106,55 +106,93 @@ final class RelationshipSeatEffectsOverlay {
             Map<String, Object> effect = effects == null ? null : effects.get(type);
             if (effect != null && Boolean.FALSE.equals(effect.get("enabled"))) continue;
             String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
-            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 48, 24, 160);
+            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
-            addEffect(pointA[0], pointA[1], pointB[0], pointB[1], type, url, sizeDp, duration);
+            addEffect(avatarA, avatarB, type, url, sizeDp, duration);
         }
     }
 
-    private void addEffect(float x1, float y1, float x2, float y2,
+    private void addEffect(@NonNull View anchorA, @NonNull View anchorB,
                            String type, String url, int sizeDp, long duration) {
-        int size = dp(sizeDp);
-        View effectView;
-        if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
-            ImageView image = new ImageView(context);
-            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            image.setContentDescription("relationship effect");
-            Glide.with(context).load(url).into(image);
-            effectView = image;
-        } else {
-            TextView emoji = new TextView(context);
-            emoji.setText(defaultEmoji(type));
-            emoji.setTextSize(Math.max(18, sizeDp * 0.58f));
-            emoji.setGravity(Gravity.CENTER);
-            emoji.setIncludeFontPadding(false);
-            emoji.setTextColor(Color.WHITE);
-            emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
-            effectView = emoji;
-        }
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
-        lp.leftMargin = Math.round(x1 - size / 2f);
-        lp.topMargin = Math.round(y1 - size / 2f);
-        effectView.setLayoutParams(lp);
-        effectView.setClickable(false);
-        effectView.setFocusable(false);
-        layer.addView(effectView);
+        // Track the live avatar anchors during every animation frame. This keeps the
+        // effect attached to people when seats are reordered, the grid relayouts, or
+        // the room view changes size, without touching RTC/audio/session state.
+        // Keep each uploaded asset small, but fill longer seat-to-seat gaps with a
+        // restrained ribbon of repeated copies. The count is capped to protect room FPS.
+        final int particleSizeDp = Math.max(10, Math.min(36, sizeDp));
+        final int size = dp(particleSizeDp);
+        final int[] aLocForDistance = new int[2];
+        final int[] bLocForDistance = new int[2];
+        anchorA.getLocationInWindow(aLocForDistance);
+        anchorB.getLocationInWindow(bLocForDistance);
+        float dx = (bLocForDistance[0] + anchorB.getWidth() / 2f)
+                - (aLocForDistance[0] + anchorA.getWidth() / 2f);
+        float dy = (bLocForDistance[1] + anchorB.getHeight() / 2f)
+                - (aLocForDistance[1] + anchorA.getHeight() / 2f);
+        float distanceDp = (float) Math.hypot(dx, dy)
+                / context.getResources().getDisplayMetrics().density;
+        final int particleCount = Math.max(3, Math.min(10,
+                (int) Math.ceil(distanceDp / Math.max(30f, particleSizeDp * 2.1f))));
+        for (int i = 0; i < particleCount; i++) {
+            final View effectView;
+            if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
+                ImageView image = new ImageView(context);
+                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                image.setContentDescription("relationship effect");
+                Glide.with(context).load(url).into(image);
+                effectView = image;
+            } else {
+                TextView emoji = new TextView(context);
+                emoji.setText(defaultEmoji(type));
+                emoji.setTextSize(Math.max(10, particleSizeDp * 0.72f));
+                emoji.setGravity(Gravity.CENTER);
+                emoji.setIncludeFontPadding(false);
+                emoji.setTextColor(Color.WHITE);
+                emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
+                effectView = emoji;
+            }
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
+            effectView.setLayoutParams(lp);
+            effectView.setClickable(false);
+            effectView.setFocusable(false);
+            effectView.setAlpha(0.88f);
+            layer.addView(effectView);
 
-        AnimatorSet set = new AnimatorSet();
-        ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, 0f, x2 - x1);
-        ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, 0f, y2 - y1);
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(effectView, View.SCALE_X, 0.72f, 1f, 0.72f);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(effectView, View.SCALE_Y, 0.72f, 1f, 0.72f);
-        for (ObjectAnimator animator : new ObjectAnimator[] { x, y, scaleX, scaleY }) {
-            animator.setDuration(duration);
-            animator.setRepeatCount(ValueAnimator.INFINITE);
-            animator.setRepeatMode(ValueAnimator.REVERSE);
-            animator.setInterpolator(new android.view.animation.LinearInterpolator());
+            final int[] rootLoc = new int[2];
+            final int[] aLoc = new int[2];
+            final int[] bLoc = new int[2];
+            ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
+            travel.setDuration(duration);
+            travel.setRepeatCount(ValueAnimator.INFINITE);
+            travel.setRepeatMode(ValueAnimator.RESTART);
+            travel.setInterpolator(new android.view.animation.LinearInterpolator());
+            travel.setStartDelay((duration / particleCount) * i);
+            travel.addUpdateListener(animation -> {
+                if (anchorA.getParent() == null || anchorB.getParent() == null
+                        || anchorA.getVisibility() != View.VISIBLE
+                        || anchorB.getVisibility() != View.VISIBLE) {
+                    effectView.setVisibility(View.INVISIBLE);
+                    return;
+                }
+                effectView.setVisibility(View.VISIBLE);
+                root.getLocationInWindow(rootLoc);
+                anchorA.getLocationInWindow(aLoc);
+                anchorB.getLocationInWindow(bLoc);
+                float fromX = aLoc[0] - rootLoc[0] + anchorA.getWidth() / 2f;
+                float fromY = aLoc[1] - rootLoc[1] + anchorA.getHeight() / 2f;
+                float toX = bLoc[0] - rootLoc[0] + anchorB.getWidth() / 2f;
+                float toY = bLoc[1] - rootLoc[1] + anchorB.getHeight() / 2f;
+                float progress = (Float) animation.getAnimatedValue();
+                effectView.setX(fromX + (toX - fromX) * progress - size / 2f);
+                effectView.setY(fromY + (toY - fromY) * progress - size / 2f);
+                // Subtle breathing only; no large bursts, spins, or flashes.
+                float scale = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
+                effectView.setScaleX(scale);
+                effectView.setScaleY(scale);
+            });
+            running.add(travel);
+            travel.start();
         }
-        set.playTogether(x, y, scaleX, scaleY);
-        set.setStartDelay(120);
-        running.add(set);
-        set.start();
     }
 
     private float[] center(View view, int[] rootLoc) {
@@ -165,9 +203,9 @@ final class RelationshipSeatEffectsOverlay {
     }
 
     void clear() {
-        List<AnimatorSet> toStop = new ArrayList<>(running);
+        List<Animator> toStop = new ArrayList<>(running);
         running.clear();
-        for (AnimatorSet animator : toStop) {
+        for (Animator animator : toStop) {
             try { animator.cancel(); } catch (Exception ignored) {}
         }
         layer.removeAllViews();

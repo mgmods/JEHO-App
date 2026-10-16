@@ -82,7 +82,7 @@
                 <div class="col-md-6">
                   <label class="form-label">صورة التأثير المتحرك (GIF أو WebP) أو صورة ثابتة</label>
                   <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="item.uploadingSeatEffect" @change="uploadSeatEffect(item, $event)">
-                  <div class="form-text">ارفع صورة خاصة بهذا النوع؛ لن يتم تغيير ملفات الصوت أو إعدادات الروم.</div>
+                  <div class="form-text">ارفع الصورة المرفوعة تتكرر تلقائياً كشريط متحرك بين الشريكين، والحجم قابل للتصغير لتجنب إزعاج الروم. لن يتم تغيير الصوت أو إعدادات الروم.</div>
                   <div v-if="item.uploadingSeatEffect" class="small text-primary mt-2">جارٍ رفع الصورة…</div>
                 </div>
                 <div class="col-md-6">
@@ -90,8 +90,8 @@
                   <input v-model.trim="item.seatEffectUrl" class="form-control" type="url" dir="ltr" placeholder="https://…">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">حجم التأثير (dp)</label>
-                  <input v-model.number="item.seatEffectSize" class="form-control" type="number" min="24" max="160" step="1">
+                  <label class="form-label">حجم الرمز الواحد (dp)</label>
+                  <input v-model.number="item.seatEffectSize" class="form-control" type="number" min="10" max="36" step="1">
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">مدة الحركة (مللي ثانية)</label>
@@ -234,7 +234,7 @@ async function load() {
       rulesText: JSON.stringify(item.rules || {}, null, 2),
       seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
-      seatEffectSize: Math.max(24, Math.min(160, Number(item.rules?.seatEffect?.sizeDp || 56))),
+      seatEffectSize: Math.max(10, Math.min(36, Number(item.rules?.seatEffect?.sizeDp || 18))),
       seatEffectDuration: Math.max(500, Math.min(10000, Number(item.rules?.seatEffect?.durationMs || 1800))),
       uploadingSeatEffect: false,
     }))
@@ -283,7 +283,7 @@ async function saveType(item) {
     rules.seatEffect = {
       enabled: item.seatEffectEnabled === true,
       url: String(item.seatEffectUrl || '').trim(),
-      sizeDp: Math.max(24, Math.min(160, Number(item.seatEffectSize || 56))),
+      sizeDp: Math.max(10, Math.min(36, Number(item.seatEffectSize || 18))),
       durationMs: Math.max(500, Math.min(10000, Number(item.seatEffectDuration || 1800))),
     }
     const payload = {
