@@ -64,7 +64,45 @@
           <div class="col-12">
             <label class="form-label">قواعد النوع (JSON)</label>
             <textarea v-model="item.rulesText" class="form-control font-monospace" rows="3" dir="ltr" spellcheck="false" placeholder="{}"></textarea>
-            <div class="form-text">للقواعد المستقبلية مثل قيود نوع العلاقة. لم نفرض قيوداً على تعدد العلاقات غير المحددة.</div>
+            <div class="form-text">قواعد إضافية خاصة بنوع العلاقة.</div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded-3 p-3">
+              <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap mb-3">
+                <div>
+                  <h4 class="h6 mb-1">تأثير العلاقة بين مقاعد الروم</h4>
+                  <p class="form-text mb-0">يظهر فقط عندما يكون الشريكان معاً على المقاعد. إذا كان أحدهما خارج المقاعد، لا يظهر التأثير.</p>
+                </div>
+                <label class="form-check form-switch mb-0">
+                  <input v-model="item.seatEffectEnabled" class="form-check-input" type="checkbox" role="switch">
+                  <span class="form-check-label">{{ item.seatEffectEnabled ? 'مفعّل' : 'متوقف' }}</span>
+                </label>
+              </div>
+              <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                  <label class="form-label">صورة التأثير المتحرك (GIF أو WebP) أو صورة ثابتة</label>
+                  <input class="form-control" type="file" accept=".gif,.webp,.png,.jpg,.jpeg,image/gif,image/webp,image/png,image/jpeg" :disabled="item.uploadingSeatEffect" @change="uploadSeatEffect(item, $event)">
+                  <div class="form-text">ارفع صورة خاصة بهذا النوع؛ لن يتم تغيير ملفات الصوت أو إعدادات الروم.</div>
+                  <div v-if="item.uploadingSeatEffect" class="small text-primary mt-2">جارٍ رفع الصورة…</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">رابط الصورة</label>
+                  <input v-model.trim="item.seatEffectUrl" class="form-control" type="url" dir="ltr" placeholder="https://…">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">حجم التأثير (dp)</label>
+                  <input v-model.number="item.seatEffectSize" class="form-control" type="number" min="24" max="160" step="1">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">مدة الحركة (مللي ثانية)</label>
+                  <input v-model.number="item.seatEffectDuration" class="form-control" type="number" min="500" max="10000" step="100">
+                </div>
+                <div v-if="item.seatEffectUrl" class="col-12 d-flex align-items-center gap-3">
+                  <img :src="item.seatEffectUrl" :alt="'تأثير ' + label(item.type)" style="width:72px;height:72px;object-fit:contain;background:#111;border-radius:12px;padding:6px">
+                  <span class="small text-secondary">معاينة التأثير الحالي · {{ label(item.type) }}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
@@ -151,7 +189,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { cpAdminApi, giftsApi } from '@/api'
+import { cpAdminApi, giftsApi, uploadsApi } from '@/api'
 import { extractList } from '@/composables/useUtils'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -194,6 +232,11 @@ async function load() {
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
+      seatEffectEnabled: item.rules?.seatEffect?.enabled === true,
+      seatEffectUrl: item.rules?.seatEffect?.url || '',
+      seatEffectSize: Math.max(24, Math.min(160, Number(item.rules?.seatEffect?.sizeDp || 56))),
+      seatEffectDuration: Math.max(500, Math.min(10000, Number(item.rules?.seatEffect?.durationMs || 1800))),
+      uploadingSeatEffect: false,
     }))
     policy.value = {
       requestExpiryMinutes: Number(config.policy?.requestExpiryMinutes || 30),
@@ -204,6 +247,32 @@ async function load() {
   finally { loading.value = false }
 }
 
+async function uploadSeatEffect(item, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const allowed = /\.(gif|webp|png|jpe?g)$/i.test(file.name)
+  if (!allowed) { error.value = 'اختر صورة GIF أو WebP أو PNG أو JPG.'; event.target.value = ''; return }
+  if (file.size > 40 * 1024 * 1024) { error.value = 'حجم الصورة يجب ألا يتجاوز 40 ميغابايت.'; event.target.value = ''; return }
+  item.uploadingSeatEffect = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع الصورة')
+    const data = payloadOf(response)
+    if (!data?.url && !data?.path) throw new Error('تم استلام رد رفع غير مكتمل من الخادم.')
+    const uploadedUrl = data.url || data.path
+    item.seatEffectUrl = /^https?:\/\//i.test(uploadedUrl)
+      ? uploadedUrl
+      : new URL(uploadedUrl, window.location.origin).toString()
+    success.value = 'تم رفع الصورة. اضغط حفظ ' + label(item.type) + ' لاعتمادها.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة التأثير'
+  } finally {
+    item.uploadingSeatEffect = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
 async function saveType(item) {
   error.value = ''; success.value = ''; saving.value = true; savingType.value = item.type
   try {
@@ -211,6 +280,12 @@ async function saveType(item) {
     try { levels = JSON.parse(item.levelsText || '[]'); rules = JSON.parse(item.rulesText || '{}') }
     catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
     if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('المستويات يجب أن تكون قائمة والقواعد كائناً JSON.')
+    rules.seatEffect = {
+      enabled: item.seatEffectEnabled === true && !!String(item.seatEffectUrl || '').trim(),
+      url: String(item.seatEffectUrl || '').trim(),
+      sizeDp: Math.max(24, Math.min(160, Number(item.seatEffectSize || 56))),
+      durationMs: Math.max(500, Math.min(10000, Number(item.seatEffectDuration || 1800))),
+    }
     const payload = {
       enabled: !!item.enabled,
       giftId: item.giftId || '',
