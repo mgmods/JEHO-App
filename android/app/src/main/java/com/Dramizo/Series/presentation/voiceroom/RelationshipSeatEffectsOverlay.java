@@ -121,10 +121,8 @@ final class RelationshipSeatEffectsOverlay {
         // restrained ribbon of repeated copies. The count is capped to protect room FPS.
         final int particleSizeDp = Math.max(10, Math.min(36, sizeDp));
         final int size = dp(particleSizeDp);
-        final int[] rootLocForDistance = new int[2];
         final int[] aLocForDistance = new int[2];
         final int[] bLocForDistance = new int[2];
-        root.getLocationInWindow(rootLocForDistance);
         anchorA.getLocationInWindow(aLocForDistance);
         anchorB.getLocationInWindow(bLocForDistance);
         float dx = (bLocForDistance[0] + anchorB.getWidth() / 2f)
@@ -146,7 +144,7 @@ final class RelationshipSeatEffectsOverlay {
             } else {
                 TextView emoji = new TextView(context);
                 emoji.setText(defaultEmoji(type));
-                emoji.setTextSize(Math.max(15, particleSizeDp * 0.72f));
+                emoji.setTextSize(Math.max(10, particleSizeDp * 0.72f));
                 emoji.setGravity(Gravity.CENTER);
                 emoji.setIncludeFontPadding(false);
                 emoji.setTextColor(Color.WHITE);
