@@ -114,47 +114,55 @@ final class RelationshipSeatEffectsOverlay {
 
     private void addEffect(float x1, float y1, float x2, float y2,
                            String type, String url, int sizeDp, long duration) {
-        int size = dp(sizeDp);
-        View effectView;
-        if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
-            ImageView image = new ImageView(context);
-            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            image.setContentDescription("relationship effect");
-            Glide.with(context).load(url).into(image);
-            effectView = image;
-        } else {
-            TextView emoji = new TextView(context);
-            emoji.setText(defaultEmoji(type));
-            emoji.setTextSize(Math.max(18, sizeDp * 0.58f));
-            emoji.setGravity(Gravity.CENTER);
-            emoji.setIncludeFontPadding(false);
-            emoji.setTextColor(Color.WHITE);
-            emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
-            effectView = emoji;
-        }
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
-        lp.leftMargin = Math.round(x1 - size / 2f);
-        lp.topMargin = Math.round(y1 - size / 2f);
-        effectView.setLayoutParams(lp);
-        effectView.setClickable(false);
-        effectView.setFocusable(false);
-        layer.addView(effectView);
+        // A small stream of particles makes the connection visible even across distant seats.
+        // Keep this overlay decorative-only; no RTC/audio/session state is read or changed.
+        final int particleCount = 3;
+        final int particleSizeDp = Math.max(18, Math.min(44, Math.round(sizeDp / 2.2f)));
+        final int size = dp(particleSizeDp);
+        for (int i = 0; i < particleCount; i++) {
+            View effectView;
+            if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
+                ImageView image = new ImageView(context);
+                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                image.setContentDescription("relationship effect");
+                Glide.with(context).load(url).into(image);
+                effectView = image;
+            } else {
+                TextView emoji = new TextView(context);
+                emoji.setText(defaultEmoji(type));
+                emoji.setTextSize(Math.max(15, particleSizeDp * 0.72f));
+                emoji.setGravity(Gravity.CENTER);
+                emoji.setIncludeFontPadding(false);
+                emoji.setTextColor(Color.WHITE);
+                emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
+                effectView = emoji;
+            }
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
+            lp.leftMargin = Math.round(x1 - size / 2f);
+            lp.topMargin = Math.round(y1 - size / 2f);
+            effectView.setLayoutParams(lp);
+            effectView.setClickable(false);
+            effectView.setFocusable(false);
+            layer.addView(effectView);
 
-        AnimatorSet set = new AnimatorSet();
-        ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, 0f, x2 - x1);
-        ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, 0f, y2 - y1);
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(effectView, View.SCALE_X, 0.72f, 1f, 0.72f);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(effectView, View.SCALE_Y, 0.72f, 1f, 0.72f);
-        for (ObjectAnimator animator : new ObjectAnimator[] { x, y, scaleX, scaleY }) {
-            animator.setDuration(duration);
-            animator.setRepeatCount(ValueAnimator.INFINITE);
-            animator.setRepeatMode(ValueAnimator.REVERSE);
-            animator.setInterpolator(new android.view.animation.LinearInterpolator());
+            AnimatorSet set = new AnimatorSet();
+            ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, 0f, x2 - x1);
+            ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, 0f, y2 - y1);
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(effectView, View.SCALE_X, 0.82f, 1f, 0.82f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(effectView, View.SCALE_Y, 0.82f, 1f, 0.82f);
+            for (ObjectAnimator animator : new ObjectAnimator[] { x, y, scaleX, scaleY }) {
+                animator.setDuration(duration);
+                animator.setRepeatCount(ValueAnimator.INFINITE);
+                // Travel from the first seat to the second, then restart; stagger particles
+                // so the link reads as a moving stream rather than one bouncing icon.
+                animator.setRepeatMode(ValueAnimator.RESTART);
+                animator.setInterpolator(new android.view.animation.LinearInterpolator());
+            }
+            set.playTogether(x, y, scaleX, scaleY);
+            set.setStartDelay((duration / particleCount) * i);
+            running.add(set);
+            set.start();
         }
-        set.playTogether(x, y, scaleX, scaleY);
-        set.setStartDelay(120);
-        running.add(set);
-        set.start();
     }
 
     private float[] center(View view, int[] rootLoc) {
