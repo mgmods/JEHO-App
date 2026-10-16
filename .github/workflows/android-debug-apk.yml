@@ -39,6 +39,7 @@ jobs:
             android/**
             !android/app/keystore.properties
             !android/app/keystore/**
+            backend/public/mall/**
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
