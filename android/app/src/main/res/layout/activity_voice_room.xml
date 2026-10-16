@@ -994,7 +994,7 @@
     <RelativeLayout
         android:id="@+id/musicCard"
         android:layout_width="310dp"
-        android:layout_height="92dp"
+        android:layout_height="120dp"
         android:layout_marginTop="100dp"
         android:background="@drawable/mc_bg"
         android:clickable="true"
@@ -1068,7 +1068,7 @@
             android:layout_alignParentBottom="true"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="6dp"
-            android:layout_marginBottom="8dp"
+            android:layout_marginBottom="28dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -1153,6 +1153,20 @@
                 android:scaleType="centerInside"
                 android:src="@drawable/icon_music_list_more" />
         </LinearLayout>
+
+        <SeekBar
+            android:id="@+id/seekMusicVolume"
+            android:layout_width="0dp"
+            android:layout_height="22dp"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="66dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="3dp"
+            android:max="100"
+            android:progress="100"
+            android:progressTint="#34D399"
+            android:thumbTint="#FFFFFF"
+            android:contentDescription="مستوى صوت الموسيقى" />
 
         <TextView
             android:id="@+id/btnMusicDismiss"
