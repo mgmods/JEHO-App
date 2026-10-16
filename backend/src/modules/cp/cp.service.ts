@@ -151,7 +151,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       try { rules = JSON.parse(String(setting?.value || '{}')); } catch { rules = {}; }
       const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       effects[type] = {
-        enabled: effect.enabled === true && typeof effect.url === 'string' && /^https?:\\/\\//i.test(effect.url),
+        enabled: effect.enabled !== false,
         url: typeof effect.url === 'string' ? effect.url : '',
         sizeDp: Math.max(24, Math.min(160, Number(effect.sizeDp) || 56)),
         durationMs: Math.max(500, Math.min(10000, Number(effect.durationMs) || 1800)),
