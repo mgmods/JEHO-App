@@ -161,6 +161,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private ActivityVoiceRoomBinding binding;
     private VoiceRoomViewModel viewModel;
     private SeatAdapter seatAdapter;
+    @Nullable private RelationshipSeatEffectsOverlay relationshipSeatEffectsOverlay;
+    private volatile boolean relationshipEffectsFetchInFlight;
+    private long lastRelationshipEffectsFetchMs;
+    @Nullable private String lastRelationshipEffectsSeatSignature;
     private RecentJoinersAdapter audienceAdapter;
     private String roomId;
     private boolean micOn = false;
@@ -689,6 +693,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         });
         binding.recyclerSeats.setAdapter(seatAdapter);
+        try {
+            if (binding.getRoot() instanceof ViewGroup) {
+                relationshipSeatEffectsOverlay = new RelationshipSeatEffectsOverlay(
+                        this, (ViewGroup) binding.getRoot(), binding.recyclerSeats);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("VoiceRoom", "Relationship effect overlay unavailable", e);
+        }
         audienceAdapter = new RecentJoinersAdapter(member ->
                 showUserCard(member.userId, member.displayName, member.avatarUrl,
                         member.vipBadgeUrl,
@@ -12848,6 +12860,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             try {
                 applyMikooSeatGrid(gridSeats.size());
                 if (seatAdapter != null) seatAdapter.submit(gridSeats);
+                refreshRoomRelationshipEffects(gridSeats);
                 RoomDtos.RoomDto latest = viewModel != null ? viewModel.getRoom().getValue() : null;
                 bindHostStage(findHostSeat(allSeats), latest != null ? latest : room);
             } catch (Exception e) {
@@ -12859,6 +12872,77 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             bind.run();
         }
+    }
+
+    /**
+     * Fetch relationship metadata for occupied seats only. This is decorative UI and is
+     * deliberately isolated from all RTC, microphone, ZEGO and Redis flows.
+     */
+    private void refreshRoomRelationshipEffects(@Nullable List<RoomDtos.SeatDto> seats) {
+        if (seats == null || seats.isEmpty() || relationshipSeatEffectsOverlay == null
+                || isFinishing() || exiting) {
+            if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
+            return;
+        }
+        java.util.TreeSet<String> ids = new java.util.TreeSet<>();
+        for (RoomDtos.SeatDto seat : seats) {
+            if (seat == null || seat.locked()) continue;
+            String id = seatUserId(seat);
+            if (id == null || id.trim().isEmpty()) continue;
+            ids.add(id.trim());
+        }
+        if (ids.size() < 2) {
+            lastRelationshipEffectsSeatSignature = ids.toString();
+            if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
+            return;
+        }
+        String signature = android.text.TextUtils.join(",", ids);
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (signature.equals(lastRelationshipEffectsSeatSignature)
+                && now - lastRelationshipEffectsFetchMs < 15000L) return;
+        if (relationshipEffectsFetchInFlight) return;
+        relationshipEffectsFetchInFlight = true;
+        lastRelationshipEffectsFetchMs = now;
+        lastRelationshipEffectsSeatSignature = signature;
+        final List<RoomDtos.SeatDto> seatSnapshot = new ArrayList<>(seats);
+        AppContainer cpContainer;
+        try {
+            cpContainer = ContainerProvider.from(this);
+        } catch (Exception e) {
+            relationshipEffectsFetchInFlight = false;
+            return;
+        }
+        cpContainer.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(
+                    cpContainer.getUserApi().cpRoomSeatEffects(signature));
+            relationshipEffectsFetchInFlight = false;
+            if (!result.success || result.data == null || isFinishing() || isDestroyed()) return;
+            Object relationsValue = result.data.get("relationships");
+            Object effectsValue = result.data.get("effects");
+            List<Map<String, Object>> relations = new ArrayList<>();
+            if (relationsValue instanceof List) {
+                for (Object item : (List<?>) relationsValue) {
+                    if (item instanceof Map) relations.add((Map<String, Object>) item);
+                }
+            }
+            Map<String, Map<String, Object>> effects = new HashMap<>();
+            if (effectsValue instanceof Map) {
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) effectsValue).entrySet()) {
+                    if (entry.getValue() instanceof Map) {
+                        effects.put(String.valueOf(entry.getKey()), (Map<String, Object>) entry.getValue());
+                    }
+                }
+            }
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || relationshipSeatEffectsOverlay == null) return;
+                if (!signature.equals(lastRelationshipEffectsSeatSignature)) return;
+                binding.recyclerSeats.post(() -> {
+                    if (relationshipSeatEffectsOverlay != null) {
+                        relationshipSeatEffectsOverlay.render(seatSnapshot, relations, effects);
+                    }
+                });
+            });
+        });
     }
 
     /** Instant local sit so wear shows before takeSeat API returns. */
