@@ -755,6 +755,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // Mikoo: header avatar is boss mic (seat 0) — sit / leave / profile.
             binding.hostCard.setOnClickListener(v -> onHostStageClick());
         }
+        if (binding.tvFollowRoomHeart != null) {
+            binding.tvFollowRoomHeart.setOnClickListener(v -> toggleFollowRoomHeart());
+            refreshRoomFollowHeart();
+        }
         if (binding.hostStage != null) {
             binding.hostStage.setVisibility(View.GONE);
             binding.hostStage.setClickable(false);
@@ -13552,6 +13556,66 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && Boolean.TRUE.equals(r.data.get("following"));
             runOnUiThread(() -> label.setText(following
                     ? R.string.unfollow_room : R.string.follow_room));
+        });
+    }
+
+    private void renderRoomFollowHeart(boolean following) {
+        if (binding == null || binding.tvFollowRoomHeart == null) return;
+        binding.tvFollowRoomHeart.setText(following ? "♥" : "♡");
+        binding.tvFollowRoomHeart.setTextColor(Color.parseColor("#22C55E"));
+        binding.tvFollowRoomHeart.setContentDescription(
+                following ? "إلغاء متابعة الروم" : "متابعة الروم");
+    }
+
+    private void refreshRoomFollowHeart() {
+        if (binding == null || binding.tvFollowRoomHeart == null || roomId == null
+                || roomId.trim().isEmpty()) return;
+        RoomDtos.RoomDto current = viewModel == null ? null : viewModel.getRoom().getValue();
+        String myId = ContainerProvider.from(this).getSessionManager().getUserId();
+        boolean isHost = current != null && myId != null
+                && (myId.equals(current.hostId) || myId.equals(current.activeHostId));
+        if (isHost) {
+            binding.tvFollowRoomHeart.setVisibility(View.GONE);
+            return;
+        }
+        binding.tvFollowRoomHeart.setVisibility(View.VISIBLE);
+        renderRoomFollowHeart(false);
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> status =
+                    ApiCall.execute(c.getRoomApi().roomFollowStatus(roomId));
+            boolean following = status.success && status.data != null
+                    && Boolean.TRUE.equals(status.data.get("following"));
+            runOnUiThread(() -> renderRoomFollowHeart(following));
+        });
+    }
+
+    private void toggleFollowRoomHeart() {
+        if (roomId == null || roomId.trim().isEmpty()) return;
+        AppContainer c = ContainerProvider.from(this);
+        if (binding != null && binding.tvFollowRoomHeart != null) {
+            binding.tvFollowRoomHeart.setEnabled(false);
+        }
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> status =
+                    ApiCall.execute(c.getRoomApi().roomFollowStatus(roomId));
+            boolean following = status.success && status.data != null
+                    && Boolean.TRUE.equals(status.data.get("following"));
+            Result<Object> result = following
+                    ? ApiCall.execute(c.getRoomApi().unfollowRoom(roomId))
+                    : ApiCall.execute(c.getRoomApi().followRoom(roomId));
+            runOnUiThread(() -> {
+                if (binding != null && binding.tvFollowRoomHeart != null) {
+                    binding.tvFollowRoomHeart.setEnabled(true);
+                }
+                if (result.success) {
+                    renderRoomFollowHeart(!following);
+                } else {
+                    Toast.makeText(this,
+                            result.error != null ? result.error : getString(R.string.error_generic),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
         });
     }
 
