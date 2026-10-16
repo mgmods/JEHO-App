@@ -54,10 +54,19 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       // CP types are available automatically; only a valid configured price and active gift
       // are required for paid room requests. The legacy dashboard enabled flag is not a blocker.
       const enabled = Number.isSafeInteger(price) && price > 0 && !!gift;
+      let rules: Record<string, any> = {};
+      try { rules = JSON.parse(settings[`cp.rules.${type}`] || '{}'); } catch { rules = {}; }
+      const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
       catalog.push({
         type, enabled, priceCoins: enabled ? price : null,
         gift: gift ? { id: gift.id, name: gift.name, iconUrl: gift.iconUrl, animationUrl: gift.animationUrl } : null,
         giftPoints: Number(settings[`cp.gift_points.${type}`] || 0) || 0,
+        seatEffect: {
+          enabled: effect.enabled === true && typeof effect.url === 'string' && /^https?:\\/\\//i.test(effect.url),
+          url: typeof effect.url === 'string' ? effect.url : '',
+          sizeDp: Math.max(24, Math.min(160, Number(effect.sizeDp) || 56)),
+          durationMs: Math.max(500, Math.min(10000, Number(effect.durationMs) || 1800)),
+        },
       });
     }
     return catalog;
@@ -112,6 +121,48 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
         rewardsUnlocked,
       };
     });
+  }
+
+  async roomSeatEffects(userIdsInput: string) {
+    const userIds = Array.from(new Set(
+      String(userIdsInput || '').split(',').map((id) => id.trim()).filter((id) => UUID_REGEX.test(id)),
+    )).slice(0, 20);
+    if (userIds.length < 2) return { relationships: [], effects: {} };
+
+    const rows = await this.dataSource.query(
+      `SELECT id, type, "userAId", "userBId"
+       FROM cp_relationships
+       WHERE status = 'active'
+         AND "userAId" = ANY($1::uuid[])
+         AND "userBId" = ANY($1::uuid[])
+       ORDER BY "startedAt" ASC`,
+      [userIds],
+    );
+    if (!rows.length) return { relationships: [], effects: {} };
+
+    const types = Array.from(new Set<string>(rows.map((row: any) => String(row.type))));
+    const effects: Record<string, any> = {};
+    for (const type of types) {
+      const [setting] = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key=$1',
+        [`cp.rules.${type}`],
+      );
+      let rules: Record<string, any> = {};
+      try { rules = JSON.parse(String(setting?.value || '{}')); } catch { rules = {}; }
+      const effect = rules?.seatEffect && typeof rules.seatEffect === 'object' ? rules.seatEffect : {};
+      effects[type] = {
+        enabled: effect.enabled === true && typeof effect.url === 'string' && /^https?:\\/\\//i.test(effect.url),
+        url: typeof effect.url === 'string' ? effect.url : '',
+        sizeDp: Math.max(24, Math.min(160, Number(effect.sizeDp) || 56)),
+        durationMs: Math.max(500, Math.min(10000, Number(effect.durationMs) || 1800)),
+      };
+    }
+    return {
+      relationships: rows.map((row: any) => ({
+        id: row.id, type: row.type, userAId: row.userAId, userBId: row.userBId,
+      })),
+      effects,
+    };
   }
 
   async profileRelationships(userId: string) {
