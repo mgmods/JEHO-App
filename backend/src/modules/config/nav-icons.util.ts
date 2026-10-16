@@ -35,7 +35,7 @@ const IMG_RE = /\.(png|jpe?g|webp|svg)(\?|$)/i;
 /** Public media is served at host root, not below Nest's /api/v1 prefix. */
 function publicOrigin(raw?: string): string {
   const value = String(raw || '').trim() || 'https://jeho-own-backend.mgs.blitz.cloud';
-  return value.replace(/\\/+$/, '').replace(/\\/api\\/v\\d+$/i, '');
+  return value.replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
 }
 
 function cleanUrl(raw: unknown): string {
