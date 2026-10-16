@@ -785,7 +785,7 @@ public final class NativeRoomEffectsView extends FrameLayout {
                     } else {
                         entryAnimView = null;
                     }
-                    View streamed = createGiftVideoStream(mediaUrl, null, null);
+                    View streamed = createGiftVideoStream(mediaUrl, null, null, file);
                     if (streamed != null) {
                         addView(streamed, new LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -885,6 +885,13 @@ public final class NativeRoomEffectsView extends FrameLayout {
     @Nullable
     private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
                                        @Nullable String fallbackUrl) {
+        return createGiftVideoStream(absUrl, iconUrl, fallbackUrl, null);
+    }
+
+    @Nullable
+    private View createGiftVideoStream(String absUrl, @Nullable String iconUrl,
+                                       @Nullable String fallbackUrl,
+                                       @Nullable File preloadedFile) {
         if (absUrl == null || absUrl.isEmpty()) return null;
         releaseGiftPlayer();
 
@@ -958,7 +965,9 @@ public final class NativeRoomEffectsView extends FrameLayout {
         final int token = generation;
         final String finalUrl = playUrl;
         final String altUrl = fallbackAbs;
-        File warmPrimary = peekGiftMp4Cache(getContext(), finalUrl);
+        File warmPrimary = preloadedFile != null && preloadedFile.exists()
+                && preloadedFile.length() > 8_192
+                ? preloadedFile : peekGiftMp4Cache(getContext(), finalUrl);
         File warmAlt = altUrl != null ? peekGiftMp4Cache(getContext(), altUrl) : null;
         File warm = warmPrimary != null ? warmPrimary : warmAlt;
         String warmUrl = warmPrimary != null ? finalUrl : (warmAlt != null ? altUrl : null);
