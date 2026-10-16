@@ -339,6 +339,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String currentMusicPublisherId;
     private boolean musicEndReported;
     private boolean musicPanelExpanded;
+    /** Shared music gain (0..1), synchronized for everyone in the live room. */
+    private float sharedMusicVolume = 1.0f;
     private ObjectAnimator musicDiscAnimator;
     private android.animation.AnimatorSet taskFloatPulseAnimator;
     private long roomMusicServerOffsetMs;
@@ -3674,6 +3676,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 viewModel.updateMusic(roomId, "seek", null, null, null, position);
             }
         });
+        if (binding.seekMusicVolume != null) {
+            binding.seekMusicVolume.setMax(100);
+            binding.seekMusicVolume.setProgress(100);
+            binding.seekMusicVolume.setOnSeekBarChangeListener(
+                    new android.widget.SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(
+                        android.widget.SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    if (!canManageMusic) {
+                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
+                        return;
+                    }
+                    sharedMusicVolume = Math.max(0f, Math.min(1f, progress / 100f));
+                    applySharedMusicVolume();
+                }
+
+                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                    if (!canManageMusic) {
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "التحكم بصوت الموسيقى للمضيف أو المشرف المخوّل",
+                                Toast.LENGTH_SHORT).show();
+                    }
+                }
+
+                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
+                    if (!canManageMusic || roomId == null) {
+                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
+                        return;
+                    }
+                    JsonObject payload = new JsonObject();
+                    payload.addProperty("volume", sharedMusicVolume);
+                    RealtimeClient.getInstance().emitRoomEvent(
+                            roomId, "room:music_volume", payload);
+                }
+            });
+        }
         handler.post(musicProgressRunnable);
     }
 
@@ -4192,10 +4230,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** Shared room music volume (host + guests). Honors "كتم أصوات الغرفة". */
+    /** Shared music gain; local room mute only affects this listener's playback. */
     private void applySharedMusicVolume() {
-        if (roomMusicPlayer == null) return;
-        roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : 1f);
+        if (roomMusicPlayer != null) {
+            roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
+        }
+        // For device music mixed into the host's published audio, adjust only the
+        // dedicated ZEGO media player; microphone capture gain remains untouched.
+        if (canManageMusic && isLocalMusicUrl(currentMusicUrl)) {
+            RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+        }
+        if (binding != null && binding.seekMusicVolume != null
+                && !binding.seekMusicVolume.isPressed()) {
+            binding.seekMusicVolume.setProgress(Math.round(sharedMusicVolume * 100f));
+        }
     }
 
     /** @deprecated kept for any remaining call sites — uses shared volume. */
@@ -11377,6 +11425,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (r != null) r.chatAutoClearMinutes = mins;
             long stamp = parseIsoMillis(memberStr(payload, "chatClearedAt"));
             if (stamp > 0) RoomChatMemory.honorServerWipe(roomId, stamp);
+        } else if ("room:music_volume".equals(event)) {
+            sharedMusicVolume = Math.max(0f, Math.min(1f,
+                    (float) memberDouble(payload, "volume", 1.0)));
+            applySharedMusicVolume();
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
             if (serverTime != null) {
