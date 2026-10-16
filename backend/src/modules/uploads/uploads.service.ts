@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -11,6 +12,7 @@ import { ContentModerationService } from '../moderation/content-moderation.servi
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
   private readonly uploadDir: string;
   private readonly maxSizeMb: number;
   private readonly supabaseUrl: string;
@@ -39,8 +41,8 @@ export class UploadsService {
           : process.env.SUPABASE_STORAGE_KEY?.trim()
             ? 'storage_key'
             : 'missing';
-    console.log(
-      `[Uploads] Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; bucket=${this.storageBucket}; key=${keySource}`,
+    this.logger.log(
+      `Supabase Storage ${this.supabaseUrl && this.storageKey ? 'configured' : 'NOT configured'}; url=${this.supabaseUrl ? 'set' : 'missing'}; bucket=${this.storageBucket}; key=${keySource}`,
     );
     if (!existsSync(this.uploadDir)) mkdirSync(this.uploadDir, { recursive: true });
   }
