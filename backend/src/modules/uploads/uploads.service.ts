@@ -210,7 +210,7 @@ export class UploadsService {
       });
       const fileBuffer = readFileSync(storedPath);
       const upload = await this.storageFetch(this.storageObjectUrl(storedName), {
-        method: 'PUT',
+        method: 'POST',
         headers: uploadHeaders,
         body: fileBuffer,
       });
