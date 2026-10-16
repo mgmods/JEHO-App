@@ -35,7 +35,7 @@ final class RelationshipSeatEffectsOverlay {
     private final ViewGroup root;
     private final RecyclerView seatsRecycler;
     private final FrameLayout layer;
-    private final List<AnimatorSet> running = new ArrayList<>();
+    private final List<Animator> running = new ArrayList<>();
 
     RelationshipSeatEffectsOverlay(@NonNull Context context, @NonNull ViewGroup root,
                                    @NonNull RecyclerView seatsRecycler) {
@@ -144,6 +144,9 @@ final class RelationshipSeatEffectsOverlay {
             effectView.setFocusable(false);
             layer.addView(effectView);
 
+            final int[] rootLoc = new int[2];
+            final int[] aLoc = new int[2];
+            final int[] bLoc = new int[2];
             ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
             travel.setDuration(duration);
             travel.setRepeatCount(ValueAnimator.INFINITE);
@@ -158,13 +161,16 @@ final class RelationshipSeatEffectsOverlay {
                     return;
                 }
                 effectView.setVisibility(View.VISIBLE);
-                int[] rootLoc = new int[2];
                 root.getLocationInWindow(rootLoc);
-                float[] from = center(anchorA, rootLoc);
-                float[] to = center(anchorB, rootLoc);
+                anchorA.getLocationInWindow(aLoc);
+                anchorB.getLocationInWindow(bLoc);
+                float fromX = aLoc[0] - rootLoc[0] + anchorA.getWidth() / 2f;
+                float fromY = aLoc[1] - rootLoc[1] + anchorA.getHeight() / 2f;
+                float toX = bLoc[0] - rootLoc[0] + anchorB.getWidth() / 2f;
+                float toY = bLoc[1] - rootLoc[1] + anchorB.getHeight() / 2f;
                 float progress = (Float) animation.getAnimatedValue();
-                effectView.setX(from[0] + (to[0] - from[0]) * progress - size / 2f);
-                effectView.setY(from[1] + (to[1] - from[1]) * progress - size / 2f);
+                effectView.setX(fromX + (toX - fromX) * progress - size / 2f);
+                effectView.setY(fromY + (toY - fromY) * progress - size / 2f);
                 float scale = 0.82f + 0.18f * (float) Math.sin(progress * Math.PI);
                 effectView.setScaleX(scale);
                 effectView.setScaleY(scale);
@@ -182,9 +188,9 @@ final class RelationshipSeatEffectsOverlay {
     }
 
     void clear() {
-        List<AnimatorSet> toStop = new ArrayList<>(running);
+        List<Animator> toStop = new ArrayList<>(running);
         running.clear();
-        for (AnimatorSet animator : toStop) {
+        for (Animator animator : toStop) {
             try { animator.cancel(); } catch (Exception ignored) {}
         }
         layer.removeAllViews();
