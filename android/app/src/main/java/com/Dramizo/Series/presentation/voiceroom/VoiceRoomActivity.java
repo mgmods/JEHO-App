@@ -10926,12 +10926,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         bumpRoomViewers(1);
                     }
 
-                    // Mikoo: owner does NOT see their own entry effect — only other users.
-                    if (selfJoin || myUserId == null || myUserId.isEmpty()) {
+                    // Play the equipped entrance for the joining user too. The server
+                    // broadcasts room:user_joined to the entire room, including this
+                    // client's socket; previously the self-join guard silently skipped
+                    // the buyer's own entrance every time they entered/re-entered.
+                    if (myUserId == null || myUserId.isEmpty()) {
                         return;
                     }
 
-                    // Always show join entry for others so equipped rides play in-room.
+                    // Queue the same equipped entrance on every room client, including the entrant.
                     if (effectQueue != null) {
                         RoomEffectQueue.EffectType entryType;
                         if ("supporter".equals(supporterTier) || "legendary".equals(supporterTier)) {
