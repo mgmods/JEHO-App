@@ -48,6 +48,7 @@ import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
 import { ensureBadgeTables } from './database/badges-bootstrap';
+import { ensureCpTables } from './database/cp-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -124,6 +125,16 @@ const entityList = Object.values(entities).filter(
         } catch (error) {
           console.error(
             '[BadgesBootstrap] Could not initialize badge tables; API startup continues.',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+
+        // Create only missing CP tables/indexes for older deployments; preserve all existing rows.
+        try {
+          await ensureCpTables(appDataSource);
+        } catch (error) {
+          console.error(
+            '[CpBootstrap] Could not initialize CP tables; API startup continues.',
             error instanceof Error ? error.message : String(error),
           );
         }
