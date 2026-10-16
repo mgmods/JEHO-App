@@ -232,7 +232,7 @@ async function load() {
       maxLevel: item.maxLevel == null ? null : Number(item.maxLevel),
       levelsText: JSON.stringify(item.levels || [], null, 2),
       rulesText: JSON.stringify(item.rules || {}, null, 2),
-      seatEffectEnabled: item.rules?.seatEffect?.enabled === true,
+      seatEffectEnabled: item.rules?.seatEffect?.enabled !== false,
       seatEffectUrl: item.rules?.seatEffect?.url || '',
       seatEffectSize: Math.max(24, Math.min(160, Number(item.rules?.seatEffect?.sizeDp || 56))),
       seatEffectDuration: Math.max(500, Math.min(10000, Number(item.rules?.seatEffect?.durationMs || 1800))),
@@ -281,7 +281,7 @@ async function saveType(item) {
     catch { throw new Error('تحقق من صيغة JSON في المستويات أو القواعد.') }
     if (!Array.isArray(levels) || !rules || typeof rules !== 'object' || Array.isArray(rules)) throw new Error('المستويات يجب أن تكون قائمة والقواعد كائناً JSON.')
     rules.seatEffect = {
-      enabled: item.seatEffectEnabled === true && !!String(item.seatEffectUrl || '').trim(),
+      enabled: item.seatEffectEnabled === true,
       url: String(item.seatEffectUrl || '').trim(),
       sizeDp: Math.max(24, Math.min(160, Number(item.seatEffectSize || 56))),
       durationMs: Math.max(500, Math.min(10000, Number(item.seatEffectDuration || 1800))),
