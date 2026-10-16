@@ -108,19 +108,20 @@ final class RelationshipSeatEffectsOverlay {
             String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
             int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 48, 24, 160);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
-            addEffect(pointA[0], pointA[1], pointB[0], pointB[1], type, url, sizeDp, duration);
+            addEffect(avatarA, avatarB, type, url, sizeDp, duration);
         }
     }
 
-    private void addEffect(float x1, float y1, float x2, float y2,
+    private void addEffect(@NonNull View anchorA, @NonNull View anchorB,
                            String type, String url, int sizeDp, long duration) {
-        // A small stream of particles makes the connection visible even across distant seats.
-        // Keep this overlay decorative-only; no RTC/audio/session state is read or changed.
+        // Track the live avatar anchors during every animation frame. This keeps the
+        // effect attached to people when seats are reordered, the grid relayouts, or
+        // the room view changes size, without touching RTC/audio/session state.
         final int particleCount = 3;
         final int particleSizeDp = Math.max(18, Math.min(44, Math.round(sizeDp / 2.2f)));
         final int size = dp(particleSizeDp);
         for (int i = 0; i < particleCount; i++) {
-            View effectView;
+            final View effectView;
             if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
                 ImageView image = new ImageView(context);
                 image.setScaleType(ImageView.ScaleType.FIT_CENTER);
@@ -138,30 +139,38 @@ final class RelationshipSeatEffectsOverlay {
                 effectView = emoji;
             }
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
-            lp.leftMargin = Math.round(x1 - size / 2f);
-            lp.topMargin = Math.round(y1 - size / 2f);
             effectView.setLayoutParams(lp);
             effectView.setClickable(false);
             effectView.setFocusable(false);
             layer.addView(effectView);
 
-            AnimatorSet set = new AnimatorSet();
-            ObjectAnimator x = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_X, 0f, x2 - x1);
-            ObjectAnimator y = ObjectAnimator.ofFloat(effectView, View.TRANSLATION_Y, 0f, y2 - y1);
-            ObjectAnimator scaleX = ObjectAnimator.ofFloat(effectView, View.SCALE_X, 0.82f, 1f, 0.82f);
-            ObjectAnimator scaleY = ObjectAnimator.ofFloat(effectView, View.SCALE_Y, 0.82f, 1f, 0.82f);
-            for (ObjectAnimator animator : new ObjectAnimator[] { x, y, scaleX, scaleY }) {
-                animator.setDuration(duration);
-                animator.setRepeatCount(ValueAnimator.INFINITE);
-                // Travel from the first seat to the second, then restart; stagger particles
-                // so the link reads as a moving stream rather than one bouncing icon.
-                animator.setRepeatMode(ValueAnimator.RESTART);
-                animator.setInterpolator(new android.view.animation.LinearInterpolator());
-            }
-            set.playTogether(x, y, scaleX, scaleY);
-            set.setStartDelay((duration / particleCount) * i);
-            running.add(set);
-            set.start();
+            ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
+            travel.setDuration(duration);
+            travel.setRepeatCount(ValueAnimator.INFINITE);
+            travel.setRepeatMode(ValueAnimator.RESTART);
+            travel.setInterpolator(new android.view.animation.LinearInterpolator());
+            travel.setStartDelay((duration / particleCount) * i);
+            travel.addUpdateListener(animation -> {
+                if (anchorA.getParent() == null || anchorB.getParent() == null
+                        || anchorA.getVisibility() != View.VISIBLE
+                        || anchorB.getVisibility() != View.VISIBLE) {
+                    effectView.setVisibility(View.INVISIBLE);
+                    return;
+                }
+                effectView.setVisibility(View.VISIBLE);
+                int[] rootLoc = new int[2];
+                root.getLocationInWindow(rootLoc);
+                float[] from = center(anchorA, rootLoc);
+                float[] to = center(anchorB, rootLoc);
+                float progress = (Float) animation.getAnimatedValue();
+                effectView.setX(from[0] + (to[0] - from[0]) * progress - size / 2f);
+                effectView.setY(from[1] + (to[1] - from[1]) * progress - size / 2f);
+                float scale = 0.82f + 0.18f * (float) Math.sin(progress * Math.PI);
+                effectView.setScaleX(scale);
+                effectView.setScaleY(scale);
+            });
+            running.add(travel);
+            travel.start();
         }
     }
 
