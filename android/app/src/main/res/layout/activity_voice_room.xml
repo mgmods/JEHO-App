@@ -393,6 +393,20 @@
                             android:textSize="12.5sp"
                             android:textStyle="bold" />
 
+                        <TextView
+                            android:id="@+id/tvFollowRoomHeart"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_marginStart="3dp"
+                            android:gravity="center"
+                            android:text="♡"
+                            android:textColor="#22C55E"
+                            android:textSize="21sp"
+                            android:includeFontPadding="false"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="متابعة الروم" />
+
                         <ImageView
                             android:id="@+id/imgHeaderAgencyVerified"
                             android:layout_width="14dp"
