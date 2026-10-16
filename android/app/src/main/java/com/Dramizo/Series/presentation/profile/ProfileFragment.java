@@ -47,6 +47,7 @@ import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.VipStyle;
 
 import java.util.Calendar;
+import java.util.Locale;
 import java.text.NumberFormat;
 
 public class ProfileFragment extends Fragment {
@@ -560,7 +561,7 @@ public class ProfileFragment extends Fragment {
             act.runOnUiThread(() -> {
                 if (!isAdded() || binding == null) return;
                 if (r.success && r.data != null) {
-                    NumberFormat nf = NumberFormat.getInstance();
+                    NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
                     String coins = nf.format(Math.max(0, r.data.coins));
                     String diamonds = nf.format(Math.max(0, r.data.diamonds));
                     if (binding.tvWalletCoins != null
