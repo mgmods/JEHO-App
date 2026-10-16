@@ -334,6 +334,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
     private String currentMusicStatus = "stopped";
+    /** Per-listener level for streamed music; host can also scale locally mixed Zego music. */
+    private int musicVolumePercent = 100;
     private String currentMusicStartedAt;
     /** User id that last loaded/updated room music (for Zego mix stream of local files). */
     @Nullable private String currentMusicPublisherId;
@@ -3612,6 +3614,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     Toast.LENGTH_SHORT).show();
         });
         binding.btnMusicDismiss.setOnClickListener(v -> dismissMusicCard());
+        if (binding.musicVolumeDown != null) {
+            binding.musicVolumeDown.setOnClickListener(v -> adjustRoomMusicVolume(-10));
+        }
+        if (binding.musicVolumeUp != null) {
+            binding.musicVolumeUp.setOnClickListener(v -> adjustRoomMusicVolume(10));
+        }
         // Player body is for drag only — adding music is via list-more button (Mikoo).
         binding.musicCard.setOnClickListener(null);
         binding.imgMusicDisc.setOnClickListener(null);
@@ -4192,10 +4200,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    /** Volume buttons affect streamed music locally, or the host's outgoing local-music mix. */
+    private void adjustRoomMusicVolume(int delta) {
+        if (isLocalMusicUrl(currentMusicUrl)) {
+            if (!canManageMusic || RoomRtcEngine.getInstance().isLiveKit()) {
+                Toast.makeText(this, "الموسيقى المحلية تُبث مع صوت المضيف؛ التحكم بمستواها للمضيف", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            musicVolumePercent = Math.max(0, Math.min(100, musicVolumePercent + delta));
+            RoomRtcEngine.getInstance().setMusicMixVolumePercent(musicVolumePercent * 2);
+        } else {
+            musicVolumePercent = Math.max(0, Math.min(100, musicVolumePercent + delta));
+            applySharedMusicVolume();
+        }
+        Toast.makeText(this, "صوت الموسيقى: " + musicVolumePercent + "%", Toast.LENGTH_SHORT).show();
+    }
+
     /** Shared room music volume (host + guests). Honors "كتم أصوات الغرفة". */
     private void applySharedMusicVolume() {
         if (roomMusicPlayer == null) return;
-        roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : 1f);
+        roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : musicVolumePercent / 100f);
     }
 
     /** @deprecated kept for any remaining call sites — uses shared volume. */
