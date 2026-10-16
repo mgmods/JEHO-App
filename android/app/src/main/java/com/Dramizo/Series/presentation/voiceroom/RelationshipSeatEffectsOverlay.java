@@ -106,7 +106,7 @@ final class RelationshipSeatEffectsOverlay {
             Map<String, Object> effect = effects == null ? null : effects.get(type);
             if (effect != null && Boolean.FALSE.equals(effect.get("enabled"))) continue;
             String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
-            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 48, 24, 160);
+            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(avatarA, avatarB, type, url, sizeDp, duration);
         }
@@ -117,9 +117,24 @@ final class RelationshipSeatEffectsOverlay {
         // Track the live avatar anchors during every animation frame. This keeps the
         // effect attached to people when seats are reordered, the grid relayouts, or
         // the room view changes size, without touching RTC/audio/session state.
-        final int particleCount = 3;
-        final int particleSizeDp = Math.max(18, Math.min(44, Math.round(sizeDp / 2.2f)));
+        // Keep each uploaded asset small, but fill longer seat-to-seat gaps with a
+        // restrained ribbon of repeated copies. The count is capped to protect room FPS.
+        final int particleSizeDp = Math.max(10, Math.min(36, sizeDp));
         final int size = dp(particleSizeDp);
+        final int[] rootLocForDistance = new int[2];
+        final int[] aLocForDistance = new int[2];
+        final int[] bLocForDistance = new int[2];
+        root.getLocationInWindow(rootLocForDistance);
+        anchorA.getLocationInWindow(aLocForDistance);
+        anchorB.getLocationInWindow(bLocForDistance);
+        float dx = (bLocForDistance[0] + anchorB.getWidth() / 2f)
+                - (aLocForDistance[0] + anchorA.getWidth() / 2f);
+        float dy = (bLocForDistance[1] + anchorB.getHeight() / 2f)
+                - (aLocForDistance[1] + anchorA.getHeight() / 2f);
+        float distanceDp = (float) Math.hypot(dx, dy)
+                / context.getResources().getDisplayMetrics().density;
+        final int particleCount = Math.max(3, Math.min(10,
+                (int) Math.ceil(distanceDp / Math.max(30f, particleSizeDp * 2.1f))));
         for (int i = 0; i < particleCount; i++) {
             final View effectView;
             if (!url.trim().isEmpty() && (url.startsWith("https://") || url.startsWith("http://"))) {
@@ -142,6 +157,7 @@ final class RelationshipSeatEffectsOverlay {
             effectView.setLayoutParams(lp);
             effectView.setClickable(false);
             effectView.setFocusable(false);
+            effectView.setAlpha(0.88f);
             layer.addView(effectView);
 
             final int[] rootLoc = new int[2];
@@ -171,7 +187,8 @@ final class RelationshipSeatEffectsOverlay {
                 float progress = (Float) animation.getAnimatedValue();
                 effectView.setX(fromX + (toX - fromX) * progress - size / 2f);
                 effectView.setY(fromY + (toY - fromY) * progress - size / 2f);
-                float scale = 0.82f + 0.18f * (float) Math.sin(progress * Math.PI);
+                // Subtle breathing only; no large bursts, spins, or flashes.
+                float scale = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
                 effectView.setScaleX(scale);
                 effectView.setScaleY(scale);
             });
