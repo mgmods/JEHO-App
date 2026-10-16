@@ -43,6 +43,29 @@ export class VanityIdsController {
     private readonly txRepo: Repository<WalletTransaction>,
   ) {}
 
+  /** Public read-only appearance contract used by all app ID labels. */
+  @Public()
+  @Get('style/:publicId')
+  @ApiOperation({ summary: 'Read vanity ID display style' })
+  async publicStyle(@Param('publicId') publicId: string) {
+    const normalized = String(publicId || '').trim();
+    if (!/^\\d{3,16}$/.test(normalized)) {
+      throw new BadRequestException('Invalid public ID');
+    }
+    const row = await this.vanityRepo.findOne({ where: { publicId: normalized } });
+    if (!row) {
+      return { publicId: normalized, styleMode: 'static', styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: false };
+    }
+    return {
+      publicId: normalized,
+      styleMode: row.styleMode === 'animated' ? 'animated' : 'static',
+      styleColor1: row.styleColor1 || '#52E8FF',
+      styleColor2: row.styleColor2 || '#C084FC',
+      styleColor3: row.styleColor3 || '#FF7AC8',
+      styleGlow: Boolean(row.styleGlow),
+    };
+  }
+
   @Public()
   @Get()
   @ApiOperation({ summary: 'List available / catalog vanity IDs' })
