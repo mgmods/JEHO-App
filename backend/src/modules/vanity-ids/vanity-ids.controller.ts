@@ -304,7 +304,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Create / upsert vanity IDs from dashboard' })
   async adminUpsert(
     @Body()
-    body: { publicId: string; priceCoins?: number; status?: string },
+    body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
   ) {
     const publicId = String(body.publicId || '').trim();
     if (!/^\d{6}$/.test(publicId)) {
@@ -318,6 +318,7 @@ export class VanityIdsController {
         publicId,
         status: VanityIdStatus.AVAILABLE,
         priceCoins: Math.max(0, Math.floor(Number(body.priceCoins) || 0)),
+        ...this.parseStyle(body),
       });
     } else {
       if (body.priceCoins != null) {
@@ -345,12 +346,13 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Update vanity price / status (dashboard)' })
   async adminPatch(
     @Param('id') id: string,
-    @Body() body: { priceCoins?: number; status?: string },
+    @Body() body: { priceCoins?: number; status?: string; styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
   ) {
     const row = await this.requireRow(id);
     if (body.priceCoins != null) {
       row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
     }
+    Object.assign(row, this.parseStyle(body));
     if (body.status) {
       this.assertAdminStatus(body.status);
       const next = body.status as VanityIdStatus;
@@ -527,6 +529,29 @@ export class VanityIdsController {
     const row = await this.vanityRepo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('Vanity ID not found');
     return row;
+  }
+
+  private parseStyle(body: {
+    styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean;
+  }): Partial<VanityId> {
+    const result: Partial<VanityId> = {};
+    if (body.styleMode != null) {
+      if (!['static', 'animated'].includes(body.styleMode)) {
+        throw new BadRequestException('styleMode must be static or animated');
+      }
+      result.styleMode = body.styleMode as 'static' | 'animated';
+    }
+    for (const key of ['styleColor1', 'styleColor2', 'styleColor3'] as const) {
+      const value = body[key];
+      if (value != null) {
+        if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+          throw new BadRequestException(`${key} must be a hex color such as #52E8FF`);
+        }
+        result[key] = value.toUpperCase();
+      }
+    }
+    if (body.styleGlow != null) result.styleGlow = Boolean(body.styleGlow);
+    return result;
   }
 
   private assertAdminStatus(status: string) {
