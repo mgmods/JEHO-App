@@ -10,9 +10,11 @@ permissions:
   contents: read
   packages: write
 
+# Let an active image publish finish; newer queued pushes can then publish next.
+# Cancelling during Docker push can leave Blitz's mutable tag pointing at an older image.
 concurrency:
   group: build-jeho-own-blitz-image
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-and-publish:
