@@ -3965,10 +3965,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.musicCard.bringToFront();
             }
         } else {
-            // Listeners: NEVER see the control card. Only spinning disc while music plays.
-            musicPanelExpanded = false;
-            binding.musicCard.setVisibility(View.GONE);
-            showMusicReopenChip(!dismissed && playing);
+            // Listeners get a read-only player card so they can adjust their own streamed-music volume.
+            // Playback, seek, skip and stop remain disabled below; ZEGO room voice is untouched.
+            boolean showCard = !dismissed && (playing || paused);
+            musicPanelExpanded = showCard;
+            binding.musicCard.setVisibility(showCard ? View.VISIBLE : View.GONE);
+            showMusicReopenChip(!showCard && playing);
+            if (showCard) {
+                binding.musicCard.setElevation(dp(28));
+                binding.musicCard.setTranslationZ(dp(28));
+                binding.musicCard.bringToFront();
+            }
         }
 
         binding.tvMusicTitle.setText(title != null && !title.isEmpty() ? title : "موسيقى الغرفة");
