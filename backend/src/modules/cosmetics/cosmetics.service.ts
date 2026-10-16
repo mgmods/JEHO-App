@@ -1592,7 +1592,7 @@ export class CosmeticsService implements OnModuleInit {
       const c = row.cosmetic;
       if (!c || !row.userId) continue;
       if (c.type !== CosmeticType.VIP_BADGE && c.type !== CosmeticType.HOST_BADGE) continue;
-      const anim = c.animationUrl || '';
+      const anim = this.cosmeticAnimationUrl(c);
       const lower = String(anim).toLowerCase();
       const playable =
         !!anim &&
