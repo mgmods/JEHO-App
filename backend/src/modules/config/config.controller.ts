@@ -103,6 +103,27 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('profile-banner')
+  @ApiOperation({ summary: 'Independent profile page banner managed from dashboard' })
+  async profileBanner() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'profile_banner' } });
+    if (!row?.value) return [];
+    try {
+      const parsed = JSON.parse(row.value);
+      const imageUrl = typeof parsed?.imageUrl === 'string' ? parsed.imageUrl.trim() : '';
+      if (!imageUrl) return [];
+      return [{
+        title: typeof parsed.title === 'string' ? parsed.title : '',
+        imageUrl,
+        link: typeof parsed.link === 'string' ? parsed.link : '',
+        lang: 'all',
+      }];
+    } catch {
+      return [];
+    }
+  }
+
+  @Public()
   @Get('features')
   @ApiOperation({ summary: 'App feature flags for clients' })
   async features() {
