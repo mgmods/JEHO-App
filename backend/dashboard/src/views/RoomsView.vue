@@ -220,6 +220,18 @@ async function createPlatformRoom() {
     placeholder: 'اسم الروم',
   })
   if (title == null || !String(title).trim()) return
+  const categoryRaw = await askPrompt({
+    title: 'نوع الروم الرسمي',
+    message: 'اكتب customer_service لخدمة العملاء، أو management لإدارة المنصة، أو official لروم رسمي آخر.',
+    defaultValue: 'customer_service',
+    placeholder: 'customer_service | management | official',
+  })
+  if (categoryRaw == null) return
+  const category = String(categoryRaw).trim().toLowerCase()
+  if (!['customer_service', 'management', 'official'].includes(category)) {
+    toast().danger('نوع الروم غير صحيح')
+    return
+  }
   const idsRaw = await askPrompt({
     title: 'مشرفو الروم',
     message: 'أدخل ID الحسابات العامة للمشرفين، وافصل بين أكثر من ID بفاصلة. سيحصلون على صلاحيات إدارة الروم.',
@@ -248,6 +260,7 @@ async function createPlatformRoom() {
   loading.value = true
   const { data, error: err } = await roomsApi.createPlatform({
     title: String(title).trim(),
+    category,
     moderatorIds,
     coverUrl: String(coverUrl).trim() || undefined,
     seatCount,
