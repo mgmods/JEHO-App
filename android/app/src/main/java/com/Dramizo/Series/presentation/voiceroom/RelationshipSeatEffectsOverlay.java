@@ -143,7 +143,7 @@ final class RelationshipSeatEffectsOverlay {
             String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
             int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
-            addEffect(avatarA, avatarB, type, url, sizeDp, duration);
+            addEffect(a, b, type, url, sizeDp, duration);
         }
         if (running.isEmpty()) retryIfNoParticles();
     }
@@ -163,87 +163,129 @@ final class RelationshipSeatEffectsOverlay {
         });
     }
 
-    private void addEffect(@NonNull View anchorA, @NonNull View anchorB,
+    /**
+     * Draw the configured relationship ribbon between USER IDs, not stale View references.
+     * RecyclerView recycles seat holders when either member changes seats; resolving by ID on
+     * every frame keeps the ribbon attached to the correct people during and after seat moves.
+     */
+    private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
-        final int size = dp(Math.max(10, Math.min(36, sizeDp)));
-        final int[] gridLoc = new int[2];
-        final int[] aLoc = new int[2];
-        final int[] bLoc = new int[2];
-        anchorA.getLocationInWindow(aLoc);
-        anchorB.getLocationInWindow(bLoc);
-        float dx = (bLoc[0] + anchorB.getWidth() / 2f) - (aLoc[0] + anchorA.getWidth() / 2f);
-        float dy = (bLoc[1] + anchorB.getHeight() / 2f) - (aLoc[1] + anchorA.getHeight() / 2f);
-        float distanceDp = (float) Math.hypot(dx, dy)
-                / context.getResources().getDisplayMetrics().density;
-        // Repeat the dashboard-uploaded animated image along the full path between seats.
-        final int particleCount = Math.max(3, Math.min(24,
-                (int) Math.ceil(distanceDp / Math.max(28f, sizeDp * 1.65f))));
-        for (int i = 0; i < particleCount; i++) {
-            final View effectView;
-            if (!url.trim().isEmpty()
-                    && (url.startsWith("https://") || url.startsWith("http://"))) {
-                ImageView image = new ImageView(context);
-                image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                image.setContentDescription("relationship effect");
-                Glide.with(context).load(url).into(image);
-                effectView = image;
-            } else {
-                TextView emoji = new TextView(context);
-                emoji.setText(defaultEmoji(type));
-                emoji.setTextSize(Math.max(10, sizeDp * 0.72f));
-                emoji.setGravity(Gravity.CENTER);
-                emoji.setIncludeFontPadding(false);
-                emoji.setTextColor(Color.WHITE);
-                emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
-                effectView = emoji;
-            }
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(size, size);
-            effectView.setLayoutParams(lp);
-            effectView.setClickable(false);
-            effectView.setFocusable(false);
-            effectView.setAlpha(0.95f);
-            layer.addView(effectView);
-
-            ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
-            travel.setDuration(duration);
-            travel.setRepeatCount(ValueAnimator.INFINITE);
-            travel.setRepeatMode(ValueAnimator.RESTART);
-            travel.setInterpolator(new LinearInterpolator());
-            travel.setStartDelay((duration / particleCount) * i);
-            travel.addUpdateListener(animation -> {
-                if (anchorA.getParent() == null || anchorB.getParent() == null
-                        || anchorA.getVisibility() != View.VISIBLE
-                        || anchorB.getVisibility() != View.VISIBLE
-                        || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
-                    effectView.setVisibility(View.INVISIBLE);
-                    return;
-                }
-                effectView.setVisibility(View.VISIBLE);
-                layer.getLocationInWindow(gridLoc);
-                anchorA.getLocationInWindow(aLoc);
-                anchorB.getLocationInWindow(bLoc);
-                float fromX = aLoc[0] - gridLoc[0] + anchorA.getWidth() / 2f;
-                float fromY = aLoc[1] - gridLoc[1] + anchorA.getHeight() / 2f;
-                float toX = bLoc[0] - gridLoc[0] + anchorB.getWidth() / 2f;
-                float toY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
-                float maxX = Math.max(0f, layer.getWidth() - size);
-                float maxY = Math.max(0f, layer.getHeight() - size);
-                fromX = clamp(fromX - size / 2f, 0f, maxX) + size / 2f;
-                toX = clamp(toX - size / 2f, 0f, maxX) + size / 2f;
-                fromY = clamp(fromY - size / 2f, 0f, maxY) + size / 2f;
-                toY = clamp(toY - size / 2f, 0f, maxY) + size / 2f;
-                float progress = (Float) animation.getAnimatedValue();
-                float x = fromX + (toX - fromX) * progress - size / 2f;
-                float y = fromY + (toY - fromY) * progress - size / 2f;
-                effectView.setX(clamp(x, 0f, maxX));
-                effectView.setY(clamp(y, 0f, maxY));
-                float scale = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
-                effectView.setScaleX(scale);
-                effectView.setScaleY(scale);
-            });
-            running.add(travel);
-            travel.start();
+        final int thickness = dp(Math.max(6, Math.min(48, sizeDp)));
+        final View effectView;
+        final boolean hasRibbon = !url.trim().isEmpty()
+                && (url.startsWith("https://") || url.startsWith("http://"));
+        if (hasRibbon) {
+            ImageView ribbon = new ImageView(context);
+            ribbon.setScaleType(ImageView.ScaleType.FIT_XY);
+            ribbon.setContentDescription("relationship ribbon");
+            // Glide preserves animated GIF/WebP assets uploaded from the dashboard.
+            Glide.with(context).load(url).into(ribbon);
+            effectView = ribbon;
+        } else {
+            TextView emoji = new TextView(context);
+            emoji.setText(defaultEmoji(type));
+            emoji.setTextSize(Math.max(12, Math.min(28, sizeDp * 0.72f)));
+            emoji.setGravity(Gravity.CENTER);
+            emoji.setIncludeFontPadding(false);
+            emoji.setTextColor(Color.WHITE);
+            emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
+            effectView = emoji;
         }
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(1, thickness);
+        effectView.setLayoutParams(lp);
+        effectView.setClickable(false);
+        effectView.setFocusable(false);
+        effectView.setAlpha(0.98f);
+        layer.addView(effectView);
+
+        ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
+        travel.setDuration(Math.max(500L, duration));
+        travel.setRepeatCount(ValueAnimator.INFINITE);
+        travel.setRepeatMode(ValueAnimator.RESTART);
+        travel.setInterpolator(new LinearInterpolator());
+        travel.addUpdateListener(animation -> {
+            View anchorA = findAvatarForUser(userA);
+            View anchorB = findAvatarForUser(userB);
+            if (anchorA == null || anchorB == null
+                    || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
+                // Seats can temporarily detach during a move/layout pass. Keep the animation
+                // alive and reconnect it as soon as both current holders are attached again.
+                effectView.setVisibility(View.INVISIBLE);
+                return;
+            }
+            layer.getLocationInWindow(gridLoc);
+            anchorA.getLocationInWindow(aLoc);
+            anchorB.getLocationInWindow(bLoc);
+            float fromX = aLoc[0] - gridLoc[0] + anchorA.getWidth() / 2f;
+            float fromY = aLoc[1] - gridLoc[1] + anchorA.getHeight() / 2f;
+            float toX = bLoc[0] - gridLoc[0] + anchorB.getWidth() / 2f;
+            float toY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
+
+            // Keep the entire effect inside the RecyclerView's own canvas. It cannot drift into
+            // the status bar, bottom controls, or outside the room's seat grid.
+            fromX = clamp(fromX, 0f, layer.getWidth());
+            toX = clamp(toX, 0f, layer.getWidth());
+            fromY = clamp(fromY, 0f, layer.getHeight());
+            toY = clamp(toY, 0f, layer.getHeight());
+            float dx = toX - fromX;
+            float dy = toY - fromY;
+            float distance = (float) Math.hypot(dx, dy);
+            if (distance < dp(8)) {
+                effectView.setVisibility(View.INVISIBLE);
+                return;
+            }
+            effectView.setVisibility(View.VISIBLE);
+            float angle = (float) Math.toDegrees(Math.atan2(dy, dx));
+            float progress = (Float) animation.getAnimatedValue();
+            if (hasRibbon) {
+                // One continuous, dashboard-configured animated ribbon bridges the two avatars.
+                ViewGroup.LayoutParams params = effectView.getLayoutParams();
+                int wantedWidth = Math.max(1, Math.round(distance));
+                if (params.width != wantedWidth || params.height != thickness) {
+                    params.width = wantedWidth;
+                    params.height = thickness;
+                    effectView.setLayoutParams(params);
+                }
+                effectView.setPivotX(wantedWidth / 2f);
+                effectView.setPivotY(thickness / 2f);
+                effectView.setRotation(angle);
+                effectView.setX((fromX + toX) / 2f - wantedWidth / 2f);
+                effectView.setY((fromY + toY) / 2f - thickness / 2f);
+                // Subtle pulse keeps the ribbon visibly alive without shifting its endpoints.
+                float pulse = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI * 2f);
+                effectView.setAlpha(pulse);
+            } else {
+                // Fallback if no dashboard asset is configured: smoothly travel along the link.
+                float x = fromX + dx * progress - thickness / 2f;
+                float y = fromY + dy * progress - thickness / 2f;
+                effectView.setX(clamp(x, 0f, Math.max(0f, layer.getWidth() - thickness)));
+                effectView.setY(clamp(y, 0f, Math.max(0f, layer.getHeight() - thickness)));
+                effectView.setRotation(angle);
+                float pulse = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
+                effectView.setScaleX(pulse);
+                effectView.setScaleY(pulse);
+            }
+        });
+        running.add(travel);
+        travel.start();
+    }
+
+    @Nullable
+    private View findAvatarForUser(@NonNull String userId) {
+        String wanted = normalize(userId);
+        if (wanted.isEmpty()) return null;
+        for (int i = 0; i < seatsRecycler.getChildCount(); i++) {
+            View child = seatsRecycler.getChildAt(i);
+            RecyclerView.ViewHolder holder = seatsRecycler.getChildViewHolder(child);
+            if (holder instanceof SeatAdapter.VH) {
+                SeatAdapter.VH seatHolder = (SeatAdapter.VH) holder;
+                if (wanted.equals(normalize(seatHolder.boundUserId))) {
+                    View avatar = child.findViewById(R.id.imgAvatar);
+                    if (avatar != null && avatar.getVisibility() == View.VISIBLE) return avatar;
+                }
+            }
+        }
+        return null;
     }
 
     private static float clamp(float value, float min, float max) {
