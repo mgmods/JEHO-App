@@ -282,23 +282,18 @@ async function managePlatformModerators(r) {
     toast().danger('إدارة مشرفي المنصة متاحة للرومات الرسمية فقط')
     return
   }
-  const raw = await askPrompt({
-    title: 'إدارة مشرفي روم المنصة',
-    message: 'أدخل قائمة ID الحسابات العامة للمشرفين مفصولة بفواصل. هذه القائمة ستستبدل المشرفين الحاليين، ويجب إبقاء مشرف واحد على الأقل.',
-    placeholder: 'مثال: 123456, 234567',
+  const publicId = await askPrompt({
+    title: 'إضافة مشرف لروم المنصة',
+    message: 'أدخل الـ ID العام للحساب. ستتم إضافته كمشرف دون حذف المشرفين الحاليين.',
+    placeholder: 'ID المستخدم',
   })
-  if (raw == null) return
-  const moderatorIds = parsePublicIds(raw)
-  if (!moderatorIds.length) {
-    toast().danger('يجب إدخال ID مشرف واحد على الأقل')
-    return
-  }
-  const { error: err } = await roomsApi.setPlatformModerators(r.id, moderatorIds)
+  if (publicId == null || !String(publicId).trim()) return
+  const { data, error: err } = await roomsApi.addPlatformModerator(r.id, String(publicId).trim())
   if (err) {
     error.value = err.message
     toast().danger(err.message)
   } else {
-    toast().success('تم تحديث مشرفي روم المنصة')
+    toast().success(data?.alreadyModerator ? 'هذا المستخدم مشرف بالفعل' : 'تمت إضافة المشرف بنجاح')
     await load()
   }
 }
