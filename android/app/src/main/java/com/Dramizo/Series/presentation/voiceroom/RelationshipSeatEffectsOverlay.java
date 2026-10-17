@@ -132,8 +132,8 @@ final class RelationshipSeatEffectsOverlay {
             // Accept the API's canonical pair fields and common serialized aliases.
             // Older CP payloads used user1/user2 or nested user objects; treating those as
             // missing IDs silently removed every room ribbon after the recent renderer change.
-            String a = firstValue(relation, "userAId", "user1Id", "fromUserId", "requesterId", "userA", "user1", "fromUser");
-            String b = firstValue(relation, "userBId", "user2Id", "toUserId", "targetId", "userB", "user2", "toUser");
+            String a = normalize(firstValue(relation, "userAId", "user1Id", "fromUserId", "requesterId", "userA", "user1", "fromUser"));
+            String b = normalize(firstValue(relation, "userBId", "user2Id", "toUserId", "targetId", "userB", "user2", "toUser"));
             Integer indexA = positions.get(a);
             Integer indexB = positions.get(b);
             if (indexA == null || indexB == null || a.equals(b)) continue;
@@ -250,20 +250,9 @@ final class RelationshipSeatEffectsOverlay {
             float centerBY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
             float centerDx = centerBX - centerAX;
             float centerDy = centerBY - centerAY;
-            // Only show the CP ribbon for people visibly sitting side-by-side. This uses live
-            // avatar geometry rather than seat indexes, so row wraps and recycled holders cannot
-            // accidentally connect users from different rows.
-            float horizontalGap = Math.abs(centerDx);
-            float verticalGap = Math.abs(centerDy);
-            float avatarWidth = Math.max(anchorA.getWidth(), anchorB.getWidth());
-            float avatarHeight = Math.max(anchorA.getHeight(), anchorB.getHeight());
-            if (verticalGap > Math.max(dp(18), avatarHeight * 0.72f)
-                    || horizontalGap > Math.max(dp(72), avatarWidth * 2.8f)) {
-                effectView.setVisibility(View.INVISIBLE);
-                fallback.setVisibility(View.INVISIBLE);
-                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
-                return;
-            }
+            // A valid active CP pair should keep its effect visible whenever BOTH members
+            // occupy seats, including different rows/ends of the grid. The former proximity
+            // gate silently hid the animation for normal seat layouts and row-wrapped pairs.
             float centerDistance = (float) Math.hypot(centerDx, centerDy);
             if (centerDistance < dp(8)) {
                 effectView.setVisibility(View.INVISIBLE);
@@ -410,8 +399,21 @@ final class RelationshipSeatEffectsOverlay {
             if (holder instanceof SeatAdapter.VH) {
                 SeatAdapter.VH seatHolder = (SeatAdapter.VH) holder;
                 if (wanted.equals(normalize(seatHolder.boundUserId))) {
+                    // The avatar ImageView is intentionally GONE while an animated VIP/host
+                    // frame is rendered by HostSignalView. Anchor to the seat's fixed avatar
+                    // stack container instead, so CP motion does not disappear for framed users.
                     View avatar = child.findViewById(R.id.imgAvatar);
-                    if (avatar != null && avatar.getVisibility() == View.VISIBLE) return avatar;
+                    if (avatar != null && avatar.getParent() instanceof View) {
+                        View stack = (View) avatar.getParent();
+                        if (stack.getWidth() > 0 && stack.getHeight() > 0) return stack;
+                    }
+                    View liveWear = child.findViewById(R.id.seatHostSignal);
+                    if (liveWear != null && liveWear.getVisibility() == View.VISIBLE) return liveWear;
+                    View frame = child.findViewById(R.id.imgFrame);
+                    if (frame != null && frame.getVisibility() == View.VISIBLE) return frame;
+                    View badge = child.findViewById(R.id.imgHostBadge);
+                    if (badge != null && badge.getVisibility() == View.VISIBLE) return badge;
+                    if (avatar != null && avatar.getWidth() > 0 && avatar.getHeight() > 0) return avatar;
                 }
             }
         }
