@@ -767,17 +767,28 @@ public final class NativeRoomEffectsView extends FrameLayout {
                 });
                 return;
             }
-            // Gift path: plain MP4 (no vapc) → Exo fullscreen. Entry rides stay on AnimView.
-            if (giftMode && !localFileHasVapc(file)) {
+            // VAP entry packs need AnimView; ordinary uploaded MP4s do not contain
+            // the embedded vapc metadata and must use ExoPlayer instead. Previously
+            // only gifts had this fallback, so a normal purchased entry MP4 produced
+            // no video and no visual fallback on every room client.
+            if (!localFileHasVapc(file)) {
                 android.util.Log.i("NativeRoomEffects",
-                        "gift mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
+                        (giftMode ? "gift" : "entry")
+                                + " mp4 has no vapc — Exo fullscreen url=" + mediaUrl);
                 post(() -> {
-                    if (giftAnimView != anim) return;
+                    if (giftMode) {
+                        if (giftAnimView != anim) return;
+                        giftAnimView = null;
+                    } else {
+                        if (entryAnimView != anim) return;
+                        entryAnimView = null;
+                    }
                     try {
-                        removeView(anim);
+                        if (anim.getParent() instanceof ViewGroup) {
+                            ((ViewGroup) anim.getParent()).removeView(anim);
+                        }
                     } catch (Exception ignored) {
                     }
-                    giftAnimView = null;
                     View streamed = createGiftVideoStream(mediaUrl, null, null);
                     if (streamed != null) {
                         addView(streamed, new LayoutParams(
