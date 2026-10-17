@@ -190,44 +190,35 @@
                             android:scaleType="centerCrop"
                             android:visibility="gone" />
 
-                        <!-- Earned badges sit immediately beside the country flag. -->
+                        <TextView
+                            android:id="@+id/tvCountryChip"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:includeFontPadding="false"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp"
+                            android:visibility="gone" />
                         <LinearLayout
                             android:id="@+id/rowProfileBadges"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="5dp"
+                            android:layout_marginStart="7dp"
                             android:gravity="center_vertical"
                             android:orientation="horizontal"
                             android:foreground="?attr/selectableItemBackground"
                             android:clickable="true"
                             android:focusable="true"
+                            android:visibility="gone"
                             android:contentDescription="عرض الشارات المكتسبة">
 
-                            <HorizontalScrollView
-                                android:layout_width="96dp"
-                                android:layout_height="24dp"
-                                android:fillViewport="false"
-                                android:overScrollMode="never"
-                                android:scrollbars="none">
-
-                                <LinearLayout
-                                    android:id="@+id/earnedBadgesContainer"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="match_parent"
-                                    android:gravity="center_vertical"
-                                    android:orientation="horizontal" />
-                            </HorizontalScrollView>
+                            <LinearLayout
+                                android:id="@+id/earnedBadgesContainer"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal" />
                         </LinearLayout>
-
-                        <TextView
-                            android:id="@+id/tvCountryChip"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="5dp"
-                            android:includeFontPadding="false"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="11sp"
-                            android:visibility="gone" />
                     </LinearLayout>
                 </LinearLayout>
 
