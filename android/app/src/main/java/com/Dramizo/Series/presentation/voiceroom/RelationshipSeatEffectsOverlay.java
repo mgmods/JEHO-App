@@ -101,14 +101,15 @@ final class RelationshipSeatEffectsOverlay {
 
     private void renderCurrent() {
         clearParticles();
-        if (seats == null || relationships == null || relationships.isEmpty()
-                || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
+        if (lastSeats == null || lastRelationships == null || lastRelationships.isEmpty()) return;
+        if (layer.getWidth() <= 0 || layer.getHeight() <= 0) {
+            retryIfNoParticles();
             return;
         }
 
         Map<String, Integer> positions = new HashMap<>();
-        for (int i = 0; i < seats.size(); i++) {
-            RoomDtos.SeatDto seat = seats.get(i);
+        for (int i = 0; i < lastSeats.size(); i++) {
+            RoomDtos.SeatDto seat = lastSeats.get(i);
             if (seat == null || seat.locked()) continue;
             String id = normalize(seat.userId);
             if (id.isEmpty() && seat.user != null) id = normalize(seat.user.id);
@@ -117,7 +118,7 @@ final class RelationshipSeatEffectsOverlay {
         if (positions.size() < 2) return;
 
         Set<String> drawn = new HashSet<>();
-        for (Map<String, Object> relation : relationships) {
+        for (Map<String, Object> relation : lastRelationships) {
             if (relation == null) continue;
             String a = normalize(relation.get("userAId"));
             String b = normalize(relation.get("userBId"));
@@ -144,6 +145,7 @@ final class RelationshipSeatEffectsOverlay {
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(avatarA, avatarB, type, url, sizeDp, duration);
         }
+        if (running.isEmpty()) retryIfNoParticles();
     }
 
     private void retryIfNoParticles() {
