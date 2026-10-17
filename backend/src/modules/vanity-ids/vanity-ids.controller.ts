@@ -58,7 +58,7 @@ export class VanityIdsController {
       where,
       order: { priceCoins: 'ASC', publicId: 'ASC' },
       take: 200,
-    })).filter((i) => /^\d{6}$/.test(i.publicId));
+    })).filter((i) => /^\d{3,12}$/.test(i.publicId));
     return {
       items: items.map((i) => ({
         ...i,
