@@ -324,6 +324,7 @@ export class VanityIdsController {
       if (body.priceCoins != null) {
         row.priceCoins = Math.max(0, Math.floor(Number(body.priceCoins)));
       }
+      Object.assign(row, this.parseStyle(body));
       if (body.status) {
         this.assertAdminStatus(body.status);
         row.status = body.status as VanityIdStatus;
