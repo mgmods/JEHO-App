@@ -197,7 +197,7 @@ public final class UserProfileCardSheet {
                                                 .alpha(1f).setDuration(480L).withEndAction(pulse[0]).start();
                                     }).start();
                         };
-                        pulse[0].run();
+                        tvCpRelationshipSymbol.post(pulse[0]);
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
                 });
