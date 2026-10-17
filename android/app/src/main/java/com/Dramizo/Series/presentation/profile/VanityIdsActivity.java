@@ -333,6 +333,7 @@ public class VanityIdsActivity extends ThemedActivity {
             int days = item.leaseDays > 0 ? item.leaseDays : 30;
 
             h.tvPublicId.setText(pid);
+            com.Dramizo.Series.util.VanityIdStyle.bind(h.tvPublicId, c.getVanityApi(), pid, 0);
             h.tvTier.setText(tierLabel(pid));
             if (h.tvMineBadge != null) {
                 h.tvMineBadge.setVisibility(renew ? View.VISIBLE : View.GONE);
