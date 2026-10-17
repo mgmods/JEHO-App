@@ -748,8 +748,8 @@ public class ProfileActivity extends ThemedActivity {
     private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
         if (imageView == null) return;
         if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
-            imageView.setImageResource(R.drawable.ic_default_avatar);
-            imageView.setVisibility(View.VISIBLE);
+            imageView.setImageDrawable(null);
+            imageView.setVisibility(View.GONE);
             return;
         }
         imageView.setVisibility(View.VISIBLE);
