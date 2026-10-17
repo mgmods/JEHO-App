@@ -560,12 +560,8 @@ export class CosmeticsService implements OnModuleInit {
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
     });
 
-    // Auto-equip after purchase/claim so the user wears it immediately.
-    try {
-      await this.equip(userId, cosmeticId, { skipRequirements: true });
-    } catch {
-      /* ownership is enough; equip may fail on rare races */
-    }
+    // Buying only adds the item to the bag. Wearing is a separate explicit action.
+    // This keeps the mall button sequence deterministic: buy → wear → remove.
     return result;
   }
 
