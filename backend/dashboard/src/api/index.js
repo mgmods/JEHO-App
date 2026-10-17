@@ -64,6 +64,8 @@ export const usersApi = {
 export const roomsApi = {
   list: (params) => safeRequest(() => api.get('/admin/rooms', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/rooms/${id}`)),
+  createPlatformManaged: (data) => safeRequest(() => api.post('/admin/rooms/platform-managed', data)),
+  setPlatformModerator: (id, data) => safeRequest(() => api.post(`/admin/rooms/${id}/platform-moderators`, data)),
   update: (id, data) => safeRequest(() => api.patch(`/admin/rooms/${id}`, data)),
   setCustomerService: (id, enabled) =>
     safeRequest(() =>
