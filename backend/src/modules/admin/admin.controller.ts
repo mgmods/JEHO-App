@@ -492,6 +492,7 @@ export class AdminController {
       title?: string;
       description?: string;
       coverUrl?: string;
+      category?: string;
       seatCount?: number;
       moderatorIds?: string[];
     },
