@@ -250,21 +250,13 @@ public class ProfileFragment extends Fragment {
                     binding.tvLevelChip, user.levelBadgeUrl, 14);
             binding.tvAgeChip.setText(String.valueOf(ageFrom(user.birthday)));
 
-            CountryCatalog.Entry countryEntry = CountryCatalog.resolve(user.country);
+            // Profile shows the country flag only; do not render the country name.
             if (binding.imgCountryFlag != null) {
-                FlagImages.bind(binding.imgCountryFlag, user.country);
+                boolean hasCountry = user.country != null && !user.country.trim().isEmpty();
+                binding.imgCountryFlag.setVisibility(hasCountry ? View.VISIBLE : View.GONE);
+                if (hasCountry) FlagImages.bind(binding.imgCountryFlag, user.country);
             }
-            if (binding.tvCountryChip != null) {
-                if (countryEntry != null && countryEntry.nameAr != null && !countryEntry.nameAr.isEmpty()) {
-                    binding.tvCountryChip.setVisibility(View.VISIBLE);
-                    binding.tvCountryChip.setText(countryEntry.nameAr);
-                } else if (user.country != null && !user.country.isEmpty()) {
-                    binding.tvCountryChip.setVisibility(View.VISIBLE);
-                    binding.tvCountryChip.setText(user.country);
-                } else {
-                    binding.tvCountryChip.setVisibility(View.GONE);
-                }
-            }
+            if (binding.tvCountryChip != null) binding.tvCountryChip.setVisibility(View.GONE);
 
             int vip = Math.max(0, user.vipLevel);
             long wealth = user.wealthLevel > 0 ? user.wealthLevel
@@ -285,13 +277,21 @@ public class ProfileFragment extends Fragment {
             if (binding.tvDiamondChip != null) {
                 binding.tvDiamondChip.setVisibility(View.GONE);
             }
-            if (vip > 0) {
-                binding.tvVipChip.setVisibility(View.VISIBLE);
-                binding.tvVipChip.setBackgroundResource(R.drawable.bg_chip_vip);
-                binding.tvVipChip.setTextColor(0xFFFFFFFF);
-                binding.tvVipChip.setText("VIP" + vip);
-            } else {
-                binding.tvVipChip.setVisibility(View.GONE);
+            // Use the real VIP head emblem asset, not a text-only "VIP" chip.
+            if (binding.tvVipChip != null) binding.tvVipChip.setVisibility(View.GONE);
+            if (binding.imgVipBadge != null) {
+                String vipEmblem = user.vipHeadUrl;
+                if (vip > 0 && vipEmblem != null && !vipEmblem.trim().isEmpty()) {
+                    binding.imgVipBadge.setVisibility(View.VISIBLE);
+                    Glide.with(ProfileFragment.this)
+                            .load(AssetCatalog.absoluteUrl(vipEmblem))
+                            .placeholder(R.drawable.ic_medal_default)
+                            .error(R.drawable.ic_medal_default)
+                            .into(binding.imgVipBadge);
+                } else {
+                    binding.imgVipBadge.setVisibility(View.GONE);
+                    binding.imgVipBadge.setImageDrawable(null);
+                }
             }
             AppLoadingOverlay.hide(requireActivity());
         });
@@ -516,10 +516,10 @@ public class ProfileFragment extends Fragment {
                 }
                 for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
                     android.widget.ImageView icon = new android.widget.ImageView(requireContext());
-                    int size = (int) (19 * getResources().getDisplayMetrics().density + 0.5f);
+                    int size = (int) (27 * getResources().getDisplayMetrics().density + 0.5f);
                     android.widget.LinearLayout.LayoutParams lp =
                             new android.widget.LinearLayout.LayoutParams(size, size);
-                    lp.setMargins(0, 0, (int) (4 * getResources().getDisplayMetrics().density + 0.5f), 0);
+                    lp.setMargins(0, 0, (int) (6 * getResources().getDisplayMetrics().density + 0.5f), 0);
                     icon.setLayoutParams(lp);
                     icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
                     icon.setContentDescription(badge.name == null ? "شارة مكتسبة" : badge.name);
@@ -680,7 +680,7 @@ public class ProfileFragment extends Fragment {
                 String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type"));
                 Object avatarValue = partner.get("avatarUrl");
                 String partnerAvatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
-                binding.tvMyProfileCpLabel.setText(partnerName);
+                binding.tvMyProfileCpLabel.setText("مرتبط بـ " + partnerName);
                 if (binding.tvMyProfileCpType != null) {
                     binding.tvMyProfileCpType.setText(myCpTypeLabel(type));
                 }
