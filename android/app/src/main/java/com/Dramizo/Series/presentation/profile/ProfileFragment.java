@@ -503,8 +503,9 @@ public class ProfileFragment extends Fragment {
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
+                        // Show every earned badge, regardless of whether it came from
+                        // tasks, a gift, or an administrator grant. The strip scrolls horizontally.
                         if (badge != null && badge.earned) earned.add(badge);
-                        if (earned.size() >= 3) break;
                     }
                 }
             } catch (Exception ignored) {
@@ -516,7 +517,7 @@ public class ProfileFragment extends Fragment {
                 binding.earnedBadgesContainer.removeAllViews();
                 for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
                     android.widget.ImageView icon = new android.widget.ImageView(requireContext());
-                    int size = (int) (24 * getResources().getDisplayMetrics().density + 0.5f);
+                    int size = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
                     android.widget.LinearLayout.LayoutParams lp =
                             new android.widget.LinearLayout.LayoutParams(size, size);
                     lp.setMargins(0, 0, (int) (4 * getResources().getDisplayMetrics().density + 0.5f), 0);

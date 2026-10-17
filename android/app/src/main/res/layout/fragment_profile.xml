@@ -190,45 +190,44 @@
                             android:scaleType="centerCrop"
                             android:visibility="gone" />
 
+                        <!-- Earned badges sit immediately beside the country flag. -->
+                        <LinearLayout
+                            android:id="@+id/rowProfileBadges"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="5dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:foreground="?attr/selectableItemBackground"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:contentDescription="عرض الشارات المكتسبة">
+
+                            <HorizontalScrollView
+                                android:layout_width="96dp"
+                                android:layout_height="24dp"
+                                android:fillViewport="false"
+                                android:overScrollMode="never"
+                                android:scrollbars="none">
+
+                                <LinearLayout
+                                    android:id="@+id/earnedBadgesContainer"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="match_parent"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal" />
+                            </HorizontalScrollView>
+                        </LinearLayout>
+
                         <TextView
                             android:id="@+id/tvCountryChip"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="4dp"
+                            android:layout_marginStart="5dp"
                             android:includeFontPadding="false"
                             android:textColor="@color/text_secondary"
                             android:textSize="11sp"
                             android:visibility="gone" />
-                    </LinearLayout>
-
-                    <!-- Official earned-badge strip beside the profile identity/country. -->
-                    <LinearLayout
-                        android:id="@+id/rowProfileBadges"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:foreground="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:contentDescription="عرض الشارات المكتسبة">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="الشارات"
-                            android:textColor="#FFE7C46A"
-                            android:textSize="11sp"
-                            android:textStyle="bold" />
-
-                        <LinearLayout
-                            android:id="@+id/earnedBadgesContainer"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="6dp"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal" />
                     </LinearLayout>
                 </LinearLayout>
 
