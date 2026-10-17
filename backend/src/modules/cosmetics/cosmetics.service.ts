@@ -510,9 +510,17 @@ export class CosmeticsService implements OnModuleInit {
       const active =
         !!owned &&
         (owned.expiresAt == null || owned.expiresAt.getTime() > now.getTime());
-      // Renew at half price only while the lease is still active.
-      const renew = active;
-      const price = this.chargePrice(fullPrice, renew);
+      // A valid lease is a one-time purchase: do not charge or extend it again
+      // until it expires. Permanent ownership can never be repurchased.
+      if (active) {
+        throw new BadRequestException(
+          owned!.expiresAt
+            ? `هذا العنصر موجود عندك بالفعل، ولا يمكن تجديده قبل انتهاء المدة في ${owned!.expiresAt.toLocaleDateString('ar')}`
+            : 'هذا العنصر مملوك لك بشكل دائم بالفعل',
+        );
+      }
+      const renew = false;
+      const price = fullPrice;
 
       if (price > 0) {
         if (!wallet || wallet.coins < price) {
@@ -545,12 +553,8 @@ export class CosmeticsService implements OnModuleInit {
           expiresAt: new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000),
         });
       } else {
-        const base =
-          renew && owned.expiresAt && owned.expiresAt.getTime() > now.getTime()
-            ? owned.expiresAt.getTime()
-            : now.getTime();
-        // Always timed mall lease (max 30 days per purchase/renew).
-        owned.expiresAt = new Date(base + leaseDays * 24 * 60 * 60 * 1000);
+        // An expired lease starts a fresh term from now; never stack days.
+        owned.expiresAt = new Date(now.getTime() + leaseDays * 24 * 60 * 60 * 1000);
       }
       owned = await manager.save(UserCosmetic, owned);
       return { owned, renew, price, fullPrice, leaseDays, expiresAt: owned.expiresAt };
