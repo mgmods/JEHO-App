@@ -345,9 +345,8 @@ public final class RoomRtcEngine {
         if (!isLiveKit()) ZegoEngineManager.getInstance().seekLocalMusic(positionMs);
     }
 
-    /** Music-only output gain; deliberately does not touch mic or room voice gain. */
-    public void setLocalMusicVolume(float volume) {
-        if (!isLiveKit()) ZegoEngineManager.getInstance().setLocalMusicVolume(volume);
+    public void setMusicMixVolume(int volume) {
+        if (!isLiveKit()) ZegoEngineManager.getInstance().setMusicMixVolume(volume);
     }
 
     public void boostMusicMixVolume() {
