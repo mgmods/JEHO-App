@@ -301,6 +301,8 @@ public final class UserProfileCardSheet {
                     if (!pid.isEmpty()) {
                         tvUserId.setVisibility(View.VISIBLE);
                         tvUserId.setText("ID:" + pid);
+                        com.Dramizo.Series.util.VanityIdStyle.bind(tvUserId,
+                                container.getVanityApi(), pid, u.vipLevel);
                         if (btnCopyId != null) btnCopyId.setVisibility(View.VISIBLE);
                     } else {
                         tvUserId.setVisibility(View.GONE);
