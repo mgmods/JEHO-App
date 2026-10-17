@@ -141,8 +141,12 @@ public class VoiceRoomViewModel extends ViewModel {
     }
 
     public void inviteSeat(String roomId, String userId) {
+        inviteSeat(roomId, userId, null);
+    }
+
+    public void inviteSeat(String roomId, String userId, Integer seatIndex) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getRoomRepository().inviteSeat(roomId, userId, null);
+            Result<Object> r = c.getRoomRepository().inviteSeat(roomId, userId, seatIndex);
             if (r.success) info.postValue("تم إرسال دعوة المايك");
             else error.postValue(r.error != null ? r.error : "تعذر إرسال الدعوة");
         });
