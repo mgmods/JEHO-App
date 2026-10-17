@@ -24,7 +24,9 @@ import retrofit2.Response;
 /** One shared ID-label renderer: dashboard style for owned special IDs, animated VIP treatment otherwise. */
 public final class VanityIdStyle {
     private static final Map<String, VanityDtos.Style> CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Long> CACHE_AT = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> LOADING = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 30_000L;
     private VanityIdStyle() {}
 
     public static void bind(@Nullable TextView view, @Nullable VanityApi api,
@@ -38,11 +40,17 @@ public final class VanityIdStyle {
         final String id = publicId.trim();
         view.setTag(R.id.tag_vanity_id_style_key, id);
         VanityDtos.Style cached = CACHE.get(id);
-        if (cached != null) {
+        Long cachedAt = CACHE_AT.get(id);
+        if (cached != null && cachedAt != null
+                && System.currentTimeMillis() - cachedAt < CACHE_TTL_MS) {
             if ("none".equals(cached.styleMode)) clear(view);
             else if ("vip".equals(cached.styleMode)) apply(view, id, vipColors(cached.styleVipLevel), false, cached.styleGlow);
             else apply(view, id, colors(cached), "animated".equals(cached.styleMode), cached.styleGlow);
             return;
+        }
+        if (cached != null) {
+            CACHE.remove(id);
+            CACHE_AT.remove(id);
         }
         if (api == null || !id.matches("\\d{3,16}")) return;
         if (LOADING.putIfAbsent(id, Boolean.TRUE) != null) return;
@@ -53,6 +61,7 @@ public final class VanityIdStyle {
                 if (!response.isSuccessful() || body == null || body.data == null) return;
                 VanityDtos.Style style = body.data;
                 CACHE.put(id, style);
+                CACHE_AT.put(id, System.currentTimeMillis());
                 Object current = view.getTag(R.id.tag_vanity_id_style_key);
                 if (!id.equals(current)) return;
                 if ("none".equals(style.styleMode)) clear(view);
