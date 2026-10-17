@@ -821,11 +821,24 @@ public final class NativeRoomEffectsView extends FrameLayout {
         new Thread(() -> {
             File file = cacheEntryMp4(mediaUrl);
             if (file == null || !file.exists() || file.length() <= 8_192) {
-                android.util.Log.w("NativeRoomEffects", "vap cache miss: " + mediaUrl);
+                android.util.Log.w("NativeRoomEffects", "vap cache miss; try streamed video: " + mediaUrl);
                 post(() -> {
-                    if (giftMode) {
-                        if (giftAnimView == anim) finishActive();
-                    } else if (entryAnimView == anim) {
+                    AnimView current = giftMode ? giftAnimView : entryAnimView;
+                    if (current != anim) return;
+                    if (giftMode) giftAnimView = null;
+                    else entryAnimView = null;
+                    try {
+                        if (anim.getParent() instanceof ViewGroup) {
+                            ((ViewGroup) anim.getParent()).removeView(anim);
+                        }
+                    } catch (Exception ignored) {}
+                    View streamed = createGiftVideoStream(mediaUrl, null, null);
+                    if (streamed != null) {
+                        addView(streamed, new LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                Gravity.CENTER));
+                    } else {
                         finishActive();
                     }
                 });
