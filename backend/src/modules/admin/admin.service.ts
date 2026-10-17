@@ -1219,7 +1219,7 @@ export class AdminService {
       this.roomSeatsRepo.create({
         roomId: room.id,
         seatIndex,
-        userId: null,
+        userId: seatIndex === 0 ? host.id : null,
         status: seatIndex === 0 ? 'occupied' as any : 'empty' as any,
         isHostSeat: seatIndex === 0,
       }),
