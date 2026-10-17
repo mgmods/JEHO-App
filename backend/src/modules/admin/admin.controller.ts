@@ -502,6 +502,17 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Add a moderator to an official platform room by public user ID' })
+  addPlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { publicId?: string },
+  ) {
+    return this.adminService.addPlatformRoomModerator(id, body?.publicId || '');
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Patch('rooms/:id/platform-moderators')
   @ApiOperation({ summary: 'Replace official platform room moderators by public user ID' })
   setPlatformRoomModerators(
