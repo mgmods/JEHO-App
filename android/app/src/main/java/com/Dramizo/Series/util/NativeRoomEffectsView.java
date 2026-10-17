@@ -693,7 +693,71 @@ public final class NativeRoomEffectsView extends FrameLayout {
      */
     @Nullable
     private View createEntryRideVisual(String url, int width, int height) {
-        return createVapAnimVisual(url, /* forGift */ false);
+        String abs = AssetCatalog.absoluteUrl(url);
+        if (abs == null || abs.isEmpty()) return null;
+        CosmeticMedia.Kind kind = CosmeticMedia.kind(abs);
+        if (kind == CosmeticMedia.Kind.IMAGE) {
+            ImageView image = new ImageView(getContext());
+            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            image.setBackgroundColor(Color.TRANSPARENT);
+            try {
+                Glide.with(getContext().getApplicationContext()).load(abs).fitCenter().into(image);
+                image.setLayoutParams(new LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER));
+                return image;
+            } catch (Exception e) {
+                android.util.Log.w("NativeRoomEffects", "entry preview image failed: " + abs, e);
+                return null;
+            }
+        }
+        if (kind == CosmeticMedia.Kind.SVGA) {
+            try {
+                final com.opensource.svgaplayer.SVGAImageView svga =
+                        new com.opensource.svgaplayer.SVGAImageView(getContext());
+                svga.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                svga.setClearsAfterStop(true);
+                svga.setLoops(1);
+                svga.setLayoutParams(new LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        Gravity.CENTER));
+                final int token = generation;
+                com.opensource.svgaplayer.SVGAParser parser =
+                        new com.opensource.svgaplayer.SVGAParser(getContext());
+                parser.decodeFromURL(new URL(abs), new com.opensource.svgaplayer.SVGAParser.ParseCompletion() {
+                    @Override public void onComplete(
+                            @androidx.annotation.NonNull com.opensource.svgaplayer.SVGAVideoEntity item) {
+                        post(() -> {
+                            if (token != generation || svga.getParent() == null) return;
+                            svga.setVideoItem(item);
+                            try {
+                                svga.setCallback(new com.opensource.svgaplayer.SVGACallback() {
+                                    @Override public void onPause() {}
+                                    @Override public void onFinished() { post(() -> {
+                                        if (token == generation) finishActive();
+                                    }); }
+                                    @Override public void onRepeat() {}
+                                    @Override public void onStep(int frame, double percentage) {}
+                                });
+                            } catch (Exception ignored) {}
+                            svga.startAnimation();
+                        });
+                    }
+                    @Override public void onError() {
+                        android.util.Log.w("NativeRoomEffects", "entry SVGA parse failed: " + abs);
+                        post(() -> { if (token == generation) finishActive(); });
+                    }
+                }, null);
+                return svga;
+            } catch (Exception e) {
+                android.util.Log.w("NativeRoomEffects", "entry SVGA setup failed: " + abs, e);
+                return null;
+            }
+        }
+        // VAP packs use AnimView; ordinary MP4 falls back to ExoPlayer below.
+        return createVapAnimVisual(abs, /* forGift */ false);
     }
 
     /**
@@ -757,11 +821,24 @@ public final class NativeRoomEffectsView extends FrameLayout {
         new Thread(() -> {
             File file = cacheEntryMp4(mediaUrl);
             if (file == null || !file.exists() || file.length() <= 8_192) {
-                android.util.Log.w("NativeRoomEffects", "vap cache miss: " + mediaUrl);
+                android.util.Log.w("NativeRoomEffects", "vap cache miss; try streamed video: " + mediaUrl);
                 post(() -> {
-                    if (giftMode) {
-                        if (giftAnimView == anim) finishActive();
-                    } else if (entryAnimView == anim) {
+                    AnimView current = giftMode ? giftAnimView : entryAnimView;
+                    if (current != anim) return;
+                    if (giftMode) giftAnimView = null;
+                    else entryAnimView = null;
+                    try {
+                        if (anim.getParent() instanceof ViewGroup) {
+                            ((ViewGroup) anim.getParent()).removeView(anim);
+                        }
+                    } catch (Exception ignored) {}
+                    View streamed = createGiftVideoStream(mediaUrl, null, null);
+                    if (streamed != null) {
+                        addView(streamed, new LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                Gravity.CENTER));
+                    } else {
                         finishActive();
                     }
                 });
