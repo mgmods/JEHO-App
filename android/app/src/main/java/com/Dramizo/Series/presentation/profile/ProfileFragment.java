@@ -189,7 +189,7 @@ public class ProfileFragment extends Fragment {
             if (user == null) return;
             myId = user.id;
             loadProfileBadges(user.id);
-            bindMyCpRelationship(user.id);
+            bindMyCpRelationship(user.id, user.avatarUrl);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
             bindGenderIcon(user);
@@ -649,7 +649,7 @@ public class ProfileFragment extends Fragment {
         });
     }
 
-    private void bindMyCpRelationship(String userId) {
+    private void bindMyCpRelationship(String userId, String selfAvatarUrl) {
         if (userId == null || userId.trim().isEmpty() || binding == null) {
             hideMyCpRelationship();
             return;
@@ -693,6 +693,7 @@ public class ProfileFragment extends Fragment {
                     binding.imgMyProfileCpHeart.setText(myCpTypeSymbol(type));
                     binding.imgMyProfileCpHeart.setContentDescription(myCpTypeLabel(type));
                 }
+                bindMyCpAvatar(binding.imgMyProfileCpSelf, selfAvatarUrl);
                 bindMyCpAvatar(binding.imgMyProfileCpPartner, partnerAvatar);
                 binding.rowMyProfileCp.setVisibility(View.VISIBLE);
                 startMyCpHeartAnimation();
