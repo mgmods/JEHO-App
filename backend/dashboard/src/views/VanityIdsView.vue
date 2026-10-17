@@ -39,7 +39,7 @@
         </div>
         <div class="col-md-3">
           <label class="form-label">نمط العرض</label>
-          <select v-model="form.styleMode" class="form-select"><option value="static">ألوان ثابتة</option><option value="animated">ألوان متحركة</option></select>
+          <select v-model="form.styleMode" class="form-select"><option value="none">بدون لون (اللون الرسمي)</option><option value="static">لون ثابت</option><option value="animated">ألوان متحركة</option><option value="vip">نمط VIP</option></select>
         </div>
         <div class="col-md-2"><label class="form-label">اللون الأول</label><input v-model="form.styleColor1" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><label class="form-label">اللون الثاني</label><input v-model="form.styleColor2" type="color" class="form-control form-control-color w-100" /></div>
@@ -89,7 +89,7 @@
           </div>
           <div class="vanity-style-editor mb-3">
             <div class="row g-2">
-              <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="static">ثابت</option><option value="animated">متحرك</option></select></div>
+              <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="none">رسمي بدون لون</option><option value="static">ثابت</option><option value="animated">متحرك</option><option value="vip">VIP</option></select></div>
               <div class="col-6 d-flex align-items-end"><label class="form-check mb-2"><input v-model="item._styleGlow" class="form-check-input" type="checkbox" /><span class="form-check-label small">توهّج</span></label></div>
               <div class="col-4"><input v-model="item._styleColor1" type="color" class="form-control form-control-color w-100" aria-label="اللون الأول" /></div>
               <div class="col-4"><input v-model="item._styleColor2" type="color" class="form-control form-control-color w-100" aria-label="اللون الثاني" /></div>
@@ -169,7 +169,7 @@ const busyId = ref('')
 const error = ref('')
 const ok = ref('')
 const filterStatus = ref('')
-const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true })
+const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleVipLevel: 1, styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true })
 
 const confirmOpen = ref(false)
 const confirmTitle = ref('')
@@ -226,7 +226,8 @@ function withPriceEdit(list) {
   return (list || []).map((i) => ({
     ...i,
     _priceEdit: Number(i.priceCoins) || 0,
-    _styleMode: i.styleMode === 'animated' ? 'animated' : 'static',
+    _styleMode: ['none', 'static', 'animated', 'vip'].includes(i.styleMode) ? i.styleMode : 'static',
+    _styleVipLevel: Number(i.styleVipLevel) >= 1 && Number(i.styleVipLevel) <= 7 ? Number(i.styleVipLevel) : 1,
     _styleColor1: /^#[0-9a-fA-F]{6}$/.test(i.styleColor1 || '') ? i.styleColor1 : '#52E8FF',
     _styleColor2: /^#[0-9a-fA-F]{6}$/.test(i.styleColor2 || '') ? i.styleColor2 : '#C084FC',
     _styleColor3: /^#[0-9a-fA-F]{6}$/.test(i.styleColor3 || '') ? i.styleColor3 : '#FF7AC8',
@@ -263,6 +264,7 @@ async function create() {
       publicId: id,
       priceCoins: form.priceCoins,
       styleMode: form.styleMode,
+      styleVipLevel: form.styleVipLevel,
       styleColor1: form.styleColor1,
       styleColor2: form.styleColor2,
       styleColor3: form.styleColor3,
@@ -299,12 +301,14 @@ async function saveStyle(item) {
   try {
     await api.patch(`/vanity-ids/admin/${item.id}`, {
       styleMode: item._styleMode,
+      styleVipLevel: item._styleVipLevel,
       styleColor1: item._styleColor1,
       styleColor2: item._styleColor2,
       styleColor3: item._styleColor3,
       styleGlow: item._styleGlow,
     })
     item.styleMode = item._styleMode
+    item.styleVipLevel = item._styleVipLevel
     item.styleColor1 = item._styleColor1
     item.styleColor2 = item._styleColor2
     item.styleColor3 = item._styleColor3
