@@ -52,6 +52,7 @@ public final class StaffRoleHelper {
         String r = normalize(user);
         if (SUPER.equals(r)) return "Super Admin";
         if (MANAGER.equals(r)) return "Manager";
+        if (user != null && user.isRechargeAgent) return "وكيل شحن";
         return "";
     }
 
