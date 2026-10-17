@@ -80,7 +80,7 @@
           type="button"
           @click="$emit('managePlatformModerators', room)"
         >
-          إدارة المشرفين بالـ ID
+          إضافة مشرف بالـ ID
         </button>
         <button
           v-if="room.isLive"
