@@ -655,6 +655,9 @@ public class ProfileActivity extends ThemedActivity {
                     return;
                 }
                 binding.tvProfileCpLabel.setText(cpTypeLabel(type) + " · " + name);
+                if (binding.tvProfileCpHeart != null) {
+                    binding.tvProfileCpHeart.setText(cpRelationshipSymbol(type));
+                }
                 bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
                 bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
                 // Only render the frame URLs actually returned by the server; never synthesize cosmetics.
@@ -704,6 +707,18 @@ public class ProfileActivity extends ThemedActivity {
             cpHeartAnimator = null;
         }
         binding.rowProfileCp.setVisibility(View.GONE);
+    }
+
+    private String cpRelationshipSymbol(String type) {
+        if (type == null) return "💗";
+        switch (type.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "engagement": return "💍";
+            case "marriage": return "💞";
+            case "friendship": return "🤝";
+            case "brotherhood": return "💙";
+            case "love": return "💗";
+            default: return "✨";
+        }
     }
 
     private String cpTypeLabel(String type) {

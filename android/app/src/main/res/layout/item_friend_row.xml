@@ -20,8 +20,10 @@
         android:paddingVertical="10dp">
 
         <FrameLayout
+            android:id="@+id/avatarPairWrap"
             android:layout_width="66dp"
             android:layout_height="66dp"
+            android:layoutDirection="ltr"
             android:clipChildren="false"
             android:clipToPadding="false">
 
@@ -29,7 +31,7 @@
                 android:id="@+id/imgAvatar"
                 android:layout_width="55dp"
                 android:layout_height="55dp"
-                android:layout_gravity="center"
+                android:layout_gravity="start|center_vertical"
                 android:background="@drawable/bg_seat_avatar_clip"
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
@@ -37,11 +39,35 @@
 
             <ImageView
                 android:id="@+id/imgFrame"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
+                android:layout_width="66dp"
+                android:layout_height="66dp"
+                android:layout_gravity="start|center_vertical"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvCpRelationSymbol"
+                android:layout_width="24dp"
+                android:layout_height="32dp"
+                android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="54dp"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:text="💗"
+                android:textColor="#FFFF5277"
+                android:textSize="20sp"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/imgCpPartnerAvatar"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="2dp"
+                android:background="@drawable/bg_seat_avatar_clip"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
                 android:visibility="gone" />
         </FrameLayout>
 

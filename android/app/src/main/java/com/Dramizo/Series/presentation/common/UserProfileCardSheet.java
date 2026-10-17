@@ -125,7 +125,9 @@ public final class UserProfileCardSheet {
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
         View actCpRequest = sheet.findViewById(R.id.actCpRequest);
         View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPrimaryAvatar = sheet.findViewById(R.id.imgCpPrimaryAvatar);
         ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationshipSymbol = sheet.findViewById(R.id.tvCpRelationshipSymbol);
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
 
         final String[] publicIdHold = {""};
@@ -158,7 +160,7 @@ public final class UserProfileCardSheet {
             actCpRequest.setVisibility(uid.equals(myId) ? View.GONE : View.VISIBLE);
             actCpRequest.setOnClickListener(v -> showCpRequestDialog(activity, container, uid, dialog));
         }
-        if (!uid.equals(myId)) {
+        if (uid != null && !uid.trim().isEmpty()) {
             container.getIoExecutor().execute(() -> {
                 Result<List<Map<String, Object>>> cp = ApiCall.execute(container.getUserApi().cpProfileRelationships(uid));
                 if (!cp.success || cp.data == null || cp.data.isEmpty()) return;
@@ -173,8 +175,29 @@ public final class UserProfileCardSheet {
                     if (dialog.getWindow() == null || rowCpRelationship == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
+                    if (imgCpPrimaryAvatar != null && !avatarHold[0].trim().isEmpty()) {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(avatarHold[0]))
+                                .placeholder(R.drawable.ic_tab_me).into(imgCpPrimaryAvatar);
+                    }
                     if (imgCpPartnerAvatar != null && !partnerAvatar.isEmpty()) {
-                        Glide.with(activity).load(partnerAvatar).placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(partnerAvatar))
+                                .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    if (tvCpRelationshipSymbol != null) {
+                        tvCpRelationshipSymbol.setText(cpRelationshipSymbol(type));
+                        tvCpRelationshipSymbol.setScaleX(1f);
+                        tvCpRelationshipSymbol.setScaleY(1f);
+                        Runnable[] pulse = new Runnable[1];
+                        pulse[0] = () -> {
+                            if (!dialog.isShowing()) return;
+                            tvCpRelationshipSymbol.animate().scaleX(1.16f).scaleY(1.16f)
+                                    .alpha(0.82f).setDuration(480L).withEndAction(() -> {
+                                        if (!dialog.isShowing()) return;
+                                        tvCpRelationshipSymbol.animate().scaleX(1f).scaleY(1f)
+                                                .alpha(1f).setDuration(480L).withEndAction(pulse[0]).start();
+                                    }).start();
+                        };
+                        tvCpRelationshipSymbol.post(pulse[0]);
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
                 });
@@ -771,6 +794,18 @@ public final class UserProfileCardSheet {
             view.setTextColor(0xFF7CFFB2);
         } else {
             view.setVisibility(View.GONE);
+        }
+    }
+
+    private static String cpRelationshipSymbol(String type) {
+        if (type == null) return "💗";
+        switch (type.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "engagement": return "💍";
+            case "marriage": return "💞";
+            case "friendship": return "🤝";
+            case "brotherhood": return "💙";
+            case "love": return "💗";
+            default: return "✨";
         }
     }
 

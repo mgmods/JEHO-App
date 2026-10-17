@@ -128,14 +128,9 @@ final class RelationshipSeatEffectsOverlay {
             String key = a.compareTo(b) <= 0 ? a + ":" + b : b + ":" + a;
             if (!drawn.add(key)) continue;
 
-            RecyclerView.ViewHolder holderA = seatsRecycler.findViewHolderForAdapterPosition(indexA);
-            RecyclerView.ViewHolder holderB = seatsRecycler.findViewHolderForAdapterPosition(indexB);
-            if (holderA == null || holderB == null) continue;
-            View avatarA = holderA.itemView.findViewById(R.id.imgAvatar);
-            View avatarB = holderB.itemView.findViewById(R.id.imgAvatar);
-            if (avatarA == null || avatarB == null
-                    || avatarA.getVisibility() != View.VISIBLE
-                    || avatarB.getVisibility() != View.VISIBLE) continue;
+            View avatarA = findAvatar(a);
+            View avatarB = findAvatar(b);
+            if (avatarA == null || avatarB == null) continue;
 
             String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
             Map<String, Object> effect = lastEffects == null ? null : lastEffects.get(type);
@@ -143,7 +138,9 @@ final class RelationshipSeatEffectsOverlay {
             String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
             int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
-            addEffect(avatarA, avatarB, type, url, sizeDp, duration);
+            // Bind the animation to user IDs, not ViewHolder instances. RecyclerView reuses
+            // holders when members swap seats; the endpoints must follow the people, not the cells.
+            addEffect(a, b, avatarA, avatarB, type, url, sizeDp, duration);
         }
         if (running.isEmpty()) retryIfNoParticles();
     }
@@ -163,16 +160,34 @@ final class RelationshipSeatEffectsOverlay {
         });
     }
 
-    private void addEffect(@NonNull View anchorA, @NonNull View anchorB,
+    @Nullable
+    private View findAvatar(@NonNull String userId) {
+        if (lastSeats == null || userId.isEmpty()) return null;
+        for (int position = 0; position < lastSeats.size(); position++) {
+            RoomDtos.SeatDto seat = lastSeats.get(position);
+            if (seat == null || seat.locked()) continue;
+            String seatedId = normalize(seat.userId);
+            if (seatedId.isEmpty() && seat.user != null) seatedId = normalize(seat.user.id);
+            if (!userId.equals(seatedId)) continue;
+            RecyclerView.ViewHolder holder = seatsRecycler.findViewHolderForAdapterPosition(position);
+            if (holder == null) return null;
+            View avatar = holder.itemView.findViewById(R.id.imgAvatar);
+            return avatar != null && avatar.getVisibility() == View.VISIBLE ? avatar : null;
+        }
+        return null;
+    }
+
+    private void addEffect(@NonNull String userA, @NonNull String userB,
+                           @NonNull View initialA, @NonNull View initialB,
                            String type, String url, int sizeDp, long duration) {
         final int size = dp(Math.max(10, Math.min(36, sizeDp)));
         final int[] gridLoc = new int[2];
         final int[] aLoc = new int[2];
         final int[] bLoc = new int[2];
-        anchorA.getLocationInWindow(aLoc);
-        anchorB.getLocationInWindow(bLoc);
-        float dx = (bLoc[0] + anchorB.getWidth() / 2f) - (aLoc[0] + anchorA.getWidth() / 2f);
-        float dy = (bLoc[1] + anchorB.getHeight() / 2f) - (aLoc[1] + anchorA.getHeight() / 2f);
+        initialA.getLocationInWindow(aLoc);
+        initialB.getLocationInWindow(bLoc);
+        float dx = (bLoc[0] + initialB.getWidth() / 2f) - (aLoc[0] + initialA.getWidth() / 2f);
+        float dy = (bLoc[1] + initialB.getHeight() / 2f) - (aLoc[1] + initialA.getHeight() / 2f);
         float distanceDp = (float) Math.hypot(dx, dy)
                 / context.getResources().getDisplayMetrics().density;
         // Repeat the dashboard-uploaded animated image along the full path between seats.
@@ -211,9 +226,10 @@ final class RelationshipSeatEffectsOverlay {
             travel.setInterpolator(new LinearInterpolator());
             travel.setStartDelay((duration / particleCount) * i);
             travel.addUpdateListener(animation -> {
-                if (anchorA.getParent() == null || anchorB.getParent() == null
-                        || anchorA.getVisibility() != View.VISIBLE
-                        || anchorB.getVisibility() != View.VISIBLE
+                View anchorA = findAvatar(userA);
+                View anchorB = findAvatar(userB);
+                if (anchorA == null || anchorB == null
+                        || anchorA.getParent() == null || anchorB.getParent() == null
                         || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
                     effectView.setVisibility(View.INVISIBLE);
                     return;

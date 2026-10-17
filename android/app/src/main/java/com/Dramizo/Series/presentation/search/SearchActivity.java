@@ -294,7 +294,9 @@ public class SearchActivity extends ThemedActivity {
                 AvatarCosmetics.bindWear(h.b.imgAvatar, h.b.imgFrame, row.user);
                 FlagImages.bind(h.b.imgCountryFlag, row.user.country);
                 bindBadges(h, row.user);
+
             } else {
+                resetCpPair(h);
                 AvatarCosmetics.bindAvatar(h.b.imgAvatar, AssetCatalog.absoluteUrl(row.imageUrl));
                 AvatarCosmetics.applyFrame(h.b.imgFrame, null);
                 FlagImages.bind(h.b.imgCountryFlag, row.room != null && row.room.host != null
@@ -302,6 +304,29 @@ public class SearchActivity extends ThemedActivity {
                 hideBadges(h);
             }
             h.itemView.setOnClickListener(v -> openRow(row));
+        }
+
+        private void resetCpPair(VH h) {
+            if (h.b.imgCpPartnerAvatar != null) {
+                h.b.imgCpPartnerAvatar.setVisibility(View.GONE);
+                h.b.imgCpPartnerAvatar.setImageDrawable(null);
+            }
+            if (h.b.tvCpRelationSymbol != null) {
+                h.b.tvCpRelationSymbol.animate().cancel();
+                h.b.tvCpRelationSymbol.setVisibility(View.GONE);
+                h.b.tvCpRelationSymbol.setTag(null);
+                h.b.tvCpRelationSymbol.setScaleX(1f);
+                h.b.tvCpRelationSymbol.setScaleY(1f);
+                h.b.tvCpRelationSymbol.setAlpha(1f);
+            }
+            if (h.b.avatarPairWrap != null) {
+                ViewGroup.LayoutParams lp = h.b.avatarPairWrap.getLayoutParams();
+                int pairWidthPx = (int) (66f * h.itemView.getResources().getDisplayMetrics().density + 0.5f);
+                if (lp != null && lp.width != pairWidthPx) {
+                    lp.width = pairWidthPx;
+                    h.b.avatarPairWrap.setLayoutParams(lp);
+                }
+            }
         }
 
         private void bindBadges(VH h, AuthDtos.UserDto user) {
