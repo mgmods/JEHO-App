@@ -1730,8 +1730,25 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // cosmetics from the realtime/detail refresh after it is visible.
     if (options?.fast) {
       const { passwordHash: _passwordHash, ...safeRoom } = room as any;
+      // Keep the fast join path, but include each seated user's equipped avatar wear.
+      // Without this, the first room payload contains the face only and loses the frame
+      // until a later full room refresh (especially noticeable in agency rooms).
+      const fastUserIds: string[] = [];
+      if (room.hostId) fastUserIds.push(room.hostId);
+      for (const seat of room.seats || []) {
+        const uid = seat?.userId || seat?.user?.id;
+        if (uid) fastUserIds.push(uid);
+      }
+      const fastVipMap = await this.vipMapForUsers(fastUserIds);
+      const fastSeats = await Promise.all((room.seats || []).map(async (seat: any) => {
+        const uid = seat?.userId || seat?.user?.id;
+        return { ...seat, user: await this.attachFrame(seat.user, fastVipMap.get(uid) || 0) };
+      }));
+      const fastHost = await this.attachFrame(room.host, fastVipMap.get(room.hostId) || 0);
       return {
         ...safeRoom,
+        host: fastHost,
+        seats: fastSeats,
         seatCount: desiredSeatCount,
         roomLevel: this.computeRoomLevel(
           giftCoins.get(id) || 0,
