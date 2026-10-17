@@ -475,6 +475,44 @@ export class AdminController {
     return this.adminService.deleteUser(id, adminId);
   }
 
+  // ─── Official platform-managed rooms ───────────────────────
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/platform')
+  @ApiOperation({ summary: 'Create a pinned official platform room' })
+  createPlatformRoom(
+    @Body() body: { title?: string; description?: string; hostPublicId?: string; coverUrl?: string },
+  ) {
+    return this.adminService.createPlatformRoom(body);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('rooms/:id/platform-staff')
+  listPlatformRoomStaff(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.listPlatformRoomStaff(id);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/:id/platform-staff')
+  assignPlatformRoomStaff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { publicId?: string },
+  ) {
+    return this.adminService.assignPlatformRoomStaff(id, body?.publicId || '');
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Delete('rooms/:id/platform-staff/:publicId')
+  removePlatformRoomStaff(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('publicId') publicId: string,
+  ) {
+    return this.adminService.removePlatformRoomStaff(id, publicId);
+  }
+
   // ─── Rooms ─────────────────────────────────────────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
