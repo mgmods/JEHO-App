@@ -439,13 +439,19 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.tvStaffBadge == null) return;
-        if (!StaffRoleHelper.isStaff(user) && !user.isRechargeAgent) {
+        boolean rechargeAgent = user.isRechargeAgent;
+        boolean agencyOwner = user.agency != null
+                && "owner".equalsIgnoreCase(user.agency.role);
+        if (!StaffRoleHelper.isStaff(user) && !rechargeAgent && !agencyOwner) {
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
         String role = StaffRoleHelper.normalize(user);
+        String badgeLabel = StaffRoleHelper.isStaff(user)
+                ? StaffRoleHelper.badgeAr(user)
+                : (rechargeAgent ? "وكيل شحن" : "وكالة");
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
-        binding.tvStaffBadge.setText(StaffRoleHelper.badgeAr(user));
+        binding.tvStaffBadge.setText(badgeLabel);
         binding.tvStaffBadge.setBackgroundResource(
                 StaffRoleHelper.SUPER.equals(role)
                         ? R.drawable.bg_chip_staff_super
