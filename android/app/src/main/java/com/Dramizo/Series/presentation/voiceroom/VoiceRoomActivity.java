@@ -11371,7 +11371,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @SuppressLint("NewApi")
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
-        if ("chat:message".equals(event)) {
+        if ("room:music_volume".equals(event)) {
+            // The server broadcasts the room-wide value to every member. Apply it here,
+            // including on the music controller, so all local players and the host mix
+            // follow the same gain without changing microphone volume or ZEGO credentials.
+            float incomingVolume = sharedMusicVolume;
+            try {
+                if (payload.has("volume") && !payload.get("volume").isJsonNull()) {
+                    incomingVolume = payload.get("volume").getAsFloat();
+                }
+            } catch (RuntimeException ignored) {
+                // Ignore malformed volume events and keep the current gain.
+            }
+            sharedMusicVolume = Math.max(0f, Math.min(1f, incomingVolume));
+            applySharedMusicVolume();
+        } else if ("chat:message".equals(event)) {
             String name = memberStr(payload, "name");
             if (name == null) name = memberStr(payload, "displayName");
             if (name == null) name = fromUsername != null ? fromUsername : "مستخدم";
