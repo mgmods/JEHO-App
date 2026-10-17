@@ -3712,6 +3712,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             });
         }
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setOnClickListener(v -> adjustSharedMusicVolumeBy(-0.1f));
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setOnClickListener(v -> adjustSharedMusicVolumeBy(0.1f));
+        }
         handler.post(musicProgressRunnable);
     }
 
@@ -4007,6 +4013,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnMusicSkip.setEnabled(canManageMusic);
         binding.btnMusicStop.setEnabled(canManageMusic);
         binding.seekMusic.setEnabled(canManageMusic);
+        if (binding.btnMusicVolumeDown != null) binding.btnMusicVolumeDown.setEnabled(canManageMusic);
+        if (binding.btnMusicVolumeUp != null) binding.btnMusicVolumeUp.setEnabled(canManageMusic);
         updateMusicProgressUi();
         binding.btnMusicPlayPause.setImageResource(playing
                 ? android.R.drawable.ic_media_pause
@@ -4228,6 +4236,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
             });
         });
+    }
+
+    /** Host-authorized volume buttons update the shared room value for every listener. */
+    private void adjustSharedMusicVolumeBy(float delta) {
+        if (!canManageMusic || roomId == null || roomId.isEmpty()) {
+            Toast.makeText(this, "التحكم بمستوى الموسيقى للمضيف أو المشرف المخوّل", Toast.LENGTH_SHORT).show();
+            if (binding != null && binding.seekMusicVolume != null) {
+                binding.seekMusicVolume.setProgress(Math.round(sharedMusicVolume * 100f));
+            }
+            return;
+        }
+        sharedMusicVolume = Math.max(0f, Math.min(1f, sharedMusicVolume + delta));
+        applySharedMusicVolume();
+        JsonObject payload = new JsonObject();
+        payload.addProperty("volume", sharedMusicVolume);
+        boolean sent = RealtimeClient.getInstance().emitRoomEvent(roomId, "room:music_volume", payload);
+        if (!sent) {
+            Toast.makeText(this, "تعذر مزامنة مستوى الموسيقى مع الغرفة", Toast.LENGTH_SHORT).show();
+        }
     }
 
     /** Shared music gain; local room mute only affects this listener's playback. */

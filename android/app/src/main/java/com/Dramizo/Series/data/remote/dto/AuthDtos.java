@@ -166,6 +166,8 @@ public final class AuthDtos {
         @SerializedName("isNewMale") public boolean isNewMale;
         /** True when the authenticated viewer follows this user. */
         @SerializedName("isFollowing") public Boolean isFollowing;
+        /** Active recharge-agent role used for the public profile badge. */
+        @SerializedName("isRechargeAgent") public boolean isRechargeAgent;
         /** Active agency membership (if any) for room user-card. */
         @SerializedName("agency") public AgencySnip agency;
 

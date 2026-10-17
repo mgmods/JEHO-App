@@ -132,8 +132,10 @@ public class ProfileActivity extends ThemedActivity {
         }
 
         binding.btnFollow.setOnClickListener(v -> {
-            if (userId == null) return;
-            if (myId != null && userId.equals(myId)) {
+            // Use the loaded profile UUID rather than a possible public-ID/deep-link value.
+            String targetId = targetUserIdHold[0];
+            if (targetId == null || targetId.trim().isEmpty()) return;
+            if (myId != null && targetId.equals(myId)) {
                 Toast.makeText(this, "هذا حسابك", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -142,8 +144,8 @@ public class ProfileActivity extends ThemedActivity {
             container.getIoExecutor().execute(() -> {
                 Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
                         unfollow
-                                ? container.getUserApi().unfollow(userId)
-                                : container.getUserApi().follow(userId));
+                                ? container.getUserApi().unfollow(targetId)
+                                : container.getUserApi().follow(targetId));
                 runOnUiThread(() -> {
                     binding.btnFollow.setEnabled(true);
                     if (r.success) {
@@ -248,8 +250,11 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
 
+        // Wait for the incoming public ID/deep link to resolve to a UUID before enabling follow.
+        binding.btnFollow.setEnabled(false);
         vm.getUser().observe(this, user -> {
             if (user == null) return;
+            binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
@@ -439,13 +444,19 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.tvStaffBadge == null) return;
-        if (!StaffRoleHelper.isStaff(user)) {
+        boolean rechargeAgent = user.isRechargeAgent;
+        boolean agencyOwner = user.agency != null
+                && "owner".equalsIgnoreCase(user.agency.role);
+        if (!StaffRoleHelper.isStaff(user) && !rechargeAgent && !agencyOwner) {
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
         String role = StaffRoleHelper.normalize(user);
+        String label = StaffRoleHelper.isStaff(user)
+                ? StaffRoleHelper.badgeAr(user)
+                : (rechargeAgent ? "وكيل شحن" : "وكالة");
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
-        binding.tvStaffBadge.setText(StaffRoleHelper.badgeAr(user));
+        binding.tvStaffBadge.setText(label);
         binding.tvStaffBadge.setBackgroundResource(
                 StaffRoleHelper.SUPER.equals(role)
                         ? R.drawable.bg_chip_staff_super
@@ -715,8 +726,8 @@ public class ProfileActivity extends ThemedActivity {
                         container.getUserApi().badges(profileId).execute();
                 if (response.isSuccessful() && response.body() != null && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
+                        // Show all earned badges, including those granted manually by admins.
                         if (badge != null && badge.earned) earned.add(badge);
-                        if (earned.size() >= 3) break;
                     }
                 }
             } catch (Exception ignored) { }
@@ -726,7 +737,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
                 for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
                     ImageView icon = new ImageView(this);
-                    int size = (int) (22 * getResources().getDisplayMetrics().density + 0.5f);
+                    int size = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
                     android.widget.LinearLayout.LayoutParams lp =
                             new android.widget.LinearLayout.LayoutParams(size, size);
                     lp.setMargins(2, 0, 2, 0);
