@@ -181,15 +181,13 @@ jobs:
             fi
             printf '%s  %s bytes (%.2f MiB)\n' "$(basename "$APK")" "$(stat -c '%s' "$APK")" "$(awk -v n="$(stat -c '%s' "$APK")" 'BEGIN {print n/1048576}')"
           done
-          ASSET_DIR="android/app/build/intermediates/merged_assets/debug/mergeDebugAssets"
-          if [[ ! -d "$ASSET_DIR" ]]; then
-            ASSET_DIR="$(find android/app/build/intermediates/merged_assets -type d -path '*debug*' -print -quit)"
-          fi
-          for HTML in cp-center.html cp-insights.html wealth-insights.html wealth-ranking.html; do
-            if ! find "$ASSET_DIR" -type f -name "$HTML" -print -quit | grep -q .; then
-              echo "::error::Required in-app HTML asset missing from debug build: $HTML"
-              exit 1
-            fi
+          for APK in "${APK_FILES[@]}"; do
+            for HTML in cp-center.html cp-insights.html wealth-insights.html wealth-ranking.html; do
+              if ! unzip -Z1 "$APK" | grep -E "(^|/)${HTML}$" -q; then
+                echo "::error::Required in-app HTML asset missing inside $(basename "$APK"): $HTML"
+                exit 1
+              fi
+            done
           done
           echo "Verified: both ABI APKs use the approved signing key and contain required HTML pages."
 
