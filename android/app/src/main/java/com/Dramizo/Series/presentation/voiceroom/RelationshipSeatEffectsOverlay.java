@@ -4,6 +4,11 @@ import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Shader;
+import android.graphics.LinearGradient;
+import android.graphics.drawable.Drawable;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,6 +25,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.DataSource;
+import com.bumptech.glide.load.engine.GlideException;
+import com.bumptech.glide.request.RequestListener;
+import com.bumptech.glide.request.target.Target;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -165,33 +174,44 @@ final class RelationshipSeatEffectsOverlay {
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
         final int thickness = dp(Math.max(6, Math.min(48, sizeDp)));
-        final View effectView;
         final boolean hasRibbon = !url.trim().isEmpty()
                 && (url.startsWith("https://") || url.startsWith("http://"));
+        final RibbonFallbackView fallback = new RibbonFallbackView(context);
+        fallback.setVisibility(hasRibbon ? View.INVISIBLE : View.VISIBLE);
+        FrameLayout.LayoutParams fallbackLp = new FrameLayout.LayoutParams(1, thickness);
+        fallback.setLayoutParams(fallbackLp);
+        fallback.setClickable(false);
+        fallback.setFocusable(false);
+        layer.addView(fallback);
+
+        final ImageView ribbon;
         if (hasRibbon) {
-            ImageView ribbon = new ImageView(context);
+            ribbon = new ImageView(context);
             ribbon.setScaleType(ImageView.ScaleType.FIT_XY);
             ribbon.setContentDescription("relationship ribbon");
-            // Glide preserves animated GIF/WebP assets uploaded from the dashboard.
-            Glide.with(context).load(url).into(ribbon);
-            effectView = ribbon;
+            ribbon.setVisibility(View.INVISIBLE);
+            ribbon.setClickable(false);
+            ribbon.setFocusable(false);
+            layer.addView(ribbon);
+            Glide.with(context).load(url).listener(new RequestListener<Drawable>() {
+                @Override public boolean onLoadFailed(@Nullable GlideException e, Object model,
+                        Target<Drawable> target, boolean isFirstResource) {
+                    ribbon.setVisibility(View.INVISIBLE);
+                    fallback.setVisibility(View.VISIBLE);
+                    android.util.Log.w("RelationshipEffect", "Ribbon asset failed to load; using animated fallback", e);
+                    return false;
+                }
+                @Override public boolean onResourceReady(Drawable resource, Object model,
+                        Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                    ribbon.setVisibility(View.VISIBLE);
+                    fallback.setVisibility(View.INVISIBLE);
+                    return false;
+                }
+            }).into(ribbon);
         } else {
-            TextView emoji = new TextView(context);
-            emoji.setText(defaultEmoji(type));
-            emoji.setTextSize(Math.max(12, Math.min(28, sizeDp * 0.72f)));
-            emoji.setGravity(Gravity.CENTER);
-            emoji.setIncludeFontPadding(false);
-            emoji.setTextColor(Color.WHITE);
-            emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
-            effectView = emoji;
+            ribbon = null;
         }
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(hasRibbon ? 1 : thickness, thickness);
-        effectView.setLayoutParams(lp);
-        effectView.setClickable(false);
-        effectView.setFocusable(false);
-        effectView.setAlpha(0.98f);
-        layer.addView(effectView);
-
+        final View effectView = hasRibbon ? ribbon : fallback;
         final int[] gridLoc = new int[2];
         final int[] aLoc = new int[2];
         final int[] bLoc = new int[2];
@@ -234,37 +254,76 @@ final class RelationshipSeatEffectsOverlay {
             effectView.setVisibility(View.VISIBLE);
             float angle = (float) Math.toDegrees(Math.atan2(dy, dx));
             float progress = (Float) animation.getAnimatedValue();
-            if (hasRibbon) {
-                // One continuous, dashboard-configured animated ribbon bridges the two avatars.
-                ViewGroup.LayoutParams params = effectView.getLayoutParams();
-                int wantedWidth = Math.max(1, Math.round(distance));
+            // Keep a full connector spanning the two live avatar centers. Both the uploaded
+            // asset and the fallback use the same endpoints, so neither can drift from a seat.
+            int wantedWidth = Math.max(1, Math.round(distance));
+            View[] views = hasRibbon ? new View[]{ribbon, fallback} : new View[]{fallback};
+            for (View view : views) {
+                if (view == null) continue;
+                ViewGroup.LayoutParams params = view.getLayoutParams();
                 if (params.width != wantedWidth || params.height != thickness) {
                     params.width = wantedWidth;
                     params.height = thickness;
-                    effectView.setLayoutParams(params);
+                    view.setLayoutParams(params);
                 }
-                effectView.setPivotX(wantedWidth / 2f);
-                effectView.setPivotY(thickness / 2f);
-                effectView.setRotation(angle);
-                effectView.setX((fromX + toX) / 2f - wantedWidth / 2f);
-                effectView.setY((fromY + toY) / 2f - thickness / 2f);
-                // Subtle pulse keeps the ribbon visibly alive without shifting its endpoints.
-                float pulse = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI * 2f);
-                effectView.setAlpha(pulse);
-            } else {
-                // Fallback if no dashboard asset is configured: smoothly travel along the link.
-                float x = fromX + dx * progress - thickness / 2f;
-                float y = fromY + dy * progress - thickness / 2f;
-                effectView.setX(clamp(x, 0f, Math.max(0f, layer.getWidth() - thickness)));
-                effectView.setY(clamp(y, 0f, Math.max(0f, layer.getHeight() - thickness)));
-                effectView.setRotation(angle);
-                float pulse = 0.92f + 0.08f * (float) Math.sin(progress * Math.PI);
-                effectView.setScaleX(pulse);
-                effectView.setScaleY(pulse);
+                view.setPivotX(wantedWidth / 2f);
+                view.setPivotY(thickness / 2f);
+                view.setRotation(angle);
+                view.setX((fromX + toX) / 2f - wantedWidth / 2f);
+                view.setY((fromY + toY) / 2f - thickness / 2f);
+                float pulse = 0.90f + 0.10f * (float) Math.sin(progress * Math.PI * 2f);
+                view.setAlpha(pulse);
             }
+            fallback.setProgress(progress);
         });
         running.add(travel);
         travel.start();
+    }
+
+    /** Drawn fallback connector: visible and animated even if the dashboard asset is missing,
+     * an unsupported format, or temporarily unreachable. */
+    private static final class RibbonFallbackView extends View {
+        private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint core = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint particle = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float progress;
+
+        RibbonFallbackView(Context context) {
+            super(context);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            glow.setStyle(Paint.Style.STROKE);
+            glow.setStrokeCap(Paint.Cap.ROUND);
+            glow.setStrokeWidth(10f);
+            glow.setColor(0x55FF5B9A);
+            core.setStyle(Paint.Style.STROKE);
+            core.setStrokeCap(Paint.Cap.ROUND);
+            core.setStrokeWidth(3.5f);
+            core.setColor(0xFFFF8DBB);
+            particle.setStyle(Paint.Style.FILL);
+            particle.setColor(Color.WHITE);
+        }
+
+        void setProgress(float value) {
+            progress = value;
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float cy = getHeight() / 2f;
+            float right = Math.max(1f, getWidth());
+            glow.setStrokeWidth(Math.max(5f, getHeight() * 0.9f));
+            core.setStrokeWidth(Math.max(2f, getHeight() * 0.24f));
+            canvas.drawLine(0f, cy, right, cy, glow);
+            canvas.drawLine(0f, cy, right, cy, core);
+            float dot = Math.max(2f, getHeight() * 0.22f);
+            for (int i = 0; i < 3; i++) {
+                float p = (progress + i / 3f) % 1f;
+                float x = dot + p * Math.max(0f, right - 2f * dot);
+                canvas.drawCircle(x, cy, dot, particle);
+                canvas.drawCircle(x, cy, dot * 1.8f, glow);
+            }
+        }
     }
 
     @Nullable
