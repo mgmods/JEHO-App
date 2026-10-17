@@ -756,6 +756,9 @@ public class ProfileActivity extends ThemedActivity {
             cpHeartAnimator = null;
         }
         binding.rowProfileCp.setVisibility(View.GONE);
+        if (binding.rowProfileCpCv != null) {
+            binding.rowProfileCpCv.setVisibility(View.GONE);
+        }
     }
 
     private String cpTypeLabel(String type) {
