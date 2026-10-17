@@ -23,6 +23,7 @@
             android:id="@+id/avatarPairWrap"
             android:layout_width="66dp"
             android:layout_height="66dp"
+            android:layoutDirection="ltr"
             android:clipChildren="false"
             android:clipToPadding="false">
 
