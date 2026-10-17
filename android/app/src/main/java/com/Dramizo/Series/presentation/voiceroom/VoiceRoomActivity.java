@@ -842,6 +842,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
         });
         binding.btnGift.setOnClickListener(v -> {
+            refreshSelfGiftPolicy();
             RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
             // Default to live host — including self when I am hosting (Mikoo support).
             String hostTarget = resolveLiveHostId(room);
@@ -7237,6 +7238,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 return;
             }
             final String giftTarget = target;
+            refreshSelfGiftPolicy();
             // Open gifts after the user-card sheet fully dismisses.
             binding.getRoot().post(() ->
                     GiftBottomSheet.show(getSupportFragmentManager(), giftTarget, null, roomId));
