@@ -331,6 +331,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Prefetch completed before observers existed — publish after wires. */
     @Nullable private RoomDtos.JoinRoomResult pendingPrefetchSession;
     private String currentMusicUrl;
+    /** Per-device music gain (0–200%). Host also applies this to the outgoing ZEGO music mix. */
+    private int roomMusicMixVolume = 200;
     private String dismissedMusicUrl;
     private String preparedMusicUrl;
     private String currentMusicStatus = "stopped";
@@ -339,8 +341,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String currentMusicPublisherId;
     private boolean musicEndReported;
     private boolean musicPanelExpanded;
-    /** Shared music gain (0..1), synchronized for everyone in the live room. */
-    private float sharedMusicVolume = 1.0f;
     private ObjectAnimator musicDiscAnimator;
     private android.animation.AnimatorSet taskFloatPulseAnimator;
     private long roomMusicServerOffsetMs;
@@ -3607,6 +3607,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         clipOval(binding.musicFloatWrap);
         // YouTube WebView is lazy — see ensureMusicYoutubeWebView().
         binding.btnMusicPlayPause.setOnClickListener(v -> toggleRoomMusicPlayback());
+        if (binding.btnMusicVolumeDown != null) {
+            binding.btnMusicVolumeDown.setOnClickListener(v -> changeRoomMusicVolume(-20));
+        }
+        if (binding.btnMusicVolumeUp != null) {
+            binding.btnMusicVolumeUp.setOnClickListener(v -> changeRoomMusicVolume(20));
+        }
+        updateRoomMusicVolumeUi();
         binding.btnMusicStop.setOnClickListener(v -> {
             // Mikoo music_list_more — open library to add/pick tracks from the player.
             if (canManageMusic) showSavedMusicLibrary();
@@ -3676,42 +3683,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 viewModel.updateMusic(roomId, "seek", null, null, null, position);
             }
         });
-        if (binding.seekMusicVolume != null) {
-            binding.seekMusicVolume.setMax(100);
-            binding.seekMusicVolume.setProgress(100);
-            binding.seekMusicVolume.setOnSeekBarChangeListener(
-                    new android.widget.SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(
-                        android.widget.SeekBar seekBar, int progress, boolean fromUser) {
-                    if (!fromUser) return;
-                    if (!canManageMusic) {
-                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
-                        return;
-                    }
-                    sharedMusicVolume = Math.max(0f, Math.min(1f, progress / 100f));
-                    applySharedMusicVolume();
-                }
-
-                @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
-                    if (!canManageMusic) {
-                        Toast.makeText(VoiceRoomActivity.this,
-                                "التحكم بصوت الموسيقى للمضيف أو المشرف المخوّل",
-                                Toast.LENGTH_SHORT).show();
-                    }
-                }
-
-                @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
-                    if (!canManageMusic || roomId == null) {
-                        seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
-                        return;
-                    }
-                    JsonObject payload = new JsonObject();
-                    payload.addProperty("volume", sharedMusicVolume);
-                    RealtimeClient.getInstance().emitRoomEvent(
-                            roomId, "room:music_volume", payload);
-                }
-            });
-        }
         handler.post(musicProgressRunnable);
     }
 
@@ -4230,31 +4201,43 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** Shared music gain; local room mute only affects this listener's playback. */
-    private void applySharedMusicVolume() {
-        if (roomMusicPlayer != null) {
-            roomMusicPlayer.setVolume(roomSpeakerMuted ? 0f : sharedMusicVolume);
-        }
-        if (youtubeUsingEmbed && musicYoutubeWebView != null) {
-            int percent = Math.round(sharedMusicVolume * 100f);
-            String js = "if(window.musicYtPlayer&&window.musicYtPlayer.setVolume){"
-                    + "if(" + percent + "===0){window.musicYtPlayer.mute();}"
-                    + "else{window.musicYtPlayer.unMute();window.musicYtPlayer.setVolume("
-                    + percent + ");}}";
-            musicYoutubeWebView.evaluateJavascript(js, null);
-        }
-        // For device music mixed into the host's published audio, adjust only the
-        // dedicated ZEGO media player; microphone capture gain remains untouched.
-        if (canManageMusic) {
-            // Also cache the gain before a device track is loaded.
-            RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
-        }
-        if (binding != null && binding.seekMusicVolume != null
-                && !binding.seekMusicVolume.isPressed()) {
-            binding.seekMusicVolume.setProgress(Math.round(sharedMusicVolume * 100f));
+    /** Shared room music gain (0–200%) synchronized to every member through realtime. */
+    private void changeRoomMusicVolume(int delta) {
+        roomMusicMixVolume = Math.max(0, Math.min(200, roomMusicMixVolume + delta));
+        updateRoomMusicVolumeUi();
+        applySharedMusicVolume();
+        if (canManageMusic && roomId != null) {
+            // The room manager is authoritative: the server fans this value out to all clients.
+            JsonObject payload = new JsonObject();
+            payload.addProperty("volume", roomMusicMixVolume);
+            RealtimeClient.getInstance().emitRoomEvent(roomId, "room:music_volume", payload);
+            // The publisher's ZEGO mix must be updated too so remote listeners hear the change.
+            RoomRtcEngine.getInstance().setMusicMixVolume(roomMusicMixVolume);
         }
     }
 
+    private void updateRoomMusicVolumeUi() {
+        if (binding != null && binding.tvMusicVolume != null) {
+            binding.tvMusicVolume.setText(roomMusicMixVolume + "%");
+        }
+        if (binding != null) {
+            if (binding.btnMusicVolumeDown != null) {
+                binding.btnMusicVolumeDown.setEnabled(roomMusicMixVolume > 0);
+                binding.btnMusicVolumeDown.setAlpha(roomMusicMixVolume > 0 ? 1f : 0.45f);
+            }
+            if (binding.btnMusicVolumeUp != null) {
+                binding.btnMusicVolumeUp.setEnabled(roomMusicMixVolume < 200);
+                binding.btnMusicVolumeUp.setAlpha(roomMusicMixVolume < 200 ? 1f : 0.45f);
+            }
+        }
+    }
+
+    /** Shared room music volume for local playback; honors room mute. */
+    private void applySharedMusicVolume() {
+        if (roomMusicPlayer == null) return;
+        float gain = roomSpeakerMuted ? 0f : roomMusicMixVolume / 200f;
+        roomMusicPlayer.setVolume(Math.max(0f, Math.min(1f, gain)));
+    }
     /** @deprecated kept for any remaining call sites — uses shared volume. */
     private void applyHostOrGuestMusicVolume() {
         applySharedMusicVolume();
@@ -4347,16 +4330,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         long startSec = Math.max(0L, positionMs / 1000L);
         String html = "<!DOCTYPE html><html><head><meta name='viewport' "
                 + "content='width=device-width,initial-scale=1,maximum-scale=1'/>"
-                + "<style>html,body,#player{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
-                + "</style></head><body><div id='player'></div>"
-                + "<script src='https://www.youtube.com/iframe_api'></script><script>"
-                + "var musicYtPlayer;function onYouTubeIframeAPIReady(){musicYtPlayer=new YT.Player('player',"
-                + "{height:'100%',width:'100%',videoId:'" + videoId + "',playerVars:{autoplay:"
-                + (playing ? "1" : "0")
-                + ",controls:0,playsinline:1,rel:0,modestbranding:1,fs:0,start:" + startSec
-                + "},events:{onReady:function(e){var v=" + Math.round(sharedMusicVolume * 100f)
-                + ";if(v===0)e.target.mute();else{e.target.unMute();e.target.setVolume(v);}}}});}"
-                + "</script></body></html>";
+                + "<style>html,body{margin:0;padding:0;background:#000;overflow:hidden;height:100%;}"
+                + "iframe{border:0;width:100%;height:100%;}</style></head><body>"
+                + "<iframe src='https://www.youtube.com/embed/" + videoId
+                + "?autoplay=" + (playing ? "1" : "0")
+                + "&controls=0&playsinline=1&rel=0&modestbranding=1&fs=0&start=" + startSec
+                + "' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
+                + "</body></html>";
         ensureMusicYoutubeWebView().loadDataWithBaseURL(
                 "https://www.youtube.com", html, "text/html", "utf-8", null);
         showMusicVideoSurface(true);
@@ -11440,10 +11420,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (r != null) r.chatAutoClearMinutes = mins;
             long stamp = parseIsoMillis(memberStr(payload, "chatClearedAt"));
             if (stamp > 0) RoomChatMemory.honorServerWipe(roomId, stamp);
-        } else if ("room:music_volume".equals(event)) {
-            sharedMusicVolume = Math.max(0f, Math.min(1f,
-                    memberFloat(payload, "volume", 1.0f)));
-            applySharedMusicVolume();
         } else if ("room:music".equals(event)) {
             String serverTime = memberStr(payload, "serverTime");
             if (serverTime != null) {
@@ -11460,6 +11436,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberLong(payload, "positionMs", 0L),
                     memberStr(payload, "startedAt"),
                     memberStr(payload, "updatedBy"));
+        } else if ("room:music_volume".equals(event)) {
+            // Apply the room-authoritative gain on every device, not only on the sender.
+            int sharedVolume = Math.max(0, Math.min(200, memberInt(payload, "volume", 200)));
+            roomMusicMixVolume = sharedVolume;
+            updateRoomMusicVolumeUi();
+            applySharedMusicVolume();
+            if (canManageMusic) {
+                RoomRtcEngine.getInstance().setMusicMixVolume(sharedVolume);
+            }
         } else if ("room:reaction".equals(event)) {
             String uid = memberStr(payload, "userId");
             if (uid == null) uid = fromUserId;
