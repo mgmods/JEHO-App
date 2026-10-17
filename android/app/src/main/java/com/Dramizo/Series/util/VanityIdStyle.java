@@ -98,9 +98,15 @@ public final class VanityIdStyle {
     private static void apply(TextView view, String id, int[] colors, boolean animated, boolean glow) {
         view.setShadowLayer(glow ? 7f : 0f, 0f, 0f, colors[1]);
         if (!animated) {
-            view.getPaint().setShader(new LinearGradient(0, 0, Math.max(1, view.getWidth()), 0, colors, null, Shader.TileMode.CLAMP));
-            view.invalidate();
-            view.post(view::invalidate);
+            // The profile screen can bind the style before the TextView has completed layout.
+            // Rebuild the gradient after measurement so static/colored IDs do not collapse to
+            // a near-solid color because their first measured width was zero.
+            view.post(() -> {
+                if (!id.equals(view.getTag(R.id.tag_vanity_id_style_key)) || !view.isAttachedToWindow()) return;
+                float width = Math.max(1f, view.getWidth());
+                view.getPaint().setShader(new LinearGradient(0f, 0f, width, 0f, colors, null, Shader.TileMode.CLAMP));
+                view.invalidate();
+            });
             return;
         }
         ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
