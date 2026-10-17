@@ -80,11 +80,16 @@ export class UsersService {
   ) {}
 
   private async hasActiveRechargeAgent(userId: string): Promise<boolean> {
-    const agent = await this.rechargeAgentsRepo.findOne({
-      where: { userId, status: RechargeAgentStatus.ACTIVE },
-      select: { id: true },
-    });
-    return !!agent;
+    try {
+      const agent = await this.rechargeAgentsRepo.findOne({
+        where: { userId, status: RechargeAgentStatus.ACTIVE },
+        select: { id: true },
+      });
+      return !!agent;
+    } catch {
+      // Badge lookup must never make the core profile endpoint unavailable.
+      return false;
+    }
   }
 
   private economyStats(profile?: UserProfile | null) {
