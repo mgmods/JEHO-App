@@ -364,9 +364,7 @@ function assetUrl(path) { return resolveAsset(path) }
 
 function badgeSrc(p) {
   const lvl = tierForLevel(p.level)
-  const fromPlan = p.badgeUrl && String(p.badgeUrl).includes(`vip_medal_mikoo_${lvl}`)
-    ? p.badgeUrl
-    : `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`
+  const fromPlan = p.badgeUrl || `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`
   return resolveAsset(fromPlan)
 }
 
