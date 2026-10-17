@@ -483,6 +483,45 @@ export class AdminController {
     return this.adminService.listRooms(query);
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/platform')
+  @ApiOperation({ summary: 'Create an official platform-managed room and assign moderators by public user ID' })
+  createPlatformRoom(
+    @Body() body: {
+      title?: string;
+      description?: string;
+      coverUrl?: string;
+      category?: string;
+      seatCount?: number;
+      moderatorIds?: string[];
+    },
+  ) {
+    return this.adminService.createPlatformRoom(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Add a moderator to an official platform room by public user ID' })
+  addPlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { publicId?: string },
+  ) {
+    return this.adminService.addPlatformRoomModerator(id, body?.publicId || '');
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Replace official platform room moderators by public user ID' })
+  setPlatformRoomModerators(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { moderatorIds?: string[] },
+  ) {
+    return this.adminService.setPlatformRoomModerators(id, body?.moderatorIds || []);
+  }
+
   // ─── Streams (live voice rooms for dashboard) ───────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()

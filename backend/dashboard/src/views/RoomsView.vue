@@ -2,6 +2,9 @@
   <div>
     <PageHeader :title="t('rooms.title')" :subtitle="t('rooms.subtitle')">
       <template #actions>
+        <button class="btn btn-aurora btn-sm" type="button" @click="createPlatformRoom" :disabled="loading">
+          <i class="bi bi-shield-check me-1"></i> إنشاء روم تابع للمنصة
+        </button>
         <button class="btn btn-ghost btn-sm" type="button" @click="load" :disabled="loading">
           <i class="bi bi-arrow-clockwise me-1"></i> {{ t('common.refresh') }}
         </button>
@@ -59,6 +62,7 @@
         @edit="editRoom"
         @forceEnd="forceEndRoom"
         @toggleSupport="toggleSupport"
+        @managePlatformModerators="managePlatformModerators"
       />
     </div>
 
@@ -203,6 +207,95 @@ function toggleSupport(r) {
     ? `ترقية الروم «${r.name || r.title || r.id}» إلى روم خدمة عملاء رسمي؟ سيظهر أعلى القائمة في التطبيق.`
     : `إلغاء ترقية «${r.name || r.title || r.id}» وإعادته روماً عادياً؟`
   confirmOpen.value = true
+}
+
+function parsePublicIds(raw) {
+  return [...new Set(String(raw || '').split(/[;,\s]+/).map(x => x.trim()).filter(Boolean))]
+}
+
+async function createPlatformRoom() {
+  const title = await askPrompt({
+    title: 'إنشاء روم تابع للمنصة',
+    message: 'اسم الروم (مثلاً: خدمة العملاء أو إدارة المنصة)',
+    placeholder: 'اسم الروم',
+  })
+  if (title == null || !String(title).trim()) return
+  const categoryRaw = await askPrompt({
+    title: 'نوع الروم الرسمي',
+    message: 'اكتب customer_service لخدمة العملاء، أو management لإدارة المنصة، أو official لروم رسمي آخر.',
+    defaultValue: 'customer_service',
+    placeholder: 'customer_service | management | official',
+  })
+  if (categoryRaw == null) return
+  const category = String(categoryRaw).trim().toLowerCase()
+  if (!['customer_service', 'management', 'official'].includes(category)) {
+    toast().danger('نوع الروم غير صحيح')
+    return
+  }
+  const idsRaw = await askPrompt({
+    title: 'مشرفو الروم',
+    message: 'أدخل ID الحسابات العامة للمشرفين، وافصل بين أكثر من ID بفاصلة. سيحصلون على صلاحيات إدارة الروم.',
+    placeholder: 'مثال: 123456, 234567',
+  })
+  if (idsRaw == null) return
+  const moderatorIds = parsePublicIds(idsRaw)
+  if (!moderatorIds.length) {
+    toast().danger('أدخل ID مشرف واحداً على الأقل')
+    return
+  }
+  const coverUrl = await askPrompt({
+    title: 'صورة الروم (اختياري)',
+    message: 'رابط صورة الغلاف، أو اتركه فارغاً لاستخدام الافتراضي',
+    placeholder: 'https://...',
+    defaultValue: '',
+  })
+  if (coverUrl == null) return
+  const seatRaw = await askPrompt({
+    title: 'عدد المقاعد',
+    message: 'اختر عدد المقاعد من 2 إلى 20',
+    defaultValue: '11',
+  })
+  if (seatRaw == null) return
+  const seatCount = Math.max(2, Math.min(20, Math.floor(Number(seatRaw) || 11)))
+  loading.value = true
+  const { data, error: err } = await roomsApi.createPlatform({
+    title: String(title).trim(),
+    category,
+    moderatorIds,
+    coverUrl: String(coverUrl).trim() || undefined,
+    seatCount,
+  })
+  loading.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  toast().success('تم إنشاء الروم الرسمي وتثبيته بأعلى الرومات')
+  page.value = 1
+  status.value = ''
+  await load()
+}
+
+async function managePlatformModerators(r) {
+  if (!(r.roomKind === 'support' || r.isSupport)) {
+    toast().danger('إدارة مشرفي المنصة متاحة للرومات الرسمية فقط')
+    return
+  }
+  const publicId = await askPrompt({
+    title: 'إضافة مشرف لروم المنصة',
+    message: 'أدخل الـ ID العام للحساب. ستتم إضافته كمشرف دون حذف المشرفين الحاليين.',
+    placeholder: 'ID المستخدم',
+  })
+  if (publicId == null || !String(publicId).trim()) return
+  const { data, error: err } = await roomsApi.addPlatformModerator(r.id, String(publicId).trim())
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else {
+    toast().success(data?.alreadyModerator ? 'هذا المستخدم مشرف بالفعل' : 'تمت إضافة المشرف بنجاح')
+    await load()
+  }
 }
 
 function removeRoom(r) {

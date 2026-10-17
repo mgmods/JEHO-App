@@ -13,6 +13,7 @@ import {
   RoomType,
 } from '../../database/entities/room.entity';
 import { RoomSeat, SeatStatus } from '../../database/entities/room-seat.entity';
+import { RoomModerator, ModeratorRole } from '../../database/entities/room-moderator.entity';
 import { RoomAccess } from '../../database/entities/room-access.entity';
 import { Gift } from '../../database/entities/gift.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
@@ -1183,6 +1184,216 @@ export class AdminService {
 
     await this.roomsRepo.save(room);
     return room;
+  }
+
+  /**
+   * Create a platform-owned, persistent official room. RoomKind.SUPPORT is the
+   * existing server-enforced pin/listing mechanism; no schema reset is needed.
+   * moderatorIds are public account IDs shown in the app, not database UUIDs.
+   */
+  async createPlatformRoom(dto: {
+    title?: string;
+    description?: string;
+    coverUrl?: string;
+    category?: string;
+    seatCount?: number;
+    moderatorIds?: string[];
+  }) {
+    const title = String(dto.title || '').trim().slice(0, 128);
+    if (!title) throw new BadRequestException('اسم الروم مطلوب');
+    const requestedIds = [...new Set((dto.moderatorIds || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean))];
+    if (!requestedIds.length) {
+      throw new BadRequestException('أضف آيدي مستخدم واحد على الأقل كمشرف للروم');
+    }
+    const moderatorUsers: User[] = [];
+    for (const publicId of requestedIds) {
+      const user = await this.usersRepo.findOne({ where: { publicId } });
+      if (!user || user.status === UserStatus.DELETED) {
+        throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+      }
+      moderatorUsers.push(user);
+    }
+
+    // Prefer an existing platform-admin account as the technical room host.
+    // If the deployment has no linked platform account, use the first appointed
+    // moderator as the required host reference; the room remains platform-managed.
+    const platformAdmin = await this.usersRepo.findOne({
+      where: { isAdmin: true, status: Not(UserStatus.DELETED) },
+      order: { createdAt: 'ASC' },
+    });
+    const hostId = platformAdmin?.id || moderatorUsers[0].id;
+    const seatCount = Math.max(2, Math.min(20, Math.floor(Number(dto.seatCount) || 11)));
+    let publicId = '';
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const candidate = String(Math.floor(100000 + Math.random() * 900000));
+      if (!(await this.roomsRepo.exist({ where: { publicId: candidate } }))) {
+        publicId = candidate;
+        break;
+      }
+    }
+    if (!publicId) throw new ConflictException('تعذر إنشاء آيدي روم فريد');
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const room = manager.create(Room, {
+        publicId,
+        title,
+        description: String(dto.description || '').trim().slice(0, 2000) || null,
+        coverUrl: String(dto.coverUrl || '').trim().slice(0, 512) || null,
+        topic: ['customer_service', 'management', 'official'].includes(String(dto.category || '').trim().toLowerCase())
+          ? String(dto.category).trim().toLowerCase()
+          : 'official',
+        type: RoomType.VOICE,
+        status: RoomStatus.OPEN,
+        hostId,
+        cohostId: null,
+        seatCount,
+        viewerCount: 0,
+        zegoRoomId: `room_${uuidv4().replace(/-/g, '').slice(0, 16)}`,
+        hasPassword: false,
+        passwordHash: null,
+        isPublic: true,
+        roomKind: RoomKind.SUPPORT,
+        isPersistent: true,
+        activeHostId: null,
+        emptySince: null,
+        accessMode: RoomAccessMode.FREE,
+        entryFeeCoins: 0,
+      });
+      await manager.save(room);
+
+      const seats: RoomSeat[] = [];
+      for (let seatIndex = 0; seatIndex < seatCount; seatIndex += 1) {
+        seats.push(manager.create(RoomSeat, {
+          roomId: room.id,
+          seatIndex,
+          userId: null,
+          status: SeatStatus.EMPTY,
+          isHostSeat: seatIndex === 0,
+          isMuted: false,
+          isModeratorMuted: false,
+        }));
+      }
+      await manager.save(seats);
+
+      const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
+        roomId: room.id,
+        userId: user.id,
+        role: ModeratorRole.ADMIN,
+        canManageMusic: true,
+        canChangeFrames: true,
+        canControlGames: true,
+        canMute: true,
+        canKick: true,
+        canBan: true,
+        canManageSeats: true,
+        canInvite: true,
+        canManageRoom: true,
+        appointedById: hostId,
+      }));
+      await manager.save(mods);
+      return { room, moderators: moderatorUsers.map((user) => ({
+        userId: user.id,
+        publicId: user.publicId,
+        displayName: user.displayName || user.username,
+      })) };
+    });
+    return { ...result, isPlatformManaged: true, isPinned: true };
+  }
+
+  /** Add one moderator to an official platform room without replacing existing staff. */
+  async addPlatformRoomModerator(roomId: string, publicIdRaw: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن إضافة مشرفين لرومات المنصة الرسمية فقط');
+    }
+    const publicId = String(publicIdRaw || '').trim();
+    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user || user.status === UserStatus.DELETED) {
+      throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+    }
+    const existing = await this.dataSource.getRepository(RoomModerator).findOne({
+      where: { roomId, userId: user.id },
+    });
+    if (existing) {
+      return {
+        roomId,
+        alreadyModerator: true,
+        moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+      };
+    }
+    const moderator = this.dataSource.getRepository(RoomModerator).create({
+      roomId,
+      userId: user.id,
+      role: ModeratorRole.ADMIN,
+      canManageMusic: true,
+      canChangeFrames: true,
+      canControlGames: true,
+      canMute: true,
+      canKick: true,
+      canBan: true,
+      canManageSeats: true,
+      canInvite: true,
+      canManageRoom: true,
+      appointedById: room.hostId,
+    });
+    await this.dataSource.getRepository(RoomModerator).save(moderator);
+    return {
+      roomId,
+      added: true,
+      moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+    };
+  }
+
+  /** Replace the moderator list of an official platform room by public user IDs. */
+  async setPlatformRoomModerators(roomId: string, publicIds: string[]) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن إدارة مشرفي المنصة للرومات الرسمية فقط');
+    }
+    const requestedIds = [...new Set((publicIds || [])
+      .map((value) => String(value || '').trim())
+      .filter(Boolean))];
+    if (!requestedIds.length) {
+      throw new BadRequestException('يجب أن يبقى للروم مشرف واحد على الأقل');
+    }
+    const users: User[] = [];
+    for (const publicId of requestedIds) {
+      const user = await this.usersRepo.findOne({ where: { publicId } });
+      if (!user || user.status === UserStatus.DELETED) {
+        throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+      }
+      users.push(user);
+    }
+    const moderators = await this.dataSource.transaction(async (manager) => {
+      await manager.delete(RoomModerator, { roomId });
+      const rows = users.map((user) => manager.create(RoomModerator, {
+        roomId,
+        userId: user.id,
+        role: ModeratorRole.ADMIN,
+        canManageMusic: true,
+        canChangeFrames: true,
+        canControlGames: true,
+        canMute: true,
+        canKick: true,
+        canBan: true,
+        canManageSeats: true,
+        canInvite: true,
+        canManageRoom: true,
+        appointedById: room.hostId,
+      }));
+      await manager.save(rows);
+      return users.map((user) => ({
+        userId: user.id,
+        publicId: user.publicId,
+        displayName: user.displayName || user.username,
+      }));
+    });
+    return { roomId, moderators, isPlatformManaged: true, isPinned: true };
   }
 
   async setRoomCustomerService(roomId: string, enabled: boolean) {

@@ -19,6 +19,7 @@ public final class RoomDtos {
         @SerializedName("cohostId") public String cohostId;
         @SerializedName("agencyId") public String agencyId;
         @SerializedName("roomKind") public String roomKind;
+        @SerializedName("topic") public String topic;
         @SerializedName("isSupport") public boolean isSupport;
         @SerializedName("isPersistent") public boolean isPersistent;
         @SerializedName("activeHostId") public String activeHostId;
