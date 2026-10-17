@@ -49,6 +49,7 @@ const ALLOWED_ROOM_EVENTS = new Set([
   'chat:message',
   'room:summon',
   'room:chat_cleared',
+  'room:music_volume',
 ]);
 
 @WebSocketGateway({
@@ -61,6 +62,8 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly onlineUsers = new Map<string, Set<string>>();
+  /** Live-session music gain; defaults to full volume and does not alter mic gain. */
+  private readonly roomMusicVolumes = new Map<string, number>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -241,6 +244,15 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     client.data.roomProfiles = client.data.roomProfiles || {};
     client.data.roomProfiles[data.roomId] = profilePayload;
     client.join(`room:${data.roomId}`);
+    const musicVolume = this.roomMusicVolumes.get(data.roomId);
+    if (musicVolume !== undefined) {
+      client.emit('room:event', {
+        roomId: data.roomId,
+        event: 'room:music_volume',
+        payload: { volume: musicVolume },
+        at: new Date().toISOString(),
+      });
+    }
     this.server.to(`room:${data.roomId}`).emit('room:user_joined', {
       roomId: data.roomId,
       ...profilePayload,
@@ -617,7 +629,26 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: 'Event payload is too large' };
     }
     let payload: Record<string, unknown> = { ...incoming, userId: client.userId };
-    if (data.event === 'room:summon') {
+    if (data.event === 'room:music_volume') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      if (!room) return { error: 'Room not found' };
+      let canControlMusic =
+        room.hostId === client.userId ||
+        room.activeHostId === client.userId ||
+        room.cohostId === client.userId;
+      if (!canControlMusic) {
+        const mod = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        canControlMusic = mod?.canManageMusic === true;
+      }
+      if (!canControlMusic) return { error: 'Music permission is required' };
+      const rawVolume = Number(incoming.volume);
+      if (!Number.isFinite(rawVolume)) return { error: 'Invalid music volume' };
+      const volume = Math.max(0, Math.min(1, rawVolume));
+      this.roomMusicVolumes.set(data.roomId, volume);
+      payload = { userId: client.userId, volume };
+    } else if (data.event === 'room:summon') {
       payload = {
         userId: client.userId,
         hostId: client.userId,
