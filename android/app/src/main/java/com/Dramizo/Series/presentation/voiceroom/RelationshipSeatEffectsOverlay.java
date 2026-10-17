@@ -128,14 +128,8 @@ final class RelationshipSeatEffectsOverlay {
             String key = a.compareTo(b) <= 0 ? a + ":" + b : b + ":" + a;
             if (!drawn.add(key)) continue;
 
-            RecyclerView.ViewHolder holderA = seatsRecycler.findViewHolderForAdapterPosition(indexA);
-            RecyclerView.ViewHolder holderB = seatsRecycler.findViewHolderForAdapterPosition(indexB);
-            if (holderA == null || holderB == null) continue;
-            View avatarA = holderA.itemView.findViewById(R.id.imgAvatar);
-            View avatarB = holderB.itemView.findViewById(R.id.imgAvatar);
-            if (avatarA == null || avatarB == null
-                    || avatarA.getVisibility() != View.VISIBLE
-                    || avatarB.getVisibility() != View.VISIBLE) continue;
+            // Do not require holders to be attached during this pass. The animation resolves
+            // each endpoint by user ID on every frame, including while RecyclerView rebinds seats.
 
             String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
             Map<String, Object> effect = lastEffects == null ? null : lastEffects.get(type);
