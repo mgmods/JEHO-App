@@ -25,6 +25,13 @@ export class GiftsController {
     return this.giftsService.listCategories();
   }
 
+  @Public()
+  @Get('policy')
+  @ApiOperation({ summary: 'Public gift policy flags for the app UI' })
+  policy() {
+    return this.giftsService.giftPolicy();
+  }
+
   @Post('send')
   @ApiOperation({ summary: 'Send gift with combo/lucky support' })
   send(@CurrentUser('sub') userId: string, @Body() dto: SendGiftDto) {

@@ -1449,7 +1449,7 @@ export class GiftsService implements OnModuleInit {
     if (upserted > 0) this.log.log(`Mikoo gift catalog synced (${upserted} rows)`);
   }
 
-  private async assertGiftTarget(dto: SendGiftDto) {
+  private async assertGiftTarget(dto: SendGiftDto, allowSelfTarget = false) {
     // Chat / DM gifts: no room — only verify the receiver exists.
     if (!dto.roomId) {
       const receiver = await this.usersRepo.findOne({ where: { id: dto.receiverId } });
@@ -1458,6 +1458,8 @@ export class GiftsService implements OnModuleInit {
     }
     const room = await this.roomsRepo.findOne({ where: { id: dto.roomId } });
     if (!room) throw new NotFoundException('Room not found');
+    // Dashboard-enabled self-gifting works even when the sender is alone and has no mic seat.
+    if (allowSelfTarget) return;
     const rid = String(dto.receiverId || '');
     // Live host on stage (seat 0 / activeHost / owner) is always giftable.
     const isLiveHost =
@@ -1686,6 +1688,10 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
+  async giftPolicy() {
+    return { selfGiftAllowed: !(await this.isSelfGiftBlocked()) };
+  }
+
   private async isSelfGiftBlocked(): Promise<boolean> {
     try {
       const row = await this.settingsRepo.findOne({
@@ -1714,7 +1720,7 @@ export class GiftsService implements OnModuleInit {
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
     if (!gift) throw new NotFoundException('Gift not found');
-    await this.assertGiftTarget(dto);
+    await this.assertGiftTarget(dto, selfGift);
 
     const giftCategory = String((gift as any).category || '')
       .trim()
@@ -2351,7 +2357,7 @@ export class GiftsService implements OnModuleInit {
         receiverId: rid,
         roomId: dto.roomId,
         quantity: dto.quantity,
-      });
+      }, rid === String(senderId));
     }
 
     const gift = await this.giftsRepo.findOne({

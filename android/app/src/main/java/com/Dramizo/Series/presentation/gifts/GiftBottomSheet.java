@@ -1059,22 +1059,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (fb != null && !fb.isEmpty()) { receiverId = fb; targets.add(fb); }
         }
 
-        // Never allow self-support (room owner/host gifting themselves).
-        String myId = null;
-        try {
-            myId = ContainerProvider.from(requireActivity()).getSessionManager().getUserId();
-        } catch (Exception ignored) {
-        }
-        if (myId != null && !myId.isEmpty()) {
-            final String me = myId;
-            boolean removedSelf = targets.removeIf(id -> me.equals(id));
-            if (removedSelf && targets.isEmpty()) {
-                Toast.makeText(requireContext(),
-                        "لا يمكنك دعم نفسك — اختر مستلم آخر",
-                        Toast.LENGTH_LONG).show();
-                return;
-            }
-        }
+        // Self-gifting is controlled by the live dashboard policy and enforced by the server.
+        // Keep selected recipients intact; stripping the sender here made the dashboard toggle ineffective.
 
         if (targets.isEmpty()) {
             Toast.makeText(requireContext(),

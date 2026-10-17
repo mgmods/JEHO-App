@@ -184,6 +184,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
     private String myUserId;
+    private volatile boolean selfGiftAllowed = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -587,6 +588,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         applyRoomToolbarIcons();
         startRoomGmtClock();
         setupRealtime();
+        refreshSelfGiftPolicy();
         setupZegoListener();
         setupLuckyBoxUi();
 
@@ -9250,7 +9252,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // 1) Pin the live host first when giftable (skip if that host is me).
         if (liveHostId != null && !liveHostId.isEmpty()
-                && (myUserId == null || !myUserId.equals(liveHostId))) {
+                && (myUserId == null || !myUserId.equals(liveHostId) || selfGiftAllowed)) {
             String name = null;
             String avatar = null;
             String hostBadge = null;
@@ -9297,7 +9299,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             for (RoomDtos.SeatDto seat : ordered) {
                 String uid = seatUserId(seat);
                 if (uid == null || uid.isEmpty()) continue;
-                if (myUserId != null && myUserId.equals(uid)) continue;
+                if (myUserId != null && myUserId.equals(uid) && !selfGiftAllowed) continue;
                 if (!seen.add(uid)) continue;
                 String name = seat.user != null
                         ? (seat.user.displayName != null ? seat.user.displayName : seat.user.username)
@@ -9313,6 +9315,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         uid, name, avatar, hostBadge, vipBadge,
                         seat.seatIndex, host, support, level));
             }
+        }
+        // When enabled, also expose the current user as a selectable target even when not seated.
+        // The server verifies the dashboard policy before accepting the self-gift.
+        if (selfGiftAllowed && myUserId != null && !myUserId.isEmpty() && seen.add(myUserId)) {
+            AuthDtos.UserDto me = null;
+            try { me = ContainerProvider.from(this).getSessionManager().getUser(); } catch (Exception ignored) {}
+            String selfName = me != null ? firstNonEmpty(me.displayName, me.username) : "أنا";
+            out.add(new GiftRecipient(myUserId, selfName != null ? selfName : "أنا",
+                    me != null ? me.avatarUrl : null,
+                    me != null ? me.hostBadgeUrl : null,
+                    me != null ? me.vipBadgeUrl : null,
+                    -1, false, seatAdapter != null ? seatAdapter.getGiftCoins(myUserId) : 0L,
+                    me != null ? Math.max(0, me.level) : 0));
         }
         return out;
     }
@@ -9332,13 +9347,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     /** Live host / owner / cohost may send gifts to themselves (room support). */
     private boolean canHostGiftSelf() {
-        if (myUserId == null || myUserId.isEmpty()) return false;
-        RoomDtos.RoomDto room = viewModel != null ? viewModel.getRoom().getValue() : null;
-        String liveHostId = resolveLiveHostId(room);
-        return sameUser(myUserId, liveHostId)
-                || sameUser(myUserId, roomHostId)
-                || sameUser(myUserId, roomCohostId)
-                || (room != null && sameUser(myUserId, room.activeHostId));
+        return myUserId != null && !myUserId.isEmpty() && selfGiftAllowed;
+    }
+
+    /** Read the live self-gift switch; failures fail closed and the server remains authoritative. */
+    private void refreshSelfGiftPolicy() {
+        final AppContainer container;
+        try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
+        container.getIoExecutor().execute(() -> {
+            Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
+            boolean allowed = false;
+            if (result.success && result.data != null) {
+                Object value = result.data.get("selfGiftAllowed");
+                allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
+                        || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
+            }
+            final boolean next = allowed;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                if (selfGiftAllowed != next) {
+                    selfGiftAllowed = next;
+                    notifyGiftSheetRecipientsChanged();
+                }
+            });
+        });
     }
 
     @Override

@@ -15,6 +15,9 @@ public interface GiftApi {
     @GET("gifts/categories")
     Call<ApiResponse<GiftDtos.GiftCategoryList>> categories();
 
+    @GET("gifts/policy")
+    Call<ApiResponse<java.util.Map<String, Object>>> selfGiftPolicy();
+
     @POST("gifts/send")
     Call<ApiResponse<GiftDtos.SendGiftResult>> send(@Body GiftDtos.SendGiftRequest body);
 
