@@ -334,6 +334,9 @@ const tabs = computed(() => [
   { key: 'vip_badge', label: t('cosmetics.frames') },
   { key: 'entry_effect', label: t('cosmetics.entry') },
   { key: 'room_card', label: t('cosmetics.roomCards') },
+  { key: 'profile_card', label: 'بطاقة الملف الشخصي' },
+  { key: 'chat_bubble', label: 'فقاعة الدردشة' },
+  { key: 'nameplate', label: 'لوحة الاسم' },
   { key: 'room_background', label: t('cosmetics.roomBackgrounds') },
   { key: 'level_badge', label: t('cosmetics.levels') },
 ])
@@ -555,7 +558,7 @@ function isFrameLike(item) {
 
 function isWide(item) {
   const type = item.type || tab.value
-  return type === 'room_card' || type === 'entry_effect' || type === 'room_background'
+  return type === 'room_card' || type === 'entry_effect' || type === 'room_background' || type === 'profile_card' || type === 'chat_bubble' || type === 'nameplate'
 }
 
 function previewSrc(item) {
