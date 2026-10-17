@@ -35,7 +35,7 @@ public class CosmeticsActivity extends ThemedActivity {
     public static final String EXTRA_ROOM_ID = "room_id";
     static final String[] TYPES = {
             "vip_badge", "entry_effect",
-            "level_badge", "room_card", "room_background"
+            "level_badge", "room_card", "room_background", "profile_card", "chat_bubble", "nameplate"
     };
 
     @Nullable private WebView mallWebView;
@@ -217,6 +217,9 @@ public class CosmeticsActivity extends ThemedActivity {
         if ("badges".equals(type) || "level_badge".equals(type)) return "level_badge";
         if ("room_card".equals(type)) return "room_card";
         if ("room_background".equals(type)) return "room_background";
+        if ("profile_card".equals(type)) return "profile_card";
+        if ("chat_bubble".equals(type)) return "chat_bubble";
+        if ("nameplate".equals(type)) return "nameplate";
         return "vip_badge";
     }
 
