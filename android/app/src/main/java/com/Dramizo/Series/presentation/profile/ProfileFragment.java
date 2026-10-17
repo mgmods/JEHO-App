@@ -189,7 +189,7 @@ public class ProfileFragment extends Fragment {
             if (user == null) return;
             myId = user.id;
             loadProfileBadges(user.id);
-            bindMyCpRelationship(user.id, user.avatarUrl);
+            bindMyCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
             binding.tvDisplayName.setText(user.displayName);
             com.Dramizo.Series.util.GenderVerifiedBadge.bind(binding.tvDisplayName, null, user);
             bindGenderIcon(user);
@@ -649,7 +649,7 @@ public class ProfileFragment extends Fragment {
         });
     }
 
-    private void bindMyCpRelationship(String userId, String selfAvatarUrl) {
+    private void bindMyCpRelationship(String userId, String selfAvatarUrl, String selfFrameUrl) {
         if (userId == null || userId.trim().isEmpty() || binding == null) {
             hideMyCpRelationship();
             return;
@@ -695,10 +695,62 @@ public class ProfileFragment extends Fragment {
                 }
                 bindMyCpAvatar(binding.imgMyProfileCpSelf, selfAvatarUrl);
                 bindMyCpAvatar(binding.imgMyProfileCpPartner, partnerAvatar);
+
+                String partnerFrameUrl = partner.get("vipBadgeUrl") == null
+                        ? "" : String.valueOf(partner.get("vipBadgeUrl")).trim();
+                bindMyCpAvatar(binding.imgMyProfileCpCvSelf, selfAvatarUrl);
+                bindMyCpAvatar(binding.imgMyProfileCpCvPartner, partnerAvatar);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpCvSelfFrame, selfFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpCvPartnerFrame, partnerFrameUrl);
+                int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
+                long relationshipDays = cpDurationDays(relation.get("startedAt"));
+                binding.tvMyProfileCpCvType.setText(myCpTypeLabel(type));
+                binding.tvMyProfileCpCvHeart.setText("♥");
+                binding.tvMyProfileCpCvLevel.setText("Lv." + relationshipLevel);
+                binding.tvMyProfileCpCvDays.setText(relationshipDays + " أيام");
+                binding.rowMyProfileCpCv.setVisibility(View.VISIBLE);
                 binding.rowMyProfileCp.setVisibility(View.VISIBLE);
                 startMyCpHeartAnimation();
             });
         });
+    }
+
+    private int parsePositiveInt(Object value, int fallback) {
+        try {
+            int parsed = Integer.parseInt(String.valueOf(value));
+            return parsed > 0 ? parsed : fallback;
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private long cpDurationDays(Object startedAtValue) {
+        if (startedAtValue == null) return 0L;
+        java.util.Date startedAt = null;
+        if (startedAtValue instanceof java.util.Date) {
+            startedAt = (java.util.Date) startedAtValue;
+        } else {
+            String raw = String.valueOf(startedAtValue).trim();
+            String[] patterns = {
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                    "yyyy-MM-dd'T'HH:mm:ssX",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    "yyyy-MM-dd"
+            };
+            for (String pattern : patterns) {
+                try {
+                    java.text.SimpleDateFormat format =
+                            new java.text.SimpleDateFormat(pattern, java.util.Locale.US);
+                    format.setLenient(false);
+                    format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    startedAt = format.parse(raw);
+                    if (startedAt != null) break;
+                } catch (Exception ignored) { }
+            }
+        }
+        if (startedAt == null) return 0L;
+        return Math.max(0L, (System.currentTimeMillis() - startedAt.getTime()) / 86400000L);
     }
 
     private void bindMyCpAvatar(android.widget.ImageView view, String avatarUrl) {
@@ -758,6 +810,9 @@ public class ProfileFragment extends Fragment {
         }
         if (binding != null && binding.rowMyProfileCp != null) {
             binding.rowMyProfileCp.setVisibility(View.GONE);
+        }
+        if (binding != null && binding.rowMyProfileCpCv != null) {
+            binding.rowMyProfileCpCv.setVisibility(View.GONE);
         }
     }
 
