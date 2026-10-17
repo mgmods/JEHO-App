@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.common;
 import com.Dramizo.Series.util.StaffRoleHelper;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.Drawable;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -35,6 +36,8 @@ import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.HostSignalView;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.util.HashMap;
@@ -247,6 +250,27 @@ public final class UserProfileCardSheet {
                 bindVipMedal(imgVipMedal, liveVip, u.levelBadgeUrl);
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
+                // Dashboard-uploaded profile-card art and nameplate are applied from equipped cosmetics.
+                if (u.profileCardUrl != null && !u.profileCardUrl.trim().isEmpty() && userCardBg != null) {
+                    try {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(u.profileCardUrl)).into(new CustomTarget<Drawable>() {
+                            @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                if (dialog.isShowing()) userCardBg.setBackground(resource);
+                            }
+                            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                        });
+                    } catch (Exception ignored) { }
+                }
+                if (tvName != null && u.nameplateUrl != null && !u.nameplateUrl.trim().isEmpty()) {
+                    try {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(u.nameplateUrl)).into(new CustomTarget<Drawable>() {
+                            @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                if (dialog.isShowing()) tvName.setBackground(resource);
+                            }
+                            @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                        });
+                    } catch (Exception ignored) { }
+                }
                 if (tvName != null) {
                     String displayName = displayNameHold[0].isEmpty() ? "مستخدم" : displayNameHold[0];
                     if (superAdminFrame != null) {
