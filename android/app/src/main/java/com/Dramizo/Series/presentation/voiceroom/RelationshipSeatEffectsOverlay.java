@@ -147,7 +147,7 @@ final class RelationshipSeatEffectsOverlay {
             Map<String, Object> effect = findEffect(type);
             if (effect != null && Boolean.FALSE.equals(effect.get("enabled"))) continue;
             String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
-            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
+            int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 28, 20, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(a, b, type, url, sizeDp, duration);
         }
@@ -176,7 +176,7 @@ final class RelationshipSeatEffectsOverlay {
      */
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
-        final int thickness = dp(Math.max(6, Math.min(48, sizeDp)));
+        final int thickness = dp(Math.max(20, Math.min(48, sizeDp)));
         final boolean hasRibbon = !url.trim().isEmpty()
                 && (url.startsWith("https://") || url.startsWith("http://"));
         final RibbonFallbackView fallback = new RibbonFallbackView(context);
@@ -337,6 +337,7 @@ final class RelationshipSeatEffectsOverlay {
         private final Paint core = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint particle = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint heart = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint capsule = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float progress;
 
         RibbonFallbackView(Context context) {
@@ -353,9 +354,12 @@ final class RelationshipSeatEffectsOverlay {
             particle.setStyle(Paint.Style.FILL);
             particle.setColor(Color.WHITE);
             heart.setStyle(Paint.Style.FILL);
-            heart.setColor(0xFFFF2F86);
+            heart.setColor(Color.WHITE);
             heart.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
             heart.setTextAlign(Paint.Align.CENTER);
+            capsule.setStyle(Paint.Style.FILL);
+            capsule.setColor(0xEEFF4F93);
+            capsule.setShadowLayer(5f, 0f, 1f, 0xAAFF2F86);
         }
 
         void setProgress(float value) {
@@ -371,10 +375,15 @@ final class RelationshipSeatEffectsOverlay {
             super.onDraw(canvas);
             float cy = getHeight() / 2f;
             float right = Math.max(1f, getWidth());
-            glow.setStrokeWidth(Math.max(5f, getHeight() * 0.9f));
-            core.setStrokeWidth(Math.max(2f, getHeight() * 0.24f));
-            canvas.drawLine(0f, cy, right, cy, glow);
-            canvas.drawLine(0f, cy, right, cy, core);
+            float inset = Math.max(1f, getHeight() * 0.06f);
+            canvas.drawRoundRect(inset, inset, Math.max(inset + 1f, right - inset),
+                    Math.max(inset + 1f, getHeight() - inset), getHeight() / 2f,
+                    capsule, null);
+            capsule.clearShadowLayer();
+            glow.setStrokeWidth(Math.max(5f, getHeight() * 0.24f));
+            core.setStrokeWidth(Math.max(2f, getHeight() * 0.12f));
+            canvas.drawLine(inset, cy, right - inset, cy, glow);
+            canvas.drawLine(inset, cy, right - inset, cy, core);
             float dot = Math.max(2f, getHeight() * 0.22f);
             for (int i = 0; i < 3; i++) {
                 float p = (progress + i / 3f) % 1f;
@@ -384,9 +393,9 @@ final class RelationshipSeatEffectsOverlay {
             }
             // A clear heart at the center makes the ribbon recognizable even when no custom
             // effect image is configured in the dashboard or its URL fails to load.
-            heart.setTextSize(Math.max(dpForView(10), getHeight() * 1.55f));
-            heart.setShadowLayer(2f, 0f, 0f, Color.WHITE);
-            canvas.drawText("♥", right / 2f, cy + heart.getTextSize() * 0.34f, heart);
+            heart.setTextSize(Math.max(dpForView(10), getHeight() * 0.58f));
+            heart.setShadowLayer(2f, 0f, 0f, 0xAA9B174D);
+            canvas.drawText("CP  ♥", right / 2f, cy + heart.getTextSize() * 0.34f, heart);
             heart.clearShadowLayer();
         }
     }
