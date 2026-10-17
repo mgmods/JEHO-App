@@ -652,16 +652,17 @@ public class ProfileActivity extends ThemedActivity {
                     Object frameValue = partner.get("vipBadgeUrl");
                     partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
                 }
-                // Render only a real active relationship returned by the API; never synthesize a name or photo.
-                if (partner == null || name.isEmpty()) {
+                // Only the active relationship and its real partner payload are required;
+                // the top pair intentionally shows no partner name or relationship text.
+                if (partner == null) {
                     hideProfileCpRelationship();
                     return;
                 }
-                binding.tvProfileCpLabel.setText(cpTypeLabel(type) + " · " + name);
-                bindRealCpAvatar(binding.imgProfileCpSelf, ownAvatarUrl);
+                binding.tvProfileCpLabel.setVisibility(View.GONE);
+                binding.imgProfileCpSelf.setVisibility(View.GONE);
+                binding.imgProfileCpSelfFrame.setVisibility(View.GONE);
                 bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
-                // Only render the frame URLs actually returned by the server; never synthesize cosmetics.
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
+                // Keep the partner's actual profile frame; do not synthesize cosmetic assets.
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
 
                 // Mirror the same live relationship into the decorative CV card.
@@ -747,8 +748,8 @@ public class ProfileActivity extends ThemedActivity {
     private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
         if (imageView == null) return;
         if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
-            imageView.setImageDrawable(null);
-            imageView.setVisibility(View.GONE);
+            imageView.setImageResource(R.drawable.ic_default_avatar);
+            imageView.setVisibility(View.VISIBLE);
             return;
         }
         imageView.setVisibility(View.VISIBLE);
