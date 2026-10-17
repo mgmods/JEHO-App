@@ -39,6 +39,7 @@ final class RelationshipSeatEffectsOverlay {
     @Nullable private List<Map<String, Object>> lastRelationships;
     @Nullable private Map<String, Map<String, Object>> lastEffects;
     private boolean retryPosted;
+    private boolean retryAttempted;
 
     RelationshipSeatEffectsOverlay(@NonNull Context context, @NonNull ViewGroup root,
                                    @NonNull RecyclerView seatsRecycler) {
@@ -94,6 +95,11 @@ final class RelationshipSeatEffectsOverlay {
         lastSeats = seats == null ? null : new ArrayList<>(seats);
         lastRelationships = relationships == null ? null : new ArrayList<>(relationships);
         lastEffects = effects == null ? null : new HashMap<>(effects);
+        retryAttempted = false;
+        renderCurrent();
+    }
+
+    private void renderCurrent() {
         clearParticles();
         if (seats == null || relationships == null || relationships.isEmpty()
                 || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
@@ -141,15 +147,16 @@ final class RelationshipSeatEffectsOverlay {
     }
 
     private void retryIfNoParticles() {
-        if (retryPosted || running.size() > 0 || lastRelationships == null
+        if (retryPosted || retryAttempted || running.size() > 0 || lastRelationships == null
                 || lastRelationships.isEmpty() || lastSeats == null) return;
         retryPosted = true;
+        retryAttempted = true;
         // RecyclerView can report the new seat list before holders are laid out. Retry once
         // after its next layout/attachment instead of silently losing the effect for 15 seconds.
         seatsRecycler.post(() -> {
             retryPosted = false;
             if (running.isEmpty() && lastSeats != null && lastRelationships != null) {
-                render(lastSeats, lastRelationships, lastEffects);
+                renderCurrent();
             }
         });
     }
