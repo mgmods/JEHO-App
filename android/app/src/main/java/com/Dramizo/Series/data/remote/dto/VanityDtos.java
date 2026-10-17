@@ -24,6 +24,7 @@ public final class VanityDtos {
         @SerializedName("styleColor2") public String styleColor2;
         @SerializedName("styleColor3") public String styleColor3;
         @SerializedName("styleGlow") public boolean styleGlow;
+        @SerializedName("styleVipLevel") public int styleVipLevel;
     }
 
     public static class VanityItem {
