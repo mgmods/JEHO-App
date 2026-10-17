@@ -622,6 +622,27 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
 
+                // Room staff who are not seated can invite an audience member to this
+                // exact empty seat, or choose to sit here themselves.
+                if (canInviteMic && !isOnSeat(currentSeats)) {
+                    new androidx.appcompat.app.AlertDialog.Builder(VoiceRoomActivity.this)
+                            .setTitle("المقعد فارغ")
+                            .setItems(new CharSequence[]{"دعوة شخص للمقعد", "الجلوس على المقعد"},
+                                    (dialog, which) -> {
+                                        if (which == 0) {
+                                            showSeatInvitePickerDialog(seat.seatIndex);
+                                        } else {
+                                            takeEmptySeat(seat.seatIndex);
+                                        }
+                                    })
+                            .setNegativeButton("إلغاء", null)
+                            .show();
+                    return;
+                }
+                takeEmptySeat(seat.seatIndex);
+            }
+
+            private void takeEmptySeat(int seatIndex) {
                 // Host / owner can sit freely and hop seats. Guests already on mic can hop;
                 // first seat requires host approval unless dashboard enables free mic.
                 boolean freeMic = isFreeMicEnabled();
@@ -633,10 +654,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
                 try {
                     if (canHop) {
-                        optimisticTakeSeat(seat.seatIndex);
-                        viewModel.takeSeat(roomId, seat.seatIndex);
+                        optimisticTakeSeat(seatIndex);
+                        viewModel.takeSeat(roomId, seatIndex);
                     } else {
-                        viewModel.requestSeat(roomId, seat.seatIndex);
+                        viewModel.requestSeat(roomId, seatIndex);
                     }
                 } catch (Exception e) {
                     android.util.Log.e("VoiceRoom", "takeSeat click failed", e);
@@ -10823,6 +10844,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         showRoomJoinLoading();
         viewModel.join(targetRoomId, password);
         // hoppingRoom stays true until the new session arrives (see session observer).
+    }
+
+    /** Show only members currently in this room who are not occupying any mic seat. */
+    private void showSeatInvitePickerDialog(int seatIndex) {
+        if (isFinishing() || roomId == null) return;
+        java.util.ArrayList<JsonObject> eligible = new java.util.ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        List<JsonObject> source = !roomMembersAll.isEmpty() ? roomMembersAll : roomAudience;
+        for (JsonObject member : source) {
+            if (member == null) continue;
+            String uid = memberStr(member, "userId");
+            if (uid == null || uid.isEmpty() || !seen.add(normalizeUserId(uid))) continue;
+            if (sameUser(uid, myUserId) || sameUser(uid, roomHostId)
+                    || sameUser(uid, roomCohostId) || isUserSeated(uid)) continue;
+            eligible.add(member);
+        }
+        if (eligible.isEmpty()) {
+            Toast.makeText(this, "لا يوجد أعضاء غير جالسين على المقاعد داخل الروم", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[eligible.size()];
+        for (int i = 0; i < eligible.size(); i++) {
+            JsonObject member = eligible.get(i);
+            String name = memberStr(member, "displayName");
+            if (name == null || name.trim().isEmpty()) name = memberStr(member, "username");
+            labels[i] = (name == null || name.trim().isEmpty()) ? "عضو" : name;
+        }
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("اختر عضواً لدعوته للمقعد " + Math.max(1, seatIndex))
+                .setItems(labels, (dialog, which) -> {
+                    if (which < 0 || which >= eligible.size()) return;
+                    String targetId = memberStr(eligible.get(which), "userId");
+                    if (targetId != null && !targetId.isEmpty()) {
+                        viewModel.inviteSeat(roomId, targetId, seatIndex);
+                    }
+                })
+                .setNegativeButton("إلغاء", null)
+                .show();
     }
 
     private void showPendingSeatInviteDialog() {
