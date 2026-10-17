@@ -186,8 +186,8 @@ final class RelationshipSeatEffectsOverlay {
         final int[] bLoc = new int[2];
         initialA.getLocationInWindow(aLoc);
         initialB.getLocationInWindow(bLoc);
-        float dx = (bLoc[0] + anchorB.getWidth() / 2f) - (aLoc[0] + anchorA.getWidth() / 2f);
-        float dy = (bLoc[1] + anchorB.getHeight() / 2f) - (aLoc[1] + anchorA.getHeight() / 2f);
+        float dx = (bLoc[0] + initialB.getWidth() / 2f) - (aLoc[0] + initialA.getWidth() / 2f);
+        float dy = (bLoc[1] + initialB.getHeight() / 2f) - (aLoc[1] + initialA.getHeight() / 2f);
         float distanceDp = (float) Math.hypot(dx, dy)
                 / context.getResources().getDisplayMetrics().density;
         // Repeat the dashboard-uploaded animated image along the full path between seats.
