@@ -15,7 +15,7 @@
 
     <div class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="إدارة VIP">
       <button type="button" class="btn btn-sm" :class="activeTab === 'plans' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('plans')">مستويات VIP والأعضاء</button>
-      <button type="button" class="btn btn-sm" :class="activeTab === 'visuals' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('visuals')">الإطارات والدخوليات والمظاهر</button>
+      <button type="button" class="btn btn-sm" :class="activeTab === 'visuals' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('visuals')">مظاهر VIP حسب المستوى</button>
     </div>
 
     <template v-if="activeTab === 'plans'">
@@ -159,6 +159,30 @@
                 <label class="form-label">{{ t('vip.benefits') }}</label>
                 <input v-model="planForm.benefitsText" class="form-control" />
               </div>
+              <hr />
+              <h6 class="mb-2">مظاهر هذا المستوى — ترفع مباشرة إلى VIP {{ planForm.level }}</h6>
+              <div class="mb-3">
+                <label class="form-label">شارة / شعار VIP</label>
+                <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'badgeUrl')" />
+                <div v-if="planForm.badgeUrl" class="vip-upload-preview"><img :src="assetUrl(planForm.badgeUrl)" alt="معاينة شارة VIP" /></div>
+              </div>
+              <div class="row g-3">
+                <div v-for="asset in [
+                  { key: 'vipFrameUrl', label: 'إطار VIP' },
+                  { key: 'vipCardUrl', label: 'بطاقة VIP' },
+                  { key: 'profileCardUrl', label: 'بطاقة الملف الشخصي' },
+                  { key: 'chatBubbleUrl', label: 'فقاعة الدردشة' },
+                  { key: 'nameplateUrl', label: 'لوحة الاسم' },
+                ]" :key="asset.key" class="col-md-6">
+                  <label class="form-label">{{ asset.label }}</label>
+                  <input type="file" class="form-control" accept="image/*,video/mp4,video/webm,.gif,.webp,.mp4,.webm,.svga" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, asset.key)" />
+                  <div v-if="planForm.visuals[asset.key]" class="vip-upload-preview">
+                    <video v-if="/\.(mp4|webm)(\?|$)/i.test(planForm.visuals[asset.key])" :src="assetUrl(planForm.visuals[asset.key])" muted autoplay loop playsinline />
+                    <img v-else :src="assetUrl(planForm.visuals[asset.key])" :alt="asset.label" />
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals[asset.key] = ''">إزالة من الخطة</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-ghost" @click="showPlan = false">{{ t('common.cancel') }}</button>
@@ -208,7 +232,31 @@
       @confirm="runConfirm"
     />
     </template>
-    <CosmeticsView v-else />
+    <template v-else>
+      <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
+      <div class="widget-grid mb-3">
+        <article v-for="p in plans" :key="p.id" class="widget-card vip-card" :style="{ '--vip-accent': tierColor(p.level) }">
+          <div class="widget-card-media vip-media vip-visual-preview">
+            <img v-if="p.badgeUrl" :src="assetUrl(p.badgeUrl)" alt="شارة VIP" />
+            <span v-else class="vip-tier-chip">VIP {{ p.level }}</span>
+          </div>
+          <div class="widget-card-body">
+            <h3 class="widget-card-title">{{ p.name || ('VIP ' + p.level) }}</h3>
+            <div class="small text-muted mb-2">إدارة ملفات هذا المستوى مباشرة، بدون فتح المتجر</div>
+            <div class="vip-asset-list">
+              <span :class="{ 'is-set': p.visuals?.vipFrameUrl }">إطار VIP</span>
+              <span :class="{ 'is-set': p.visuals?.vipCardUrl }">بطاقة VIP</span>
+              <span :class="{ 'is-set': p.visuals?.profileCardUrl }">بطاقة الملف الشخصي</span>
+              <span :class="{ 'is-set': p.visuals?.chatBubbleUrl }">فقاعة الدردشة</span>
+              <span :class="{ 'is-set': p.visuals?.nameplateUrl }">لوحة الاسم</span>
+            </div>
+            <div class="action-btns mt-3">
+              <button class="btn btn-sm btn-aurora" type="button" @click="openPlan(p)">تعديل مظاهر VIP {{ p.level }}</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -228,7 +276,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import CosmeticsView from '@/views/CosmeticsView.vue'
+import { uploadsApi } from '@/api'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -253,7 +301,11 @@ const error = ref('')
 const success = ref('')
 const showPlan = ref(false)
 const showAssign = ref(false)
-const planForm = reactive({ id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '' })
+const planForm = reactive({
+  id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '',
+  badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '' },
+})
+const uploadingVisual = ref('')
 const assignForm = reactive({ userId: '', planId: '' })
 const bulkBusy = ref(false)
 
@@ -308,7 +360,7 @@ function tierColor(level) {
   return LEVEL_COLORS[tierForLevel(level)] || '#00c9b1'
 }
 
-function badgeSrc(p) {
+function assetUrl(path) { return resolveAsset(path) }\n\nfunction badgeSrc(p) {
   const lvl = tierForLevel(p.level)
   const fromPlan = p.badgeUrl && String(p.badgeUrl).includes(`vip_medal_mikoo_${lvl}`)
     ? p.badgeUrl
@@ -343,11 +395,44 @@ function openPlan(p = null) {
       durationDays: p.durationDays || p.duration || 30,
       level: Math.max(1, Math.min(100, Number(p.level || 1))),
       benefitsText: (p.benefits || p.perks || []).join(', '),
+      badgeUrl: p.badgeUrl || '',
+      visuals: {
+        vipFrameUrl: p.visuals?.vipFrameUrl || '',
+        vipCardUrl: p.visuals?.vipCardUrl || '',
+        profileCardUrl: p.visuals?.profileCardUrl || '',
+        chatBubbleUrl: p.visuals?.chatBubbleUrl || '',
+        nameplateUrl: p.visuals?.nameplateUrl || '',
+      },
     })
   } else {
-    Object.assign(planForm, { id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '' })
+    Object.assign(planForm, {
+      id: null, name: '', price: 99, durationDays: 30, level: plans.value.length + 1, benefitsText: '',
+      badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '' },
+    })
   }
   showPlan.value = true
+}
+
+async function uploadPlanVisual(event, field) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  uploadingVisual.value = field
+  error.value = ''
+  try {
+    const { data, error: err } = await uploadsApi.upload(file)
+    if (err) throw err
+    const url = data?.data?.url || data?.url
+    if (!url) throw new Error('لم يرجع الخادم رابط الملف بعد الرفع')
+    if (field === 'badgeUrl') planForm.badgeUrl = url
+    else planForm.visuals[field] = url
+    toast().success('تم رفع الملف')
+  } catch (e) {
+    error.value = e?.message || t('app.error')
+    toast().danger(error.value)
+  } finally {
+    uploadingVisual.value = ''
+    event.target.value = ''
+  }
 }
 
 async function savePlan() {
@@ -358,6 +443,8 @@ async function savePlan() {
     durationDays: planForm.durationDays,
     level: Math.max(1, Math.min(100, Number(planForm.level || 1))),
     benefits: planForm.benefitsText.split(',').map((s) => s.trim()).filter(Boolean),
+    badgeUrl: planForm.badgeUrl || null,
+    visuals: { ...planForm.visuals },
   }
   const result = planForm.id
     ? await vipApi.updatePlan(planForm.id, payload)
@@ -488,6 +575,13 @@ onMounted(load)
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
+.vip-visual-preview { min-height: 140px; }
+.vip-visual-preview img { max-width: 70%; max-height: 120px; object-fit: contain; }
+.vip-asset-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.vip-asset-list span { border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 7px; font-size: .72rem; opacity: .7; }
+.vip-asset-list span.is-set { opacity: 1; border-color: #00c9b1; color: #00c9b1; }
+.vip-upload-preview { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.vip-upload-preview img, .vip-upload-preview video { max-width: 180px; max-height: 100px; object-fit: contain; border-radius: 8px; background: #111; }
 .vip-price {
   color: #ffe08a;
   font-size: 1.12rem;
