@@ -3016,6 +3016,7 @@ export class AdminService {
       badgeUrl:
         p.badgeUrl ||
         `/assets/cosmetics/vip/vip_medal_mikoo_${Math.min(7, Math.max(1, p.level || 1))}.png?v=20260801vip7`,
+      visuals: (p.benefits as any)?.visuals || {},
       benefits: p.benefits?.extra?.length
         ? p.benefits.extra
         : [
@@ -3067,6 +3068,17 @@ export class AdminService {
       extra: Array.isArray(body.benefits) ? body.benefits : [],
     };
     if (Array.isArray(body.benefits)) benefits.extra = body.benefits;
+    // Keep tier-specific visual assets in the existing JSON column: additive,
+    // backward-compatible, and no table reset or destructive migration required.
+    const incomingVisuals = body.visuals && typeof body.visuals === 'object' && !Array.isArray(body.visuals)
+      ? body.visuals as Record<string, unknown>
+      : null;
+    const currentVisuals = (benefits as any).visuals && typeof (benefits as any).visuals === 'object'
+      ? (benefits as any).visuals
+      : {};
+    if (incomingVisuals) {
+      (benefits as any).visuals = { ...currentVisuals, ...incomingVisuals };
+    }
     if (!plan) {
       plan = this.vipRepo.create({
         level,
@@ -3083,6 +3095,7 @@ export class AdminService {
       }
       if (body.level != null) plan.level = level;
       plan.benefits = benefits;
+      if (body.badgeUrl !== undefined) plan.badgeUrl = String(body.badgeUrl || '').trim() || null;
       if (typeof body.isActive === 'boolean') plan.isActive = body.isActive;
     }
     return this.vipRepo.save(plan);
