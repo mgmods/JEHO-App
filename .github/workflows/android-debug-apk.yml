@@ -177,13 +177,19 @@ jobs:
             exit 1
           fi
           APK_ENTRIES="$(unzip -Z1 "$APK")"
-          grep -q '^lib/armeabi-v7a/.*\.so
+          grep -q '^lib/armeabi-v7a/.*\.so$' <<< "$APK_ENTRIES" || { echo "::error::ARM 32-bit native libraries are missing."; exit 1; }
+          grep -q '^lib/arm64-v8a/.*\.so$' <<< "$APK_ENTRIES" || { echo "::error::ARM 64-bit native libraries are missing."; exit 1; }
+          if grep -Eq '^lib/(x86|x86_64)/' <<< "$APK_ENTRIES"; then
+            echo "::error::Unexpected x86 libraries remain in the phone universal APK."
+            exit 1
+          fi
+          for HTML in cp-center.html cp-insights.html wealth-insights.html wealth-ranking.html; do
             if ! unzip -Z1 "$APK" | grep -E "(^|/)${HTML}$" -q; then
               echo "::error::Required in-app HTML asset missing inside universal APK: $HTML"
               exit 1
             fi
           done
-          echo "Verified: universal APK contains required HTML pages and uses the approved signing key."
+          echo "Verified: universal APK contains both ARM phone ABIs, required HTML pages, and the approved signing key."
 
       - name: Upload universal APK
         uses: actions/upload-artifact@v4
