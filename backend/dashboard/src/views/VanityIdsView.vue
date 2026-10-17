@@ -41,7 +41,7 @@
           <label class="form-label">نمط العرض</label>
           <select v-model="form.styleMode" class="form-select"><option value="none">بدون لون (اللون الرسمي)</option><option value="static">لون ثابت</option><option value="animated">ألوان متحركة</option><option value="vip">نمط VIP</option></select>
         </div>
-        <div class="col-md-2"><label class="form-label">اللون الأول</label><input v-model="form.styleColor1" type="color" class="form-control form-control-color w-100" /></div>
+        <div v-if="form.styleMode === &quot;vip&quot;" class="col-md-2"><label class="form-label">مستوى VIP</label><select v-model.number="form.styleVipLevel" class="form-select"><option v-for="n in 7" :key="n" :value="n">VIP {{ n }}</option></select></div><div class="col-md-2"><label class="form-label">اللون الأول</label><input v-model="form.styleColor1" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><label class="form-label">اللون الثاني</label><input v-model="form.styleColor2" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><label class="form-label">اللون الثالث</label><input v-model="form.styleColor3" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><button class="btn btn-aurora" type="submit" :disabled="saving">إضافة للبيع</button></div>
@@ -90,7 +90,7 @@
           <div class="vanity-style-editor mb-3">
             <div class="row g-2">
               <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="none">رسمي بدون لون</option><option value="static">ثابت</option><option value="animated">متحرك</option><option value="vip">VIP</option></select></div>
-              <div class="col-6 d-flex align-items-end"><label class="form-check mb-2"><input v-model="item._styleGlow" class="form-check-input" type="checkbox" /><span class="form-check-label small">توهّج</span></label></div>
+              <div v-if="item._styleMode === &quot;vip&quot;" class="col-6"><label class="form-label small mb-1">مستوى VIP</label><select v-model.number="item._styleVipLevel" class="form-select form-select-sm"><option v-for="n in 7" :key="n" :value="n">VIP {{ n }}</option></select></div><div class="col-6 d-flex align-items-end"><label class="form-check mb-2"><input v-model="item._styleGlow" class="form-check-input" type="checkbox" /><span class="form-check-label small">توهّج</span></label></div>
               <div class="col-4"><input v-model="item._styleColor1" type="color" class="form-control form-control-color w-100" aria-label="اللون الأول" /></div>
               <div class="col-4"><input v-model="item._styleColor2" type="color" class="form-control form-control-color w-100" aria-label="اللون الثاني" /></div>
               <div class="col-4"><input v-model="item._styleColor3" type="color" class="form-control form-control-color w-100" aria-label="اللون الثالث" /></div>
@@ -282,6 +282,12 @@ async function create() {
 }
 
 function idPreviewStyle(item) {
+  if (item._styleMode === 'none') return { color: 'inherit', backgroundImage: 'none', textShadow: 'none' }
+  if (item._styleMode === 'vip') {
+    const colors = ['#B6C4D2', '#68C8FF', '#65E6B4', '#B28AFF', '#FF9A52', '#FFD66B', '#FF6AA9']
+    const color = colors[Math.max(0, Math.min(6, Number(item._styleVipLevel || 1) - 1))]
+    return { color: color, backgroundImage: 'none', textShadow: '0 0 10px ' + color }
+  }
   const a = item._styleColor1 || '#52E8FF'
   const b = item._styleColor2 || '#C084FC'
   const c = item._styleColor3 || '#FF7AC8'
