@@ -112,10 +112,10 @@ jobs:
           test -s "$KEYSTORE"
           KEY_INFO="$(keytool -list -v -keystore "$KEYSTORE" -storepass "$JEHO_SIGNING_STORE_PASSWORD" -alias "$JEHO_SIGNING_KEY_ALIAS")"
           printf '%s\n' "$KEY_INFO" | grep -E 'Alias name:|SHA1:|SHA256:'
-          EXPECTED_BASELINE_SHA1="FE544713A2726865005599472B4527C62818E696"
+          EXPECTED_BASELINE_SHA1="5A63B18BD7F18CE914F255AA70918BDB91D683E4"
           ACTUAL_KEY_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
           if [[ "$ACTUAL_KEY_SHA1" != "$EXPECTED_BASELINE_SHA1" ]]; then
-            echo "::error::Signing key does not match the newly approved JEHO release key."
+            echo "::error::Signing key does not match the previously verified installed JEHO APK key."
             echo "::error::Expected stable SHA-1: $EXPECTED_BASELINE_SHA1"
             echo "::error::Available key SHA-1: ${ACTUAL_KEY_SHA1:-not detected}"
             exit 1
