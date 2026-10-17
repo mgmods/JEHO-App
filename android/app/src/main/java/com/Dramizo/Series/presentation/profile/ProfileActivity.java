@@ -660,11 +660,63 @@ public class ProfileActivity extends ThemedActivity {
                 // Only render the frame URLs actually returned by the server; never synthesize cosmetics.
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpSelfFrame, ownFrameUrl);
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
+
+                // Mirror the same live relationship into the decorative CV card.
+                bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
+                bindRealCpAvatar(binding.imgProfileCpCvPartner, avatar);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvSelfFrame, ownFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvPartnerFrame, partnerFrameUrl);
+                int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
+                long relationshipDays = cpDurationDays(relation.get("startedAt"));
+                binding.tvProfileCpCvType.setText(cpTypeLabel(type));
+                binding.tvProfileCpCvHeart.setText("♥");
+                binding.tvProfileCpCvLevel.setText("Lv." + relationshipLevel);
+                binding.tvProfileCpCvDays.setText(relationshipDays + " أيام");
+                binding.rowProfileCpCv.setVisibility(View.VISIBLE);
+
                 binding.rowProfileCp.setVisibility(View.VISIBLE);
                 binding.btnCpRequest.setVisibility(View.GONE);
                 startProfileCpHeartAnimation();
             });
         });
+    }
+
+    private int parsePositiveInt(Object value, int fallback) {
+        try {
+            int parsed = Integer.parseInt(String.valueOf(value));
+            return parsed > 0 ? parsed : fallback;
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private long cpDurationDays(Object startedAtValue) {
+        if (startedAtValue == null) return 0L;
+        java.util.Date startedAt = null;
+        if (startedAtValue instanceof java.util.Date) {
+            startedAt = (java.util.Date) startedAtValue;
+        } else {
+            String raw = String.valueOf(startedAtValue).trim();
+            String[] patterns = {
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+                    "yyyy-MM-dd'T'HH:mm:ssX",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+                    "yyyy-MM-dd'T'HH:mm:ss'Z'",
+                    "yyyy-MM-dd"
+            };
+            for (String pattern : patterns) {
+                try {
+                    java.text.SimpleDateFormat format =
+                            new java.text.SimpleDateFormat(pattern, java.util.Locale.US);
+                    format.setLenient(false);
+                    format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+                    startedAt = format.parse(raw);
+                    if (startedAt != null) break;
+                } catch (Exception ignored) { }
+            }
+        }
+        if (startedAt == null) return 0L;
+        return Math.max(0L, (System.currentTimeMillis() - startedAt.getTime()) / 86400000L);
     }
 
     private void bindRealCpAvatar(ImageView imageView, String avatarUrl) {
