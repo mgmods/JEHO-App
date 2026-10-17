@@ -842,7 +842,7 @@
 
                 <!-- Pink and gold relationship CV card; all values come from the active backend relationship. -->
                 <LinearLayout
-                    android:id="@+id/ProfileCpCv"
+                    android:id="@+id/rowProfileCpCv"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="14dp"
