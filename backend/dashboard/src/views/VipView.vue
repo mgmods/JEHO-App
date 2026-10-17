@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PageHeader :title="t('vip.title')" :subtitle="t('vip.subtitle')">
+    <PageHeader v-if="activeTab === 'plans'" :title="t('vip.title')" :subtitle="t('vip.subtitle')">
       <template #actions>
         <template v-if="activeTab === 'plans'">
         <button class="btn btn-ghost btn-sm" type="button" @click="openPlan()">
