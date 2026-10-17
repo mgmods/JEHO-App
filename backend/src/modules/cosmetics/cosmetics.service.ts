@@ -627,6 +627,9 @@ export class CosmeticsService implements OnModuleInit {
           [cardUrl, userId],
         ).catch(() => undefined);
       }
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
@@ -718,6 +721,9 @@ export class CosmeticsService implements OnModuleInit {
           [userId],
         ).catch(() => undefined);
       }
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
       if (type === CosmeticType.HOST_BADGE) {
         profile.hostBadgeUrl = null;
       }
