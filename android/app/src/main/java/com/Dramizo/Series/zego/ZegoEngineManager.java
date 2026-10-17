@@ -782,12 +782,10 @@ public class ZegoEngineManager {
     @Nullable private im.zego.zegoexpress.ZegoMediaPlayer localMusicPlayer;
     @Nullable private String localMusicPath;
     /** Publish mix loudness 0–200 (Zego default is only 60 — too quiet for listeners). */
-    private static final int MUSIC_PUBLISH_VOLUME = 200;
+    private int musicPublishVolume = 200;
     /** Host local monitor via MediaPlayer (local files). 0–200. */
     private static final int MUSIC_PLAY_VOLUME = 160;
     private boolean musicMuteLocalMonitor;
-    /** Independent gain for the music mix; never changes microphone gain. */
-    private float localMusicVolume = 1.0f;
 
     public void playLocalMusic(String absolutePath) {
         playLocalMusic(absolutePath, 0L, false);
@@ -860,7 +858,7 @@ public class ZegoEngineManager {
                     }
                     Log.i(TAG, "local music started path=" + absolutePath
                             + " seek=" + seekTo
-                            + " publishVol=" + MUSIC_PUBLISH_VOLUME
+                            + " publishVol=" + musicPublishVolume
                             + " muteLocal=" + musicMuteLocalMonitor);
                 } else {
                     Log.w(TAG, "local music load failed err=" + errorCode);
@@ -872,30 +870,28 @@ public class ZegoEngineManager {
     }
 
     /** Boost music into the publish stream so remote listeners hear it clearly. */
-    /** Apply a 0..1 music-only gain to both the published mix and local monitor. */
-    public void setLocalMusicVolume(float volume) {
-        localMusicVolume = Math.max(0f, Math.min(1f, volume));
-        applyMusicMixVolumes(localMusicPlayer);
-    }
-
     private void applyMusicMixVolumes(
             @Nullable im.zego.zegoexpress.ZegoMediaPlayer player) {
         if (player == null) return;
-        int publishVolume = Math.round(MUSIC_PUBLISH_VOLUME * localMusicVolume);
-        int playVolume = Math.round(MUSIC_PLAY_VOLUME * localMusicVolume);
         try {
-            player.setPublishVolume(publishVolume);
-            // This only changes the music player, never the microphone stream.
-            player.setPlayVolume(musicMuteLocalMonitor || speakerMuted ? 0 : playVolume);
+            player.setPublishVolume(musicPublishVolume);
+            // When muteLocal is used, play volume is irrelevant; otherwise host must hear.
+            player.setPlayVolume(musicMuteLocalMonitor || speakerMuted ? 0 : MUSIC_PLAY_VOLUME);
         } catch (Throwable t) {
             try {
-                player.setVolume(publishVolume);
+                player.setVolume(musicPublishVolume);
             } catch (Throwable ignored) {
             }
         }
     }
 
-    /** Re-apply loud mix if the player already exists (e.g. after reconnect). */
+    /** Set outgoing room music mix gain (0–200) without changing ZEGO connection/config. */
+    public void setMusicMixVolume(int volume) {
+        musicPublishVolume = Math.max(0, Math.min(200, volume));
+        applyMusicMixVolumes(localMusicPlayer);
+    }
+
+    /** Re-apply the current music mix gain if the player already exists (e.g. after reconnect). */
     public void boostMusicMixVolume() {
         applyMusicMixVolumes(localMusicPlayer);
     }
