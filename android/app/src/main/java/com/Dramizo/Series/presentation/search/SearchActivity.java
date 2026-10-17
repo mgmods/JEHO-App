@@ -11,6 +11,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.widget.TextView;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -42,6 +44,10 @@ import com.Dramizo.Series.util.VipStyle;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class SearchActivity extends ThemedActivity {
     private static final int KIND_USER = 1;
@@ -54,6 +60,8 @@ public class SearchActivity extends ThemedActivity {
     private ActivitySearchBinding binding;
     private final List<Row> allItems = new ArrayList<>();
     private final List<Row> visibleItems = new ArrayList<>();
+    private final Map<String, CpPair> cpPairs = new HashMap<>();
+    private final Set<String> cpLookupStarted = new HashSet<>();
     private Adapter adapter;
     private AppContainer c;
     private Runnable pendingSearch;
@@ -279,6 +287,17 @@ public class SearchActivity extends ThemedActivity {
         RoomDtos.RoomDto room;
     }
 
+    private static final class CpPair {
+        final String avatarUrl;
+        final String name;
+        final String type;
+        CpPair(String avatarUrl, String name, String type) {
+            this.avatarUrl = avatarUrl;
+            this.name = name;
+            this.type = type;
+        }
+    }
+
     private class Adapter extends RecyclerView.Adapter<Adapter.VH> {
         @NonNull @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -294,7 +313,9 @@ public class SearchActivity extends ThemedActivity {
                 AvatarCosmetics.bindWear(h.b.imgAvatar, h.b.imgFrame, row.user);
                 FlagImages.bind(h.b.imgCountryFlag, row.user.country);
                 bindBadges(h, row.user);
+                bindCpPair(h, row.user);
             } else {
+                resetCpPair(h);
                 AvatarCosmetics.bindAvatar(h.b.imgAvatar, AssetCatalog.absoluteUrl(row.imageUrl));
                 AvatarCosmetics.applyFrame(h.b.imgFrame, null);
                 FlagImages.bind(h.b.imgCountryFlag, row.room != null && row.room.host != null
@@ -302,6 +323,117 @@ public class SearchActivity extends ThemedActivity {
                 hideBadges(h);
             }
             h.itemView.setOnClickListener(v -> openRow(row));
+        }
+
+        private void bindCpPair(VH h, AuthDtos.UserDto user) {
+            resetCpPair(h);
+            if (user == null || user.id == null || user.id.trim().isEmpty()) return;
+            String uid = user.id.trim().toLowerCase(java.util.Locale.ROOT);
+            CpPair cached = cpPairs.get(uid);
+            if (cached != null) {
+                applyCpPair(h, uid, cached);
+                return;
+            }
+            if (!cpLookupStarted.add(uid)) return;
+            c.getIoExecutor().execute(() -> {
+                Result<List<java.util.Map<String, Object>>> result =
+                        ApiCall.execute(c.getUserApi().cpProfileRelationships(user.id));
+                CpPair pair = null;
+                if (result.success && result.data != null && !result.data.isEmpty()) {
+                    java.util.Map<String, Object> relation = result.data.get(0);
+                    Object rawPartner = relation == null ? null : relation.get("partner");
+                    java.util.Map<?, ?> partner = rawPartner instanceof java.util.Map
+                            ? (java.util.Map<?, ?>) rawPartner : null;
+                    if (partner != null) {
+                        Object rawAvatar = partner.get("avatarUrl");
+                        Object rawName = partner.get("displayName") != null
+                                ? partner.get("displayName") : partner.get("username");
+                        String avatar = rawAvatar == null ? "" : String.valueOf(rawAvatar).trim();
+                        String name = rawName == null ? "" : String.valueOf(rawName).trim();
+                        String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type"));
+                        if (!avatar.isEmpty()) pair = new CpPair(avatar, name, type);
+                    }
+                }
+                final CpPair found = pair;
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (found != null) cpPairs.put(uid, found);
+                    for (int i = 0; i < visibleItems.size(); i++) {
+                        Row visible = visibleItems.get(i);
+                        if (visible.user != null && visible.user.id != null
+                                && uid.equals(visible.user.id.trim().toLowerCase(java.util.Locale.ROOT))) {
+                            adapter.notifyItemChanged(i);
+                            break;
+                        }
+                    }
+                });
+            });
+        }
+
+        private void resetCpPair(VH h) {
+            if (h.b.imgCpPartnerAvatar != null) {
+                h.b.imgCpPartnerAvatar.setVisibility(View.GONE);
+                h.b.imgCpPartnerAvatar.setImageDrawable(null);
+            }
+            if (h.b.tvCpRelationSymbol != null) {
+                h.b.tvCpRelationSymbol.animate().cancel();
+                h.b.tvCpRelationSymbol.setVisibility(View.GONE);
+                h.b.tvCpRelationSymbol.setTag(null);
+                h.b.tvCpRelationSymbol.setScaleX(1f);
+                h.b.tvCpRelationSymbol.setScaleY(1f);
+                h.b.tvCpRelationSymbol.setAlpha(1f);
+            }
+            if (h.b.avatarPairWrap != null) {
+                ViewGroup.LayoutParams lp = h.b.avatarPairWrap.getLayoutParams();
+                if (lp != null && lp.width != dp(66)) {
+                    lp.width = dp(66);
+                    h.b.avatarPairWrap.setLayoutParams(lp);
+                }
+            }
+        }
+
+        private void applyCpPair(VH h, String uid, CpPair pair) {
+            if (h.b.avatarPairWrap == null || h.b.imgCpPartnerAvatar == null
+                    || h.b.tvCpRelationSymbol == null || pair == null) return;
+            ViewGroup.LayoutParams lp = h.b.avatarPairWrap.getLayoutParams();
+            if (lp != null) {
+                lp.width = dp(110);
+                h.b.avatarPairWrap.setLayoutParams(lp);
+            }
+            h.b.imgCpPartnerAvatar.setVisibility(View.VISIBLE);
+            com.Dramizo.Series.util.AvatarImageLoader.load(
+                    h.b.imgCpPartnerAvatar, AssetCatalog.absoluteUrl(pair.avatarUrl));
+            TextView symbol = h.b.tvCpRelationSymbol;
+            symbol.setText(cpRelationshipSymbol(pair.type));
+            symbol.setTag(uid);
+            symbol.setVisibility(View.VISIBLE);
+            Runnable[] pulse = new Runnable[1];
+            pulse[0] = () -> {
+                if (symbol.getVisibility() != View.VISIBLE || !uid.equals(symbol.getTag())) return;
+                symbol.animate().scaleX(1.14f).scaleY(1.14f).alpha(0.82f)
+                        .setDuration(450L).withEndAction(() -> {
+                            if (symbol.getVisibility() != View.VISIBLE || !uid.equals(symbol.getTag())) return;
+                            symbol.animate().scaleX(1f).scaleY(1f).alpha(1f)
+                                    .setDuration(450L).withEndAction(pulse[0]).start();
+                        }).start();
+            };
+            pulse[0].run();
+        }
+
+        private int dp(float value) {
+            return Math.round(value * getResources().getDisplayMetrics().density);
+        }
+
+        private String cpRelationshipSymbol(String type) {
+            if (type == null) return "💗";
+            switch (type.trim().toLowerCase(java.util.Locale.ROOT)) {
+                case "engagement": return "💍";
+                case "marriage": return "💞";
+                case "friendship": return "🤝";
+                case "brotherhood": return "💙";
+                case "love": return "💗";
+                default: return "✨";
+            }
         }
 
         private void bindBadges(VH h, AuthDtos.UserDto user) {
