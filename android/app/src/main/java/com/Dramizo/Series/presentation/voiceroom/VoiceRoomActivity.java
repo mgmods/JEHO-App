@@ -597,7 +597,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (seat.locked()) {
                     String lockedOccupant = seatUserId(seat);
                     boolean lockedEmpty = lockedOccupant == null || lockedOccupant.isEmpty();
-                    if (lockedEmpty && !isOnSeat(currentSeats) && seat.seatIndex != 0
+                    if (lockedEmpty && seat.seatIndex != 0
                             && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
                         showEmptySeatActionMenu(anchor, seat);
                     } else if (canManageSeats) {
@@ -631,7 +631,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
 
                 // Owners and room staff who are not seated get explicit seat actions.
-                if (!isOnSeat(currentSeats) && seat.seatIndex != 0
+                if (seat.seatIndex != 0
                         && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
                     showEmptySeatActionMenu(anchor, seat);
                     return;
@@ -10910,8 +10910,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /** Context menu for an empty mic: move, invite someone already in the room, or lock it. */
+    private void takeEmptySeat(int seatIndex) {
+        // Authorized staff can move seats even while already seated.
+        boolean freeMic = isFreeMicEnabled();
+        boolean canHop = isHost || isOwner || isOnSeat(currentSeats) || freeMic;
+        if (!PermissionHelper.hasAudioPermission(VoiceRoomActivity.this)) {
+            PermissionHelper.ensureMediaPermissions(VoiceRoomActivity.this, false);
+            Toast.makeText(VoiceRoomActivity.this, "فعّل إذن الميكروفون أولاً", Toast.LENGTH_LONG).show();
+            return;
+        }
+        try {
+            if (canHop) {
+                optimisticTakeSeat(seatIndex);
+                viewModel.takeSeat(roomId, seatIndex);
+            } else {
+                viewModel.requestSeat(roomId, seatIndex);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("VoiceRoom", "takeSeat click failed", e);
+            Toast.makeText(VoiceRoomActivity.this, "تعذر الانتقال للمقعد", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void showEmptySeatActionMenu(@Nullable View anchor, @NonNull RoomDtos.SeatDto seat) {
-        if (roomId == null || isOnSeat(currentSeats)) return;
+        if (roomId == null) return;
         java.util.ArrayList<String> labels = new java.util.ArrayList<>();
         java.util.ArrayList<Integer> actions = new java.util.ArrayList<>();
         labels.add("انتقال");
