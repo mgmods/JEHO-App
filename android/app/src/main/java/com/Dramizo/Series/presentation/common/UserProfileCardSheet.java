@@ -172,7 +172,7 @@ public final class UserProfileCardSheet {
                         cpPartner.get("displayName") != null ? cpPartner.get("displayName") : cpPartner.get("username"));
                 String partnerAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? "" : String.valueOf(cpPartner.get("avatarUrl"));
                 activity.runOnUiThread(() -> {
-                    if (dialog.getWindow() == null || rowCpRelationship == null || !dialog.isShowing()) return;
+                    if (dialog.getWindow() == null || rowCpRelationship == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
                     if (imgCpPrimaryAvatar != null && !avatarHold[0].trim().isEmpty()) {
