@@ -57,44 +57,33 @@ final class RelationshipSeatEffectsOverlay {
         this.seatsRecycler = seatsRecycler;
         layer = new FrameLayout(context);
         layer.setBackgroundColor(Color.TRANSPARENT);
-        // The effect canvas must have exactly the seat-grid bounds, not the whole Activity.
-        // This prevents any particle from entering the status bar or leaving the room surface.
-        layer.setClipChildren(true);
-        layer.setClipToPadding(true);
+        // Use an Activity-content-sized overlay instead of a RecyclerView-sized sibling.
+        // The old sibling was clipped to the seat grid and could be drawn under room cards;
+        // the relationship ribbon therefore existed in code but was not actually visible.
+        // This root overlay stays inside the app content (below the system status bar), spans
+        // the live seat coordinates, and never intercepts taps or gestures.
+        layer.setClipChildren(false);
+        layer.setClipToPadding(false);
         layer.setClickable(false);
         layer.setFocusable(false);
         layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        // Keep the effects in the exact same parent as the seat grid. Adding them to the
-        // Activity root can leave a zero-sized ConstraintLayout child or place the animation
-        // underneath elevated room overlays. This layer is visual-only and never receives input.
-        layer.setElevation(dp(80));
-        layer.setTranslationZ(dp(80));
-        if (seatsRecycler.getParent() instanceof ViewGroup) {
-            ViewGroup parent = (ViewGroup) seatsRecycler.getParent();
-            int seatIndex = parent.indexOfChild(seatsRecycler);
-            if (parent instanceof ConstraintLayout && seatsRecycler.getId() != View.NO_ID) {
-                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
-                lp.startToStart = seatsRecycler.getId();
-                lp.endToEnd = seatsRecycler.getId();
-                lp.topToTop = seatsRecycler.getId();
-                lp.bottomToBottom = seatsRecycler.getId();
-                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
-            } else {
-                ViewGroup.LayoutParams source = seatsRecycler.getLayoutParams();
-                ViewGroup.LayoutParams lp = source == null
-                        ? new ViewGroup.LayoutParams(seatsRecycler.getWidth(), seatsRecycler.getHeight())
-                        : new ViewGroup.LayoutParams(source.width, source.height);
-                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
-                layer.setTranslationX(seatsRecycler.getX());
-                layer.setTranslationY(seatsRecycler.getY());
-            }
+        layer.setElevation(dp(240));
+        layer.setTranslationZ(dp(240));
+        if (root instanceof ConstraintLayout) {
+            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
+            lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+            root.addView(layer, lp);
         } else {
             root.addView(layer, new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
+        layer.bringToFront();
+        root.invalidate();
         seatsRecycler.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
-            if (layer.getWidth() != seatsRecycler.getWidth()
-                    || layer.getHeight() != seatsRecycler.getHeight()) {
+            if (layer.getWidth() != root.getWidth() || layer.getHeight() != root.getHeight()) {
                 layer.requestLayout();
             }
             retryIfNoParticles();
@@ -261,6 +250,20 @@ final class RelationshipSeatEffectsOverlay {
             float centerBY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
             float centerDx = centerBX - centerAX;
             float centerDy = centerBY - centerAY;
+            // Only show the CP ribbon for people visibly sitting side-by-side. This uses live
+            // avatar geometry rather than seat indexes, so row wraps and recycled holders cannot
+            // accidentally connect users from different rows.
+            float horizontalGap = Math.abs(centerDx);
+            float verticalGap = Math.abs(centerDy);
+            float avatarWidth = Math.max(anchorA.getWidth(), anchorB.getWidth());
+            float avatarHeight = Math.max(anchorA.getHeight(), anchorB.getHeight());
+            if (verticalGap > Math.max(dp(18), avatarHeight * 0.72f)
+                    || horizontalGap > Math.max(dp(72), avatarWidth * 2.8f)) {
+                effectView.setVisibility(View.INVISIBLE);
+                fallback.setVisibility(View.INVISIBLE);
+                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
+                return;
+            }
             float centerDistance = (float) Math.hypot(centerDx, centerDy);
             if (centerDistance < dp(8)) {
                 effectView.setVisibility(View.INVISIBLE);
@@ -333,6 +336,7 @@ final class RelationshipSeatEffectsOverlay {
         private final Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint core = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint particle = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint heart = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float progress;
 
         RibbonFallbackView(Context context) {
@@ -348,11 +352,19 @@ final class RelationshipSeatEffectsOverlay {
             core.setColor(0xFFFF8DBB);
             particle.setStyle(Paint.Style.FILL);
             particle.setColor(Color.WHITE);
+            heart.setStyle(Paint.Style.FILL);
+            heart.setColor(0xFFFF2F86);
+            heart.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+            heart.setTextAlign(Paint.Align.CENTER);
         }
 
         void setProgress(float value) {
             progress = value;
             invalidate();
+        }
+
+        private float dpForView(float value) {
+            return value * getResources().getDisplayMetrics().density;
         }
 
         @Override protected void onDraw(Canvas canvas) {
@@ -370,6 +382,12 @@ final class RelationshipSeatEffectsOverlay {
                 canvas.drawCircle(x, cy, dot, particle);
                 canvas.drawCircle(x, cy, dot * 1.8f, glow);
             }
+            // A clear heart at the center makes the ribbon recognizable even when no custom
+            // effect image is configured in the dashboard or its URL fails to load.
+            heart.setTextSize(Math.max(dpForView(10), getHeight() * 1.55f));
+            heart.setShadowLayer(2f, 0f, 0f, Color.WHITE);
+            canvas.drawText("♥", right / 2f, cy + heart.getTextSize() * 0.34f, heart);
+            heart.clearShadowLayer();
         }
     }
 
