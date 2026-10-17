@@ -411,19 +411,32 @@ export class UsersService {
     ) {
       isOnline = false;
     }
-    return this.withWearMeta(
-      await this.withPublicIdStyle(this.applyFixedVipWear(
-        {
-          ...this.flatten(user),
-          vipLevel,
-          isFollowing,
-          isRechargeAgent: !!activeRechargeAgent,
-          agency,
-          visitorsCount,
-          isOnline,
-        },
+    const flat = this.applyFixedVipWear(
+      {
+        ...this.flatten(user),
         vipLevel,
-      ), id),
+        isFollowing,
+        isRechargeAgent: !!activeRechargeAgent,
+        agency,
+        visitorsCount,
+        isOnline,
+      },
+      vipLevel,
+    );
+    const vipVisuals = vip && (!vip.expiresAt || vip.expiresAt > now)
+      ? ((vip.vipPlan?.benefits as any)?.visuals || {})
+      : {};
+    const withVipVisuals = {
+      ...flat,
+      vipHeadUrl: (vip && (!vip.expiresAt || vip.expiresAt > now) ? vip.vipPlan?.badgeUrl : null) || flat.vipHeadUrl,
+      vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
+      vipCardUrl: vipVisuals.vipCardUrl || null,
+      profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
+      chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
+      nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+    };
+    return this.withWearMeta(
+      await this.withPublicIdStyle(withVipVisuals, id),
     );
   }
 
@@ -626,15 +639,9 @@ export class UsersService {
       entryEffectUrl: user.profile?.entryEffectUrl ?? null,
       entryAnimationUrl: user.profile?.entryAnimationUrl ?? null,
       roomCardUrl: user.profile?.roomCardUrl ?? null,
-      profileCardUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
-        ? ((vip.vipPlan?.benefits as any)?.visuals?.profileCardUrl || (vip.vipPlan?.benefits as any)?.visuals?.vipCardUrl)
-        : null) || user.profile?.profileCardUrl) ?? null,
-      chatBubbleUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
-        ? (vip.vipPlan?.benefits as any)?.visuals?.chatBubbleUrl
-        : null) || user.profile?.chatBubbleUrl) ?? null,
-      nameplateUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
-        ? (vip.vipPlan?.benefits as any)?.visuals?.nameplateUrl
-        : null) || user.profile?.nameplateUrl) ?? null,
+      profileCardUrl: user.profile?.profileCardUrl ?? null,
+      chatBubbleUrl: user.profile?.chatBubbleUrl ?? null,
+      nameplateUrl: user.profile?.nameplateUrl ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
