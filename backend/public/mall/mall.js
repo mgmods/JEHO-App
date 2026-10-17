@@ -638,18 +638,12 @@
       } else if (state.roomId) {
         el.btnPrimary.textContent = 'طبّق على الروم';
         el.btnPrimary.className = 'btn btn-primary';
-        el.btnSecondary.hidden = false;
-        el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
-        el.btnSecondary.disabled = state.busy;
       } else {
         el.btnPrimary.textContent = left != null
           ? ('مشتراة · متبقي ' + left + ' يوم')
           : 'مشتراة — من إعدادات الروم';
         el.btnPrimary.className = 'btn btn-owned';
         el.btnPrimary.disabled = true;
-        el.btnSecondary.hidden = false;
-        el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
-        el.btnSecondary.disabled = state.busy;
       }
       return;
     }
@@ -660,18 +654,13 @@
         : 'احصل مجاناً · 30 يوم';
       el.btnPrimary.className = 'btn btn-buy';
     } else if (equipped) {
-      el.btnPrimary.textContent = left != null ? ('مُرتدى · ' + left + ' يوم') : 'مُرتدى';
-      el.btnPrimary.className = 'btn btn-owned';
-      el.btnPrimary.disabled = true;
-      el.btnSecondary.hidden = false;
-      el.btnSecondary.textContent = 'إزالة';
-      el.btnSecondary.disabled = state.busy;
+      el.btnPrimary.textContent = left != null ? ('خلع · ' + left + ' يوم') : 'خلع';
+      el.btnPrimary.className = 'btn btn-primary';
+      el.btnSecondary.hidden = true;
     } else {
       el.btnPrimary.textContent = 'ارتدِ';
       el.btnPrimary.className = 'btn btn-primary';
-      el.btnSecondary.hidden = false;
-      el.btnSecondary.innerHTML = 'تجديد ' + coinMarkup(renewPrice(item.coinPrice)) + ' · +30 يوم';
-      el.btnSecondary.disabled = state.busy;
+      el.btnSecondary.hidden = true;
     }
   }
 
@@ -973,6 +962,10 @@
   async function onPrimary() {
     var item = selectedItem();
     if (!item || state.busy) return;
+    if (isActiveOwned(item.id) && state.equipped[item.id] && state.type !== 'room_background') {
+      onUnequip();
+      return;
+    }
     if (!state.token) {
       setStatus('سجّل الدخول أولاً', 'err');
       toastNative('سجّل الدخول أولاً');
@@ -1049,24 +1042,9 @@
   }
 
   async function onSecondary() {
+    // Renewals are intentionally unavailable while a lease is active.
     var item = selectedItem();
-    if (!item || state.busy) return;
-    if (!isActiveOwned(item.id)) return;
-    state.busy = true;
-    syncActionButtons(item);
-    try {
-      await renewItem(item);
-      updateHero();
-      renderGrid();
-    } catch (err) {
-      var em = (err && err.message) ? err.message : 'فشل التجديد';
-      setStatus(em, 'err');
-      if (looksInsufficient(em)) openRechargeNative(em);
-      else toastNative(em);
-    } finally {
-      state.busy = false;
-      syncActionButtons(selectedItem());
-    }
+    if (!item || state.busy || isActiveOwned(item.id)) return;
   }
 
   async function onUnequip() {
