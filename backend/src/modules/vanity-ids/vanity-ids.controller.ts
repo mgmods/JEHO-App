@@ -47,7 +47,7 @@ export class VanityIdsController {
   @Get('style/:publicId')
   @ApiOperation({ summary: 'Get the configured public-ID appearance for profile and shop rendering' })
   async getPublicIdStyle(@Param('publicId') publicId: string) {
-    if (!/^\\d{3,12}$/.test(publicId)) {
+    if (!/^\d{3,12}$/.test(publicId)) {
       throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
