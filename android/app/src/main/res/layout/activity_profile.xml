@@ -91,112 +91,120 @@
                 android:orientation="vertical"
                 android:paddingBottom="20dp">
 
-                <!-- Avatar + VIP frame (left, card style) -->
-                <FrameLayout
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:layout_marginStart="16dp"
-                    android:layout_marginTop="-36dp"
-                    android:clipChildren="false"
-                    android:clipToPadding="false">
-
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/imgAvatar"
-                        android:layout_width="86dp"
-                        android:layout_height="86dp"
-                        android:layout_gravity="center"
-                        android:contentDescription="@string/nav_profile"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_default_avatar"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-
-                    <ImageView
-                        android:id="@+id/imgFrame"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_gravity="center"
-                        android:contentDescription="@null"
-                        android:scaleType="fitCenter"
-                        android:visibility="gone" />
-
-                    <com.Dramizo.Series.util.HostSignalView
-                        android:id="@+id/webProfileHostSignal"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:layout_gravity="center"
-                        android:visibility="gone" />
-                </FrameLayout>
-
-<LinearLayout
-                    android:id="@+id/rowProfileCp"
+                <!-- Profile avatar and the linked partner portrait share one compact row. -->
+                <LinearLayout
+                    android:id="@+id/profileIdentityAndCp"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_user_card_stat_cell"
+                    android:layout_height="120dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:layoutDirection="rtl"
-                    android:padding="10dp"
-                    android:visibility="gone">
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
                     <FrameLayout
-                        android:layout_width="48dp"
-                        android:layout_height="48dp">
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginTop="-24dp"
+                        android:clipChildren="false"
+                        android:clipToPadding="false">
+
                         <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/imgProfileCpSelf"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:contentDescription="@null"
+                            android:id="@+id/imgAvatar"
+                            android:layout_width="86dp"
+                            android:layout_height="86dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/nav_profile"
                             android:scaleType="centerCrop"
-                            android:visibility="gone"
+                            android:src="@drawable/ic_default_avatar"
                             app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+
                         <ImageView
-                            android:id="@+id/imgProfileCpSelfFrame"
+                            android:id="@+id/imgFrame"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
+                            android:layout_gravity="center"
                             android:contentDescription="@null"
-                            android:scaleType="fitXY"
+                            android:scaleType="fitCenter"
+                            android:visibility="gone" />
+
+                        <com.Dramizo.Series.util.HostSignalView
+                            android:id="@+id/webProfileHostSignal"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:layout_gravity="center"
                             android:visibility="gone" />
                     </FrameLayout>
-                    <TextView
-                        android:id="@+id/tvProfileCpHeart"
-                        android:layout_width="32dp"
-                        android:layout_height="40dp"
+
+                    <LinearLayout
+                        android:id="@+id/rowProfileCp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="56dp"
+                        android:layout_marginStart="2dp"
                         android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:text="♥"
-                        android:textColor="#FFFF5277"
-                        android:textSize="26sp"
-                        android:textStyle="bold" />
-                    <FrameLayout
-                        android:layout_width="42dp"
-                        android:layout_height="42dp"
-                        android:layout_marginEnd="2dp">
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/imgProfileCpPartner"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:contentDescription="@null"
-                            android:scaleType="centerCrop"
-                            android:visibility="gone"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-                        <ImageView
-                            android:id="@+id/imgProfileCpPartnerFrame"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:contentDescription="@null"
-                            android:scaleType="fitXY"
+                        android:orientation="horizontal"
+                        android:layoutDirection="ltr"
+                        android:padding="0dp"
+                        android:visibility="gone">
+
+                        <!-- Retained hidden legacy binding IDs for safe view binding. -->
+                        <FrameLayout
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
+                            android:visibility="gone">
+                            <com.google.android.material.imageview.ShapeableImageView
+                                android:id="@+id/imgProfileCpSelf"
+                                android:layout_width="0dp"
+                                android:layout_height="0dp"
+                                android:contentDescription="@null"
+                                android:visibility="gone"
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                            <ImageView
+                                android:id="@+id/imgProfileCpSelfFrame"
+                                android:layout_width="0dp"
+                                android:layout_height="0dp"
+                                android:contentDescription="@null"
+                                android:visibility="gone" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tvProfileCpHeart"
+                            android:layout_width="30dp"
+                            android:layout_height="42dp"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:text="♥"
+                            android:textColor="#FFFF5277"
+                            android:textSize="26sp"
+                            android:textStyle="bold" />
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp">
+                            <com.google.android.material.imageview.ShapeableImageView
+                                android:id="@+id/imgProfileCpPartner"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:contentDescription="@null"
+                                android:scaleType="centerCrop"
+                                android:visibility="gone"
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                            <ImageView
+                                android:id="@+id/imgProfileCpPartnerFrame"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:contentDescription="@null"
+                                android:scaleType="fitXY"
+                                android:visibility="gone" />
+                        </FrameLayout>
+
+                        <TextView
+                            android:id="@+id/tvProfileCpLabel"
+                            android:layout_width="0dp"
+                            android:layout_height="0dp"
                             android:visibility="gone" />
-                    </FrameLayout>
-                    <TextView
-                        android:id="@+id/tvProfileCpLabel"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_weight="1"
-                        android:textColor="#FFFFFFFF"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- Name + gender + online -->
@@ -742,6 +750,107 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- Full-width CP CV ribbon directly under Family / Supporters / Friends. -->
+                <LinearLayout
+                    android:id="@+id/rowProfileCpCv"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_cp_cv_card"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:layoutDirection="ltr"
+                    android:paddingHorizontal="7dp"
+                    android:paddingVertical="4dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvProfileCpCvType"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone" />
+
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp">
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/imgProfileCpCvSelf"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:padding="2dp"
+                            android:background="@drawable/bg_cp_cv_avatar_gold"
+                            android:scaleType="centerCrop"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                        <ImageView
+                            android:id="@+id/imgProfileCpCvSelfFrame"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/tvProfileCpCvHeart"
+                        android:layout_width="28dp"
+                        android:layout_height="42dp"
+                        android:gravity="center"
+                        android:text="♥"
+                        android:textColor="#FFE64F86"
+                        android:textSize="25sp"
+                        android:textStyle="bold" />
+
+                    <FrameLayout
+                        android:layout_width="38dp"
+                        android:layout_height="38dp">
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/imgProfileCpCvPartner"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:padding="2dp"
+                            android:background="@drawable/bg_cp_cv_avatar_gold"
+                            android:scaleType="centerCrop"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                        <ImageView
+                            android:id="@+id/imgProfileCpCvPartnerFrame"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <TextView
+                        android:id="@+id/tvProfileCpCvLevel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="3dp"
+                        android:background="@drawable/bg_cp_cv_chip"
+                        android:paddingHorizontal="7dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="#FF9D4778"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvProfileCpCvDays"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="3dp"
+                        android:background="@drawable/bg_cp_cv_chip"
+                        android:paddingHorizontal="7dp"
+                        android:paddingVertical="4dp"
+                        android:textColor="#FF9D4778"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
                 <TextView
                     android:id="@+id/tvBio"
                     android:layout_width="match_parent"
@@ -842,109 +951,7 @@
 
                 
 
-                <!-- Pink and gold relationship CV card; all values come from the active backend relationship. -->
-                <LinearLayout
-                    android:id="@+id/rowProfileCpCv"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="14dp"
-                    android:layout_marginTop="10dp"
-                    android:background="@drawable/bg_cp_cv_card"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:visibility="gone">
-                    <TextView
-                        android:id="@+id/tvProfileCpCvType"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:textColor="#FF9D4778"
-                        android:textSize="14sp"
-                        android:textStyle="bold" />
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-                        <FrameLayout
-                            android:layout_width="76dp"
-                            android:layout_height="76dp">
-                            <com.google.android.material.imageview.ShapeableImageView
-                                android:id="@+id/imgProfileCpCvSelf"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:padding="3dp"
-                                android:background="@drawable/bg_cp_cv_avatar_gold"
-                                android:scaleType="centerCrop"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-                            <ImageView
-                                android:id="@+id/imgProfileCpCvSelfFrame"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:contentDescription="@null"
-                                android:scaleType="fitXY"
-                                android:visibility="gone" />
-                        </FrameLayout>
-                        <TextView
-                            android:id="@+id/tvProfileCpCvHeart"
-                            android:layout_width="54dp"
-                            android:layout_height="60dp"
-                            android:gravity="center"
-                            android:text="♥"
-                            android:textColor="#FFE64F86"
-                            android:textSize="38sp"
-                            android:textStyle="bold" />
-                        <FrameLayout
-                            android:layout_width="62dp"
-                            android:layout_height="62dp">
-                            <com.google.android.material.imageview.ShapeableImageView
-                                android:id="@+id/imgProfileCpCvPartner"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:padding="3dp"
-                                android:background="@drawable/bg_cp_cv_avatar_gold"
-                                android:scaleType="centerCrop"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
-                            <ImageView
-                                android:id="@+id/imgProfileCpCvPartnerFrame"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
-                                android:contentDescription="@null"
-                                android:scaleType="fitXY"
-                                android:visibility="gone" />
-                        </FrameLayout>
-                    </LinearLayout>
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-                        <TextView
-                            android:id="@+id/tvProfileCpCvLevel"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="8dp"
-                            android:background="@drawable/bg_cp_cv_chip"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="5dp"
-                            android:textColor="#FF9D4778"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                        <TextView
-                            android:id="@+id/tvProfileCpCvDays"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginHorizontal="8dp"
-                            android:background="@drawable/bg_cp_cv_chip"
-                            android:paddingHorizontal="12dp"
-                            android:paddingVertical="5dp"
-                            android:textColor="#FF9D4778"
-                            android:textSize="12sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                </LinearLayout>
+
             </LinearLayout>
 
             <TextView
