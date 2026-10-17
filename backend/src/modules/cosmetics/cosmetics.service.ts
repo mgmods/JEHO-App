@@ -225,7 +225,10 @@ export class CosmeticsService implements OnModuleInit {
                 "levelBadgeUrl" = CASE WHEN "levelBadgeUrl" LIKE $1 THEN NULL ELSE "levelBadgeUrl" END,
                 "entryEffectUrl" = CASE WHEN "entryEffectUrl" LIKE $1 THEN NULL ELSE "entryEffectUrl" END,
                 "entryAnimationUrl" = CASE WHEN "entryAnimationUrl" LIKE $1 THEN NULL ELSE "entryAnimationUrl" END,
-                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END`,
+                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END,
+                "profileCardUrl" = CASE WHEN "profileCardUrl" LIKE $1 THEN NULL ELSE "profileCardUrl" END,
+                "chatBubbleUrl" = CASE WHEN "chatBubbleUrl" LIKE $1 THEN NULL ELSE "chatBubbleUrl" END,
+                "nameplateUrl" = CASE WHEN "nameplateUrl" LIKE $1 THEN NULL ELSE "nameplateUrl" END`,
         [`${clean}%`],
       ).catch(() => undefined);
       await this.dataSource.query(
