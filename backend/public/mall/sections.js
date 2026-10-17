@@ -45,7 +45,17 @@ box.innerHTML=list.map(function(it){
     :'';
   var title='ID مميز لمدة 30 يوم';
   var buttonLabel=isMine?'تجديد':'شراء';
-  return '<article class="item-card id-item-card"><div class="id-visual" aria-label="ID '+esc(id)+'"><span class="id-visual-label">ID</span><strong>'+esc(id)+'</strong></div><h3>'+esc(title)+'</h3><div class="id-price-row">'+coin(cost)+availability+'</div><button type="button" class="primary-btn" data-id="'+esc(id)+'">'+buttonLabel+'</button>'+extra+'</article>';
+  var mode=String(it.styleMode||'none');
+  var c1=/^#[0-9a-fA-F]{6}$/.test(it.styleColor1||'')?it.styleColor1:'#52E8FF';
+  var c2=/^#[0-9a-fA-F]{6}$/.test(it.styleColor2||'')?it.styleColor2:'#C084FC';
+  var c3=/^#[0-9a-fA-F]{6}$/.test(it.styleColor3||'')?it.styleColor3:'#FF7AC8';
+  var vipColors=['#B6C4D2','#68C8FF','#65E6B4','#B28AFF','#FF9A52','#FFD66B','#FF6AA9'];
+  var vipColor=vipColors[Math.max(0,Math.min(6,Number(it.styleVipLevel||1)-1))];
+  var idStyle='';
+  if(mode==='static')idStyle='color:'+c1+';text-shadow:'+(it.styleGlow?'0 0 8px '+c1+',0 0 14px '+c2:'none')+';';
+  else if(mode==='animated')idStyle='color:transparent;background-image:linear-gradient(110deg,'+c1+','+c2+','+c3+','+c1+');background-size:240% 100%;background-clip:text;-webkit-background-clip:text;animation:vanity-id-gradient 3s linear infinite;text-shadow:'+(it.styleGlow?'0 0 8px '+c1:'none')+';';
+  else if(mode==='vip')idStyle='color:'+vipColor+';text-shadow:0 0 9px '+vipColor+';';
+  return '<article class="item-card id-item-card"><div class="id-visual" aria-label="ID '+esc(id)+'"><span class="id-visual-label">ID</span><strong style="'+idStyle+'">'+esc(id)+'</strong></div><h3>'+esc(title)+'</h3><div class="id-price-row">'+coin(cost)+availability+'</div><button type="button" class="primary-btn" data-id="'+esc(id)+'">'+buttonLabel+'</button>'+extra+'</article>';
 }).join('');
 }
 async function loadVip(){var box=$('catalog');var results=await Promise.allSettled([api('vip/plans'),api('vip/me')]);var plans=results[0].status==='fulfilled'?results[0].value:[];var mine=results[1].status==='fulfilled'?results[1].value:null;plans=Array.isArray(plans)?plans:(plans&&Array.isArray(plans.items)?plans.items:[]);plans=plans.filter(function(p){var n=Number(p&&p.level);return n>=1&&n<=7&&p.isActive!==false}).sort(function(a,b){return Number(a.level)-Number(b.level)});state.items=plans;var current=Number((mine&&mine.level)||(mine&&mine.vipPlan&&mine.vipPlan.level)||(state.me&&state.me.vipLevel)||0);$('heroSummary').hidden=false;$('heroSummary').innerHTML=summaryCard('مستوى VIP الحالي',current||'بدون','VIP يتفعّل لمدة محددة')+summaryCard('خطط متاحة',plans.length,'المستويات الأصلية من VIP 1 إلى VIP 7');if(!plans.length){box.innerHTML='<div class="empty">تعذر العثور على خطط VIP متاحة.</div>';return}box.innerHTML=plans.filter(function(p){return p.isActive!==false}).map(function(p){var level=Number(p.level||0);var benefits=p.benefits||{};var feats=[];if(benefits.entryEffect)feats.push('دخولية مميزة');if(benefits.antiKick)feats.push('حماية من الطرد');if(benefits.hostBadge)feats.push('شارة VIP');if(benefits.exclusiveGifts)feats.push('هدايا حصرية');if(benefits.flyingComment)feats.push('تعليق متحرك');var pack=(p.durationPacks||[]).find(function(x){return Number(x.days)===state.durationDays});var price=Number((pack&&pack.coinPrice)||p.coinPriceMonthly||0);return card(p.name||('VIP '+level),feats.join(' · ')||'مزايا خاصة بالمستوى',p.badgeUrl||'',price,'تفعيل '+state.durationDays+' يوم','purchase:'+level,level===current?'مستواك الحالي':state.durationDays+' يوم')}).join('')}
