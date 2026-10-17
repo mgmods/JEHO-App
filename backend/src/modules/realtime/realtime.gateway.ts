@@ -62,8 +62,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private readonly logger = new Logger(RealtimeGateway.name);
   private readonly onlineUsers = new Map<string, Set<string>>();
-  /** Live-session music gain; defaults to full volume and does not alter mic gain. */
-  private readonly roomMusicVolumes = new Map<string, number>();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -244,15 +242,6 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     client.data.roomProfiles = client.data.roomProfiles || {};
     client.data.roomProfiles[data.roomId] = profilePayload;
     client.join(`room:${data.roomId}`);
-    const musicVolume = this.roomMusicVolumes.get(data.roomId);
-    if (musicVolume !== undefined) {
-      client.emit('room:event', {
-        roomId: data.roomId,
-        event: 'room:music_volume',
-        payload: { volume: musicVolume },
-        at: new Date().toISOString(),
-      });
-    }
     this.server.to(`room:${data.roomId}`).emit('room:user_joined', {
       roomId: data.roomId,
       ...profilePayload,
@@ -618,6 +607,25 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
     }
 
+    // Shared music gain is a room-wide setting. Only the host/cohost or a moderator
+    // explicitly granted music control may change it.
+    if (data.event === 'room:music_volume') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      const isRoomLead = !!room && (
+        room.hostId === client.userId ||
+        room.activeHostId === client.userId ||
+        room.cohostId === client.userId
+      );
+      let mayManageMusic = isRoomLead;
+      if (!mayManageMusic) {
+        const moderator = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        mayManageMusic = moderator?.canManageMusic === true;
+      }
+      if (!mayManageMusic) return { error: 'Music control permission required' };
+    }
+
     const profile = client.data.roomProfiles?.[data.roomId] || {};
     const incoming =
       data.payload &&
@@ -629,26 +637,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: 'Event payload is too large' };
     }
     let payload: Record<string, unknown> = { ...incoming, userId: client.userId };
-    if (data.event === 'room:music_volume') {
-      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
-      if (!room) return { error: 'Room not found' };
-      let canControlMusic =
-        room.hostId === client.userId ||
-        room.activeHostId === client.userId ||
-        room.cohostId === client.userId;
-      if (!canControlMusic) {
-        const mod = await this.roomModerators.findOne({
-          where: { roomId: data.roomId, userId: client.userId },
-        });
-        canControlMusic = mod?.canManageMusic === true;
-      }
-      if (!canControlMusic) return { error: 'Music permission is required' };
-      const rawVolume = Number(incoming.volume);
-      if (!Number.isFinite(rawVolume)) return { error: 'Invalid music volume' };
-      const volume = Math.max(0, Math.min(1, rawVolume));
-      this.roomMusicVolumes.set(data.roomId, volume);
-      payload = { userId: client.userId, volume };
-    } else if (data.event === 'room:summon') {
+    if (data.event === 'room:summon') {
       payload = {
         userId: client.userId,
         hostId: client.userId,
@@ -841,6 +830,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       };
     } else if (data.event === 'room:typing') {
       payload = { userId: client.userId, isTyping: incoming.isTyping === true };
+    } else if (data.event === 'room:music_volume') {
+      const requested = Number(incoming.volume);
+      const volume = Number.isFinite(requested)
+        ? Math.max(0, Math.min(200, Math.round(requested)))
+        : 200;
+      payload = { userId: client.userId, volume };
     }
 
     this.server.to(`room:${data.roomId}`).emit('room:event', {
