@@ -233,6 +233,7 @@ async function onBulkAction(key) {
 async function createPlatformRoom() {
   if (creatingPlatformRoom.value) return
   creatingPlatformRoom.value = true
+  const submittedTitle = newPlatformRoom.value.title
   const { data, error: err } = await roomsApi.createPlatform({ ...newPlatformRoom.value })
   creatingPlatformRoom.value = false
   if (err) {
@@ -243,7 +244,7 @@ async function createPlatformRoom() {
   toast().success('تم إنشاء الروم الرسمي وتثبيته أعلى الرومات')
   newPlatformRoom.value = { title: '', hostPublicId: '', description: '' }
   await load()
-  const created = data?.id ? data : rooms.value.find(r => r.title === newPlatformRoom.value.title)
+  const created = data?.id ? data : rooms.value.find(r => r.title === submittedTitle)
   if (created?.id) staffRoomId.value = created.id
   else if (platformRooms.value.length) staffRoomId.value = platformRooms.value[0].id
   await loadPlatformStaff()
