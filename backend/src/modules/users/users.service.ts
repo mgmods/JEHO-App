@@ -280,6 +280,9 @@ export class UsersService {
       entryEffectUrl: p?.entryEffectUrl ?? null,
       entryAnimationUrl: p?.entryAnimationUrl ?? null,
       roomCardUrl: p?.roomCardUrl ?? null,
+      profileCardUrl: p?.profileCardUrl ?? null,
+      chatBubbleUrl: p?.chatBubbleUrl ?? null,
+      nameplateUrl: p?.nameplateUrl ?? null,
       vipBadgeUrl: wearVip,
       levelBadgeUrl: p?.levelBadgeUrl ?? null,
       hostBadgeUrl: p?.hostBadgeUrl ?? null,
@@ -609,6 +612,9 @@ export class UsersService {
       entryEffectUrl: user.profile?.entryEffectUrl ?? null,
       entryAnimationUrl: user.profile?.entryAnimationUrl ?? null,
       roomCardUrl: user.profile?.roomCardUrl ?? null,
+      profileCardUrl: user.profile?.profileCardUrl ?? null,
+      chatBubbleUrl: user.profile?.chatBubbleUrl ?? null,
+      nameplateUrl: user.profile?.nameplateUrl ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null

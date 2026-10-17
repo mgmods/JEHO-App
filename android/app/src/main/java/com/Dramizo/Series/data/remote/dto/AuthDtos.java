@@ -125,6 +125,9 @@ public final class AuthDtos {
         @SerializedName("entryEffectUrl") public String entryEffectUrl;
         @SerializedName("entryAnimationUrl") public String entryAnimationUrl;
         @SerializedName("roomCardUrl") public String roomCardUrl;
+        @SerializedName("profileCardUrl") public String profileCardUrl;
+        @SerializedName("chatBubbleUrl") public String chatBubbleUrl;
+        @SerializedName("nameplateUrl") public String nameplateUrl;
         @SerializedName("bio") public String bio;
         @SerializedName("gender") public String gender;
         @SerializedName("level") public int level;

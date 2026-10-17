@@ -68,6 +68,29 @@ export class CosmeticsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Safe additive schema guard: no resets and no edits to existing user data.
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'profile_card'`);
+    } catch (err) {
+      this.logger.warn(`profile_card cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'chat_bubble'`);
+    } catch (err) {
+      this.logger.warn(`chat_bubble cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'nameplate'`);
+    } catch (err) {
+      this.logger.warn(`nameplate cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "profileCardUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "chatBubbleUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512)`);
+    } catch (err) {
+      this.logger.warn(`visual cosmetic profile columns ensure: ${(err as Error).message}`);
+    }
     // Always install fixed VIP head frames + re-bind VIP gates (safe on production).
     try {
       await this.ensureFixedVipTouFrames();
@@ -225,7 +248,10 @@ export class CosmeticsService implements OnModuleInit {
                 "levelBadgeUrl" = CASE WHEN "levelBadgeUrl" LIKE $1 THEN NULL ELSE "levelBadgeUrl" END,
                 "entryEffectUrl" = CASE WHEN "entryEffectUrl" LIKE $1 THEN NULL ELSE "entryEffectUrl" END,
                 "entryAnimationUrl" = CASE WHEN "entryAnimationUrl" LIKE $1 THEN NULL ELSE "entryAnimationUrl" END,
-                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END`,
+                "roomCardUrl" = CASE WHEN "roomCardUrl" LIKE $1 THEN NULL ELSE "roomCardUrl" END,
+                "profileCardUrl" = CASE WHEN "profileCardUrl" LIKE $1 THEN NULL ELSE "profileCardUrl" END,
+                "chatBubbleUrl" = CASE WHEN "chatBubbleUrl" LIKE $1 THEN NULL ELSE "chatBubbleUrl" END,
+                "nameplateUrl" = CASE WHEN "nameplateUrl" LIKE $1 THEN NULL ELSE "nameplateUrl" END`,
         [`${clean}%`],
       ).catch(() => undefined);
       await this.dataSource.query(
@@ -627,6 +653,9 @@ export class CosmeticsService implements OnModuleInit {
           [cardUrl, userId],
         ).catch(() => undefined);
       }
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = owned.cosmetic.previewUrl || null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = owned.cosmetic.previewUrl || null;
       // room_background is applied per-room via PATCH /rooms/:id/background (not profile).
       if (type === CosmeticType.HOST_BADGE) {
         // Prefer GIF/WebP/MP4 animation when provided; skip HTML/JSON engines.
@@ -718,6 +747,9 @@ export class CosmeticsService implements OnModuleInit {
           [userId],
         ).catch(() => undefined);
       }
+      if (type === CosmeticType.PROFILE_CARD) profile.profileCardUrl = null;
+      if (type === CosmeticType.CHAT_BUBBLE) profile.chatBubbleUrl = null;
+      if (type === CosmeticType.NAMEPLATE) profile.nameplateUrl = null;
       if (type === CosmeticType.HOST_BADGE) {
         profile.hostBadgeUrl = null;
       }

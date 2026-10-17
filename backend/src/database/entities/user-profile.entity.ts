@@ -57,6 +57,15 @@ export class UserProfile {
   roomCardUrl: string | null;
 
   @Column({ type: 'varchar', length: 512, nullable: true })
+  profileCardUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  chatBubbleUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  nameplateUrl: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
   vipBadgeUrl: string | null;
 
   @Column({ type: 'varchar', length: 512, nullable: true })

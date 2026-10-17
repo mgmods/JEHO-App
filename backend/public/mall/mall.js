@@ -6,6 +6,9 @@
     { key: 'entry_effect', label: 'الدخوليات', hint: 'الدخولية عند دخول الغرفة (سيارات / مؤثرات)' },
     { key: 'level_badge', label: 'شارات المستوى', hint: 'شارات المستوى بجانب الاسم' },
     { key: 'room_card', label: 'بطاقات الغرف', hint: 'إطار كرت الغرفة في القائمة الرئيسية' },
+    { key: 'profile_card', label: 'بطاقة الملف الشخصي', hint: 'تصميم بطاقة المستخدم عند فتح ملفه الشخصي' },
+    { key: 'chat_bubble', label: 'فقاعة الدردشة', hint: 'تصميم فقاعات الرسائل في المحادثة' },
+    { key: 'nameplate', label: 'لوحة الاسم', hint: 'لوحة مخصصة خلف اسم المستخدم' },
     { key: 'room_background', label: 'خلفيات الغرف', hint: 'خلفيات كاملة داخل الروم — طبّقها من إعدادات الغرفة' },
   ];
 
@@ -557,6 +560,9 @@
       el.heroAvatar.hidden = true;
       el.heroBg.hidden = false;
       el.heroBg.src = thumb || wear;
+    } else if (state.type === 'profile_card' || state.type === 'chat_bubble' || state.type === 'nameplate') {
+      el.heroAvatar.hidden = false;
+      showStaticFrame(thumb || wear, kind === 'gif');
     } else if (state.type === 'entry_effect') {
       // Keep the account avatar visible: entrance media is layered over it,
       // so users can judge the effect against their actual profile photo.
