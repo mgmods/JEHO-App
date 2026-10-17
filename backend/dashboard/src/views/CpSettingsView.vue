@@ -104,6 +104,27 @@
               </div>
             </div>
           </div>
+          <div class="col-12">
+            <div class="border rounded-3 p-3">
+              <h4 class="h6 mb-1">خلفية بطاقة CP في الملف الشخصي</h4>
+              <p class="form-text">تُطبّق على بطاقة العلاقة فقط، مع الحفاظ على أبعادها ومواقع الصور والقلب والنصوص.</p>
+              <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                  <label class="form-label">رفع خلفية البطاقة (PNG أو JPG أو WebP)</label>
+                  <input class="form-control" type="file" accept=".webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg" :disabled="item.uploadingCpCardBackground" @change="uploadCpCardBackground(item, $event)">
+                  <div v-if="item.uploadingCpCardBackground" class="small text-primary mt-2">جارٍ رفع الخلفية…</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">رابط خلفية البطاقة</label>
+                  <input v-model.trim="item.cpCardBackgroundUrl" class="form-control" type="url" dir="ltr" placeholder="https://…">
+                </div>
+                <div v-if="item.cpCardBackgroundUrl" class="col-12">
+                  <img :src="item.cpCardBackgroundUrl" :alt="'خلفية بطاقة ' + label(item.type)" style="width:100%;max-width:420px;height:110px;object-fit:cover;border-radius:12px;border:1px solid #d6b46b">
+                  <button class="btn btn-sm btn-outline-secondary mt-2" type="button" @click="item.cpCardBackgroundUrl = ''">إزالة الخلفية</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="d-flex justify-content-end mt-3">
           <button class="btn btn-aurora" :disabled="saving" @click="saveType(item)">
@@ -236,7 +257,9 @@ async function load() {
       seatEffectUrl: item.rules?.seatEffect?.url || '',
       seatEffectSize: Math.max(10, Math.min(36, Number(item.rules?.seatEffect?.sizeDp || 18))),
       seatEffectDuration: Math.max(500, Math.min(10000, Number(item.rules?.seatEffect?.durationMs || 1800))),
+      cpCardBackgroundUrl: item.rules?.cardBackgroundUrl || '',
       uploadingSeatEffect: false,
+      uploadingCpCardBackground: false,
     }))
     policy.value = {
       requestExpiryMinutes: Number(config.policy?.requestExpiryMinutes || 30),
@@ -273,6 +296,39 @@ async function uploadSeatEffect(item, event) {
   }
 }
 
+async function uploadCpCardBackground(item, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/\.(webp|png|jpe?g)$/i.test(file.name)) {
+    error.value = 'اختر خلفية بصيغة WebP أو PNG أو JPG.'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 40 * 1024 * 1024) {
+    error.value = 'حجم الخلفية يجب ألا يتجاوز 40 ميغابايت.'
+    event.target.value = ''
+    return
+  }
+  item.uploadingCpCardBackground = true
+  error.value = ''
+  try {
+    const response = await uploadsApi.upload(file)
+    if (response?.error) throw new Error(response.error.message || 'تعذر رفع الخلفية')
+    const data = payloadOf(response)
+    if (!data?.url && !data?.path) throw new Error('رد رفع الخلفية غير مكتمل.')
+    const uploadedUrl = data.url || data.path
+    item.cpCardBackgroundUrl = /^https?:\/\//i.test(uploadedUrl)
+      ? uploadedUrl
+      : new URL(uploadedUrl, window.location.origin).toString()
+    success.value = 'تم رفع الخلفية. اضغط حفظ ' + label(item.type) + ' لاعتمادها.'
+  } catch (e) {
+    error.value = e?.response?.data?.message || e?.message || 'تعذر رفع خلفية البطاقة'
+  } finally {
+    item.uploadingCpCardBackground = false
+    if (event?.target) event.target.value = ''
+  }
+}
+
 async function saveType(item) {
   error.value = ''; success.value = ''; saving.value = true; savingType.value = item.type
   try {
@@ -286,6 +342,7 @@ async function saveType(item) {
       sizeDp: Math.max(10, Math.min(36, Number(item.seatEffectSize || 18))),
       durationMs: Math.max(500, Math.min(10000, Number(item.seatEffectDuration || 1800))),
     }
+    rules.cardBackgroundUrl = String(item.cpCardBackgroundUrl || '').trim()
     const payload = {
       enabled: !!item.enabled,
       giftId: item.giftId || '',
