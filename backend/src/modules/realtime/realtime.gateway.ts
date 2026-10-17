@@ -49,6 +49,7 @@ const ALLOWED_ROOM_EVENTS = new Set([
   'chat:message',
   'room:summon',
   'room:chat_cleared',
+  'room:music_volume',
 ]);
 
 @WebSocketGateway({
@@ -606,6 +607,25 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       }
     }
 
+    // Shared music gain is a room-wide setting. Only the host/cohost or a moderator
+    // explicitly granted music control may change it.
+    if (data.event === 'room:music_volume') {
+      const room = await this.roomsRepo.findOne({ where: { id: data.roomId } });
+      const isRoomLead = !!room && (
+        room.hostId === client.userId ||
+        room.activeHostId === client.userId ||
+        room.cohostId === client.userId
+      );
+      let mayManageMusic = isRoomLead;
+      if (!mayManageMusic) {
+        const moderator = await this.roomModerators.findOne({
+          where: { roomId: data.roomId, userId: client.userId },
+        });
+        mayManageMusic = moderator?.canManageMusic === true;
+      }
+      if (!mayManageMusic) return { error: 'Music control permission required' };
+    }
+
     const profile = client.data.roomProfiles?.[data.roomId] || {};
     const incoming =
       data.payload &&
@@ -810,6 +830,12 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       };
     } else if (data.event === 'room:typing') {
       payload = { userId: client.userId, isTyping: incoming.isTyping === true };
+    } else if (data.event === 'room:music_volume') {
+      const requested = Number(incoming.volume);
+      const volume = Number.isFinite(requested)
+        ? Math.max(0, Math.min(200, Math.round(requested)))
+        : 200;
+      payload = { userId: client.userId, volume };
     }
 
     this.server.to(`room:${data.roomId}`).emit('room:event', {
