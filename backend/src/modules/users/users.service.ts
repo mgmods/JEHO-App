@@ -39,6 +39,7 @@ import { effectiveVipLevel } from '../../common/vip-progress';
 import { fixedVipFrameUrl, fixedVipHeadUrl, isStaticVipTouUrl } from '../../common/vip-visual';
 import { AgencyMember, AgencyMemberStatus } from '../../database/entities/agency-member.entity';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
+import { RechargeAgent, RechargeAgentStatus } from '../../database/entities/recharge-agent.entity';
 
 const LEVEL_THRESHOLDS = [
   0, 100, 500, 1500, 4000, 10000, 25000, 60000, 150000, 400000, 1000000,
@@ -68,6 +69,7 @@ export class UsersService {
     @InjectRepository(ProfileVisit) private readonly visitsRepo: Repository<ProfileVisit>,
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
     @InjectRepository(AgencyMember) private readonly agencyMembersRepo: Repository<AgencyMember>,
+    @InjectRepository(RechargeAgent) private readonly rechargeAgentsRepo: Repository<RechargeAgent>,
     private readonly dataSource: DataSource,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
@@ -326,6 +328,10 @@ export class UsersService {
       isFollowing = !!follow;
     }
     const agency = await this.resolveActiveAgency(id);
+    const activeRechargeAgent = await this.rechargeAgentsRepo.findOne({
+      where: { userId: id, status: RechargeAgentStatus.ACTIVE },
+      select: { id: true },
+    });
     const visitorsCount = await this.visitsRepo.count({
       where: { profileUserId: id },
     });
@@ -349,6 +355,7 @@ export class UsersService {
           ...this.flatten(user),
           vipLevel,
           isFollowing,
+          isRechargeAgent: !!activeRechargeAgent,
           agency,
           visitorsCount,
           isOnline,
