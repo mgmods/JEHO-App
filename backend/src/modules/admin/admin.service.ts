@@ -814,6 +814,121 @@ export class AdminService {
     return { reset: true, resetCount, skipped };
   }
 
+  /** Create an official platform room from the dashboard. A real user account is
+   * used as the room's technical host because rooms.hostId is a required FK;
+   * roomKind=SUPPORT makes the room platform-managed and permanently pinned. */
+  async createPlatformRoom(dto: { title?: string; description?: string; hostPublicId?: string; coverUrl?: string }) {
+    const title = String(dto.title || '').trim();
+    const hostPublicId = String(dto.hostPublicId || '').trim();
+    if (!title) throw new BadRequestException('اسم الروم مطلوب');
+    if (!hostPublicId) throw new BadRequestException('أدخل ID حساب مسؤول الروم');
+    const host = await this.usersRepo.findOne({ where: { publicId: hostPublicId } });
+    if (!host || host.status === UserStatus.DELETED) {
+      throw new NotFoundException('لم يتم العثور على حساب بهذا الـ ID');
+    }
+    const room = this.roomsRepo.create({
+      title: title.slice(0, 128),
+      description: String(dto.description || '').trim() || null,
+      coverUrl: String(dto.coverUrl || '').trim() || null,
+      type: RoomType.VOICE,
+      status: RoomStatus.OPEN,
+      hostId: host.id,
+      cohostId: null,
+      activeHostId: null,
+      roomKind: RoomKind.SUPPORT,
+      isPersistent: true,
+      agencyId: null,
+      isPublic: true,
+      accessMode: RoomAccessMode.FREE,
+      entryFeeCoins: 0,
+      hasPassword: false,
+      passwordHash: null,
+      seatCount: 11,
+      zegoRoomId: `room_${uuidv4().replace(/-/g, '').slice(0, 16)}`,
+      liveSessionStartedAt: null,
+      emptySince: null,
+    });
+    const saved = await this.roomsRepo.save(room);
+    const seats = Array.from({ length: 11 }, (_, seatIndex) =>
+      this.roomSeatsRepo.create({
+        roomId: saved.id,
+        seatIndex,
+        userId: null,
+        status: SeatStatus.EMPTY,
+        isMuted: false,
+        isModeratorMuted: false,
+        isHostSeat: seatIndex === 0,
+      }),
+    );
+    await this.roomSeatsRepo.save(seats);
+    return {
+      ...saved,
+      name: saved.title,
+      ownerName: host.displayName || host.username,
+      hostName: host.displayName || host.username,
+      platformManaged: true,
+    };
+  }
+
+  async listPlatformRoomStaff(roomId: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    return this.dataSource.query(
+      `SELECT u.id AS "userId", u."publicId" AS "publicId",
+              COALESCE(u."displayName", u.username) AS "displayName",
+              rm.role AS "role", rm."createdAt" AS "createdAt"
+         FROM room_moderators rm
+         JOIN users u ON u.id = rm."userId"
+        WHERE rm."roomId" = $1
+        ORDER BY rm."createdAt" ASC`,
+      [roomId],
+    );
+  }
+
+  async assignPlatformRoomStaff(roomId: string, publicIdInput: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن تعيين إدارة المنصة للرومات الرسمية التابعة للمنصة فقط');
+    }
+    const publicId = String(publicIdInput || '').trim();
+    if (!publicId) throw new BadRequestException('أدخل ID المستخدم');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user || user.status === UserStatus.DELETED) {
+      throw new NotFoundException('لم يتم العثور على مستخدم بهذا الـ ID');
+    }
+    if (user.id === room.hostId) {
+      throw new ConflictException('هذا الحساب هو المسؤول الأساسي عن الروم بالفعل');
+    }
+    await this.dataSource.query(
+      `INSERT INTO room_moderators
+         ("roomId", "userId", role, "canManageMusic", "canChangeFrames",
+          "canControlGames", "canMute", "canKick", "canBan", "canManageSeats",
+          "canInvite", "canManageRoom", "appointedById")
+       VALUES ($1, $2, 'admin', true, true, true, true, true, true, true, true, true, $3)
+       ON CONFLICT ("roomId", "userId") DO UPDATE SET
+         role = 'admin', "canManageMusic" = true, "canChangeFrames" = true,
+         "canControlGames" = true, "canMute" = true, "canKick" = true,
+         "canBan" = true, "canManageSeats" = true, "canInvite" = true,
+         "canManageRoom" = true`,
+      [roomId, user.id, room.hostId],
+    );
+    return { assigned: true, userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username };
+  }
+
+  async removePlatformRoomStaff(roomId: string, publicIdInput: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    const publicId = String(publicIdInput || '').trim();
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user) throw new NotFoundException('لم يتم العثور على مستخدم بهذا الـ ID');
+    await this.dataSource.query(
+      'DELETE FROM room_moderators WHERE "roomId" = $1 AND "userId" = $2',
+      [roomId, user.id],
+    );
+    return { removed: true, publicId };
+  }
+
   async listRooms(query: PaginationDto) {
     const qb = this.roomsRepo
       .createQueryBuilder('r')

@@ -11,6 +11,69 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
 
     <div class="glass p-3 mb-3">
+      <h5 class="mb-1">إنشاء روم رسمي تابع للمنصة</h5>
+      <p class="small text-muted mb-3">رومات خدمة العملاء والإدارة تبقى مثبتة أعلى قائمة الرومات. أدخل ID حساب المسؤول الأساسي التقني للروم.</p>
+      <form class="row g-2 align-items-end" @submit.prevent="createPlatformRoom">
+        <div class="col-md-3">
+          <label class="form-label">اسم الروم</label>
+          <input v-model.trim="newPlatformRoom.title" class="form-control" maxlength="128" required placeholder="مثلاً: خدمة العملاء" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">ID المسؤول الأساسي</label>
+          <input v-model.trim="newPlatformRoom.hostPublicId" class="form-control" required inputmode="numeric" placeholder="ID المستخدم" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">وصف الروم (اختياري)</label>
+          <input v-model.trim="newPlatformRoom.description" class="form-control" placeholder="روم رسمي تابع لإدارة المنصة" />
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-aurora w-100" type="submit" :disabled="creatingPlatformRoom">
+            {{ creatingPlatformRoom ? 'جارٍ الإنشاء…' : 'إنشاء وتثبيت' }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="glass p-3 mb-3">
+      <h5 class="mb-1">إدارة مشرفي الرومات الرسمية</h5>
+      <p class="small text-muted mb-3">اختر رومًا رسميًا وأضف أو أزل المشرفين باستخدام ID الحساب. تُمنح صلاحيات إدارة الروم ومقاعد المايك والدعوات والإشراف.</p>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">الروم الرسمي</label>
+          <select v-model="staffRoomId" class="form-select" @change="loadPlatformStaff" :disabled="!platformRooms.length">
+            <option value="">اختر الروم</option>
+            <option v-for="r in platformRooms" :key="r.id" :value="r.id">{{ r.title || r.name }} · {{ r.id }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ID المستخدم لإضافته كمشرف</label>
+          <input v-model.trim="staffPublicId" class="form-control" inputmode="numeric" placeholder="ID الحساب" />
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-aurora w-100" type="button" :disabled="!staffRoomId || !staffPublicId || staffBusy" @click="addPlatformStaff">إضافة مشرف</button>
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-ghost w-100" type="button" :disabled="!staffRoomId || staffBusy" @click="loadPlatformStaff">تحديث القائمة</button>
+        </div>
+      </div>
+      <div v-if="staffLoading" class="small text-muted mt-3">جارٍ تحميل المشرفين…</div>
+      <div v-else-if="staffRoomId && !platformStaff.length" class="small text-muted mt-3">لا يوجد مشرفون مضافون لهذا الروم بعد.</div>
+      <div v-else-if="platformStaff.length" class="table-responsive mt-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>الاسم</th><th>ID</th><th>الدور</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="person in platformStaff" :key="person.userId">
+              <td>{{ person.displayName || 'مستخدم' }}</td>
+              <td>{{ person.publicId }}</td>
+              <td>{{ person.role === 'admin' ? 'إدارة الروم' : 'مشرف' }}</td>
+              <td class="text-end"><button class="btn btn-sm btn-outline-danger" type="button" :disabled="staffBusy" @click="removePlatformStaff(person.publicId)">إزالة</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="glass p-3 mb-3">
       <div class="row g-2 align-items-end">
         <div class="col-md-5">
           <label class="form-label">{{ t('common.search') }}</label>
@@ -109,6 +172,16 @@ const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
 const bulkBusy = ref(false)
+const newPlatformRoom = ref({ title: '', hostPublicId: '', description: '' })
+const creatingPlatformRoom = ref(false)
+const staffRoomId = ref('')
+const staffPublicId = ref('')
+const platformStaff = ref([])
+const staffLoading = ref(false)
+const staffBusy = ref(false)
+const platformRooms = computed(() => rooms.value.filter(r =>
+  String(r.roomKind || '').toLowerCase() === 'support' || r.isSupport === true
+))
 
 const {
   selectedIds,
@@ -157,6 +230,69 @@ async function onBulkAction(key) {
   confirmOpen.value = true
 }
 
+async function createPlatformRoom() {
+  if (creatingPlatformRoom.value) return
+  creatingPlatformRoom.value = true
+  const submittedTitle = newPlatformRoom.value.title
+  const { data, error: err } = await roomsApi.createPlatform({ ...newPlatformRoom.value })
+  creatingPlatformRoom.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  toast().success('تم إنشاء الروم الرسمي وتثبيته أعلى الرومات')
+  newPlatformRoom.value = { title: '', hostPublicId: '', description: '' }
+  await load()
+  const created = data?.id ? data : rooms.value.find(r => r.title === submittedTitle)
+  if (created?.id) staffRoomId.value = created.id
+  else if (platformRooms.value.length) staffRoomId.value = platformRooms.value[0].id
+  await loadPlatformStaff()
+}
+
+async function loadPlatformStaff() {
+  if (!staffRoomId.value) { platformStaff.value = []; return }
+  staffLoading.value = true
+  const { data, error: err } = await roomsApi.platformStaff(staffRoomId.value)
+  staffLoading.value = false
+  if (err) {
+    error.value = err.message
+    platformStaff.value = []
+    return
+  }
+  platformStaff.value = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []
+}
+
+async function addPlatformStaff() {
+  if (!staffRoomId.value || !staffPublicId.value || staffBusy.value) return
+  staffBusy.value = true
+  const { error: err } = await roomsApi.addPlatformStaff(staffRoomId.value, staffPublicId.value)
+  staffBusy.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  toast().success('تم تعيين المستخدم إدارةً للروم')
+  staffPublicId.value = ''
+  await loadPlatformStaff()
+}
+
+async function removePlatformStaff(publicId) {
+  if (!staffRoomId.value || !publicId || staffBusy.value) return
+  if (!window.confirm(`إزالة المستخدم صاحب ID ${publicId} من إدارة هذا الروم؟`)) return
+  staffBusy.value = true
+  const { error: err } = await roomsApi.removePlatformStaff(staffRoomId.value, publicId)
+  staffBusy.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  toast().success('تمت إزالة المشرف من الروم')
+  await loadPlatformStaff()
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -174,6 +310,10 @@ async function load() {
   }
   rooms.value = extractList(data)
   total.value = Number(data?.meta?.total ?? data?.total ?? rooms.value.length)
+  if (!staffRoomId.value && platformRooms.value.length) {
+    staffRoomId.value = platformRooms.value[0].id
+    await loadPlatformStaff()
+  }
 }
 
 const confirmOpen = ref(false)
