@@ -39,6 +39,7 @@ import { effectiveVipLevel } from '../../common/vip-progress';
 import { fixedVipFrameUrl, fixedVipHeadUrl, isStaticVipTouUrl } from '../../common/vip-visual';
 import { AgencyMember, AgencyMemberStatus } from '../../database/entities/agency-member.entity';
 import { Agency, AgencyStatus } from '../../database/entities/agency.entity';
+import { RechargeAgent, RechargeAgentStatus } from '../../database/entities/recharge-agent.entity';
 
 const LEVEL_THRESHOLDS = [
   0, 100, 500, 1500, 4000, 10000, 25000, 60000, 150000, 400000, 1000000,
@@ -68,6 +69,7 @@ export class UsersService {
     @InjectRepository(ProfileVisit) private readonly visitsRepo: Repository<ProfileVisit>,
     @InjectRepository(Cosmetic) private readonly cosmeticsRepo: Repository<Cosmetic>,
     @InjectRepository(AgencyMember) private readonly agencyMembersRepo: Repository<AgencyMember>,
+    @InjectRepository(RechargeAgent) private readonly rechargeAgentsRepo: Repository<RechargeAgent>,
     private readonly dataSource: DataSource,
     private readonly realtimeGateway: RealtimeGateway,
     private readonly mediaCleanup: MediaCleanupService,
@@ -76,6 +78,14 @@ export class UsersService {
     @Optional() private readonly notifications?: NotificationsService,
     @Optional() private readonly tasksService?: TasksService,
   ) {}
+
+  private async hasActiveRechargeAgent(userId: string): Promise<boolean> {
+    const agent = await this.rechargeAgentsRepo.findOne({
+      where: { userId, status: RechargeAgentStatus.ACTIVE },
+      select: { id: true },
+    });
+    return !!agent;
+  }
 
   private economyStats(profile?: UserProfile | null) {
     const received = Math.max(0, Number(profile?.totalReceivedDiamonds ?? 0));
@@ -284,6 +294,7 @@ export class UsersService {
       Number(user.profile?.totalSentCoins || 0),
     );
     const agency = await this.resolveActiveAgency(userId);
+    const isRechargeAgent = await this.hasActiveRechargeAgent(userId);
     return this.withWearMeta(
       this.applyFixedVipWear(
         {
@@ -293,6 +304,7 @@ export class UsersService {
           genderVerified: verification.genderVerified,
           genderVerificationStatus: verification.genderVerificationStatus,
           agency,
+          isRechargeAgent,
         },
         vipLevel,
       ),
@@ -326,6 +338,7 @@ export class UsersService {
       isFollowing = !!follow;
     }
     const agency = await this.resolveActiveAgency(id);
+    const isRechargeAgent = await this.hasActiveRechargeAgent(id);
     const visitorsCount = await this.visitsRepo.count({
       where: { profileUserId: id },
     });
@@ -350,6 +363,7 @@ export class UsersService {
           vipLevel,
           isFollowing,
           agency,
+          isRechargeAgent,
           visitorsCount,
           isOnline,
         },
@@ -365,7 +379,8 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withWearMeta(this.flatten(user));
+    const isRechargeAgent = await this.hasActiveRechargeAgent(user.id);
+    return this.withWearMeta({ ...this.flatten(user), isRechargeAgent });
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
