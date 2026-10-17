@@ -98,7 +98,6 @@ final class RelationshipSeatEffectsOverlay {
         clearParticles();
         if (seats == null || relationships == null || relationships.isEmpty()
                 || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
-            retryIfNoParticles();
             return;
         }
 
@@ -140,7 +139,6 @@ final class RelationshipSeatEffectsOverlay {
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(avatarA, avatarB, type, url, sizeDp, duration);
         }
-        if (running.isEmpty()) retryIfNoParticles();
     }
 
     private void retryIfNoParticles() {
