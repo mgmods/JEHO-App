@@ -132,8 +132,10 @@ public class ProfileActivity extends ThemedActivity {
         }
 
         binding.btnFollow.setOnClickListener(v -> {
-            if (userId == null) return;
-            if (myId != null && userId.equals(myId)) {
+            // Use the resolved UUID from the loaded profile, not the incoming public ID/deep link.
+            String targetId = targetUserIdHold[0];
+            if (targetId == null || targetId.trim().isEmpty()) return;
+            if (myId != null && targetId.equals(myId)) {
                 Toast.makeText(this, "هذا حسابك", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -142,8 +144,8 @@ public class ProfileActivity extends ThemedActivity {
             container.getIoExecutor().execute(() -> {
                 Result<Object> r = com.Dramizo.Series.util.ApiCall.execute(
                         unfollow
-                                ? container.getUserApi().unfollow(userId)
-                                : container.getUserApi().follow(userId));
+                                ? container.getUserApi().unfollow(targetId)
+                                : container.getUserApi().follow(targetId));
                 runOnUiThread(() -> {
                     binding.btnFollow.setEnabled(true);
                     if (r.success) {
