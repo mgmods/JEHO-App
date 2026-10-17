@@ -700,17 +700,9 @@ public class ProfileFragment extends Fragment {
                         ? "" : String.valueOf(partner.get("vipBadgeUrl")).trim();
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpSelfFrame, selfFrameUrl);
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpPartnerFrame, partnerFrameUrl);
-                bindMyCpAvatar(binding.imgMyProfileCpCvSelf, selfAvatarUrl);
-                bindMyCpAvatar(binding.imgMyProfileCpCvPartner, partnerAvatar);
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpCvSelfFrame, selfFrameUrl);
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpCvPartnerFrame, partnerFrameUrl);
-                int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
-                long relationshipDays = cpDurationDays(relation.get("startedAt"));
-                binding.tvMyProfileCpCvType.setText(myCpTypeLabel(type));
-                binding.tvMyProfileCpCvHeart.setText("♥");
-                binding.tvMyProfileCpCvLevel.setText("Lv." + relationshipLevel);
-                binding.tvMyProfileCpCvDays.setText(relationshipDays + " أيام");
-                binding.rowMyProfileCpCv.setVisibility(View.VISIBLE);
+                // The "أنا" tab shows only the compact CP pair at the top.
+                // Keep the ornate CV card for the full profile page to avoid a duplicate here.
+                if (binding.rowMyProfileCpCv != null) binding.rowMyProfileCpCv.setVisibility(View.GONE);
                 binding.rowMyProfileCp.setVisibility(View.VISIBLE);
                 startMyCpHeartAnimation();
             });
