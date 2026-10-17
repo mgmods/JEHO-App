@@ -1195,6 +1195,7 @@ export class AdminService {
     title?: string;
     description?: string;
     coverUrl?: string;
+    category?: string;
     seatCount?: number;
     moderatorIds?: string[];
   }) {
@@ -1240,6 +1241,9 @@ export class AdminService {
         title,
         description: String(dto.description || '').trim().slice(0, 2000) || null,
         coverUrl: String(dto.coverUrl || '').trim().slice(0, 512) || null,
+        topic: ['customer_service', 'management', 'official'].includes(String(dto.category || '').trim().toLowerCase())
+          ? String(dto.category).trim().toLowerCase()
+          : 'official',
         type: RoomType.VOICE,
         status: RoomStatus.OPEN,
         hostId,
