@@ -6719,6 +6719,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }).setNegativeButton("إلغاء", null).show();
     }
 
+    private String roomCpRelationshipSymbol(String type) {
+        if (type == null) return "💗";
+        switch (type.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "engagement": return "💍";
+            case "marriage": return "💞";
+            case "friendship": return "🤝";
+            case "brotherhood": return "💙";
+            case "love": return "💗";
+            default: return "✨";
+        }
+    }
+
     private String roomCpTypeLabel(String type) {
         switch (type) {
             case "friendship": return "✦ علاقة صداقة";
@@ -6888,7 +6900,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View rowHostTasks = sheet.findViewById(R.id.rowHostTasks);
         View actCpRequest = sheet.findViewById(R.id.actCpRequest);
         View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
+        ImageView imgCpPrimaryAvatar = sheet.findViewById(R.id.imgCpPrimaryAvatar);
         ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
+        TextView tvCpRelationshipSymbol = sheet.findViewById(R.id.tvCpRelationshipSymbol);
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
@@ -6909,7 +6923,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             actCpRequest.setVisibility(userId != null && !userId.equals(myUserId) ? View.VISIBLE : View.GONE);
             actCpRequest.setOnClickListener(v -> showRoomCardCpRequest(userId, cpContainer));
         }
-        if (userId != null && !userId.equals(myUserId)) {
+        if (userId != null && !userId.trim().isEmpty()) {
             cpContainer.getIoExecutor().execute(() -> {
                 Result<List<Map<String, Object>>> cpResult = ApiCall.execute(cpContainer.getUserApi().cpProfileRelationships(userId));
                 if (!cpResult.success || cpResult.data == null || cpResult.data.isEmpty()) return;
@@ -6922,13 +6936,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String cpAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? ""
                         : String.valueOf(cpPartner.get("avatarUrl"));
                 runOnUiThread(() -> {
-                    if (rowCpRelationship == null || dialog.getWindow() == null) return;
+                    if (rowCpRelationship == null || dialog.getWindow() == null || !dialog.isShowing()) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(type)
                             + (cpName.isEmpty() ? "" : " · " + cpName));
+                    if (imgCpPrimaryAvatar != null && avatarUrl != null && !avatarUrl.trim().isEmpty()) {
+                        Glide.with(VoiceRoomActivity.this).load(AssetCatalog.absoluteUrl(avatarUrl))
+                                .placeholder(R.drawable.ic_tab_me).into(imgCpPrimaryAvatar);
+                    }
                     if (imgCpPartnerAvatar != null && !cpAvatar.isEmpty()) {
-                        Glide.with(VoiceRoomActivity.this).load(cpAvatar)
+                        Glide.with(VoiceRoomActivity.this).load(AssetCatalog.absoluteUrl(cpAvatar))
                                 .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    if (tvCpRelationshipSymbol != null) {
+                        tvCpRelationshipSymbol.setText(roomCpRelationshipSymbol(type));
+                        Runnable[] pulse = new Runnable[1];
+                        pulse[0] = () -> {
+                            if (!dialog.isShowing()) return;
+                            tvCpRelationshipSymbol.animate().scaleX(1.16f).scaleY(1.16f)
+                                    .alpha(0.82f).setDuration(480L).withEndAction(() -> {
+                                        if (!dialog.isShowing()) return;
+                                        tvCpRelationshipSymbol.animate().scaleX(1f).scaleY(1f)
+                                                .alpha(1f).setDuration(480L).withEndAction(pulse[0]).start();
+                                    }).start();
+                        };
+                        pulse[0].run();
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
                 });
