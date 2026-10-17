@@ -646,9 +646,6 @@ export class UsersService {
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
         : user.profile?.vipBadgeUrl ?? null,
-      vipHeadUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? vip.vipPlan?.badgeUrl : null) || fixedVipHeadUrl(vipLevel),
-      vipTouUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? (vip.vipPlan?.benefits as any)?.visuals?.vipFrameUrl : null) || fixedVipFrameUrl(vipLevel),
-      vipCardUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? (vip.vipPlan?.benefits as any)?.visuals?.vipCardUrl : null) || null,
       levelBadgeUrl: user.profile?.levelBadgeUrl ?? null,
       hostBadgeUrl: user.profile?.hostBadgeUrl ?? null,
       country: user.profile?.country ?? null,
