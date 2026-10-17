@@ -3,6 +3,7 @@ package com.Dramizo.Series.presentation.chat;
 import android.app.Dialog;
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
@@ -41,6 +42,8 @@ import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RoomShareCodec;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,6 +76,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
     private final AuthDtos.UserDto me;
     private final Listener listener;
     private String peerAvatarUrl;
+    private String peerChatBubbleUrl;
     private String peerHostBadgeUrl;
     private java.util.Map<String, Object> peerHostBadgeMeta;
     private String peerDisplayName;
@@ -119,6 +123,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
             int vipLevel,
             int level) {
         this.peerDisplayName = displayName;
+        this.peerChatBubbleUrl = null;
         this.peerAvatarUrl = avatarUrl;
         this.peerHostBadgeUrl = hostBadgeUrl;
         this.peerHostBadgeMeta = hostBadgeMeta;
@@ -139,6 +144,7 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 null,
                 peer.vipLevel,
                 peer.level > 0 ? peer.level : 1);
+        this.peerChatBubbleUrl = peer.chatBubbleUrl;
     }
 
     public void setPeerLastReadAt(String iso) {
@@ -306,6 +312,10 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 holder.b.bubbleRoot.setBackgroundResource(R.drawable.bg_chat_bubble_peer);
             }
         }
+
+        // Dashboard-managed chat bubble artwork overrides the fallback/VIP skin when equipped.
+        String customBubble = mine ? (me != null ? me.chatBubbleUrl : null) : peerChatBubbleUrl;
+        applyCustomBubbleArtwork(holder.b.bubbleRoot, customBubble);
 
         // VIP-aware body colors (white on rose/VIP; dark on peer light gray).
         applyBubbleInk(holder, mine, useVipSkin ? vipLevel : 0);
@@ -1071,6 +1081,18 @@ public class MessageAdapter extends RecyclerView.Adapter<MessageAdapter.VH> {
                 iv.setImageDrawable(null);
             }
         }
+    }
+
+    private void applyCustomBubbleArtwork(@NonNull View bubble, @Nullable String url) {
+        if (url == null || url.trim().isEmpty()) return;
+        try {
+            Glide.with(bubble).load(AssetCatalog.absoluteUrl(url)).into(new CustomTarget<Drawable>() {
+                @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                    if (bubble.getContext() != null) bubble.setBackground(resource);
+                }
+                @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+            });
+        } catch (Exception ignored) { }
     }
 
     private void applyBrandMineBubble(@NonNull View bubble) {
