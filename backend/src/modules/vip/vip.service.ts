@@ -22,10 +22,10 @@ import {
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 
 export class PurchaseVipDto {
-  @ApiProperty({ minimum: 1, maximum: 100 })
+  @ApiProperty({ minimum: 1, maximum: 7 })
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(7)
   level: number;
 
   /** Rental days — VIP is never permanent. Allowed: 7 / 30 / 40. */
@@ -39,9 +39,9 @@ export class PurchaseVipDto {
 @Injectable()
 export class VipService {
   private readonly logger = new Logger(VipService.name);
-  private static readonly MAX_VIP_LEVEL = 100;
+  private static readonly MAX_VIP_LEVEL = 7;
 
-  /** Hard progression curve so VIP100 stays elite. */
+  /** Fallback prices are used only when the catalog is empty; existing database prices stay authoritative. */
   private static vipPriceForLevel(level: number): number {
     const l = Math.max(1, Math.min(VipService.MAX_VIP_LEVEL, Math.floor(Number(level) || 1)));
     if (l <= 10) return [0, 99, 199, 399, 699, 999, 1499, 2499, 3999, 5999, 9999][l];
@@ -66,7 +66,9 @@ export class VipService {
         where: { isActive: true },
         order: { level: 'ASC' },
       });
-      return plans.map((p) => ({
+      // Older database rows may include levels beyond the actual VIP1–VIP7 product.
+      // Hide them from the catalog without deleting or resetting persistent data.
+      return plans.filter((p) => Number(p.level) >= 1 && Number(p.level) <= VipService.MAX_VIP_LEVEL).map((p) => ({
         ...p,
         durationPacks: VIP_DURATION_PACKS.map((pack) => ({
           ...pack,
@@ -134,6 +136,9 @@ export class VipService {
   }
 
   async purchase(userId: string, dto: PurchaseVipDto) {
+    if (!Number.isInteger(Number(dto.level)) || Number(dto.level) < 1 || Number(dto.level) > VipService.MAX_VIP_LEVEL) {
+      throw new BadRequestException('VIP level must be between 1 and 7');
+    }
     await this.ensurePlans();
     const plan = await this.plansRepo.findOne({ where: { level: dto.level, isActive: true } });
     if (!plan) throw new NotFoundException('VIP plan not found');
