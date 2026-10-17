@@ -336,6 +336,10 @@ export class VanityIdsController {
     }
     let row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) {
+      const accountConflict = await this.usersRepo.exist({ where: { publicId } });
+      if (accountConflict) {
+        throw new BadRequestException('هذا الـ ID مستخدم بالفعل في حساب حالي');
+      }
       row = this.vanityRepo.create({
         publicId,
         status: VanityIdStatus.AVAILABLE,
