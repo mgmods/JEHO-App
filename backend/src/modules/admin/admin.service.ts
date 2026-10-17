@@ -1302,6 +1302,52 @@ export class AdminService {
     return { ...result, isPlatformManaged: true, isPinned: true };
   }
 
+  /** Add one moderator to an official platform room without replacing existing staff. */
+  async addPlatformRoomModerator(roomId: string, publicIdRaw: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن إضافة مشرفين لرومات المنصة الرسمية فقط');
+    }
+    const publicId = String(publicIdRaw || '').trim();
+    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user || user.status === UserStatus.DELETED) {
+      throw new BadRequestException(`لم يتم العثور على مستخدم بالآيدي ${publicId}`);
+    }
+    const existing = await this.dataSource.getRepository(RoomModerator).findOne({
+      where: { roomId, userId: user.id },
+    });
+    if (existing) {
+      return {
+        roomId,
+        alreadyModerator: true,
+        moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+      };
+    }
+    const moderator = this.dataSource.getRepository(RoomModerator).create({
+      roomId,
+      userId: user.id,
+      role: ModeratorRole.ADMIN,
+      canManageMusic: true,
+      canChangeFrames: true,
+      canControlGames: true,
+      canMute: true,
+      canKick: true,
+      canBan: true,
+      canManageSeats: true,
+      canInvite: true,
+      canManageRoom: true,
+      appointedById: room.hostId,
+    });
+    await this.dataSource.getRepository(RoomModerator).save(moderator);
+    return {
+      roomId,
+      added: true,
+      moderator: { userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username },
+    };
+  }
+
   /** Replace the moderator list of an official platform room by public user IDs. */
   async setPlatformRoomModerators(roomId: string, publicIds: string[]) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
