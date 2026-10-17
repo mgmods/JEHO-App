@@ -624,7 +624,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
                 // Room staff who are not seated can invite an audience member to this
                 // exact empty seat, or choose to sit here themselves.
-                if (canInviteMic && !isOnSeat(currentSeats)) {
+                if (canInviteMic && !isOnSeat(currentSeats) && seat.seatIndex != 0) {
                     new androidx.appcompat.app.AlertDialog.Builder(VoiceRoomActivity.this)
                             .setTitle("المقعد فارغ")
                             .setItems(new CharSequence[]{"دعوة شخص للمقعد", "الجلوس على المقعد"},
