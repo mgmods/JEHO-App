@@ -640,6 +640,10 @@ public class ProfileActivity extends ThemedActivity {
                 String name = "";
                 String avatar = "";
                 String partnerFrameUrl = "";
+                String partnerHostBadgeUrl = "";
+                Map<String, ?> partnerHostBadgeMeta = null;
+                int partnerVipLevel = 0;
+                String partnerVipTouUrl = "";
                 String type = relation.get("type") == null ? "" : String.valueOf(relation.get("type")).trim();
                 if (partner != null) {
                     Object displayName = partner.get("displayName");
@@ -651,6 +655,22 @@ public class ProfileActivity extends ThemedActivity {
                     avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
                     Object frameValue = partner.get("vipBadgeUrl");
                     partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
+                    Object vipLevelValue = partner.get("vipLevel");
+                    partnerVipLevel = parsePositiveInt(vipLevelValue, 0);
+                    Object vipTouValue = partner.get("vipTouUrl");
+                    partnerVipTouUrl = vipTouValue == null ? "" : String.valueOf(vipTouValue).trim();
+                    Object hostBadgeValue = partner.get("hostBadgeUrl");
+                    partnerHostBadgeUrl = hostBadgeValue == null ? "" : String.valueOf(hostBadgeValue).trim();
+                    Object hostMetaValue = partner.get("hostBadgeMeta");
+                    if (hostMetaValue instanceof Map) {
+                        partnerHostBadgeMeta = (Map<String, ?>) hostMetaValue;
+                    }
+                    // Match the same profile-frame resolution used for the profile owner:
+                    // equipped frame first, otherwise the partner's real VIP nobility frame.
+                    if (partnerFrameUrl.isEmpty()) {
+                        String vipFrame = VipStyle.profileNobilityFrameUrl(partnerVipLevel, partnerVipTouUrl);
+                        partnerFrameUrl = vipFrame == null ? "" : vipFrame;
+                    }
                 }
                 // Only the active relationship and its real partner payload are required;
                 // the top pair intentionally shows no partner name or relationship text.
@@ -661,9 +681,16 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvProfileCpLabel.setVisibility(View.GONE);
                 binding.imgProfileCpSelf.setVisibility(View.GONE);
                 binding.imgProfileCpSelfFrame.setVisibility(View.GONE);
-                bindRealCpAvatar(binding.imgProfileCpPartner, avatar);
-                // Keep the partner's actual profile frame; do not synthesize cosmetic assets.
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpPartnerFrame, partnerFrameUrl);
+                // Use the partner's real equipped frame/host badge and VIP fallback exactly
+                // as on their own profile, preserving animated wear where supported.
+                com.Dramizo.Series.util.AvatarCosmetics.bindWear(
+                        binding.imgProfileCpPartner,
+                        binding.imgProfileCpPartnerFrame,
+                        avatar,
+                        partnerFrameUrl,
+                        partnerHostBadgeUrl,
+                        null,
+                        partnerHostBadgeMeta);
 
                 // Mirror the same live relationship into the decorative CV card.
                 bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
