@@ -3984,6 +3984,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.btnMusicSkip.setEnabled(canManageMusic);
         binding.btnMusicStop.setEnabled(canManageMusic);
         binding.seekMusic.setEnabled(canManageMusic);
+        boolean canAdjustMusicVolume = !isLocalMusicUrl(incomingMusicUrl)
+                || (canManageMusic && !RoomRtcEngine.getInstance().isLiveKit());
+        if (binding.musicVolumeDown != null) binding.musicVolumeDown.setEnabled(canAdjustMusicVolume);
+        if (binding.musicVolumeUp != null) binding.musicVolumeUp.setEnabled(canAdjustMusicVolume);
         updateMusicProgressUi();
         binding.btnMusicPlayPause.setImageResource(playing
                 ? android.R.drawable.ic_media_pause
