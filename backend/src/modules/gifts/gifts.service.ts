@@ -2318,16 +2318,13 @@ export class GiftsService implements OnModuleInit {
   async sendAllMic(senderId: string, dto: SendAllMicGiftDto) {
     const rawIds = Array.isArray(dto.receiverIds) ? dto.receiverIds : [];
     const selfGiftBlocked = await this.isSelfGiftBlocked();
+    if (selfGiftBlocked && rawIds.some((id) => String(id || '').trim() === String(senderId))) {
+      throw new BadRequestException(
+        'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة',
+      );
+    }
     const receiverIds = [
-      ...new Set(
-        rawIds
-          .map((id) => String(id || '').trim())
-          .filter(
-            (id) =>
-              id.length > 0 &&
-              (!selfGiftBlocked || id !== String(senderId)),
-          ),
-      ),
+      ...new Set(rawIds.map((id) => String(id || '').trim()).filter((id) => id.length > 0)),
     ].slice(0, 20);
     if (receiverIds.length === 0) {
       throw new BadRequestException(
@@ -2500,7 +2497,7 @@ export class GiftsService implements OnModuleInit {
         const rid = receiverIds[i];
         const share = micShares.get(rid) || 0;
         if (share <= 0) continue;
-        if (rid === senderId) continue;
+        // When self-gifting is enabled, the sender's own selected share is paid to their wallet too.
         let rw = await manager.findOne(Wallet, {
           where: { userId: rid },
           lock: { mode: 'pessimistic_write' },
