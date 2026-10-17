@@ -439,7 +439,7 @@ public class ProfileActivity extends ThemedActivity {
 
     private void bindStaffBadge(com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user) {
         if (binding == null || binding.tvStaffBadge == null) return;
-        if (!StaffRoleHelper.isStaff(user)) {
+        if (!StaffRoleHelper.isStaff(user) && !user.isRechargeAgent) {
             binding.tvStaffBadge.setVisibility(View.GONE);
             return;
         }
