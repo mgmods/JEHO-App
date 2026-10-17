@@ -2793,7 +2793,22 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Guests may only switch seats if already on mic; first seat requires host approval
     // unless the dashboard enables free mic (rooms.mic_without_host_approval).
     if (!isHost && !alreadySeated) {
-      const freeMic = await this.micWithoutHostApproval();
+      // Active agency members may take an open guest seat in their own agency room,
+      // even when the global free-mic setting is disabled.
+      let agencyMemberCanSit = false;
+      if (room.agencyId || room.roomKind === RoomKind.AGENCY) {
+        if (room.agencyId) {
+          const membership = await this.dataSource.query(
+            `SELECT id FROM agency_members
+             WHERE "agencyId" = $1 AND "userId" = $2
+               AND status = 'active' AND "isActive" = true
+             LIMIT 1`,
+            [room.agencyId, userId],
+          );
+          agencyMemberCanSit = membership.length > 0;
+        }
+      }
+      const freeMic = agencyMemberCanSit || await this.micWithoutHostApproval();
       if (!freeMic) {
         throw new ForbiddenException('Request mic access and wait for host approval');
       }
