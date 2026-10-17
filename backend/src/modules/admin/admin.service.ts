@@ -1185,6 +1185,78 @@ export class AdminService {
     return room;
   }
 
+  /** Create a persistent platform-managed room. hostPublicId is the platform staff account responsible for the room. */
+  async createPlatformRoom(dto: { title?: string; hostPublicId?: string; description?: string; coverUrl?: string }) {
+    const title = String(dto.title || '').trim();
+    const hostPublicId = String(dto.hostPublicId || '').trim();
+    if (!title || title.length > 128) throw new BadRequestException('اسم الروم مطلوب (حتى 128 حرفاً)');
+    if (!hostPublicId) throw new BadRequestException('أدخل ID حساب مسؤول الروم');
+    const host = await this.usersRepo.findOne({
+      where: [{ publicId: hostPublicId }, { username: hostPublicId }],
+      select: ['id', 'publicId', 'username', 'displayName', 'status'],
+    });
+    if (!host || host.status === UserStatus.DELETED) throw new NotFoundException('لم يتم العثور على حساب مسؤول الروم بهذا ID');
+    const room = await this.roomsRepo.save(this.roomsRepo.create({
+      publicId: await this.allocateAdminRoomPublicId(),
+      title,
+      description: String(dto.description || '').trim() || 'روم إداري تابع لمنصة JEHO CHAT',
+      coverUrl: String(dto.coverUrl || '').trim() || null,
+      hostId: host.id,
+      activeHostId: host.id,
+      status: RoomStatus.OPEN,
+      type: RoomType.VOICE,
+      roomKind: RoomKind.SUPPORT,
+      isPersistent: true,
+      seatCount: 11,
+      viewerCount: 0,
+      isPublic: true,
+      hasPassword: false,
+      accessMode: RoomAccessMode.FREE,
+      entryFeeCoins: 0,
+      emptySince: null,
+    }));
+    await this.roomSeatsRepo.save(Array.from({ length: 11 }, (_, seatIndex) =>
+      this.roomSeatsRepo.create({
+        roomId: room.id,
+        seatIndex,
+        userId: null,
+        status: seatIndex === 0 ? 'occupied' as any : 'empty' as any,
+        isHostSeat: seatIndex === 0,
+      }),
+    ));
+    return { ...room, host: { id: host.id, publicId: host.publicId, username: host.username, displayName: host.displayName } };
+  }
+
+  private async allocateAdminRoomPublicId(): Promise<string> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const candidate = String(100000 + Math.floor(Math.random() * 900000));
+      const exists = await this.roomsRepo.exist({ where: { publicId: candidate } });
+      if (!exists) return candidate;
+    }
+    throw new ConflictException('تعذر إنشاء آيدي روم فريد، حاول مرة أخرى');
+  }
+
+  /** Assign room administrator/moderator using the user's public ID, not internal UUID. */
+  async setPlatformRoomModerator(roomId: string, userPublicId: string, role: 'admin' | 'mod' = 'admin') {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('الروم غير موجود');
+    if (room.roomKind !== RoomKind.SUPPORT) throw new BadRequestException('يمكن تعيين إدارة المنصة فقط لروم تابع للمنصة');
+    const publicId = String(userPublicId || '').trim();
+    if (!publicId) throw new BadRequestException('أدخل ID المستخدم');
+    const user = await this.usersRepo.findOne({
+      where: [{ publicId }, { username: publicId }],
+      select: ['id', 'publicId', 'username', 'displayName', 'status'],
+    });
+    if (!user || user.status === UserStatus.DELETED) throw new NotFoundException('لم يتم العثور على المستخدم بهذا ID');
+    await this.dataSource.query(
+      `INSERT INTO room_moderators ("roomId", "userId", role, "appointedById", "canManageMusic", "canChangeFrames", "canControlGames", "canMute", "canKick", "canBan", "canManageSeats", "canInvite", "canManageRoom")
+       VALUES ($1, $2, $3::"enum_room_moderators_role_enum", $4, true, true, true, true, true, true, true, true, true)
+       ON CONFLICT ("roomId", "userId") DO UPDATE SET role = EXCLUDED.role, "canManageMusic" = true, "canChangeFrames" = true, "canControlGames" = true, "canMute" = true, "canKick" = true, "canBan" = true, "canManageSeats" = true, "canInvite" = true, "canManageRoom" = true`,
+      [roomId, user.id, role, user.id],
+    );
+    return { roomId, userId: user.id, publicId: user.publicId, displayName: user.displayName || user.username, role };
+  }
+
   async setRoomCustomerService(roomId: string, enabled: boolean) {
     return this.updateRoom(roomId, { isSupport: enabled });
   }
