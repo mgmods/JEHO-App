@@ -52,3 +52,7 @@ html[data-section="vip"] footer{color:#b8a66d}
 
 /* Remove explanatory category banners across all store sections. */
 .page-hero{display:none!important}
+
+
+/* Vanity ID animation shared by the mall preview and catalog cards. */
+@keyframes vanity-id-gradient{to{background-position:240% center}}
