@@ -628,13 +628,13 @@ export class UsersService {
       roomCardUrl: user.profile?.roomCardUrl ?? null,
       profileCardUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
         ? ((vip.vipPlan?.benefits as any)?.visuals?.profileCardUrl || (vip.vipPlan?.benefits as any)?.visuals?.vipCardUrl)
-        : null) || user.profile?.profileCardUrl ?? null,
+        : null) || user.profile?.profileCardUrl) ?? null,
       chatBubbleUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
         ? (vip.vipPlan?.benefits as any)?.visuals?.chatBubbleUrl
-        : null) || user.profile?.chatBubbleUrl ?? null,
+        : null) || user.profile?.chatBubbleUrl) ?? null,
       nameplateUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
         ? (vip.vipPlan?.benefits as any)?.visuals?.nameplateUrl
-        : null) || user.profile?.nameplateUrl ?? null,
+        : null) || user.profile?.nameplateUrl) ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
