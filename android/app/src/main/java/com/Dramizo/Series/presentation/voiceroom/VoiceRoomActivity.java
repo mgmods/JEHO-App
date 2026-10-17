@@ -3681,6 +3681,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (binding.seekMusicVolume != null) {
             binding.seekMusicVolume.setMax(100);
             binding.seekMusicVolume.setProgress(100);
+            final float[] volumeBeforeSeek = {sharedMusicVolume};
             binding.seekMusicVolume.setOnSeekBarChangeListener(
                     new android.widget.SeekBar.OnSeekBarChangeListener() {
                 @Override public void onProgressChanged(
@@ -3695,6 +3696,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 }
 
                 @Override public void onStartTrackingTouch(android.widget.SeekBar seekBar) {
+                    volumeBeforeSeek[0] = sharedMusicVolume;
                     if (!canManageMusic) {
                         Toast.makeText(VoiceRoomActivity.this,
                                 "التحكم بصوت الموسيقى للمضيف أو المشرف المخوّل",
@@ -3704,13 +3706,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
                 @Override public void onStopTrackingTouch(android.widget.SeekBar seekBar) {
                     if (!canManageMusic || roomId == null) {
+                        sharedMusicVolume = volumeBeforeSeek[0];
+                        applySharedMusicVolume();
                         seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
                         return;
                     }
                     JsonObject payload = new JsonObject();
                     payload.addProperty("volume", sharedMusicVolume);
-                    RealtimeClient.getInstance().emitRoomEvent(
-                            roomId, "room:music_volume", payload);
+                    boolean sent = RealtimeClient.getInstance().emitRoomEvent(
+                            roomId, "room:music_volume", payload, (ok, error, code) -> handler.post(() -> {
+                                if (isFinishing() || isDestroyed()) return;
+                                if (!ok) {
+                                    sharedMusicVolume = volumeBeforeSeek[0];
+                                    applySharedMusicVolume();
+                                    android.util.Log.w("VoiceRoom",
+                                            "Shared music slider update rejected: " + error);
+                                    Toast.makeText(VoiceRoomActivity.this,
+                                            error != null && !error.isEmpty()
+                                                    ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
+                                                    : "رفض الخادم مزامنة صوت الموسيقى",
+                                            Toast.LENGTH_LONG).show();
+                                }
+                            }));
+                    if (!sent) {
+                        sharedMusicVolume = volumeBeforeSeek[0];
+                        applySharedMusicVolume();
+                        Toast.makeText(VoiceRoomActivity.this,
+                                "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
+                    }
                 }
             });
         }
