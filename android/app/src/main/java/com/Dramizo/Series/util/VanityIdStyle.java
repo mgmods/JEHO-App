@@ -37,13 +37,10 @@ public final class VanityIdStyle {
         }
         final String id = publicId.trim();
         view.setTag(R.id.tag_vanity_id_style_key, id);
-        if (vipLevel > 0) {
-            apply(view, id, new int[]{Color.rgb(255, 224, 117), Color.rgb(255, 105, 190), Color.rgb(116, 232, 255)}, true, true);
-            return;
-        }
         VanityDtos.Style cached = CACHE.get(id);
         if (cached != null) {
             if ("none".equals(cached.styleMode)) clear(view);
+            else if ("vip".equals(cached.styleMode)) apply(view, id, vipColors(cached.styleVipLevel), false, cached.styleGlow);
             else apply(view, id, colors(cached), "animated".equals(cached.styleMode), cached.styleGlow);
             return;
         }
@@ -59,10 +56,23 @@ public final class VanityIdStyle {
                 Object current = view.getTag(R.id.tag_vanity_id_style_key);
                 if (!id.equals(current)) return;
                 if ("none".equals(style.styleMode)) clear(view);
+                else if ("vip".equals(style.styleMode)) apply(view, id, vipColors(style.styleVipLevel), false, style.styleGlow);
                 else apply(view, id, colors(style), "animated".equals(style.styleMode), style.styleGlow);
             }
             @Override public void onFailure(Call<ApiResponse<VanityDtos.Style>> call, Throwable error) { LOADING.remove(id); }
         });
+    }
+
+    private static int[] vipColors(int level) {
+        switch (Math.max(1, Math.min(7, level))) {
+            case 1: return new int[]{0xFFB6C4D2, 0xFFB6C4D2, 0xFFEEF3F7};
+            case 2: return new int[]{0xFF68C8FF, 0xFF68C8FF, 0xFFB9E9FF};
+            case 3: return new int[]{0xFF65E6B4, 0xFF65E6B4, 0xFFB7FFE2};
+            case 4: return new int[]{0xFFB28AFF, 0xFFB28AFF, 0xFFE0D0FF};
+            case 5: return new int[]{0xFFFF9A52, 0xFFFF9A52, 0xFFFFD1A9};
+            case 6: return new int[]{0xFFFFD66B, 0xFFFFD66B, 0xFFFFF0B7};
+            default: return new int[]{0xFFFF6AA9, 0xFFFF6AA9, 0xFFFFC3DC};
+        }
     }
 
     private static int[] colors(VanityDtos.Style style) {
