@@ -56,8 +56,7 @@ final class RelationshipSeatEffectsOverlay {
         layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         layer.setElevation(dp(3));
         if (root instanceof ConstraintLayout) {
-            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
             lp.startToStart = R.id.recyclerSeats;
             lp.endToEnd = R.id.recyclerSeats;
             lp.topToTop = R.id.recyclerSeats;
