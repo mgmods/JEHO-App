@@ -100,8 +100,8 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
-    if (!/^\d{6}$/.test(publicId)) {
-      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    if (!/^\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
@@ -137,8 +137,8 @@ export class VanityIdsController {
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
   ) {
-    if (!/^\d{6}$/.test(publicId)) {
-      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    if (!/^\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
@@ -222,14 +222,14 @@ export class VanityIdsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Post('id/:publicId/apply')
-  @ApiOperation({ summary: 'Equip a purchased six-digit ID to account, personal room, or owned agency' })
+  @ApiOperation({ summary: 'Equip a purchased 3–12 digit ID to account, personal room, or owned agency' })
   async apply(
     @CurrentUser('sub') userId: string,
     @Param('publicId') publicId: string,
     @Body() body: { targetType?: string },
   ) {
-    if (!/^\d{6}$/.test(publicId)) {
-      throw new BadRequestException('الآيدي يجب أن يتكون من 6 أرقام');
+    if (!/^\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) throw new NotFoundException('ID not found');
@@ -307,9 +307,9 @@ export class VanityIdsController {
     body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
   ) {
     const publicId = String(body.publicId || '').trim();
-    if (!/^\d{6}$/.test(publicId)) {
+    if (!/^\d{3,12}$/.test(publicId)) {
       throw new BadRequestException(
-        'الآيدي يجب أن يتكون من 6 أرقام',
+        'الآيدي يجب أن يتكون من 3 إلى 12 رقماً',
       );
     }
     let row = await this.vanityRepo.findOne({ where: { publicId } });
