@@ -11,6 +11,30 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
 
     <div class="glass p-3 mb-3">
+      <h3 class="h6 mb-3">إنشاء روم إداري تابع للمنصة</h3>
+      <p class="small text-muted mb-3">الروم يبقى مثبتاً أعلى قائمة الرومات حتى لو كان المسؤول غير متصل. أدخل ID العام لحساب المسؤول الذي سيظهر كصاحب الروم.</p>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label">اسم الروم</label>
+          <input v-model="platformRoomTitle" class="form-control" maxlength="128" placeholder="خدمة العملاء أو إدارة المنصة" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">ID مسؤول الروم</label>
+          <input v-model="platformRoomHostId" class="form-control" placeholder="ID المستخدم" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">وصف (اختياري)</label>
+          <input v-model="platformRoomDescription" class="form-control" placeholder="روم رسمي تابع للمنصة" />
+        </div>
+        <div class="col-md-2">
+          <button class="btn btn-aurora w-100" type="button" :disabled="creatingPlatformRoom" @click="createPlatformRoom">
+            {{ creatingPlatformRoom ? 'جارٍ الإنشاء…' : 'إنشاء وتثبيت' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass p-3 mb-3">
       <div class="row g-2 align-items-end">
         <div class="col-md-5">
           <label class="form-label">{{ t('common.search') }}</label>
@@ -48,18 +72,27 @@
     <LoadingSpinner v-if="loading" />
     <div v-else-if="!rooms.length" class="glass empty-state p-5 text-center">{{ t('rooms.empty') }}</div>
     <div v-else class="widget-grid rooms-grid">
-      <RoomCard
-        v-for="r in rooms"
-        :key="r.id"
-        :room="r"
-        :selected="isSelected(r.id)"
-        @toggle-select="(row) => toggle(row.id)"
-        @close="closeRoom"
-        @delete="removeRoom"
-        @edit="editRoom"
-        @forceEnd="forceEndRoom"
-        @toggleSupport="toggleSupport"
-      />
+      <div v-for="r in rooms" :key="r.id" class="d-flex flex-column gap-2">
+        <RoomCard
+          :room="r"
+          :selected="isSelected(r.id)"
+          @toggle-select="(row) => toggle(row.id)"
+          @close="closeRoom"
+          @delete="removeRoom"
+          @edit="editRoom"
+          @forceEnd="forceEndRoom"
+          @toggleSupport="toggleSupport"
+        />
+        <div v-if="r.roomKind === 'support' || r.isSupport" class="glass p-2">
+          <label class="form-label small mb-1">إضافة إدارة للروم عبر ID المستخدم</label>
+          <div class="d-flex gap-2">
+            <input v-model="moderatorIdByRoom[r.id]" class="form-control form-control-sm" placeholder="ID المستخدم" />
+            <button class="btn btn-sm btn-aurora text-nowrap" type="button" :disabled="!!moderatorBusyByRoom[r.id]" @click="assignPlatformModerator(r)">
+              {{ moderatorBusyByRoom[r.id] ? 'جارٍ الحفظ…' : 'تعيين إدارة' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-3 mt-2">
@@ -109,6 +142,12 @@ const page = ref(1)
 const limit = ref(20)
 const total = ref(0)
 const bulkBusy = ref(false)
+const platformRoomTitle = ref('')
+const platformRoomHostId = ref('')
+const platformRoomDescription = ref('')
+const creatingPlatformRoom = ref(false)
+const moderatorIdByRoom = ref({})
+const moderatorBusyByRoom = ref({})
 
 const {
   selectedIds,
@@ -155,6 +194,52 @@ async function onBulkAction(key) {
     }
   }
   confirmOpen.value = true
+}
+
+async function createPlatformRoom() {
+  const title = platformRoomTitle.value.trim()
+  const hostPublicId = platformRoomHostId.value.trim()
+  if (!title || !hostPublicId) {
+    toast().danger('أدخل اسم الروم وID مسؤول الروم')
+    return
+  }
+  creatingPlatformRoom.value = true
+  const { data, error: err } = await roomsApi.createPlatformManaged({
+    title,
+    hostPublicId,
+    description: platformRoomDescription.value.trim() || undefined,
+  })
+  creatingPlatformRoom.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  platformRoomTitle.value = ''
+  platformRoomHostId.value = ''
+  platformRoomDescription.value = ''
+  status.value = ''
+  page.value = 1
+  toast().success('تم إنشاء الروم الإداري وتثبيته أعلى الرومات')
+  await load()
+}
+
+async function assignPlatformModerator(room) {
+  const userPublicId = String(moderatorIdByRoom.value[room.id] || '').trim()
+  if (!userPublicId) {
+    toast().danger('أدخل ID المستخدم أولاً')
+    return
+  }
+  moderatorBusyByRoom.value[room.id] = true
+  const { error: err } = await roomsApi.setPlatformModerator(room.id, { userPublicId, role: 'admin' })
+  moderatorBusyByRoom.value[room.id] = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  moderatorIdByRoom.value[room.id] = ''
+  toast().success('تم تعيين المستخدم إدارة للروم')
 }
 
 async function load() {

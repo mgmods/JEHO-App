@@ -553,6 +553,25 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('rooms/platform-managed')
+  @ApiOperation({ summary: 'Create a persistent platform-managed support or administration room' })
+  createPlatformRoom(@Body() body: { title?: string; hostPublicId?: string; description?: string; coverUrl?: string }) {
+    return this.adminService.createPlatformRoom(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('rooms/:id/platform-moderators')
+  @ApiOperation({ summary: 'Assign platform room admin/moderator by public user ID' })
+  setPlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { userPublicId?: string; role?: 'admin' | 'mod' },
+  ) {
+    return this.adminService.setPlatformRoomModerator(id, body?.userPublicId || '', body?.role || 'admin');
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('rooms/:id/customer-service')
   @ApiOperation({ summary: 'Elevate or revoke a room as official customer-service' })
   setRoomCustomerService(
