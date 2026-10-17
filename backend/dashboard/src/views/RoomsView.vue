@@ -210,7 +210,7 @@ function toggleSupport(r) {
 }
 
 function parsePublicIds(raw) {
-  return [...new Set(String(raw || '').split(/[;,\\s]+/).map(x => x.trim()).filter(Boolean))]
+  return [...new Set(String(raw || '').split(/[;,\s]+/).map(x => x.trim()).filter(Boolean))]
 }
 
 async function createPlatformRoom() {
