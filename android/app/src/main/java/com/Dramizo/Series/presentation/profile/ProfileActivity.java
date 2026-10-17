@@ -723,8 +723,8 @@ public class ProfileActivity extends ThemedActivity {
                         container.getUserApi().badges(profileId).execute();
                 if (response.isSuccessful() && response.body() != null && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
+                        // Show all earned badges, including those granted manually by admins.
                         if (badge != null && badge.earned) earned.add(badge);
-                        if (earned.size() >= 3) break;
                     }
                 }
             } catch (Exception ignored) { }
@@ -734,7 +734,7 @@ public class ProfileActivity extends ThemedActivity {
                 binding.rowEarnedBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
                 for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
                     ImageView icon = new ImageView(this);
-                    int size = (int) (22 * getResources().getDisplayMetrics().density + 0.5f);
+                    int size = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
                     android.widget.LinearLayout.LayoutParams lp =
                             new android.widget.LinearLayout.LayoutParams(size, size);
                     lp.setMargins(2, 0, 2, 0);
