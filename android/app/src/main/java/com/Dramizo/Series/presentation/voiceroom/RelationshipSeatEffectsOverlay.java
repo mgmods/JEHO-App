@@ -64,19 +64,30 @@ final class RelationshipSeatEffectsOverlay {
         layer.setClickable(false);
         layer.setFocusable(false);
         layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        layer.setElevation(dp(3));
-        if (root instanceof ConstraintLayout) {
-            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
-            lp.startToStart = R.id.recyclerSeats;
-            lp.endToEnd = R.id.recyclerSeats;
-            lp.topToTop = R.id.recyclerSeats;
-            lp.bottomToBottom = R.id.recyclerSeats;
-            root.addView(layer, lp);
-        } else if (seatsRecycler.getParent() instanceof ViewGroup) {
+        // Keep the effects in the exact same parent as the seat grid. Adding them to the
+        // Activity root can leave a zero-sized ConstraintLayout child or place the animation
+        // underneath elevated room overlays. This layer is visual-only and never receives input.
+        layer.setElevation(dp(80));
+        layer.setTranslationZ(dp(80));
+        if (seatsRecycler.getParent() instanceof ViewGroup) {
             ViewGroup parent = (ViewGroup) seatsRecycler.getParent();
-            parent.addView(layer, parent.indexOfChild(seatsRecycler) + 1,
-                    new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT));
+            int seatIndex = parent.indexOfChild(seatsRecycler);
+            if (parent instanceof ConstraintLayout && seatsRecycler.getId() != View.NO_ID) {
+                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
+                lp.startToStart = seatsRecycler.getId();
+                lp.endToEnd = seatsRecycler.getId();
+                lp.topToTop = seatsRecycler.getId();
+                lp.bottomToBottom = seatsRecycler.getId();
+                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
+            } else {
+                ViewGroup.LayoutParams source = seatsRecycler.getLayoutParams();
+                ViewGroup.LayoutParams lp = source == null
+                        ? new ViewGroup.LayoutParams(seatsRecycler.getWidth(), seatsRecycler.getHeight())
+                        : new ViewGroup.LayoutParams(source.width, source.height);
+                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
+                layer.setTranslationX(seatsRecycler.getX());
+                layer.setTranslationY(seatsRecycler.getY());
+            }
         } else {
             root.addView(layer, new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
