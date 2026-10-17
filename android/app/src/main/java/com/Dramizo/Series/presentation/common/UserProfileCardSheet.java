@@ -251,9 +251,10 @@ public final class UserProfileCardSheet {
                 bindAgency(activity, rowAgency, imgAgencyLogo, tvAgencyName, tvAgencyGid, u.agency);
                 AgencyUi.applyUserCardSheet(userCardBg, moreActionsBlock, liveVip);
                 // Dashboard-uploaded profile-card art and nameplate are applied from equipped cosmetics.
-                if (u.profileCardUrl != null && !u.profileCardUrl.trim().isEmpty() && userCardBg != null) {
+                String vipProfileCard = firstNonEmpty(u.profileCardUrl, u.vipCardUrl);
+                if (vipProfileCard != null && !vipProfileCard.trim().isEmpty() && userCardBg != null) {
                     try {
-                        Glide.with(activity).load(AssetCatalog.absoluteUrl(u.profileCardUrl)).into(new CustomTarget<Drawable>() {
+                        Glide.with(activity).load(AssetCatalog.absoluteUrl(vipProfileCard)).into(new CustomTarget<Drawable>() {
                             @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
                                 if (dialog.isShowing()) userCardBg.setBackground(resource);
                             }
