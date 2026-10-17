@@ -158,7 +158,7 @@ const routes = [
       {
         path: 'cosmetics',
         name: 'cosmetics',
-        component: () => import('@/views/CosmeticsView.vue'),
+        redirect: { name: 'vip', query: { tab: 'visuals' } },
         meta: { titleKey: 'routes.cosmetics' },
       },
       {
