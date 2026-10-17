@@ -4249,13 +4249,32 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             return;
         }
-        sharedMusicVolume = Math.max(0f, Math.min(1f, sharedMusicVolume + delta));
+        final float previousVolume = sharedMusicVolume;
+        final float requestedVolume = Math.max(0f, Math.min(1f, previousVolume + delta));
+        sharedMusicVolume = requestedVolume;
         applySharedMusicVolume();
         JsonObject payload = new JsonObject();
-        payload.addProperty("volume", sharedMusicVolume);
-        boolean sent = RealtimeClient.getInstance().emitRoomEvent(roomId, "room:music_volume", payload);
+        payload.addProperty("volume", requestedVolume);
+        boolean sent = RealtimeClient.getInstance().emitRoomEvent(
+                roomId, "room:music_volume", payload, (ok, error, code) -> handler.post(() -> {
+                    if (isFinishing() || isDestroyed()) return;
+                    if (!ok) {
+                        // The server is authoritative. Do not leave a local-only volume change
+                        // when the room rejected the shared update.
+                        sharedMusicVolume = previousVolume;
+                        applySharedMusicVolume();
+                        android.util.Log.w("VoiceRoom", "Shared music volume rejected: " + error);
+                        Toast.makeText(this,
+                                error != null && !error.isEmpty()
+                                        ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
+                                        : "رفض الخادم مزامنة صوت الموسيقى",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
         if (!sent) {
-            Toast.makeText(this, "تعذر مزامنة مستوى الموسيقى مع الغرفة", Toast.LENGTH_SHORT).show();
+            sharedMusicVolume = previousVolume;
+            applySharedMusicVolume();
+            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
         }
     }
 
