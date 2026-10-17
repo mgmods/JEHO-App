@@ -212,14 +212,22 @@ public class CpCenterActivity extends ThemedActivity {
             body.put("accept", accept);
             c.getIoExecutor().execute(() -> {
                 Result<Map<String, Object>> r = ApiCall.execute(c.getUserApi().respondCpRequest(requestId, body));
+                String responseText;
                 if (r.success) {
                     String status = r.data == null ? "" : String.valueOf(r.data.get("status"));
-                    String text = "expired".equals(status) ? "انتهت مهلة الطلب."
+                    responseText = "expired".equals(status) ? "انتهت مهلة الطلب."
                             : accept ? "تم قبول العلاقة بنجاح." : "تم رفض الطلب.";
-                    message(text);
+                    message(responseText);
                     loadHome();
                     loadRequests();
-                } else message(r.error != null ? r.error : "تعذرت معالجة الطلب");
+                    js("window.onCpRequestResponse && window.onCpRequestResponse("
+                            + gson.toJson(requestId) + "," + accept + ",true," + gson.toJson(responseText) + ")");
+                } else {
+                    responseText = r.error != null ? r.error : "تعذرت معالجة الطلب";
+                    message(responseText);
+                    js("window.onCpRequestResponse && window.onCpRequestResponse("
+                            + gson.toJson(requestId) + "," + accept + ",false," + gson.toJson(responseText) + ")");
+                }
             });
         }
 
