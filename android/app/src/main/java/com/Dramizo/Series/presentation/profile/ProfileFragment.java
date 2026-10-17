@@ -197,8 +197,6 @@ public class ProfileFragment extends Fragment {
             bindStaffUi(user);
             final String publicId = user.displayPublicId();
             binding.tvUsername.setText(publicId.isEmpty() ? "ID: —" : ("ID: " + publicId));
-            com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
-                    ContainerProvider.from(requireActivity()).getVanityApi(), publicId, user.vipLevel);
             if (binding.btnCopyId != null) {
                 binding.btnCopyId.setOnClickListener(v -> {
                     if (publicId.isEmpty()) {
@@ -503,8 +501,6 @@ public class ProfileFragment extends Fragment {
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        // Show every earned badge, regardless of whether it came from
-                        // tasks, a gift, or an administrator grant. The strip scrolls horizontally.
                         if (badge != null && badge.earned) earned.add(badge);
                     }
                 }
@@ -515,9 +511,12 @@ public class ProfileFragment extends Fragment {
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || !isAdded()) return;
                 binding.earnedBadgesContainer.removeAllViews();
+                if (binding.rowProfileBadges != null) {
+                    binding.rowProfileBadges.setVisibility(earned.isEmpty() ? View.GONE : View.VISIBLE);
+                }
                 for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : earned) {
                     android.widget.ImageView icon = new android.widget.ImageView(requireContext());
-                    int size = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
+                    int size = (int) (19 * getResources().getDisplayMetrics().density + 0.5f);
                     android.widget.LinearLayout.LayoutParams lp =
                             new android.widget.LinearLayout.LayoutParams(size, size);
                     lp.setMargins(0, 0, (int) (4 * getResources().getDisplayMetrics().density + 0.5f), 0);
