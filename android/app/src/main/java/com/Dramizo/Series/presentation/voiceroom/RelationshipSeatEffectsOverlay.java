@@ -64,19 +64,30 @@ final class RelationshipSeatEffectsOverlay {
         layer.setClickable(false);
         layer.setFocusable(false);
         layer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
-        layer.setElevation(dp(3));
-        if (root instanceof ConstraintLayout) {
-            ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
-            lp.startToStart = R.id.recyclerSeats;
-            lp.endToEnd = R.id.recyclerSeats;
-            lp.topToTop = R.id.recyclerSeats;
-            lp.bottomToBottom = R.id.recyclerSeats;
-            root.addView(layer, lp);
-        } else if (seatsRecycler.getParent() instanceof ViewGroup) {
+        // Keep the effects in the exact same parent as the seat grid. Adding them to the
+        // Activity root can leave a zero-sized ConstraintLayout child or place the animation
+        // underneath elevated room overlays. This layer is visual-only and never receives input.
+        layer.setElevation(dp(80));
+        layer.setTranslationZ(dp(80));
+        if (seatsRecycler.getParent() instanceof ViewGroup) {
             ViewGroup parent = (ViewGroup) seatsRecycler.getParent();
-            parent.addView(layer, parent.indexOfChild(seatsRecycler) + 1,
-                    new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT));
+            int seatIndex = parent.indexOfChild(seatsRecycler);
+            if (parent instanceof ConstraintLayout && seatsRecycler.getId() != View.NO_ID) {
+                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(0, 0);
+                lp.startToStart = seatsRecycler.getId();
+                lp.endToEnd = seatsRecycler.getId();
+                lp.topToTop = seatsRecycler.getId();
+                lp.bottomToBottom = seatsRecycler.getId();
+                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
+            } else {
+                ViewGroup.LayoutParams source = seatsRecycler.getLayoutParams();
+                ViewGroup.LayoutParams lp = source == null
+                        ? new ViewGroup.LayoutParams(seatsRecycler.getWidth(), seatsRecycler.getHeight())
+                        : new ViewGroup.LayoutParams(source.width, source.height);
+                parent.addView(layer, Math.min(parent.getChildCount(), seatIndex + 1), lp);
+                layer.setTranslationX(seatsRecycler.getX());
+                layer.setTranslationY(seatsRecycler.getY());
+            }
         } else {
             root.addView(layer, new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -244,10 +255,28 @@ final class RelationshipSeatEffectsOverlay {
             layer.getLocationInWindow(gridLoc);
             anchorA.getLocationInWindow(aLoc);
             anchorB.getLocationInWindow(bLoc);
-            float fromX = aLoc[0] - gridLoc[0] + anchorA.getWidth() / 2f;
-            float fromY = aLoc[1] - gridLoc[1] + anchorA.getHeight() / 2f;
-            float toX = bLoc[0] - gridLoc[0] + anchorB.getWidth() / 2f;
-            float toY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
+            float centerAX = aLoc[0] - gridLoc[0] + anchorA.getWidth() / 2f;
+            float centerAY = aLoc[1] - gridLoc[1] + anchorA.getHeight() / 2f;
+            float centerBX = bLoc[0] - gridLoc[0] + anchorB.getWidth() / 2f;
+            float centerBY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
+            float centerDx = centerBX - centerAX;
+            float centerDy = centerBY - centerAY;
+            float centerDistance = (float) Math.hypot(centerDx, centerDy);
+            if (centerDistance < dp(8)) {
+                effectView.setVisibility(View.INVISIBLE);
+                fallback.setVisibility(View.INVISIBLE);
+                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
+                return;
+            }
+            float unitX = centerDx / centerDistance;
+            float unitY = centerDy / centerDistance;
+            // Stop at avatar edges so the high-z connector stays visible without covering faces.
+            float radiusA = Math.max(anchorA.getWidth(), anchorA.getHeight()) * 0.46f;
+            float radiusB = Math.max(anchorB.getWidth(), anchorB.getHeight()) * 0.46f;
+            float fromX = centerAX + unitX * radiusA;
+            float fromY = centerAY + unitY * radiusA;
+            float toX = centerBX - unitX * radiusB;
+            float toY = centerBY - unitY * radiusB;
 
             // Keep the entire effect inside the RecyclerView's own canvas. It cannot drift into
             // the status bar, bottom controls, or outside the room's seat grid.
