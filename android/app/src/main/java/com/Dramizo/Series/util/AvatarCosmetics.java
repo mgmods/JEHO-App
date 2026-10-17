@@ -548,18 +548,23 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
         String wearKey = String.valueOf(avatarUrl) + '|' + String.valueOf(vipFrameUrl);
+        boolean hasWear = vipFrameUrl != null && !vipFrameUrl.trim().isEmpty();
         if (hostSignal != null) {
             Object prev = hostSignal.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)
-                    && (hostSignal.getVisibility() == View.VISIBLE
-                    || (avatarView != null && avatarView.getVisibility() == View.VISIBLE))) {
-                // Already bound this wear — skip clear/reload flash on every /me refresh.
+            boolean wearAlreadyVisible = hostSignal.getVisibility() == View.VISIBLE
+                    || (frameView != null && frameView.getVisibility() == View.VISIBLE)
+                    || (!hasWear && avatarView != null && avatarView.getVisibility() == View.VISIBLE);
+            if (wearKey.equals(prev) && wearAlreadyVisible) {
+                // Skip refresh only after a frame actually became visible. If an animated frame
+                // failed its first load, a later profile refresh retries it instead of caching
+                // the blank state just because the avatar itself is visible.
                 return;
             }
             hostSignal.setTag(R.id.tag_wear_key, wearKey);
         } else if (avatarView != null) {
             Object prev = avatarView.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)) return;
+            boolean wearAlreadyVisible = frameView != null && frameView.getVisibility() == View.VISIBLE;
+            if (wearKey.equals(prev) && (wearAlreadyVisible || !hasWear)) return;
             avatarView.setTag(R.id.tag_wear_key, wearKey);
         }
         // Personal profile: animate VIP frame via HostSignalView when present.
