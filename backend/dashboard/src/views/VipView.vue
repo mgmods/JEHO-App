@@ -186,7 +186,7 @@
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-ghost" @click="showPlan = false">{{ t('common.cancel') }}</button>
-              <button type="submit" class="btn btn-aurora" :disabled="saving">{{ t('common.save') }}</button>
+              <button type="submit" class="btn btn-aurora" :disabled="saving || !!uploadingVisual">{{ t('common.save') }}</button>
             </div>
           </form>
         </div>
