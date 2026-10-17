@@ -4316,8 +4316,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         // For device music mixed into the host's published audio, adjust only the
         // dedicated ZEGO media player; microphone capture gain remains untouched.
-        if (canManageMusic) {
-            // Also cache the gain before a device track is loaded.
+        // Host/staff flags may arrive after room metadata; recognize the active
+        // publisher too, so the outgoing music mix is updated for every listener.
+        if (canManageMusic || isHost || isOwner || isRoomStaff()
+                || sameUser(myUserId, currentMusicPublisherId)) {
             RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
         }
         if (binding != null && binding.seekMusicVolume != null
