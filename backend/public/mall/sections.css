@@ -43,36 +43,12 @@ html[data-section="vip"] footer{color:#b8a66d}
 /* Vanity ID cards: show the actual ID inside its preview, with price and availability together. */
 .id-item-card .id-visual{height:92px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:13px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#51432b 0%,#29233a 52%,#171b2e 100%);border:1px solid #e8c66d35;box-shadow:inset 0 0 24px #e8c66d0d}
 .id-item-card .id-visual-label{font-size:10px;font-weight:900;letter-spacing:2px;color:var(--gold);opacity:.92}
-.id-item-card .id-visual strong{max-width:100%;padding:0 6px;font-size:clamp(17px,5vw,23px);font-weight:900;letter-spacing:1.1px;line-height:1.25;color:#fff4cf;text-shadow:0 2px 12px #d9a83a2b;overflow-wrap:anywhere}
+.id-item-card .id-visual strong{max-width:100%;padding:0 6px;font-size:clamp(14px,4vw,18px);font-weight:900;letter-spacing:.7px;line-height:1.25;color:#fff4cf;text-shadow:0 2px 12px #d9a83a2b;overflow-wrap:anywhere}
 .id-item-card h3{font-size:13px;line-height:1.45}
 .id-price-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;min-height:29px}
 .id-price-row .price{font-size:13px}
 .id-price-row .tag{flex:0 0 auto}
 .id-item-card>.primary-btn{width:100%;margin-top:0}
 
-/* Configurable vanity-ID previews from the dashboard */
-.id-item-card .id-visual {
-  --id-color-1: #52E8FF;
-  --id-color-2: #C084FC;
-  --id-color-3: #FF7AC8;
-  --id-glow: 1;
-  border-color: color-mix(in srgb, var(--id-color-1) 45%, transparent);
-}
-.id-item-card .id-visual strong {
-  color: var(--id-color-1);
-  text-shadow: 0 0 calc(10px * var(--id-glow)) var(--id-color-1),
-               0 0 calc(18px * var(--id-glow)) var(--id-color-2);
-}
-.id-item-card .id-visual-animated strong {
-  background: linear-gradient(100deg, var(--id-color-1), var(--id-color-2), var(--id-color-3), var(--id-color-1));
-  background-size: 260% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  animation: jeho-id-spectrum 3s linear infinite;
-}
-.id-item-card .id-visual-animated {
-  box-shadow: inset 0 0 24px color-mix(in srgb, var(--id-color-2) 15%, transparent),
-              0 0 14px color-mix(in srgb, var(--id-color-1) 12%, transparent);
-}
-@keyframes jeho-id-spectrum { to { background-position: 260% center; } }
+/* Remove explanatory category banners across all store sections. */
+.page-hero{display:none!important}
