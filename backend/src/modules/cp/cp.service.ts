@@ -180,14 +180,23 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   }
 
   async forUser(userId: string) {
+    // The CP space is the current relationship workspace, not a history list.
+    // Ended relationships stay in audit data but are not returned to the UI.
     return this.dataSource.query(
-      `SELECT r.*, json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName", 'avatarUrl', p."avatarUrl", 'level', p.level,
-         'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl") AS partner
+      `SELECT r.*,
+         json_build_object('id', me.id, 'username', me.username, 'displayName', me."displayName",
+           'avatarUrl', me."avatarUrl", 'level', me.level,
+           'vipBadgeUrl', mp."vipBadgeUrl", 'hostBadgeUrl', mp."hostBadgeUrl", 'levelBadgeUrl', mp."levelBadgeUrl") AS self,
+         json_build_object('id', p.id, 'username', p.username, 'displayName', p."displayName",
+           'avatarUrl', p."avatarUrl", 'level', p.level,
+           'vipBadgeUrl', pp."vipBadgeUrl", 'hostBadgeUrl', pp."hostBadgeUrl", 'levelBadgeUrl', pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
+       JOIN users me ON me.id = $1
        JOIN users p ON p.id = CASE WHEN r."userAId" = $1 THEN r."userBId" ELSE r."userAId" END
+       LEFT JOIN user_profiles mp ON mp."userId" = me.id
        LEFT JOIN user_profiles pp ON pp."userId" = p.id
-       WHERE (r."userAId" = $1 OR r."userBId" = $1)
-       ORDER BY (r.status = 'active') DESC, r."startedAt" DESC`,
+       WHERE (r."userAId" = $1 OR r."userBId" = $1) AND r.status = 'active'
+       ORDER BY r."startedAt" DESC LIMIT 1`,
       [userId],
     );
   }
