@@ -130,6 +130,51 @@ export class UsersService {
     return { ...flat, hostBadgeMeta };
   }
 
+  /** Return the saved vanity-ID style only to the account that currently owns/equips it. */
+  private async withPublicIdStyle<T extends Record<string, unknown>>(flat: T, userId: string): Promise<T> {
+    const publicId = String(flat.publicId || '').trim();
+    if (!publicId) return {
+      ...flat,
+      publicIdStyleMode: 'none',
+      publicIdStyleVipLevel: 1,
+      publicIdStyleColor1: null,
+      publicIdStyleColor2: null,
+      publicIdStyleColor3: null,
+      publicIdStyleGlow: false,
+    } as T;
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT "styleMode", "styleVipLevel", "styleColor1", "styleColor2", "styleColor3", "styleGlow"
+         FROM vanity_ids
+         WHERE "publicId" = $1 AND "ownerUserId" = $2 AND status = 'owned'
+           AND ("expiresAt" IS NULL OR "expiresAt" > NOW())
+           AND ("targetType" = 'account' OR "targetType" IS NULL)
+         LIMIT 1`,
+        [publicId, userId],
+      );
+      const row = rows?.[0];
+      return {
+        ...flat,
+        publicIdStyleMode: row?.styleMode || 'none',
+        publicIdStyleVipLevel: Math.min(7, Math.max(1, Number(row?.styleVipLevel) || 1)),
+        publicIdStyleColor1: row?.styleColor1 || null,
+        publicIdStyleColor2: row?.styleColor2 || null,
+        publicIdStyleColor3: row?.styleColor3 || null,
+        publicIdStyleGlow: row?.styleGlow === true,
+      } as T;
+    } catch {
+      return {
+        ...flat,
+        publicIdStyleMode: 'none',
+        publicIdStyleVipLevel: 1,
+        publicIdStyleColor1: null,
+        publicIdStyleColor2: null,
+        publicIdStyleColor3: null,
+        publicIdStyleGlow: false,
+      } as T;
+    }
+  }
+
   /**
    * Mikoo: VIP has separate static layers (head banner + optional vip_tou badge frame).
    * Never overwrite vipBadgeUrl — that is the equipped mall/SVGA head frame wear.
@@ -287,7 +332,7 @@ export class UsersService {
     );
     const agency = await this.resolveActiveAgency(userId);
     return this.withWearMeta(
-      this.applyFixedVipWear(
+      await this.withPublicIdStyle(this.applyFixedVipWear(
         {
           ...this.flatten(user),
           activeVip: vipValid,
@@ -297,7 +342,7 @@ export class UsersService {
           agency,
         },
         vipLevel,
-      ),
+      ), userId),
     );
   }
 
@@ -350,7 +395,7 @@ export class UsersService {
       isOnline = false;
     }
     return this.withWearMeta(
-      this.applyFixedVipWear(
+      await this.withPublicIdStyle(this.applyFixedVipWear(
         {
           ...this.flatten(user),
           vipLevel,
@@ -361,7 +406,7 @@ export class UsersService {
           isOnline,
         },
         vipLevel,
-      ),
+      ), id),
     );
   }
 
@@ -372,7 +417,7 @@ export class UsersService {
       relations: ['profile'],
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.withWearMeta(this.flatten(user));
+    return this.withWearMeta(await this.withPublicIdStyle(this.flatten(user), user.id));
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
