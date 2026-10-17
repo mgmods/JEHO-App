@@ -224,10 +224,11 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       if (!recipient) throw new NotFoundException('المستخدم المستهدف غير موجود أو غير نشط');
       const [active] = await manager.query(
         `SELECT id FROM cp_relationships WHERE status='active'
-         AND (("userAId"=$1 AND "userBId"=$2) OR ("userAId"=$2 AND "userBId"=$1)) LIMIT 1 FOR UPDATE`,
-        [userId, recipientId],
+         AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
+         LIMIT 1 FOR UPDATE`,
+        [[userId, recipientId]],
       );
-      if (active) throw new ConflictException('توجد علاقة نشطة بينكما بالفعل');
+      if (active) throw new ConflictException('يجب إنهاء العلاقة الحالية قبل إرسال طلب ارتباط جديد');
       const [pending] = await manager.query(
         `SELECT id FROM cp_requests WHERE
          (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
@@ -386,11 +387,12 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       // Prevent repeated taps/network retries from charging the sender multiple times
       // for the same active or still-pending relationship type.
       const [activeRelationship] = await manager.query(
-        `SELECT id FROM cp_relationships WHERE status='active' AND type=$1
-         AND (("userAId"=$2 AND "userBId"=$3) OR ("userAId"=$3 AND "userBId"=$2)) LIMIT 1 FOR UPDATE`,
-        [type, userId, recipientId],
+        `SELECT id FROM cp_relationships WHERE status='active'
+         AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
+         LIMIT 1 FOR UPDATE`,
+        [[userId, recipientId]],
       );
-      if (activeRelationship) throw new ConflictException('هذه العلاقة موجودة بالفعل بينكما');
+      if (activeRelationship) throw new ConflictException('يجب إنهاء العلاقة الحالية قبل إنشاء ارتباط جديد');
       const [pendingRequest] = await manager.query(
         `SELECT id FROM cp_requests WHERE
            (("fromUserId"=$1 AND "toUserId"=$2) OR ("fromUserId"=$2 AND "toUserId"=$1))
@@ -468,14 +470,15 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
       const pairKey = [request.fromUserId, request.toUserId].sort().join(':') + ':' + request.type;
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), 0)', [pairKey]);
       const active = await manager.query(
-        `SELECT id FROM cp_relationships WHERE status='active' AND type=$1
-         AND (("userAId"=$2 AND "userBId"=$3) OR ("userAId"=$3 AND "userBId"=$2)) LIMIT 1 FOR UPDATE`,
-        [request.type, request.fromUserId, request.toUserId],
+        `SELECT id FROM cp_relationships WHERE status='active'
+         AND ("userAId" = ANY($1::uuid[]) OR "userBId" = ANY($1::uuid[]))
+         LIMIT 1 FOR UPDATE`,
+        [[request.fromUserId, request.toUserId]],
       );
       if (active.length) {
         await this.refund(manager, request);
         await manager.query(`UPDATE cp_requests SET status='rejected',"respondedAt"=now(),"updatedAt"=now() WHERE id=$1`, [requestId]);
-        return { id: requestId, status: 'rejected', refunded: true, reason: 'relationship_already_active' };
+        return { id: requestId, status: 'rejected', refunded: true, reason: 'user_already_has_active_relationship' };
       }
       const [relationship] = await manager.query(
         `INSERT INTO cp_relationships ("userAId","userBId",type,status,points,level,"startedAt","createdAt","updatedAt")
