@@ -4201,13 +4201,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    /** Shared room music volume (host + guests). Honors "كتم أصوات الغرفة". */
-    /** Per-device music gain; the host also controls the outgoing ZEGO music mix. */
+    /** Shared room music gain (0–200%) synchronized to every member through realtime. */
     private void changeRoomMusicVolume(int delta) {
         roomMusicMixVolume = Math.max(0, Math.min(200, roomMusicMixVolume + delta));
         updateRoomMusicVolumeUi();
         applySharedMusicVolume();
-        if (canManageMusic) {
+        if (canManageMusic && roomId != null) {
+            // The room manager is authoritative: the server fans this value out to all clients.
+            JsonObject payload = new JsonObject();
+            payload.addProperty("volume", roomMusicMixVolume);
+            RealtimeClient.getInstance().emitRoomEvent(roomId, "room:music_volume", payload);
+            // The publisher's ZEGO mix must be updated too so remote listeners hear the change.
             RoomRtcEngine.getInstance().setMusicMixVolume(roomMusicMixVolume);
         }
     }
@@ -11432,6 +11436,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     memberLong(payload, "positionMs", 0L),
                     memberStr(payload, "startedAt"),
                     memberStr(payload, "updatedBy"));
+        } else if ("room:music_volume".equals(event)) {
+            // Apply the room-authoritative gain on every device, not only on the sender.
+            int sharedVolume = Math.max(0, Math.min(200, memberInt(payload, "volume", 200)));
+            roomMusicMixVolume = sharedVolume;
+            updateRoomMusicVolumeUi();
+            applySharedMusicVolume();
+            if (canManageMusic) {
+                RoomRtcEngine.getInstance().setMusicMixVolume(sharedVolume);
+            }
         } else if ("room:reaction".equals(event)) {
             String uid = memberStr(payload, "userId");
             if (uid == null) uid = fromUserId;
