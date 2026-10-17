@@ -51,7 +51,14 @@ public final class RoomUiHelper {
         }
         badge.setVisibility(View.VISIBLE);
         if (isSupportRoom(room)) {
-            badge.setText(R.string.room_badge_support);
+            String category = room.topic != null ? room.topic.trim().toLowerCase(java.util.Locale.ROOT) : "";
+            if ("management".equals(category)) {
+                badge.setText("إدارة المنصة");
+            } else if ("customer_service".equals(category)) {
+                badge.setText("خدمة العملاء");
+            } else {
+                badge.setText("رسمي");
+            }
             badge.setBackgroundResource(R.drawable.bg_room_badge_support);
             if (verifiedIcon != null) verifiedIcon.setVisibility(View.GONE);
         } else if (isAgencyRoom(room)) {
