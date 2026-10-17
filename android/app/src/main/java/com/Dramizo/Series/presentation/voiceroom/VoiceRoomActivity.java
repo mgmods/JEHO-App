@@ -7657,13 +7657,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void applyRoomSpeakerMute(boolean muted) {
         RoomSoundFx.setMuted(muted);
         RoomRtcEngine.getInstance().setSpeakerMuted(muted);
+        // Keep the room's selected music gain when speaker mute is toggled.
+        // This affects only the music player; ZEGO microphone gain is untouched.
         if (roomMusicPlayer != null) {
-            if (isYoutubeMusicUrl(currentMusicUrl)
-                    || (currentMusicUrl != null && !isLocalMusicUrl(currentMusicUrl))) {
-                applySharedMusicVolume();
-            } else {
-                roomMusicPlayer.setVolume(muted ? 0f : 1f);
-            }
+            applySharedMusicVolume();
         }
         if (!muted) {
             // Resume pulling seat streams after mute (minutes billing resumes only now).
