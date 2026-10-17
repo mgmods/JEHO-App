@@ -163,6 +163,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private SeatAdapter seatAdapter;
     @Nullable private RelationshipSeatEffectsOverlay relationshipSeatEffectsOverlay;
     private volatile boolean relationshipEffectsFetchInFlight;
+    @Nullable private List<RoomDtos.SeatDto> pendingRelationshipEffectsSeats;
+    @Nullable private String pendingRelationshipEffectsSeatSignature;
     private long lastRelationshipEffectsFetchMs;
     @Nullable private String lastRelationshipEffectsSeatSignature;
     private RecentJoinersAdapter audienceAdapter;
@@ -12980,6 +12982,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (seats == null || seats.isEmpty() || relationshipSeatEffectsOverlay == null
                 || isFinishing() || exiting) {
             if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
+            lastRelationshipEffectsSeatSignature = null;
+            pendingRelationshipEffectsSeats = null;
             return;
         }
         java.util.TreeSet<String> ids = new java.util.TreeSet<>();
@@ -12990,24 +12994,31 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (id == null || id.trim().isEmpty()) continue;
             id = id.trim();
             ids.add(id);
-            // Include seat position in the cache signature. A pair can move while the
-            // same users remain seated; rebuild their visual anchors in that case.
             seatedByPosition.put(seat.seatIndex, id);
         }
+        String signature = seatedByPosition.toString();
         if (ids.size() < 2) {
-            lastRelationshipEffectsSeatSignature = seatedByPosition.toString();
+            lastRelationshipEffectsSeatSignature = signature;
+            pendingRelationshipEffectsSeatSignature = null;
             if (relationshipSeatEffectsOverlay != null) relationshipSeatEffectsOverlay.clear();
             return;
         }
         String userIds = android.text.TextUtils.join(",", ids);
-        String signature = seatedByPosition.toString();
         long now = android.os.SystemClock.elapsedRealtime();
         if (signature.equals(lastRelationshipEffectsSeatSignature)
                 && now - lastRelationshipEffectsFetchMs < 15000L) return;
-        if (relationshipEffectsFetchInFlight) return;
+        if (relationshipEffectsFetchInFlight) {
+            // If seat occupants move while a request is in flight, remember the newest grid.
+            // The old response must never prevent the new pair from getting its own effect.
+            pendingRelationshipEffectsSeats = new ArrayList<>(seats);
+            pendingRelationshipEffectsSeatSignature = signature;
+            lastRelationshipEffectsSeatSignature = signature;
+            return;
+        }
         relationshipEffectsFetchInFlight = true;
         lastRelationshipEffectsFetchMs = now;
         lastRelationshipEffectsSeatSignature = signature;
+        pendingRelationshipEffectsSeatSignature = null;
         final List<RoomDtos.SeatDto> seatSnapshot = new ArrayList<>(seats);
         AppContainer cpContainer;
         try {
@@ -13020,7 +13031,22 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             Result<Map<String, Object>> result = ApiCall.execute(
                     cpContainer.getUserApi().cpRoomSeatEffects(userIds));
             relationshipEffectsFetchInFlight = false;
-            if (!result.success || result.data == null || isFinishing() || isDestroyed()) return;
+            List<RoomDtos.SeatDto> pending = pendingRelationshipEffectsSeats;
+            pendingRelationshipEffectsSeats = null;
+            if (pending != null) {
+                runOnUiThread(() -> {
+                    if (!isFinishing() && !isDestroyed()) refreshRoomRelationshipEffects(pending);
+                });
+            }
+            if (!result.success || result.data == null || isFinishing() || isDestroyed()) {
+                runOnUiThread(() -> {
+                    if (signature.equals(lastRelationshipEffectsSeatSignature)) {
+                        // Allow a later room refresh to retry a failed request.
+                        lastRelationshipEffectsSeatSignature = null;
+                    }
+                });
+                return;
+            }
             Object relationsValue = result.data.get("relationships");
             Object effectsValue = result.data.get("effects");
             List<Map<String, Object>> relations = new ArrayList<>();
@@ -13041,7 +13067,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (isFinishing() || isDestroyed() || relationshipSeatEffectsOverlay == null) return;
                 if (!signature.equals(lastRelationshipEffectsSeatSignature)) return;
                 binding.recyclerSeats.post(() -> {
-                    if (relationshipSeatEffectsOverlay != null) {
+                    if (relationshipSeatEffectsOverlay != null
+                            && signature.equals(lastRelationshipEffectsSeatSignature)) {
                         relationshipSeatEffectsOverlay.render(seatSnapshot, relations, effects);
                     }
                 });
