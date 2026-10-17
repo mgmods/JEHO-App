@@ -1,4 +1,4 @@
-name: Android Debug APK
+name: Android Universal APK
 
 on:
   push:
@@ -110,93 +110,78 @@ jobs:
           test -s "$KEYSTORE"
           KEY_INFO="$(keytool -list -v -keystore "$KEYSTORE" -storepass "$JEHO_SIGNING_STORE_PASSWORD" -alias "$JEHO_SIGNING_KEY_ALIAS")"
           printf '%s\n' "$KEY_INFO" | grep -E 'Alias name:|SHA1:|SHA256:'
-          EXPECTED_BASELINE_SHA1="FE544713A2726865005599472B4527C62818E696"
-          ACTUAL_KEY_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-          if [[ "$ACTUAL_KEY_SHA1" != "$EXPECTED_BASELINE_SHA1" ]]; then
+          EXPECTED_SHA1="FE544713A2726865005599472B4527C62818E696"
+          ACTUAL_SHA1="$(printf '%s\n' "$KEY_INFO" | sed -n 's/^[[:space:]]*SHA1: //p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
             echo "::error::Signing key does not match the previously verified installed JEHO APK key."
-            echo "::error::Expected stable SHA-1: $EXPECTED_BASELINE_SHA1"
-            echo "::error::Available key SHA-1: ${ACTUAL_KEY_SHA1:-not detected}"
+            echo "::error::Expected stable SHA-1: $EXPECTED_SHA1"
+            echo "::error::Available key SHA-1: ${ACTUAL_SHA1:-not detected}"
             exit 1
           fi
           {
-            echo "JEHO_DEBUG_KEYSTORE=$KEYSTORE"
-            echo "JEHO_DEBUG_STORE_PASSWORD=$JEHO_SIGNING_STORE_PASSWORD"
-            echo "JEHO_DEBUG_KEY_ALIAS=$JEHO_SIGNING_KEY_ALIAS"
-            echo "JEHO_DEBUG_KEY_PASSWORD=$JEHO_SIGNING_KEY_PASSWORD"
+            echo "JEHO_RELEASE_KEYSTORE=$KEYSTORE"
+            echo "JEHO_RELEASE_STORE_PASSWORD=$JEHO_SIGNING_STORE_PASSWORD"
+            echo "JEHO_RELEASE_KEY_ALIAS=$JEHO_SIGNING_KEY_ALIAS"
+            echo "JEHO_RELEASE_KEY_PASSWORD=$JEHO_SIGNING_KEY_PASSWORD"
           } >> "$GITHUB_ENV"
           echo "Verified: stable JEHO release signing key matches."
 
-      - name: Verify original signing key
-        shell: bash
-        run: |
-          keytool -list -v -keystore "$JEHO_DEBUG_KEYSTORE" -storepass "$JEHO_DEBUG_STORE_PASSWORD" -alias "$JEHO_DEBUG_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:'
-
-      - name: Print Android signing fingerprints
+      - name: Configure stable release signing
         working-directory: android
-        run: gradle --no-daemon signingReport
-
-      - name: Build ABI-specific debug APKs
-        working-directory: android
-        env:
-          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
-        run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleDebug
-
-      - name: Verify both ABI APKs, HTML assets, and signing certificate
         shell: bash
         run: |
           set -euo pipefail
-          APK_DIR="android/app/build/outputs/apk/debug"
-          APKSIGNER="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          cat > local.properties <<EOF
+          API_BASE_URL=https://jeho-own-backend.mgs.blitz.cloud/api/v1
+          STORE_FILE=$JEHO_RELEASE_KEYSTORE
+          STORE_PASSWORD=$JEHO_RELEASE_STORE_PASSWORD
+          KEY_ALIAS=$JEHO_RELEASE_KEY_ALIAS
+          KEY_PASSWORD=$JEHO_RELEASE_KEY_PASSWORD
+          EOF
+
+      - name: Build universal release APK
+        working-directory: android
+        env:
+          JEHO_OWN_API_URL: https://jeho-own-backend.mgs.blitz.cloud/api/v1
+        run: gradle --no-daemon -PJEHO_OWN_API_URL="$JEHO_OWN_API_URL" assembleRelease
+
+      - name: Verify universal APK, HTML assets, and signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-universal-release.apk"
+          if [[ ! -f "$APK" ]]; then
+            echo "::error::Universal release APK was not produced at expected path: $APK"
+            find android/app/build/outputs/apk -type f -name '*.apk' -print || true
+            exit 1
+          fi
+          APKSIGNER="$(find "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"/build-tools -type f -name apksigner -print | sort -V | tail -n 1)"
           if [[ -z "$APKSIGNER" ]]; then
             echo "::error::apksigner was not found."
             exit 1
           fi
-          shopt -s nullglob
-          APK_FILES=("$APK_DIR"/*-armeabi-v7a-debug.apk "$APK_DIR"/*-arm64-v8a-debug.apk)
-          if (( ${#APK_FILES[@]} != 2 )); then
-            echo "::error::Expected exactly two ABI-specific APKs (armeabi-v7a and arm64-v8a); found ${#APK_FILES[@]}."
-            find "$APK_DIR" -maxdepth 1 -type f -name '*.apk' -print || true
+          CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
+          echo "$CERT_OUTPUT"
+          EXPECTED_SHA1="FE544713A2726865005599472B4527C62818E696"
+          ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
+            echo "::error::Universal APK signing certificate mismatch."
+            echo "::error::Expected $EXPECTED_SHA1; got ${ACTUAL_SHA1:-not detected}"
             exit 1
           fi
-          for ABI in armeabi-v7a arm64-v8a; do
-            FOUND=0
-            for APK in "${APK_FILES[@]}"; do
-              [[ "$APK" == *"$ABI"* ]] && FOUND=1
-            done
-            if [[ "$FOUND" != 1 ]]; then
-              echo "::error::Missing APK for $ABI."
+          printf '%s  %s bytes (%.2f MiB)\n' "$(basename "$APK")" "$(stat -c '%s' "$APK")" "$(awk -v n="$(stat -c '%s' "$APK")" 'BEGIN {print n/1048576}')"
+          for HTML in cp-center.html cp-insights.html wealth-insights.html wealth-ranking.html; do
+            if ! unzip -Z1 "$APK" | grep -E "(^|/)${HTML}$" -q; then
+              echo "::error::Required in-app HTML asset missing inside universal APK: $HTML"
               exit 1
             fi
           done
-          EXPECTED_SHA1="FE544713A2726865005599472B4527C62818E696"
-          for APK in "${APK_FILES[@]}"; do
-            echo "Checking $APK"
-            CERT_OUTPUT="$("$APKSIGNER" verify --print-certs "$APK")"
-            echo "$CERT_OUTPUT"
-            ACTUAL_SHA1="$(printf '%s\n' "$CERT_OUTPUT" | sed -n 's/.*certificate SHA-1 digest: //Ip' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-            if [[ "$ACTUAL_SHA1" != "$EXPECTED_SHA1" ]]; then
-              echo "::error::APK signing certificate mismatch for $APK."
-              echo "::error::Expected $EXPECTED_SHA1; got ${ACTUAL_SHA1:-not detected}"
-              exit 1
-            fi
-            printf '%s  %s bytes (%.2f MiB)\n' "$(basename "$APK")" "$(stat -c '%s' "$APK")" "$(awk -v n="$(stat -c '%s' "$APK")" 'BEGIN {print n/1048576}')"
-          done
-          for APK in "${APK_FILES[@]}"; do
-            for HTML in cp-center.html cp-insights.html wealth-insights.html wealth-ranking.html; do
-              if ! unzip -Z1 "$APK" | grep -E "(^|/)${HTML}$" -q; then
-                echo "::error::Required in-app HTML asset missing inside $(basename "$APK"): $HTML"
-                exit 1
-              fi
-            done
-          done
-          echo "Verified: both ABI APKs use the approved signing key and contain required HTML pages."
+          echo "Verified: universal APK contains required HTML pages and uses the approved signing key."
 
-      - name: Upload ABI-specific APKs
+      - name: Upload universal APK
         uses: actions/upload-artifact@v4
         with:
-          name: JEHO-MG-JEHO-Update-APK-ABI-SPLITS
-          path: |
-            android/app/build/outputs/apk/debug/*-armeabi-v7a-debug.apk
-            android/app/build/outputs/apk/debug/*-arm64-v8a-debug.apk
+          name: JEHO-MG-JEHO-Universal-Update-APK
+          path: android/app/build/outputs/apk/release/app-universal-release.apk
           if-no-files-found: error
           retention-days: 7
