@@ -460,7 +460,112 @@ export class AuthService implements OnModuleInit {
   async ensureAllPublicIds(): Promise<{ updated: number }> {
     const missing = await this.usersRepo
       .createQueryBuilder('u')
-      .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{6}$'")
+      .where("u.publicId IS NULL OR u.publicId = '' OR u.publicId !~ '^[0-9]{3,12}
+      .getMany();
+    let updated = 0;
+    for (const u of missing) {
+      u.publicId = await this.allocatePublicId();
+      await this.usersRepo.save(u);
+      updated += 1;
+    }
+    if (updated > 0) {
+      this.logger.log(`Allocated six-digit publicId for ${updated} existing user(s)`);
+    }
+    return { updated };
+  }
+  private async issueTokens(user: User) {
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Account is restricted');
+    }
+    if (!user.publicId) {
+      user.publicId = await this.allocatePublicId();
+      await this.usersRepo.update(user.id, { publicId: user.publicId });
+    }
+    const staffRole = normalizeStaffRole(user);
+    const payload = {
+      sub: user.id,
+      username: user.username,
+      publicId: user.publicId,
+      isAdmin: user.isAdmin || staffRole === 'super',
+      staffRole,
+      role: user.isAdmin || staffRole === 'super' ? 'admin' : 'user',
+      isGuest: user.isGuest,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: this.configService.get<string>('app.jwt.secret'),
+      expiresIn: this.configService.get<string>('app.jwt.expiresIn'),
+    });
+
+    const refreshToken = await this.jwtService.signAsync(
+      { sub: user.id },
+      {
+        secret: this.configService.get<string>('app.jwt.refreshSecret'),
+        expiresIn: this.configService.get<string>('app.jwt.refreshExpiresIn'),
+      },
+    );
+
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    await this.usersRepo.update(user.id, { refreshTokenHash });
+
+    const now = new Date();
+    // Include the persisted profile snapshot in the login response. The app must
+    // not mistake a returning account for a new account when /users/me is briefly
+    // unavailable immediately after authentication.
+    let profile = await this.profilesRepo.findOne({ where: { userId: user.id } });
+    if (!profile) {
+      profile = await this.profilesRepo.save(
+        this.profilesRepo.create({ userId: user.id }),
+      );
+    }
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId: user.id, isActive: true },
+      order: { level: 'DESC' },
+    });
+    const vipLevel =
+      vip && (!vip.expiresAt || vip.expiresAt > now) ? Number(vip.level || 0) : 0;
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        username: user.username,
+        publicId: user.publicId,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        coverUrl: profile.coverUrl,
+        bio: profile.bio,
+        gender: user.gender,
+        birthday: user.birthday,
+        country: profile.country,
+        countryChangedAt: profile.countryChangedAt,
+        city: profile.city,
+        language: profile.language,
+        interests: profile.interests || [],
+        albumUrls: profile.albumUrls || [],
+        showOnlineStatus: profile.showOnlineStatus,
+        allowDmFromStrangers: profile.allowDmFromStrangers,
+        dmGiftGateEnabled: profile.dmGiftGateEnabled,
+        dmRequiredGiftId: profile.dmRequiredGiftId,
+        level: user.level,
+        vipLevel,
+        isGuest: user.isGuest,
+        isAdmin: user.isAdmin || staffRole === 'super',
+        staffRole,
+      },
+    };
+  }
+
+  private hashOtp(code: string): string {
+    return createHash('sha256').update(code).digest('hex');
+  }
+}
+
+")
       .getMany();
     let updated = 0;
     for (const u of missing) {
