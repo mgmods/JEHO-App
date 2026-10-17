@@ -140,7 +140,11 @@ android {
         // Uncompressed + 16 KB zip-aligned native libs (AGP 8.5.1+).
         // Required for Google Play 16 KB page-size compliance.
         jniLibs {
-            useLegacyPackaging = false
+            // Keep one direct-install APK small by compressing the native libraries.
+            // The release APK targets Android phones (ARM 32-bit + ARM 64-bit); do not bundle
+            // desktop/emulator x86 native libraries in the universal phone APK.
+            useLegacyPackaging = true
+            excludes += ['**/x86/**', '**/x86_64/**']
         }
     }
 }
