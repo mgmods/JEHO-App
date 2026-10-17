@@ -2,15 +2,23 @@
   <div>
     <PageHeader :title="t('vip.title')" :subtitle="t('vip.subtitle')">
       <template #actions>
+        <template v-if="activeTab === 'plans'">
         <button class="btn btn-ghost btn-sm" type="button" @click="openPlan()">
           <i class="bi bi-plus-lg me-1"></i> {{ t('vip.newPlan') }}
         </button>
         <button class="btn btn-aurora btn-sm" type="button" @click="showAssign = true">
           <i class="bi bi-person-plus me-1"></i> {{ t('vip.assignVip') }}
         </button>
+        </template>
       </template>
     </PageHeader>
 
+    <div class="d-flex flex-wrap gap-2 mb-3" role="tablist" aria-label="إدارة VIP">
+      <button type="button" class="btn btn-sm" :class="activeTab === 'plans' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('plans')">مستويات VIP والأعضاء</button>
+      <button type="button" class="btn btn-sm" :class="activeTab === 'visuals' ? 'btn-aurora' : 'btn-ghost'" @click="setTab('visuals')">الإطارات والدخوليات والمظاهر</button>
+    </div>
+
+    <template v-if="activeTab === 'plans'">
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
@@ -199,11 +207,14 @@
       :message="confirmMsg"
       @confirm="runConfirm"
     />
+    </template>
+    <CosmeticsView v-else />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { vipApi } from '@/api'
 import { extractList, formatNumber, formatDate } from '@/composables/useUtils'
@@ -217,8 +228,22 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import StatusBadge from '@/components/StatusBadge.vue'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import CosmeticsView from '@/views/CosmeticsView.vue'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const activeTab = ref(route.query.tab === 'visuals' ? 'visuals' : 'plans')
+
+function setTab(tab) {
+  activeTab.value = tab
+  const query = tab === 'visuals' ? { tab: 'visuals' } : {}
+  router.replace({ name: 'vip', query })
+}
+
+watch(() => route.query.tab, (tab) => {
+  activeTab.value = tab === 'visuals' ? 'visuals' : 'plans'
+})
 
 const plans = ref([])
 const members = ref([])
