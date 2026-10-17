@@ -51,7 +51,7 @@
 
         <div class="rc__meta">
           <span class="rc__chip">{{ accessLabel }}</span>
-          <span v-if="isSupport" class="rc__chip rc__chip--ok">خدمة عملاء</span>
+          <span v-if="isSupport" class="rc__chip rc__chip--ok">رسمي · مثبت للمنصة</span>
           <span v-else-if="isAgency" class="rc__chip rc__chip--info">{{ t('rooms.agency') }}</span>
           <span v-else class="rc__chip rc__chip--muted">شخصي</span>
           <span v-if="entryFee > 0" class="rc__chip rc__chip--coin">
@@ -72,7 +72,15 @@
           type="button"
           @click="$emit('toggleSupport', room)"
         >
-          {{ isSupport ? 'إلغاء خدمة عملاء' : 'ترقية لخدمة عملاء' }}
+          {{ isSupport ? 'إلغاء تثبيت المنصة' : 'ترقية لروم رسمي مثبت' }}
+        </button>
+        <button
+          v-if="isSupport"
+          class="btn btn-sm btn-outline-primary"
+          type="button"
+          @click="$emit('managePlatformModerators', room)"
+        >
+          إدارة المشرفين بالـ ID
         </button>
         <button
           v-if="room.isLive"
@@ -115,7 +123,7 @@ const props = defineProps({
 })
 const { t } = useI18n()
 
-defineEmits(['close', 'delete', 'edit', 'forceEnd', 'toggleSupport', 'toggle-select'])
+defineEmits(['close', 'delete', 'edit', 'forceEnd', 'toggleSupport', 'managePlatformModerators', 'toggle-select'])
 
 const avatarError = ref(false)
 const isSupport = computed(
