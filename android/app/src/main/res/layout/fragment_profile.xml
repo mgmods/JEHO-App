@@ -237,7 +237,7 @@
                     android:orientation="horizontal" />
             </LinearLayout>
 
-            <!-- Own-profile relationship summary: keep the main avatar as the only self photo. -->
+            <!-- Active relationship: own avatar large, partner avatar smaller, animated bond symbol between them. -->
             <LinearLayout
                 android:id="@+id/rowMyProfileCp"
                 android:layout_width="match_parent"
@@ -252,6 +252,24 @@
                 android:paddingHorizontal="12dp"
                 android:paddingVertical="9dp"
                 android:visibility="gone">
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/imgMyProfileCpSelf"
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:contentDescription="@null"
+                    android:scaleType="centerCrop"
+                    app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                <TextView
+                    android:id="@+id/imgMyProfileCpHeart"
+                    android:layout_width="34dp"
+                    android:layout_height="48dp"
+                    android:layout_marginHorizontal="3dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="♥"
+                    android:textColor="#FFFF5277"
+                    android:textSize="27sp"
+                    android:textStyle="bold" />
                 <com.google.android.material.imageview.ShapeableImageView
                     android:id="@+id/imgMyProfileCpPartner"
                     android:layout_width="42dp"
@@ -284,17 +302,6 @@
                         android:textColor="@color/text_secondary"
                         android:textSize="11sp" />
                 </LinearLayout>
-                <TextView
-                    android:id="@+id/imgMyProfileCpHeart"
-                    android:layout_width="36dp"
-                    android:layout_height="42dp"
-                    android:layout_marginStart="8dp"
-                    android:gravity="center"
-                    android:includeFontPadding="false"
-                    android:text="♥"
-                    android:textColor="#FFFF5277"
-                    android:textSize="25sp"
-                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Compact stats under profile (age / level / VIP / wealth / charm) -->
