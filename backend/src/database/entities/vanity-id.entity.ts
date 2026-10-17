@@ -32,7 +32,11 @@ export class VanityId {
 
   /** Per-ID appearance, independent of VIP membership. */
   @Column({ type: 'varchar', length: 16, default: 'static' })
-  styleMode!: 'static' | 'animated';
+  styleMode!: 'none' | 'static' | 'animated' | 'vip';
+
+  /** VIP tier used only when styleMode=vip; existing tiers are VIP1–VIP7. */
+  @Column({ type: 'int', default: 1 })
+  styleVipLevel!: number;
 
   @Column({ type: 'varchar', length: 7, default: '#52E8FF' })
   styleColor1!: string;
