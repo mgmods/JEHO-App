@@ -451,7 +451,13 @@ export class AuthService implements OnModuleInit {
     for (let i = 0; i < 64; i++) {
       const id = String(randomInt(100_000, 1_000_000));
       const exists = await this.usersRepo.exist({ where: { publicId: id } });
-      if (!exists) return id;
+      if (exists) continue;
+      // Keep new account IDs distinct from IDs reserved in the vanity-ID catalog.
+      const vanityConflict = await this.usersRepo.manager.query(
+        'SELECT 1 FROM vanity_ids WHERE "publicId" = $1 LIMIT 1',
+        [id],
+      );
+      if (!vanityConflict.length) return id;
     }
     throw new ConflictException('تعذر إنشاء آيدي حساب فريد من ستة أرقام، حاول مرة أخرى');
   }
