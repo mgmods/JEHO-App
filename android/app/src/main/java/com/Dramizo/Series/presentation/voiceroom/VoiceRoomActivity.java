@@ -595,8 +595,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             public void onSeatClick(View anchor, RoomDtos.SeatDto seat) {
                 if (roomId == null || seat == null) return;
                 if (seat.locked()) {
-                    if (canManageSeats) viewModel.lockSeat(roomId, seat.seatIndex, false);
-                    else Toast.makeText(VoiceRoomActivity.this, R.string.seat_locked_toast, Toast.LENGTH_SHORT).show();
+                    String lockedOccupant = seatUserId(seat);
+                    boolean lockedEmpty = lockedOccupant == null || lockedOccupant.isEmpty();
+                    if (lockedEmpty && !isOnSeat(currentSeats) && seat.seatIndex != 0
+                            && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
+                        showEmptySeatActionMenu(anchor, seat);
+                    } else if (canManageSeats) {
+                        viewModel.lockSeat(roomId, seat.seatIndex, false);
+                    } else {
+                        Toast.makeText(VoiceRoomActivity.this, R.string.seat_locked_toast, Toast.LENGTH_SHORT).show();
+                    }
                     return;
                 }
                 String occupantId = seatUserId(seat);
@@ -622,21 +630,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
 
-                // Room staff who are not seated can invite an audience member to this
-                // exact empty seat, or choose to sit here themselves.
-                if (canInviteMic && !isOnSeat(currentSeats) && seat.seatIndex != 0) {
-                    new androidx.appcompat.app.AlertDialog.Builder(VoiceRoomActivity.this)
-                            .setTitle("المقعد فارغ")
-                            .setItems(new CharSequence[]{"دعوة شخص للمقعد", "الجلوس على المقعد"},
-                                    (dialog, which) -> {
-                                        if (which == 0) {
-                                            showSeatInvitePickerDialog(seat.seatIndex);
-                                        } else {
-                                            takeEmptySeat(seat.seatIndex);
-                                        }
-                                    })
-                            .setNegativeButton("إلغاء", null)
-                            .show();
+                // Owners and room staff who are not seated get explicit seat actions.
+                if (!isOnSeat(currentSeats) && seat.seatIndex != 0
+                        && (canInviteMic || canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) {
+                    showEmptySeatActionMenu(anchor, seat);
                     return;
                 }
                 takeEmptySeat(seat.seatIndex);
@@ -10846,9 +10843,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // hoppingRoom stays true until the new session arrives (see session observer).
     }
 
-    /** Show only members currently in this room who are not occupying any mic seat. */
+    /** Show only current room members who are not seated; each row has its own invite action. */
     private void showSeatInvitePickerDialog(int seatIndex) {
-        if (isFinishing() || roomId == null) return;
+        if (isFinishing() || roomId == null || !canInviteMic) return;
         java.util.ArrayList<JsonObject> eligible = new java.util.ArrayList<>();
         java.util.HashSet<String> seen = new java.util.HashSet<>();
         List<JsonObject> source = !roomMembersAll.isEmpty() ? roomMembersAll : roomAudience;
@@ -10864,20 +10861,88 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             Toast.makeText(this, "لا يوجد أعضاء غير جالسين على المقاعد داخل الروم", Toast.LENGTH_SHORT).show();
             return;
         }
-        String[] labels = new String[eligible.size()];
-        for (int i = 0; i < eligible.size(); i++) {
-            JsonObject member = eligible.get(i);
+        final androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("دعوة للجلوس على المايك " + Math.max(1, seatIndex))
+                .setNegativeButton("إغلاق", null)
+                .create();
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        android.widget.LinearLayout rows = new android.widget.LinearLayout(this);
+        rows.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = dp(12);
+        rows.setPadding(pad, dp(4), pad, dp(8));
+        for (JsonObject member : eligible) {
+            final String targetId = memberStr(member, "userId");
             String name = memberStr(member, "displayName");
             if (name == null || name.trim().isEmpty()) name = memberStr(member, "username");
-            labels[i] = (name == null || name.trim().isEmpty()) ? "عضو" : name;
+            if (name == null || name.trim().isEmpty()) name = "عضو";
+            android.widget.LinearLayout row = new android.widget.LinearLayout(this);
+            row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(8), dp(7), dp(8), dp(7));
+            android.widget.TextView nameView = new android.widget.TextView(this);
+            nameView.setText(name);
+            nameView.setTextSize(15);
+            nameView.setTextColor(0xFF202124);
+            nameView.setMaxLines(1);
+            nameView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            row.addView(nameView, new android.widget.LinearLayout.LayoutParams(0, dp(44), 1f));
+            android.widget.Button invite = new android.widget.Button(this);
+            invite.setText("دعوة");
+            invite.setAllCaps(false);
+            invite.setEnabled(targetId != null && !targetId.isEmpty());
+            invite.setOnClickListener(v -> {
+                if (targetId == null || targetId.isEmpty()) return;
+                viewModel.inviteSeat(roomId, targetId, seatIndex);
+                dialog.dismiss();
+            });
+            row.addView(invite, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, dp(44)));
+            rows.addView(row, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            android.view.View divider = new android.view.View(this);
+            divider.setBackgroundColor(0xFFE8E8E8);
+            rows.addView(divider, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+        }
+        scroll.addView(rows);
+        dialog.setView(scroll);
+        dialog.show();
+    }
+
+    /** Context menu for an empty mic: move, invite someone already in the room, or lock it. */
+    private void showEmptySeatActionMenu(@Nullable View anchor, @NonNull RoomDtos.SeatDto seat) {
+        if (roomId == null || isOnSeat(currentSeats)) return;
+        java.util.ArrayList<String> labels = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> actions = new java.util.ArrayList<>();
+        labels.add("انتقال");
+        actions.add(0);
+        if (canInviteMic) {
+            labels.add("دعوة");
+            actions.add(1);
+        }
+        if (canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff()) {
+            labels.add(seat.locked() ? "فتح" : "قفل");
+            actions.add(2);
         }
         new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("اختر عضواً لدعوته للمقعد " + Math.max(1, seatIndex))
-                .setItems(labels, (dialog, which) -> {
-                    if (which < 0 || which >= eligible.size()) return;
-                    String targetId = memberStr(eligible.get(which), "userId");
-                    if (targetId != null && !targetId.isEmpty()) {
-                        viewModel.inviteSeat(roomId, targetId, seatIndex);
+                .setTitle("المقعد " + (seat.seatIndex + 1))
+                .setItems(labels.toArray(new String[0]), (d, which) -> {
+                    if (which < 0 || which >= actions.size()) return;
+                    switch (actions.get(which)) {
+                        case 0:
+                            takeEmptySeat(seat.seatIndex);
+                            break;
+                        case 1:
+                            showSeatInvitePickerDialog(seat.seatIndex);
+                            break;
+                        case 2:
+                            if (!(canManageSeats || canManageRoom || isHost || isOwner || isRoomStaff())) return;
+                            viewModel.lockSeat(roomId, seat.seatIndex, !seat.locked());
+                            Toast.makeText(this, seat.locked() ? "تم فتح المقعد" : "تم قفل المقعد",
+                                    Toast.LENGTH_SHORT).show();
+                            break;
+                        default:
+                            break;
                     }
                 })
                 .setNegativeButton("إلغاء", null)
@@ -10888,10 +10953,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (isFinishing() || roomId == null) return;
         AuraDialogHelper.confirm(this,
                 "دعوة إلى المايك",
-                "دعاك مشرف الغرفة للصعود إلى المايك. هل تقبل؟",
-                "قبول",
+                "تم دعوتك للجلوس على المايك. هل ترغب بالموافقة؟",
+                "موافقة",
                 () -> viewModel.respondSeatInvite(roomId, true),
-                "رفض",
+                "إلغاء",
                 () -> viewModel.respondSeatInvite(roomId, false));
     }
 
