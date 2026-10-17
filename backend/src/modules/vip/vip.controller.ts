@@ -11,7 +11,7 @@ export class VipController {
 
   @Public()
   @Get('plans')
-  @ApiOperation({ summary: 'List VIP1-100 plans and benefits' })
+  @ApiOperation({ summary: 'List the existing VIP1-7 plans and benefits' })
   plans() {
     return this.vipService.listPlans();
   }
