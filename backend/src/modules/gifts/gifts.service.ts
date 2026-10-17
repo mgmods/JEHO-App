@@ -2710,8 +2710,11 @@ export class GiftsService implements OnModuleInit {
         senderVipLevel: vipLevel,
         senderUserLevel: Math.max(1, Number(sender?.level || 1)),
         allMic: true,
+        // Keep receiver IDs for seat animation/accounting, but do not designate one
+        // recipient as the public-facing receiver of a group gift.
         receiverIds,
-        receiverId: receiverIds[0],
+        recipientDisplayMode: 'group',
+        recipientCount: personCount,
         roomId: dto.roomId,
         quantity: qty,
         comboCount,
