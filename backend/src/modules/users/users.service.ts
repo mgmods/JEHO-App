@@ -334,18 +334,31 @@ export class UsersService {
       Number(user.profile?.totalSentCoins || 0),
     );
     const agency = await this.resolveActiveAgency(userId);
-    return this.withWearMeta(
-      await this.withPublicIdStyle(this.applyFixedVipWear(
-        {
-          ...this.flatten(user),
-          activeVip: vipValid,
-          vipLevel,
-          genderVerified: verification.genderVerified,
-          genderVerificationStatus: verification.genderVerificationStatus,
-          agency,
-        },
+    const flat = this.applyFixedVipWear(
+      {
+        ...this.flatten(user),
+        activeVip: vipValid,
         vipLevel,
-      ), userId),
+        genderVerified: verification.genderVerified,
+        genderVerificationStatus: verification.genderVerificationStatus,
+        agency,
+      },
+      vipLevel,
+    );
+    // VIP-tier media is controlled from Dashboard > VIP. Apply it at read time
+    // so changing a plan updates active members without overwriting their stored profile data.
+    const vipVisuals = (vipValid?.vipPlan?.benefits as any)?.visuals || {};
+    const withVipVisuals = {
+      ...flat,
+      vipHeadUrl: vipValid?.vipPlan?.badgeUrl || flat.vipHeadUrl,
+      vipTouUrl: vipVisuals.vipFrameUrl || flat.vipTouUrl,
+      vipCardUrl: vipVisuals.vipCardUrl || null,
+      profileCardUrl: vipVisuals.profileCardUrl || vipVisuals.vipCardUrl || flat.profileCardUrl,
+      chatBubbleUrl: vipVisuals.chatBubbleUrl || flat.chatBubbleUrl,
+      nameplateUrl: vipVisuals.nameplateUrl || flat.nameplateUrl,
+    };
+    return this.withWearMeta(
+      await this.withPublicIdStyle(withVipVisuals, userId),
     );
   }
 
@@ -358,6 +371,7 @@ export class UsersService {
     const now = new Date();
     const vip = await this.userVipsRepo.findOne({
       where: { userId: id, isActive: true },
+      relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
     const vipLevelRaw =
@@ -612,15 +626,22 @@ export class UsersService {
       entryEffectUrl: user.profile?.entryEffectUrl ?? null,
       entryAnimationUrl: user.profile?.entryAnimationUrl ?? null,
       roomCardUrl: user.profile?.roomCardUrl ?? null,
-      profileCardUrl: user.profile?.profileCardUrl ?? null,
-      chatBubbleUrl: user.profile?.chatBubbleUrl ?? null,
-      nameplateUrl: user.profile?.nameplateUrl ?? null,
+      profileCardUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
+        ? ((vip.vipPlan?.benefits as any)?.visuals?.profileCardUrl || (vip.vipPlan?.benefits as any)?.visuals?.vipCardUrl)
+        : null) || user.profile?.profileCardUrl ?? null,
+      chatBubbleUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
+        ? (vip.vipPlan?.benefits as any)?.visuals?.chatBubbleUrl
+        : null) || user.profile?.chatBubbleUrl ?? null,
+      nameplateUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now))
+        ? (vip.vipPlan?.benefits as any)?.visuals?.nameplateUrl
+        : null) || user.profile?.nameplateUrl ?? null,
       // Equipped mall / animated frame only — never force static VIP art.
       vipBadgeUrl: isStaticVipTouUrl(user.profile?.vipBadgeUrl)
         ? null
         : user.profile?.vipBadgeUrl ?? null,
-      vipHeadUrl: fixedVipHeadUrl(vipLevel),
-      vipTouUrl: fixedVipFrameUrl(vipLevel),
+      vipHeadUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? vip.vipPlan?.badgeUrl : null) || fixedVipHeadUrl(vipLevel),
+      vipTouUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? (vip.vipPlan?.benefits as any)?.visuals?.vipFrameUrl : null) || fixedVipFrameUrl(vipLevel),
+      vipCardUrl: ((vip && (!vip.expiresAt || vip.expiresAt > now)) ? (vip.vipPlan?.benefits as any)?.visuals?.vipCardUrl : null) || null,
       levelBadgeUrl: user.profile?.levelBadgeUrl ?? null,
       hostBadgeUrl: user.profile?.hostBadgeUrl ?? null,
       country: user.profile?.country ?? null,
