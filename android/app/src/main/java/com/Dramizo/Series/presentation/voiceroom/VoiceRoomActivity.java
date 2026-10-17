@@ -6936,7 +6936,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 String cpAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? ""
                         : String.valueOf(cpPartner.get("avatarUrl"));
                 runOnUiThread(() -> {
-                    if (rowCpRelationship == null || dialog.getWindow() == null || !dialog.isShowing()) return;
+                    if (rowCpRelationship == null || dialog.getWindow() == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(type)
                             + (cpName.isEmpty() ? "" : " · " + cpName));
