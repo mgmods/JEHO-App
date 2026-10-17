@@ -12,6 +12,7 @@ import android.animation.ValueAnimator;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.graphics.drawable.Drawable;
 import android.widget.Toast;
 
 import androidx.core.graphics.Insets;
@@ -42,6 +43,8 @@ import com.Dramizo.Series.util.ServerAssets;
 import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -670,6 +673,8 @@ public class ProfileActivity extends ThemedActivity {
                 long relationshipDays = cpDurationDays(relation.get("startedAt"));
                 binding.tvProfileCpCvType.setText(cpTypeLabel(type));
                 binding.tvProfileCpCvHeart.setText("♥");
+                Object cardBackground = relation.get("cardBackgroundUrl");
+                applyCpCardBackground(cardBackground == null ? "" : String.valueOf(cardBackground));
                 binding.tvProfileCpCvLevel.setText("Lv." + relationshipLevel);
                 binding.tvProfileCpCvDays.setText(relationshipDays + " أيام");
                 binding.rowProfileCpCv.setVisibility(View.VISIBLE);
@@ -678,6 +683,26 @@ public class ProfileActivity extends ThemedActivity {
                 binding.btnCpRequest.setVisibility(View.GONE);
                 startProfileCpHeartAnimation();
             });
+        });
+    }
+
+    private void applyCpCardBackground(String url) {
+        if (binding == null || binding.rowProfileCpCv == null) return;
+        String value = url == null ? "" : url.trim();
+        if (value.isEmpty()) {
+            binding.rowProfileCpCv.setBackgroundResource(R.drawable.bg_cp_cv_card);
+            return;
+        }
+        Glide.with(this).load(value).into(new CustomTarget<Drawable>() {
+            @Override public void onResourceReady(Drawable resource, Transition<? super Drawable> transition) {
+                if (binding != null && !isFinishing()) {
+                    // Set only the card background; layout bounds and child positions remain unchanged.
+                    binding.rowProfileCpCv.setBackground(resource);
+                }
+            }
+            @Override public void onLoadCleared(Drawable placeholder) {
+                if (binding != null) binding.rowProfileCpCv.setBackgroundResource(R.drawable.bg_cp_cv_card);
+            }
         });
     }
 
