@@ -131,10 +131,9 @@ const sections = computed(() => [
     id: 'memberships',
     label: t('nav.memberships'),
     items: [
-      { name: 'vip', icon: 'bi-diamond', label: t('nav.vip') },
+      { name: 'vip', query: {}, icon: 'bi-diamond', label: 'VIP ومظاهره' },
       { name: 'badges', icon: 'bi-award', label: 'الشارات' },
       { name: 'vanity-ids', icon: 'bi-hash', label: 'الأيدي المميزة والمتحركة' },
-      { name: 'cosmetics', icon: 'bi-palette2', label: t('nav.cosmetics') },
       { name: 'offers', icon: 'bi-box-seam', label: t('nav.offers') },
       { name: 'promos', icon: 'bi-stars', label: t('nav.promos') },
     ],
