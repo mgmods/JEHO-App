@@ -698,6 +698,8 @@ public class ProfileFragment extends Fragment {
 
                 String partnerFrameUrl = partner.get("vipBadgeUrl") == null
                         ? "" : String.valueOf(partner.get("vipBadgeUrl")).trim();
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpSelfFrame, selfFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpPartnerFrame, partnerFrameUrl);
                 bindMyCpAvatar(binding.imgMyProfileCpCvSelf, selfAvatarUrl);
                 bindMyCpAvatar(binding.imgMyProfileCpCvPartner, partnerAvatar);
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgMyProfileCpCvSelfFrame, selfFrameUrl);
