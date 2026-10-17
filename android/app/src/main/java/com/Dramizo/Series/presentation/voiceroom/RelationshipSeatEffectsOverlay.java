@@ -378,7 +378,7 @@ final class RelationshipSeatEffectsOverlay {
             float inset = Math.max(1f, getHeight() * 0.06f);
             canvas.drawRoundRect(inset, inset, Math.max(inset + 1f, right - inset),
                     Math.max(inset + 1f, getHeight() - inset), getHeight() / 2f,
-                    capsule, null);
+                    getHeight() / 2f, capsule);
             capsule.clearShadowLayer();
             glow.setStrokeWidth(Math.max(5f, getHeight() * 0.24f));
             core.setStrokeWidth(Math.max(2f, getHeight() * 0.12f));
