@@ -11807,9 +11807,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String receiverId = memberStr(payload, "receiverId");
             String senderId = memberStr(payload, "senderId");
             if (senderId == null) senderId = fromUserId;
-            if (myUserId != null && (myUserId.equals(fromUserId) || myUserId.equals(senderId))) {
-                return; // The successful send response already queued the local effect.
-            }
+            boolean localSenderEcho = myUserId != null
+                    && (myUserId.equals(fromUserId) || myUserId.equals(senderId));
             String giftKind = memberStr(payload, "giftType");
             if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)) {
                 GiftAudioFx.playLuckyCoins(this, 3);
@@ -11836,6 +11835,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             long giftNow = System.currentTimeMillis();
             recentGiftEffects.entrySet().removeIf(entry -> giftNow - entry.getValue() > 15_000L);
             if (recentGiftEffects.put(giftEventKey, giftNow) != null) return;
+            // A single-recipient gift must name the receiver in the room chat. Group gifts
+            // intentionally stay anonymous as a group, without listing all recipients.
+            String receiverName = memberStr(payload, "receiverName");
+            if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
+                appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
+            }
+            if (localSenderEcho) {
+                return; // Local send response already queued the sender's visual effect.
+            }
             boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
             int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
             // Lucky: Mikoo center-hold → scatter (no JSON/Lottie pulse).
