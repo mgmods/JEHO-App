@@ -44,6 +44,28 @@ export class VanityIdsController {
   ) {}
 
   @Public()
+  @Get('style/:publicId')
+  @ApiOperation({ summary: 'Get the configured public-ID appearance for profile and shop rendering' })
+  async getPublicIdStyle(@Param('publicId') publicId: string) {
+    if (!/^\\d{3,12}$/.test(publicId)) {
+      throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
+    }
+    const row = await this.vanityRepo.findOne({ where: { publicId } });
+    if (!row) {
+      return { publicId, styleMode: 'none', styleVipLevel: 1, styleColor1: null, styleColor2: null, styleColor3: null, styleGlow: false };
+    }
+    return {
+      publicId,
+      styleMode: row.styleMode || 'none',
+      styleVipLevel: Math.min(7, Math.max(1, Number(row.styleVipLevel) || 1)),
+      styleColor1: row.styleColor1 || null,
+      styleColor2: row.styleColor2 || null,
+      styleColor3: row.styleColor3 || null,
+      styleGlow: !!row.styleGlow,
+    };
+  }
+
+  @Public()
   @Get()
   @ApiOperation({ summary: 'List available / catalog vanity IDs' })
   async list(@Query('status') status?: string) {
