@@ -168,6 +168,7 @@ export class CpService implements OnModuleInit, OnModuleDestroy {
   async profileRelationships(userId: string) {
     return this.dataSource.query(
       `SELECT r.id,r.type,r.points::text AS points,r.level,r."startedAt",
+       COALESCE((SELECT value::jsonb ->> 'cardBackgroundUrl' FROM app_settings WHERE key = 'cp.rules.' || r.type), '') AS "cardBackgroundUrl",
        json_build_object('id',p.id,'username',p.username,'displayName',p."displayName",'avatarUrl',p."avatarUrl",'level',p.level,
          'vipBadgeUrl',pp."vipBadgeUrl",'hostBadgeUrl',pp."hostBadgeUrl",'levelBadgeUrl',pp."levelBadgeUrl") AS partner
        FROM cp_relationships r
