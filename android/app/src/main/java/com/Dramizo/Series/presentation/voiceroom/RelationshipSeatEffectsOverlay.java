@@ -184,6 +184,8 @@ final class RelationshipSeatEffectsOverlay {
         fallback.setFocusable(false);
         layer.addView(fallback);
 
+        final boolean[] assetLoaded = {false};
+        final boolean[] assetFailed = {!hasRibbon};
         final ImageView ribbon;
         if (hasRibbon) {
             ribbon = new ImageView(context);
@@ -196,6 +198,8 @@ final class RelationshipSeatEffectsOverlay {
             Glide.with(context).load(url).listener(new RequestListener<Drawable>() {
                 @Override public boolean onLoadFailed(@Nullable GlideException e, Object model,
                         Target<Drawable> target, boolean isFirstResource) {
+                    assetFailed[0] = true;
+                    assetLoaded[0] = false;
                     ribbon.setVisibility(View.INVISIBLE);
                     fallback.setVisibility(View.VISIBLE);
                     android.util.Log.w("RelationshipEffect", "Ribbon asset failed to load; using animated fallback", e);
@@ -203,6 +207,8 @@ final class RelationshipSeatEffectsOverlay {
                 }
                 @Override public boolean onResourceReady(Drawable resource, Object model,
                         Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                    assetLoaded[0] = true;
+                    assetFailed[0] = false;
                     ribbon.setVisibility(View.VISIBLE);
                     fallback.setVisibility(View.INVISIBLE);
                     return false;
@@ -228,6 +234,8 @@ final class RelationshipSeatEffectsOverlay {
                 // Seats can temporarily detach during a move/layout pass. Keep the animation
                 // alive and reconnect it as soon as both current holders are attached again.
                 effectView.setVisibility(View.INVISIBLE);
+                fallback.setVisibility(View.INVISIBLE);
+                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
                 return;
             }
             layer.getLocationInWindow(gridLoc);
@@ -249,9 +257,16 @@ final class RelationshipSeatEffectsOverlay {
             float distance = (float) Math.hypot(dx, dy);
             if (distance < dp(8)) {
                 effectView.setVisibility(View.INVISIBLE);
+                fallback.setVisibility(View.INVISIBLE);
+                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
                 return;
             }
-            effectView.setVisibility(View.VISIBLE);
+            if (hasRibbon) {
+                ribbon.setVisibility(assetLoaded[0] ? View.VISIBLE : View.INVISIBLE);
+                fallback.setVisibility(assetFailed[0] ? View.VISIBLE : View.INVISIBLE);
+            } else {
+                fallback.setVisibility(View.VISIBLE);
+            }
             float angle = (float) Math.toDegrees(Math.atan2(dy, dx));
             float progress = (Float) animation.getAnimatedValue();
             // Keep a full connector spanning the two live avatar centers. Both the uploaded
