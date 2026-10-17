@@ -304,7 +304,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Create / upsert vanity IDs from dashboard' })
   async adminUpsert(
     @Body()
-    body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
+    body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
   ) {
     const publicId = String(body.publicId || '').trim();
     if (!/^\d{3,12}$/.test(publicId)) {
@@ -346,7 +346,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Update vanity price / status (dashboard)' })
   async adminPatch(
     @Param('id') id: string,
-    @Body() body: { priceCoins?: number; status?: string; styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
+    @Body() body: { priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
   ) {
     const row = await this.requireRow(id);
     if (body.priceCoins != null) {
@@ -532,14 +532,19 @@ export class VanityIdsController {
   }
 
   private parseStyle(body: {
-    styleMode?: string; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean;
+    styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean;
   }): Partial<VanityId> {
     const result: Partial<VanityId> = {};
     if (body.styleMode != null) {
-      if (!['static', 'animated'].includes(body.styleMode)) {
-        throw new BadRequestException('styleMode must be static or animated');
+      if (!['none', 'static', 'animated', 'vip'].includes(body.styleMode)) {
+        throw new BadRequestException('styleMode must be none, static, animated or vip');
       }
-      result.styleMode = body.styleMode as 'static' | 'animated';
+      result.styleMode = body.styleMode as 'none' | 'static' | 'animated' | 'vip';
+    }
+    if (body.styleVipLevel != null) {
+      const level = Math.floor(Number(body.styleVipLevel));
+      if (!Number.isInteger(level) || level < 1 || level > 7) throw new BadRequestException('styleVipLevel must be between VIP1 and VIP7');
+      result.styleVipLevel = level;
     }
     for (const key of ['styleColor1', 'styleColor2', 'styleColor3'] as const) {
       const value = body[key];
