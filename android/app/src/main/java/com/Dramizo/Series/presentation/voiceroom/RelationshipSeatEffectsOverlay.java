@@ -191,13 +191,16 @@ final class RelationshipSeatEffectsOverlay {
             emoji.setShadowLayer(dp(3), 0, dp(1), 0xAA000000);
             effectView = emoji;
         }
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(1, thickness);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(hasRibbon ? 1 : thickness, thickness);
         effectView.setLayoutParams(lp);
         effectView.setClickable(false);
         effectView.setFocusable(false);
         effectView.setAlpha(0.98f);
         layer.addView(effectView);
 
+        final int[] gridLoc = new int[2];
+        final int[] aLoc = new int[2];
+        final int[] bLoc = new int[2];
         ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
         travel.setDuration(Math.max(500L, duration));
         travel.setRepeatCount(ValueAnimator.INFINITE);
