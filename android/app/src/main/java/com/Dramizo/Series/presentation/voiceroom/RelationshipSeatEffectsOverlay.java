@@ -382,11 +382,11 @@ final class RelationshipSeatEffectsOverlay {
                 for (String nestedKey : new String[]{"id", "userId", "uid"}) {
                     Object nestedValue = nested.get(nestedKey);
                     if (nestedValue != null && !String.valueOf(nestedValue).trim().isEmpty()) {
-                        return normalize(nestedValue);
+                        return String.valueOf(nestedValue).trim();
                     }
                 }
             } else if (value != null && !String.valueOf(value).trim().isEmpty()) {
-                return normalize(value);
+                return String.valueOf(value).trim();
             }
         }
         return "";
