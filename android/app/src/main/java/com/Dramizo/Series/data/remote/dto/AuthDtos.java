@@ -104,6 +104,12 @@ public final class AuthDtos {
         @SerializedName("username") public String username;
         /** Stable numeric app ID — not Google / store account name. */
         @SerializedName("publicId") public String publicId;
+        @SerializedName("publicIdStyleMode") public String publicIdStyleMode;
+        @SerializedName("publicIdStyleVipLevel") public int publicIdStyleVipLevel;
+        @SerializedName("publicIdStyleColor1") public String publicIdStyleColor1;
+        @SerializedName("publicIdStyleColor2") public String publicIdStyleColor2;
+        @SerializedName("publicIdStyleColor3") public String publicIdStyleColor3;
+        @SerializedName("publicIdStyleGlow") public boolean publicIdStyleGlow;
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("coverUrl") public String coverUrl;
