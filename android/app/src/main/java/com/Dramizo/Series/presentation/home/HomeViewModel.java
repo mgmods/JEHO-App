@@ -186,6 +186,7 @@ public class HomeViewModel extends ViewModel {
         // Identity must track server (personal vs agency), not stick to first poll.
         c.agencyId = neu.agencyId != null ? neu.agencyId : old.agencyId;
         c.roomKind = neu.roomKind != null ? neu.roomKind : old.roomKind;
+        c.topic = neu.topic != null ? neu.topic : old.topic;
         c.isSupport = neu.isSupport || "support".equalsIgnoreCase(
                 neu.roomKind != null ? neu.roomKind : "");
         c.isPersistent = neu.isPersistent;
