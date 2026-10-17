@@ -13,6 +13,7 @@ import { ProfileVisit } from '../../database/entities/profile-visit.entity';
 import { Cosmetic } from '../../database/entities/cosmetic.entity';
 import { AgencyMember } from '../../database/entities/agency-member.entity';
 import { Agency } from '../../database/entities/agency.entity';
+import { RechargeAgent } from '../../database/entities/recharge-agent.entity';
 import { FemaleIdentityVerification } from '../../database/entities/female-identity-verification.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
@@ -41,6 +42,7 @@ import { IdentityVerificationService } from './identity-verification.service';
       Cosmetic,
       AgencyMember,
       Agency,
+      RechargeAgent,
       FemaleIdentityVerification,
       AppSetting,
     ]),
