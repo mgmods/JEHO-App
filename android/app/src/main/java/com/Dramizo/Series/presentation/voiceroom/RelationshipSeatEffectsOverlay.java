@@ -129,8 +129,11 @@ final class RelationshipSeatEffectsOverlay {
         Set<String> drawn = new HashSet<>();
         for (Map<String, Object> relation : lastRelationships) {
             if (relation == null) continue;
-            String a = normalize(relation.get("userAId"));
-            String b = normalize(relation.get("userBId"));
+            // Accept the API's canonical pair fields and common serialized aliases.
+            // Older CP payloads used user1/user2 or nested user objects; treating those as
+            // missing IDs silently removed every room ribbon after the recent renderer change.
+            String a = firstValue(relation, "userAId", "user1Id", "fromUserId", "requesterId", "userA", "user1", "fromUser");
+            String b = firstValue(relation, "userBId", "user2Id", "toUserId", "targetId", "userB", "user2", "toUser");
             Integer indexA = positions.get(a);
             Integer indexB = positions.get(b);
             if (indexA == null || indexB == null || a.equals(b)) continue;
@@ -140,10 +143,10 @@ final class RelationshipSeatEffectsOverlay {
             // Do not require holders to be attached during this pass. The animation resolves
             // each endpoint by user ID on every frame, including while RecyclerView rebinds seats.
 
-            String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
-            Map<String, Object> effect = lastEffects == null ? null : lastEffects.get(type);
+            String type = firstValue(relation, "type", "relationshipType", "relationType", "bondType");
+            Map<String, Object> effect = findEffect(type);
             if (effect != null && Boolean.FALSE.equals(effect.get("enabled"))) continue;
-            String url = effect == null || effect.get("url") == null ? "" : String.valueOf(effect.get("url"));
+            String url = effect == null ? "" : firstValue(effect, "url", "imageUrl", "assetUrl", "effectUrl", "iconUrl");
             int sizeDp = intValue(effect == null ? null : effect.get("sizeDp"), 18, 10, 36);
             long duration = intValue(effect == null ? null : effect.get("durationMs"), 1800, 500, 10000);
             addEffect(a, b, type, url, sizeDp, duration);
@@ -357,6 +360,36 @@ final class RelationshipSeatEffectsOverlay {
             }
         }
         return null;
+    }
+
+    private Map<String, Object> findEffect(@NonNull String type) {
+        if (lastEffects == null) return null;
+        Map<String, Object> effect = lastEffects.get(type);
+        if (effect != null) return effect;
+        for (Map.Entry<String, Map<String, Object>> entry : lastEffects.entrySet()) {
+            if (normalize(entry.getKey()).equals(normalize(type))) return entry.getValue();
+        }
+        return null;
+    }
+
+    @NonNull
+    private static String firstValue(@Nullable Map<String, Object> source, String... keys) {
+        if (source == null) return "";
+        for (String key : keys) {
+            Object value = source.get(key);
+            if (value instanceof Map) {
+                Map<?, ?> nested = (Map<?, ?>) value;
+                for (String nestedKey : new String[]{"id", "userId", "uid"}) {
+                    Object nestedValue = nested.get(nestedKey);
+                    if (nestedValue != null && !String.valueOf(nestedValue).trim().isEmpty()) {
+                        return normalize(nestedValue);
+                    }
+                }
+            } else if (value != null && !String.valueOf(value).trim().isEmpty()) {
+                return normalize(value);
+            }
+        }
+        return "";
     }
 
     private static float clamp(float value, float min, float max) {
