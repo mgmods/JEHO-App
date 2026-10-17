@@ -548,18 +548,28 @@ public final class AvatarCosmetics {
             @Nullable Map<String, ?> hostBadgeMeta,
             int fallbackLevel) {
         String wearKey = String.valueOf(avatarUrl) + '|' + String.valueOf(vipFrameUrl);
+        boolean hasWear = vipFrameUrl != null && !vipFrameUrl.trim().isEmpty();
         if (hostSignal != null) {
             Object prev = hostSignal.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)
-                    && (hostSignal.getVisibility() == View.VISIBLE
-                    || (avatarView != null && avatarView.getVisibility() == View.VISIBLE))) {
-                // Already bound this wear — skip clear/reload flash on every /me refresh.
+            boolean animatedFrameReady = hostSignal.getVisibility() == View.VISIBLE
+                    && hostSignal.getAlpha() > 0.01f;
+            boolean staticFrameReady = frameView != null
+                    && frameView.getVisibility() == View.VISIBLE
+                    && frameView.getDrawable() != null;
+            boolean avatarReady = avatarView == null || avatarView.getVisibility() == View.VISIBLE;
+            if (wearKey.equals(prev) && avatarReady
+                    && (animatedFrameReady || staticFrameReady || !hasWear)) {
+                // Skip reload only when the actual frame is visible; an avatar alone must not
+                // cache a failed animated-frame load as a completed profile render.
                 return;
             }
             hostSignal.setTag(R.id.tag_wear_key, wearKey);
         } else if (avatarView != null) {
             Object prev = avatarView.getTag(R.id.tag_wear_key);
-            if (wearKey.equals(prev)) return;
+            boolean staticFrameReady = frameView != null
+                    && frameView.getVisibility() == View.VISIBLE
+                    && frameView.getDrawable() != null;
+            if (wearKey.equals(prev) && (staticFrameReady || !hasWear)) return;
             avatarView.setTag(R.id.tag_wear_key, wearKey);
         }
         // Personal profile: animate VIP frame via HostSignalView when present.
