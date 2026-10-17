@@ -321,8 +321,9 @@ public class SearchActivity extends ThemedActivity {
             }
             if (h.b.avatarPairWrap != null) {
                 ViewGroup.LayoutParams lp = h.b.avatarPairWrap.getLayoutParams();
-                if (lp != null && lp.width != dp(66)) {
-                    lp.width = dp(66);
+                int pairWidthPx = (int) (66f * h.itemView.getResources().getDisplayMetrics().density + 0.5f);
+                if (lp != null && lp.width != pairWidthPx) {
+                    lp.width = pairWidthPx;
                     h.b.avatarPairWrap.setLayoutParams(lp);
                 }
             }
