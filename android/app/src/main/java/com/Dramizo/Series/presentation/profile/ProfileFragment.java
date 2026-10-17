@@ -501,7 +501,9 @@ public class ProfileFragment extends Fragment {
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
-                        if (badge != null && badge.earned) earned.add(badge);
+                        if (badge != null && (badge.earned
+                                || (badge.grantedAt != null && !badge.grantedAt.trim().isEmpty())
+                                || (badge.source != null && !badge.source.trim().isEmpty()))) earned.add(badge);
                     }
                 }
             } catch (Exception ignored) {
