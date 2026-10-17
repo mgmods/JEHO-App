@@ -360,7 +360,9 @@ function tierColor(level) {
   return LEVEL_COLORS[tierForLevel(level)] || '#00c9b1'
 }
 
-function assetUrl(path) { return resolveAsset(path) }\n\nfunction badgeSrc(p) {
+function assetUrl(path) { return resolveAsset(path) }
+
+function badgeSrc(p) {
   const lvl = tierForLevel(p.level)
   const fromPlan = p.badgeUrl && String(p.badgeUrl).includes(`vip_medal_mikoo_${lvl}`)
     ? p.badgeUrl
