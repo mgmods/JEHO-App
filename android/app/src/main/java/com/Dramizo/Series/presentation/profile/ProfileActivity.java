@@ -250,8 +250,11 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
 
+        // Wait for the incoming public ID/deep link to resolve to a UUID before enabling follow.
+        binding.btnFollow.setEnabled(false);
         vm.getUser().observe(this, user -> {
             if (user == null) return;
+            binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
