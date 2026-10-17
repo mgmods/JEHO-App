@@ -68,6 +68,29 @@ export class CosmeticsService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    // Safe additive schema guard: no resets and no edits to existing user data.
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'profile_card'`);
+    } catch (err) {
+      this.logger.warn(`profile_card cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'chat_bubble'`);
+    } catch (err) {
+      this.logger.warn(`chat_bubble cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TYPE "cosmetics_type_enum" ADD VALUE IF NOT EXISTS 'nameplate'`);
+    } catch (err) {
+      this.logger.warn(`nameplate cosmetic enum ensure: ${(err as Error).message}`);
+    }
+    try {
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "profileCardUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "chatBubbleUrl" varchar(512)`);
+      await this.dataSource.query(`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS "nameplateUrl" varchar(512)`);
+    } catch (err) {
+      this.logger.warn(`visual cosmetic profile columns ensure: ${(err as Error).message}`);
+    }
     // Always install fixed VIP head frames + re-bind VIP gates (safe on production).
     try {
       await this.ensureFixedVipTouFrames();
