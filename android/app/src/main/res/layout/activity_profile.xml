@@ -151,23 +151,28 @@
                         android:padding="0dp"
                         android:visibility="gone">
 
-                        <!-- Retained hidden legacy binding IDs for safe view binding. -->
+                        <!-- Profile owner avatar, matching the linked partner avatar dimensions. -->
                         <FrameLayout
-                            android:layout_width="0dp"
-                            android:layout_height="0dp"
-                            android:visibility="gone">
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
-                                android:layout_width="0dp"
-                                android:layout_height="0dp"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
                                 android:contentDescription="@null"
+                                android:elevation="4dp"
+                                android:scaleType="centerCrop"
                                 android:visibility="gone"
-                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+                                app:strokeColor="#FFFFFFFF"
+                                app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="0dp"
-                                android:layout_height="0dp"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
                                 android:contentDescription="@null"
+                                android:scaleType="fitXY"
                                 android:visibility="gone" />
                         </FrameLayout>
 
