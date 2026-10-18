@@ -7032,7 +7032,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String resolvedPartnerAvatar = partnerAvatarUrl.isEmpty() ? null : AssetCatalog.absoluteUrl(partnerAvatarUrl);
                     if (imgCpPartnerAvatar != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
                             .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
-                    if (cpTopPartnerWrap != null && cpPartner != null) {
+                    // Show the linked portrait from either nested partner objects or flattened API fields.
+                    if (cpTopPartnerWrap != null && !partnerAvatarUrl.isEmpty()) {
                         cpTopPartnerWrap.setVisibility(View.VISIBLE);
                         if (imgCpPartnerTop != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
                                 .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerTop);
