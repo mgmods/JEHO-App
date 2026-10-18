@@ -17,6 +17,9 @@ import { Gift, GiftType } from '../../database/entities/gift.entity';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
+import { UserBadge } from '../../database/entities/user-badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -1779,6 +1782,54 @@ export class GiftsService implements OnModuleInit {
           state.level = Math.max(1, Number(state.level) || 1) + 1;
           state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
           state.goalReached = false;
+        } else if (rewardType === 'frame') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest frame reward requires rewardItemId');
+          const cosmetic = await manager.getRepository(Cosmetic).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!cosmetic) throw new BadRequestException('Support chest frame reward is not an active cosmetic');
+          const userCosmetics = manager.getRepository(UserCosmetic);
+          const owned = await userCosmetics.findOne({
+            where: { userId: senderId, cosmeticId: cosmetic.id },
+          });
+          if (!owned) {
+            await userCosmetics.save(userCosmetics.create({
+              userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: null,
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'frame';
+          state.lastRewardItemId = cosmetic.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
+        } else if (rewardType === 'badge') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest badge reward requires rewardItemId');
+          const badge = await manager.getRepository(Badge).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!badge) throw new BadRequestException('Support chest badge reward is not an active badge');
+          const userBadges = manager.getRepository(UserBadge);
+          const owned = await userBadges.findOne({
+            where: { userId: senderId, badgeId: badge.id },
+          });
+          if (!owned) {
+            await userBadges.save(userBadges.create({
+              userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest',
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'badge';
+          state.lastRewardItemId = badge.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
         } else if (rewardType === 'none' || amount <= 0) {
           state.lastWinnerId = senderId;
           state.coins = 0; state.diamonds = 0;
@@ -1786,7 +1837,7 @@ export class GiftsService implements OnModuleInit {
           state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
           state.goalReached = false;
         } else {
-          // Inventory-backed rewards are deliberately not reset or marked paid until their grant path exists.
+          // Gift-inventory rewards are not supported yet; keep the goal pending rather than falsely marking paid.
           state.rewardPending = true;
           state.winnerId = senderId;
         }
