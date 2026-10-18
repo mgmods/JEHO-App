@@ -44,6 +44,7 @@ export class VanityIdsService implements OnModuleInit {
 
   async onModuleInit() {
     try {
+      await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleIconUrl" VARCHAR(512)');
       await this.dataSource.query('ALTER TABLE vanity_ids ADD COLUMN IF NOT EXISTS "styleVipLevel" INTEGER NOT NULL DEFAULT 1');
     } catch (e) {
       this.log.warn(`vanity style VIP column ensure skipped: ${e instanceof Error ? e.message : String(e)}`);
