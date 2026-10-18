@@ -13261,6 +13261,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             binding.btnFollowRoomHeart.setVisibility(View.GONE);
             return;
         }
+        String currentUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        if (!agency && currentUserId != null && currentUserId.equals(room.hostId)) {
+            binding.btnFollowRoomHeart.setVisibility(View.GONE);
+            return;
+        }
         final String key = (agency ? "agency:" : "room:") + targetId;
         binding.btnFollowRoomHeart.setVisibility(View.VISIBLE);
         binding.btnFollowRoomHeart.setEnabled(!headerFollowBusy);
