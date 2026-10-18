@@ -724,6 +724,9 @@ public class ProfileActivity extends ThemedActivity {
                 binding.tvProfileCpCvDays.setText(relationshipDays + " أيام");
                 binding.rowProfileCpCv.setVisibility(View.VISIBLE);
 
+                // Show exactly two portraits in the upper profile area: reuse the larger
+                // profile portrait slot for the linked pair instead of leaving a third copy.
+                if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.GONE);
                 binding.rowProfileCp.setVisibility(View.VISIBLE);
                 binding.btnCpRequest.setVisibility(View.GONE);
                 startProfileCpHeartAnimation();
@@ -826,6 +829,7 @@ public class ProfileActivity extends ThemedActivity {
             cpHeartAnimator = null;
         }
         binding.rowProfileCp.setVisibility(View.GONE);
+        if (binding.profileAvatarWrap != null) binding.profileAvatarWrap.setVisibility(View.VISIBLE);
         if (binding.rowProfileCpCv != null) {
             binding.rowProfileCpCv.setVisibility(View.GONE);
         }
