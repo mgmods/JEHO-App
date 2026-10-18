@@ -2917,10 +2917,56 @@ export class AdminService {
     // VIP level shortcut: assign by numeric level if vipLevel provided.
     if (body.vipLevel != null && Number.isFinite(Number(body.vipLevel))) {
       const vipLevel = Math.max(0, Math.floor(Number(body.vipLevel)));
+      const previousVip = await this.userVipRepo.findOne({
+        where: { userId: id, isActive: true },
+        order: { level: 'DESC' },
+      });
+      const previousVipLevel =
+        previousVip && (!previousVip.expiresAt || previousVip.expiresAt > new Date())
+          ? Number(previousVip.level || 0)
+          : 0;
       if (vipLevel <= 0) {
         await this.revokeActiveVip(id);
       } else {
         await this.assignVipByLevel(id, vipLevel);
+      }
+
+      if (vipLevel < previousVipLevel) {
+        // Lowering VIP must immediately remove wear that the new tier no longer
+        // qualifies for, instead of leaving stale equipped frames/entry effects.
+        await this.dataSource.query(
+          `UPDATE user_cosmetics owned
+              SET equipped = false
+             FROM cosmetics cosmetic
+            WHERE owned."cosmeticId" = cosmetic.id
+              AND owned."userId" = $1
+              AND owned.equipped = true
+              AND COALESCE(cosmetic."minVipLevel", 0) > $2`,
+          [id, vipLevel],
+        );
+        profile.vipBadgeUrl = null;
+        profile.hostBadgeUrl = null;
+        await this.profilesRepo.save(profile);
+        user.profile = profile;
+      }
+    }
+
+    if (body.level != null && Number.isFinite(Number(body.level))) {
+      const newLevel = Math.max(1, Math.min(9999, Math.floor(Number(body.level))));
+      await this.dataSource.query(
+        `UPDATE user_cosmetics owned
+            SET equipped = false
+           FROM cosmetics cosmetic
+          WHERE owned."cosmeticId" = cosmetic.id
+            AND owned."userId" = $1
+            AND owned.equipped = true
+            AND COALESCE(cosmetic."minUserLevel", 0) > $2`,
+        [id, newLevel],
+      );
+      if (newLevel < Number(user.level || 1)) {
+        profile.levelBadgeUrl = null;
+        await this.profilesRepo.save(profile);
+        user.profile = profile;
       }
     }
 
