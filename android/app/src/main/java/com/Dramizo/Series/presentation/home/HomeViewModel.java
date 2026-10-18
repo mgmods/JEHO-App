@@ -351,55 +351,22 @@ public class HomeViewModel extends ViewModel {
         if (!quiet) loading.postValue(true);
         try {
             c.getIoExecutor().execute(() -> {
-                boolean gotValidRoomPage = false;
+                boolean loaded = false;
                 try {
-                    String myId = c.getSessionManager().getUserId();
-                    java.util.Set<String> followingIds = new java.util.HashSet<>();
-                    if (myId != null && !myId.isEmpty()) {
-                        Result<MiscDtos.ListResult<com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto>> following =
-                                ApiCall.execute(c.getUserApi().following(myId, 1));
-                        if (following.success && following.data != null && following.data.items != null) {
-                            for (com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto user : following.data.items) {
-                                if (user != null && user.id != null) followingIds.add(user.id);
-                            }
-                        }
-                    }
-
-                    // Publish each page as it arrives so the UI needn't wait for the full scan.
-                    List<RoomDtos.RoomDto> matched = new ArrayList<>();
-                    int page = 1;
-                    while (page <= 10) {
-                        Result<MiscDtos.ListResult<RoomDtos.RoomDto>> roomResult =
-                                c.listRoomsUseCase.execute(page, PAGE_SIZE);
-                        if (!roomResult.success || roomResult.data == null || roomResult.data.items == null) {
-                            break;
-                        }
-                        gotValidRoomPage = true;
-                        List<RoomDtos.RoomDto> batch = dedupeRooms(roomResult.data.items);
-                        if (batch.isEmpty()) {
-                            followingRooms.postValue(new ArrayList<>(matched));
-                            break;
-                        }
-                        for (RoomDtos.RoomDto room : batch) {
-                            if (room == null) continue;
-                            if (!com.Dramizo.Series.util.RoomBrowseFilter.isBrowsablePersonal(room)) continue;
-                            String hostId = room.hostId;
-                            if (hostId == null && room.host != null) hostId = room.host.id;
-                            if (hostId != null && followingIds.contains(hostId)) matched.add(room);
-                        }
-                        followingRooms.postValue(new ArrayList<>(matched));
-                        if (batch.size() < PAGE_SIZE) break;
-                        page++;
+                    Result<MiscDtos.ListResult<RoomDtos.RoomDto>> result =
+                            ApiCall.execute(c.getRoomApi().followingRooms());
+                    if (result.success && result.data != null && result.data.items != null) {
+                        followingRooms.postValue(dedupeRooms(result.data.items));
+                        loaded = true;
                     }
                 } catch (Throwable ignored) {
-                    // Keep the last visible results if a background refresh fails.
+                    // Keep the last visible list if a refresh fails.
                 } finally {
                     synchronized (HomeViewModel.this) {
                         followingLoading = false;
-                        followingLoaded = gotValidRoomPage;
-                        // Brief retry backoff on failure; successful results are cached for 30s.
+                        followingLoaded = loaded;
                         lastFollowingLoadAt = System.currentTimeMillis()
-                                - (gotValidRoomPage ? 0L : FOLLOWING_CACHE_MS - 5_000L);
+                                - (loaded ? 0L : FOLLOWING_CACHE_MS - 5_000L);
                     }
                     if (!quiet) loading.postValue(false);
                 }
