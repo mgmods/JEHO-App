@@ -54,7 +54,7 @@ export class VanityIdsController {
     }
     const row = await this.vanityRepo.findOne({ where: { publicId } });
     if (!row) {
-      return { publicId, styleMode: 'none', styleVipLevel: 1, styleColor1: null, styleColor2: null, styleColor3: null, styleGlow: false };
+      return { publicId, styleMode: 'none', styleVipLevel: 1, styleColor1: null, styleColor2: null, styleColor3: null, styleGlow: false, styleIconUrl: null };
     }
     return {
       publicId,
@@ -64,6 +64,7 @@ export class VanityIdsController {
       styleColor2: row.styleColor2 || null,
       styleColor3: row.styleColor3 || null,
       styleGlow: !!row.styleGlow,
+      styleIconUrl: row.styleIconUrl || null,
     };
   }
 
@@ -339,7 +340,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Create / upsert vanity IDs from dashboard' })
   async adminUpsert(
     @Body()
-    body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
+    body: { publicId: string; priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean; styleIconUrl?: string | null },
   ) {
     const publicId = String(body.publicId || '').trim();
     if (!/^\d{3,12}$/.test(publicId)) {
@@ -378,6 +379,7 @@ export class VanityIdsController {
       styleColor2: saved.styleColor2,
       styleColor3: saved.styleColor3,
       styleGlow: saved.styleGlow,
+      styleIconUrl: saved.styleIconUrl || null,
       at: new Date().toISOString(),
     });
     if (saved.ownerUserId) {
@@ -400,7 +402,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Update vanity price / status (dashboard)' })
   async adminPatch(
     @Param('id') id: string,
-    @Body() body: { priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean },
+    @Body() body: { priceCoins?: number; status?: string; styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean; styleIconUrl?: string | null },
   ) {
     const row = await this.requireRow(id);
     if (body.priceCoins != null) {
@@ -455,7 +457,7 @@ export class VanityIdsController {
     this.realtimeGateway.emitToAll('vanity_id:style_updated', {
       publicId: saved.publicId, styleMode: saved.styleMode, styleVipLevel: saved.styleVipLevel,
       styleColor1: saved.styleColor1, styleColor2: saved.styleColor2, styleColor3: saved.styleColor3,
-      styleGlow: saved.styleGlow, at: new Date().toISOString(),
+      styleGlow: saved.styleGlow, styleIconUrl: saved.styleIconUrl || null, at: new Date().toISOString(),
     });
     return saved;
   }
@@ -644,7 +646,7 @@ export class VanityIdsController {
   }
 
   private parseStyle(body: {
-    styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean;
+    styleMode?: string; styleVipLevel?: number; styleColor1?: string; styleColor2?: string; styleColor3?: string; styleGlow?: boolean; styleIconUrl?: string | null;
   }): Partial<VanityId> {
     const result: Partial<VanityId> = {};
     if (body.styleMode != null) {
@@ -668,6 +670,14 @@ export class VanityIdsController {
       }
     }
     if (body.styleGlow != null) result.styleGlow = Boolean(body.styleGlow);
+    if (body.styleIconUrl !== undefined) {
+      const iconUrl = body.styleIconUrl == null ? '' : String(body.styleIconUrl).trim();
+      if (iconUrl.length > 512) throw new BadRequestException('styleIconUrl is too long');
+      if (iconUrl && !/^\/(?:uploads\/)[A-Za-z0-9._-]+$/.test(iconUrl) && !/^https:\/\//i.test(iconUrl)) {
+        throw new BadRequestException('styleIconUrl must be an uploaded /uploads path or HTTPS URL');
+      }
+      result.styleIconUrl = iconUrl || null;
+    }
     return result;
   }
 
