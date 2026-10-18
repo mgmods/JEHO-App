@@ -659,6 +659,35 @@ public class ProfileActivity extends ThemedActivity {
                 if (!(partnerObj instanceof Map)) partnerObj = relation.get("otherUser");
                 if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
                 Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
+                // Compatibility fallback for older API/search payloads that flatten the
+                // partner fields instead of returning the nested "partner" object.
+                if (partner == null) {
+                    Map<String, Object> flattenedPartner = new HashMap<>();
+                    Object flattenedId = firstNonEmpty(
+                            relation.get("partnerId") == null ? null : String.valueOf(relation.get("partnerId")),
+                            relation.get("linkedUserId") == null ? null : String.valueOf(relation.get("linkedUserId")),
+                            relation.get("relatedUserId") == null ? null : String.valueOf(relation.get("relatedUserId")),
+                            relation.get("otherUserId") == null ? null : String.valueOf(relation.get("otherUserId")),
+                            relation.get("counterpartId") == null ? null : String.valueOf(relation.get("counterpartId")));
+                    if (flattenedId != null) flattenedPartner.put("id", flattenedId);
+                    Object flattenedName = firstNonEmpty(
+                            relation.get("partnerDisplayName") == null ? null : String.valueOf(relation.get("partnerDisplayName")),
+                            relation.get("partnerUsername") == null ? null : String.valueOf(relation.get("partnerUsername")));
+                    if (flattenedName != null) flattenedPartner.put("displayName", flattenedName);
+                    Object flattenedAvatar = firstNonEmpty(
+                            relation.get("partnerAvatarUrl") == null ? null : String.valueOf(relation.get("partnerAvatarUrl")),
+                            relation.get("partner_avatar_url") == null ? null : String.valueOf(relation.get("partner_avatar_url")),
+                            relation.get("partnerProfileImageUrl") == null ? null : String.valueOf(relation.get("partnerProfileImageUrl")),
+                            relation.get("partnerPhotoUrl") == null ? null : String.valueOf(relation.get("partnerPhotoUrl")),
+                            relation.get("partnerPicture") == null ? null : String.valueOf(relation.get("partnerPicture")),
+                            relation.get("partnerImageUrl") == null ? null : String.valueOf(relation.get("partnerImageUrl")));
+                    if (flattenedAvatar != null) flattenedPartner.put("avatarUrl", flattenedAvatar);
+                    Object flattenedFrame = firstNonEmpty(
+                            relation.get("partnerFrameUrl") == null ? null : String.valueOf(relation.get("partnerFrameUrl")),
+                            relation.get("partnerVipBadgeUrl") == null ? null : String.valueOf(relation.get("partnerVipBadgeUrl")));
+                    if (flattenedFrame != null) flattenedPartner.put("vipBadgeUrl", flattenedFrame);
+                    if (!flattenedPartner.isEmpty()) partner = flattenedPartner;
+                }
                 String name = "";
                 String avatar = "";
                 String partnerFrameUrl = "";
