@@ -988,6 +988,48 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`user:${userId}`).emit(event, payload);
   }
 
+  /**
+   * Rebuild authoritative room-profile snapshots after dashboard changes.
+   * This avoids stale cached VIP/cosmetic data on the user's own client and on
+   * every other participant currently viewing that user in a room.
+   */
+  async refreshUserProfile(userId: string, reason = 'admin_update') {
+    if (!this.server || !userId) return;
+    const userSockets = await this.server.in(`user:${userId}`).fetchSockets();
+    const roomIds = new Set<string>();
+    for (const socket of userSockets) {
+      for (const roomId of Object.keys(socket.data?.roomProfiles || {})) {
+        roomIds.add(roomId);
+      }
+    }
+
+    for (const roomId of roomIds) {
+      const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+      if (!room) continue;
+      const payload = await this.buildJoinPayload(userId, roomId, room.hostId);
+      const roomSockets = await this.server.in(`room:${roomId}`).fetchSockets();
+      for (const socket of roomSockets) {
+        if (socket.data?.userId !== userId) continue;
+        socket.data.roomProfiles = socket.data.roomProfiles || {};
+        socket.data.roomProfiles[roomId] = payload;
+      }
+      this.emitToRoom(roomId, 'room:user_joined', {
+        roomId,
+        ...payload,
+        profileUpdated: true,
+        updateReason: reason,
+        at: new Date().toISOString(),
+      });
+      await this.emitRoomMembers(roomId);
+    }
+
+    const event = { userId, reason, at: new Date().toISOString() };
+    this.emitToUser(userId, 'user:profile_updated', event);
+    // Public, non-sensitive invalidation event: clients can reload this user's
+    // profile/card data even when they are not sharing a room with them.
+    this.emitToAll('user:profile_updated', event);
+  }
+
   private async enforceChatViolation(
     roomId: string,
     userId: string,
