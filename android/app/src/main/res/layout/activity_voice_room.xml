@@ -314,6 +314,18 @@
                         android:visibility="gone" />
                 </LinearLayout>
 
+                <ImageButton
+                    android:id="@+id/btnFollowRoomHeart"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="5dp"
+                    android:background="@drawable/bg_follow_heart_button"
+                    android:contentDescription="متابعة الروم أو الوكالة"
+                    android:padding="5dp"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_heart_outline_red"
+                    android:visibility="gone" />
+
                 <!-- Flexible text rail so long personal/agency names marquee like Mikoo. -->
                 <LinearLayout
                     android:layout_width="0dp"
