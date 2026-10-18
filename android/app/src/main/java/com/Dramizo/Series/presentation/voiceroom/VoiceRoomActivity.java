@@ -4584,14 +4584,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void ensurePublishingForMusic() {
         if (myUserId == null || myUserId.isEmpty()) return;
-        if (myUserId != null) currentMusicPublisherId = myUserId;
-        RoomRtcEngine.getInstance().startPublishingAudio(
-                RoomRtcEngine.audioStreamId(myUserId));
-        // Refresh JWT if needed so publish is allowed for music DJ off-seat.
+        currentMusicPublisherId = myUserId;
+        String streamId = RoomRtcEngine.audioStreamId(myUserId);
+        // Never race a publish attempt against an expired/missing grant. The token callback
+        // starts the music-only publish once isLocalMusicMixNeeded() is true.
         if (!rtcCanPublish
                 || System.currentTimeMillis() >= rtcPublishTokenExpiresAtMs - 20_000L) {
-            refreshRtcPublishToken(RoomRtcEngine.audioStreamId(myUserId));
+            refreshRtcPublishToken(streamId);
+            return;
         }
+        RoomRtcEngine.getInstance().startPublishingAudio(streamId);
     }
 
     /** Host is mixing phone music into Zego — publish must stay up. */
@@ -4901,11 +4903,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             return;
         }
         clearDismissedMusic();
-        ensurePublishingForMusic();
-        RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
+        // Publish permission checks depend on the active room-music state. Set that state
+        // before requesting a fresh RTC token; otherwise a fast token response can see
+        // "no music active", stop the DJ stream, and leave the selected phone track local-only.
         preparedMusicUrl = track.url;
         currentMusicUrl = track.url;
         currentMusicStatus = "playing";
+        currentMusicPublisherId = myUserId;
+        ensurePublishingForMusic();
+        RoomRtcEngine.getInstance().setLocalMusicVolume(sharedMusicVolume);
+        RoomRtcEngine.getInstance().playLocalMusic(track.localPath);
         binding.tvMusicTitle.setText(track.title != null ? track.title : "أغنية");
         binding.tvMusicArtist.setText(track.artist != null && !track.artist.isEmpty()
                 ? track.artist : "فنان غير معروف");
