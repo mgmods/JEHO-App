@@ -75,7 +75,7 @@
                 android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
         </FrameLayout>
         <TextView android:id="@+id/tvCpTopHeart" android:layout_width="34dp" android:layout_height="34dp"
-            android:layout_gravity="center_vertical|end" android:layout_marginEnd="58dp" android:background="@drawable/bg_cp_cv_badge"
+            android:layout_gravity="center_vertical|end" android:layout_marginEnd="58dp" android:background="@drawable/bg_room_cp_heart"
             android:elevation="10dp" android:gravity="center" android:includeFontPadding="false" android:shadowColor="#FFFF8DB9"
             android:shadowDx="0" android:shadowDy="0" android:shadowRadius="8" android:text="♥" android:textColor="#FFFF6FA9"
             android:textSize="23sp" android:textStyle="bold" android:visibility="gone" />
