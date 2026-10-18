@@ -6881,6 +6881,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 androidx.core.widget.NestedScrollView scroll =
                         (androidx.core.widget.NestedScrollView) sheet;
                 final int baseBottom = scroll.getPaddingBottom();
+                scroll.setClipToPadding(false);
                 ViewCompat.setOnApplyWindowInsetsListener(scroll, (view, insets) -> {
                     Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
                     // Reserve a larger scroll tail so moderator controls never sit behind
@@ -6890,7 +6891,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             systemBars.bottom + densityPadding);
                     view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
                             view.getPaddingRight(), safeBottom);
-                    view.setClipToPadding(false);
                     view.setVerticalScrollBarEnabled(true);
                     return insets;
                 });
