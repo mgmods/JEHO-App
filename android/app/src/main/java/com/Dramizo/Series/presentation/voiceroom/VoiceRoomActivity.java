@@ -11470,6 +11470,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             ? payload.get("roomId").getAsString() : null;
                     if (roomId == null || rid == null || !roomId.equals(rid)) return;
                     handler.post(() -> {
+                        // User-targeted room events are wrapped as room:event by the gateway.
+                        // Handle them here as well as the room channel so kick/seat removal still
+                        // reaches the target when its room socket subscription is stale.
+                        if ("room:event".equals(event)) {
+                            String innerEvent = payload.has("event") && !payload.get("event").isJsonNull()
+                                    ? payload.get("event").getAsString() : null;
+                            JsonObject innerPayload = payload.has("payload") && payload.get("payload").isJsonObject()
+                                    ? payload.getAsJsonObject("payload") : null;
+                            if (innerEvent != null && innerPayload != null) {
+                                handleRoomEvent(innerEvent, innerPayload, null, null);
+                            }
+                            return;
+                        }
                         if ("moderation:blocked".equals(event) || "moderation:action".equals(event)) {
                             String action = payload.has("action") && !payload.get("action").isJsonNull()
                                     ? payload.get("action").getAsString() : "";
