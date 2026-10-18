@@ -893,8 +893,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // Room side shortcuts. Keep the music shortcut on the existing music flow;
         // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
+        View sideChest = findViewById(R.id.btnRoomSupportChest);
         View sideMusic = findViewById(R.id.btnRoomSideMusic);
         View sideGames = findViewById(R.id.btnRoomSideGames);
+        if (sideChest != null) {
+            sideChest.setOnClickListener(v -> showSupportChestSheet());
+            android.animation.ObjectAnimator chestWobble =
+                    android.animation.ObjectAnimator.ofFloat(sideChest, View.ROTATION, -5f, 5f, -5f);
+            chestWobble.setDuration(1900L);
+            chestWobble.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            chestWobble.setRepeatMode(android.animation.ValueAnimator.RESTART);
+            chestWobble.start();
+            sideChest.animate().scaleX(1.045f).scaleY(1.045f).setDuration(900L)
+                    .withEndAction(() -> sideChest.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(900L).start()).start();
+        }
         View sideSettings = findViewById(R.id.btnRoomSideSettings);
         if (sideMusic != null) {
             sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
@@ -1525,6 +1538,55 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
         // Longer on weak networks — user should see loading, not a sudden eject.
         handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
+    }
+
+    /**
+     * Opens the support-chest HTML as a half-height room sheet.
+     * This UI-only first pass intentionally does not alter room audio/ZEGO or claim live
+     * contribution/reward state until the matching backend contract is implemented.
+     */
+    private void showSupportChestSheet() {
+        if (isFinishing() || isDestroyed()) return;
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        FrameLayout host = new FrameLayout(this);
+        host.setBackgroundColor(Color.TRANSPARENT);
+        WebView web = new WebView(this);
+        web.setBackgroundColor(Color.TRANSPARENT);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setWebViewClient(new WebViewClient());
+        web.loadUrl("file:///android_asset/support-chest.html");
+        host.addView(web, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        dialog.setContentView(host);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setOnDismissListener(d -> {
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+        });
+        dialog.setOnShowListener(d -> {
+            android.view.View bottomSheet = dialog.findViewById(
+                    com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackground(new ColorDrawable(Color.TRANSPARENT));
+                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.58f);
+                bottomSheet.getLayoutParams().height = height;
+                bottomSheet.requestLayout();
+                com.google.android.material.bottomsheet.BottomSheetBehavior<?> behavior =
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet);
+                behavior.setPeekHeight(height);
+                behavior.setFitToContents(true);
+                behavior.setHideable(true);
+                behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
+            }
+        });
+        dialog.show();
     }
 
     private void ensureMusicUiReady() {
