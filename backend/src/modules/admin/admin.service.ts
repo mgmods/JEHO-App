@@ -267,7 +267,7 @@ export class AdminService {
 
   async patchSupportChestConfig(input: Record<string, unknown>) {
     const allowedModes = new Set(['coins', 'diamonds', 'both']);
-    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge', 'gift']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge']);
     const goalMode = String(input.goalMode || 'coins');
     const rewardType = String(input.rewardType || 'none');
     if (!allowedModes.has(goalMode)) throw new BadRequestException('Invalid support chest goal mode');
