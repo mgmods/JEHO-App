@@ -6844,6 +6844,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    private static String roomCpTopSymbol(String type) {
+        if (type == null) return "♥";
+        String value = type.trim().toLowerCase(java.util.Locale.ROOT);
+        if (value.contains("marriage") || value.contains("زوج") || value.contains("wedding")) return "💍";
+        if (value.contains("engage") || value.contains("خطوب")) return "💎";
+        if (value.contains("friend") || value.contains("صدا")) return "♡";
+        if (value.contains("sibling") || value.contains("اخو") || value.contains("أخو")) return "✦";
+        return "♥";
+    }
+
     private void showUserCard(String userId, String name, String avatarUrl, String frameUrl,
                               String hostBadgeUrl, int vipLevel, int userLevel) {
         BottomSheetDialog dialog = AuraDialogHelper.bottomSheet(this);
@@ -6890,6 +6900,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
         ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
+        View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
+        ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
         AvatarCosmetics.styleUserCardBadges(
@@ -6904,6 +6917,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         // CP requests are profile-level and independent of the room gift request flow.
         if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
+        if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
         AppContainer cpContainer = ContainerProvider.from(this);
         if (actCpRequest != null) {
             actCpRequest.setVisibility(userId != null && !userId.equals(myUserId) ? View.VISIBLE : View.GONE);
@@ -6929,6 +6944,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     if (imgCpPartnerAvatar != null && !cpAvatar.isEmpty()) {
                         Glide.with(VoiceRoomActivity.this).load(cpAvatar)
                                 .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    }
+                    // The room popup has its own compact paired-avatar header (not ProfileActivity).
+                    if (cpTopPartnerWrap != null && !cpAvatar.trim().isEmpty()) {
+                        cpTopPartnerWrap.setVisibility(View.VISIBLE);
+                        if (imgCpPartnerTop != null) {
+                            Glide.with(VoiceRoomActivity.this).load(cpAvatar)
+                                    .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerTop);
+                        }
+                        if (tvCpTopHeart != null) {
+                            tvCpTopHeart.setText(roomCpTopSymbol(type));
+                            tvCpTopHeart.setVisibility(View.VISIBLE);
+                        }
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
                 });
@@ -7076,6 +7103,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         if (!pid.isEmpty()) {
                             tvUserId.setVisibility(View.VISIBLE);
                             tvUserId.setText("ID:" + pid);
+                            com.Dramizo.Series.util.VanityIdStyle.bind(
+                                    tvUserId, cpContainer.getVanityApi(), pid, liveVip);
                             if (btnCopyId != null) btnCopyId.setVisibility(View.VISIBLE);
                         } else {
                             tvUserId.setVisibility(View.GONE);
