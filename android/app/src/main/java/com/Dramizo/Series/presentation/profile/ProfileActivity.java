@@ -655,6 +655,9 @@ public class ProfileActivity extends ThemedActivity {
                             ? String.valueOf(displayName).trim()
                             : username != null ? String.valueOf(username).trim() : "";
                     Object avatarValue = partner.get("avatarUrl");
+                    if (avatarValue == null || String.valueOf(avatarValue).trim().isEmpty()) {
+                        avatarValue = partner.get("avatar");
+                    }
                     avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
                     Object frameValue = partner.get("vipBadgeUrl");
                     partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
