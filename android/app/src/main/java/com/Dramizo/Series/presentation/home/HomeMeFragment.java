@@ -362,7 +362,8 @@ public class HomeMeFragment extends Fragment {
                 if (subTab == SUB_RECENT) {
                     if (liveRoom == null) continue;
                     out.add(liveRoom);
-                } else if (RoomBrowseFilter.isBrowsablePersonal(r)) {
+                } else if (RoomBrowseFilter.isBrowsablePersonal(r)
+                        || com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(r)) {
                     out.add(liveRoom != null ? liveRoom : r);
                 }
             }
