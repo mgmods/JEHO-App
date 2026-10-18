@@ -1550,6 +1550,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         final View chestIcon = findViewById(R.id.btnRoomSupportChest);
         final String targetRoomId = roomId;
         if (chestIcon == null || targetRoomId == null || targetRoomId.isEmpty()) return;
+        chestIcon.setVisibility(View.GONE);
         ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
                 .supportChest(targetRoomId)
                 .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
