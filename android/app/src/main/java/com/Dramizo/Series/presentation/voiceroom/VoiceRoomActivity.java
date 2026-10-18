@@ -1547,74 +1547,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * contribution/reward state until the matching backend contract is implemented.
      */
     private void refreshSupportChestIcon() {
+        // Keep the chest discoverable in every room. Previously it was hidden until
+        // two remote dashboard flags were both true, making it invisible by default.
+        // The sheet loads the current room state after the user opens it.
         final View chestIcon = findViewById(R.id.btnRoomSupportChest);
-        final String targetRoomId = roomId;
-        if (chestIcon == null || targetRoomId == null || targetRoomId.isEmpty()) return;
-        chestIcon.setVisibility(View.GONE);
-        ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
-                .supportChest(targetRoomId)
-                .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
-                    @Override
-                    public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
-                                           retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
-                        if (!response.isSuccessful() || response.body() == null
-                                || response.body().data == null || isFinishing() || isDestroyed()) return;
-                        Object raw = response.body().data.get("config");
-                        boolean visible = false;
-                        if (raw instanceof Map) {
-                            Map<?, ?> config = (Map<?, ?>) raw;
-                            visible = Boolean.TRUE.equals(config.get("enabled"))
-                                    && Boolean.TRUE.equals(config.get("iconVisible"));
-                        }
-                        final boolean show = visible;
-                        runOnUiThread(() -> {
-                            if (chestIcon != null && !isFinishing() && !isDestroyed()) {
-                                chestIcon.setVisibility(show ? View.VISIBLE : View.GONE);
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
-                                          Throwable error) {
-                        android.util.Log.w("SupportChest", "Could not refresh room chest icon visibility", error);
-                    }
-                });
-    }
-
-    private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
-        if (isFinishing() || isDestroyed() || web == null) return;
-        try {
-            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
-                    .supportChest(targetRoomId)
-                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
-                        @Override
-                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
-                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
-                            if (!response.isSuccessful() || response.body() == null
-                                    || response.body().data == null || web == null) return;
-                            Map<String, Object> payload = response.body().data;
-                            Object config = payload.get("config");
-                            Object state = payload.get("state");
-                            if (config == null || state == null) return;
-                            String js = "window.applySupportChestData && window.applySupportChestData("
-                                    + new com.google.gson.Gson().toJson(config) + ","
-                                    + new com.google.gson.Gson().toJson(state) + ");";
-                            runOnUiThread(() -> {
-                                if (!isFinishing() && !isDestroyed()) web.evaluateJavascript(js, null);
-                            });
-                        }
-
-                        @Override
-                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
-                                              Throwable error) {
-                            android.util.Log.w("SupportChest", "Could not load room support chest state",
-                                    error);
-                        }
-                    });
-        } catch (Exception error) {
-            android.util.Log.w("SupportChest", "Support chest request could not be started", error);
-        }
+        if (chestIcon == null || isFinishing() || isDestroyed()) return;
+        chestIcon.setVisibility(View.VISIBLE);
     }
 
     private void showSupportChestSheet() {
