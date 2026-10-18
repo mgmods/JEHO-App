@@ -24,6 +24,9 @@ public interface GiftApi {
     @POST("gifts/send-all-mic")
     Call<ApiResponse<GiftDtos.SendGiftResult>> sendAllMic(@Body GiftDtos.SendAllMicRequest body);
 
+    @GET("gifts/support-chest")
+    Call<ApiResponse<java.util.Map<String, Object>>> supportChest(@retrofit2.http.Query("roomId") String roomId);
+
     @GET("gifts/history")
     Call<ApiResponse<MiscDtos.ListResult<GiftDtos.GiftHistoryDto>>> history(@retrofit2.http.Query("page") int page);
 }
