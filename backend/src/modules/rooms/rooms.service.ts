@@ -1772,23 +1772,61 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const room = await this.roomsRepo.findOne({ where: { id } });
     if (!room) throw new NotFoundException('Room not found');
     await this.assertAgencyRoomActive(room);
-    if (room.isPublic && !room.hasPassword) return this.getRoom(id);
-    if (
-      room.hostId === userId ||
-      room.activeHostId === userId ||
-      room.cohostId === userId
-    ) {
-      return this.getRoom(id);
+    if (!(room.isPublic && !room.hasPassword) &&
+      room.hostId !== userId && room.activeHostId !== userId && room.cohostId !== userId) {
+      const [access, seat, moderator] = await Promise.all([
+        this.accessRepo.findOne({ where: { roomId: id, userId } }),
+        this.seatsRepo.findOne({ where: { roomId: id, userId } }),
+        this.modsRepo.findOne({ where: { roomId: id, userId } }),
+      ]);
+      if (!this.hasActiveAccess(access) && !seat && !moderator) {
+        throw new ForbiddenException('Join this room before viewing its participants');
+      }
     }
-    const [access, seat, moderator] = await Promise.all([
-      this.accessRepo.findOne({ where: { roomId: id, userId } }),
-      this.seatsRepo.findOne({ where: { roomId: id, userId } }),
-      this.modsRepo.findOne({ where: { roomId: id, userId } }),
+    // Send effective permissions for this viewer, not only the moderator roster.
+    // This keeps agency owners and platform staff controls visible and aligned with
+    // the same authorization rules enforced by the mutation endpoints.
+    const [payload, viewerPermissions] = await Promise.all([
+      this.getRoom(id),
+      this.getViewerRoomPermissions(room, userId),
     ]);
-    if (!this.hasActiveAccess(access) && !seat && !moderator) {
-      throw new ForbiddenException('Join this room before viewing its participants');
+    return { ...payload, viewerPermissions };
+  }
+
+  private async getViewerRoomPermissions(room: Room, userId: string) {
+    const all = {
+      canManageMusic: true, canChangeFrames: true, canControlGames: true,
+      canMute: true, canKick: true, canBan: true, canManageSeats: true,
+      canInvite: true, canManageRoom: true,
+    };
+    if (room.hostId === userId || room.cohostId === userId || room.activeHostId === userId) {
+      return all;
     }
-    return this.getRoom(id);
+    const staff = await this.platformStaffRole(userId);
+    if (staff === 'super') return all;
+    if (staff === 'manager') {
+      return {
+        canManageMusic: false, canChangeFrames: false, canControlGames: false,
+        canMute: true, canKick: true, canBan: true, canManageSeats: true,
+        canInvite: true, canManageRoom: false,
+      };
+    }
+    if (room.agencyId) {
+      const agency = await this.agenciesRepo.findOne({ where: { id: room.agencyId } });
+      if (agency?.ownerId === userId) return all;
+    }
+    const moderator = await this.modsRepo.findOne({ where: { roomId: room.id, userId } });
+    return {
+      canManageMusic: moderator?.canManageMusic === true,
+      canChangeFrames: moderator?.canChangeFrames === true,
+      canControlGames: moderator?.canControlGames === true,
+      canMute: moderator?.canMute === true,
+      canKick: moderator?.canKick === true,
+      canBan: moderator?.canBan === true,
+      canManageSeats: moderator?.canManageSeats === true,
+      canInvite: moderator?.canInvite === true,
+      canManageRoom: moderator?.canManageRoom === true,
+    };
   }
 
   async join(roomId: string, userId: string, dto: JoinRoomDto) {
