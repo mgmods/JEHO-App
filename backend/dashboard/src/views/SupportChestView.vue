@@ -11,12 +11,12 @@
       <p class="muted">استخدم معرّفات الهدايا الحقيقية من كتالوج التطبيق.</p>
     </section>
     <section class="card p-4 mt-3"><h2>مكافأة الفائز</h2>
-      <label class="field">نوع المكافأة<select v-model="form.rewardType"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="gift">هدية</option></select></label>
+      <label class="field">نوع المكافأة<select v-model="form.rewardType"><option value="none">بدون مكافأة تلقائية</option><option value="coins">كوينزات</option><option value="diamonds">ماسات</option><option value="frame">إطار ملف شخصي</option><option value="badge">شارة</option><option value="gift" disabled>هدية (غير مدعومة تلقائياً حالياً)</option></select></label>
       <label class="field">معرّف المكافأة من كتالوج JEHO<input v-model="form.rewardItemId" type="text" placeholder="معرّف الإطار / الشارة / الهدية"></label>
       <label class="field">كمية المكافأة<input v-model.number="form.rewardAmount" type="number" min="0"></label>
       <label class="field">تعليمات الصندوق<textarea v-model="form.instructions" rows="4"></textarea></label>
     </section>
-    <p class="muted foot">لا تُفعّل المكافآت التلقائية للإنتاج حتى يكتمل ربط الخادم ومنح المكافآت والتحقق من عدم تكرارها.</p>
+    <p class="muted foot">يدعم الخادم مكافآت الكوينزات والماسات والإطارات والشارات مع تسجيلها ضمن المعاملة. مكافأة الهدية من المخزون غير مفعّلة تلقائياً حالياً.</p>
   </div>
 </template>
 <script setup>
