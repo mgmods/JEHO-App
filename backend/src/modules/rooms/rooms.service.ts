@@ -3804,10 +3804,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const moderator = await this.modsRepo.findOne({
       where: { roomId, userId: actorId },
     });
-    // Display / room management: any appointed moderator (or one with the flag).
-    if (permission === 'canManageRoom' && moderator) {
-      return;
-    }
+    // Moderator permissions are explicit and must match the dashboard flags.
+    // Room owner/cohost/platform staff were handled above; appointed moderators
+    // only receive canManageRoom when that permission is enabled.
     if (!moderator || moderator[permission] !== true) {
       throw new ForbiddenException(message);
     }
