@@ -669,7 +669,7 @@ public class ProfileActivity extends ThemedActivity {
                             partner.get("photoUrl") == null ? null : String.valueOf(partner.get("photoUrl")),
                             partner.get("picture") == null ? null : String.valueOf(partner.get("picture")),
                             partner.get("imageUrl") == null ? null : String.valueOf(partner.get("imageUrl")));
-                    avatar = avatarValue == null ? "" : avatarValue.trim();
+                    avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
                     Object frameValue = partner.get("vipBadgeUrl");
                     partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
                     Object vipLevelValue = partner.get("vipLevel");
