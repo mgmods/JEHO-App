@@ -1812,15 +1812,21 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       };
     }
     if (room.agencyId) {
-      const membership = await this.agencyMembersRepo.findOne({
-        where: {
-          agencyId: room.agencyId,
-          userId,
-          isActive: true,
-          status: AgencyMemberStatus.ACTIVE,
-        },
-      });
-      if (membership && [AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)) {
+      const [membership, agency] = await Promise.all([
+        this.agencyMembersRepo.findOne({
+          where: {
+            agencyId: room.agencyId,
+            userId,
+            isActive: true,
+            status: AgencyMemberStatus.ACTIVE,
+          },
+        }),
+        this.agenciesRepo.findOne({ where: { id: room.agencyId } }),
+      ]);
+      // Match the mutation authorization path: an agency's actual owner retains
+      // room moderation even when their membership row is missing or stale.
+      if (agency?.ownerId === userId
+          || (membership && [AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role))) {
         return all;
       }
     }
