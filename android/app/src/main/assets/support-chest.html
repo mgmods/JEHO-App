@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="color-scheme" content="dark">
+<title>صندوق الدعم</title>
+<style>
+:root{--gold:#ffd36a;--gold2:#b87924;--cyan:#5ce8f4;--ink:#11121d;--panel:#1c1d2b;--muted:#b8b8c8}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:transparent;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{overflow-y:auto;overscroll-behavior:contain}.sheet{min-height:100%;padding:9px 14px 22px;background:radial-gradient(ellipse at 50% -10%,#48402b 0,#24202a 37%,#151622 78%);border:1px solid #6b5834;border-bottom:0;border-radius:22px 22px 0 0;position:relative;overflow:hidden}
+.grabber{height:4px;width:38px;background:#777789;border-radius:9px;margin:0 auto 12px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+h1{font-size:18px;margin:0;font-weight:850;letter-spacing:.1px}.sub{font-size:11px;color:#d4c5a4;margin-top:3px}
+.actions{display:flex;gap:7px}.round{width:34px;height:34px;border:1px solid #b9944b;background:#302a25;color:#ffe7a4;border-radius:50%;font-size:18px;font-weight:800;display:grid;place-items:center}
+.stage{position:relative;text-align:center;margin:7px auto 0;max-width:360px;padding:0 0 2px;min-height:160px}
+.glow{position:absolute;left:50%;top:47px;transform:translateX(-50%);width:170px;height:95px;background:#ffc74b33;filter:blur(22px);border-radius:50%}
+.chest{position:relative;z-index:1;width:148px;height:148px;object-fit:contain;filter:drop-shadow(0 9px 10px #0009);animation:float 3s ease-in-out infinite}
+.coin{position:absolute;z-index:2;font-size:22px;filter:drop-shadow(0 2px 3px #000);animation:coin 2.6s ease-in-out infinite}.c1{left:15%;top:48px}.c2{right:15%;top:62px;animation-delay:.5s}.c3{left:24%;top:105px;animation-delay:1s}.gift{position:absolute;font-size:24px;z-index:2;animation:float 2.3s ease-in-out infinite}.g1{right:19%;top:15px}.g2{left:18%;top:18px;animation-delay:.6s}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}@keyframes coin{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-8px) rotate(12deg)}}
+.levelrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:-2px}.level{font-size:13px;font-weight:800;color:#ffe4a0}.tag{font-size:10px;color:#a6f5ff;border:1px solid #367f88;background:#123039;padding:4px 8px;border-radius:99px}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}
+.mode{border:1px solid #444456;background:#222333;color:#d8d8e6;padding:8px 4px;border-radius:11px;font-size:12px;font-weight:700}.mode.active{border-color:#d6ad50;background:linear-gradient(135deg,#5a4526,#332c28);color:#ffe4a0}
+.stats{background:#191a28;border:1px solid #363448;border-radius:14px;padding:10px 11px}
+.stathead{display:flex;justify-content:space-between;align-items:center;font-size:12px;gap:6px}.stathead strong{color:#fff}.stathead .percent{color:var(--cyan);font-weight:850}
+.track{height:12px;background:#353548;border:1px solid #4a465a;border-radius:99px;overflow:hidden;margin:9px 0 7px;box-shadow:inset 0 2px 4px #0008}
+.fill{height:100%;width:65%;border-radius:99px;background:linear-gradient(90deg,#31c6da,#7af4f2 48%,#ffd05d);box-shadow:0 0 12px #6be6ef88;transition:width .45s ease}
+.details{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted)}.details b{color:#f9dc92}
+.sectiontitle{display:flex;align-items:center;justify-content:space-between;margin:14px 1px 8px;font-size:14px;font-weight:850}.hint{font-size:10px;color:#aaaabd;font-weight:500}
+.gifts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.giftcard{min-width:0;text-align:center;border:1px solid #343449;background:linear-gradient(160deg,#28293b,#1b1c2a);border-radius:12px;padding:7px 3px 8px}
+.giftcard img{width:43px;height:43px;object-fit:contain;filter:drop-shadow(0 2px 3px #0007)}.giftname{font-size:10px;color:#e9e8f3;margin-top:2px;white-space:nowrap}.value{font-size:10px;color:#ffdf84;margin-top:4px;font-weight:800}
+.footnote{margin:12px 0 0;font-size:10px;line-height:1.7;color:#a9a8bb;text-align:center}
+.help{display:none;position:absolute;inset:0;z-index:10;background:#0e0f19ed;padding:17px 16px 20px;overflow:auto}.help.open{display:block}.helptop{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.helptop h2{margin:0;font-size:17px}.help ol{padding-right:20px;margin:0}.help li{font-size:13px;line-height:1.8;color:#e4e3ef;margin:8px 0}.help .small{font-size:11px;color:#aaaabd;margin-top:12px}
+@media(max-height:650px){.stage{min-height:133px}.chest{width:124px;height:124px}.coin{font-size:18px}.gifts{gap:5px}.giftcard img{width:36px;height:36px}}
+</style>
+</head>
+<body>
+<main class="sheet">
+<div class="grabber"></div>
+<header><div><h1>🎁 صندوق الدعم</h1><div class="sub">كل هدية تقرّب الروم من فتح الكنز</div></div><div class="actions"><button class="round" id="helpBtn" aria-label="التعليمات">؟</button><button class="round" id="closeHelp" aria-label="إغلاق التعليمات" style="display:none">×</button></div></header>
+<section class="stage" aria-label="صندوق كنز"><div class="glow"></div><span class="coin c1">🪙</span><span class="coin c2">🪙</span><span class="coin c3">✨</span><span class="gift g1">🎁</span><span class="gift g2">💎</span><img class="chest" src="file:///android_asset/visual-system/gifts/assets/gift-treasure-chest.png" alt="صندوق كنز"></section>
+<div class="levelrow"><div class="level">المستوى <span id="level">1</span> · صندوق الروم</div><div class="tag">هدف الدعم</div></div>
+<div class="modes"><button class="mode active" data-mode="coins">🪙 كوينزات</button><button class="mode" data-mode="diamonds">💎 ماسات</button><button class="mode" data-mode="both">🪙 + 💎 الاثنين</button></div>
+<section class="stats"><div class="stathead"><strong id="metricTitle">تقدّم الكوينزات</strong><span class="percent" id="percent">65%</span></div><div class="track"><div class="fill" id="fill"></div></div><div class="details"><span>المجموع: <b id="current">65,000</b></span><span>الهدف: <b id="target">100,000</b></span><span>المتبقي: <b id="remaining">35,000</b></span></div></section>
+<div class="sectiontitle"><span>الهدايا التي تساهم بالصندوق</span><span class="hint">قيمة المساهمة</span></div>
+<section class="gifts">
+<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-rose.png" alt=""><div class="giftname">وردة</div><div class="value">+100 🪙</div></div>
+<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-heart.png" alt=""><div class="giftname">قلب</div><div class="value">+500 🪙</div></div>
+<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-crown.png" alt=""><div class="giftname">تاج</div><div class="value">+2,000 🪙</div></div>
+<div class="giftcard"><img src="file:///android_asset/visual-system/gifts/assets/gift-diamond.png" alt=""><div class="giftname">ماسة</div><div class="value">+5,000 💎</div></div>
+</section>
+<p class="footnote">واجهة أولية للتصميم. الأهداف والأعداد وقيم مساهمة الهدايا تحتاج ربطاً ببيانات الروم والداشبورد قبل اعتمادها كمعلومات حقيقية.</p>
+<section class="help" id="helpPanel"><div class="helptop"><h2>❔ تعليمات صندوق الدعم</h2><button class="round" id="helpClose" aria-label="إغلاق">×</button></div><ol><li>اختاروا نوع الهدف: كوينزات أو ماسات أو الاثنين معاً.</li><li>كل هدية مؤهلة تضيف قيمتها إلى تقدّم الصندوق، ويتحرك خط التقدّم مع كل مساهمة.</li><li>يعرض الخط المجموع الحالي والهدف والمتبقي حتى يعرف الجميع كم بقي.</li><li>عند اكتمال الهدف، يُفتح الصندوق وتُعرض المكافأة والفائز وفق قواعد الروم المعتمدة.</li><li>بعد منح المكافأة بنجاح، يبدأ الصندوق دورة جديدة.</li></ol><p class="small">الأرقام المعروضة حالياً أمثلة شكلية وليست رصيداً حقيقياً. المزامنة بين الأعضاء، تحديد الفائز، منح المكافآت وإعدادات الداشبورد تحتاج تنفيذ وربطاً من جهة الخادم.</p></section>
+</main>
+<script>
+const modes=document.querySelectorAll('.mode'),fill=document.getElementById('fill'),percent=document.getElementById('percent'),title=document.getElementById('metricTitle'),current=document.getElementById('current'),target=document.getElementById('target'),remaining=document.getElementById('remaining');
+const demo={coins:{title:'تقدّم الكوينزات',current:65000,target:100000,level:1},diamonds:{title:'تقدّم الماسات',current:3200,target:10000,level:1},both:{title:'تحقّق الهدفين معاً',current:65000,target:100000,level:1}};
+function setMode(key){modes.forEach(b=>b.classList.toggle('active',b.dataset.mode===key));const d=demo[key],p=Math.min(100,Math.round(d.current/d.target*100));title.textContent=d.title;percent.textContent=key==='both'?'65% 🪙 · 32% 💎':p+'%';fill.style.width=p+'%';current.textContent=d.current.toLocaleString('en-US');target.textContent=d.target.toLocaleString('en-US');remaining.textContent=Math.max(0,d.target-d.current).toLocaleString('en-US');document.getElementById('level').textContent=d.level;}
+modes.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+const help=document.getElementById('helpPanel'),helpBtn=document.getElementById('helpBtn'),closeTop=document.getElementById('closeHelp'),closeHelp=document.getElementById('helpClose');
+function hideHelp(){help.classList.remove('open');helpBtn.style.display='grid';closeTop.style.display='none'}
+helpBtn.addEventListener('click',()=>{help.classList.add('open');helpBtn.style.display='none';closeTop.style.display='grid'});closeTop.addEventListener('click',hideHelp);closeHelp.addEventListener('click',hideHelp);
+</script>
+</body></html>
