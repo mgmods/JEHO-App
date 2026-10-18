@@ -10947,18 +10947,66 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (name == null || name.trim().isEmpty()) name = "عضو";
             android.widget.LinearLayout row = new android.widget.LinearLayout(this);
             row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            row.setLayoutDirection(android.view.View.LAYOUT_DIRECTION_RTL);
             row.setGravity(android.view.Gravity.CENTER_VERTICAL);
             row.setPadding(dp(8), dp(7), dp(8), dp(7));
+            row.setBackgroundResource(R.drawable.bg_seat_avatar_clip);
+
+            // Professional invite row: circular real avatar with a subtle frame, then name.
+            android.widget.FrameLayout avatarWrap = new android.widget.FrameLayout(this);
+            android.widget.LinearLayout.LayoutParams avatarWrapLp =
+                    new android.widget.LinearLayout.LayoutParams(dp(48), dp(48));
+            avatarWrapLp.setMargins(0, 0, dp(10), 0);
+            avatarWrap.setBackgroundResource(R.drawable.bg_seat_ring);
+            avatarWrap.setPadding(dp(3), dp(3), dp(3), dp(3));
+            android.widget.ImageView avatarView = new android.widget.ImageView(this);
+            avatarView.setScaleType(android.widget.ImageView.ScaleType.CENTER_CROP);
+            avatarView.setBackgroundResource(R.drawable.bg_seat_avatar_clip);
+            avatarView.setClipToOutline(true);
+            android.widget.FrameLayout.LayoutParams avatarImageLp =
+                    new android.widget.FrameLayout.LayoutParams(
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+                            android.widget.FrameLayout.LayoutParams.MATCH_PARENT);
+            avatarWrap.addView(avatarView, avatarImageLp);
+            String avatarUrl = memberStr(member, "avatarUrl");
+            if (avatarUrl == null || avatarUrl.trim().isEmpty()) {
+                avatarUrl = memberStr(member, "avatar");
+            }
+            try {
+                if (avatarUrl != null && !avatarUrl.trim().isEmpty()) {
+                    Glide.with(this)
+                            .load(AssetCatalog.absoluteUrl(avatarUrl))
+                            .circleCrop()
+                            .placeholder(R.drawable.ic_tab_me)
+                            .error(R.drawable.ic_tab_me)
+                            .into(avatarView);
+                } else {
+                    avatarView.setImageResource(R.drawable.ic_tab_me);
+                }
+            } catch (Exception ignored) {
+                avatarView.setImageResource(R.drawable.ic_tab_me);
+            }
+            row.addView(avatarWrap, avatarWrapLp);
+
             android.widget.TextView nameView = new android.widget.TextView(this);
             nameView.setText(name);
             nameView.setTextSize(15);
+            nameView.setTypeface(nameView.getTypeface(), android.graphics.Typeface.BOLD);
             nameView.setTextColor(0xFF202124);
             nameView.setMaxLines(1);
             nameView.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            row.addView(nameView, new android.widget.LinearLayout.LayoutParams(0, dp(44), 1f));
+            nameView.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.widget.LinearLayout.LayoutParams nameLp =
+                    new android.widget.LinearLayout.LayoutParams(0, dp(48), 1f);
+            nameLp.setMargins(0, 0, dp(4), 0);
+            row.addView(nameView, nameLp);
+
             android.widget.Button invite = new android.widget.Button(this);
             invite.setText("دعوة");
             invite.setAllCaps(false);
+            invite.setTextColor(0xFFFFFFFF);
+            invite.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xFFDE4D91));
+            invite.setMinWidth(dp(72));
             invite.setEnabled(targetId != null && !targetId.isEmpty());
             invite.setOnClickListener(v -> {
                 if (targetId == null || targetId.isEmpty()) return;
