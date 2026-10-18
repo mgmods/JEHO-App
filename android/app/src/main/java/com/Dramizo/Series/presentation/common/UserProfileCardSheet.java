@@ -183,9 +183,10 @@ public final class UserProfileCardSheet {
                 if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
                 Map<?, ?> cpPartner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
                 String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
-                String partnerName = cpPartner == null ? "" : firstNonEmpty(
+                String partnerNameValue = cpPartner == null ? "" : firstNonEmpty(
                         cpPartner.get("displayName") == null ? null : String.valueOf(cpPartner.get("displayName")),
-                        cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")), "");
+                        cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")));
+                final String partnerName = partnerNameValue == null ? "" : partnerNameValue;
                 String partnerAvatar = cpPartner == null ? "" : firstNonEmpty(
                         cpPartner.get("avatarUrl") == null ? null : String.valueOf(cpPartner.get("avatarUrl")),
                         cpPartner.get("avatar") == null ? null : String.valueOf(cpPartner.get("avatar")),
