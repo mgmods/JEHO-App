@@ -718,7 +718,7 @@ public class ProfileActivity extends ThemedActivity {
         if (binding == null || binding.rowProfileCpCv == null) return;
         String value = url == null ? "" : url.trim();
         if (value.isEmpty()) {
-            binding.rowProfileCpCv.setBackgroundResource(R.drawable.bg_cp_cv_card);
+            binding.rowProfileCpCv.setBackgroundResource(R.drawable.home_bg_cp);
             return;
         }
         Glide.with(this).load(value).into(new CustomTarget<Drawable>() {
@@ -729,7 +729,7 @@ public class ProfileActivity extends ThemedActivity {
                 }
             }
             @Override public void onLoadCleared(Drawable placeholder) {
-                if (binding != null) binding.rowProfileCpCv.setBackgroundResource(R.drawable.bg_cp_cv_card);
+                if (binding != null) binding.rowProfileCpCv.setBackgroundResource(R.drawable.home_bg_cp);
             }
         });
     }
