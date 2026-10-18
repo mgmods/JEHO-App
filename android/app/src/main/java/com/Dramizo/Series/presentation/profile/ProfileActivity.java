@@ -638,7 +638,15 @@ public class ProfileActivity extends ThemedActivity {
                     return;
                 }
                 Map<String, Object> relation = result.data.get(0);
+                // The public CP endpoint has returned several compatible payload shapes over
+                // time. Resolve the linked account from explicit partner fields so every entry
+                // point (search, ranking, chat, room, and direct profile) uses the same real data.
                 Object partnerObj = relation.get("partner");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("partnerUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("linkedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("relatedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("otherUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
                 Map<?, ?> partner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
                 String name = "";
                 String avatar = "";
@@ -654,11 +662,14 @@ public class ProfileActivity extends ThemedActivity {
                     name = displayName != null && !String.valueOf(displayName).trim().isEmpty()
                             ? String.valueOf(displayName).trim()
                             : username != null ? String.valueOf(username).trim() : "";
-                    Object avatarValue = partner.get("avatarUrl");
-                    if (avatarValue == null || String.valueOf(avatarValue).trim().isEmpty()) {
-                        avatarValue = partner.get("avatar");
-                    }
-                    avatar = avatarValue == null ? "" : String.valueOf(avatarValue).trim();
+                    Object avatarValue = firstNonEmpty(
+                            partner.get("avatarUrl") == null ? null : String.valueOf(partner.get("avatarUrl")),
+                            partner.get("avatar") == null ? null : String.valueOf(partner.get("avatar")),
+                            partner.get("profileImageUrl") == null ? null : String.valueOf(partner.get("profileImageUrl")),
+                            partner.get("photoUrl") == null ? null : String.valueOf(partner.get("photoUrl")),
+                            partner.get("picture") == null ? null : String.valueOf(partner.get("picture")),
+                            partner.get("imageUrl") == null ? null : String.valueOf(partner.get("imageUrl")));
+                    avatar = avatarValue == null ? "" : avatarValue.trim();
                     Object frameValue = partner.get("vipBadgeUrl");
                     partnerFrameUrl = frameValue == null ? "" : String.valueOf(frameValue).trim();
                     Object vipLevelValue = partner.get("vipLevel");
