@@ -140,6 +140,12 @@ export class RoomsController {
     return this.roomsService.unfollowHostRoom(userId, id);
   }
 
+  @Get('following')
+  @ApiOperation({ summary: 'List rooms and agency rooms followed by the current user' })
+  followingRooms(@CurrentUser('sub') userId: string) {
+    return this.roomsService.followingRooms(userId);
+  }
+
   @Get(':id/follow')
   @ApiOperation({ summary: 'Is following host voice rooms' })
   followStatus(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
