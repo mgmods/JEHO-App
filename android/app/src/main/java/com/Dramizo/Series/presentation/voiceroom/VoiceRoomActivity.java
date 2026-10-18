@@ -11478,7 +11478,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                     ? payload.get("event").getAsString() : null;
                             JsonObject innerPayload = payload.has("payload") && payload.get("payload").isJsonObject()
                                     ? payload.getAsJsonObject("payload") : null;
-                            if (innerEvent != null && innerPayload != null) {
+                            // The room listener handles events while joined; this direct
+                            // delivery is a fallback for a stale/missing room subscription only.
+                            if (innerEvent != null && innerPayload != null
+                                    && !RealtimeClient.getInstance().isJoinedRoom(roomId)) {
                                 handleRoomEvent(innerEvent, innerPayload, null, null);
                             }
                             return;
