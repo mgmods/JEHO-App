@@ -300,16 +300,20 @@ public class VoiceRoomViewModel extends ViewModel {
     public void kickUser(String roomId, String userId, String reason) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().kick(roomId, userId, reason);
-            if (r.success) info.postValue("تم إخراج المستخدم من الغرفة");
-            else error.postValue(r.error != null ? r.error : "تعذر الإخراج");
+            if (r.success) {
+                info.postValue("تم إخراج المستخدم من الغرفة");
+                refresh(roomId);
+            } else error.postValue(r.error != null ? r.error : "تعذر الإخراج");
         });
     }
 
     public void banUser(String roomId, String userId, String reason, Integer durationMinutes) {
         c.getIoExecutor().execute(() -> {
             Result<Object> r = c.getRoomRepository().ban(roomId, userId, reason, durationMinutes);
-            if (r.success) info.postValue("تم تطبيق الطرد المؤقت");
-            else error.postValue(r.error != null ? r.error : "تعذر الحظر");
+            if (r.success) {
+                info.postValue("تم تطبيق الطرد المؤقت");
+                refresh(roomId);
+            } else error.postValue(r.error != null ? r.error : "تعذر الحظر");
         });
     }
 
