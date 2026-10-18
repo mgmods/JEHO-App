@@ -3024,16 +3024,13 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     await this.clearUserSeat(roomId, userId);
     this.notifyRoomUpdated(roomId);
     const member = await this.memberIdentity(userId);
-    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
-      roomId,
-      event: 'room:seat_left',
-      payload: {
-        roomId,
-        ...member,
-        forced: true,
-        reason: reason || 'auto_moderation',
-      },
-      at: new Date().toISOString(),
+    // Broadcast to the room and directly to the affected user. The Android target
+    // handles this direct room:event too, so removal works even if its room channel
+    // subscription is stale.
+    this.emitRoomEventToUser(roomId, userId, 'room:seat_left', {
+      ...member,
+      forced: true,
+      reason: reason || 'moderator',
     });
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true, userId };
