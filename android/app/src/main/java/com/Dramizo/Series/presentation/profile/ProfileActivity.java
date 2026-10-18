@@ -260,7 +260,8 @@ public class ProfileActivity extends ThemedActivity {
             binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
-            loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl);
+            loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
+                    user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
             int level = Math.max(1, user.level);
 
@@ -620,7 +621,9 @@ public class ProfileActivity extends ThemedActivity {
                 }).setNegativeButton("إلغاء", null).show();
     }
 
-    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl) {
+    private void loadPublicCpRelationship(String targetId, String ownAvatarUrl, String ownFrameUrl,
+            int ownVipLevel, String ownVipTouUrl, String ownHostBadgeUrl,
+            Map<String, Object> ownHostBadgeMeta) {
         if (targetId == null || targetId.trim().isEmpty()) {
             hideProfileCpRelationship();
             return;
@@ -679,10 +682,24 @@ public class ProfileActivity extends ThemedActivity {
                     return;
                 }
                 binding.tvProfileCpLabel.setVisibility(View.GONE);
-                binding.imgProfileCpSelf.setVisibility(View.GONE);
-                binding.imgProfileCpSelfFrame.setVisibility(View.GONE);
-                // Use the partner's real equipped frame/host badge and VIP fallback exactly
-                // as on their own profile, preserving animated wear where supported.
+                // The profile owner is the first avatar; the actual linked account is the
+                // second. Keep this same pair when the profile is opened from search,
+                // ranking, chat, or a direct profile link.
+                String resolvedOwnFrame = ownFrameUrl == null ? "" : ownFrameUrl.trim();
+                if (resolvedOwnFrame.isEmpty()) {
+                    String vipFrame = VipStyle.profileNobilityFrameUrl(ownVipLevel, ownVipTouUrl);
+                    resolvedOwnFrame = vipFrame == null ? "" : vipFrame;
+                }
+                com.Dramizo.Series.util.AvatarCosmetics.bindWear(
+                        binding.imgProfileCpSelf,
+                        binding.imgProfileCpSelfFrame,
+                        ownAvatarUrl,
+                        resolvedOwnFrame,
+                        ownHostBadgeUrl,
+                        null,
+                        ownHostBadgeMeta);
+                // The partner's frame comes from that linked account's real equipped wear,
+                // with the same VIP fallback used on their own profile.
                 com.Dramizo.Series.util.AvatarCosmetics.bindWear(
                         binding.imgProfileCpPartner,
                         binding.imgProfileCpPartnerFrame,
@@ -695,7 +712,7 @@ public class ProfileActivity extends ThemedActivity {
                 // Mirror the same live relationship into the decorative CV card.
                 bindRealCpAvatar(binding.imgProfileCpCvSelf, ownAvatarUrl);
                 bindRealCpAvatar(binding.imgProfileCpCvPartner, avatar);
-                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvSelfFrame, ownFrameUrl);
+                com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvSelfFrame, resolvedOwnFrame);
                 com.Dramizo.Series.util.AvatarCosmetics.applyFrame(binding.imgProfileCpCvPartnerFrame, partnerFrameUrl);
                 int relationshipLevel = parsePositiveInt(relation.get("level"), 1);
                 long relationshipDays = cpDurationDays(relation.get("startedAt"));
