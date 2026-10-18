@@ -27,6 +27,7 @@ import {
 import { CurrentUser, Public } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const VANITY_LEASE_DAYS = 30;
 
@@ -41,6 +42,7 @@ export class VanityIdsController {
     @InjectRepository(Agency) private readonly agenciesRepo: Repository<Agency>,
     @InjectRepository(WalletTransaction)
     private readonly txRepo: Repository<WalletTransaction>,
+    private readonly realtimeGateway: RealtimeGateway,
   ) {}
 
   @Public()
@@ -315,6 +317,17 @@ export class VanityIdsController {
       row.targetId = agency.id;
     }
     await this.vanityRepo.save(row);
+    await this.realtimeGateway.refreshUserProfile(userId, 'vanity_id_applied');
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId,
+      styleMode: row.styleMode,
+      styleVipLevel: row.styleVipLevel,
+      styleColor1: row.styleColor1,
+      styleColor2: row.styleColor2,
+      styleColor3: row.styleColor3,
+      styleGlow: row.styleGlow,
+      at: new Date().toISOString(),
+    });
     return { success: true, publicId, targetType, targetId: row.targetId };
   }
 
@@ -394,7 +407,21 @@ export class VanityIdsController {
       }
       row.status = next;
     }
-    return this.vanityRepo.save(row);
+    const saved = await this.vanityRepo.save(row);
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: saved.publicId,
+      styleMode: saved.styleMode,
+      styleVipLevel: saved.styleVipLevel,
+      styleColor1: saved.styleColor1,
+      styleColor2: saved.styleColor2,
+      styleColor3: saved.styleColor3,
+      styleGlow: saved.styleGlow,
+      at: new Date().toISOString(),
+    });
+    if (saved.ownerUserId) {
+      await this.realtimeGateway.refreshUserProfile(saved.ownerUserId, 'vanity_id_admin_updated');
+    }
+    return saved;
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -534,6 +561,17 @@ export class VanityIdsController {
     target.purchasedAt = now;
     target.expiresAt = permanent ? null : new Date(baseTime + days * 24 * 60 * 60 * 1000);
     const saved = await this.vanityRepo.save(target);
+    await this.realtimeGateway.refreshUserProfile(userId, 'vanity_id_admin_assigned');
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: saved.publicId,
+      styleMode: saved.styleMode,
+      styleVipLevel: saved.styleVipLevel,
+      styleColor1: saved.styleColor1,
+      styleColor2: saved.styleColor2,
+      styleColor3: saved.styleColor3,
+      styleGlow: saved.styleGlow,
+      at: new Date().toISOString(),
+    });
     return { granted: true, item: saved, permanent, days: permanent ? null : days };
   }
 
@@ -543,10 +581,24 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Revoke a granted vanity ID and restore the previous public ID' })
   async adminRevoke(@Param('id') id: string) {
     const row = await this.requireRow(id);
+    const affectedUserId = row.ownerUserId;
     await this.restoreOwnerPublicId(row);
     this.clearLeaseFields(row);
     row.status = VanityIdStatus.AVAILABLE;
     await this.vanityRepo.save(row);
+    if (affectedUserId) {
+      await this.realtimeGateway.refreshUserProfile(affectedUserId, 'vanity_id_revoked');
+    }
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: row.publicId,
+      styleMode: row.styleMode,
+      styleVipLevel: row.styleVipLevel,
+      styleColor1: row.styleColor1,
+      styleColor2: row.styleColor2,
+      styleColor3: row.styleColor3,
+      styleGlow: row.styleGlow,
+      at: new Date().toISOString(),
+    });
     return { revoked: true, id };
   }
 
