@@ -13248,6 +13248,85 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * Mikoo boss card = fixed room-host identity (not a leaveable mic).
      * Guest mics only in the grid — host may sit/leave those; card always shows host.
      */
+    private boolean headerFollowBusy = false;
+    private boolean headerFollowing = false;
+    private String headerFollowTargetKey = "";
+
+    private void bindRoomFollowHeart(@Nullable RoomDtos.RoomDto room) {
+        if (binding == null || binding.btnFollowRoomHeart == null || room == null) return;
+        final boolean agency = com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room)
+                && room.agencyId != null && !room.agencyId.trim().isEmpty();
+        final String targetId = agency ? room.agencyId : room.id;
+        if (targetId == null || targetId.trim().isEmpty()) {
+            binding.btnFollowRoomHeart.setVisibility(View.GONE);
+            return;
+        }
+        final String key = (agency ? "agency:" : "room:") + targetId;
+        binding.btnFollowRoomHeart.setVisibility(View.VISIBLE);
+        binding.btnFollowRoomHeart.setEnabled(!headerFollowBusy);
+        if (!key.equals(headerFollowTargetKey)) {
+            headerFollowTargetKey = key;
+            headerFollowing = false;
+            binding.btnFollowRoomHeart.setImageResource(R.drawable.ic_heart_outline_red);
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                boolean following = false;
+                if (agency) {
+                    Result<MiscDtos.AgencyDto> result =
+                            ApiCall.execute(c.getAgencyApi().get(targetId));
+                    following = result.success && result.data != null
+                            && Boolean.TRUE.equals(result.data.isFollowing);
+                } else {
+                    Result<java.util.Map<String, Object>> result =
+                            ApiCall.execute(c.getRoomApi().roomFollowStatus(targetId));
+                    following = result.success && result.data != null
+                            && Boolean.TRUE.equals(result.data.get("following"));
+                }
+                final boolean state = following;
+                runOnUiThread(() -> {
+                    if (binding == null || !key.equals(headerFollowTargetKey)) return;
+                    headerFollowing = state;
+                    binding.btnFollowRoomHeart.setImageResource(state
+                            ? R.drawable.ic_heart_filled_red : R.drawable.ic_heart_outline_red);
+                });
+            });
+        }
+        binding.btnFollowRoomHeart.setOnClickListener(v -> {
+            if (headerFollowBusy) return;
+            headerFollowBusy = true;
+            binding.btnFollowRoomHeart.setEnabled(false);
+            final boolean wasFollowing = headerFollowing;
+            AppContainer c = ContainerProvider.from(this);
+            c.getIoExecutor().execute(() -> {
+                Result<?> result;
+                if (agency) {
+                    result = wasFollowing
+                            ? ApiCall.execute(c.getAgencyApi().unfollowAgency(targetId))
+                            : ApiCall.execute(c.getAgencyApi().followAgency(targetId));
+                } else {
+                    result = wasFollowing
+                            ? ApiCall.execute(c.getRoomApi().unfollowRoom(targetId))
+                            : ApiCall.execute(c.getRoomApi().followRoom(targetId));
+                }
+                final boolean ok = result.success;
+                runOnUiThread(() -> {
+                    if (binding == null || !key.equals(headerFollowTargetKey)) return;
+                    headerFollowBusy = false;
+                    binding.btnFollowRoomHeart.setEnabled(true);
+                    if (ok) {
+                        headerFollowing = !wasFollowing;
+                        binding.btnFollowRoomHeart.setImageResource(headerFollowing
+                                ? R.drawable.ic_heart_filled_red : R.drawable.ic_heart_outline_red);
+                        Toast.makeText(this, headerFollowing ? "تمت المتابعة" : "تم إلغاء المتابعة",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, getString(R.string.error_generic), Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+    }
+
     private void bindHeaderHostVisual(@Nullable RoomDtos.RoomDto room,
                                       @Nullable List<RoomDtos.SeatDto> seats) {
         if (binding == null || room == null) return;
