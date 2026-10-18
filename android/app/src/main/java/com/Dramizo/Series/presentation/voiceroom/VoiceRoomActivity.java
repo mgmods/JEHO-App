@@ -1023,6 +1023,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             }
             roomModeratorIds.clear();
             if (room.moderatorIds != null) roomModeratorIds.addAll(room.moderatorIds);
+            boolean appointed = myUserId != null && roomModeratorIds.contains(myUserId);
             isHost = myUserId != null
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
