@@ -103,6 +103,7 @@
                     android:clipToPadding="false">
 
                     <FrameLayout
+                        android:id="@+id/profileAvatarWrap"
                         android:layout_width="120dp"
                         android:layout_height="120dp"
                         android:layout_marginStart="16dp"
@@ -142,8 +143,8 @@
 
                     <LinearLayout
                         android:id="@+id/rowProfileCp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="56dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="84dp"
                         android:layout_marginStart="-8dp"
                         android:gravity="center"
                         android:orientation="horizontal"
@@ -158,8 +159,8 @@
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_width="76dp"
+                                android:layout_height="76dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -169,8 +170,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpSelfFrame"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_width="76dp"
+                                android:layout_height="76dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
@@ -180,6 +181,8 @@
                             android:id="@+id/tvProfileCpHeart"
                             android:layout_width="34dp"
                             android:layout_height="42dp"
+                            android:layout_marginStart="-5dp"
+                            android:layout_marginEnd="-5dp"
                             android:gravity="center"
                             android:includeFontPadding="false"
                             android:shadowColor="#FFFF8EB4"
@@ -197,8 +200,8 @@
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_width="56dp"
+                                android:layout_height="56dp"
                                 android:contentDescription="@null"
                                 android:elevation="4dp"
                                 android:scaleType="centerCrop"
@@ -208,8 +211,8 @@
                                 app:strokeWidth="3dp" />
                             <ImageView
                                 android:id="@+id/imgProfileCpPartnerFrame"
-                                android:layout_width="match_parent"
-                                android:layout_height="match_parent"
+                                android:layout_width="56dp"
+                                android:layout_height="56dp"
                                 android:contentDescription="@null"
                                 android:scaleType="fitXY"
                                 android:visibility="gone" />
