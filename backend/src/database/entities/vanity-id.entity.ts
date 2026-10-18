@@ -50,6 +50,10 @@ export class VanityId {
   @Column({ type: 'boolean', default: true })
   styleGlow!: boolean;
 
+  /** Optional dashboard-uploaded icon shown directly beside this ID. */
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  styleIconUrl!: string | null;
+
   @Column({ type: 'uuid', nullable: true })
   ownerUserId!: string | null;
 
