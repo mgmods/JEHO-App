@@ -693,6 +693,11 @@ public class ProfileActivity extends ThemedActivity {
                     String vipFrame = VipStyle.profileNobilityFrameUrl(ownVipLevel, ownVipTouUrl);
                     resolvedOwnFrame = vipFrame == null ? "" : vipFrame;
                 }
+                // These two avatar views start as GONE in the shared profile layout.
+                // Make them visible before binding; AvatarCosmetics loads the real server URL
+                // and wear, but intentionally does not change the caller's visibility.
+                binding.imgProfileCpSelf.setVisibility(View.VISIBLE);
+                binding.imgProfileCpPartner.setVisibility(View.VISIBLE);
                 com.Dramizo.Series.util.AvatarCosmetics.bindWear(
                         binding.imgProfileCpSelf,
                         binding.imgProfileCpSelfFrame,
