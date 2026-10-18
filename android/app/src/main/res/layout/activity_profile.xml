@@ -145,17 +145,16 @@
                         android:id="@+id/rowProfileCp"
                         android:layout_width="match_parent"
                         android:layout_height="84dp"
-                        android:layout_marginStart="-8dp"
-                        android:gravity="center"
+                                                android:gravity="center"
                         android:orientation="horizontal"
                         android:layoutDirection="rtl"
                         android:padding="0dp"
                         android:visibility="gone">
 
-                        <!-- Profile owner avatar, matching the linked partner avatar dimensions. -->
+                        <!-- Larger primary portrait for the profile owner. -->
                         <FrameLayout
-                            android:layout_width="64dp"
-                            android:layout_height="64dp"
+                            android:layout_width="76dp"
+                            android:layout_height="76dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpSelf"
@@ -195,8 +194,8 @@
                             android:textStyle="bold" />
 
                         <FrameLayout
-                            android:layout_width="64dp"
-                            android:layout_height="64dp"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
                             android:elevation="4dp">
                             <com.google.android.material.imageview.ShapeableImageView
                                 android:id="@+id/imgProfileCpPartner"
