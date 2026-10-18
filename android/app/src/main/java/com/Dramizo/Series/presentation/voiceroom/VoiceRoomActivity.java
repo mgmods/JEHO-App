@@ -6952,7 +6952,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             actCpRequest.setVisibility(userId != null && !userId.equals(myUserId) ? View.VISIBLE : View.GONE);
             actCpRequest.setOnClickListener(v -> showRoomCardCpRequest(userId, cpContainer));
         }
-        if (userId != null && !userId.equals(myUserId)) {
+        if (userId != null && !userId.trim().isEmpty()) {
             cpContainer.getIoExecutor().execute(() -> {
                 Result<List<Map<String, Object>>> cpResult = ApiCall.execute(
                         cpContainer.getUserApi().cpProfileRelationships(userId));

@@ -129,6 +129,7 @@ public final class UserProfileCardSheet {
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
         View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
         ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        ImageView imgCpPartnerTopFrame = sheet.findViewById(R.id.imgCpPartnerTopFrame);
         TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
 
         final String[] publicIdHold = {""};
@@ -163,7 +164,7 @@ public final class UserProfileCardSheet {
             actCpRequest.setVisibility(uid.equals(myId) ? View.GONE : View.VISIBLE);
             actCpRequest.setOnClickListener(v -> showCpRequestDialog(activity, container, uid, dialog));
         }
-        if (!uid.equals(myId)) {
+        if (uid != null && !uid.trim().isEmpty()) {
             container.getIoExecutor().execute(() -> {
                 Result<List<Map<String, Object>>> cp = ApiCall.execute(container.getUserApi().cpProfileRelationships(uid));
                 if (!cp.success || cp.data == null || cp.data.isEmpty()) return;
@@ -195,6 +196,24 @@ public final class UserProfileCardSheet {
                         cpPartner.get("profilePicture") == null ? null : String.valueOf(cpPartner.get("profilePicture")),
                         cpPartner.get("photo") == null ? null : String.valueOf(cpPartner.get("photo")),
                         cpPartner.get("avatar_url") == null ? null : String.valueOf(cpPartner.get("avatar_url")), "");
+                String partnerFrame = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("vipBadgeUrl") == null ? null : String.valueOf(cpPartner.get("vipBadgeUrl")),
+                        cpPartner.get("profileFrameUrl") == null ? null : String.valueOf(cpPartner.get("profileFrameUrl")),
+                        cpPartner.get("frameUrl") == null ? null : String.valueOf(cpPartner.get("frameUrl")),
+                        cpPartner.get("avatarFrameUrl") == null ? null : String.valueOf(cpPartner.get("avatarFrameUrl")),
+                        cpPartner.get("vipTouUrl") == null ? null : String.valueOf(cpPartner.get("vipTouUrl")), "");
+                int partnerVipLevel = 0;
+                String partnerVipTou = cpPartner == null || cpPartner.get("vipTouUrl") == null
+                        ? "" : String.valueOf(cpPartner.get("vipTouUrl"));
+                try {
+                    Object level = cpPartner == null ? null : cpPartner.get("vipLevel");
+                    partnerVipLevel = level == null ? 0 : Integer.parseInt(String.valueOf(level));
+                } catch (Exception ignored) { }
+                if (partnerFrame == null || partnerFrame.trim().isEmpty()) {
+                    String fallbackFrame = VipStyle.profileNobilityFrameUrl(partnerVipLevel, partnerVipTou);
+                    partnerFrame = fallbackFrame == null ? "" : fallbackFrame;
+                }
+                final String partnerFrameUrl = partnerFrame == null ? "" : partnerFrame.trim();
                 activity.runOnUiThread(() -> {
                     if (activity.isFinishing() || rowCpRelationship == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
@@ -216,6 +235,16 @@ public final class UserProfileCardSheet {
                                     .placeholder(R.drawable.ic_tab_me)
                                     .error(R.drawable.ic_tab_me)
                                     .into(imgCpPartnerTop);
+                        }
+                        if (imgCpPartnerTopFrame != null) {
+                            if (partnerFrameUrl.isEmpty()) {
+                                imgCpPartnerTopFrame.setImageDrawable(null);
+                                imgCpPartnerTopFrame.setVisibility(View.GONE);
+                            } else {
+                                imgCpPartnerTopFrame.setVisibility(View.VISIBLE);
+                                Glide.with(activity).load(AssetCatalog.absoluteUrl(partnerFrameUrl))
+                                        .into(imgCpPartnerTopFrame);
+                            }
                         }
                         if (tvCpTopHeart != null) {
                             tvCpTopHeart.setText(cpTypeSymbol(type));
