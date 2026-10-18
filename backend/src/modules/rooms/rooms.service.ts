@@ -1812,8 +1812,17 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       };
     }
     if (room.agencyId) {
-      const agency = await this.agenciesRepo.findOne({ where: { id: room.agencyId } });
-      if (agency?.ownerId === userId) return all;
+      const membership = await this.agencyMembersRepo.findOne({
+        where: {
+          agencyId: room.agencyId,
+          userId,
+          isActive: true,
+          status: AgencyMemberStatus.ACTIVE,
+        },
+      });
+      if (membership && [AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)) {
+        return all;
+      }
     }
     const moderator = await this.modsRepo.findOne({ where: { roomId: room.id, userId } });
     return {
@@ -3831,10 +3840,19 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     await this.assertAgencyRoomActive(room);
-    // Agency owner may manage agency rooms for settings/moderation APIs.
+    // Active agency owners/managers can moderate rooms belonging to their agency.
     if (room.agencyId) {
+      const membership = await this.agencyMembersRepo.findOne({
+        where: {
+          agencyId: room.agencyId,
+          userId: actorId,
+          isActive: true,
+          status: AgencyMemberStatus.ACTIVE,
+        },
+      });
+      if (membership && [AgencyRole.OWNER, AgencyRole.MANAGER].includes(membership.role)) return;
       const agency = await this.agenciesRepo.findOne({ where: { id: room.agencyId } });
-      if (agency && agency.ownerId === actorId) return;
+      if (agency?.ownerId === actorId) return;
     }
     const moderator = await this.modsRepo.findOne({
       where: { roomId, userId: actorId },
