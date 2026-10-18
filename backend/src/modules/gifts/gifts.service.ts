@@ -1729,6 +1729,36 @@ export class GiftsService implements OnModuleInit {
     return { config, state };
   }
 
+  async applySupportChestGift(roomId: string, giftId: string, coins: number, diamonds: number, senderId: string) {
+    const key = 'support_chest_room:' + roomId;
+    const result = await this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+      const repo = manager.getRepository(AppSetting);
+      const cfgRow = await repo.findOne({ where: { key: 'support_chest_config' } });
+      if (!cfgRow) return null;
+      let cfg: any;
+      try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
+      if (cfg.enabled !== true) return null;
+      const giftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
+      if (giftIds.length && !giftIds.includes(String(giftId))) return null;
+      let row = await repo.findOne({ where: { key } });
+      let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
+      try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
+      state.coins = (Number(state.coins) || 0) + Math.max(0, Number(coins) || 0);
+      state.diamonds = (Number(state.diamonds) || 0) + Math.max(0, Number(diamonds) || 0);
+      state.lastSenderId = senderId;
+      state.updatedAt = new Date().toISOString();
+      const mode = String(cfg.goalMode || 'coins');
+      const c = Number(cfg.coinTarget) > 0 && state.coins >= Number(cfg.coinTarget);
+      const d = Number(cfg.diamondTarget) > 0 && state.diamonds >= Number(cfg.diamondTarget);
+      state.goalReached = mode === 'both' ? c && d : mode === 'diamonds' ? d : c;
+      if (row) { row.value = JSON.stringify(state); await repo.save(row); }
+      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Room support chest state' }));
+      return { config: cfg, state };
+    });
+    if (result) this.realtime?.emitToRoom(roomId, 'room:event', { roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString() });
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2322,6 +2352,13 @@ export class GiftsService implements OnModuleInit {
         }
       }
       this.realtime?.emitToUser(dto.receiverId, 'gift:animation', animationPayload);
+      if (dto.roomId) {
+        try {
+          await this.applySupportChestGift(dto.roomId, String(dto.giftId), Number(result.totalCoins || 0), Number(result.hostDiamonds || 0), senderId);
+        } catch (error) {
+          this.log.error('Support chest progress update failed', error instanceof Error ? error.stack : String(error));
+        }
+      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
