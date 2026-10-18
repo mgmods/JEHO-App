@@ -1089,6 +1089,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canChangeFrames = false;
                 canControlGames = false;
             }
+            // Server-authoritative effective permissions also cover agency owners and
+            // platform roles that are not listed as room moderators.
+            RoomDtos.ViewerPermissionsDto viewerPermissions = room.viewerPermissions;
+            if (viewerPermissions != null) {
+                canManageMusic |= viewerPermissions.canManageMusic;
+                canChangeFrames |= viewerPermissions.canChangeFrames;
+                canControlGames |= viewerPermissions.canControlGames;
+                canMuteUsers |= viewerPermissions.canMute;
+                canKickUsers |= viewerPermissions.canKick;
+                canBanUsers |= viewerPermissions.canBan;
+                canManageSeats |= viewerPermissions.canManageSeats;
+                canInviteMic |= viewerPermissions.canInvite;
+                canManageRoom |= viewerPermissions.canManageRoom;
+            }
             updateAdminControls();
             seatAdapter.setHostUserId(roomHostId);
             refreshSelfHostWearOnSeats();
@@ -6862,6 +6876,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             AuraDialogHelper.configureShown(dialog);
             View bs = dialog.findViewById(com.google.android.material.R.id.design_bottom_sheet);
             if (bs != null) bs.setBackgroundResource(android.R.color.transparent);
+            // Keep the last moderation controls above Android's gesture/navigation area.
+            if (sheet instanceof androidx.core.widget.NestedScrollView) {
+                androidx.core.widget.NestedScrollView scroll =
+                        (androidx.core.widget.NestedScrollView) sheet;
+                final int baseBottom = scroll.getPaddingBottom();
+                ViewCompat.setOnApplyWindowInsetsListener(scroll, (view, insets) -> {
+                    Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+                    int safeBottom = Math.max(baseBottom,
+                            systemBars.bottom + (int) (16 * getResources().getDisplayMetrics().density));
+                    view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
+                            view.getPaddingRight(), safeBottom);
+                    return insets;
+                });
+                ViewCompat.requestApplyInsets(scroll);
+            }
         });
         TextView tvName = sheet.findViewById(R.id.tvUserName);
         TextView tvUserId = sheet.findViewById(R.id.tvUserId);
@@ -7210,13 +7239,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 actForceLeaveSeat.setText("إنزال من المايك");
                 actForceLeaveSeat.setOnClickListener(v -> {
                     dialog.dismiss();
-                    AuraDialogHelper.confirm(this,
-                            "إنزال من المايك",
-                            "إنزال هذا المستخدم من المايك؟ سيبقى داخل الغرفة كمستمع.",
-                            "إنزال",
-                            () -> viewModel.forceLeaveSeat(roomId, userId),
-                            "إلغاء",
-                            null);
+                    if (roomId == null || userId == null || userId.trim().isEmpty()) {
+                        Toast.makeText(this, "تعذر تحديد المستخدم أو الغرفة", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    // Run the server action immediately; the room:seat_left event stops
+                    // the target's mic publisher while keeping them in the room.
+                    viewModel.forceLeaveSeat(roomId, userId);
                 });
             }
         }
