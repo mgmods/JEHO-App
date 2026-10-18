@@ -338,3 +338,8 @@ export const badgesApi = {
   grant: (id, userId) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, { userId })),
   revoke: (id, userId) => safeRequest(() => api.delete(`/admin/badges/${id}/users/${encodeURIComponent(userId)}`)),
 }
+
+export const supportChestApi = {
+  getConfig: () => safeRequest(() => api.get('/admin/support-chest/config')),
+  saveConfig: (payload) => safeRequest(() => api.patch('/admin/support-chest/config', payload)),
+}
