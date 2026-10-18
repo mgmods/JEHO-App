@@ -2814,6 +2814,7 @@ export class AdminService {
       relations: ['profile', 'wallet'],
     });
     if (!user) throw new NotFoundException('User not found');
+    const originalUserLevel = Number(user.level || 1);
 
     const displayName =
       typeof body.displayName === 'string'
@@ -2963,7 +2964,7 @@ export class AdminService {
             AND COALESCE(cosmetic."minUserLevel", 0) > $2`,
         [id, newLevel],
       );
-      if (newLevel < Number(user.level || 1)) {
+      if (newLevel < originalUserLevel) {
         profile.levelBadgeUrl = null;
         await this.profilesRepo.save(profile);
         user.profile = profile;
