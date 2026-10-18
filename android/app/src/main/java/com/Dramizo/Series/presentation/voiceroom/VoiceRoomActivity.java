@@ -1016,6 +1016,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
+            refreshSupportChestIcon();
             final int bindSeq = ++roomUiBindSeq;
             // Disk chat wipe + history restore: off main thread (ANR on mid-range MIUI).
             final String chatClearedAtIso = room.chatClearedAt;
@@ -1545,6 +1546,41 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * This UI-only first pass intentionally does not alter room audio/ZEGO or claim live
      * contribution/reward state until the matching backend contract is implemented.
      */
+    private void refreshSupportChestIcon() {
+        final View chestIcon = findViewById(R.id.btnRoomSupportChest);
+        final String targetRoomId = roomId;
+        if (chestIcon == null || targetRoomId == null || targetRoomId.isEmpty()) return;
+        ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                .supportChest(targetRoomId)
+                .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                    @Override
+                    public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                           retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                        if (!response.isSuccessful() || response.body() == null
+                                || response.body().data == null || isFinishing() || isDestroyed()) return;
+                        Object raw = response.body().data.get("config");
+                        boolean visible = false;
+                        if (raw instanceof Map) {
+                            Map<?, ?> config = (Map<?, ?>) raw;
+                            visible = Boolean.TRUE.equals(config.get("enabled"))
+                                    && Boolean.TRUE.equals(config.get("iconVisible"));
+                        }
+                        final boolean show = visible;
+                        runOnUiThread(() -> {
+                            if (chestIcon != null && !isFinishing() && !isDestroyed()) {
+                                chestIcon.setVisibility(show ? View.VISIBLE : View.GONE);
+                            }
+                        });
+                    }
+
+                    @Override
+                    public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                          Throwable error) {
+                        android.util.Log.w("SupportChest", "Could not refresh room chest icon visibility", error);
+                    }
+                });
+    }
+
     private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
         if (isFinishing() || isDestroyed() || web == null) return;
         try {
