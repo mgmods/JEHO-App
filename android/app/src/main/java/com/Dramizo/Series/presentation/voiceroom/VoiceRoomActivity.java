@@ -1073,19 +1073,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 canInviteMic = true;
                 canManageRoom = true;
             }
-            // Appointed room mods (and hosts) should open room tools reliably.
-            boolean appointed =
-                    (myUserId != null && roomModeratorIds.contains(myUserId))
-                    || isHost
-                    || isOwner
-                    || (myUserId != null && sameUser(myUserId, roomCohostId));
-            if (appointed || isPlatformSuper()) {
-                canManageRoom = true;
-                canManageSeats = true;
-                canChangeFrames = true;
-                canBanUsers = true;
-                canManageMusic = true;
-            }
+            // Do not infer permissions from moderator status alone.
+            // UI actions must mirror the server's explicit permission flags so
+            // moderators cannot see controls the API will correctly reject.
             // Manager (platform) stays person-focused: mute/kick/ban, not full host settings.
             if (isPlatformManager() && !isPlatformSuper() && !appointed) {
                 canMuteUsers = true;
