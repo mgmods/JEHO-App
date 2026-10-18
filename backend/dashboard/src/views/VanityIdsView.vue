@@ -44,6 +44,7 @@
         <div v-if="form.styleMode === &quot;vip&quot;" class="col-md-2"><label class="form-label">مستوى VIP</label><select v-model.number="form.styleVipLevel" class="form-select"><option v-for="n in 7" :key="n" :value="n">VIP {{ n }}</option></select></div><div class="col-md-2"><label class="form-label">اللون الأول</label><input v-model="form.styleColor1" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><label class="form-label">اللون الثاني</label><input v-model="form.styleColor2" type="color" class="form-control form-control-color w-100" /></div>
         <div class="col-md-2"><label class="form-label">اللون الثالث</label><input v-model="form.styleColor3" type="color" class="form-control form-control-color w-100" /></div>
+        <div class="col-md-4"><label class="form-label">أيقونة هذا النوع من الـID</label><input class="form-control form-control-sm" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" @change="uploadIcon(form, $event)" /><div class="form-text">ارفع الأيقونة التي تظهر بجانب الرقم لهذا النمط.</div><img v-if="form.styleIconUrl" :src="iconPreviewUrl(form.styleIconUrl)" class="vanity-style-icon-preview mt-2" alt="معاينة الأيقونة" /></div>
         <div class="col-md-2"><button class="btn btn-aurora" type="submit" :disabled="saving">إضافة للبيع</button></div>
       </form>
     </div>
@@ -65,7 +66,7 @@
       <article v-for="item in filtered" :key="item.id" class="widget-card vanity-card">
         <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-            <div class="vanity-id" :class="{ 'vanity-id-animated': item._styleMode === 'animated', 'vanity-id-glow': item._styleGlow }" :style="idPreviewStyle(item)">{{ item.publicId }}</div>
+            <div class="d-flex align-items-center gap-1"><div class="vanity-id" :class="{ 'vanity-id-animated': item._styleMode === 'animated', 'vanity-id-glow': item._styleGlow }" :style="idPreviewStyle(item)">{{ item.publicId }}</div><img v-if="item._styleIconUrl" :src="iconPreviewUrl(item._styleIconUrl)" class="vanity-style-icon" alt="أيقونة ID" /></div>
             <span class="badge" :class="statusClass(item.status)">{{ statusLabel(item.status) }}</span>
           </div>
           <div class="vanity-price-row mb-2">
@@ -89,11 +90,12 @@
           </div>
           <div class="vanity-style-editor mb-3">
             <div class="row g-2">
-              <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="none">رسمي بدون لون</option><option value="static">ثابت</option><option value="animated">متحرك</option><option value="vip">VIP</option></select></div>
+              <div class="col-6"><label class="form-label small mb-1">نمط الـID</label><select v-model="item._styleMode" class="form-select form-select-sm"><option value="none">عادي / رسمي</option><option value="static">ملوّن ثابت</option><option value="animated">ملوّن متحرك</option><option value="vip">VIP</option></select></div>
               <div v-if="item._styleMode === &quot;vip&quot;" class="col-6"><label class="form-label small mb-1">مستوى VIP</label><select v-model.number="item._styleVipLevel" class="form-select form-select-sm"><option v-for="n in 7" :key="n" :value="n">VIP {{ n }}</option></select></div><div class="col-6 d-flex align-items-end"><label class="form-check mb-2"><input v-model="item._styleGlow" class="form-check-input" type="checkbox" /><span class="form-check-label small">توهّج</span></label></div>
               <div class="col-4"><input v-model="item._styleColor1" type="color" class="form-control form-control-color w-100" aria-label="اللون الأول" /></div>
               <div class="col-4"><input v-model="item._styleColor2" type="color" class="form-control form-control-color w-100" aria-label="اللون الثاني" /></div>
               <div class="col-4"><input v-model="item._styleColor3" type="color" class="form-control form-control-color w-100" aria-label="اللون الثالث" /></div>
+              <div class="col-12"><label class="form-label small mb-1">أيقونة النمط (تظهر بجانب الرقم)</label><input class="form-control form-control-sm" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="busyId === item.id" @change="uploadIcon(item, $event)" /><div class="d-flex align-items-center gap-2 mt-2"><img v-if="item._styleIconUrl" :src="iconPreviewUrl(item._styleIconUrl)" class="vanity-style-icon-preview" alt="معاينة الأيقونة" /><button v-if="item._styleIconUrl" class="btn btn-sm btn-outline-secondary" type="button" @click="item._styleIconUrl = ''">إزالة الأيقونة</button></div></div>
               <div class="col-12"><button class="btn btn-sm btn-outline-info w-100" type="button" :disabled="busyId === item.id" @click="saveStyle(item)">حفظ التصميم</button></div>
             </div>
           </div>
@@ -169,7 +171,7 @@ const busyId = ref('')
 const error = ref('')
 const ok = ref('')
 const filterStatus = ref('')
-const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleVipLevel: 1, styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true })
+const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleVipLevel: 1, styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true, styleIconUrl: '' })
 
 const confirmOpen = ref(false)
 const confirmTitle = ref('')
@@ -232,6 +234,7 @@ function withPriceEdit(list) {
     _styleColor2: /^#[0-9a-fA-F]{6}$/.test(i.styleColor2 || '') ? i.styleColor2 : '#C084FC',
     _styleColor3: /^#[0-9a-fA-F]{6}$/.test(i.styleColor3 || '') ? i.styleColor3 : '#FF7AC8',
     _styleGlow: i.styleGlow !== false,
+    _styleIconUrl: typeof i.styleIconUrl === 'string' ? i.styleIconUrl : '',
   }))
 }
 
@@ -269,6 +272,7 @@ async function create() {
       styleColor2: form.styleColor2,
       styleColor3: form.styleColor3,
       styleGlow: form.styleGlow,
+      styleIconUrl: form.styleIconUrl || null,
     })
     ok.value = `تمت إضافة ${id} بسعر ${formatNumber(form.priceCoins)} كوينز`
     toast().success(ok.value)
@@ -279,6 +283,51 @@ async function create() {
     toast().danger(error.value)
   }
   saving.value = false
+}
+
+function iconPreviewUrl(path) {
+  if (!path) return ''
+  if (/^https?:\/\//i.test(path)) return path
+  const base = String(api.defaults.baseURL || '/api/v1').replace(/\/$/, '')
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+async function uploadIcon(target, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(file.type)) {
+    error.value = 'اختر صورة PNG أو JPG أو WEBP أو GIF أو SVG'
+    event.target.value = ''
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    error.value = 'حجم الأيقونة يجب ألا يتجاوز 5 ميغابايت'
+    event.target.value = ''
+    return
+  }
+  const formData = new FormData()
+  formData.append('file', file)
+  const id = target?.id
+  if (id) busyId.value = id
+  else saving.value = true
+  error.value = ''
+  try {
+    const response = await api.post('/uploads', formData)
+    const payload = response?.data?.data || response?.data
+    const url = payload?.url || payload?.path
+    if (!url) throw new Error('لم يرجع الخادم رابط الأيقونة')
+    target._styleIconUrl = url
+    if (target === form) target.styleIconUrl = url
+    ok.value = 'تم رفع الأيقونة، اضغط حفظ التصميم لتطبيقها'
+    toast().success(ok.value)
+  } catch (e) {
+    error.value = e?.message || 'تعذر رفع الأيقونة'
+    toast().danger(error.value)
+  } finally {
+    if (id) busyId.value = ''
+    else saving.value = false
+    if (event?.target) event.target.value = ''
+  }
 }
 
 function idPreviewStyle(item) {
@@ -312,6 +361,7 @@ async function saveStyle(item) {
       styleColor2: item._styleColor2,
       styleColor3: item._styleColor3,
       styleGlow: item._styleGlow,
+      styleIconUrl: item._styleIconUrl || null,
     })
     item.styleMode = item._styleMode
     item.styleVipLevel = item._styleVipLevel
@@ -319,6 +369,7 @@ async function saveStyle(item) {
     item.styleColor2 = item._styleColor2
     item.styleColor3 = item._styleColor3
     item.styleGlow = item._styleGlow
+    item.styleIconUrl = item._styleIconUrl || null
     ok.value = `تم حفظ تصميم ${item.publicId}`
     toast().success(ok.value)
   } catch (e) {
@@ -424,6 +475,8 @@ onMounted(load)
   padding: 0 4px;
 }
 .vanity-id-animated { animation: vanity-id-gradient 3s linear infinite; }
+.vanity-style-icon { width: 22px; height: 22px; object-fit: contain; flex: 0 0 auto; }
+.vanity-style-icon-preview { width: 32px; height: 32px; object-fit: contain; background: rgba(255,255,255,.06); border-radius: 6px; padding: 3px; }
 .vanity-id-glow { filter: drop-shadow(0 0 5px currentColor); }
 .vanity-style-editor { border-top: 1px solid rgba(255,255,255,.1); padding-top: .75rem; }
 @keyframes vanity-id-gradient { to { background-position: 240% center; } }
