@@ -6883,10 +6883,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 final int baseBottom = scroll.getPaddingBottom();
                 ViewCompat.setOnApplyWindowInsetsListener(scroll, (view, insets) -> {
                     Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                    int safeBottom = Math.max(baseBottom,
-                            systemBars.bottom + (int) (16 * getResources().getDisplayMetrics().density));
+                    // Reserve a larger scroll tail so moderator controls never sit behind
+                    // Android's Home / Back / gesture-navigation area on short screens.
+                    int densityPadding = (int) (56 * getResources().getDisplayMetrics().density);
+                    int safeBottom = Math.max(baseBottom + densityPadding,
+                            systemBars.bottom + densityPadding);
                     view.setPadding(view.getPaddingLeft(), view.getPaddingTop(),
                             view.getPaddingRight(), safeBottom);
+                    view.setClipToPadding(false);
+                    view.setVerticalScrollBarEnabled(true);
                     return insets;
                 });
                 ViewCompat.requestApplyInsets(scroll);
