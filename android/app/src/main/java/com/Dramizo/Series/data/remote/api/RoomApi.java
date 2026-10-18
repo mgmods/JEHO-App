@@ -84,6 +84,9 @@ public interface RoomApi {
     @GET("rooms/{id}/follow")
     Call<ApiResponse<java.util.Map<String, Object>>> roomFollowStatus(@Path("id") String id);
 
+    @GET("rooms/following")
+    Call<ApiResponse<MiscDtos.ListResult<RoomDtos.RoomDto>>> followingRooms();
+
     @PATCH("rooms/{id}")
     Call<ApiResponse<RoomDtos.RoomDto>> update(@Path("id") String id, @Body Map<String, String> body);
 
