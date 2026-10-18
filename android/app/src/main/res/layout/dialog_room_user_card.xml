@@ -50,9 +50,12 @@
         android:layout_marginTop="8dp" android:clipChildren="false" android:clipToPadding="false"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintHorizontal_bias="0.5" app:layout_constraintTop_toTopOf="parent">
-        <ImageView android:id="@+id/imgUserAvatar" android:layout_width="76dp" android:layout_height="76dp"
+        <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgUserAvatar"
+            android:layout_width="76dp" android:layout_height="76dp"
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:elevation="4dp"
-            android:scaleType="centerCrop" android:src="@drawable/ic_tab_me" />
+            android:scaleType="centerCrop" android:src="@drawable/ic_tab_me"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+            app:strokeColor="#FFFFFFFF" app:strokeWidth="3dp" />
         <ImageView android:id="@+id/imgUserFrame" android:layout_width="92dp" android:layout_height="92dp"
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
         <com.Dramizo.Series.util.HostSignalView android:id="@+id/userCardHostSignal" android:layout_width="92dp"
