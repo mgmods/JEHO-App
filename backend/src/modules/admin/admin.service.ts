@@ -681,6 +681,9 @@ export class AdminService {
       profile.entryEffectUrl = null;
       profile.entryAnimationUrl = null;
       profile.roomCardUrl = null;
+      profile.profileCardUrl = null;
+      profile.chatBubbleUrl = null;
+      profile.nameplateUrl = null;
       profile.vipBadgeUrl = null;
       profile.levelBadgeUrl = null;
       profile.hostBadgeUrl = null;
@@ -688,6 +691,54 @@ export class AdminService {
       profile.totalSentCoins = 0;
       profile.totalReceivedDiamonds = 0;
       await manager.save(profile);
+
+      // Release every vanity ID owned by this account and restore its previous
+      // account/room/agency ID where it is still the currently applied value.
+      const vanityRows: Array<Record<string, any>> = await manager.query(
+        `SELECT "publicId", "previousPublicId", "targetType", "targetId", "previousTargetPublicId"
+           FROM vanity_ids
+          WHERE "ownerUserId" = $1
+            AND status IN ('owned', 'reserved')`,
+        [userId],
+      );
+      for (const vanity of vanityRows) {
+        if (vanity.targetType === 'account' && vanity.targetId === userId && vanity.previousPublicId) {
+          const conflict = await manager.query(
+            `SELECT id FROM users WHERE "publicId" = $1 AND id <> $2 LIMIT 1`,
+            [vanity.previousPublicId, userId],
+          );
+          if (!conflict.length) {
+            await manager.update(User, { id: userId, publicId: vanity.publicId }, {
+              publicId: vanity.previousPublicId,
+            });
+          }
+        } else if (vanity.targetType === 'room' && vanity.targetId && vanity.previousTargetPublicId) {
+          await manager.query(
+            `UPDATE rooms SET "publicId" = $1 WHERE id = $2 AND "publicId" = $3`,
+            [vanity.previousTargetPublicId, vanity.targetId, vanity.publicId],
+          );
+        } else if (vanity.targetType === 'agency' && vanity.targetId && vanity.previousTargetPublicId) {
+          await manager.query(
+            `UPDATE agencies SET "publicId" = $1 WHERE id = $2 AND "publicId" = $3`,
+            [vanity.previousTargetPublicId, vanity.targetId, vanity.publicId],
+          );
+        }
+      }
+      await manager.query(
+        `UPDATE vanity_ids
+            SET status = 'available',
+                "ownerUserId" = NULL,
+                "targetType" = NULL,
+                "targetId" = NULL,
+                "reservedUntil" = NULL,
+                "purchasedAt" = NULL,
+                "expiresAt" = NULL,
+                "previousPublicId" = NULL,
+                "previousTargetPublicId" = NULL
+          WHERE "ownerUserId" = $1
+            AND status IN ('owned', 'reserved')`,
+        [userId],
+      );
 
       const cosmeticsDeleted = await manager.delete(UserCosmetic, { userId });
       const gameItemsDeleted = await manager.delete(UserGameItem, { userId });
@@ -713,8 +764,9 @@ export class AdminService {
         reason: 'admin_reset_baseline',
         at: new Date().toISOString(),
       });
+      await this.realtimeGateway.refreshUserProfile(userId, 'admin_reset_baseline');
     } catch {
-      // ignore realtime failures
+      // The database reset is authoritative even if a live socket is unavailable.
     }
 
     return {
@@ -2883,6 +2935,7 @@ export class AdminService {
       where: { id },
       relations: ['profile', 'wallet'],
     });
+    await this.realtimeGateway.refreshUserProfile(id, 'admin_user_updated');
     return this.mapAdminUser(refreshed!);
   }
 
