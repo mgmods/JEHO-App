@@ -1545,8 +1545,44 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
      * This UI-only first pass intentionally does not alter room audio/ZEGO or claim live
      * contribution/reward state until the matching backend contract is implemented.
      */
+    private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
+        if (isFinishing() || isDestroyed() || web == null) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (!response.isSuccessful() || response.body() == null
+                                    || response.body().data == null || web == null) return;
+                            Map<String, Object> payload = response.body().data;
+                            Object config = payload.get("config");
+                            Object state = payload.get("state");
+                            if (config == null || state == null) return;
+                            String js = "window.applySupportChestData && window.applySupportChestData("
+                                    + new com.google.gson.Gson().toJson(config) + ","
+                                    + new com.google.gson.Gson().toJson(state) + ");";
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed()) web.evaluateJavascript(js, null);
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            android.util.Log.w("SupportChest", "Could not load room support chest state",
+                                    error);
+                        }
+                    });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Support chest request could not be started", error);
+        }
+    }
+
     private void showSupportChestSheet() {
-        if (isFinishing() || isDestroyed()) return;
+        if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
+        final String chestRoomId = roomId;
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         FrameLayout host = new FrameLayout(this);
         host.setBackgroundColor(Color.TRANSPARENT);
@@ -1558,7 +1594,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if ("file:///android_asset/support-chest.html".equals(url)) {
+                    loadSupportChestState(view, chestRoomId);
+                }
+            }
+        });
+        final Runnable refreshChest = new Runnable() {
+            @Override public void run() {
+                if (!dialog.isShowing() || isFinishing() || isDestroyed()) return;
+                loadSupportChestState(web, chestRoomId);
+                handler.postDelayed(this, 15000L);
+            }
+        };
         web.loadUrl("file:///android_asset/support-chest.html");
         host.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -1566,6 +1616,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         dialog.setCancelable(true);
         dialog.setCanceledOnTouchOutside(true);
         dialog.setOnDismissListener(d -> {
+            handler.removeCallbacks(refreshChest);
             web.stopLoading();
             web.loadUrl("about:blank");
             web.destroy();
@@ -1585,6 +1636,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 behavior.setHideable(true);
                 behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
             }
+            handler.removeCallbacks(refreshChest);
+            handler.postDelayed(refreshChest, 15000L);
         });
         dialog.show();
     }
