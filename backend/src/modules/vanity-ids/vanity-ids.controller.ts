@@ -369,7 +369,21 @@ export class VanityIdsController {
         row.status = body.status as VanityIdStatus;
       }
     }
-    return this.vanityRepo.save(row);
+    const saved = await this.vanityRepo.save(row);
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: saved.publicId,
+      styleMode: saved.styleMode,
+      styleVipLevel: saved.styleVipLevel,
+      styleColor1: saved.styleColor1,
+      styleColor2: saved.styleColor2,
+      styleColor3: saved.styleColor3,
+      styleGlow: saved.styleGlow,
+      at: new Date().toISOString(),
+    });
+    if (saved.ownerUserId) {
+      await this.realtimeGateway.refreshUserProfile(saved.ownerUserId, 'vanity_id_admin_upserted');
+    }
+    return saved;
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -432,10 +446,18 @@ export class VanityIdsController {
   })
   async adminRelease(@Param('id') id: string) {
     const row = await this.requireRow(id);
+    const affectedUserId = row.ownerUserId;
     await this.restoreOwnerPublicId(row);
     this.clearLeaseFields(row);
     row.status = VanityIdStatus.AVAILABLE;
-    return this.vanityRepo.save(row);
+    const saved = await this.vanityRepo.save(row);
+    if (affectedUserId) await this.realtimeGateway.refreshUserProfile(affectedUserId, 'vanity_id_released');
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: saved.publicId, styleMode: saved.styleMode, styleVipLevel: saved.styleVipLevel,
+      styleColor1: saved.styleColor1, styleColor2: saved.styleColor2, styleColor3: saved.styleColor3,
+      styleGlow: saved.styleGlow, at: new Date().toISOString(),
+    });
+    return saved;
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -444,6 +466,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Disable ID: hide from shop; release owner if any' })
   async adminDisable(@Param('id') id: string) {
     const row = await this.requireRow(id);
+    const affectedUserId = row.ownerUserId;
     if (
       row.status === VanityIdStatus.OWNED ||
       row.status === VanityIdStatus.RESERVED
@@ -452,7 +475,14 @@ export class VanityIdsController {
       this.clearLeaseFields(row);
     }
     row.status = VanityIdStatus.DISABLED;
-    return this.vanityRepo.save(row);
+    const saved = await this.vanityRepo.save(row);
+    if (affectedUserId) await this.realtimeGateway.refreshUserProfile(affectedUserId, 'vanity_id_disabled');
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', {
+      publicId: saved.publicId, styleMode: saved.styleMode, styleVipLevel: saved.styleVipLevel,
+      styleColor1: saved.styleColor1, styleColor2: saved.styleColor2, styleColor3: saved.styleColor3,
+      styleGlow: saved.styleGlow, at: new Date().toISOString(),
+    });
+    return saved;
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
@@ -475,6 +505,7 @@ export class VanityIdsController {
   @ApiOperation({ summary: 'Delete vanity ID (releases owner first if needed)' })
   async adminDelete(@Param('id') id: string) {
     const row = await this.requireRow(id);
+    const affectedUserId = row.ownerUserId;
     if (
       row.status === VanityIdStatus.OWNED ||
       row.status === VanityIdStatus.RESERVED
@@ -482,6 +513,8 @@ export class VanityIdsController {
       await this.restoreOwnerPublicId(row);
     }
     await this.vanityRepo.remove(row);
+    if (affectedUserId) await this.realtimeGateway.refreshUserProfile(affectedUserId, 'vanity_id_deleted');
+    this.realtimeGateway.emitToAll('vanity_id:style_updated', { publicId: row.publicId, at: new Date().toISOString() });
     return { ok: true, id };
   }
 
