@@ -1752,6 +1752,45 @@ export class GiftsService implements OnModuleInit {
       const c = Number(cfg.coinTarget) > 0 && state.coins >= Number(cfg.coinTarget);
       const d = Number(cfg.diamondTarget) > 0 && state.diamonds >= Number(cfg.diamondTarget);
       state.goalReached = mode === 'both' ? c && d : mode === 'diamonds' ? d : c;
+      if (state.goalReached) {
+        const rewardType = String(cfg.rewardType || 'none');
+        const amount = Math.max(0, Math.floor(Number(cfg.rewardAmount) || 0));
+        if ((rewardType === 'coins' || rewardType === 'diamonds') && amount > 0) {
+          const walletRepo = manager.getRepository(Wallet);
+          const wallet = await walletRepo.findOne({ where: { userId: senderId }, lock: { mode: 'pessimistic_write' } });
+          if (!wallet) throw new BadRequestException('Support chest winner wallet not found');
+          if (rewardType === 'coins') wallet.coins = Number(wallet.coins || 0) + amount;
+          else wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+          await walletRepo.save(wallet);
+          const txRepo = manager.getRepository(WalletTransaction);
+          await txRepo.save(txRepo.create({
+            userId: senderId, type: TransactionType.ADMIN_ADJUST,
+            currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
+            amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
+            referenceType: 'support_chest_reward',
+            referenceId: roomId + ':' + String(state.cycle || 1),
+            description: 'JEHO support chest reward',
+            metadata: { roomId, cycle: state.cycle || 1, giftId },
+          }));
+          state.lastWinnerId = senderId;
+          state.lastRewardType = rewardType;
+          state.lastRewardAmount = amount;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+        } else if (rewardType === 'none' || amount <= 0) {
+          state.lastWinnerId = senderId;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+        } else {
+          // Inventory-backed rewards are deliberately not reset or marked paid until their grant path exists.
+          state.rewardPending = true;
+          state.winnerId = senderId;
+        }
+      }
       if (row) { row.value = JSON.stringify(state); await repo.save(row); }
       else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Room support chest state' }));
       return { config: cfg, state };
