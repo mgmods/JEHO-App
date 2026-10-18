@@ -1172,6 +1172,50 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return { following: !!row, hostId: room.hostId };
   }
 
+  /** Rooms and agency rooms followed by the current user, for Home > أنا. */
+  async followingRooms(followerId: string) {
+    const hostFollows = await this.roomFollowsRepo.find({ where: { followerId } });
+    const hostIds = [...new Set(hostFollows.map((row) => row.hostId).filter(Boolean))];
+    let agencyIds: string[] = [];
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT "agencyId" FROM agency_follows WHERE "userId" = $1`,
+        [followerId],
+      );
+      agencyIds = [...new Set((rows || []).map((row: any) => String(row.agencyId || '')).filter(Boolean))];
+    } catch {
+      // agency_follows may not exist on older installations until agency service initializes.
+    }
+    if (!hostIds.length && !agencyIds.length) return paginate([], 0, 1, 100);
+    const qb = this.roomsRepo
+      .createQueryBuilder('room')
+      .leftJoinAndSelect('room.host', 'host')
+      .leftJoinAndSelect('host.profile', 'hostProfile')
+      .leftJoinAndSelect('room.seats', 'seats')
+      .leftJoinAndSelect('seats.user', 'seatUser')
+      .leftJoinAndSelect('seatUser.profile', 'seatProfile');
+    const conditions: string[] = [];
+    if (hostIds.length) {
+      conditions.push('room."hostId" IN (:...hostIds)');
+      qb.setParameter('hostIds', hostIds);
+    }
+    if (agencyIds.length) {
+      conditions.push('room."agencyId" IN (:...agencyIds)');
+      qb.setParameter('agencyIds', agencyIds);
+    }
+    qb.where(conditions.map((part) => `(${part})`).join(' OR '))
+      .andWhere('room."status" != :closedStatus', { closedStatus: RoomStatus.CLOSED })
+      .orderBy('room."updatedAt"', 'DESC')
+      .take(100);
+    const rooms = this.dedupeRoomsById(await qb.getMany());
+    const giftCoins = await this.roomGiftCoinTotals(rooms.map((room) => room.id));
+    const items = await Promise.all(rooms.map(async (room) => ({
+      ...(await this.decorateRoom(room)),
+      roomLevel: this.computeRoomLevel(giftCoins.get(room.id) || 0, room.viewerCount || 0),
+    })));
+    return paginate(items, items.length, 1, 100);
+  }
+
   private async wearMetaForUrl(url?: string | null) {
     if (!url) return null;
     const row = await this.cosmeticsRepo.findOne({ where: { previewUrl: url } });
