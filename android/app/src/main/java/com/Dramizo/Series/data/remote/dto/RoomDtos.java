@@ -25,6 +25,7 @@ public final class RoomDtos {
         @SerializedName("activeHostId") public String activeHostId;
         @SerializedName("moderatorIds") public List<String> moderatorIds;
         @SerializedName("moderatorPermissions") public List<ModeratorPermissionDto> moderatorPermissions;
+        @SerializedName("viewerPermissions") public ViewerPermissionsDto viewerPermissions;
         @SerializedName("musicUrl") public String musicUrl;
         @SerializedName("musicTitle") public String musicTitle;
         @SerializedName("musicArtist") public String musicArtist;
@@ -66,6 +67,18 @@ public final class RoomDtos {
         @SerializedName("agencyTotalDiamonds") public long agencyTotalDiamonds;
         /** Official dashboard verification for the agency (show badge next to وكالة). */
         @SerializedName("agencyIsVerified") public boolean agencyIsVerified;
+    }
+
+    public static class ViewerPermissionsDto {
+        @SerializedName("canManageMusic") public boolean canManageMusic;
+        @SerializedName("canChangeFrames") public boolean canChangeFrames;
+        @SerializedName("canControlGames") public boolean canControlGames;
+        @SerializedName("canMute") public boolean canMute;
+        @SerializedName("canKick") public boolean canKick;
+        @SerializedName("canBan") public boolean canBan;
+        @SerializedName("canManageSeats") public boolean canManageSeats;
+        @SerializedName("canInvite") public boolean canInvite;
+        @SerializedName("canManageRoom") public boolean canManageRoom;
     }
 
     public static class ModeratorPermissionDto {
