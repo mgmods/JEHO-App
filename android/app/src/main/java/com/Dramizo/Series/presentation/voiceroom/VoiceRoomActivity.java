@@ -13330,6 +13330,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void bindHeaderHostVisual(@Nullable RoomDtos.RoomDto room,
                                       @Nullable List<RoomDtos.SeatDto> seats) {
         if (binding == null || room == null) return;
+        bindRoomFollowHeart(room);
         if (binding.hostStage != null) {
             binding.hostStage.setVisibility(View.GONE);
         }
