@@ -28,7 +28,6 @@ import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.EdgeToEdgeHelper;
-import com.Dramizo.Series.presentation.common.UserProfileCardSheet;
 import com.Dramizo.Series.presentation.voiceroom.VoiceRoomActivity;
 import com.Dramizo.Series.util.AuraDialogHelper;
 import com.Dramizo.Series.util.AvatarCosmetics;
@@ -227,13 +226,13 @@ public class SearchActivity extends ThemedActivity {
     private void openRow(Row row) {
         if (row.kind == KIND_USER && row.user != null) {
             AuthDtos.UserDto u = row.user;
-            UserProfileCardSheet.show(
-                    this,
-                    u.id,
-                    u.displayName != null ? u.displayName : u.username,
-                    u.avatarUrl,
-                    Math.max(0, u.vipLevel),
-                    Math.max(1, u.level));
+            // Open the full profile so the real CP pair (large self avatar,
+            // smaller linked partner avatar, and relationship symbol) is rendered
+            // by ProfileActivity exactly like direct profile navigation.
+            Intent profile = new Intent(this,
+                    com.Dramizo.Series.presentation.profile.ProfileActivity.class);
+            profile.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, u.id);
+            startActivity(profile);
         } else if (row.kind == KIND_ROOM && row.room != null) {
             openRoom(row.room);
         }
