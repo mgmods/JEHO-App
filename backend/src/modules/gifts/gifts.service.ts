@@ -1710,6 +1710,25 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
+  async getSupportChestState(roomId: string) {
+    if (!roomId || !/^[0-9a-f-]{36}$/i.test(roomId)) {
+      throw new BadRequestException('A valid roomId is required');
+    }
+    const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    const defaults = { enabled: false, iconVisible: false, goalMode: 'coins', coinTarget: 100000, diamondTarget: 10000, giftIds: [], rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '' };
+    let config: any = defaults;
+    try { if (configRow?.value) config = { ...defaults, ...JSON.parse(configRow.value) }; } catch {}
+    const key = 'support_chest_room:' + roomId;
+    let row = await this.settingsRepo.findOne({ where: { key } });
+    if (!row) {
+      await this.dataSource.query('INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING', [key, JSON.stringify({ roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 }), 'Room support chest state']);
+      row = await this.settingsRepo.findOne({ where: { key } });
+    }
+    let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
+    try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
+    return { config, state };
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
