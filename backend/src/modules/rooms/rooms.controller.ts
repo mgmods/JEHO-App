@@ -81,6 +81,12 @@ export class RoomsController {
     return this.roomsService.removeMusicTrack(trackId, userId);
   }
 
+  @Get('following')
+  @ApiOperation({ summary: 'List rooms and agency rooms followed by the current user' })
+  followingRooms(@CurrentUser('sub') userId: string) {
+    return this.roomsService.followingRooms(userId);
+  }
+
   @Get(':id')
   get(
     @Param('id', ParseUUIDPipe) id: string,
@@ -138,12 +144,6 @@ export class RoomsController {
   @ApiOperation({ summary: 'Unfollow host voice rooms' })
   unfollowRoom(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
     return this.roomsService.unfollowHostRoom(userId, id);
-  }
-
-  @Get('following')
-  @ApiOperation({ summary: 'List rooms and agency rooms followed by the current user' })
-  followingRooms(@CurrentUser('sub') userId: string) {
-    return this.roomsService.followingRooms(userId);
   }
 
   @Get(':id/follow')
