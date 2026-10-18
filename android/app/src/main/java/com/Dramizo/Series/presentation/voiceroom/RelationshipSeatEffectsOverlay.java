@@ -174,56 +174,31 @@ final class RelationshipSeatEffectsOverlay {
      * RecyclerView recycles seat holders when either member changes seats; resolving by ID on
      * every frame keeps the ribbon attached to the correct people during and after seat moves.
      */
+    /**
+     * Render the configured artwork as fixed-size moving copies along the live CP path.
+     * Never stretch or rotate the uploaded image: its native aspect ratio and orientation
+     * are preserved regardless of the distance or direction between the two seats.
+     */
     private void addEffect(@NonNull String userA, @NonNull String userB,
                            String type, String url, int sizeDp, long duration) {
-        final int thickness = dp(Math.max(20, Math.min(48, sizeDp)));
-        final boolean hasRibbon = !url.trim().isEmpty()
+        final int iconSize = dp(Math.max(20, Math.min(36, sizeDp)));
+        final boolean hasAsset = !url.trim().isEmpty()
                 && (url.startsWith("https://") || url.startsWith("http://"));
         final RibbonFallbackView fallback = new RibbonFallbackView(context);
-        fallback.setVisibility(hasRibbon ? View.INVISIBLE : View.VISIBLE);
-        FrameLayout.LayoutParams fallbackLp = new FrameLayout.LayoutParams(1, thickness);
+        fallback.setVisibility(hasAsset ? View.INVISIBLE : View.VISIBLE);
+        FrameLayout.LayoutParams fallbackLp = new FrameLayout.LayoutParams(1, iconSize);
         fallback.setLayoutParams(fallbackLp);
         fallback.setClickable(false);
         fallback.setFocusable(false);
         layer.addView(fallback);
 
+        final List<ImageView> copies = new ArrayList<>();
         final boolean[] assetLoaded = {false};
-        final boolean[] assetFailed = {!hasRibbon};
-        final ImageView ribbon;
-        if (hasRibbon) {
-            ribbon = new ImageView(context);
-            ribbon.setScaleType(ImageView.ScaleType.FIT_XY);
-            ribbon.setContentDescription("relationship ribbon");
-            ribbon.setVisibility(View.INVISIBLE);
-            ribbon.setClickable(false);
-            ribbon.setFocusable(false);
-            layer.addView(ribbon);
-            Glide.with(context).load(url).listener(new RequestListener<Drawable>() {
-                @Override public boolean onLoadFailed(@Nullable GlideException e, Object model,
-                        Target<Drawable> target, boolean isFirstResource) {
-                    assetFailed[0] = true;
-                    assetLoaded[0] = false;
-                    ribbon.setVisibility(View.INVISIBLE);
-                    fallback.setVisibility(View.VISIBLE);
-                    android.util.Log.w("RelationshipEffect", "Ribbon asset failed to load; using animated fallback", e);
-                    return false;
-                }
-                @Override public boolean onResourceReady(Drawable resource, Object model,
-                        Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
-                    assetLoaded[0] = true;
-                    assetFailed[0] = false;
-                    ribbon.setVisibility(View.VISIBLE);
-                    fallback.setVisibility(View.INVISIBLE);
-                    return false;
-                }
-            }).into(ribbon);
-        } else {
-            ribbon = null;
-        }
-        final View effectView = hasRibbon ? ribbon : fallback;
+        final boolean[] assetFailed = {!hasAsset};
         final int[] gridLoc = new int[2];
         final int[] aLoc = new int[2];
         final int[] bLoc = new int[2];
+
         ValueAnimator travel = ValueAnimator.ofFloat(0f, 1f);
         travel.setDuration(Math.max(500L, duration));
         travel.setRepeatCount(ValueAnimator.INFINITE);
@@ -234,13 +209,13 @@ final class RelationshipSeatEffectsOverlay {
             View anchorB = findAvatarForUser(userB);
             if (anchorA == null || anchorB == null
                     || layer.getWidth() <= 0 || layer.getHeight() <= 0) {
-                // Seats can temporarily detach during a move/layout pass. Keep the animation
-                // alive and reconnect it as soon as both current holders are attached again.
-                effectView.setVisibility(View.INVISIBLE);
+                // A holder may detach during seat movement/recycling. Keep the animator alive
+                // and reconnect to the same users as soon as their new holders are attached.
+                for (ImageView copy : copies) copy.setVisibility(View.INVISIBLE);
                 fallback.setVisibility(View.INVISIBLE);
-                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
                 return;
             }
+
             layer.getLocationInWindow(gridLoc);
             anchorA.getLocationInWindow(aLoc);
             anchorB.getLocationInWindow(bLoc);
@@ -250,28 +225,21 @@ final class RelationshipSeatEffectsOverlay {
             float centerBY = bLoc[1] - gridLoc[1] + anchorB.getHeight() / 2f;
             float centerDx = centerBX - centerAX;
             float centerDy = centerBY - centerAY;
-            // A valid active CP pair should keep its effect visible whenever BOTH members
-            // occupy seats, including different rows/ends of the grid. The former proximity
-            // gate silently hid the animation for normal seat layouts and row-wrapped pairs.
             float centerDistance = (float) Math.hypot(centerDx, centerDy);
             if (centerDistance < dp(8)) {
-                effectView.setVisibility(View.INVISIBLE);
+                for (ImageView copy : copies) copy.setVisibility(View.INVISIBLE);
                 fallback.setVisibility(View.INVISIBLE);
-                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
                 return;
             }
+
             float unitX = centerDx / centerDistance;
             float unitY = centerDy / centerDistance;
-            // Stop at avatar edges so the high-z connector stays visible without covering faces.
             float radiusA = Math.max(anchorA.getWidth(), anchorA.getHeight()) * 0.46f;
             float radiusB = Math.max(anchorB.getWidth(), anchorB.getHeight()) * 0.46f;
             float fromX = centerAX + unitX * radiusA;
             float fromY = centerAY + unitY * radiusA;
             float toX = centerBX - unitX * radiusB;
             float toY = centerBY - unitY * radiusB;
-
-            // Keep the entire effect inside the RecyclerView's own canvas. It cannot drift into
-            // the status bar, bottom controls, or outside the room's seat grid.
             fromX = clamp(fromX, 0f, layer.getWidth());
             toX = clamp(toX, 0f, layer.getWidth());
             fromY = clamp(fromY, 0f, layer.getHeight());
@@ -280,40 +248,93 @@ final class RelationshipSeatEffectsOverlay {
             float dy = toY - fromY;
             float distance = (float) Math.hypot(dx, dy);
             if (distance < dp(8)) {
-                effectView.setVisibility(View.INVISIBLE);
+                for (ImageView copy : copies) copy.setVisibility(View.INVISIBLE);
                 fallback.setVisibility(View.INVISIBLE);
-                if (ribbon != null) ribbon.setVisibility(View.INVISIBLE);
                 return;
             }
-            if (hasRibbon) {
-                ribbon.setVisibility(assetLoaded[0] ? View.VISIBLE : View.INVISIBLE);
-                fallback.setVisibility(assetFailed[0] ? View.VISIBLE : View.INVISIBLE);
-            } else {
-                fallback.setVisibility(View.VISIBLE);
-            }
-            float angle = (float) Math.toDegrees(Math.atan2(dy, dx));
+
             float progress = (Float) animation.getAnimatedValue();
-            // Keep a full connector spanning the two live avatar centers. Both the uploaded
-            // asset and the fallback use the same endpoints, so neither can drift from a seat.
-            int wantedWidth = Math.max(1, Math.round(distance));
-            View[] views = hasRibbon ? new View[]{ribbon, fallback} : new View[]{fallback};
-            for (View view : views) {
-                if (view == null) continue;
-                ViewGroup.LayoutParams params = view.getLayoutParams();
-                if (params.width != wantedWidth || params.height != thickness) {
-                    params.width = wantedWidth;
-                    params.height = thickness;
-                    view.setLayoutParams(params);
+            if (hasAsset && !assetFailed[0]) {
+                // One fixed-size copy every ~1.3 icon widths; more copies are created for
+                // longer seat-to-seat distances instead of stretching a single bitmap.
+                int wantedCopies = Math.max(2, Math.min(32,
+                        (int) Math.ceil(distance / Math.max(1f, iconSize * 1.30f))));
+                while (copies.size() < wantedCopies) {
+                    ImageView copy = new ImageView(context);
+                    copy.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                    copy.setAdjustViewBounds(false);
+                    copy.setContentDescription("moving relationship effect");
+                    copy.setClickable(false);
+                    copy.setFocusable(false);
+                    copy.setVisibility(View.INVISIBLE);
+                    copy.setRotation(0f);
+                    copy.setScaleX(1f);
+                    copy.setScaleY(1f);
+                    FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(iconSize, iconSize);
+                    copy.setLayoutParams(lp);
+                    layer.addView(copy);
+                    copies.add(copy);
+                    Glide.with(context).load(url).listener(new RequestListener<Drawable>() {
+                        @Override public boolean onLoadFailed(@Nullable GlideException e, Object model,
+                                Target<Drawable> target, boolean isFirstResource) {
+                            assetFailed[0] = true;
+                            android.util.Log.w("RelationshipEffect",
+                                    "Effect image failed; switching to animated fallback", e);
+                            return false;
+                        }
+                        @Override public boolean onResourceReady(Drawable resource, Object model,
+                                Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
+                            assetLoaded[0] = true;
+                            return false;
+                        }
+                    }).into(copy);
                 }
-                view.setPivotX(wantedWidth / 2f);
-                view.setPivotY(thickness / 2f);
-                view.setRotation(angle);
-                view.setX((fromX + toX) / 2f - wantedWidth / 2f);
-                view.setY((fromY + toY) / 2f - thickness / 2f);
-                float pulse = 0.90f + 0.10f * (float) Math.sin(progress * Math.PI * 2f);
-                view.setAlpha(pulse);
+                while (copies.size() > wantedCopies) {
+                    ImageView last = copies.remove(copies.size() - 1);
+                    Glide.with(context).clear(last);
+                    layer.removeView(last);
+                }
+
+                fallback.setVisibility(View.INVISIBLE);
+                for (int i = 0; i < copies.size(); i++) {
+                    ImageView copy = copies.get(i);
+                    if (assetFailed[0]) {
+                        copy.setVisibility(View.INVISIBLE);
+                        continue;
+                    }
+                    // Every copy follows the same direction, with a phase offset. The image
+                    // itself is never rotated, mirrored, or resized to match the path length.
+                    float phase = (progress + (float) i / copies.size()) % 1f;
+                    float x = fromX + dx * phase;
+                    float y = fromY + dy * phase;
+                    copy.setX(x - iconSize / 2f);
+                    copy.setY(y - iconSize / 2f);
+                    copy.setRotation(0f);
+                    copy.setScaleX(1f);
+                    copy.setScaleY(1f);
+                    copy.setAlpha(0.94f + 0.06f
+                            * (float) Math.sin((progress * Math.PI * 2f) + i));
+                    copy.setVisibility(assetLoaded[0] ? View.VISIBLE : View.INVISIBLE);
+                }
+            } else {
+                for (ImageView copy : copies) copy.setVisibility(View.INVISIBLE);
+                fallback.setVisibility(View.VISIBLE);
+                int wantedWidth = Math.max(1, Math.round(distance));
+                ViewGroup.LayoutParams params = fallback.getLayoutParams();
+                if (params.width != wantedWidth || params.height != iconSize) {
+                    params.width = wantedWidth;
+                    params.height = iconSize;
+                    fallback.setLayoutParams(params);
+                }
+                float angle = (float) Math.toDegrees(Math.atan2(dy, dx));
+                fallback.setPivotX(wantedWidth / 2f);
+                fallback.setPivotY(iconSize / 2f);
+                fallback.setRotation(angle);
+                fallback.setX((fromX + toX) / 2f - wantedWidth / 2f);
+                fallback.setY((fromY + toY) / 2f - iconSize / 2f);
+                fallback.setAlpha(0.94f + 0.06f * (float) Math.sin(progress * Math.PI * 2f));
+                fallback.setProgress(progress);
             }
-            fallback.setProgress(progress);
         });
         running.add(travel);
         travel.start();
