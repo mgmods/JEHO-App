@@ -3092,12 +3092,23 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   ) {
     const uid = String(targetUserId || '').trim();
     if (!uid) throw new BadRequestException('معرّف المستخدم مطلوب');
-    await this.assertModeratorPermission(
-      roomId,
-      actorId,
-      'canManageSeats',
-      'لا تملك صلاحية إنزال المستخدمين من المايك',
-    );
+    try {
+      await this.assertModeratorPermission(
+        roomId,
+        actorId,
+        'canManageSeats',
+        'لا تملك صلاحية إنزال المستخدمين من المايك',
+      );
+    } catch (permissionError) {
+      // A moderator explicitly granted room-kick rights can also remove a user from the mic.
+      // Room owners/cohosts, platform staff and agency managers pass the first check above.
+      await this.assertModeratorPermission(
+        roomId,
+        actorId,
+        'canKick',
+        'لا تملك صلاحية إنزال المستخدمين من المايك',
+      );
+    }
     await this.assertCanTargetUser(roomId, actorId, uid);
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId: uid } });
     if (!seat) {

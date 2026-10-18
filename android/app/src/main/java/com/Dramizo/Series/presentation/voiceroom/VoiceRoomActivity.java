@@ -2370,7 +2370,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             menu.getMenu().add(0, i++, 0,
                     (seatRef.isMuted || seatRef.isModeratorMuted) ? "فك كتم المايك" : "كتم المايك");
         }
-        if (canManageSeats && canTarget && seatRef != null) {
+        if ((canManageSeats || canKickUsers) && canTarget && seatRef != null) {
             menu.getMenu().add(0, i++, 0, "إنزال من المايك");
         }
         if ((canKickUsers || canBanUsers) && canTarget) {
@@ -6929,6 +6929,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
         View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
         ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        ImageView imgCpPartnerTopFrame = sheet.findViewById(R.id.imgCpPartnerTopFrame);
         TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
         final String[] publicIdHold = { "" };
         tvName.setText(name != null ? name : "مستخدم");
@@ -6953,35 +6954,102 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if (userId != null && !userId.equals(myUserId)) {
             cpContainer.getIoExecutor().execute(() -> {
-                Result<List<Map<String, Object>>> cpResult = ApiCall.execute(cpContainer.getUserApi().cpProfileRelationships(userId));
+                Result<List<Map<String, Object>>> cpResult = ApiCall.execute(
+                        cpContainer.getUserApi().cpProfileRelationships(userId));
                 if (!cpResult.success || cpResult.data == null || cpResult.data.isEmpty()) return;
                 Map<String, Object> rel = cpResult.data.get(0);
                 Object partnerObject = rel.get("partner");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("partnerUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("linkedUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("relatedUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("otherUser");
+                if (!(partnerObject instanceof Map)) partnerObject = rel.get("counterpart");
                 Map<?, ?> cpPartner = partnerObject instanceof Map ? (Map<?, ?>) partnerObject : null;
-                String type = String.valueOf(rel.get("type") == null ? "" : rel.get("type"));
-                String cpName = cpPartner == null ? "" : String.valueOf(cpPartner.get("displayName") != null
-                        ? cpPartner.get("displayName") : cpPartner.get("username"));
-                String cpAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? ""
-                        : String.valueOf(cpPartner.get("avatarUrl"));
+                String type = rel.get("type") == null ? "" : String.valueOf(rel.get("type"));
+                String status = firstNonEmpty(rel.get("status") == null ? null : String.valueOf(rel.get("status")),
+                        rel.get("state") == null ? null : String.valueOf(rel.get("state")),
+                        rel.get("relationshipStatus") == null ? null : String.valueOf(rel.get("relationshipStatus")), "");
+                String statusLower = status == null ? "" : status.trim().toLowerCase(java.util.Locale.ROOT);
+                boolean inactive = Boolean.FALSE.equals(rel.get("isActive")) || Boolean.FALSE.equals(rel.get("active"))
+                        || rel.get("endedAt") != null || statusLower.contains("ended")
+                        || statusLower.contains("reject") || statusLower.contains("expired")
+                        || statusLower.contains("pending") || statusLower.contains("inactive");
+                if (inactive) return;
+                String cpName = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerDisplayName") == null ? null : String.valueOf(rel.get("partnerDisplayName")),
+                                rel.get("partnerUsername") == null ? null : String.valueOf(rel.get("partnerUsername")), "")
+                        : firstNonEmpty(cpPartner.get("displayName") == null ? null : String.valueOf(cpPartner.get("displayName")),
+                                cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")),
+                                cpPartner.get("name") == null ? null : String.valueOf(cpPartner.get("name")), "");
+                String cpAvatar = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerAvatarUrl") == null ? null : String.valueOf(rel.get("partnerAvatarUrl")),
+                                rel.get("partner_avatar_url") == null ? null : String.valueOf(rel.get("partner_avatar_url")),
+                                rel.get("partnerProfileImageUrl") == null ? null : String.valueOf(rel.get("partnerProfileImageUrl")),
+                                rel.get("partnerPhotoUrl") == null ? null : String.valueOf(rel.get("partnerPhotoUrl")),
+                                rel.get("partnerPicture") == null ? null : String.valueOf(rel.get("partnerPicture")),
+                                rel.get("partnerImageUrl") == null ? null : String.valueOf(rel.get("partnerImageUrl")), "")
+                        : firstNonEmpty(cpPartner.get("avatarUrl") == null ? null : String.valueOf(cpPartner.get("avatarUrl")),
+                                cpPartner.get("avatar") == null ? null : String.valueOf(cpPartner.get("avatar")),
+                                cpPartner.get("profileImageUrl") == null ? null : String.valueOf(cpPartner.get("profileImageUrl")),
+                                cpPartner.get("photoUrl") == null ? null : String.valueOf(cpPartner.get("photoUrl")),
+                                cpPartner.get("picture") == null ? null : String.valueOf(cpPartner.get("picture")),
+                                cpPartner.get("imageUrl") == null ? null : String.valueOf(cpPartner.get("imageUrl")),
+                                cpPartner.get("profilePicture") == null ? null : String.valueOf(cpPartner.get("profilePicture")),
+                                cpPartner.get("photo") == null ? null : String.valueOf(cpPartner.get("photo")),
+                                cpPartner.get("avatar_url") == null ? null : String.valueOf(cpPartner.get("avatar_url")), "");
+                String cpFrame = cpPartner == null
+                        ? firstNonEmpty(rel.get("partnerFrameUrl") == null ? null : String.valueOf(rel.get("partnerFrameUrl")),
+                                rel.get("partnerVipBadgeUrl") == null ? null : String.valueOf(rel.get("partnerVipBadgeUrl")), "")
+                        : firstNonEmpty(cpPartner.get("vipBadgeUrl") == null ? null : String.valueOf(cpPartner.get("vipBadgeUrl")),
+                                cpPartner.get("profileFrameUrl") == null ? null : String.valueOf(cpPartner.get("profileFrameUrl")),
+                                cpPartner.get("frameUrl") == null ? null : String.valueOf(cpPartner.get("frameUrl")),
+                                cpPartner.get("avatarFrameUrl") == null ? null : String.valueOf(cpPartner.get("avatarFrameUrl")),
+                                cpPartner.get("vipTouUrl") == null ? null : String.valueOf(cpPartner.get("vipTouUrl")), "");
+                String cpVipTou = cpPartner == null || cpPartner.get("vipTouUrl") == null ? "" : String.valueOf(cpPartner.get("vipTouUrl"));
+                int cpVipLevel = 0;
+                try { Object vip = cpPartner == null ? rel.get("partnerVipLevel") : cpPartner.get("vipLevel");
+                    cpVipLevel = vip == null ? 0 : Integer.parseInt(String.valueOf(vip));
+                } catch (Exception ignored) { }
+                if (cpFrame == null || cpFrame.trim().isEmpty()) {
+                    String vipFrame = VipStyle.profileNobilityFrameUrl(cpVipLevel, cpVipTou);
+                    cpFrame = vipFrame == null ? "" : vipFrame;
+                }
+                final String partnerAvatarUrl = cpAvatar == null ? "" : cpAvatar.trim();
+                final String partnerFrameUrl = cpFrame == null ? "" : cpFrame.trim();
+                final String relationshipType = type;
+                final String partnerName = cpName == null ? "" : cpName;
                 runOnUiThread(() -> {
-                    if (rowCpRelationship == null || dialog.getWindow() == null) return;
-                    rowCpRelationship.setVisibility(View.VISIBLE);
-                    if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(type)
-                            + (cpName.isEmpty() ? "" : " · " + cpName));
-                    if (imgCpPartnerAvatar != null && !cpAvatar.isEmpty()) {
-                        Glide.with(VoiceRoomActivity.this).load(cpAvatar)
-                                .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
-                    }
-                    // The room popup has its own compact paired-avatar header (not ProfileActivity).
-                    if (cpTopPartnerWrap != null && !cpAvatar.trim().isEmpty()) {
+                    // Network may return before the bottom-sheet Window exists; still bind the views.
+                    if (isFinishing() || isDestroyed()) return;
+                    if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.VISIBLE);
+                    if (tvCpRelationship != null) tvCpRelationship.setText(roomCpTypeLabel(relationshipType)
+                            + (partnerName.isEmpty() ? "" : " · " + partnerName));
+                    String resolvedPartnerAvatar = partnerAvatarUrl.isEmpty() ? null : AssetCatalog.absoluteUrl(partnerAvatarUrl);
+                    if (imgCpPartnerAvatar != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
+                            .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    if (cpTopPartnerWrap != null && cpPartner != null) {
                         cpTopPartnerWrap.setVisibility(View.VISIBLE);
-                        if (imgCpPartnerTop != null) {
-                            Glide.with(VoiceRoomActivity.this).load(cpAvatar)
-                                    .placeholder(R.drawable.ic_tab_me).into(imgCpPartnerTop);
+                        if (imgCpPartnerTop != null) Glide.with(VoiceRoomActivity.this).load(resolvedPartnerAvatar)
+                                .placeholder(R.drawable.ic_tab_me).error(R.drawable.ic_tab_me).into(imgCpPartnerTop);
+                        if (imgCpPartnerTopFrame != null) {
+                            if (partnerFrameUrl.isEmpty()) { imgCpPartnerTopFrame.setImageDrawable(null); imgCpPartnerTopFrame.setVisibility(View.GONE); }
+                            else { imgCpPartnerTopFrame.setVisibility(View.VISIBLE);
+                                Glide.with(VoiceRoomActivity.this).load(AssetCatalog.absoluteUrl(partnerFrameUrl)).into(imgCpPartnerTopFrame); }
                         }
                         if (tvCpTopHeart != null) {
-                            tvCpTopHeart.setText(roomCpTopSymbol(type));
+                            tvCpTopHeart.setText(roomCpTopSymbol(relationshipType));
                             tvCpTopHeart.setVisibility(View.VISIBLE);
+                            tvCpTopHeart.setTextColor(android.graphics.Color.parseColor("#FFFF6FA9"));
+                            tvCpTopHeart.setShadowLayer(8f, 0f, 0f, android.graphics.Color.parseColor("#FFFF8DB9"));
+                            android.animation.ObjectAnimator sx = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_X, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator sy = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_Y, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator alpha = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.ALPHA, 0.78f, 1f, 0.78f);
+                            android.animation.AnimatorSet heartMotion = new android.animation.AnimatorSet();
+                            heartMotion.playTogether(sx, sy, alpha); heartMotion.setDuration(900L);
+                            heartMotion.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+                            sx.setRepeatCount(android.animation.ValueAnimator.INFINITE); sy.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            alpha.setRepeatCount(android.animation.ValueAnimator.INFINITE); heartMotion.start();
+                            dialog.setOnDismissListener(d -> heartMotion.cancel());
                         }
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
@@ -7233,7 +7301,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         TextView actForceLeaveSeat = sheet.findViewById(R.id.actForceLeaveSeat);
         if (actForceLeaveSeat != null) {
-            boolean showForceLeave = canManageSeats && canTarget && targetSeat != null;
+            boolean showForceLeave = (canManageSeats || canKickUsers) && canTarget && targetSeat != null;
             actForceLeaveSeat.setVisibility(showForceLeave ? View.VISIBLE : View.GONE);
             if (showForceLeave) {
                 actForceLeaveSeat.setText("إنزال من المايك");

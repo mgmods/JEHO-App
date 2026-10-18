@@ -168,17 +168,38 @@ public final class UserProfileCardSheet {
                 Result<List<Map<String, Object>>> cp = ApiCall.execute(container.getUserApi().cpProfileRelationships(uid));
                 if (!cp.success || cp.data == null || cp.data.isEmpty()) return;
                 Map<String, Object> relation = cp.data.get(0);
+                String relationStatus = relation.get("status") == null ? ""
+                        : String.valueOf(relation.get("status")).trim().toLowerCase(java.util.Locale.ROOT);
+                if (Boolean.FALSE.equals(relation.get("isActive")) || Boolean.FALSE.equals(relation.get("active"))
+                        || relation.get("endedAt") != null || relationStatus.contains("ended")
+                        || relationStatus.contains("reject") || relationStatus.contains("expired")
+                        || relationStatus.contains("pending") || relationStatus.contains("inactive")) return;
                 Object partnerObj = relation.get("partner");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("partnerUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("linkedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("relatedUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("otherUser");
+                if (!(partnerObj instanceof Map)) partnerObj = relation.get("counterpart");
                 Map<?, ?> cpPartner = partnerObj instanceof Map ? (Map<?, ?>) partnerObj : null;
                 String type = String.valueOf(relation.get("type") == null ? "" : relation.get("type"));
-                String partnerName = cpPartner == null ? "" : String.valueOf(
-                        cpPartner.get("displayName") != null ? cpPartner.get("displayName") : cpPartner.get("username"));
-                String partnerAvatar = cpPartner == null || cpPartner.get("avatarUrl") == null ? "" : String.valueOf(cpPartner.get("avatarUrl"));
+                String partnerName = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("displayName") == null ? null : String.valueOf(cpPartner.get("displayName")),
+                        cpPartner.get("username") == null ? null : String.valueOf(cpPartner.get("username")), "");
+                String partnerAvatar = cpPartner == null ? "" : firstNonEmpty(
+                        cpPartner.get("avatarUrl") == null ? null : String.valueOf(cpPartner.get("avatarUrl")),
+                        cpPartner.get("avatar") == null ? null : String.valueOf(cpPartner.get("avatar")),
+                        cpPartner.get("profileImageUrl") == null ? null : String.valueOf(cpPartner.get("profileImageUrl")),
+                        cpPartner.get("photoUrl") == null ? null : String.valueOf(cpPartner.get("photoUrl")),
+                        cpPartner.get("picture") == null ? null : String.valueOf(cpPartner.get("picture")),
+                        cpPartner.get("imageUrl") == null ? null : String.valueOf(cpPartner.get("imageUrl")),
+                        cpPartner.get("profilePicture") == null ? null : String.valueOf(cpPartner.get("profilePicture")),
+                        cpPartner.get("photo") == null ? null : String.valueOf(cpPartner.get("photo")),
+                        cpPartner.get("avatar_url") == null ? null : String.valueOf(cpPartner.get("avatar_url")), "");
                 activity.runOnUiThread(() -> {
-                    if (dialog.getWindow() == null || rowCpRelationship == null) return;
+                    if (activity.isFinishing() || rowCpRelationship == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
-                    String resolvedPartnerAvatar = partnerAvatar.trim().isEmpty()
+                    String resolvedPartnerAvatar = partnerAvatar == null || partnerAvatar.trim().isEmpty()
                             ? null : AssetCatalog.absoluteUrl(partnerAvatar.trim());
                     if (imgCpPartnerAvatar != null) {
                         Glide.with(activity).load(resolvedPartnerAvatar)
@@ -199,6 +220,19 @@ public final class UserProfileCardSheet {
                         if (tvCpTopHeart != null) {
                             tvCpTopHeart.setText(cpTypeSymbol(type));
                             tvCpTopHeart.setVisibility(View.VISIBLE);
+                            tvCpTopHeart.setTextColor(android.graphics.Color.parseColor("#FFFF6FA9"));
+                            tvCpTopHeart.setShadowLayer(8f, 0f, 0f, android.graphics.Color.parseColor("#FFFF8DB9"));
+                            android.animation.ObjectAnimator sx = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_X, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator sy = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.SCALE_Y, 1f, 1.18f, 1f);
+                            android.animation.ObjectAnimator alpha = android.animation.ObjectAnimator.ofFloat(tvCpTopHeart, View.ALPHA, 0.78f, 1f, 0.78f);
+                            android.animation.AnimatorSet motion = new android.animation.AnimatorSet();
+                            motion.playTogether(sx, sy, alpha); motion.setDuration(900L);
+                            motion.setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator());
+                            sx.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            sy.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            alpha.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+                            motion.start();
+                            dialog.setOnDismissListener(d -> motion.cancel());
                         }
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);

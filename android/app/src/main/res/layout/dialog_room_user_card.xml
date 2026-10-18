@@ -46,95 +46,35 @@
         tools:visibility="visible" />
 
     <!-- Avatar + VIP frame (iv_vip_tou) -->
-    <FrameLayout
-        android:id="@+id/avatar_layout"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="8dp"
-        android:clipChildren="false"
-        android:clipToPadding="false"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <ImageView
-            android:id="@+id/imgUserAvatar"
-            android:layout_width="86dp"
-            android:layout_height="86dp"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_tab_me" />
-
-        <ImageView
-            android:id="@+id/imgUserFrame"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
-
-        <com.Dramizo.Series.util.HostSignalView
-            android:id="@+id/userCardHostSignal"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-
-        <ImageView
-            android:id="@+id/imgUserHostBadge"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:scaleType="fitCenter"
-            android:visibility="gone" />
-
-        <View
-            android:id="@+id/superAdminAvatarFrame"
-            android:layout_width="98dp"
-            android:layout_height="98dp"
-            android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:visibility="gone" />
-
-        <!-- Linked partner avatar for the in-room popup; populated from the active CP API. -->
-        <FrameLayout
-            android:id="@+id/cpTopPartnerWrap"
-            android:layout_width="58dp"
-            android:layout_height="58dp"
-            android:layout_gravity="bottom|end"
-            android:layout_marginEnd="0dp"
-            android:layout_marginBottom="0dp"
-            android:background="@drawable/bg_cp_cv_avatar_gold"
-            android:elevation="8dp"
-            android:padding="4dp"
-            android:visibility="gone">
-
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/imgCpPartnerTop"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
+    <FrameLayout android:id="@+id/avatar_layout" android:layout_width="160dp" android:layout_height="100dp"
+        android:layout_marginTop="8dp" android:clipChildren="false" android:clipToPadding="false"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5" app:layout_constraintTop_toTopOf="parent">
+        <ImageView android:id="@+id/imgUserAvatar" android:layout_width="76dp" android:layout_height="76dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:elevation="4dp"
+            android:scaleType="centerCrop" android:src="@drawable/ic_tab_me" />
+        <ImageView android:id="@+id/imgUserFrame" android:layout_width="92dp" android:layout_height="92dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
+        <com.Dramizo.Series.util.HostSignalView android:id="@+id/userCardHostSignal" android:layout_width="92dp"
+            android:layout_height="92dp" android:layout_gravity="center_vertical|start" android:visibility="gone" />
+        <ImageView android:id="@+id/imgUserHostBadge" android:layout_width="92dp" android:layout_height="92dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
+        <View android:id="@+id/superAdminAvatarFrame" android:layout_width="98dp" android:layout_height="98dp"
+            android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:visibility="gone" />
+        <FrameLayout android:id="@+id/cpTopPartnerWrap" android:layout_width="58dp" android:layout_height="58dp"
+            android:layout_gravity="center_vertical|end" android:background="@drawable/bg_cp_cv_avatar_gold"
+            android:elevation="8dp" android:padding="3dp" android:visibility="gone">
+            <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgCpPartnerTop"
+                android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop"
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+            <ImageView android:id="@+id/imgCpPartnerTopFrame" android:layout_width="match_parent" android:layout_height="match_parent"
+                android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
         </FrameLayout>
-
-        <TextView
-            android:id="@+id/tvCpTopHeart"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_gravity="bottom|end"
-            android:layout_marginEnd="43dp"
-            android:layout_marginBottom="1dp"
-            android:background="@drawable/bg_cp_cv_badge"
-            android:elevation="10dp"
-            android:gravity="center"
-            android:text="♥"
-            android:textColor="#FFFFF1D5"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:visibility="gone" />
+        <TextView android:id="@+id/tvCpTopHeart" android:layout_width="28dp" android:layout_height="28dp"
+            android:layout_gravity="center_vertical|end" android:layout_marginEnd="52dp" android:background="@drawable/bg_cp_cv_badge"
+            android:elevation="10dp" android:gravity="center" android:includeFontPadding="false" android:shadowColor="#FFFF8DB9"
+            android:shadowDx="0" android:shadowDy="0" android:shadowRadius="7" android:text="♥" android:textColor="#FFFF6FA9"
+            android:textSize="19sp" android:textStyle="bold" android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
