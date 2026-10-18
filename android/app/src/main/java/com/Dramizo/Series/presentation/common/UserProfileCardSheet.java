@@ -127,6 +127,9 @@ public final class UserProfileCardSheet {
         View rowCpRelationship = sheet.findViewById(R.id.rowCpRelationship);
         ImageView imgCpPartnerAvatar = sheet.findViewById(R.id.imgCpPartnerAvatar);
         TextView tvCpRelationship = sheet.findViewById(R.id.tvCpRelationship);
+        View cpTopPartnerWrap = sheet.findViewById(R.id.cpTopPartnerWrap);
+        ImageView imgCpPartnerTop = sheet.findViewById(R.id.imgCpPartnerTop);
+        TextView tvCpTopHeart = sheet.findViewById(R.id.tvCpTopHeart);
 
         final String[] publicIdHold = {""};
         final String[] displayNameHold = {name != null ? name : ""};
@@ -154,6 +157,8 @@ public final class UserProfileCardSheet {
 
         // Public CP badge: fetched from the public profile endpoint, so every viewer sees the same active bond.
         if (rowCpRelationship != null) rowCpRelationship.setVisibility(View.GONE);
+        if (cpTopPartnerWrap != null) cpTopPartnerWrap.setVisibility(View.GONE);
+        if (tvCpTopHeart != null) tvCpTopHeart.setVisibility(View.GONE);
         if (actCpRequest != null) {
             actCpRequest.setVisibility(uid.equals(myId) ? View.GONE : View.VISIBLE);
             actCpRequest.setOnClickListener(v -> showCpRequestDialog(activity, container, uid, dialog));
@@ -173,8 +178,28 @@ public final class UserProfileCardSheet {
                     if (dialog.getWindow() == null || rowCpRelationship == null) return;
                     rowCpRelationship.setVisibility(View.VISIBLE);
                     if (tvCpRelationship != null) tvCpRelationship.setText(cpTypeLabel(type) + (partnerName.isEmpty() ? "" : " · " + partnerName));
-                    if (imgCpPartnerAvatar != null && !partnerAvatar.isEmpty()) {
-                        Glide.with(activity).load(partnerAvatar).placeholder(R.drawable.ic_tab_me).into(imgCpPartnerAvatar);
+                    String resolvedPartnerAvatar = partnerAvatar.trim().isEmpty()
+                            ? null : AssetCatalog.absoluteUrl(partnerAvatar.trim());
+                    if (imgCpPartnerAvatar != null) {
+                        Glide.with(activity).load(resolvedPartnerAvatar)
+                                .placeholder(R.drawable.ic_tab_me)
+                                .error(R.drawable.ic_tab_me)
+                                .into(imgCpPartnerAvatar);
+                    }
+                    // Same paired-avatar header used in the room card: large account photo,
+                    // smaller real linked partner photo, and the relationship symbol between them.
+                    if (cpTopPartnerWrap != null && cpPartner != null) {
+                        cpTopPartnerWrap.setVisibility(View.VISIBLE);
+                        if (imgCpPartnerTop != null) {
+                            Glide.with(activity).load(resolvedPartnerAvatar)
+                                    .placeholder(R.drawable.ic_tab_me)
+                                    .error(R.drawable.ic_tab_me)
+                                    .into(imgCpPartnerTop);
+                        }
+                        if (tvCpTopHeart != null) {
+                            tvCpTopHeart.setText(cpTypeSymbol(type));
+                            tvCpTopHeart.setVisibility(View.VISIBLE);
+                        }
                     }
                     if (actCpRequest != null) actCpRequest.setVisibility(View.GONE);
                 });
@@ -596,6 +621,17 @@ public final class UserProfileCardSheet {
                 })
                 .setNegativeButton("إلغاء", null)
                 .show();
+    }
+
+    private static String cpTypeSymbol(String type) {
+        String value = type == null ? "" : type.trim().toLowerCase(java.util.Locale.ROOT);
+        switch (value) {
+            case "marriage": return "💞";
+            case "engagement": return "💍";
+            case "brotherhood": return "✦";
+            case "friendship": return "♡";
+            default: return "♥";
+        }
     }
 
     private static String cpTypeLabel(String type) {
