@@ -89,6 +89,43 @@
             android:layout_gravity="center"
             android:contentDescription="@null"
             android:visibility="gone" />
+
+        <!-- Linked partner avatar for the in-room popup; populated from the active CP API. -->
+        <FrameLayout
+            android:id="@+id/cpTopPartnerWrap"
+            android:layout_width="58dp"
+            android:layout_height="58dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="0dp"
+            android:layout_marginBottom="0dp"
+            android:background="@drawable/bg_cp_cv_avatar_gold"
+            android:elevation="8dp"
+            android:padding="4dp"
+            android:visibility="gone">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/imgCpPartnerTop"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvCpTopHeart"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="43dp"
+            android:layout_marginBottom="1dp"
+            android:background="@drawable/bg_cp_cv_badge"
+            android:elevation="10dp"
+            android:gravity="center"
+            android:text="♥"
+            android:textColor="#FFFFF1D5"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
