@@ -3080,11 +3080,23 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Broadcast to the room and directly to the affected user. The Android target
     // handles this direct room:event too, so removal works even if its room channel
     // subscription is stale.
-    this.emitRoomEventToUser(roomId, userId, 'room:seat_left', {
+    const seatLeftPayload = {
       ...member,
+      userId,
       forced: true,
       reason: reason || 'moderator',
+    };
+    // Broadcast the forced seat removal to every room participant. A room snapshot
+    // refresh alone can be delayed or missed by clients with stale socket state.
+    this.realtimeGateway.emitToRoom(roomId, 'room:event', {
+      roomId,
+      event: 'room:seat_left',
+      payload: seatLeftPayload,
+      at: new Date().toISOString(),
     });
+    // Also notify the removed user directly so their RTC publishing stops even
+    // if their room-channel subscription is stale.
+    this.emitRoomEventToUser(roomId, userId, 'room:seat_left', seatLeftPayload);
     void this.syncPersonalRoomEmptyState(roomId).catch(() => undefined);
     return { left: true, userId };
   }
