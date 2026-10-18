@@ -43,7 +43,7 @@ public final class VanityIdStyle {
         Long cachedAt = CACHE_AT.get(id);
         if (cached != null && cachedAt != null
                 && System.currentTimeMillis() - cachedAt < CACHE_TTL_MS) {
-            ServerAssets.loadCompoundStart(view, cached.styleIconUrl, 14);
+            ServerAssets.loadCompoundStart(view, resolveIconUrl(cached.styleIconUrl), 14);
             if ("none".equals(cached.styleMode)) clear(view);
             else if ("vip".equals(cached.styleMode)) apply(view, id, vipColors(cached.styleVipLevel), false, cached.styleGlow);
             else apply(view, id, colors(cached), "animated".equals(cached.styleMode), cached.styleGlow);
@@ -65,13 +65,21 @@ public final class VanityIdStyle {
                 CACHE_AT.put(id, System.currentTimeMillis());
                 Object current = view.getTag(R.id.tag_vanity_id_style_key);
                 if (!id.equals(current)) return;
-                ServerAssets.loadCompoundStart(view, style.styleIconUrl, 14);
+                ServerAssets.loadCompoundStart(view, resolveIconUrl(style.styleIconUrl), 14);
                 if ("none".equals(style.styleMode)) clear(view);
                 else if ("vip".equals(style.styleMode)) apply(view, id, vipColors(style.styleVipLevel), false, style.styleGlow);
                 else apply(view, id, colors(style), "animated".equals(style.styleMode), style.styleGlow);
             }
             @Override public void onFailure(Call<ApiResponse<VanityDtos.Style>> call, Throwable error) { LOADING.remove(id); }
         });
+    }
+
+    private static String resolveIconUrl(@Nullable String value) {
+        if (value == null || value.trim().isEmpty()) return null;
+        String url = value.trim();
+        if (url.startsWith("https://") || url.startsWith("http://") || url.startsWith("/api/v1/")) return url;
+        if (url.startsWith("/uploads/")) return "/api/v1" + url;
+        return url;
     }
 
     private static int[] vipColors(int level) {
