@@ -64,20 +64,21 @@
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:scaleType="fitCenter" android:visibility="gone" />
         <View android:id="@+id/superAdminAvatarFrame" android:layout_width="98dp" android:layout_height="98dp"
             android:layout_gravity="center_vertical|start" android:contentDescription="@null" android:visibility="gone" />
-        <FrameLayout android:id="@+id/cpTopPartnerWrap" android:layout_width="58dp" android:layout_height="58dp"
+        <FrameLayout android:id="@+id/cpTopPartnerWrap" android:layout_width="72dp" android:layout_height="72dp"
             android:layout_gravity="center_vertical|end" android:background="@drawable/bg_cp_cv_avatar_gold"
             android:elevation="8dp" android:padding="3dp" android:visibility="gone">
             <com.google.android.material.imageview.ShapeableImageView android:id="@+id/imgCpPartnerTop"
-                android:layout_width="match_parent" android:layout_height="match_parent" android:scaleType="centerCrop"
-                app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle" />
+                android:layout_width="match_parent" android:layout_height="match_parent" android:elevation="3dp"
+                android:scaleType="centerCrop" app:shapeAppearanceOverlay="@style/ShapeAppearance.AuraLive.Circle"
+                app:strokeColor="#FFFFFFFF" app:strokeWidth="2dp" />
             <ImageView android:id="@+id/imgCpPartnerTopFrame" android:layout_width="match_parent" android:layout_height="match_parent"
                 android:contentDescription="@null" android:scaleType="fitXY" android:visibility="gone" />
         </FrameLayout>
-        <TextView android:id="@+id/tvCpTopHeart" android:layout_width="28dp" android:layout_height="28dp"
-            android:layout_gravity="center_vertical|end" android:layout_marginEnd="52dp" android:background="@drawable/bg_cp_cv_badge"
+        <TextView android:id="@+id/tvCpTopHeart" android:layout_width="34dp" android:layout_height="34dp"
+            android:layout_gravity="center_vertical|end" android:layout_marginEnd="58dp" android:background="@drawable/bg_cp_cv_badge"
             android:elevation="10dp" android:gravity="center" android:includeFontPadding="false" android:shadowColor="#FFFF8DB9"
-            android:shadowDx="0" android:shadowDy="0" android:shadowRadius="7" android:text="♥" android:textColor="#FFFF6FA9"
-            android:textSize="19sp" android:textStyle="bold" android:visibility="gone" />
+            android:shadowDx="0" android:shadowDy="0" android:shadowRadius="8" android:text="♥" android:textColor="#FFFF6FA9"
+            android:textSize="23sp" android:textStyle="bold" android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
