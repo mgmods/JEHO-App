@@ -327,22 +327,7 @@
                         android:scaleType="fitCenter"
                         android:visibility="gone" />
 
-                    <HorizontalScrollView
-                        android:layout_width="96dp"
-                        android:layout_height="24dp"
-                        android:layout_marginStart="6dp"
-                        android:fillViewport="false"
-                        android:overScrollMode="never"
-                        android:scrollbars="none">
-
-                        <LinearLayout
-                            android:id="@+id/rowEarnedBadges"
-                            android:layout_width="wrap_content"
-                            android:layout_height="match_parent"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:visibility="gone" />
-                    </HorizontalScrollView>
+                    
 
                     <TextView
                         android:id="@+id/tvLevelChip"
@@ -380,6 +365,82 @@
                         android:id="@+id/imgHostBadge"
                         android:layout_width="0dp"
                         android:layout_height="0dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <!-- Achievement badges: shown below identity, separate from VIP medals. -->
+                <LinearLayout
+                    android:id="@+id/rowBadges"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="14dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_user_card_stat_cell"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="الشارات والمداليات"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvBadgeCount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 مكتسبة"
+                            android:textColor="#FFFFD479"
+                            android:textSize="11sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="عرض الكل  ›"
+                            android:textColor="#FFB8C9C9"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="36dp"
+                        android:layout_marginTop="6dp"
+                        android:fillViewport="false"
+                        android:overScrollMode="never"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:id="@+id/rowEarnedBadges"
+                            android:layout_width="wrap_content"
+                            android:layout_height="match_parent"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:visibility="gone" />
+                    </HorizontalScrollView>
+
+                    <TextView
+                        android:id="@+id/tvBadgesEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="5dp"
+                        android:text="لم تحصل على شارات بعد"
+                        android:textColor="#FF9BA8A8"
+                        android:textSize="12sp"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -1107,15 +1168,7 @@
                     android:textSize="14sp"
                     android:visibility="gone" />
 
-                <TextView
-                    android:id="@+id/rowBadges"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:gravity="center_vertical"
-                    android:text="شارة"
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="14sp"
-                    android:visibility="gone" />
+
 
                 <TextView
                     android:id="@+id/rowCars"
