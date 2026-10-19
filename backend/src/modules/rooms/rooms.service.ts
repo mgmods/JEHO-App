@@ -10,7 +10,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, IsNull, Repository } from 'typeorm';
+import { DataSource, In, IsNull, MoreThan, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { ConfigService } from '@nestjs/config';
@@ -1420,7 +1420,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user?.mysteriousMode) return null;
     const vip = await this.userVipsRepo.findOne({
-      where: { userId, isActive: true, expiresAt: require('typeorm').MoreThan(new Date()) },
+      where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
