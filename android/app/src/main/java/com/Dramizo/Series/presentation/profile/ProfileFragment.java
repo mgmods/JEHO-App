@@ -449,6 +449,7 @@ public class ProfileFragment extends Fragment {
                 java.util.Map<String, Object> data = result.data;
                 boolean eligible = mysteriousFlag(data.get("eligible"));
                 boolean enabled = mysteriousFlag(data.get("enabled"));
+                requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply();
                 if (!eligible) {
                     binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
                     return;
@@ -478,6 +479,7 @@ public class ProfileFragment extends Fragment {
                     if (binding == null || !isAdded()) return;
                     if (changed != null && changed.success && changed.data != null) {
                         boolean saved = mysteriousFlag(changed.data.get("enabled"));
+                        requireContext().getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE).edit().putBoolean("enabled", saved).apply();
                         button.setOnCheckedChangeListener(null);
                         button.setChecked(saved);
                         button.setEnabled(true);
