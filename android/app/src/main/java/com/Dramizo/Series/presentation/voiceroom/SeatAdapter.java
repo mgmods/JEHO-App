@@ -1035,6 +1035,16 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             clearHostWear(holder);
             return;
         }
+        if (user.mysteriousMan) {
+            if (holder.b.seatHostSignal != null) {
+                holder.b.seatHostSignal.clearSignal();
+                holder.b.seatHostSignal.setVisibility(View.GONE);
+            }
+            holder.b.imgFrame.setVisibility(View.GONE);
+            holder.b.imgHostBadge.setVisibility(View.GONE);
+            holder.b.imgAvatar.setImageResource(R.drawable.ic_mysterious_man);
+            return;
+        }
         String hostUrl = user.hostBadgeUrl;
         String vipUrl = user.vipBadgeUrl;
         java.util.Map<String, Object> badgeMeta = user.hostBadgeMeta;
