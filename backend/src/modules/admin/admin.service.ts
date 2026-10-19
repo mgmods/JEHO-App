@@ -1294,9 +1294,8 @@ export class AdminService {
   }
 
   /**
-   * Create a platform-owned, persistent official room. RoomKind.SUPPORT is the
-   * existing server-enforced pin/listing mechanism; no schema reset is needed.
-   * moderatorIds are public account IDs shown in the app, not database UUIDs.
+   * Create a genuinely platform-owned persistent room: no host user and no
+   * moderators unless dashboard staff explicitly supplies moderator IDs.
    */
   async createPlatformRoom(dto: {
     title?: string;
@@ -1311,9 +1310,6 @@ export class AdminService {
     const requestedIds = [...new Set((dto.moderatorIds || [])
       .map((value) => String(value || '').trim())
       .filter(Boolean))];
-    if (!requestedIds.length) {
-      throw new BadRequestException('أضف آيدي مستخدم واحد على الأقل كمشرف للروم');
-    }
     const moderatorUsers: User[] = [];
     for (const publicId of requestedIds) {
       const user = await this.usersRepo.findOne({ where: { publicId } });
@@ -1323,14 +1319,6 @@ export class AdminService {
       moderatorUsers.push(user);
     }
 
-    // Prefer an existing platform-admin account as the technical room host.
-    // If the deployment has no linked platform account, use the first appointed
-    // moderator as the required host reference; the room remains platform-managed.
-    const platformAdmin = await this.usersRepo.findOne({
-      where: { isAdmin: true, status: Not(UserStatus.DELETED) },
-      order: { createdAt: 'ASC' },
-    });
-    const hostId = platformAdmin?.id || moderatorUsers[0].id;
     const seatCount = Math.max(2, Math.min(20, Math.floor(Number(dto.seatCount) || 11)));
     let publicId = '';
     for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -1353,7 +1341,7 @@ export class AdminService {
           : 'official',
         type: RoomType.VOICE,
         status: RoomStatus.OPEN,
-        hostId,
+        hostId: null,
         cohostId: null,
         seatCount,
         viewerCount: 0,
@@ -1384,27 +1372,32 @@ export class AdminService {
       }
       await manager.save(seats);
 
-      const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
-        roomId: room.id,
-        userId: user.id,
-        role: ModeratorRole.ADMIN,
-        canManageMusic: true,
-        canChangeFrames: true,
-        canControlGames: true,
-        canMute: true,
-        canKick: true,
-        canBan: true,
-        canManageSeats: true,
-        canInvite: true,
-        canManageRoom: true,
-        appointedById: hostId,
-      }));
-      await manager.save(mods);
-      return { room, moderators: moderatorUsers.map((user) => ({
-        userId: user.id,
-        publicId: user.publicId,
-        displayName: user.displayName || user.username,
-      })) };
+      if (moderatorUsers.length) {
+        const mods = moderatorUsers.map((user) => manager.create(RoomModerator, {
+          roomId: room.id,
+          userId: user.id,
+          role: ModeratorRole.ADMIN,
+          canManageMusic: true,
+          canChangeFrames: true,
+          canControlGames: true,
+          canMute: true,
+          canKick: true,
+          canBan: true,
+          canManageSeats: true,
+          canInvite: true,
+          canManageRoom: true,
+          appointedById: null,
+        }));
+        await manager.save(mods);
+      }
+      return {
+        room,
+        moderators: moderatorUsers.map((user) => ({
+          userId: user.id,
+          publicId: user.publicId,
+          displayName: user.displayName || user.username,
+        })),
+      };
     });
     return { ...result, isPlatformManaged: true, isPinned: true };
   }
@@ -1445,7 +1438,7 @@ export class AdminService {
       canManageSeats: true,
       canInvite: true,
       canManageRoom: true,
-      appointedById: room.hostId,
+      appointedById: null,
     });
     await this.dataSource.getRepository(RoomModerator).save(moderator);
     return {
@@ -1465,9 +1458,6 @@ export class AdminService {
     const requestedIds = [...new Set((publicIds || [])
       .map((value) => String(value || '').trim())
       .filter(Boolean))];
-    if (!requestedIds.length) {
-      throw new BadRequestException('يجب أن يبقى للروم مشرف واحد على الأقل');
-    }
     const users: User[] = [];
     for (const publicId of requestedIds) {
       const user = await this.usersRepo.findOne({ where: { publicId } });
