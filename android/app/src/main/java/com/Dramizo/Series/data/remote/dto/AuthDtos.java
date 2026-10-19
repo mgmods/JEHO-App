@@ -71,8 +71,6 @@ public final class AuthDtos {
         @SerializedName("email") public String email;
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
-        /** True when the room profile is intentionally anonymized by an eligible VIP. */
-        @SerializedName("mysteriousMan") public boolean mysteriousMan;
         @SerializedName("providerUserId") public String providerUserId;
 
         public SocialLoginRequest(String provider, String token) {
@@ -114,6 +112,8 @@ public final class AuthDtos {
         @SerializedName("publicIdStyleGlow") public boolean publicIdStyleGlow;
         @SerializedName("displayName") public String displayName;
         @SerializedName("avatarUrl") public String avatarUrl;
+        /** True when the room profile is intentionally anonymized by an eligible VIP. */
+        @SerializedName("mysteriousMan") public boolean mysteriousMan;
         @SerializedName("coverUrl") public String coverUrl;
         @SerializedName("levelBadgeUrl") public String levelBadgeUrl;
         @SerializedName("vipBadgeUrl") public String vipBadgeUrl;
