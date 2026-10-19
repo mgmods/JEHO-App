@@ -34,6 +34,10 @@ public interface ConfigApi {
     @GET("config/seat-stickers")
     Call<ApiResponse<MiscDtos.SeatStickersDto>> seatStickers();
 
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
+    @GET("config/mysterious-man")
+    Call<ApiResponse<MiscDtos.MysteriousManConfigDto>> mysteriousMan();
+
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 
