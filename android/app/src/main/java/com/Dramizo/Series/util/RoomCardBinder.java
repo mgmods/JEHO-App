@@ -53,7 +53,7 @@ public final class RoomCardBinder {
         b.tvTitle.setText(title);
         b.tvTitle.setSelected(true);
         if (RoomUiHelper.isSupportRoom(room)) {
-            b.tvHost.setText("خدمة العملاء".equalsIgnoreCase(room.topic) ? "خدمة العملاء" :
+            b.tvHost.setText("customer_service".equalsIgnoreCase(room.topic) ? "خدمة العملاء" :
                     ("management".equalsIgnoreCase(room.topic) ? "إدارة المنصة" : "روم رسمي تابع للمنصة"));
         } else {
             b.tvHost.setText(resolveHostName(room));
