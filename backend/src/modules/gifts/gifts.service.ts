@@ -1718,7 +1718,7 @@ export class GiftsService implements OnModuleInit {
       throw new BadRequestException('A valid roomId is required');
     }
     const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
-    const defaults = { enabled: false, iconVisible: false, goalMode: 'coins', coinTarget: 100000, diamondTarget: 10000, giftIds: [], rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '' };
+    const defaults = { enabled: false, iconVisible: true, goalMode: 'coins', coinTarget: 100000, diamondTarget: 10000, giftIds: [], rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '' };
     let config: any = defaults;
     try { if (configRow?.value) config = { ...defaults, ...JSON.parse(configRow.value) }; } catch {}
     const key = 'support_chest_room:' + roomId;
