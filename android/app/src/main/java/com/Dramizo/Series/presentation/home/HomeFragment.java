@@ -509,12 +509,19 @@ public class HomeFragment extends Fragment {
             final String countryCode = entry.code;
             boolean active = countryCode.equalsIgnoreCase(hotCountryFilter == null ? "" : hotCountryFilter);
             TextView chip = new TextView(requireContext());
-            chip.setText(entry.flag + " " + entry.displayName());
-            chip.setTextSize(13f);
+            if ("SY".equalsIgnoreCase(entry.code)) {
+                chip.setText(entry.displayName());
+                chip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        com.Dramizo.Series.R.drawable.ic_flag_syria, 0, 0, 0);
+                chip.setCompoundDrawablePadding(dp(4));
+            } else {
+                chip.setText(entry.flag + " " + entry.displayName());
+            }
+            chip.setTextSize(12.5f);
             chip.setSingleLine(true);
             chip.setGravity(android.view.Gravity.CENTER);
-            chip.setPadding(dp(12), 0, dp(12), 0);
-            chip.setMinHeight(dp(38));
+            chip.setPadding(dp(9), 0, dp(9), 0);
+            chip.setMinHeight(dp(34));
             android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
             bg.setColor(active ? 0xFFFFE4EC : 0xFFF7F7FA);
             bg.setCornerRadius(dp(22));
@@ -523,8 +530,8 @@ public class HomeFragment extends Fragment {
             chip.setTextColor(active ? 0xFFB9164B : 0xFF34343A);
             chip.setElevation(dp(1));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
-            lp.setMargins(0, 0, dp(7), 0);
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+            lp.setMargins(0, 0, dp(6), 0);
             container.addView(chip, lp);
             chip.setOnClickListener(v -> {
                 hotCountryFilter = countryCode;
