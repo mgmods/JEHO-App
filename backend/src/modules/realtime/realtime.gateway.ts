@@ -333,16 +333,23 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       null;
     const vip = await this.userVipRepo.findOne({
       where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
+      relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
     const vipLevel = effectiveVipLevel(
       Number(vip?.level || 0),
       Number(profile?.totalSentCoins || 0),
     );
+    const benefits = vip?.vipPlan?.benefits as any;
+    const mysteriousMode = !!user?.mysteriousMode
+      && Array.isArray(benefits?.extra)
+      && benefits.extra.includes('mysterious_man');
+    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    const mysteriousFrameUrl = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
     const spent = await this.roomSpendCoins(userId, roomId);
     const supporterTier = await this.resolveSupporterTier(vipLevel, spent);
-    const displayName = user?.displayName || user?.username || 'User';
-    const avatarUrl = user?.avatarUrl || null;
+    const displayName = mysteriousMode ? 'الرجل الغامض' : (user?.displayName || user?.username || 'User');
+    const avatarUrl = mysteriousMode ? null : (user?.avatarUrl || null);
     const entryEffectUrl =
       (entryRow ? entryRow.previewUrl : null) ||
       activeUrl(profile?.entryEffectUrl) ||
@@ -409,7 +416,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       entryAnimationUrl,
       animationUrl: entryAnimationUrl,
       roomCardUrl,
-      vipBadgeUrl,
+      vipBadgeUrl: mysteriousMode ? (mysteriousFrameUrl || vipBadgeUrl) : vipBadgeUrl,
+      frameUrl: mysteriousMode ? (mysteriousFrameUrl || vipBadgeUrl) : vipBadgeUrl,
+      mysteriousMan: mysteriousMode,
       levelBadgeUrl,
       hostBadgeUrl,
       isHost,
