@@ -79,7 +79,7 @@ public class BadgeActivity extends ThemedActivity {
         back.setOnClickListener(v -> finish());
 
         TextView title = new TextView(this);
-        title.setText("الشارات");
+        title.setText("الشارات والمداليات");
         title.setTextColor(Color.WHITE);
         title.setTextSize(21);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -87,7 +87,7 @@ public class BadgeActivity extends ThemedActivity {
         root.addView(header);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("إنجازاتك وشارات الحساب");
+        subtitle.setText("الشارات التي حصل عليها هذا الحساب");
         subtitle.setTextColor(0xFFB5C0C0);
         subtitle.setTextSize(13);
         subtitle.setPadding(dp(4), 0, 0, dp(12));
@@ -111,7 +111,7 @@ public class BadgeActivity extends ThemedActivity {
         emptyState.setGravity(Gravity.CENTER);
         emptyState.setOrientation(LinearLayout.VERTICAL);
         TextView emptyText = new TextView(this);
-        emptyText.setText("لا توجد شارات متاحة حاليًا");
+        emptyText.setText("لم يحصل هذا الحساب على شارات بعد");
         emptyText.setTextColor(0xFFB5C0C0);
         emptyText.setTextSize(14);
         emptyState.addView(emptyText);
@@ -133,7 +133,10 @@ public class BadgeActivity extends ThemedActivity {
                         c.getUserApi().badges(userId).execute();
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
-                    result.addAll(response.body().data);
+                    // This screen is the earned-medals cabinet, not the admin catalogue.
+                    for (BadgeDto badge : response.body().data) {
+                        if (badge != null && badge.earned) result.add(badge);
+                    }
                 } else {
                     failure = "تعذر تحميل الشارات";
                 }
