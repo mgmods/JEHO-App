@@ -97,6 +97,19 @@ public class ProfileActivity extends ThemedActivity {
             });
         }
 
+        if (binding.rowMoments != null) {
+            binding.rowMoments.setOnClickListener(v -> {
+                String profileId = targetUserIdHold[0];
+                if (profileId == null || profileId.trim().isEmpty()) {
+                    Toast.makeText(this, "تعذر تحديد الحساب لعرض اللحظات", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Intent intent = new Intent(this, com.Dramizo.Series.presentation.home.MomentsActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.home.MomentsActivity.EXTRA_USER_ID, profileId);
+                startActivity(intent);
+            });
+        }
+
         // Mikoo card taps on full profile page.
         if (binding.cellProfileFollowers != null) {
             binding.cellProfileFollowers.setOnClickListener(v -> {

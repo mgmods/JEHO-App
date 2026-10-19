@@ -30,6 +30,7 @@
             <option value="live">{{ t('dashboard.liveRooms') }}</option>
             <option value="message">{{ t('logs.message') }}</option>
             <option value="gift">{{ t('gifts.title') }}</option>
+            <option value="moment">اللحظات</option>
           </select>
         </div>
       </div>

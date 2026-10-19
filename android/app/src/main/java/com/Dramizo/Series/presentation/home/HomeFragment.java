@@ -76,7 +76,8 @@ public class HomeFragment extends Fragment {
     private static final int TAB_HOT = 1;
     private static final int TAB_LOCATION = 2;
     private static final int TAB_ACTIVITIES = 3;
-    private static final int TAB_COUNT = 4;
+    private static final int TAB_MOMENTS = 4;
+    private static final int TAB_COUNT = 5;
     private static final String FLOATING_PREFS = "home_floating_widgets";
     private static final String OFFERS_DISMISSED_COUNT = "offers_dismissed_count";
     private int activeTab = TAB_HOT;
@@ -179,10 +180,12 @@ public class HomeFragment extends Fragment {
         binding.tvTabHot.setOnClickListener(v -> selectLogicalTab(TAB_HOT));
         binding.tvTabLocation.setOnClickListener(v -> selectLogicalTab(TAB_LOCATION));
         binding.tvTabActivities.setOnClickListener(v -> selectLogicalTab(TAB_ACTIVITIES));
+        binding.tvTabMoments.setOnClickListener(v -> selectLogicalTab(TAB_MOMENTS));
         binding.tabMeWrap.setOnClickListener(v -> selectLogicalTab(TAB_ME));
         binding.tabHotWrap.setOnClickListener(v -> selectLogicalTab(TAB_HOT));
         binding.tabLocationWrap.setOnClickListener(v -> selectLogicalTab(TAB_LOCATION));
         binding.tabActivitiesWrap.setOnClickListener(v -> selectLogicalTab(TAB_ACTIVITIES));
+        binding.tabMomentsWrap.setOnClickListener(v -> selectLogicalTab(TAB_MOMENTS));
         setupFeedPager();
         refreshLocationTabChrome();
         onLogicalTabSelected(activeTab);
@@ -227,6 +230,11 @@ public class HomeFragment extends Fragment {
                     if (f instanceof HomeActivitiesFragment) {
                         ((HomeActivitiesFragment) f).reloadFromHost();
                     }
+                }
+                binding.swipe.setRefreshing(false);
+            } else if (activeTab == TAB_MOMENTS) {
+                for (Fragment f : getChildFragmentManager().getFragments()) {
+                    if (f instanceof HomeMomentsFragment) ((HomeMomentsFragment) f).reloadFromHost();
                 }
                 binding.swipe.setRefreshing(false);
             } else {
@@ -591,13 +599,13 @@ public class HomeFragment extends Fragment {
     private boolean shouldShowEmptyState(int tab, boolean gridEmpty) {
         if (!gridEmpty) return false;
         if (tab == TAB_ME) return false;
-        if (tab == TAB_ACTIVITIES) return false;
+        if (tab == TAB_ACTIVITIES || tab == TAB_MOMENTS) return false;
         return true;
     }
 
     private void refreshEmptyStateForActiveTab() {
         if (binding == null) return;
-        if (activeTab == TAB_ME || activeTab == TAB_ACTIVITIES) {
+        if (activeTab == TAB_ME || activeTab == TAB_ACTIVITIES || activeTab == TAB_MOMENTS) {
             updateEmptyState(false);
             return;
         }
@@ -643,6 +651,9 @@ public class HomeFragment extends Fragment {
             if (activeTab == TAB_ACTIVITIES && f instanceof HomeActivitiesFragment && f.isResumed()) {
                 return ((HomeActivitiesFragment) f).canScrollListUp();
             }
+            if (activeTab == TAB_MOMENTS && f instanceof HomeMomentsFragment && f.isResumed()) {
+                return false;
+            }
         }
         return false;
     }
@@ -661,6 +672,7 @@ public class HomeFragment extends Fragment {
             public Fragment createFragment(int position) {
                 if (position == TAB_ME) return HomeMeFragment.newInstance();
                 if (position == TAB_ACTIVITIES) return HomeActivitiesFragment.newInstance();
+                if (position == TAB_MOMENTS) return HomeMomentsFragment.newInstance();
                 return HomeFeedPageFragment.newInstance(position);
             }
             @Override public int getItemCount() { return TAB_COUNT; }
@@ -677,7 +689,7 @@ public class HomeFragment extends Fragment {
     }
 
     private void selectLogicalTab(int tab) {
-        if (tab < TAB_ME || tab > TAB_ACTIVITIES) return;
+        if (tab < TAB_ME || tab > TAB_MOMENTS) return;
         if (binding == null || binding.pagerFeed == null) return;
        
         if (tab == TAB_LOCATION) {
@@ -793,6 +805,8 @@ public class HomeFragment extends Fragment {
             binding.imgTabLocationFlag.setAlpha(selected == TAB_LOCATION ? 1f : 0.55f);
         }
         styleOneTab(binding.tvTabActivities, binding.dotActivities, selected == TAB_ACTIVITIES,
+                activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
+        styleOneTab(binding.tvTabMoments, binding.dotMoments, selected == TAB_MOMENTS,
                 activeAlpha, inactiveAlpha, activeSize, inactiveSize, activeColor, inactiveColor);
     }
 
@@ -1261,8 +1275,8 @@ public class HomeFragment extends Fragment {
                 viewModel.loadFollowingRooms();
             }
             reapplyFeedPages();
-        } else if (activeTab == TAB_ACTIVITIES) {
-            /* activities fragment manages itself */
+        } else if (activeTab == TAB_ACTIVITIES || activeTab == TAB_MOMENTS) {
+            /* Activities and Moments fragments manage their own content. */
         } else {
             java.util.List<?> cur = viewModel.getRooms().getValue();
             if (cur != null && !cur.isEmpty()) {

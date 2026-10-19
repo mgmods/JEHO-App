@@ -44,12 +44,14 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { VanityIdsModule } from './modules/vanity-ids/vanity-ids.module';
 import { ModerationModule } from './modules/moderation/moderation.module';
 import { BadgesModule } from './modules/badges/badges.module';
+import { MomentsModule } from './modules/moments/moments.module';
 import { EconomyModule } from './modules/economy/economy.module';
 import { User } from './database/entities/user.entity';
 import { AdminUser } from './database/entities/admin-user.entity';
 import { ensureBadgeTables } from './database/badges-bootstrap';
 import { ensureCpTables } from './database/cp-bootstrap';
 import { ensureVanityIdStyleColumns } from './database/vanity-id-style-bootstrap';
+import { ensureMomentsTables } from './database/moments-bootstrap';
 
 const entityList = Object.values(entities).filter(
   (e) => typeof e === 'function',
@@ -147,6 +149,16 @@ const entityList = Object.values(entities).filter(
           console.error('[VanityIdStyleBootstrap] Could not initialize style columns; API startup continues.', error instanceof Error ? error.message : String(error));
         }
 
+        // Additive persistent moments tables; existing application data is preserved.
+        try {
+          await ensureMomentsTables(appDataSource);
+        } catch (error) {
+          console.error(
+            '[MomentsBootstrap] Could not initialize moments tables; API startup continues.',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+
         // Safe startup diagnostics: identify the connected database/schema without logging credentials.
         const [connectionInfo] = await appDataSource.query(
           'SELECT current_database() AS database_name, current_schema() AS schema_name, current_setting(\'search_path\') AS search_path',
@@ -200,6 +212,7 @@ const entityList = Object.values(entities).filter(
     VanityIdsModule,
     ModerationModule,
     BadgesModule,
+    MomentsModule,
   ],
   providers: [
     // JWT first so AppThrottlerGuard can key by user id (not shared carrier IP).
