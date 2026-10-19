@@ -1555,6 +1555,45 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         chestIcon.setVisibility(View.VISIBLE);
     }
 
+    private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
+        if (isFinishing() || isDestroyed()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (!response.isSuccessful() || response.body() == null
+                                    || response.body().data == null
+                                    || isFinishing() || isDestroyed()) return;
+                            Map<String, Object> data = response.body().data;
+                            Object rawConfig = data.get("config");
+                            Object rawState = data.get("state");
+                            String configJson = rawConfig instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawConfig).toString() : "{}";
+                            String stateJson = rawState instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawState).toString() : "{}";
+                            String script = "window.applySupportChestData && window.applySupportChestData("
+                                    + configJson + "," + stateJson + ");";
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed() && web != null) {
+                                    web.evaluateJavascript(script, null);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            android.util.Log.w("SupportChest", "Could not load support chest data", error);
+                        }
+                    });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Support chest request could not be started", error);
+        }
+    }
+
     private void showSupportChestSheet() {
         if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
         final String chestRoomId = roomId;
