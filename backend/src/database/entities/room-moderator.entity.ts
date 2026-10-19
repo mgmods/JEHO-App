@@ -68,8 +68,8 @@ export class RoomModerator {
   @Column({ type: 'boolean', default: true })
   canManageRoom: boolean;
 
-  @Column({ type: 'uuid' })
-  appointedById: string;
+  @Column({ type: 'uuid', nullable: true })
+  appointedById: string | null;
 
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
