@@ -322,6 +322,12 @@ public class HomeMomentsFragment extends Fragment {
             detail.addView(photo);
         }
         detail.addView(text(string(post, "body"), 15, 0xFF222222, false));
+        Button report = button("⚑ إبلاغ عن المنشور");
+        report.setTextColor(0xFFB3261E);
+        report.setOnClickListener(v -> {
+            askMomentReport(post);
+        });
+        detail.addView(report, matchWrap());
         new AlertDialog.Builder(requireContext()).setTitle("اللحظة").setView(detail)
             .setPositiveButton("إعجاب", (d, w) -> like(post))
             .setNeutralButton("تعليق", (d, w) -> comments(post))
