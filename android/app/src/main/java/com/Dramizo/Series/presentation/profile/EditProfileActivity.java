@@ -73,8 +73,32 @@ public class EditProfileActivity extends ThemedActivity {
 
         binding.spinnerGender.setAdapter(new ArrayAdapter<>(
                 this, android.R.layout.simple_spinner_dropdown_item, GENDER_LABELS));
-        binding.spinnerCountry.setAdapter(new ArrayAdapter<>(
-                this, android.R.layout.simple_spinner_dropdown_item, CountryCatalog.spinnerLabels()));
+        ArrayAdapter<String> countryAdapter = new ArrayAdapter<String>(
+                this, android.R.layout.simple_spinner_item, CountryCatalog.spinnerLabels()) {
+            private android.view.View bindCountryFlag(android.view.View row, int position) {
+                if (row instanceof android.widget.TextView && position == 1) {
+                    android.widget.TextView text = (android.widget.TextView) row;
+                    text.setText("سوريا");
+                    text.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                            R.drawable.ic_flag_syria, 0, 0, 0);
+                    text.setCompoundDrawablePadding(Math.round(6 * getResources().getDisplayMetrics().density));
+                } else if (row instanceof android.widget.TextView) {
+                    android.widget.TextView text = (android.widget.TextView) row;
+                    text.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0);
+                }
+                return row;
+            }
+            @Override public android.view.View getView(int position, android.view.View convertView,
+                    android.view.ViewGroup parent) {
+                return bindCountryFlag(super.getView(position, convertView, parent), position);
+            }
+            @Override public android.view.View getDropDownView(int position, android.view.View convertView,
+                    android.view.ViewGroup parent) {
+                return bindCountryFlag(super.getDropDownView(position, convertView, parent), position);
+            }
+        };
+        countryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        binding.spinnerCountry.setAdapter(countryAdapter);
 
         binding.etBirthday.setOnClickListener(v -> showBirthdayPicker());
         wireCountrySpinner();
