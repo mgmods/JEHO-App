@@ -197,7 +197,7 @@ public class ProfileFragment extends Fragment {
             loadProfileBanner();
             bindStaffUi(user);
             final String publicId = user.displayPublicId();
-            binding.tvUsername.setText(publicId.isEmpty() ? "ID: —" : ("ID: " + publicId));
+            binding.tvUsername.setText(publicId.isEmpty() ? "—" : publicId);
             AppContainer vanityContainer = ContainerProvider.from(requireActivity());
             com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
                     vanityContainer.getVanityApi(), publicId, user.vipLevel);
