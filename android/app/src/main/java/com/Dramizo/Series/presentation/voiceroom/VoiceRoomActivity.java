@@ -2110,6 +2110,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     @Nullable
+    private String configuredMysteriousEntryEffectUrl() {
+        String url = mysteriousEntryEffectUrl;
+        if (url != null && !url.trim().isEmpty()) return url.trim();
+        String cached = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("entry_effect_url", "");
+        return cached == null || cached.trim().isEmpty() ? null : cached.trim();
+    }
+
+    @Nullable
     private String configuredMysteriousAvatarUrl() {
         String url = mysteriousAvatarUrl;
         if (url != null && !url.trim().isEmpty()) return url.trim();
@@ -11667,6 +11676,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String name = displayName != null && !displayName.isEmpty()
                             ? displayName
                             : (username != null && !username.isEmpty() ? username : "مستخدم");
+                    boolean localMysteryEnabled = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                            .getBoolean("enabled", false);
+                    boolean mysteriousJoin = "الرجل الغامض".equals(name)
+                            || (selfJoin && localMysteryEnabled);
+                    if (mysteriousJoin) name = "الرجل الغامض";
+                    String shownAvatarUrl = mysteriousJoin
+                            ? configuredMysteriousAvatarUrl() : avatarUrl;
                     int level = Math.max(1, userLevel);
                     if (!selfJoin) {
                         RoomSoundFx.playJoin(VoiceRoomActivity.this);
@@ -11691,8 +11707,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         } else {
                             entryType = RoomEffectQueue.EffectType.NORMAL_ENTRY;
                         }
-                        String rideAnim = entryAnimationUrl;
-                        String ridePreview = entryEffectUrl;
+                        String rideAnim = mysteriousJoin ? null : entryAnimationUrl;
+                        String ridePreview = mysteriousJoin && configuredMysteriousEntryEffectUrl() != null
+                                ? configuredMysteriousEntryEffectUrl() : entryEffectUrl;
                         String ride = firstNonEmpty(rideAnim, ridePreview);
                         long hold = durationMs > 0
                                 ? Math.min(durationMs, 5500L)
@@ -11700,7 +11717,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         effectQueue.enqueue(new RoomEffectQueue.Builder()
                                 .type(entryType)
                                 .displayName(name)
-                                .avatarUrl(avatarUrl)
+                                .avatarUrl(shownAvatarUrl)
                                 .entryEffectUrl(ridePreview)
                                 .entryAnimationUrl(rideAnim)
                                 .vipLevel(vipLevel)
