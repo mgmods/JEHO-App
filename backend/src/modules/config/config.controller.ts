@@ -124,6 +124,25 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('mysterious-man')
+  @ApiOperation({ summary: 'Public shared media assets for Mysterious Man mode' })
+  async mysteriousMan() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    const defaults = { avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
+        messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  @Public()
   @Get('features')
   @ApiOperation({ summary: 'App feature flags for clients' })
   async features() {
