@@ -1849,6 +1849,46 @@ export class GiftsService implements OnModuleInit {
     if (result) this.realtime?.emitToRoom(roomId, 'room:event', { roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString() });
   }
 
+  private async mysteriousRoomIdentity(userId: string | null | undefined): Promise<{ enabled: boolean; frameUrl: string | null }> {
+    if (!userId) return { enabled: false, frameUrl: null };
+    try {
+      const rows = await this.dataSource.query(
+        `SELECT u."mysteriousMode" AS "mysteriousMode", active.benefits AS benefits
+           FROM users u
+           LEFT JOIN LATERAL (
+             SELECT vp.benefits
+               FROM user_vips uv
+               JOIN vip_plans vp ON vp.id = uv."vipPlanId"
+              WHERE uv."userId" = u.id
+                AND uv."isActive" = true
+                AND uv."expiresAt" > NOW()
+              ORDER BY uv.level DESC
+              LIMIT 1
+           ) active ON true
+          WHERE u.id = $1
+          LIMIT 1`,
+        [userId],
+      );
+      const row = rows?.[0];
+      if (!row || row.mysteriousMode !== true) return { enabled: false, frameUrl: null };
+      let benefits: any = row.benefits;
+      if (typeof benefits === 'string') {
+        try { benefits = JSON.parse(benefits); } catch { benefits = {}; }
+      }
+      if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) {
+        return { enabled: false, frameUrl: null };
+      }
+      const visuals = benefits.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+      return {
+        enabled: true,
+        frameUrl: visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null),
+      };
+    } catch {
+      // Fail closed for presentation: don't invent an anonymous state if settings cannot be read.
+      return { enabled: false, frameUrl: null };
+    }
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2345,6 +2385,27 @@ export class GiftsService implements OnModuleInit {
         luckyCoinsWon: result.luckyCoinsWon || 0,
         at: new Date().toISOString(),
       };
+
+      if (dto.roomId) {
+        const [senderIdentity, receiverIdentity] = await Promise.all([
+          this.mysteriousRoomIdentity(senderId),
+          this.mysteriousRoomIdentity(dto.receiverId),
+        ]);
+        if (senderIdentity.enabled) {
+          animationPayload.senderName = 'الرجل الغامض';
+          animationPayload.senderAvatarUrl = null;
+          animationPayload.senderHostBadgeUrl = null;
+          if (senderIdentity.frameUrl) animationPayload.senderVipBadgeUrl = senderIdentity.frameUrl;
+          animationPayload.senderMysteriousMan = true;
+        }
+        if (receiverIdentity.enabled) {
+          animationPayload.receiverName = 'الرجل الغامض';
+          animationPayload.receiverAvatarUrl = null;
+          animationPayload.receiverHostBadgeUrl = null;
+          if (receiverIdentity.frameUrl) animationPayload.receiverVipBadgeUrl = receiverIdentity.frameUrl;
+          animationPayload.receiverMysteriousMan = true;
+        }
+      }
 
       // Optional branded gift (admin-linked agency on gift catalog).
       const brandId = (gift as any).brandAgencyId || null;
@@ -2876,6 +2937,14 @@ export class GiftsService implements OnModuleInit {
         luckyCoinsWon: result.luckyCoinsWon || 0,
         at,
       };
+      const senderIdentity = await this.mysteriousRoomIdentity(senderId);
+      if (senderIdentity.enabled) {
+        animationPayload.senderName = 'الرجل الغامض';
+        animationPayload.senderAvatarUrl = null;
+        animationPayload.senderHostBadgeUrl = null;
+        if (senderIdentity.frameUrl) animationPayload.senderVipBadgeUrl = senderIdentity.frameUrl;
+        (animationPayload as any).senderMysteriousMan = true;
+      }
       this.realtime?.emitToRoom(dto.roomId, 'room:event', {
         roomId: dto.roomId,
         event: 'gift:animation',
