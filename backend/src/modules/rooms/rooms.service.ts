@@ -1475,6 +1475,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         ? room.roomCardUrl.trim()
         : null;
     const hostProfile = room.host?.profile as { roomCardUrl?: string | null } | undefined;
+    const isPlatformRoom = room.roomKind === RoomKind.SUPPORT;
     const fromHostProfile =
       !isPlatformRoom && typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
         ? hostProfile.roomCardUrl.trim()
@@ -1491,7 +1492,6 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     // Official platform rooms must never expose or resolve a user owner.
-    const isPlatformRoom = room.roomKind === RoomKind.SUPPORT;
     const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
     const hostAnonymous = !isPlatformRoom && room.hostId ? await this.mysteriousRoomIdentity(room.hostId) : null;
     const hostDto = hostAnonymous && attachedHost ? { ...attachedHost, ...hostAnonymous } : attachedHost;
