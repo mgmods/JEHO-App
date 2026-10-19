@@ -183,6 +183,9 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
       await this.dataSource.query(
         `ALTER TABLE users ADD COLUMN IF NOT EXISTS "staffRole" varchar(16) DEFAULT NULL`,
       );
+      // Platform-owned support rooms have no user owner; preserve all existing room rows.
+      await this.dataSource.query(`ALTER TABLE rooms ALTER COLUMN "hostId" DROP NOT NULL`);
+      await this.dataSource.query(`ALTER TABLE room_moderators ALTER COLUMN "appointedById" DROP NOT NULL`);
     } catch (err) {
       this.log.warn(
         `rooms column ensure skipped: ${
@@ -1473,7 +1476,7 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         : null;
     const hostProfile = room.host?.profile as { roomCardUrl?: string | null } | undefined;
     const fromHostProfile =
-      typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
+      !isPlatformRoom && typeof hostProfile?.roomCardUrl === 'string' && hostProfile.roomCardUrl.trim()
         ? hostProfile.roomCardUrl.trim()
         : null;
     const decoratedSeats = await Promise.all(
@@ -1487,8 +1490,10 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         };
       }),
     );
-    const attachedHost = await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
-    const hostAnonymous = await this.mysteriousRoomIdentity(room.hostId);
+    // Official platform rooms must never expose or resolve a user owner.
+    const isPlatformRoom = room.roomKind === RoomKind.SUPPORT;
+    const attachedHost = isPlatformRoom ? null : await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
+    const hostAnonymous = !isPlatformRoom && room.hostId ? await this.mysteriousRoomIdentity(room.hostId) : null;
     const hostDto = hostAnonymous && attachedHost ? { ...attachedHost, ...hostAnonymous } : attachedHost;
     const fromHostDto =
       hostDto && typeof (hostDto as any).roomCardUrl === 'string'
