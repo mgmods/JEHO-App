@@ -13,6 +13,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
@@ -50,6 +51,8 @@ public class HomeMomentsFragment extends Fragment {
     private LinearLayout root, feedContainer;
     private EditText composer;
     private TextView privacySelector, imageStatus, loading;
+    private ProgressBar publishProgress;
+    private Button publishButton, imagePickerButton;
     private ImageView selectedPreview;
     private View selectedImagePanel;
     private int selectedVisibility = 0;
@@ -127,10 +130,10 @@ public class HomeMomentsFragment extends Fragment {
         toolsRow.setOrientation(LinearLayout.HORIZONTAL);
         toolsRow.setGravity(Gravity.CENTER_VERTICAL);
         toolsRow.setPadding(0, dp(12), 0, dp(8));
-        Button imageButton = button("＋  صورة");
-        styleButton(imageButton, 0xFFFFF0F5, 0xFFB70F52, dp(14));
-        imageButton.setCompoundDrawablePadding(dp(5));
-        imageButton.setOnClickListener(v -> {
+        imagePickerButton = button("＋  إضافة صورة");
+        styleButton(imagePickerButton, 0xFFFFF0F5, 0xFFB70F52, dp(14));
+        imagePickerButton.setCompoundDrawablePadding(dp(5));
+        imagePickerButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.setType("image/*");
             intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -141,23 +144,30 @@ public class HomeMomentsFragment extends Fragment {
         privacySelector.setPadding(dp(12), dp(10), dp(12), dp(10));
         privacySelector.setBackground(rounded(0xFFF5F3F7, 0xFFE8E4EB, dp(14), dp(1)));
         privacySelector.setOnClickListener(v -> chooseVisibility());
-        toolsRow.addView(imageButton, new LinearLayout.LayoutParams(0, dp(44), 1));
+        toolsRow.addView(imagePickerButton, new LinearLayout.LayoutParams(0, dp(44), 1));
         LinearLayout.LayoutParams privacyLp = new LinearLayout.LayoutParams(0, dp(44), 1);
         privacyLp.leftMargin = dp(8);
         toolsRow.addView(privacySelector, privacyLp);
         composerCard.addView(toolsRow, matchWrap());
 
         imageStatus = text("", 12, 0xFF777782, false);
+        imageStatus.setGravity(Gravity.CENTER);
         composerCard.addView(imageStatus, matchWrap());
-        Button publish = button("نشر اللحظة  ↑");
-        publish.setTextSize(15);
-        publish.setTypeface(null, android.graphics.Typeface.BOLD);
-        styleButton(publish, 0xFFB70F52, 0xFFFFFFFF, dp(14));
-        publish.setElevation(dp(2));
-        publish.setOnClickListener(v -> publish());
+        publishProgress = new ProgressBar(requireContext());
+        publishProgress.setIndeterminate(true);
+        publishProgress.setVisibility(View.GONE);
+        LinearLayout.LayoutParams progressLp = new LinearLayout.LayoutParams(dp(28), dp(28));
+        progressLp.gravity = Gravity.CENTER;
+        composerCard.addView(publishProgress, progressLp);
+        publishButton = button("نشر اللحظة  ↑");
+        publishButton.setTextSize(15);
+        publishButton.setTypeface(null, android.graphics.Typeface.BOLD);
+        styleButton(publishButton, 0xFFB70F52, 0xFFFFFFFF, dp(14));
+        publishButton.setElevation(dp(2));
+        publishButton.setOnClickListener(v -> publish());
         LinearLayout.LayoutParams publishLp = new LinearLayout.LayoutParams(-1, dp(50));
         publishLp.topMargin = dp(6);
-        composerCard.addView(publish, publishLp);
+        composerCard.addView(publishButton, publishLp);
         root.addView(composerCard, matchWrap());
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
             heading.setText("لحظاتي");
@@ -527,8 +537,16 @@ public class HomeMomentsFragment extends Fragment {
     @Override public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == PICK_IMAGE && resultCode == android.app.Activity.RESULT_OK && data != null && data.getData() != null) {
-            selectedImage = data.getData(); uploadedImageUrl = null;
-            imageStatus.setText("تم اختيار صورة — سيتم رفعها عند النشر");
+            selectedImage = data.getData();
+            uploadedImageUrl = null;
+            if (selectedImagePanel != null) selectedImagePanel.setVisibility(View.VISIBLE);
+            if (selectedPreview != null) {
+                Glide.with(this).load(selectedImage).centerCrop()
+                    .placeholder(rounded(0xFFF2EFF4, 0xFFF2EFF4, dp(12)))
+                    .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(12)))
+                    .into(selectedPreview);
+            }
+            if (imageStatus != null) imageStatus.setText("تم اختيار الصورة — ستُرفع عند النشر");
             try { requireContext().getContentResolver().takePersistableUriPermission(selectedImage,
                     data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION)); }
             catch (Exception ignored) {}
