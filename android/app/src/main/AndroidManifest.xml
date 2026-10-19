@@ -38,6 +38,11 @@
         android:usesCleartextTraffic="true">
 
         <activity
+            android:name=".presentation.home.MomentsActivity"
+            android:exported="false"
+            android:label="اللحظات" />
+
+        <activity
             android:name=".presentation.splash.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.AuraLive.Splash"
