@@ -3157,7 +3157,16 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
   async forceLeaveSeat(roomId: string, userId: string, reason?: string) {
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId } });
     if (!seat) return { left: false, userId };
-    await this.clearUserSeat(roomId, userId);
+    // Persist the exact seat row found above instead of relying on a second
+    // roomId/userId update predicate. This guarantees the occupant is cleared
+    // from the authoritative seat row before the room snapshot is broadcast.
+    seat.userId = null;
+    seat.user = null;
+    seat.status = SeatStatus.EMPTY;
+    seat.isMuted = false;
+    seat.isModeratorMuted = false;
+    await this.seatsRepo.save(seat);
+    await this.seatSignalsRepo.delete({ roomId, userId });
     this.notifyRoomUpdated(roomId);
     const member = await this.memberIdentity(userId);
     // Broadcast to the room and directly to the affected user. The Android target
