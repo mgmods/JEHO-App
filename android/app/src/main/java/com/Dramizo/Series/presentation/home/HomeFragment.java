@@ -187,10 +187,12 @@ public class HomeFragment extends Fragment {
         onLogicalTabSelected(activeTab);
         // Home header icons from assets/icons by original file name.
         AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
+        AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         binding.btnMyRoomShortcut.setOnClickListener(v ->
                 com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
+        binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
         View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
@@ -644,6 +646,14 @@ public class HomeFragment extends Fragment {
         if (binding.homeActBanners != null) {
             binding.homeActBanners.getRoot().setVisibility(
                     tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
+        }
+        // Country filter: always available as Hot filter; long-press or filter icon.
+        // Country tab itself opens the picker (see selectLogicalTab).
+        if (binding.btnFilter != null) {
+            binding.btnFilter.setVisibility(tab == TAB_HOT ? View.VISIBLE : View.GONE);
+        }
+        if (binding.imgFilterIcon != null) {
+            AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         }
         refreshLocationTabChrome();
     }
