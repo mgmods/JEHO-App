@@ -3210,7 +3210,45 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'لا تملك صلاحية إنزال المستخدمين من المايك',
       );
     }
-    await this.assertCanTargetUser(roomId, actorId, uid);
+    // Removing someone from the microphone is not a room kick/ban.
+    // Keep platform-staff hierarchy and self/room-owner protections, but do not
+    // block a mic-only action merely because the target is a cohost or room moderator.
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (actorId === uid) {
+      throw new ForbiddenException('لا يمكنك إنزال نفسك بهذه الطريقة');
+    }
+    const actorStaff = await this.platformStaffRole(actorId);
+    const targetStaff = await this.platformStaffRole(uid);
+    if (
+      staffRank(targetStaff) > 0 &&
+      staffRank(actorStaff) < staffRank(targetStaff)
+    ) {
+      throw new ForbiddenException('لا يمكن استهداف طاقم المنصة الأعلى رتبة');
+    }
+    if (
+      staffRank(targetStaff) > 0 &&
+      staffRank(actorStaff) === staffRank(targetStaff) &&
+      actorStaff !== 'super'
+    ) {
+      throw new ForbiddenException('لا يمكن لمشرف المنصة استهداف زميل بنفس الرتبة');
+    }
+    if (actorStaff !== 'super' && room.hostId === uid) {
+      throw new ForbiddenException('لا يمكن إنزال صاحب الغرفة من المايك');
+    }
+    // Room moderators cannot override the host/cohost or another appointed
+    // moderator, but platform managers and the room owner can perform mic-only removal.
+    if (actorStaff !== 'super' && actorStaff !== 'manager' && room.hostId !== actorId) {
+      if (room.cohostId === uid) {
+        throw new ForbiddenException('لا يمكن للمشرف استهداف المضيف المساعد');
+      }
+      const targetModerator = await this.modsRepo.findOne({
+        where: { roomId, userId: uid },
+      });
+      if (targetModerator) {
+        throw new ForbiddenException('لا يمكن لمشرف إنزال مشرف آخر من المايك');
+      }
+    }
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId: uid } });
     if (!seat) {
       throw new BadRequestException('المستخدم ليس على المايك حالياً');
