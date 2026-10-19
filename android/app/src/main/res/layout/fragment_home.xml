@@ -170,6 +170,22 @@
             </HorizontalScrollView>
 
             <FrameLayout
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/btnSearch"
+                    android:layout_width="26dp"
+                    android:layout_height="26dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/search"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
+            <FrameLayout
                 android:id="@+id/btnMyRoomShortcut"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
@@ -186,22 +202,6 @@
                     android:text="🏠"
                     android:textSize="22sp"
                     android:contentDescription="@string/my_room" />
-            </FrameLayout>
-
-            <FrameLayout
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:id="@+id/btnSearch"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/search"
-                    android:scaleType="fitCenter" />
             </FrameLayout>
 
 
@@ -276,6 +276,65 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp" />
+
+                <!-- Worldwide popular rooms + quick country filters -->
+                <HorizontalScrollView
+                    android:id="@+id/hotCountryBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layoutDirection="rtl"
+                    android:fillViewport="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="10dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/hotAllButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="38dp"
+                            android:layout_marginEnd="7dp"
+                            android:background="@drawable/bg_home_filter_pill"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:minWidth="96dp"
+                            android:paddingHorizontal="14dp"
+                            android:text="@string/home_hot_all"
+                            android:textColor="@color/text_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:id="@+id/hotCountryChips"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal" />
+
+                        <TextView
+                            android:id="@+id/hotCountryDropdown"
+                            android:layout_width="38dp"
+                            android:layout_height="38dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_home_filter_pill"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:text="⌄"
+                            android:textColor="@color/text_primary"
+                            android:textSize="22sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+                </HorizontalScrollView>
 
                 <!-- Mikoo Hot = one RV only (no separate top-4 explore grid). -->
                 <include
