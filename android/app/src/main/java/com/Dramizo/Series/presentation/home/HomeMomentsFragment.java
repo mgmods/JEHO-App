@@ -209,6 +209,10 @@ public class HomeMomentsFragment extends Fragment {
     }
 
     private void renderFeed() {
+        if (profileUserId != null && !profileUserId.trim().isEmpty()) {
+            renderProfileGrid();
+            return;
+        }
         if (feedContainer == null) return;
         feedContainer.removeAllViews();
         loading.setVisibility(posts.isEmpty() ? View.VISIBLE : View.GONE);
@@ -217,7 +221,15 @@ public class HomeMomentsFragment extends Fragment {
             LinearLayout item = card();
             String name = string(post, "displayName");
             if (name.isEmpty()) name = string(post, "username");
-            item.addView(text(name.isEmpty() ? "مستخدم" : name, 16, 0xFF222222, true), matchWrap());
+            TextView author = text(name.isEmpty() ? "مستخدم" : name, 16, 0xFF222222, true);
+            final String authorId = string(post, "userId");
+            author.setOnClickListener(v -> {
+                if (authorId.isEmpty()) return;
+                Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class);
+                intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, authorId);
+                startActivity(intent);
+            });
+            item.addView(author, matchWrap());
             String body = string(post, "body");
             if (!body.isEmpty()) item.addView(text(body, 15, 0xFF33333A, false), matchWrap());
             String image = string(post, "imageUrl");
@@ -235,11 +247,100 @@ public class HomeMomentsFragment extends Fragment {
             like.setOnClickListener(v -> like(post));
             Button comments = button("تعليقات " + number(post.get("commentCount")));
             comments.setOnClickListener(v -> comments(post));
+            Button follow = button("متابعة");
+            String myId = container.getSessionManager().getUserId();
+            follow.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
+            follow.setOnClickListener(v -> followAuthor(authorId));
+            Button share = button("مشاركة");
+            share.setOnClickListener(v -> sharePost(post));
             row.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(comments, new LinearLayout.LayoutParams(0, dp(42), 1));
+            row.addView(follow, new LinearLayout.LayoutParams(0, dp(42), 1));
+            row.addView(share, new LinearLayout.LayoutParams(0, dp(42), 1));
             item.addView(row, matchWrap());
             feedContainer.addView(item, matchWrap());
         }
+    }
+
+    private void renderProfileGrid() {
+        feedContainer.removeAllViews();
+        loading.setVisibility(posts.isEmpty() ? View.VISIBLE : View.GONE);
+        loading.setText(posts.isEmpty() ? "لا توجد لحظات ظاهرة لهذا الحساب" : "");
+        LinearLayout currentRow = null;
+        for (int i = 0; i < posts.size(); i++) {
+            if (i % 2 == 0) {
+                currentRow = new LinearLayout(requireContext());
+                currentRow.setOrientation(LinearLayout.HORIZONTAL);
+                feedContainer.addView(currentRow, matchWrap());
+            }
+            Map<String, Object> post = posts.get(i);
+            LinearLayout tile = new LinearLayout(requireContext());
+            tile.setOrientation(LinearLayout.VERTICAL);
+            tile.setGravity(Gravity.CENTER);
+            tile.setBackgroundColor(0xFFFFFFFF);
+            tile.setPadding(dp(5), dp(5), dp(5), dp(5));
+            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(0, dp(168), 1);
+            tileLp.setMargins(dp(3), dp(3), dp(3), dp(3));
+            String image = string(post, "imageUrl");
+            if (!image.isEmpty()) {
+                ImageView photo = new ImageView(requireContext());
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(138)));
+                photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                Glide.with(this).load(image).into(photo);
+                tile.addView(photo);
+            } else {
+                TextView preview = text(string(post, "body"), 13, 0xFF33333A, false);
+                preview.setMaxLines(5);
+                tile.addView(preview, new LinearLayout.LayoutParams(-1, dp(138)));
+            }
+            tile.addView(text("♡ " + number(post.get("likeCount")), 12, 0xFFB9164B, true));
+            tile.setOnClickListener(v -> showMomentDetails(post));
+            currentRow.addView(tile, tileLp);
+        }
+        if (currentRow != null && posts.size() % 2 != 0) {
+            currentRow.addView(new View(requireContext()), new LinearLayout.LayoutParams(0, dp(168), 1));
+        }
+    }
+
+    private void showMomentDetails(Map<String, Object> post) {
+        LinearLayout detail = new LinearLayout(requireContext());
+        detail.setOrientation(LinearLayout.VERTICAL);
+        detail.setPadding(dp(16), dp(12), dp(16), dp(8));
+        String image = string(post, "imageUrl");
+        if (!image.isEmpty()) {
+            ImageView photo = new ImageView(requireContext());
+            photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(220)));
+            photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            Glide.with(this).load(image).into(photo);
+            detail.addView(photo);
+        }
+        detail.addView(text(string(post, "body"), 15, 0xFF222222, false));
+        new AlertDialog.Builder(requireContext()).setTitle("اللحظة").setView(detail)
+            .setPositiveButton("إعجاب", (d, w) -> like(post))
+            .setNeutralButton("تعليق", (d, w) -> comments(post))
+            .setNegativeButton("إغلاق", null).show();
+    }
+
+    private void followAuthor(String authorId) {
+        if (authorId == null || authorId.trim().isEmpty()) return;
+        runIo(() -> {
+            try {
+                Response<ApiResponse<Object>> response = container.getUserApi().follow(authorId).execute();
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(),
+                    response.isSuccessful() ? "تمت المتابعة" : "تعذر إتمام المتابعة", Toast.LENGTH_SHORT).show());
+            } catch (Exception e) { showError("تعذر إتمام المتابعة"); }
+        });
+    }
+
+    private void sharePost(Map<String, Object> post) {
+        String body = string(post, "body");
+        String image = string(post, "imageUrl");
+        String content = body + (image.isEmpty() ? "" : "\\n" + image);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, content.trim());
+        startActivity(Intent.createChooser(intent, "مشاركة اللحظة"));
     }
 
     private void like(Map<String, Object> post) {
