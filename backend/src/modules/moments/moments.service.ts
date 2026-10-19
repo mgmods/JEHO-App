@@ -164,6 +164,43 @@ export class MomentsService {
     return { ...row, ...author };
   }
 
+  async report(momentId: string, reporterId: string, input: { reason?: unknown; description?: unknown }) {
+    const moment = await this.visibleMoment(momentId, reporterId);
+    if (moment.userId === reporterId) throw new BadRequestException('You cannot report your own moment');
+    const allowedReasons = new Set(['spam', 'harassment', 'inappropriate', 'violence', 'scam', 'other']);
+    const reason = String(input?.reason ?? '').trim().toLowerCase();
+    if (!allowedReasons.has(reason)) throw new BadRequestException('Choose a valid report reason');
+    const note = String(input?.description ?? '').trim().slice(0, 1000);
+    const [existing] = await this.dataSource.query(
+      `SELECT id FROM "jeho_own"."reports"
+       WHERE "reporterId" = $1 AND "targetType"::text = 'moment' AND "targetId" = $2
+         AND status::text IN ('pending', 'reviewing')
+       LIMIT 1`,
+      [reporterId, momentId],
+    );
+    if (existing) throw new BadRequestException('You have already reported this moment');
+    const [snapshot] = await this.dataSource.query(
+      'SELECT body, "imageUrl" FROM "jeho_own"."moments" WHERE id = $1',
+      [momentId],
+    );
+    const excerpt = String(snapshot?.body ?? '').trim().slice(0, 1200);
+    const image = snapshot?.imageUrl ? String(snapshot.imageUrl).slice(0, 1024) : '';
+    const context = [
+      'بلاغ عن منشور في اللحظات.',
+      excerpt ? `محتوى المنشور: ${excerpt}` : '',
+      image ? `صورة المنشور: ${image}` : '',
+      note ? `ملاحظات المُبلّغ: ${note}` : '',
+    ].filter(Boolean).join('\\n');
+    const [created] = await this.dataSource.query(
+      `INSERT INTO "jeho_own"."reports"
+       ("reporterId", "targetType", "targetId", "roomId", reason, description, status, "createdAt", "updatedAt")
+       VALUES ($1, 'moment', $2, NULL, $3, $4, 'pending', now(), now())
+       RETURNING id, "targetType", "targetId", reason, status, "createdAt"`,
+      [reporterId, momentId, reason, context],
+    );
+    return { submitted: true, reportId: created.id, status: created.status };
+  }
+
   async remove(momentId: string, userId: string) {
     const [row] = await this.dataSource.query(
       'SELECT "userId" FROM "jeho_own"."moments" WHERE id = $1',
