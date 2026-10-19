@@ -12,7 +12,7 @@
         <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" /></div>
         <div class="col-md-2"><label class="form-label">نوع المنح</label><select v-model="form.awardType" class="form-select"><option value="manual">يدوي</option><option value="achievement">إنجاز تلقائي</option></select></div>
         <template v-if="form.awardType === 'achievement'">
-          <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option></select></div>
+          <div class="col-md-4"><label class="form-label">شرط الإنجاز</label><select v-model="form.achievementKey" class="form-select" required><option :value="null" disabled>اختر الشرط</option><option value="level">المستوى</option><option value="experience">الخبرة</option><option value="followers">عدد المتابعين</option><option value="recharge">إجمالي الشحن التراكمي</option><option value="support">إجمالي الدعم المرسل للآخرين</option><option value="received">إجمالي الهدايا المستلمة</option></select></div>
           <div class="col-md-3"><label class="form-label">الحد المطلوب</label><input v-model.number="form.achievementThreshold" type="number" min="1" step="1" class="form-control" required /></div>
         </template>
         <div class="col-md-2"><label class="form-label">الترتيب</label><input v-model.number="form.sortOrder" type="number" class="form-control" /></div>
