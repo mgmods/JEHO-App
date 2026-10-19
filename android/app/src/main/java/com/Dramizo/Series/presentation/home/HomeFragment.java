@@ -243,6 +243,8 @@ public class HomeFragment extends Fragment {
         binding.tileBillion.setOnClickListener(v -> openRanking("gifts"));
         binding.tileRich.setOnClickListener(v -> openRanking("rich"));
         setupHomeActBanners();
+        // Re-apply the selected page after initializing promo cards; Me/Activities stay clean.
+        updateHeaderForTab(activeTab);
         // Explore strip removed — Mikoo Hot is a single recycled grid (item_home_live_list).
         binding.tileActivity.setOnClickListener(v -> {
             if (!isTasksEnabled()) return;
@@ -720,9 +722,24 @@ public class HomeFragment extends Fragment {
         if (binding == null) return;
         View exploreRoot = binding.getRoot().findViewById(R.id.homeExplore);
         if (exploreRoot != null) exploreRoot.setVisibility(View.GONE);
+
+        // Keep the upper discovery controls scoped to the Popular/Country feed.
+        // Me and Activities are independent pages and must not inherit these banners or shortcuts.
+        boolean showDiscoveryChrome = tab == TAB_HOT || tab == TAB_LOCATION;
         if (binding.homeActBanners != null) {
             binding.homeActBanners.getRoot().setVisibility(
-                    tab == TAB_ACTIVITIES ? View.GONE : View.VISIBLE);
+                    showDiscoveryChrome ? View.VISIBLE : View.GONE);
+        }
+        View hotCountryBar = binding.getRoot().findViewById(R.id.hotCountryBar);
+        if (hotCountryBar != null) {
+            hotCountryBar.setVisibility(showDiscoveryChrome ? View.VISIBLE : View.GONE);
+        }
+        if (binding.pagerBanners != null) {
+            View carousel = (View) binding.pagerBanners.getParent();
+            if (carousel != null) {
+                boolean hasBanners = homeBannerAdapter != null && homeBannerAdapter.count() > 0;
+                carousel.setVisibility(showDiscoveryChrome && hasBanners ? View.VISIBLE : View.GONE);
+            }
         }
         refreshLocationTabChrome();
     }
@@ -1080,9 +1097,12 @@ public class HomeFragment extends Fragment {
             hideBannerSlider();
             return;
         }
-        View carousel = (View) binding.pagerBanners.getParent();
-        if (carousel != null) carousel.setVisibility(View.VISIBLE);
         homeBannerAdapter.submit(slides);
+        View carousel = (View) binding.pagerBanners.getParent();
+        boolean showDiscoveryChrome = activeTab == TAB_HOT || activeTab == TAB_LOCATION;
+        if (carousel != null) {
+            carousel.setVisibility(showDiscoveryChrome ? View.VISIBLE : View.GONE);
+        }
         binding.bannerRow.setVisibility(View.GONE);
         binding.pagerBanners.setVisibility(View.VISIBLE);
         binding.bannerDots.setVisibility(View.VISIBLE);
