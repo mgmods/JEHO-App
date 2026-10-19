@@ -16,6 +16,27 @@ import retrofit2.http.Path;
 import retrofit2.http.Query;
 
 public interface UserApi {
+    @GET("moments/feed")
+    Call<ApiResponse<List<Map<String, Object>>>> momentsFeed(@Query("page") int page, @Query("limit") int limit);
+
+    @GET("moments/users/{userId}")
+    Call<ApiResponse<List<Map<String, Object>>>> userMoments(@Path("userId") String userId);
+
+    @POST("moments")
+    Call<ApiResponse<Map<String, Object>>> createMoment(@Body Map<String, Object> body);
+
+    @POST("moments/{id}/like")
+    Call<ApiResponse<Map<String, Object>>> toggleMomentLike(@Path("id") String id);
+
+    @GET("moments/{id}/comments")
+    Call<ApiResponse<List<Map<String, Object>>>> momentComments(@Path("id") String id);
+
+    @POST("moments/{id}/comments")
+    Call<ApiResponse<Map<String, Object>>> commentOnMoment(@Path("id") String id, @Body Map<String, String> body);
+
+    @DELETE("moments/{id}")
+    Call<ApiResponse<Map<String, Object>>> deleteMoment(@Path("id") String id);
+
     @GET("users/me")
     Call<ApiResponse<AuthDtos.UserDto>> me();
 
