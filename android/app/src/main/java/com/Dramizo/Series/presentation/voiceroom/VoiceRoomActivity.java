@@ -617,6 +617,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 if (!empty) {
+                    if (seat.user != null && seat.user.mysteriousMan) {
+                        Toast.makeText(VoiceRoomActivity.this, "هوية هذا العضو مخفية داخل الروم", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
                     String name = seat.user != null
                             ? (seat.user.displayName != null ? seat.user.displayName : seat.user.username)
                             : "مستخدم";
