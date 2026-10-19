@@ -260,12 +260,35 @@ public class VoiceRoomViewModel extends ViewModel {
 
     public void forceLeaveSeat(String roomId, String userId) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> r = c.getRoomRepository().forceLeaveSeat(roomId, userId, "moderator");
-            if (r.success) {
-                info.postValue("تم إنزال المستخدم من المايك");
-                refresh(roomId);
+            Result<Object> action = c.getRoomRepository().forceLeaveSeat(roomId, userId, "moderator");
+            if (!action.success) {
+                error.postValue(action.error != null ? action.error : "تعذر إنزال المستخدم من المايك");
+                return;
+            }
+
+            // Verify the authoritative room snapshot before reporting success. This
+            // avoids telling staff the user was removed while the seat still appears
+            // occupied in the refreshed room state.
+            Result<RoomDtos.RoomDto> snapshot = c.getRoomUseCase.execute(roomId);
+            if (!snapshot.success || snapshot.data == null) {
+                error.postValue(snapshot.error != null
+                        ? snapshot.error : "تم إرسال الطلب لكن تعذر التحقق من المقعد");
+                return;
+            }
+            room.postValue(snapshot.data);
+            boolean stillSeated = false;
+            if (snapshot.data.seats != null) {
+                for (RoomDtos.SeatDto seat : snapshot.data.seats) {
+                    if (seat != null && userId.equals(seat.userId)) {
+                        stillSeated = true;
+                        break;
+                    }
+                }
+            }
+            if (stillSeated) {
+                error.postValue("الخادم لم يؤكد إنزال المستخدم من المايك؛ حاول مرة أخرى");
             } else {
-                error.postValue(r.error != null ? r.error : "تعذر إنزال المستخدم من المايك");
+                info.postValue("تم إنزال المستخدم من المايك");
             }
         });
     }
