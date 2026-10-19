@@ -685,14 +685,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String name = seat.user != null
                             ? firstNonEmpty(seat.user.displayName, seat.user.username, "مستخدم")
                             : "مستخدم";
-                    showUserCard(
-                            seat.userId,
-                            name,
-                            seat.user != null ? seat.user.avatarUrl : null,
-                            seat.user != null ? seat.user.vipBadgeUrl : null,
-                            isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
-                            seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
-                            seat.user != null ? Math.max(1, seat.user.level) : 1);
+                    if (canManageSeats || canKickUsers || isHost || isOwner
+                            || isPlatformManager() || isPlatformSuper() || isRoomStaff()) {
+                        showChatUserActions(binding.recyclerSeats, seat.userId, name,
+                                seat.user != null ? seat.user.avatarUrl : null,
+                                seat.user != null ? seat.user.vipBadgeUrl : null,
+                                seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
+                                seat.user != null ? Math.max(1, seat.user.level) : 1,
+                                null, null);
+                    } else {
+                        showUserCard(
+                                seat.userId,
+                                name,
+                                seat.user != null ? seat.user.avatarUrl : null,
+                                seat.user != null ? seat.user.vipBadgeUrl : null,
+                                isAgencyRoom ? (seat.user != null ? seat.user.hostBadgeUrl : null) : null,
+                                seat.user != null ? Math.max(0, seat.user.vipLevel) : 0,
+                                seat.user != null ? Math.max(1, seat.user.level) : 1);
+                    }
                     return;
                 }
                 if (!canManageSeats) return;
@@ -2508,8 +2518,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || userId.equals(liveHostId)
                 || (liveRoom != null && userId.equals(liveRoom.activeHostId));
         boolean targetModerator = roomModeratorIds.contains(userId);
-        boolean canTarget = anotherUser && !protectedHost
-                && (isOwner || isPlatformManager() || isPlatformSuper() || !targetModerator);
+        // Room owner may manage co-hosts/moderators; platform super retains platform-level override.
+        boolean canTarget = anotherUser
+                && (!protectedHost || isOwner || isPlatformSuper())
+                && (isOwner || isHost || isPlatformManager() || isPlatformSuper() || !targetModerator);
         RoomDtos.SeatDto targetSeat = null;
         if (currentSeats != null) {
             for (RoomDtos.SeatDto seat : currentSeats) {
