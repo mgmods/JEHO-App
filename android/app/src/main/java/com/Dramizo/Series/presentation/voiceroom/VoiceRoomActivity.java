@@ -2130,6 +2130,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             String giftIconUrl,
             long wealthScore,
             long charmScore) {
+        boolean localMysterious = userId != null && myUserId != null && sameUser(userId, myUserId)
+                && getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE).getBoolean("enabled", false);
+        if (localMysterious) {
+            name = "الرجل الغامض";
+            avatarUrl = null;
+            frameUrl = null;
+            vipLevel = 0;
+            userLevel = 1;
+            wealthScore = 0L;
+            charmScore = 0L;
+        }
+        boolean mysteriousLine = "الرجل الغامض".equals(name);
         boolean system = "النظام".equals(name) || getString(R.string.official_news).equals(name);
         boolean gameCel = CHAT_NAME_GAME_CEL.equals(name);
         if (!system && !gameCel && vipLevel <= 0) {
@@ -2247,14 +2259,26 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     avatar.setScaleType(ImageView.ScaleType.FIT_CENTER);
                     avatar.setPadding(dp(4), dp(4), dp(4), dp(4));
                     resetChatWear(avatar, frameView, hostSignal);
+                } else if (mysteriousLine) {
+                    avatar.setVisibility(View.VISIBLE);
+                    avatar.setImageResource(R.drawable.ic_mysterious_man);
+                    avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    if (frameView != null) {
+                        frameView.setVisibility(View.GONE);
+                        frameView.setImageDrawable(null);
+                    }
+                    if (hostSignal != null) {
+                        hostSignal.clearSignal();
+                        hostSignal.setVisibility(View.GONE);
+                    }
                 } else {
                     AvatarCosmetics.bindStacked(avatar, frameView, hostSignal, avatarUrl, frameUrl, null);
                 }
             }
-            boolean creator = !system && userId != null && roomHostId != null && userId.equals(roomHostId);
+            boolean creator = !mysteriousLine && !system && userId != null && roomHostId != null && userId.equals(roomHostId);
             if (hostChip != null) hostChip.setVisibility(creator ? View.VISIBLE : View.GONE);
 
-            if (vipLevel > 0) {
+            if (vipLevel > 0 && !mysteriousLine) {
                 vipChip.setVisibility(View.VISIBLE);
                 vipChip.setText("VIP" + vipLevel);
                 VipStyle.applyChip(vipChip, vipLevel);
@@ -2263,7 +2287,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 vipChip.setVisibility(View.GONE);
             }
 
-            if (system) {
+            if (system || mysteriousLine) {
                 levelChip.setVisibility(View.GONE);
                 charmChip.setVisibility(View.GONE);
                 wealthChip.setVisibility(View.GONE);
@@ -2295,14 +2319,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         final String tapName = gameCel ? null : name;
-        final String tapUserId = gameCel ? null : userId;
-        final String tapAvatar = gameCel ? null : avatarUrl;
-        final String tapFrame = gameCel ? null : frameUrl;
+        final String tapUserId = (gameCel || mysteriousLine) ? null : userId;
+        final String tapAvatar = (gameCel || mysteriousLine) ? null : avatarUrl;
+        final String tapFrame = (gameCel || mysteriousLine) ? null : frameUrl;
         final int tapVip = vipLevel;
         final int tapLv = userLevel;
         final String tapText = text;
         final View rowRef = row;
-        final boolean noUserMenu = system || gameCel;
+        final boolean noUserMenu = system || gameCel || mysteriousLine;
         View.OnClickListener openUserMenu = v -> {
             if (noUserMenu) return;
             showChatUserActions(v, tapUserId, tapName, tapAvatar, tapFrame, tapVip, tapLv, tapText, rowRef);
