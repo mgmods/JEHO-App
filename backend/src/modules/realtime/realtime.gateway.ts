@@ -772,12 +772,26 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         (agencyRoom ? hostBadgeUrl : vipBadgeUrl) ||
         (typeof incoming.frameUrl === 'string' && incoming.frameUrl) ||
         null;
+      const senderUser = await this.usersRepo.findOne({ where: { id: client.userId! } });
+      const senderVip = await this.userVipRepo.findOne({
+        where: { userId: client.userId!, isActive: true, expiresAt: MoreThan(new Date()) },
+        relations: ['vipPlan'],
+        order: { level: 'DESC' },
+      });
+      const senderBenefits = senderVip?.vipPlan?.benefits as any;
+      const mysteriousMan = !!senderUser?.mysteriousMode
+        && Array.isArray(senderBenefits?.extra)
+        && senderBenefits.extra.includes('mysterious_man');
+      const roomDisplayName = mysteriousMan
+        ? 'الرجل الغامض'
+        : (profile.displayName || client.username || 'User');
       payload = {
         text,
         userId: client.userId,
-        name: profile.displayName || client.username || 'User',
-        displayName: profile.displayName || client.username || 'User',
-        avatarUrl: profile.avatarUrl || null,
+        name: roomDisplayName,
+        displayName: roomDisplayName,
+        avatarUrl: mysteriousMan ? null : (profile.avatarUrl || null),
+        mysteriousMan,
         vipLevel: Number(profile.vipLevel || 0),
         userLevel: Math.max(1, Number(profile.userLevel || 1)),
         wealthScore: wealthLevel,
@@ -785,10 +799,10 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         totalSentCoins: Number(profile.totalSentCoins || incoming.totalSentCoins || 0),
         charmScore: charmLevel,
         charmLevel,
-        frameUrl,
-        vipBadgeUrl,
-        hostBadgeUrl,
-        isHost: !!profile.isHost,
+        frameUrl: mysteriousMan ? null : frameUrl,
+        vipBadgeUrl: mysteriousMan ? null : vipBadgeUrl,
+        hostBadgeUrl: mysteriousMan ? null : hostBadgeUrl,
+        isHost: mysteriousMan ? false : !!profile.isHost,
       };
     } else if (data.event === 'room:like') {
       const finite = (value: unknown) => {
