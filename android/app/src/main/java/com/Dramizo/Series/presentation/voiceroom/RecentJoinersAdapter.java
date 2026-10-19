@@ -78,11 +78,16 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         Joiner j = items.get(position);
-        AvatarCosmetics.bindWear(
-                h.b.imgJoinerAvatar, h.b.imgJoinerFrame, j.avatarUrl,
-                agencyRoom
-                        ? firstNonEmpty(j.hostBadgeUrl, j.vipBadgeUrl)
-                        : j.vipBadgeUrl);
+        if ("الرجل الغامض".equals(j.displayName)) {
+            h.b.imgJoinerAvatar.setImageResource(com.Dramizo.Series.R.drawable.ic_mysterious_man);
+            h.b.imgJoinerFrame.setVisibility(android.view.View.GONE);
+        } else {
+            AvatarCosmetics.bindWear(
+                    h.b.imgJoinerAvatar, h.b.imgJoinerFrame, j.avatarUrl,
+                    agencyRoom
+                            ? firstNonEmpty(j.hostBadgeUrl, j.vipBadgeUrl)
+                            : j.vipBadgeUrl);
+        }
         h.itemView.setContentDescription(j.displayName);
         h.itemView.setOnClickListener(v -> {
             if (listener != null) listener.onClick(j);
