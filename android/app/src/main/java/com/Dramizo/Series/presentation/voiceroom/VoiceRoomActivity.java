@@ -1542,17 +1542,47 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /**
-     * Opens the support-chest HTML as a half-height room sheet.
-     * This UI-only first pass intentionally does not alter room audio/ZEGO or claim live
-     * contribution/reward state until the matching backend contract is implemented.
+     * The dashboard controls chest icon visibility. If the API is temporarily unavailable,
+     * keep the icon visible so the feature remains discoverable and can be retried.
      */
     private void refreshSupportChestIcon() {
-        // Keep the chest discoverable in every room. Previously it was hidden until
-        // two remote dashboard flags were both true, making it invisible by default.
-        // The sheet loads the current room state after the user opens it.
         final View chestIcon = findViewById(R.id.btnRoomSupportChest);
         if (chestIcon == null || isFinishing() || isDestroyed()) return;
         chestIcon.setVisibility(View.VISIBLE);
+        final String targetRoomId = roomId;
+        if (targetRoomId == null || targetRoomId.trim().isEmpty()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (isFinishing() || isDestroyed()
+                                    || !targetRoomId.equals(roomId)
+                                    || !response.isSuccessful()
+                                    || response.body() == null
+                                    || response.body().data == null) return;
+                            Object rawConfig = response.body().data.get("config");
+                            if (!(rawConfig instanceof Map)) return;
+                            Map<?, ?> config = (Map<?, ?>) rawConfig;
+                            if (!config.containsKey("iconVisible")) return;
+                            Object visibleValue = config.get("iconVisible");
+                            boolean visible = visibleValue instanceof Boolean
+                                    ? (Boolean) visibleValue
+                                    : Boolean.parseBoolean(String.valueOf(visibleValue));
+                            chestIcon.setVisibility(visible ? View.VISIBLE : View.GONE);
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            // Keep the fallback visible; transient API errors must not hide the icon.
+                        }
+                    });
+        } catch (Exception ignored) {
+            // Keep the fallback visible if the API client is not ready.
+        }
     }
 
     private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
