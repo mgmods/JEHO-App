@@ -51,6 +51,45 @@
           <SectionBackgroundPanel />
         </template>
 
+        <template v-else-if="settingsTab === 'mysterious-man'">
+          <section class="settings-card">
+            <h3 class="settings-card-title">إعدادات الرجل الغامض</h3>
+            <p class="form-text mb-3">
+              ارفع هوية موحّدة يستخدمها جميع الحسابات التي فعّلت وضع الرجل الغامض. هذه الإعدادات لا تغيّر صور الحسابات الأصلية.
+            </p>
+            <div v-if="mysteryLoading" class="py-4"><LoadingSpinner /></div>
+            <div v-else class="row g-3">
+              <div class="col-md-4" v-for="asset in mysteryAssets" :key="asset.key">
+                <div class="border rounded-3 p-3 h-100">
+                  <h5 class="mb-1">{{ asset.title }}</h5>
+                  <p class="small text-secondary">{{ asset.help }}</p>
+                  <div class="rounded-3 bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height:150px">
+                    <img v-if="asset.key === 'avatarUrl' && mysteryForm[asset.key]" :src="mysteryForm[asset.key]" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain" />
+                    <video v-else-if="asset.key !== 'avatarUrl' && mysteryForm[asset.key] && /\\.(mp4|webm|mov)(\\?|$)/i.test(mysteryForm[asset.key])" :src="mysteryForm[asset.key]" controls muted loop style="max-width:100%;max-height:180px"></video>
+                    <a v-else-if="mysteryForm[asset.key]" :href="mysteryForm[asset.key]" target="_blank" rel="noopener">معاينة الملف المرفوع</a>
+                    <span v-else class="text-secondary small">لم يتم رفع ملف بعد</span>
+                  </div>
+                  <input :ref="el => setMysteryInput(asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadMysteryAsset(asset, $event)" />
+                  <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="mysteryUploading === asset.key" @click="chooseMysteryFile(asset.key)">
+                    <span v-if="mysteryUploading === asset.key" class="spinner-border spinner-border-sm me-1"></span>
+                    {{ mysteryUploading === asset.key ? 'جارٍ الرفع…' : 'اختيار ورفع ملف' }}
+                  </button>
+                  <button v-if="mysteryForm[asset.key]" type="button" class="btn btn-link btn-sm text-danger" @click="mysteryForm[asset.key] = ''">إزالة</button>
+                </div>
+              </div>
+            </div>
+            <div class="alert alert-info small mt-3">
+              الصورة: PNG أو JPG أو WEBP. الدخولية والتأثير: MP4 أو WEBM أو SVGA بحسب دعم المشغّل. لن يتم تطبيق تأثير الكتابة في التطبيق قبل ربط مشغّله.
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+              <button type="button" class="btn btn-aurora" :disabled="mysterySaving || mysteryLoading || !auth.can('settings', 'write')" @click="saveMysteryConfig">
+                <span v-if="mysterySaving" class="spinner-border spinner-border-sm me-1"></span>
+                حفظ إعدادات الرجل الغامض
+              </button>
+            </div>
+          </section>
+        </template>
+
         <template v-else-if="settingsTab === 'zego'">
           <ZegoSettingsPanel />
         </template>
@@ -584,7 +623,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { settingsApi, authApi, operatorsApi } from '@/api'
+import { settingsApi, authApi, operatorsApi, mysteriousManApi, uploadsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -617,6 +656,7 @@ const settingTabs = computed(() => {
     { id: 'economy', label: t('settings.tabEconomy'), icon: 'bi-cash-coin' },
     { id: 'operations', label: 'التشغيل المتقدم', icon: 'bi-gear-wide-connected' },
     { id: 'section-background', label: 'خلفية الأقسام الرئيسية', icon: 'bi-image' },
+    { id: 'mysterious-man', label: 'إعدادات الرجل الغامض', icon: 'bi-incognito' },
     { id: 'features', label: t('settings.tabFeatures'), icon: 'bi-toggles' },
     { id: 'moderation', label: t('settings.tabModeration'), icon: 'bi-shield-check' },
     { id: 'payment', label: t('settings.tabPayment'), icon: 'bi-credit-card' },
@@ -629,6 +669,71 @@ const settingTabs = computed(() => {
   tabs.push({ id: 'other', label: t('settings.tabOther'), icon: 'bi-three-dots' })
   return tabs
 })
+
+const mysteryLoading = ref(false)
+const mysterySaving = ref(false)
+const mysteryUploading = ref('')
+const mysteryInputs = {}
+const mysteryForm = reactive({ avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' })
+const mysteryAssets = [
+  { key: 'avatarUrl', title: 'الصورة الشخصية الموحدة', help: 'تظهر بدل الصورة الأصلية في مواضع الهوية المخفية.', accept: 'image/png,image/jpeg,image/webp' },
+  { key: 'entryEffectUrl', title: 'دخولية الرجل الغامض', help: 'فيديو/حركة الدخول الموحدة داخل الرومات.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
+  { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'ملف تأثير اختياري موحد؛ يحتاج دعم مشغّل داخل التطبيق.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
+]
+function setMysteryInput(key, el) { if (el) mysteryInputs[key] = el }
+function chooseMysteryFile(key) { mysteryInputs[key]?.click() }
+async function loadMysteryConfig() {
+  mysteryLoading.value = true
+  const { data, error: err } = await mysteriousManApi.get()
+  mysteryLoading.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  Object.assign(mysteryForm, {
+    avatarUrl: String(cfg.avatarUrl || ''),
+    entryEffectUrl: String(cfg.entryEffectUrl || ''),
+    messageEffectUrl: String(cfg.messageEffectUrl || ''),
+  })
+}
+async function uploadMysteryAsset(asset, event) {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+  const isAvatar = asset.key === 'avatarUrl'
+  const max = isAvatar ? 8 : 40
+  if (file.size > max * 1024 * 1024) {
+    toast().danger(`حجم الملف يجب ألا يتجاوز ${max} ميغابايت`)
+    event.target.value = ''
+    return
+  }
+  const extOk = isAvatar
+    ? /\\.(png|jpe?g|webp)$/i.test(file.name)
+    : /\\.(mp4|webm|mov|svga)$/i.test(file.name)
+  if (!extOk) {
+    toast().danger(isAvatar ? 'اختر صورة PNG أو JPG أو WEBP' : 'اختر MP4 أو WEBM أو MOV أو SVGA')
+    event.target.value = ''
+    return
+  }
+  mysteryUploading.value = asset.key
+  const { data, error: err } = await uploadsApi.upload(file)
+  mysteryUploading.value = ''
+  event.target.value = ''
+  if (err) { toast().danger(err.message); return }
+  const uploaded = data?.data || data || {}
+  const url = String(uploaded.url || uploaded.path || (uploaded.filename ? `/uploads/${uploaded.filename}` : '')).trim()
+  if (!url) { toast().danger('تم رفع الملف لكن لم يصل رابط صالح من الخادم'); return }
+  mysteryForm[asset.key] = url
+  toast().success('تم رفع الملف. اضغط حفظ لتطبيق الإعدادات على التطبيق.')
+}
+async function saveMysteryConfig() {
+  if (!auth.can('settings', 'write')) { toast().danger(t('settings.readOnly')); return }
+  mysterySaving.value = true
+  const { data, error: err } = await mysteriousManApi.update({ ...mysteryForm })
+  mysterySaving.value = false
+  if (err) { error.value = err.message; toast().danger(err.message); return }
+  const cfg = data?.data || data || {}
+  Object.assign(mysteryForm, cfg)
+  success.value = 'تم حفظ إعدادات الرجل الغامض'
+  toast().success(success.value)
+}
 
 const moduleKeys = DASHBOARD_MODULES
 
@@ -870,6 +975,7 @@ function normalizeAppName(raw) {
 
 function selectTab(id) {
   settingsTab.value = id
+  if (id === 'mysterious-man') loadMysteryConfig()
   router.replace({ name: 'settings', query: { tab: id } })
   if (id === 'account') fillAccountFromAuth()
   if (id === 'admins') loadOperators()
@@ -1060,6 +1166,7 @@ onMounted(async () => {
   // Always refresh Super/operator flags so "أدمنز اللوحة" appears after deploy
   await auth.fetchMe()
   syncTabFromRoute()
+  if (settingsTab.value === 'mysterious-man') loadMysteryConfig()
   fillAccountFromAuth()
   load()
 })
