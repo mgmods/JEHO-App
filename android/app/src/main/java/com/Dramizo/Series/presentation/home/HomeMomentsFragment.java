@@ -306,24 +306,67 @@ public class HomeMomentsFragment extends Fragment {
             LinearLayout item = card();
             String name = string(post, "displayName");
             if (name.isEmpty()) name = string(post, "username");
-            TextView author = text(name.isEmpty() ? "مستخدم" : name, 16, 0xFF222222, true);
+            if (name.isEmpty()) name = "مستخدم";
             final String authorId = string(post, "userId");
-            author.setOnClickListener(v -> {
+            LinearLayout authorRow = new LinearLayout(requireContext());
+            authorRow.setOrientation(LinearLayout.HORIZONTAL);
+            authorRow.setGravity(Gravity.CENTER_VERTICAL);
+            ImageView avatar = new ImageView(requireContext());
+            avatar.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+            avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            avatar.setBackground(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
+            avatar.setClipToOutline(true);
+            String avatarUrl = string(post, "avatarUrl");
+            if (!avatarUrl.isEmpty()) Glide.with(this).load(avatarUrl).circleCrop()
+                .placeholder(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22))).into(avatar);
+            else avatar.setImageDrawable(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
+            LinearLayout authorInfo = new LinearLayout(requireContext());
+            authorInfo.setOrientation(LinearLayout.VERTICAL);
+            authorInfo.setPadding(dp(10), 0, 0, 0);
+            TextView author = text(name, 15, 0xFF24212A, true);
+            author.setPadding(0, 0, 0, 0);
+            TextView authorMeta = text("@" + string(post, "username"), 11, 0xFF8B8491, false);
+            authorMeta.setPadding(0, dp(2), 0, 0);
+            authorInfo.addView(author, matchWrap());
+            authorInfo.addView(authorMeta, matchWrap());
+            authorRow.addView(avatar);
+            authorRow.addView(authorInfo, new LinearLayout.LayoutParams(0, -2, 1));
+            String createdAt = string(post, "createdAt");
+            if (!createdAt.isEmpty()) {
+                String dateLabel = createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt;
+                authorRow.addView(text(dateLabel, 10, 0xFF9A94A0, false));
+            }
+            View.OnClickListener openAuthor = v -> {
                 if (authorId.isEmpty()) return;
                 Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class);
                 intent.putExtra(com.Dramizo.Series.presentation.profile.ProfileActivity.EXTRA_USER_ID, authorId);
                 startActivity(intent);
-            });
-            item.addView(author, matchWrap());
+            };
+            authorRow.setOnClickListener(openAuthor);
+            avatar.setOnClickListener(openAuthor);
+            item.addView(authorRow, matchWrap());
             String body = string(post, "body");
-            if (!body.isEmpty()) item.addView(text(body, 15, 0xFF33333A, false), matchWrap());
+            if (!body.isEmpty()) {
+                TextView bodyText = text(body, 15, 0xFF33313A, false);
+                bodyText.setPadding(0, dp(12), 0, dp(10));
+                item.addView(bodyText, matchWrap());
+            }
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(230)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(250)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                Glide.with(this).load(image).into(photo);
-                item.addView(photo);
+                photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
+                photo.setClipToOutline(true);
+                photo.setAdjustViewBounds(true);
+                Glide.with(this).load(image)
+                    .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
+                    .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
+                    .centerCrop().into(photo);
+                LinearLayout.LayoutParams photoLp = matchWrap();
+                photoLp.topMargin = dp(4);
+                photoLp.bottomMargin = dp(10);
+                item.addView(photo, photoLp);
             }
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
