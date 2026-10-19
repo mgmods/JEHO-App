@@ -1438,7 +1438,7 @@ export class AdminService {
       canManageSeats: true,
       canInvite: true,
       canManageRoom: true,
-      appointedById: null,
+      appointedById: null as any,
     });
     await this.dataSource.getRepository(RoomModerator).save(moderator);
     return {
@@ -1496,7 +1496,7 @@ export class AdminService {
         canManageSeats: true,
         canInvite: true,
         canManageRoom: true,
-        appointedById: room.hostId,
+        appointedById: null as any,
       }));
       await manager.save(rows);
       return users.map((user) => ({
