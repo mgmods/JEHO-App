@@ -3174,12 +3174,62 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'لا تملك صلاحية إنزال المستخدمين من المايك',
       );
     }
-    await this.assertCanTargetUser(roomId, actorId, uid);
+    // Mic removal is deliberately less destructive than kick/ban: the target
+    // stays in the room and can continue using chat. Use mic-specific targeting
+    // rules so platform managers can lower room moderators without ejecting them.
+    await this.assertCanTargetUserForMicRemoval(roomId, actorId, uid);
     const seat = await this.seatsRepo.findOne({ where: { roomId, userId: uid } });
     if (!seat) {
       throw new BadRequestException('المستخدم ليس على المايك حالياً');
     }
     return this.forceLeaveSeat(roomId, uid, reason || 'moderator');
+  }
+
+  private async assertCanTargetUserForMicRemoval(
+    roomId: string,
+    actorId: string,
+    targetUserId: string,
+  ) {
+    if (actorId === targetUserId) {
+      throw new ForbiddenException('لا يمكنك إنزال نفسك من خلال إدارة المستخدمين');
+    }
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+
+    const actorStaff = await this.platformStaffRole(actorId);
+    const targetStaff = await this.platformStaffRole(targetUserId);
+    if (staffRank(targetStaff) > staffRank(actorStaff)) {
+      throw new ForbiddenException('لا يمكن إنزال موظف منصة أعلى رتبة من المايك');
+    }
+    if (
+      staffRank(targetStaff) > 0 &&
+      staffRank(targetStaff) === staffRank(actorStaff) &&
+      actorStaff !== 'super'
+    ) {
+      throw new ForbiddenException('لا يمكن إنزال زميل من طاقم المنصة بنفس الرتبة');
+    }
+
+    // Super administrators and platform managers can remove a user from a mic
+    // regardless of room-level moderator/cohost status, subject to staff rank.
+    if (actorStaff === 'super' || actorStaff === 'manager') return;
+
+    // Room owner retains full control; cohosts and appointed moderators cannot
+    // use mic removal to target the owner, cohost, or another room moderator.
+    if (room.hostId === actorId) return;
+    if (room.hostId === targetUserId) {
+      throw new ForbiddenException('لا يمكن إنزال صاحب الغرفة من المايك');
+    }
+    if (room.cohostId === targetUserId && room.cohostId !== actorId) {
+      throw new ForbiddenException('لا يمكن إنزال المضيف المساعد من المايك');
+    }
+    if (room.cohostId !== actorId && room.activeHostId !== actorId) {
+      const targetModerator = await this.modsRepo.findOne({
+        where: { roomId, userId: targetUserId },
+      });
+      if (targetModerator) {
+        throw new ForbiddenException('لا يمكن لمشرف إنزال مشرف آخر من المايك');
+      }
+    }
   }
 
   private async clearUserSeat(roomId: string, userId: string) {
