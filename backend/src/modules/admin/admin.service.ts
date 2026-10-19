@@ -256,7 +256,7 @@ export class AdminService {
   async getSupportChestConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
-      enabled: false, iconVisible: false, goalMode: 'coins',
+      enabled: false, iconVisible: true, goalMode: 'coins',
       coinTarget: 100000, diamondTarget: 10000, giftIds: [],
       rewardType: 'none', rewardItemId: '', rewardAmount: 0,
       instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.',
