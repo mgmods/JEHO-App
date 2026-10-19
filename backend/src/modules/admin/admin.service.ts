@@ -1448,6 +1448,21 @@ export class AdminService {
     };
   }
 
+  /** Remove a moderator from an official platform room by public user ID. */
+  async removePlatformRoomModerator(roomId: string, publicIdRaw: string) {
+    const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+    if (!room) throw new NotFoundException('Room not found');
+    if (room.roomKind !== RoomKind.SUPPORT || !room.isPersistent) {
+      throw new BadRequestException('يمكن رفع المشرفين من رومات المنصة الرسمية فقط');
+    }
+    const publicId = String(publicIdRaw || '').trim();
+    if (!publicId) throw new BadRequestException('آيدي المستخدم مطلوب');
+    const user = await this.usersRepo.findOne({ where: { publicId } });
+    if (!user) throw new NotFoundException('لم يتم العثور على المستخدم');
+    const result = await this.dataSource.getRepository(RoomModerator).delete({ roomId, userId: user.id });
+    return { roomId, publicId, removed: Number(result.affected || 0) > 0 };
+  }
+
   /** Replace the moderator list of an official platform room by public user IDs. */
   async setPlatformRoomModerators(roomId: string, publicIds: string[]) {
     const room = await this.roomsRepo.findOne({ where: { id: roomId } });
