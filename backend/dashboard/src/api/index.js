@@ -193,6 +193,11 @@ export const notificationsApi = {
   send: (data) => safeRequest(() => api.post('/admin/notifications/send', data)),
 }
 
+export const mysteriousManApi = {
+  get: () => safeRequest(() => api.get('/admin/mysterious-man/config')),
+  update: (data) => safeRequest(() => api.patch('/admin/mysterious-man/config', data)),
+}
+
 export const settingsApi = {
   get: () => safeRequest(() => api.get('/admin/settings')),
   update: (data) => safeRequest(() => api.patch('/admin/settings', data)),
