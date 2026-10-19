@@ -82,7 +82,11 @@ public class HomeMomentsFragment extends Fragment {
         LinearLayout hero = new LinearLayout(requireContext());
         hero.setOrientation(LinearLayout.VERTICAL);
         hero.setPadding(dp(18), dp(18), dp(18), dp(18));
-        hero.setBackground(rounded(0xFFB70F52, 0xFFEF477A, dp(22)));
+        GradientDrawable heroGradient = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFF94144E, 0xFFD92768, 0xFFF45A85});
+        heroGradient.setCornerRadius(dp(22));
+        hero.setBackground(heroGradient);
+        if (android.os.Build.VERSION.SDK_INT >= 21) hero.setElevation(dp(3));
         TextView heading = text("اللحظات", 25, 0xFFFFFFFF, true);
         heading.setPadding(0, 0, 0, dp(4));
         hero.addView(heading, matchWrap());
@@ -93,7 +97,8 @@ public class HomeMomentsFragment extends Fragment {
 
         LinearLayout composerCard = card();
         composerCard.setPadding(dp(16), dp(15), dp(16), dp(15));
-        composerCard.setBackground(rounded(0xFFFFFFFF, 0xFFFFFFFF, dp(20)));
+        composerCard.setBackground(rounded(0xFFFFFFFF, 0xFFF0E8EE, dp(20), dp(1)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) composerCard.setElevation(dp(3));
         TextView composerTitle = text("أنشئ لحظة جديدة", 17, 0xFF25232A, true);
         composerCard.addView(composerTitle, matchWrap());
         TextView composerHint = text("اكتب شيئاً جميلاً أو أرفق صورة من يومك", 12, 0xFF898590, false);
@@ -390,6 +395,12 @@ public class HomeMomentsFragment extends Fragment {
             row.addView(comments, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(follow, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(share, new LinearLayout.LayoutParams(0, dp(42), 1));
+            View actionDivider = new View(requireContext());
+            actionDivider.setBackgroundColor(0xFFF1EDF2);
+            LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
+            dividerLp.topMargin = dp(8);
+            dividerLp.bottomMargin = dp(8);
+            item.addView(actionDivider, dividerLp);
             item.addView(row, matchWrap());
             Button report = button("⚑  إبلاغ");
             report.setTextColor(0xFFB3261E);
