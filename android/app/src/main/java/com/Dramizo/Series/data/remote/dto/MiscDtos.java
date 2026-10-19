@@ -9,6 +9,8 @@ public final class MiscDtos {
 
     public static class MysteriousManConfigDto {
         @SerializedName("avatarUrl") public String avatarUrl;
+        @SerializedName("entryMode") public String entryMode;
+        @SerializedName("entryText") public String entryText;
         @SerializedName("entryEffectUrl") public String entryEffectUrl;
         @SerializedName("messageEffectUrl") public String messageEffectUrl;
     }
