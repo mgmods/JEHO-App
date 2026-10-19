@@ -167,6 +167,31 @@
                             android:visibility="invisible" />
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:id="@+id/tabMomentsWrap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/tvTabMoments"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:alpha="0.45"
+                            android:text="اللحظات"
+                            android:textColor="@color/text_primary"
+                            android:textSize="17sp"
+                            android:textStyle="bold" />
+                        <View
+                            android:id="@+id/dotMoments"
+                            android:layout_width="30dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="5dp"
+                            android:background="@drawable/bg_tab_dot_active"
+                            android:visibility="invisible" />
+                    </LinearLayout>
+
                     </LinearLayout>
             </HorizontalScrollView>
 
