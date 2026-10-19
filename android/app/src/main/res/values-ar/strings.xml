@@ -32,7 +32,7 @@
 <string name="nav_games">ألعاب</string>
 <string name="game_reward_ad">شاهد إعلان +عملات</string>
 <string name="nav_messages">دردشة</string>
-<string name="nav_profile">أنا</string>
+<string name="nav_profile">ملكي</string>
 <string name="voice_room">غرفة صوتية</string>
 <string name="following">المتابَعون</string>
 <string name="for_you">لك</string>
@@ -410,7 +410,7 @@
 <string name="tab_related">أتابع</string>
 <string name="tab_following">متابع</string>
 <string name="tab_recent">مؤخراً</string>
-<string name="tab_me_home">أنا</string>
+<string name="tab_me_home">ملكي</string>
     <string name="tab_location">أخرى</string>
 <string name="tab_hot">جار</string>
 <string name="tab_activities">النشاطات</string>
