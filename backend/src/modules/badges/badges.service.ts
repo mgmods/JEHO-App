@@ -5,6 +5,8 @@ import { Badge } from '../../database/entities/badge.entity';
 import { UserBadge } from '../../database/entities/user-badge.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { Wallet } from '../../database/entities/wallet.entity';
+import { UserProfile } from '../../database/entities/user-profile.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../../database/entities/notification.entity';
 
@@ -28,6 +30,8 @@ export class BadgesService {
     @InjectRepository(UserBadge) private readonly userBadges: Repository<UserBadge>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Follow) private readonly follows: Repository<Follow>,
+    @InjectRepository(Wallet) private readonly wallets: Repository<Wallet>,
+    @InjectRepository(UserProfile) private readonly profiles: Repository<UserProfile>,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -72,11 +76,25 @@ export class BadgesService {
     });
     if (!user) return;
 
-    const followerCount = await this.follows.count({ where: { followingId: userId } });
+    const [followerCount, wallet, profile] = await Promise.all([
+      this.follows.count({ where: { followingId: userId } }),
+      this.wallets.findOne({
+        where: { userId },
+        select: { userId: true, totalRecharged: true },
+      }),
+      this.profiles.findOne({
+        where: { userId },
+        select: { userId: true, totalSentCoins: true, totalReceivedDiamonds: true },
+      }),
+    ]);
     const metrics: Record<string, number> = {
       level: Number(user.level) || 0,
       experience: Number(user.experience) || 0,
       followers: followerCount,
+      // These values are persisted totals, not current wallet balances.
+      recharge: Number(wallet?.totalRecharged) || 0,
+      support: Number(profile?.totalSentCoins) || 0,
+      received: Number(profile?.totalReceivedDiamonds) || 0,
     };
 
     const eligible = await this.badges.find({
@@ -198,8 +216,8 @@ export class BadgesService {
     if (!dto.imageUrl?.trim()) throw new BadRequestException('Badge image URL is required');
     if (dto.name.length > 80 || dto.imageUrl.length > 512) throw new BadRequestException('Badge field is too long');
     if (dto.awardType === 'achievement') {
-      if (!dto.achievementKey || !['level', 'experience', 'followers'].includes(dto.achievementKey)) {
-        throw new BadRequestException('Achievement key must be level, experience, or followers');
+      if (!dto.achievementKey || !['level', 'experience', 'followers', 'recharge', 'support', 'received'].includes(dto.achievementKey)) {
+        throw new BadRequestException('Achievement key must be level, experience, followers, recharge, support, or received');
       }
       if (!Number.isFinite(Number(dto.achievementThreshold)) || Number(dto.achievementThreshold) <= 0) {
         throw new BadRequestException('Achievement threshold must be a positive number');
