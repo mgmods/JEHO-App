@@ -206,31 +206,42 @@ public class HomeMomentsFragment extends Fragment {
             return;
         }
         setComposerEnabled(false);
+        setPublishStatus(selectedImage != null && uploadedImageUrl == null
+                ? "جارٍ تجهيز الصورة ورفعها…" : "جارٍ نشر اللحظة…", true);
         runIo(() -> {
             try {
                 String imageUrl = uploadedImageUrl;
-                if (selectedImage != null && imageUrl == null) imageUrl = uploadImage(selectedImage);
+                if (selectedImage != null && imageUrl == null) {
+                    setPublishStatus("جارٍ رفع الصورة إلى التخزين…", true);
+                    imageUrl = uploadImage(selectedImage);
+                    uploadedImageUrl = imageUrl;
+                }
+                setPublishStatus("تم رفع الصورة، جارٍ حفظ النص والمنشور…", true);
                 String[] values = {"public", "followers", "friends", "private"};
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("body", body);
                 payload.put("imageUrl", imageUrl);
                 payload.put("visibility", values[Math.max(0, Math.min(selectedVisibility, values.length - 1))]);
                 Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().createMoment(payload).execute();
-                if (!response.isSuccessful() || response.body() == null || !response.body().success)
-                    throw new IllegalStateException("publish failed");
+                if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                    String error = response != null ? UploadApi.errorMessage(response, "تعذر حفظ المنشور") : "تعذر حفظ المنشور";
+                    throw new IllegalStateException(error);
+                }
                 requireActivity().runOnUiThread(() -> {
                     if (!isAdded()) return;
                     composer.setText("");
-                    selectedImage = null;
-                    uploadedImageUrl = null;
-                    imageStatus.setText("");
-                    selectedVisibility = 0;\n                    updatePrivacyLabel();
+                    clearSelectedImage();
+                    selectedVisibility = 0;
+                    updatePrivacyLabel();
+                    setPublishStatus("", false);
                     setComposerEnabled(true);
-                    Toast.makeText(requireContext(), "تم نشر اللحظة", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(), "تم نشر اللحظة مع الصورة بنجاح", Toast.LENGTH_SHORT).show();
+                    busy = false;
                     loadFeed();
                 });
             } catch (Exception e) {
-                showError("تعذر نشر اللحظة؛ تحقق من الاتصال والصورة");
+                setPublishStatus("لم يكتمل النشر. احتفظنا بالنص والصورة لإعادة المحاولة.", false);
+                showError("تعذر نشر اللحظة؛ " + (e.getMessage() == null ? "تحقق من الاتصال والصورة" : e.getMessage()));
                 requireActivity().runOnUiThread(() -> setComposerEnabled(true));
             }
         });
@@ -257,8 +268,17 @@ public class HomeMomentsFragment extends Fragment {
             MultipartBody.Part part = MultipartBody.Part.createFormData("file", name, body);
             Response<ApiResponse<UploadApi.UploadResult>> response = container.getUploadApi().upload(part).execute();
             if (!response.isSuccessful() || response.body() == null || response.body().data == null
-                    || response.body().data.url == null) throw new IllegalStateException("upload failed");
-            return response.body().data.url;
+                    || response.body().data.url == null) {
+                throw new IllegalStateException(UploadApi.errorMessage(response, "تعذر رفع الصورة"));
+            }
+            String returnedUrl = response.body().data.url.trim();
+            // UploadsService returns a root-relative /uploads/... URL. Resolve it to
+            // the canonical backend origin before persisting the moment.
+            if (returnedUrl.startsWith("/")) returnedUrl = com.Dramizo.Series.util.ApiOrigin.origin() + returnedUrl;
+            if (!returnedUrl.matches("(?i)^https?://.+")) {
+                throw new IllegalStateException("رابط الصورة الذي أعاده الخادم غير صالح");
+            }
+            return returnedUrl;
         }
     }
 
@@ -489,6 +509,18 @@ public class HomeMomentsFragment extends Fragment {
     private void setComposerEnabled(boolean enabled) {
         if (composer != null) composer.setEnabled(enabled);
         if (privacySelector != null) privacySelector.setEnabled(enabled);
+        if (imagePickerButton != null) imagePickerButton.setEnabled(enabled);
+        if (publishButton != null) publishButton.setEnabled(enabled);
+    }
+
+    private void setPublishStatus(String message, boolean inProgress) {
+        if (!isAdded()) return;
+        requireActivity().runOnUiThread(() -> {
+            if (!isAdded()) return;
+            if (imageStatus != null) imageStatus.setText(message == null ? "" : message);
+            if (publishProgress != null) publishProgress.setVisibility(inProgress ? View.VISIBLE : View.GONE);
+            if (publishButton != null) publishButton.setText(inProgress ? "جارٍ النشر…" : "نشر اللحظة  ↑");
+        });
     }
 
     @Override public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
