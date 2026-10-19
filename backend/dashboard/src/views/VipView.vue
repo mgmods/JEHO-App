@@ -57,8 +57,8 @@
           <div class="widget-card-meta mb-2">
             {{ p.durationDays || 30 }} {{ t('vip.days') }}
           </div>
-          <ul v-if="(p.benefits || []).length" class="vip-benefits mb-3">
-            <li v-for="(b, i) in (p.benefits || []).slice(0, 4)" :key="i">{{ b }}</li>
+          <ul v-if="planBenefitExtras(p).length" class="vip-benefits mb-3">
+            <li v-for="(b, i) in planBenefitExtras(p).slice(0, 4)" :key="i">{{ b }}</li>
           </ul>
           <div class="action-btns">
             <button class="btn btn-sm btn-ghost" type="button" @click="openPlan(p)">
@@ -432,7 +432,7 @@ function openPlan(p = null) {
     Object.assign(planForm, {
       id: p.id,
       name: p.name || '',
-      price: p.coinPrice ?? p.price ?? 99,
+      price: p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 99,
       durationDays: p.durationDays || p.duration || 30,
       level: Math.max(1, Math.min(100, Number(p.level || 1))),
       benefitsText: planBenefitExtras(p).filter((b) => b !== 'mysterious_man').join(', '),
