@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
@@ -38,9 +38,16 @@ export class PurchaseVipDto {
 }
 
 @Injectable()
-export class VipService {
+export class VipService implements OnModuleInit {
   private readonly logger = new Logger(VipService.name);
   private static readonly MAX_VIP_LEVEL = 7;
+
+  /** Additive compatibility patch for deployments that do not run SQL files automatically. */
+  async onModuleInit() {
+    await this.dataSource.query(
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
+    );
+  }
 
   /** Fallback prices are used only when the catalog is empty; existing database prices stay authoritative. */
   private static vipPriceForLevel(level: number): number {
