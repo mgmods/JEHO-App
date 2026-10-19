@@ -43,6 +43,8 @@ import retrofit2.Response;
 /** Persistent moments feed: server-owned posts, visibility, likes and comments. */
 public class HomeMomentsFragment extends Fragment {
     private static final int PICK_IMAGE = 8417;
+    public static final String ARG_PROFILE_USER_ID = "moments_profile_user_id";
+    private String profileUserId;
     private AppContainer container;
     private LinearLayout root, feedContainer;
     private EditText composer;
@@ -54,10 +56,16 @@ public class HomeMomentsFragment extends Fragment {
     private boolean busy;
 
     public static HomeMomentsFragment newInstance() { return new HomeMomentsFragment(); }
+    public static HomeMomentsFragment forProfile(String userId) {
+        HomeMomentsFragment fragment = new HomeMomentsFragment();
+        Bundle args = new Bundle(); args.putString(ARG_PROFILE_USER_ID, userId);
+        fragment.setArguments(args); return fragment;
+    }
 
     @Nullable @Override public View onCreateView(@NonNull android.view.LayoutInflater inflater,
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         container = ContainerProvider.from(requireActivity());
+        profileUserId = getArguments() != null ? getArguments().getString(ARG_PROFILE_USER_ID) : null;
         ScrollView scroll = new ScrollView(requireContext());
         scroll.setFillViewport(true);
         root = new LinearLayout(requireContext());
@@ -97,6 +105,11 @@ public class HomeMomentsFragment extends Fragment {
         imageStatus = text("", 12, 0xFF777782, false);
         composerCard.addView(imageStatus, matchWrap());
         root.addView(composerCard, matchWrap());
+        if (profileUserId != null && !profileUserId.trim().isEmpty()) {
+            heading.setText("لحظاتي");
+            sub.setText("المنشورات التي يسمح صاحب الحساب بعرضها");
+            composerCard.setVisibility(View.GONE);
+        }
         loading = text("جارٍ تحميل اللحظات…", 14, 0xFF777782, false);
         loading.setGravity(Gravity.CENTER);
         root.addView(loading, new LinearLayout.LayoutParams(-1, dp(54)));
@@ -116,7 +129,9 @@ public class HomeMomentsFragment extends Fragment {
         runIo(() -> {
             try {
                 Response<ApiResponse<List<Map<String, Object>>>> response =
-                    container.getUserApi().momentsFeed(1, 30).execute();
+                    (profileUserId != null && !profileUserId.trim().isEmpty()
+                        ? container.getUserApi().userMoments(profileUserId)
+                        : container.getUserApi().momentsFeed(1, 30)).execute();
                 List<Map<String, Object>> data = response.isSuccessful() && response.body() != null
                     ? response.body().data : null;
                 requireActivity().runOnUiThread(() -> {
