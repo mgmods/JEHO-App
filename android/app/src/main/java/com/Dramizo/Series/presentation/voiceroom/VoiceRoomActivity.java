@@ -185,6 +185,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomChatZoneVisible = true;
     private String myUserId;
     @Nullable private volatile String mysteriousAvatarUrl;
+    @Nullable private volatile String mysteriousEntryMode;
+    @Nullable private volatile String mysteriousEntryText;
     @Nullable private volatile String mysteriousEntryEffectUrl;
     @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
@@ -2094,12 +2096,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 if (result == null || !result.success || result.data == null) return;
                 MiscDtos.MysteriousManConfigDto cfg = result.data;
                 mysteriousAvatarUrl = cfg.avatarUrl;
+                mysteriousEntryMode = cfg.entryMode;
+                mysteriousEntryText = cfg.entryText;
                 mysteriousEntryEffectUrl = cfg.entryEffectUrl;
                 mysteriousMessageEffectUrl = cfg.messageEffectUrl;
                 android.content.SharedPreferences prefs =
                         getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE);
                 prefs.edit()
                         .putString("avatar_url", cfg.avatarUrl == null ? "" : cfg.avatarUrl)
+                        .putString("entry_mode", cfg.entryMode == null ? "video" : cfg.entryMode)
+                        .putString("entry_text", cfg.entryText == null ? "دخل الرجل الغامض" : cfg.entryText)
                         .putString("entry_effect_url", cfg.entryEffectUrl == null ? "" : cfg.entryEffectUrl)
                         .putString("message_effect_url", cfg.messageEffectUrl == null ? "" : cfg.messageEffectUrl)
                         .apply();
@@ -2107,6 +2113,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Retain last known dashboard media if the network is temporarily unavailable.
             }
         });
+    }
+
+    private boolean mysteriousEntranceIsText() {
+        String mode = mysteriousEntryMode;
+        if (mode == null) mode = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("entry_mode", "video");
+        return "text".equalsIgnoreCase(mode);
+    }
+
+    @NonNull
+    private String configuredMysteriousEntryText() {
+        String value = mysteriousEntryText;
+        if (value == null || value.trim().isEmpty()) {
+            value = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                    .getString("entry_text", "دخل الرجل الغامض");
+        }
+        return value == null || value.trim().isEmpty() ? "دخل الرجل الغامض" : value.trim();
     }
 
     @Nullable
@@ -11708,8 +11731,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             entryType = RoomEffectQueue.EffectType.NORMAL_ENTRY;
                         }
                         String rideAnim = mysteriousJoin ? null : entryAnimationUrl;
-                        String ridePreview = mysteriousJoin && configuredMysteriousEntryEffectUrl() != null
-                                ? configuredMysteriousEntryEffectUrl() : entryEffectUrl;
+                        String ridePreview = mysteriousJoin
+                                ? (mysteriousEntranceIsText() ? null : configuredMysteriousEntryEffectUrl())
+                                : entryEffectUrl;
+                        if (mysteriousJoin && mysteriousEntranceIsText()) {
+                            appendChatLine("الرجل الغامض", configuredMysteriousEntryText(), 0, 1,
+                                    null, userId, shownAvatarUrl, null, 0L, 0L);
+                        }
                         String ride = firstNonEmpty(rideAnim, ridePreview);
                         long hold = durationMs > 0
                                 ? Math.min(durationMs, 5500L)
