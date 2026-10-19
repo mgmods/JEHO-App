@@ -1042,7 +1042,19 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
             }
             holder.b.imgFrame.setVisibility(View.GONE);
             holder.b.imgHostBadge.setVisibility(View.GONE);
-            holder.b.imgAvatar.setImageResource(R.drawable.ic_mysterious_man);
+            String sharedAvatar = holder.itemView.getContext()
+                    .getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
+                    .getString("avatar_url", "");
+            if (sharedAvatar != null && !sharedAvatar.trim().isEmpty()) {
+                Glide.with(holder.b.imgAvatar)
+                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(sharedAvatar.trim()))
+                        .apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
+                        .placeholder(R.drawable.ic_mysterious_man)
+                        .error(R.drawable.ic_mysterious_man)
+                        .into(holder.b.imgAvatar);
+            } else {
+                holder.b.imgAvatar.setImageResource(R.drawable.ic_mysterious_man);
+            }
             return;
         }
         String hostUrl = user.hostBadgeUrl;
