@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
+import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -55,6 +56,7 @@ export class VipService {
   constructor(
     @InjectRepository(VipPlan) private readonly plansRepo: Repository<VipPlan>,
     @InjectRepository(UserVip) private readonly userVipsRepo: Repository<UserVip>,
+    @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     private readonly dataSource: DataSource,
     @Optional() private readonly cosmetics?: CosmeticsService,
@@ -133,6 +135,44 @@ export class VipService {
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
+  }
+
+  private async activeMysteriousVip(userId: string) {
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId, isActive: true, expiresAt: MoreThan(new Date()) },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    const extra = (vip?.vipPlan?.benefits as any)?.extra;
+    const enabled = Array.isArray(extra) && extra.includes('mysterious_man');
+    return enabled ? vip : null;
+  }
+
+  async mysteriousModeStatus(userId: string) {
+    const [user, vip] = await Promise.all([
+      this.usersRepo.findOne({ where: { id: userId } }),
+      this.activeMysteriousVip(userId),
+    ]);
+    const benefits = vip?.vipPlan?.benefits as any;
+    const visuals = benefits?.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    return {
+      eligible: !!vip,
+      enabled: !!user?.mysteriousMode && !!vip,
+      frameMode: visuals.mysteriousManFrameMode === 'user' ? 'user' : 'custom',
+      frameUrl: visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null),
+      vipLevel: vip?.level || null,
+    };
+  }
+
+  async setMysteriousMode(userId: string, enabled: boolean) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (enabled && !(await this.activeMysteriousVip(userId))) {
+      throw new BadRequestException('This VIP subscription does not include Mysterious Man');
+    }
+    user.mysteriousMode = enabled;
+    await this.usersRepo.save(user);
+    return this.mysteriousModeStatus(userId);
   }
 
   async purchase(userId: string, dto: PurchaseVipDto) {
