@@ -74,6 +74,8 @@ export const roomsApi = {
   createPlatform: (data) => safeRequest(() => api.post('/admin/rooms/platform', data)),
   addPlatformModerator: (id, publicId) =>
     safeRequest(() => api.post(`/admin/rooms/${id}/platform-moderators`, { publicId })),
+  removePlatformModerator: (id, publicId) =>
+    safeRequest(() => api.delete(`/admin/rooms/${id}/platform-moderators/${encodeURIComponent(publicId)}`)),
   setPlatformModerators: (id, moderatorIds) =>
     safeRequest(() => api.patch(`/admin/rooms/${id}/platform-moderators`, { moderatorIds })),
   close: (id) => safeRequest(() => api.post(`/admin/rooms/${id}/close`)),
