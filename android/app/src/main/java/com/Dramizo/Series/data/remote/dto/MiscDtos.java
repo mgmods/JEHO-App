@@ -7,6 +7,12 @@ import java.util.Map;
 public final class MiscDtos {
     private MiscDtos() {}
 
+    public static class MysteriousManConfigDto {
+        @SerializedName("avatarUrl") public String avatarUrl;
+        @SerializedName("entryEffectUrl") public String entryEffectUrl;
+        @SerializedName("messageEffectUrl") public String messageEffectUrl;
+    }
+
     public static class VipPlanDto {
         @SerializedName("id") public String id;
         @SerializedName("level") public int level;
