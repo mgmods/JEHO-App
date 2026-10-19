@@ -275,7 +275,11 @@ public class HomeMomentsFragment extends Fragment {
                     if (candidate != null && !candidate.trim().isEmpty()) name = candidate.replaceAll("[^A-Za-z0-9._-]", "_");
                 }
             }
-            RequestBody body = RequestBody.create(MediaType.parse("application/octet-stream"), output.toByteArray());
+            String mimeType = requireContext().getContentResolver().getType(uri);
+            if (mimeType == null || !mimeType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+                mimeType = "image/jpeg";
+            }
+            RequestBody body = RequestBody.create(MediaType.parse(mimeType), output.toByteArray());
             MultipartBody.Part part = MultipartBody.Part.createFormData("file", name, body);
             Response<ApiResponse<UploadApi.UploadResult>> response = container.getUploadApi().upload(part).execute();
             if (!response.isSuccessful() || response.body() == null || response.body().data == null
@@ -525,7 +529,7 @@ public class HomeMomentsFragment extends Fragment {
     private void sharePost(Map<String, Object> post) {
         String body = string(post, "body");
         String image = string(post, "imageUrl");
-        String content = body + (image.isEmpty() ? "" : "\\n" + image);
+        String content = body + (image.isEmpty() ? "" : "\n" + image);
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("text/plain");
         intent.putExtra(Intent.EXTRA_TEXT, content.trim());
