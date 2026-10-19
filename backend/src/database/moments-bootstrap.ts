@@ -10,6 +10,24 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
     console.warn('[MomentsBootstrap] Skipped: users table does not exist yet.');
     return;
   }
+  // Extend the existing shared reports enum additively so moment reports appear in the admin Reports page.
+  await dataSource.query(`
+    DO $
+    DECLARE enum_name text;
+    BEGIN
+      SELECT t.typname INTO enum_name
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+      WHERE n.nspname = 'jeho_own'
+        AND t.typtype = 'e'
+        AND t.typname ILIKE 'reports_target%enum'
+      ORDER BY t.typname
+      LIMIT 1;
+      IF enum_name IS NOT NULL THEN
+        EXECUTE format('ALTER TYPE %I.%I ADD VALUE IF NOT EXISTS %L', 'jeho_own', enum_name, 'moment');
+      END IF;
+    END $;
+  `);
   await dataSource.transaction(async (manager) => {
     await manager.query(`
       CREATE TABLE IF NOT EXISTS "jeho_own"."moments" (
