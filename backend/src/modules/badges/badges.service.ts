@@ -5,6 +5,8 @@ import { Badge } from '../../database/entities/badge.entity';
 import { UserBadge } from '../../database/entities/user-badge.entity';
 import { User } from '../../database/entities/user.entity';
 import { Follow } from '../../database/entities/follow.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 
 export interface UpsertBadgeDto {
   name: string;
@@ -26,6 +28,7 @@ export class BadgesService {
     @InjectRepository(UserBadge) private readonly userBadges: Repository<UserBadge>,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Follow) private readonly follows: Repository<Follow>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async catalogForIdentifier(identifier: string) {
@@ -91,7 +94,7 @@ export class BadgesService {
     );
     if (!earned.length) return;
 
-    await this.userBadges.createQueryBuilder()
+    const inserted = await this.userBadges.createQueryBuilder()
       .insert()
       .values(earned.map((badge) => ({
         userId,
@@ -100,7 +103,23 @@ export class BadgesService {
         source: 'achievement',
       })))
       .orIgnore()
+      .returning(['id', 'badgeId'])
       .execute();
+
+    // Only rows actually inserted by this request trigger a notification.
+    const insertedBadgeIds = new Set<string>(
+      (inserted.raw || []).map((row: { badgeId?: string; badge_id?: string }) =>
+        String(row.badgeId || row.badge_id || ''),
+      ).filter(Boolean),
+    );
+    const newlyEarned = earned.filter((badge) => insertedBadgeIds.has(badge.id));
+    await Promise.all(newlyEarned.map((badge) => this.notifications.notifyUser(
+      userId,
+      NotificationType.SYSTEM,
+      'شارة جديدة! 🏅',
+      `حصلت على شارة ${badge.name}`,
+      { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+    )));
   }
 
   listAdmin() {
@@ -153,6 +172,13 @@ export class BadgesService {
     const grant = await this.userBadges.save(this.userBadges.create({
       badgeId, userId: user.id, grantedByAdminId: adminId, source: 'manual',
     }));
+    await this.notifications.notifyUser(
+      user.id,
+      NotificationType.SYSTEM,
+      'تم منحك شارة جديدة! 🏅',
+      `تمت إضافة شارة ${badge.name} إلى حسابك`,
+      { kind: 'badge_earned', badgeId: badge.id, badgeName: badge.name, imageUrl: badge.imageUrl },
+    );
     return { ...grant, user: { id: user.id, publicId: user.publicId, username: user.username, displayName: user.displayName }, badge };
   }
 
