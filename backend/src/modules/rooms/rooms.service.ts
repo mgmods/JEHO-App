@@ -569,12 +569,16 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         LIMIT $${params.length}`,
       params,
     );
-    const items = rows.map((row: Record<string, unknown>, index: number) => ({
-      rank: index + 1,
-      userId: row.userId,
-      displayName: row.displayName,
-      avatarUrl: row.avatarUrl,
-      score: Number(row.score || 0),
+    const items = await Promise.all(rows.map(async (row: Record<string, unknown>, index: number) => {
+      const anonymous = await this.mysteriousRoomIdentity(String(row.userId || ''));
+      return {
+        rank: index + 1,
+        userId: row.userId,
+        displayName: anonymous ? 'الرجل الغامض' : row.displayName,
+        avatarUrl: anonymous ? null : row.avatarUrl,
+        mysteriousMan: !!anonymous,
+        score: Number(row.score || 0),
+      };
     }));
     const dayGold = await this.roomDayGold(roomId);
     return {
