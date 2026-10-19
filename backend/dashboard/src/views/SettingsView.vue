@@ -65,7 +65,7 @@
                   <p class="small text-secondary">{{ asset.help }}</p>
                   <div class="rounded-3 bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height:150px">
                     <img v-if="asset.key === 'avatarUrl' && mysteryForm[asset.key]" :src="mysteryForm[asset.key]" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain" />
-                    <video v-else-if="asset.key !== 'avatarUrl' && mysteryForm[asset.key] && /\\.(mp4|webm|mov)(\\?|$)/i.test(mysteryForm[asset.key])" :src="mysteryForm[asset.key]" controls muted loop style="max-width:100%;max-height:180px"></video>
+                    <video v-else-if="asset.key !== 'avatarUrl' && mysteryForm[asset.key] && /\.(mp4|webm|mov)(\?|$)/i.test(mysteryForm[asset.key])" :src="mysteryForm[asset.key]" controls muted loop style="max-width:100%;max-height:180px"></video>
                     <a v-else-if="mysteryForm[asset.key]" :href="mysteryForm[asset.key]" target="_blank" rel="noopener">معاينة الملف المرفوع</a>
                     <span v-else class="text-secondary small">لم يتم رفع ملف بعد</span>
                   </div>
