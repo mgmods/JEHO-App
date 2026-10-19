@@ -52,7 +52,12 @@ public final class RoomCardBinder {
         String title = displayTitle(room);
         b.tvTitle.setText(title);
         b.tvTitle.setSelected(true);
-        b.tvHost.setText(resolveHostName(room));
+        if (RoomUiHelper.isSupportRoom(room)) {
+            b.tvHost.setText("خدمة العملاء".equalsIgnoreCase(room.topic) ? "خدمة العملاء" :
+                    ("management".equalsIgnoreCase(room.topic) ? "إدارة المنصة" : "روم رسمي تابع للمنصة"));
+        } else {
+            b.tvHost.setText(resolveHostName(room));
+        }
 
         RoomUiHelper.bindLockOverlay(b.flLock, room);
         bindRoomLevelBadge(b, room);
@@ -68,6 +73,10 @@ public final class RoomCardBinder {
     }
 
     private static String displayTitle(RoomDtos.RoomDto room) {
+        if (RoomUiHelper.isSupportRoom(room)) {
+            String officialTitle = room.title != null ? room.title.trim() : "";
+            return officialTitle.isEmpty() ? "روم رسمي" : officialTitle;
+        }
         boolean agency = RoomUiHelper.isAgencyRoom(room);
         if (!agency) {
             String hostName = resolveHostName(room);
