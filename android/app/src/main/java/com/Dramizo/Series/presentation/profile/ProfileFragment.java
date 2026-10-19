@@ -406,6 +406,30 @@ public class ProfileFragment extends Fragment {
 
 
     /** Visible self-service switch in the main profile tab; availability is VIP-controlled. */
+    private boolean mysteriousFlag(Object value) {
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof Number) return ((Number) value).intValue() != 0;
+        return value != null && ("true".equalsIgnoreCase(String.valueOf(value))
+                || "1".equals(String.valueOf(value))
+                || "yes".equalsIgnoreCase(String.valueOf(value)));
+    }
+
+    private void applyMysteriousModeVisual(boolean enabled) {
+        if (binding == null || binding.rowMysteriousModeShortcut == null
+                || binding.switchMysteriousModeShortcut == null) return;
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+        bg.setCornerRadius(getResources().getDisplayMetrics().density * 14f);
+        bg.setColor(enabled ? 0xFF123F35 : 0xFF282832);
+        bg.setStroke(Math.round(getResources().getDisplayMetrics().density * 1.2f),
+                enabled ? 0xFF39D6A2 : 0xFF555563);
+        binding.rowMysteriousModeShortcut.setBackground(bg);
+        binding.switchMysteriousModeShortcut.setThumbTintList(
+                android.content.res.ColorStateList.valueOf(enabled ? 0xFF39D6A2 : 0xFFB8B8C4));
+        binding.switchMysteriousModeShortcut.setTrackTintList(
+                android.content.res.ColorStateList.valueOf(enabled ? 0xFF287C64 : 0xFF686875));
+    }
+
     private void bindMysteriousModeShortcut() {
         if (binding == null || binding.rowMysteriousModeShortcut == null
                 || binding.switchMysteriousModeShortcut == null) return;
@@ -413,17 +437,18 @@ public class ProfileFragment extends Fragment {
         binding.switchMysteriousModeShortcut.setEnabled(false);
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
-            Result<java.util.Map<String, Object>> statusResult = c.getVipRepository().mysteriousModeStatus();
+            Result<java.util.Map<String, Object>> result =
+                    c.getVipRepository().mysteriousModeStatus();
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
                 if (binding == null || !isAdded()) return;
-                if (statusResult == null || !statusResult.success || statusResult.data == null) {
+                if (result == null || !result.success || result.data == null) {
                     binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
                     return;
                 }
-                java.util.Map<String, Object> status = statusResult.data;
-                boolean eligible = Boolean.TRUE.equals(status.get("eligible"));
-                boolean enabled = Boolean.TRUE.equals(status.get("enabled"));
+                java.util.Map<String, Object> data = result.data;
+                boolean eligible = mysteriousFlag(data.get("eligible"));
+                boolean enabled = mysteriousFlag(data.get("enabled"));
                 if (!eligible) {
                     binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
                     return;
@@ -432,9 +457,10 @@ public class ProfileFragment extends Fragment {
                 binding.switchMysteriousModeShortcut.setOnCheckedChangeListener(null);
                 binding.switchMysteriousModeShortcut.setChecked(enabled);
                 binding.switchMysteriousModeShortcut.setEnabled(true);
+                applyMysteriousModeVisual(enabled);
                 binding.tvMysteriousModeShortcutHint.setText(enabled
                         ? "مفعّل — هويتك مخفية داخل الغرف"
-                        : "اشتراكك يسمح بالميزة — اضغط للتفعيل");
+                        : "متاح لاشتراكك — اضغط للتفعيل");
                 bindMysteriousModeShortcutListener(c);
             });
         });
@@ -442,29 +468,33 @@ public class ProfileFragment extends Fragment {
 
     private void bindMysteriousModeShortcutListener(AppContainer c) {
         if (binding == null || binding.switchMysteriousModeShortcut == null) return;
-        binding.switchMysteriousModeShortcut.setOnCheckedChangeListener((button, checked) -> {
+        binding.switchMysteriousModeShortcut.setOnCheckedChangeListener((button, requested) -> {
             button.setEnabled(false);
             c.getIoExecutor().execute(() -> {
-                Result<java.util.Map<String, Object>> changed = c.getVipRepository().setMysteriousMode(checked);
+                Result<java.util.Map<String, Object>> changed =
+                        c.getVipRepository().setMysteriousMode(requested);
                 if (!isAdded()) return;
                 requireActivity().runOnUiThread(() -> {
                     if (binding == null || !isAdded()) return;
                     if (changed != null && changed.success && changed.data != null) {
-                        boolean saved = Boolean.TRUE.equals(changed.data.get("enabled"));
+                        boolean saved = mysteriousFlag(changed.data.get("enabled"));
                         button.setOnCheckedChangeListener(null);
                         button.setChecked(saved);
                         button.setEnabled(true);
+                        applyMysteriousModeVisual(saved);
                         binding.tvMysteriousModeShortcutHint.setText(saved
                                 ? "مفعّل — هويتك مخفية داخل الغرف"
-                                : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                                : "غير مفعّل — اضغط لتفعيل الوضع الغامض");
                         bindMysteriousModeShortcutListener(c);
                     } else {
                         button.setOnCheckedChangeListener(null);
-                        button.setChecked(!checked);
+                        button.setChecked(!requested);
                         button.setEnabled(true);
+                        applyMysteriousModeVisual(!requested);
                         bindMysteriousModeShortcutListener(c);
-                        Toast.makeText(requireContext(),
-                                "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                        String error = changed != null && changed.error != null
+                                ? changed.error : "تعذر حفظ الإعداد، تحقق من اشتراك VIP وحاول مرة أخرى";
+                        Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
                     }
                 });
             });
