@@ -71,6 +71,7 @@
 
 <LinearLayout
                         android:id="@+id/tabLocationWrap"
+                        android:visibility="gone"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="14dp"
@@ -300,17 +301,17 @@
                         <TextView
                             android:id="@+id/hotAllButton"
                             android:layout_width="wrap_content"
-                            android:layout_height="38dp"
-                            android:layout_marginEnd="7dp"
+                            android:layout_height="34dp"
+                            android:layout_marginEnd="6dp"
                             android:background="@drawable/bg_home_filter_pill"
                             android:clickable="true"
                             android:focusable="true"
                             android:gravity="center"
-                            android:minWidth="96dp"
-                            android:paddingHorizontal="14dp"
+                            android:minWidth="82dp"
+                            android:paddingHorizontal="10dp"
                             android:text="@string/home_hot_all"
                             android:textColor="@color/text_primary"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
@@ -322,9 +323,9 @@
 
                         <TextView
                             android:id="@+id/hotCountryDropdown"
-                            android:layout_width="38dp"
-                            android:layout_height="38dp"
-                            android:layout_marginStart="6dp"
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="5dp"
                             android:background="@drawable/bg_home_filter_pill"
                             android:clickable="true"
                             android:focusable="true"
