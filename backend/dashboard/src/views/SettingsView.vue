@@ -705,8 +705,8 @@ async function uploadMysteryAsset(asset, event) {
     return
   }
   const extOk = isAvatar
-    ? /\\.(png|jpe?g|webp)$/i.test(file.name)
-    : /\\.(mp4|webm|mov|svga)$/i.test(file.name)
+    ? /\.(png|jpe?g|webp)$/i.test(file.name)
+    : /\.(mp4|webm|mov|svga)$/i.test(file.name)
   if (!extOk) {
     toast().danger(isAvatar ? 'اختر صورة PNG أو JPG أو WEBP' : 'اختر MP4 أو WEBM أو MOV أو SVGA')
     event.target.value = ''
