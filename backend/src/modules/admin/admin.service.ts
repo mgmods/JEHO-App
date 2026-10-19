@@ -255,12 +255,14 @@ export class AdminService {
 
   async getMysteriousManConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    const defaults = { avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' };
+    const defaults = { avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
     if (!row?.value) return defaults;
     try {
       const parsed = JSON.parse(row.value);
       return {
         avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
+        entryText: typeof parsed.entryText === 'string' ? parsed.entryText.slice(0, 160) : 'دخل الرجل الغامض',
         entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
         messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
       };
@@ -279,6 +281,8 @@ export class AdminService {
     };
     const current = {
       avatarUrl: cleanUrl(input.avatarUrl, 'avatar'),
+      entryMode: input.entryMode === 'text' ? 'text' : 'video',
+      entryText: (typeof input.entryText === 'string' ? input.entryText.trim() : 'دخل الرجل الغامض').slice(0, 160) || 'دخل الرجل الغامض',
       entryEffectUrl: cleanUrl(input.entryEffectUrl, 'entry effect'),
       messageEffectUrl: cleanUrl(input.messageEffectUrl, 'message effect'),
     };
