@@ -44,8 +44,8 @@ export class MomentsService {
         [ids],
       ),
     ]);
-    const likeMap = new Map(likes.map((x: any) => [x.momentId, x]));
-    const commentMap = new Map(comments.map((x: any) => [x.momentId, Number(x.count)]));
+    const likeMap = new Map<string, any>(likes.map((x: any) => [String(x.momentId), x] as [string, any]));
+    const commentMap = new Map<string, number>(comments.map((x: any) => [String(x.momentId), Number(x.count)] as [string, number]));
     return rows.map((row) => ({
       ...row,
       likeCount: Number(likeMap.get(row.id)?.count ?? 0),
@@ -84,7 +84,7 @@ export class MomentsService {
        ORDER BY m."createdAt" DESC, m.id DESC LIMIT 100`,
       [userId],
     );
-    const visible = [];
+    const visible: any[] = [];
     for (const row of rows) if (await this.canView(row, viewerId)) visible.push(row);
     return this.decorate(visible, viewerId);
   }
