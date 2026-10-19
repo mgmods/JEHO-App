@@ -260,6 +260,7 @@ public class ProfileActivity extends ThemedActivity {
             binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
+            bindMysteriousMode(ownProfile);
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
@@ -499,6 +500,111 @@ public class ProfileActivity extends ThemedActivity {
                         this, agencyId, agency.logoUrl, agency.coverUrl);
             } catch (Exception ignored) {
             }
+        });
+    }
+
+    private void bindMysteriousMode(boolean ownProfile) {
+        if (binding == null || binding.rowProfileMysteriousMode == null) return;
+        binding.rowProfileMysteriousMode.setVisibility(ownProfile ? View.VISIBLE : View.GONE);
+        if (!ownProfile) return;
+
+        binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+        binding.switchMysteriousMode.setEnabled(false);
+        binding.tvMysteriousModeHint.setText("جارٍ التحقق من اشتراك VIP...");
+        new Thread(() -> {
+            Result<Map<String, Object>> result = container.getVipRepository().mysteriousModeStatus();
+            runOnUiThread(() -> {
+                if (binding == null || isFinishing()) return;
+                if (result == null || !result.success || result.data == null) {
+                    binding.tvMysteriousModeHint.setText("تعذر تحميل الحالة، حاول مجددًا لاحقًا");
+                    binding.switchMysteriousMode.setEnabled(false);
+                    return;
+                }
+                Map<String, Object> status = result.data;
+                boolean eligible = Boolean.TRUE.equals(status.get("eligible"));
+                boolean enabled = Boolean.TRUE.equals(status.get("enabled"));
+                binding.switchMysteriousMode.setOnCheckedChangeListener(null);
+                binding.switchMysteriousMode.setChecked(enabled);
+                binding.switchMysteriousMode.setEnabled(eligible);
+                binding.tvMysteriousModeHint.setText(eligible
+                        ? (enabled ? "مفعّل — هويتك مخفية داخل الغرف" : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه")
+                        : "يتطلب اشتراك VIP يتضمن ميزة الرجل الغامض");
+                binding.switchMysteriousMode.setOnCheckedChangeListener((button, checked) -> {
+                    button.setEnabled(false);
+                    new Thread(() -> {
+                        Result<Map<String, Object>> changed = container.getVipRepository().setMysteriousMode(checked);
+                        runOnUiThread(() -> {
+                            if (binding == null || isFinishing()) return;
+                            button.setEnabled(eligible);
+                            if (changed != null && changed.success && changed.data != null) {
+                                boolean actual = Boolean.TRUE.equals(changed.data.get("enabled"));
+                                button.setOnCheckedChangeListener(null);
+                                button.setChecked(actual);
+                                button.setOnCheckedChangeListener((b, value) -> {
+                                    b.setEnabled(false);
+                                    new Thread(() -> {
+                                        Result<Map<String, Object>> next = container.getVipRepository().setMysteriousMode(value);
+                                        runOnUiThread(() -> {
+                                            if (binding == null || isFinishing()) return;
+                                            b.setEnabled(eligible);
+                                            if (next != null && next.success && next.data != null) {
+                                                boolean saved = Boolean.TRUE.equals(next.data.get("enabled"));
+                                                b.setOnCheckedChangeListener(null);
+                                                b.setChecked(saved);
+                                                binding.tvMysteriousModeHint.setText(saved
+                                                        ? "مفعّل — هويتك مخفية داخل الغرف"
+                                                        : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                                                bindMysteriousModeListener(eligible);
+                                            } else {
+                                                b.setOnCheckedChangeListener(null);
+                                                b.setChecked(!value);
+                                                bindMysteriousModeListener(eligible);
+                                                Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                                            }
+                                        });
+                                    }).start();
+                                });
+                                binding.tvMysteriousModeHint.setText(actual
+                                        ? "مفعّل — هويتك مخفية داخل الغرف"
+                                        : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                            } else {
+                                button.setOnCheckedChangeListener(null);
+                                button.setChecked(!checked);
+                                bindMysteriousModeListener(eligible);
+                                Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }).start();
+                });
+            });
+        }).start();
+    }
+
+    private void bindMysteriousModeListener(boolean eligible) {
+        if (binding == null || binding.switchMysteriousMode == null) return;
+        binding.switchMysteriousMode.setOnCheckedChangeListener((button, checked) -> {
+            button.setEnabled(false);
+            new Thread(() -> {
+                Result<Map<String, Object>> changed = container.getVipRepository().setMysteriousMode(checked);
+                runOnUiThread(() -> {
+                    if (binding == null || isFinishing()) return;
+                    button.setEnabled(eligible);
+                    if (changed != null && changed.success && changed.data != null) {
+                        boolean saved = Boolean.TRUE.equals(changed.data.get("enabled"));
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(saved);
+                        binding.tvMysteriousModeHint.setText(saved
+                                ? "مفعّل — هويتك مخفية داخل الغرف"
+                                : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                        bindMysteriousModeListener(eligible);
+                    } else {
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(!checked);
+                        bindMysteriousModeListener(eligible);
+                        Toast.makeText(ProfileActivity.this, "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }).start();
         });
     }
 
