@@ -19,8 +19,7 @@ export class MomentsService {
       'SELECT 1 FROM "jeho_own"."follows" WHERE "followerId" = $1 AND "followingId" = $2 LIMIT 1',
       [viewerId, moment.userId],
     );
-    if (!follow) return false;
-    if (moment.visibility === 'followers') return true;
+    if (moment.visibility === 'followers') return !!follow;
     const [friend] = await this.dataSource.query(
       `SELECT 1 FROM "jeho_own"."social_requests"
        WHERE status = 'accepted' AND type = 'friend'
