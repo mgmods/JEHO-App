@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
+import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -48,8 +49,10 @@ public class HomeMomentsFragment extends Fragment {
     private AppContainer container;
     private LinearLayout root, feedContainer;
     private EditText composer;
-    private Spinner visibility;
-    private TextView imageStatus, loading;
+    private TextView privacySelector, imageStatus, loading;
+    private ImageView selectedPreview;
+    private View selectedImagePanel;
+    private int selectedVisibility = 0;
     private Uri selectedImage;
     private String uploadedImageUrl;
     private final List<Map<String, Object>> posts = new ArrayList<>();
@@ -73,42 +76,93 @@ public class HomeMomentsFragment extends Fragment {
         root.setPadding(dp(14), dp(12), dp(14), dp(24));
         root.setBackgroundColor(0xFFF7F7FA);
         scroll.addView(root);
-        TextView heading = text("اللحظات", 22, 0xFF222222, true);
-        root.addView(heading, matchWrap());
-        TextView sub = text("شارك لحظتك مع الناس حسب الخصوصية التي تختارها", 13, 0xFF777782, false);
-        root.addView(sub, matchWrap());
+        LinearLayout hero = new LinearLayout(requireContext());
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(18), dp(18), dp(18), dp(18));
+        hero.setBackground(rounded(0xFFB70F52, 0xFFEF477A, dp(22)));
+        TextView heading = text("اللحظات", 25, 0xFFFFFFFF, true);
+        heading.setPadding(0, 0, 0, dp(4));
+        hero.addView(heading, matchWrap());
+        TextView sub = text("مساحتك لمشاركة ما يستحق أن يُرى", 14, 0xFFFFE8F0, false);
+        sub.setPadding(0, 0, 0, 0);
+        hero.addView(sub, matchWrap());
+        root.addView(hero, matchWrap());
+
         LinearLayout composerCard = card();
+        composerCard.setPadding(dp(16), dp(15), dp(16), dp(15));
+        composerCard.setBackground(rounded(0xFFFFFFFF, 0xFFFFFFFF, dp(20)));
+        TextView composerTitle = text("أنشئ لحظة جديدة", 17, 0xFF25232A, true);
+        composerCard.addView(composerTitle, matchWrap());
+        TextView composerHint = text("اكتب شيئاً جميلاً أو أرفق صورة من يومك", 12, 0xFF898590, false);
+        composerHint.setPadding(0, 0, 0, dp(10));
+        composerCard.addView(composerHint, matchWrap());
         composer = new EditText(requireContext());
-        composer.setHint("بماذا تفكر؟");
-        composer.setMinLines(2);
-        composer.setGravity(Gravity.TOP | Gravity.RIGHT);
+        composer.setHint("بماذا تود أن تشارك أصدقاءك؟");
+        composer.setMinLines(3);
+        composer.setMaxLines(7);
         composer.setTextSize(15);
+        composer.setPadding(dp(13), dp(12), dp(13), dp(12));
+        composer.setGravity(Gravity.TOP | Gravity.RIGHT);
+        composer.setBackground(rounded(0xFFF8F7FA, 0xFFEAE7EF, dp(14), dp(1)));
+        composer.setTextColor(0xFF292630);
+        composer.setHintTextColor(0xFFA29DA8);
         composerCard.addView(composer, matchWrap());
-        visibility = new Spinner(requireContext());
-        String[] privacy = {"عام", "المتابعون", "الأصدقاء", "أنا فقط"};
-        visibility.setAdapter(new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_dropdown_item, privacy));
-        composerCard.addView(visibility, matchWrap());
-        LinearLayout actions = new LinearLayout(requireContext());
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        Button imageButton = button("إضافة صورة");
+
+        selectedImagePanel = new LinearLayout(requireContext());
+        ((LinearLayout) selectedImagePanel).setOrientation(LinearLayout.VERTICAL);
+        selectedImagePanel.setVisibility(View.GONE);
+        selectedPreview = new ImageView(requireContext());
+        selectedPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        ((LinearLayout) selectedImagePanel).addView(selectedPreview,
+                new LinearLayout.LayoutParams(-1, dp(180)));
+        Button removePhoto = button("إزالة الصورة  ×");
+        styleButton(removePhoto, 0xFFFFF0F4, 0xFFB70F52, dp(12));
+        removePhoto.setOnClickListener(v -> clearSelectedImage());
+        ((LinearLayout) selectedImagePanel).addView(removePhoto, matchWrap());
+        LinearLayout.LayoutParams previewLp = matchWrap();
+        previewLp.topMargin = dp(10);
+        composerCard.addView(selectedImagePanel, previewLp);
+
+        LinearLayout toolsRow = new LinearLayout(requireContext());
+        toolsRow.setOrientation(LinearLayout.HORIZONTAL);
+        toolsRow.setGravity(Gravity.CENTER_VERTICAL);
+        toolsRow.setPadding(0, dp(12), 0, dp(8));
+        Button imageButton = button("＋  صورة");
+        styleButton(imageButton, 0xFFFFF0F5, 0xFFB70F52, dp(14));
+        imageButton.setCompoundDrawablePadding(dp(5));
         imageButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.setType("image/*");
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             startActivityForResult(intent, PICK_IMAGE);
         });
-        Button publish = button("نشر اللحظة");
-        publish.setOnClickListener(v -> publish());
-        actions.addView(imageButton, new LinearLayout.LayoutParams(0, dp(44), 1));
-        actions.addView(publish, new LinearLayout.LayoutParams(0, dp(44), 1));
-        composerCard.addView(actions, matchWrap());
+        privacySelector = text("🌐  عام  ▾", 13, 0xFF5D5664, true);
+        privacySelector.setGravity(Gravity.CENTER);
+        privacySelector.setPadding(dp(12), dp(10), dp(12), dp(10));
+        privacySelector.setBackground(rounded(0xFFF5F3F7, 0xFFE8E4EB, dp(14), dp(1)));
+        privacySelector.setOnClickListener(v -> chooseVisibility());
+        toolsRow.addView(imageButton, new LinearLayout.LayoutParams(0, dp(44), 1));
+        LinearLayout.LayoutParams privacyLp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        privacyLp.leftMargin = dp(8);
+        toolsRow.addView(privacySelector, privacyLp);
+        composerCard.addView(toolsRow, matchWrap());
+
         imageStatus = text("", 12, 0xFF777782, false);
         composerCard.addView(imageStatus, matchWrap());
+        Button publish = button("نشر اللحظة  ↑");
+        publish.setTextSize(15);
+        publish.setTypeface(null, android.graphics.Typeface.BOLD);
+        styleButton(publish, 0xFFB70F52, 0xFFFFFFFF, dp(14));
+        publish.setElevation(dp(2));
+        publish.setOnClickListener(v -> publish());
+        LinearLayout.LayoutParams publishLp = new LinearLayout.LayoutParams(-1, dp(50));
+        publishLp.topMargin = dp(6);
+        composerCard.addView(publish, publishLp);
         root.addView(composerCard, matchWrap());
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
             heading.setText("لحظاتي");
             sub.setText("المنشورات التي يسمح صاحب الحساب بعرضها");
-            composerCard.setVisibility(View.GONE);
+            composerCard.setVisibility(View.GONE);\n            hero.setVisibility(View.GONE);
         }
         loading = text("جارٍ تحميل اللحظات…", 14, 0xFF777782, false);
         loading.setGravity(Gravity.CENTER);
@@ -160,7 +214,7 @@ public class HomeMomentsFragment extends Fragment {
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("body", body);
                 payload.put("imageUrl", imageUrl);
-                payload.put("visibility", values[Math.max(0, visibility.getSelectedItemPosition())]);
+                payload.put("visibility", values[Math.max(0, Math.min(selectedVisibility, values.length - 1))]);
                 Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().createMoment(payload).execute();
                 if (!response.isSuccessful() || response.body() == null || !response.body().success)
                     throw new IllegalStateException("publish failed");
@@ -170,7 +224,7 @@ public class HomeMomentsFragment extends Fragment {
                     selectedImage = null;
                     uploadedImageUrl = null;
                     imageStatus.setText("");
-                    visibility.setSelection(0);
+                    selectedVisibility = 0;\n                    updatePrivacyLabel();
                     setComposerEnabled(true);
                     Toast.makeText(requireContext(), "تم نشر اللحظة", Toast.LENGTH_SHORT).show();
                     loadFeed();
@@ -431,7 +485,7 @@ public class HomeMomentsFragment extends Fragment {
 
     private void setComposerEnabled(boolean enabled) {
         if (composer != null) composer.setEnabled(enabled);
-        if (visibility != null) visibility.setEnabled(enabled);
+        if (privacySelector != null) privacySelector.setEnabled(enabled);
     }
 
     @Override public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -443,6 +497,55 @@ public class HomeMomentsFragment extends Fragment {
                     data.getFlags() & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION)); }
             catch (Exception ignored) {}
         }
+    }
+
+    private void chooseVisibility() {
+        String[] labels = {"🌐  عام — يمكن للجميع رؤيتها", "👥  المتابعون", "🤝  الأصدقاء", "🔒  أنا فقط"};
+        new AlertDialog.Builder(requireContext())
+            .setTitle("من يمكنه رؤية اللحظة؟")
+            .setSingleChoiceItems(labels, selectedVisibility, (dialog, which) -> {
+                selectedVisibility = which;
+                updatePrivacyLabel();
+                dialog.dismiss();
+            })
+            .setNegativeButton("إلغاء", null)
+            .show();
+    }
+
+    private void updatePrivacyLabel() {
+        if (privacySelector == null) return;
+        String[] labels = {"🌐  عام  ▾", "👥  المتابعون  ▾", "🤝  الأصدقاء  ▾", "🔒  أنا فقط  ▾"};
+        privacySelector.setText(labels[Math.max(0, Math.min(selectedVisibility, labels.length - 1))]);
+    }
+
+    private void clearSelectedImage() {
+        selectedImage = null;
+        uploadedImageUrl = null;
+        if (selectedImagePanel != null) selectedImagePanel.setVisibility(View.GONE);
+        if (selectedPreview != null) selectedPreview.setImageDrawable(null);
+        if (imageStatus != null) imageStatus.setText("");
+    }
+
+    private GradientDrawable rounded(int color, int strokeColor, int radiusDp) {
+        return rounded(color, strokeColor, radiusDp, 0);
+    }
+
+    private GradientDrawable rounded(int color, int strokeColor, int radiusDp, int strokeDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        if (strokeDp > 0) drawable.setStroke(dp(strokeDp), strokeColor);
+        return drawable;
+    }
+
+    private void styleButton(Button button, int backgroundColor, int textColor, int radiusDp) {
+        button.setAllCaps(false);
+        button.setTextColor(textColor);
+        button.setTextSize(13);
+        button.setPadding(dp(10), dp(4), dp(10), dp(4));
+        button.setMinHeight(dp(42));
+        button.setBackground(rounded(backgroundColor, backgroundColor, radiusDp));
+        if (android.os.Build.VERSION.SDK_INT >= 21) button.setStateListAnimator(null);
     }
 
     private void runIo(Runnable runnable) { ExecutorService executor = container.getIoExecutor(); executor.execute(runnable); }
