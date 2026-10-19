@@ -22,7 +22,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { supportChestApi } from '@/api'
-const form = reactive({ enabled:false, iconVisible:false, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.' })
+const form = reactive({ enabled:false, iconVisible:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.' })
 const giftIdsText=ref(''), saving=ref(false), error=ref(''), notice=ref('')
 onMounted(async()=>{try{const r=await supportChestApi.getConfig();if(r?.error)throw r.error;const d=r?.data?.data ?? r?.data;if(!d||typeof d!=='object')throw new Error('Empty support chest config');Object.assign(form,d);giftIdsText.value=(d.giftIds||[]).join(', ')}catch(e){error='تعذّر تحميل إعدادات صندوق الدعم من الخادم: '+String(e?.message||'خطأ غير معروف')}})
 async function save(){saving.value=true;error.value='';notice.value='';try{form.giftIds=giftIdsText.value.split(',').map(x=>x.trim()).filter(Boolean);const result=await supportChestApi.saveConfig({...form});if(result?.error)throw result.error;notice.value='تم حفظ إعدادات صندوق الدعم في الخادم بنجاح.'}catch(e){error='فشل الحفظ من الخادم؛ لم يتم تأكيد حفظ الإعدادات.'}finally{saving.value=false}}
