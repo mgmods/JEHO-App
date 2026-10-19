@@ -51,7 +51,7 @@
           </div>
           <div class="vip-price mb-1">
             <span class="coin-icon" aria-hidden="true">◈</span>
-            <strong>{{ formatNumber(p.coinPrice ?? p.price ?? 0) }}</strong>
+            <strong>{{ formatNumber(p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 0) }}</strong>
             <span class="vip-price-unit">{{ t('vip.perMonth') }}</span>
           </div>
           <div class="widget-card-meta mb-2">
@@ -234,7 +234,7 @@
                 <select v-model="assignForm.planId" class="form-select" required>
                   <option disabled value="">{{ t('vip.selectPlan') }}</option>
                   <option v-for="p in plans" :key="p.id" :value="p.id">
-                    {{ p.name }} · {{ formatNumber(p.coinPrice ?? p.price ?? 0) }} {{ t('common.coins') }}
+                    {{ p.name }} · {{ formatNumber(p.coinPriceMonthly ?? p.coinPrice ?? p.price ?? 0) }} {{ t('common.coins') }}
                   </option>
                 </select>
               </div>
@@ -267,11 +267,13 @@
             <h3 class="widget-card-title">{{ p.name || ('VIP ' + p.level) }}</h3>
             <div class="small text-muted mb-2">إدارة ملفات هذا المستوى مباشرة، بدون فتح المتجر</div>
             <div class="vip-asset-list">
-              <span :class="{ 'is-set': p.visuals?.vipFrameUrl }">إطار VIP</span>
-              <span :class="{ 'is-set': p.visuals?.vipCardUrl }">بطاقة VIP</span>
-              <span :class="{ 'is-set': p.visuals?.profileCardUrl }">بطاقة الملف الشخصي</span>
-              <span :class="{ 'is-set': p.visuals?.chatBubbleUrl }">فقاعة الدردشة</span>
-              <span :class="{ 'is-set': p.visuals?.nameplateUrl }">لوحة الاسم</span>
+              <span :class="{ 'is-set': planVisuals(p).vipFrameUrl }">إطار VIP</span>
+              <span :class="{ 'is-set': planVisuals(p).vipCardUrl }">بطاقة VIP</span>
+              <span :class="{ 'is-set': planVisuals(p).profileCardUrl }">بطاقة الملف الشخصي</span>
+              <span :class="{ 'is-set': planVisuals(p).chatBubbleUrl }">فقاعة الدردشة</span>
+              <span :class="{ 'is-set': planVisuals(p).nameplateUrl }">لوحة الاسم</span>
+              <span :class="{ 'is-set': planBenefitExtras(p).includes('mysterious_man') }">الرجل الغامض</span>
+              <span :class="{ 'is-set': !!planVisuals(p).mysteriousManFrameUrl || planVisuals(p).mysteriousManFrameMode === 'user' }">إطار الرجل الغامض</span>
             </div>
             <div class="action-btns mt-3">
               <button class="btn btn-sm btn-aurora" type="button" @click="openPlan(p)">تعديل مظاهر VIP {{ p.level }}</button>
@@ -386,6 +388,21 @@ function tierColor(level) {
 
 function assetUrl(path) { return resolveAsset(path) }
 
+function planBenefitExtras(plan) {
+  const benefits = plan?.benefits
+  if (Array.isArray(benefits)) return benefits
+  if (Array.isArray(benefits?.extra)) return benefits.extra
+  if (Array.isArray(plan?.perks)) return plan.perks
+  return []
+}
+
+function planVisuals(plan) {
+  // The API stores tier visuals inside vip_plans.benefits.visuals.
+  if (plan?.visuals && typeof plan.visuals === 'object') return plan.visuals
+  if (plan?.benefits?.visuals && typeof plan.benefits.visuals === 'object') return plan.benefits.visuals
+  return {}
+}
+
 function badgeSrc(p) {
   const lvl = tierForLevel(p.level)
   const fromPlan = p.badgeUrl || `/assets/cosmetics/vip/vip_medal_mikoo_${lvl}.png?v=20260801vip7`
@@ -418,17 +435,17 @@ function openPlan(p = null) {
       price: p.coinPrice ?? p.price ?? 99,
       durationDays: p.durationDays || p.duration || 30,
       level: Math.max(1, Math.min(100, Number(p.level || 1))),
-      benefitsText: (p.benefits || p.perks || []).filter((b) => b !== 'mysterious_man').join(', '),
-      mysteriousManEnabled: (p.benefits || p.perks || []).includes('mysterious_man'),
+      benefitsText: planBenefitExtras(p).filter((b) => b !== 'mysterious_man').join(', '),
+      mysteriousManEnabled: planBenefitExtras(p).includes('mysterious_man'),
       badgeUrl: p.badgeUrl || '',
       visuals: {
-        vipFrameUrl: p.visuals?.vipFrameUrl || '',
-        vipCardUrl: p.visuals?.vipCardUrl || '',
-        profileCardUrl: p.visuals?.profileCardUrl || '',
-        chatBubbleUrl: p.visuals?.chatBubbleUrl || '',
-        nameplateUrl: p.visuals?.nameplateUrl || '',
-        mysteriousManFrameUrl: p.visuals?.mysteriousManFrameUrl || '',
-        mysteriousManFrameMode: p.visuals?.mysteriousManFrameMode === 'user' ? 'user' : 'custom',
+        vipFrameUrl: planVisuals(p).vipFrameUrl || '',
+        vipCardUrl: planVisuals(p).vipCardUrl || '',
+        profileCardUrl: planVisuals(p).profileCardUrl || '',
+        chatBubbleUrl: planVisuals(p).chatBubbleUrl || '',
+        nameplateUrl: planVisuals(p).nameplateUrl || '',
+        mysteriousManFrameUrl: planVisuals(p).mysteriousManFrameUrl || '',
+        mysteriousManFrameMode: planVisuals(p).mysteriousManFrameMode === 'user' ? 'user' : 'custom',
       },
     })
   } else {
