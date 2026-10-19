@@ -253,6 +253,50 @@ export class AdminService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async getMysteriousManConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    const defaults = { avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
+        messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchMysteriousManConfig(input: Record<string, unknown>) {
+    const cleanUrl = (value: unknown, key: string) => {
+      const url = typeof value === 'string' ? value.trim() : '';
+      if (url && (!/^https?:\/\//i.test(url) || url.length > 2048)) {
+        throw new BadRequestException(`Invalid ${key} URL`);
+      }
+      return url;
+    };
+    const current = {
+      avatarUrl: cleanUrl(input.avatarUrl, 'avatar'),
+      entryEffectUrl: cleanUrl(input.entryEffectUrl, 'entry effect'),
+      messageEffectUrl: cleanUrl(input.messageEffectUrl, 'message effect'),
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed Mysterious Man shared media';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'mysterious_man_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed Mysterious Man shared media',
+      }));
+    }
+    return current;
+  }
+
   async getSupportChestConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {
