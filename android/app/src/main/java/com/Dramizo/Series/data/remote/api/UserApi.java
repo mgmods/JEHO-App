@@ -34,6 +34,9 @@ public interface UserApi {
     @POST("moments/{id}/comments")
     Call<ApiResponse<Map<String, Object>>> commentOnMoment(@Path("id") String id, @Body Map<String, String> body);
 
+    @POST("moments/{id}/report")
+    Call<ApiResponse<Map<String, Object>>> reportMoment(@Path("id") String id, @Body Map<String, String> body);
+
     @DELETE("moments/{id}")
     Call<ApiResponse<Map<String, Object>>> deleteMoment(@Path("id") String id);
 
