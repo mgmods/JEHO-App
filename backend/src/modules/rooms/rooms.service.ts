@@ -1414,6 +1414,30 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return map;
   }
 
+  /** Return room-only anonymous presentation when the user's current VIP grants it. */
+  private async mysteriousRoomIdentity(userId: string): Promise<Record<string, unknown> | null> {
+    if (!userId) return null;
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user?.mysteriousMode) return null;
+    const vip = await this.userVipsRepo.findOne({
+      where: { userId, isActive: true, expiresAt: require('typeorm').MoreThan(new Date()) },
+      relations: ['vipPlan'],
+      order: { level: 'DESC' },
+    });
+    const benefits = vip?.vipPlan?.benefits as any;
+    if (!Array.isArray(benefits?.extra) || !benefits.extra.includes('mysterious_man')) return null;
+    const visuals = benefits.visuals && typeof benefits.visuals === 'object' ? benefits.visuals : {};
+    const customFrame = visuals.mysteriousManFrameMode === 'user' ? null : (visuals.mysteriousManFrameUrl || null);
+    return {
+      mysteriousMan: true,
+      displayName: 'الرجل الغامض',
+      username: 'mysterious_man',
+      avatarUrl: null,
+      publicId: null,
+      ...(customFrame ? { vipBadgeUrl: customFrame, frameUrl: customFrame } : {}),
+    };
+  }
+
   private async decorateRoom(room: any) {
     const userIds: string[] = [];
     if (room.hostId) userIds.push(room.hostId);
@@ -1447,13 +1471,17 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const decoratedSeats = await Promise.all(
       (room.seats || []).map(async (s: any) => {
         const uid = s.userId || s.user?.id;
+        const attached = await this.attachFrame(s.user, vipMap.get(uid) || 0);
+        const anonymous = await this.mysteriousRoomIdentity(uid);
         return {
           ...s,
-          user: await this.attachFrame(s.user, vipMap.get(uid) || 0),
+          user: anonymous && attached ? { ...attached, ...anonymous } : attached,
         };
       }),
     );
-    const hostDto = await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
+    const attachedHost = await this.attachFrame(room.host, vipMap.get(room.hostId) || 0);
+    const hostAnonymous = await this.mysteriousRoomIdentity(room.hostId);
+    const hostDto = hostAnonymous && attachedHost ? { ...attachedHost, ...hostAnonymous } : attachedHost;
     const fromHostDto =
       hostDto && typeof (hostDto as any).roomCardUrl === 'string'
         ? String((hostDto as any).roomCardUrl).trim() || null
