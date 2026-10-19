@@ -13,6 +13,7 @@ import retrofit2.http.PATCH;
 import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
+import retrofit2.http.Url;
 import retrofit2.http.Query;
 
 public interface UserApi {
@@ -22,8 +23,8 @@ public interface UserApi {
     @GET("moments/users/{userId}")
     Call<ApiResponse<List<Map<String, Object>>>> userMoments(@Path("userId") String userId);
 
-    @POST("moments")
-    Call<ApiResponse<Map<String, Object>>> createMoment(@Body Map<String, Object> body);
+    @POST
+    Call<ApiResponse<Map<String, Object>>> createMoment(@Url String endpointUrl, @Body Map<String, Object> body);
 
     @POST("moments/{id}/like")
     Call<ApiResponse<Map<String, Object>>> toggleMomentLike(@Path("id") String id);
