@@ -57,6 +57,19 @@
             <p class="form-text mb-3">
               ارفع هوية موحّدة يستخدمها جميع الحسابات التي فعّلت وضع الرجل الغامض. هذه الإعدادات لا تغيّر صور الحسابات الأصلية.
             </p>
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <label class="form-label">نوع الدخولية الموحدة</label>
+                <select v-model="mysteryForm.entryMode" class="form-select">
+                  <option value="text">دخولية نصية</option>
+                  <option value="video">دخولية فيديو / حركة</option>
+                </select>
+              </div>
+              <div class="col-md-8" v-if="mysteryForm.entryMode === 'text'">
+                <label class="form-label">نص الدخولية</label>
+                <input v-model="mysteryForm.entryText" maxlength="160" class="form-control" placeholder="دخل الرجل الغامض" />
+              </div>
+            </div>
             <div v-if="mysteryLoading" class="py-4"><LoadingSpinner /></div>
             <div v-else class="row g-3">
               <div class="col-md-4" v-for="asset in mysteryAssets" :key="asset.key">
@@ -64,9 +77,9 @@
                   <h5 class="mb-1">{{ asset.title }}</h5>
                   <p class="small text-secondary">{{ asset.help }}</p>
                   <div class="rounded-3 bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height:150px">
-                    <img v-if="asset.key === 'avatarUrl' && mysteryForm[asset.key]" :src="mysteryForm[asset.key]" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain" />
+                    <img v-if="asset.key === 'avatarUrl' && mysteryForm[asset.key]" :src="previewMysteryUrl(mysteryForm[asset.key])" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain" />
                     <video v-else-if="asset.key !== 'avatarUrl' && mysteryForm[asset.key] && /\.(mp4|webm|mov)(\?|$)/i.test(mysteryForm[asset.key])" :src="mysteryForm[asset.key]" controls muted loop style="max-width:100%;max-height:180px"></video>
-                    <a v-else-if="mysteryForm[asset.key]" :href="mysteryForm[asset.key]" target="_blank" rel="noopener">معاينة الملف المرفوع</a>
+                    <a v-else-if="mysteryForm[asset.key]" :href="previewMysteryUrl(mysteryForm[asset.key])" target="_blank" rel="noopener">معاينة الملف المرفوع</a>
                     <span v-else class="text-secondary small">لم يتم رفع ملف بعد</span>
                   </div>
                   <input :ref="el => setMysteryInput(asset.key, el)" type="file" class="form-control form-control-sm mb-2" :accept="asset.accept" @change="uploadMysteryAsset(asset, $event)" />
@@ -674,12 +687,19 @@ const mysteryLoading = ref(false)
 const mysterySaving = ref(false)
 const mysteryUploading = ref('')
 const mysteryInputs = {}
-const mysteryForm = reactive({ avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' })
+const mysteryForm = reactive({ avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' })
 const mysteryAssets = [
   { key: 'avatarUrl', title: 'الصورة الشخصية الموحدة', help: 'تظهر بدل الصورة الأصلية في مواضع الهوية المخفية.', accept: 'image/png,image/jpeg,image/webp' },
   { key: 'entryEffectUrl', title: 'دخولية الرجل الغامض', help: 'فيديو/حركة الدخول الموحدة داخل الرومات.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
   { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'ملف تأثير اختياري موحد؛ يحتاج دعم مشغّل داخل التطبيق.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
 ]
+function previewMysteryUrl(raw) {
+  const value = String(raw || '').trim()
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  const base = String(import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '')
+  return value.startsWith('/uploads/') ? base + value : value
+}
 function setMysteryInput(key, el) { if (el) mysteryInputs[key] = el }
 function chooseMysteryFile(key) { mysteryInputs[key]?.click() }
 async function loadMysteryConfig() {
@@ -690,6 +710,8 @@ async function loadMysteryConfig() {
   const cfg = data?.data || data || {}
   Object.assign(mysteryForm, {
     avatarUrl: String(cfg.avatarUrl || ''),
+    entryMode: cfg.entryMode === 'text' ? 'text' : 'video',
+    entryText: String(cfg.entryText || 'دخل الرجل الغامض'),
     entryEffectUrl: String(cfg.entryEffectUrl || ''),
     messageEffectUrl: String(cfg.messageEffectUrl || ''),
   })
