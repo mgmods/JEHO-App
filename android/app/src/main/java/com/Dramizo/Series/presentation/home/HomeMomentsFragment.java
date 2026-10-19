@@ -296,8 +296,9 @@ public class HomeMomentsFragment extends Fragment {
             }
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
-            Button like = button((Boolean.TRUE.equals(post.get("likedByMe")) ? "♥ " : "♡ ")
+            Button like = button((Boolean.TRUE.equals(post.get("likedByMe")) ? "♥  " : "♡  ")
                     + number(post.get("likeCount")) + " إعجاب");
+            if (Boolean.TRUE.equals(post.get("likedByMe"))) styleButton(like, 0xFFFFE6EE, 0xFFB70F52, dp(12));
             like.setOnClickListener(v -> like(post));
             Button comments = button("تعليقات " + number(post.get("commentCount")));
             comments.setOnClickListener(v -> comments(post));
@@ -312,8 +313,9 @@ public class HomeMomentsFragment extends Fragment {
             row.addView(follow, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(share, new LinearLayout.LayoutParams(0, dp(42), 1));
             item.addView(row, matchWrap());
-            Button report = button("⚑ إبلاغ عن المنشور");
+            Button report = button("⚑  إبلاغ");
             report.setTextColor(0xFFB3261E);
+            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(12), dp(1)));
             report.setOnClickListener(v -> askMomentReport(post));
             LinearLayout reportRow = new LinearLayout(requireContext());
             reportRow.setGravity(Gravity.END);
@@ -376,8 +378,9 @@ public class HomeMomentsFragment extends Fragment {
             detail.addView(photo);
         }
         detail.addView(text(string(post, "body"), 15, 0xFF222222, false));
-        Button report = button("⚑ إبلاغ عن المنشور");
+        Button report = button("⚑  إبلاغ عن المنشور");
         report.setTextColor(0xFFB3261E);
+        report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(12), dp(1)));
         report.setOnClickListener(v -> {
             askMomentReport(post);
         });
@@ -557,8 +560,10 @@ public class HomeMomentsFragment extends Fragment {
     }
     private LinearLayout card() {
         LinearLayout box = new LinearLayout(requireContext()); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(12), dp(12), dp(12), dp(10)); box.setBackgroundColor(0xFFFFFFFF);
-        box.setElevation(dp(1)); LinearLayout.LayoutParams lp = matchWrap(); lp.bottomMargin = dp(12);
+        box.setPadding(dp(14), dp(14), dp(14), dp(12));
+        box.setBackground(rounded(0xFFFFFFFF, 0xFFF0EDF2, dp(18), dp(1)));
+        box.setElevation(dp(2));
+        LinearLayout.LayoutParams lp = matchWrap(); lp.bottomMargin = dp(14);
         box.setLayoutParams(lp); return box;
     }
     private TextView text(String value, int size, int color, boolean bold) {
@@ -567,8 +572,16 @@ public class HomeMomentsFragment extends Fragment {
         v.setPadding(0, dp(4), 0, dp(5)); return v;
     }
     private Button button(String value) {
-        Button b = new Button(requireContext()); b.setText(value); b.setAllCaps(false);
-        b.setTextSize(13); return b;
+        Button b = new Button(requireContext());
+        b.setText(value);
+        b.setAllCaps(false);
+        b.setTextSize(12);
+        b.setTextColor(0xFF5E5864);
+        b.setPadding(dp(7), dp(2), dp(7), dp(2));
+        b.setMinHeight(dp(40));
+        b.setBackground(rounded(0xFFF6F4F8, 0xFFEAE6EE, dp(12), dp(1)));
+        if (android.os.Build.VERSION.SDK_INT >= 21) b.setStateListAnimator(null);
+        return b;
     }
     private LinearLayout.LayoutParams matchWrap() { return new LinearLayout.LayoutParams(-1, -2); }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
