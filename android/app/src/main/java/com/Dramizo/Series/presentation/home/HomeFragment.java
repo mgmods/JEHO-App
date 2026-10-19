@@ -191,6 +191,15 @@ public class HomeFragment extends Fragment {
                 com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
+        binding.hotAllButton.setOnClickListener(v -> {
+            hotCountryFilter = null;
+            renderHotCountryChips();
+            selectLogicalTab(TAB_HOT);
+            reapplyFeedPages();
+        });
+        binding.hotCountryDropdown.setOnClickListener(v ->
+                showCountryPicker(false, this::renderHotCountryChips));
+        renderHotCountryChips();
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
         View appBar = binding.getRoot().findViewById(R.id.homeAppBar);
@@ -465,6 +474,64 @@ public class HomeFragment extends Fragment {
                 category == null ? "rich" : category);
         intent.putExtra(com.Dramizo.Series.presentation.ranking.WealthRankingHtmlActivity.EXTRA_PERIOD, "daily");
         startActivity(intent);
+    }
+
+    /** Render a compact country strip; the Popular button always means worldwide. */
+    private void renderHotCountryChips() {
+        if (binding == null || binding.hotCountryChips == null) return;
+        LinearLayout container = binding.hotCountryChips;
+        container.removeAllViews();
+
+        CountryCatalog.Entry selected = CountryCatalog.resolve(hotCountryFilter);
+        CountryCatalog.Entry account = CountryCatalog.resolve(getMyCountryCode());
+        if (selected == null) selected = account;
+        if (selected == null) selected = CountryCatalog.resolve("SY");
+
+        java.util.LinkedHashSet<String> codes = new java.util.LinkedHashSet<>();
+        if (selected != null) codes.add(selected.code);
+        for (String code : new String[]{"SA", "SY", "MA", "AE"}) codes.add(code);
+
+        android.graphics.drawable.GradientDrawable allBg = new android.graphics.drawable.GradientDrawable();
+        allBg.setColor(hotCountryFilter == null ? 0xFFFF477E : 0xFFF7F7FA);
+        allBg.setCornerRadius(getResources().getDisplayMetrics().density * 22f);
+        binding.hotAllButton.setBackground(allBg);
+        binding.hotAllButton.setTextColor(hotCountryFilter == null ? 0xFFFFFFFF : 0xFF34343A);
+        binding.hotAllButton.setElevation(getResources().getDisplayMetrics().density * 2f);
+
+        for (String code : codes) {
+            CountryCatalog.Entry entry = CountryCatalog.resolve(code);
+            if (entry == null) continue;
+            final String countryCode = entry.code;
+            boolean active = countryCode.equalsIgnoreCase(hotCountryFilter == null ? "" : hotCountryFilter);
+            TextView chip = new TextView(requireContext());
+            chip.setText(entry.flag + " " + entry.displayName());
+            chip.setTextSize(13f);
+            chip.setSingleLine(true);
+            chip.setGravity(android.view.Gravity.CENTER);
+            chip.setPadding(dp(12), 0, dp(12), 0);
+            chip.setMinHeight(dp(38));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(active ? 0xFFFFE4EC : 0xFFF7F7FA);
+            bg.setCornerRadius(dp(22));
+            bg.setStroke(dp(1), active ? 0xFFFF477E : 0xFFE6E6EC);
+            chip.setBackground(bg);
+            chip.setTextColor(active ? 0xFFB9164B : 0xFF34343A);
+            chip.setElevation(dp(1));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(38));
+            lp.setMargins(0, 0, dp(7), 0);
+            container.addView(chip, lp);
+            chip.setOnClickListener(v -> {
+                hotCountryFilter = countryCode;
+                renderHotCountryChips();
+                selectLogicalTab(TAB_HOT);
+                reapplyFeedPages();
+            });
+        }
+    }
+
+    private int dp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     /** Optional Hot-tab country filter (null = worldwide). */
