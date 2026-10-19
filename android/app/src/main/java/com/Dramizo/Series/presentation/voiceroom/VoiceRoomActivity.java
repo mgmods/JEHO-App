@@ -617,7 +617,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     return;
                 }
                 if (!empty) {
-                    if (seat.user != null && seat.user.mysteriousMan) {
+                    boolean canModerateHiddenIdentity = canManageSeats || canKickUsers
+                            || isHost || isOwner || isPlatformManager() || isPlatformSuper();
+                    if (seat.user != null && seat.user.mysteriousMan && !canModerateHiddenIdentity) {
                         Toast.makeText(VoiceRoomActivity.this, "هوية هذا العضو مخفية داخل الروم", Toast.LENGTH_SHORT).show();
                         return;
                     }
