@@ -30,6 +30,41 @@
             android:paddingTop="4dp"
             android:paddingBottom="6dp">
 
+            <FrameLayout
+                android:id="@+id/btnMyRoomShortcut"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:layout_marginEnd="2dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="@string/my_room">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="🏠"
+                    android:textSize="22sp"
+                    android:contentDescription="@string/my_room" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/btnSearch"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/search"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+
             <HorizontalScrollView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -188,21 +223,7 @@
                     android:scaleType="fitCenter" />
             </FrameLayout>
 
-            <FrameLayout
-                android:layout_width="42dp"
-                android:layout_height="42dp"
-                android:background="@android:color/transparent"
-                android:clickable="true"
-                android:focusable="true">
 
-                <ImageView
-                    android:id="@+id/btnSearch"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@string/search"
-                    android:scaleType="fitCenter" />
-            </FrameLayout>
         </LinearLayout>
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
