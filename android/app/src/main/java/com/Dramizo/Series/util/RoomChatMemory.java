@@ -167,8 +167,25 @@ public final class RoomChatMemory {
             BY_ROOM.remove(roomId);
             CLEARED_AT.put(roomId, stamp);
         }
+        // Invalidate any debounced write queued before the wipe so old lines
+        // cannot be written back to disk after the user leaves or chat is cleared.
+        synchronized (PERSIST_SEQ) {
+            Long previous = PERSIST_SEQ.get(roomId);
+            PERSIST_SEQ.put(roomId, (previous != null ? previous : 0L) + 1L);
+        }
         deleteSessionArtifacts(roomId);
         writeClearedMeta(roomId, stamp);
+        // A disk write may already be running when clear() is called. Queue a
+        // second cleanup on the same single-thread executor so it runs after that
+        // write, while any later append persists after this cleanup.
+        try {
+            diskIo().execute(() -> {
+                deleteSessionArtifacts(roomId);
+                writeClearedMeta(roomId, stamp);
+            });
+        } catch (RuntimeException ignored) {
+            // The synchronous wipe above remains effective if disk IO is shutting down.
+        }
     }
 
     /**
