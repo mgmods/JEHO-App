@@ -232,17 +232,8 @@ async function createPlatformRoom() {
     toast().danger('نوع الروم غير صحيح')
     return
   }
-  const idsRaw = await askPrompt({
-    title: 'مشرفو الروم',
-    message: 'أدخل ID الحسابات العامة للمشرفين، وافصل بين أكثر من ID بفاصلة. سيحصلون على صلاحيات إدارة الروم.',
-    placeholder: 'مثال: 123456, 234567',
-  })
-  if (idsRaw == null) return
-  const moderatorIds = parsePublicIds(idsRaw)
-  if (!moderatorIds.length) {
-    toast().danger('أدخل ID مشرف واحداً على الأقل')
-    return
-  }
+  // Official rooms start with no user owner and no moderators; assign staff later below.
+  const moderatorIds = []
   const coverUrl = await askPrompt({
     title: 'صورة الروم (اختياري)',
     message: 'رابط صورة الغلاف، أو اتركه فارغاً لاستخدام الافتراضي',
@@ -284,16 +275,22 @@ async function managePlatformModerators(r) {
   }
   const publicId = await askPrompt({
     title: 'إضافة مشرف لروم المنصة',
-    message: 'أدخل الـ ID العام للحساب. ستتم إضافته كمشرف دون حذف المشرفين الحاليين.',
-    placeholder: 'ID المستخدم',
+    message: 'أدخل ID لإضافة مشرف، أو اكتب -ID لرفع صلاحياته من هذا الروم.',
+    placeholder: '123456 أو -123456',
   })
   if (publicId == null || !String(publicId).trim()) return
-  const { data, error: err } = await roomsApi.addPlatformModerator(r.id, String(publicId).trim())
+  const rawId = String(publicId).trim()
+  const removing = rawId.startsWith('-')
+  const targetId = removing ? rawId.slice(1).trim() : rawId
+  if (!targetId) return
+  const { data, error: err } = removing
+    ? await roomsApi.removePlatformModerator(r.id, targetId)
+    : await roomsApi.addPlatformModerator(r.id, targetId)
   if (err) {
     error.value = err.message
     toast().danger(err.message)
   } else {
-    toast().success(data?.alreadyModerator ? 'هذا المستخدم مشرف بالفعل' : 'تمت إضافة المشرف بنجاح')
+    toast().success(removing ? 'تم رفع صلاحيات المشرف من الروم' : (data?.alreadyModerator ? 'هذا المستخدم مشرف بالفعل' : 'تمت إضافة المشرف بنجاح'))
     await load()
   }
 }
