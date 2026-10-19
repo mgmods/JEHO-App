@@ -258,6 +258,13 @@ public class HomeMomentsFragment extends Fragment {
             row.addView(follow, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(share, new LinearLayout.LayoutParams(0, dp(42), 1));
             item.addView(row, matchWrap());
+            Button report = button("⚑ إبلاغ عن المنشور");
+            report.setTextColor(0xFFB3261E);
+            report.setOnClickListener(v -> askMomentReport(post));
+            LinearLayout reportRow = new LinearLayout(requireContext());
+            reportRow.setGravity(Gravity.END);
+            reportRow.addView(report, new LinearLayout.LayoutParams(-2, dp(40)));
+            item.addView(reportRow, matchWrap());
             feedContainer.addView(item, matchWrap());
         }
     }
@@ -319,6 +326,51 @@ public class HomeMomentsFragment extends Fragment {
             .setPositiveButton("إعجاب", (d, w) -> like(post))
             .setNeutralButton("تعليق", (d, w) -> comments(post))
             .setNegativeButton("إغلاق", null).show();
+    }
+
+    private void askMomentReport(Map<String, Object> post) {
+        String[] labels = {"محتوى مزعج أو سبام", "إساءة أو تحرّش", "محتوى غير لائق", "عنف أو تهديد", "احتيال أو تضليل", "سبب آخر"};
+        String[] reasons = {"spam", "harassment", "inappropriate", "violence", "scam", "other"};
+        new AlertDialog.Builder(requireContext())
+            .setTitle("سبب الإبلاغ")
+            .setItems(labels, (dialog, which) -> {
+                EditText details = new EditText(requireContext());
+                details.setHint("تفاصيل إضافية (اختياري)");
+                details.setMinLines(2);
+                new AlertDialog.Builder(requireContext())
+                    .setTitle("إرسال البلاغ")
+                    .setMessage("سيصل البلاغ إلى لوحة الإدارة لمراجعته.")
+                    .setView(details)
+                    .setPositiveButton("إرسال", (d, w) -> submitMomentReport(post, reasons[which], details.getText().toString()))
+                    .setNegativeButton("إلغاء", null)
+                    .show();
+            })
+            .setNegativeButton("إلغاء", null)
+            .show();
+    }
+
+    private void submitMomentReport(Map<String, Object> post, String reason, String description) {
+        String id = string(post, "id");
+        if (id.isEmpty()) {
+            Toast.makeText(requireContext(), "تعذر تحديد المنشور", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        runIo(() -> {
+            try {
+                Map<String, String> payload = new HashMap<>();
+                payload.put("reason", reason);
+                payload.put("description", description == null ? "" : description.trim());
+                Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().reportMoment(id, payload).execute();
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (!isAdded()) return;
+                    String message = response.isSuccessful() && response.body() != null && response.body().success
+                        ? "تم إرسال البلاغ إلى الإدارة"
+                        : "تعذر إرسال البلاغ؛ قد تكون أبلغت عن هذا المنشور سابقاً";
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception e) { showError("تعذر إرسال البلاغ، تحقق من الاتصال"); }
+        });
     }
 
     private void followAuthor(String authorId) {
