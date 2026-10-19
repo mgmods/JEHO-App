@@ -529,6 +529,17 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Delete('rooms/:id/platform-moderators/:publicId')
+  @ApiOperation({ summary: 'Remove a moderator from an official platform room by public user ID' })
+  removePlatformRoomModerator(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('publicId') publicId: string,
+  ) {
+    return this.adminService.removePlatformRoomModerator(id, publicId);
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Patch('rooms/:id/platform-moderators')
   @ApiOperation({ summary: 'Replace official platform room moderators by public user ID' })
   setPlatformRoomModerators(
