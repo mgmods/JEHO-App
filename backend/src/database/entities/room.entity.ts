@@ -100,12 +100,12 @@ export class Room {
   publicId: string | null;
 
   @Index()
-  @Column({ type: 'uuid' })
-  hostId: string;
+  @Column({ type: 'uuid', nullable: true })
+  hostId: string | null;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'hostId' })
-  host: User;
+  host: User | null;
 
   @Column({ type: 'uuid', nullable: true })
   cohostId: string | null;
