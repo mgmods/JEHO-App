@@ -1007,11 +1007,11 @@ export class AdminService {
       return {
         ...r,
         name: r.title,
-        ownerName: r.host?.displayName || r.host?.username || '—',
-        hostName: r.host?.displayName || r.host?.username || '—',
-        hostAvatarUrl: r.host?.avatarUrl || null,
-        hostFrameUrl,
-        hostFrameAnimUrl: equippedFrame || hostFrameUrl,
+        ownerName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
+        hostName: r.roomKind === RoomKind.SUPPORT ? (r.title || 'روم رسمي تابع للمنصة') : (r.host?.displayName || r.host?.username || '—'),
+        hostAvatarUrl: r.roomKind === RoomKind.SUPPORT ? null : (r.host?.avatarUrl || null),
+        hostFrameUrl: r.roomKind === RoomKind.SUPPORT ? null : hostFrameUrl,
+        hostFrameAnimUrl: r.roomKind === RoomKind.SUPPORT ? null : (equippedFrame || hostFrameUrl),
         membersCount: r.viewerCount ?? 0,
         isSupport: r.roomKind === RoomKind.SUPPORT,
         isLive,
@@ -1341,7 +1341,7 @@ export class AdminService {
           : 'official',
         type: RoomType.VOICE,
         status: RoomStatus.OPEN,
-        hostId: null,
+        hostId: null as any,
         cohostId: null,
         seatCount,
         viewerCount: 0,
@@ -1386,7 +1386,7 @@ export class AdminService {
           canManageSeats: true,
           canInvite: true,
           canManageRoom: true,
-          appointedById: null,
+          appointedById: null as any,
         }));
         await manager.save(mods);
       }
