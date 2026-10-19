@@ -829,6 +829,49 @@
                     </LinearLayout>
                 </LinearLayout>
 
+                <!-- Mysterious Man toggle: visible only on the account owner's profile. -->
+                <LinearLayout
+                    android:id="@+id/rowProfileMysteriousMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="16dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_profile_panel"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="12dp"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="🕵️ الرجل الغامض"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+                        <TextView
+                            android:id="@+id/tvMysteriousModeHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="3dp"
+                            android:text="إخفاء هويتك داخل الغرف"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                    <Switch
+                        android:id="@+id/switchMysteriousMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:contentDescription="تفعيل أو إلغاء الرجل الغامض"
+                        android:showText="false" />
+                </LinearLayout>
+
                 <!-- CP relationship card: live server data, original CP background, responsive horizontal layout. -->
                 <FrameLayout
                     android:id="@+id/rowProfileCpCv"
