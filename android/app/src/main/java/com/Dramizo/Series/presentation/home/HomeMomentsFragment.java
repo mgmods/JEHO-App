@@ -162,7 +162,8 @@ public class HomeMomentsFragment extends Fragment {
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
             heading.setText("لحظاتي");
             sub.setText("المنشورات التي يسمح صاحب الحساب بعرضها");
-            composerCard.setVisibility(View.GONE);\n            hero.setVisibility(View.GONE);
+            composerCard.setVisibility(View.GONE);
+            hero.setVisibility(View.GONE);
         }
         loading = text("جارٍ تحميل اللحظات…", 14, 0xFF777782, false);
         loading.setGravity(Gravity.CENTER);
