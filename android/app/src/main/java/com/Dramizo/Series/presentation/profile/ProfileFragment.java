@@ -162,6 +162,7 @@ public class ProfileFragment extends Fragment {
         binding.btnVip.setOnClickListener(v -> openVipHtmlPage());
         binding.btnSettingsQuick.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), SettingsActivity.class)));
+        bindMysteriousModeShortcut();
         if (binding.levelCard != null) {
             binding.levelCard.setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), UserLevelActivity.class)));
@@ -403,6 +404,72 @@ public class ProfileFragment extends Fragment {
         }
     }
 
+
+    /** Visible self-service switch in the main profile tab; availability is VIP-controlled. */
+    private void bindMysteriousModeShortcut() {
+        if (binding == null || binding.rowMysteriousModeShortcut == null
+                || binding.switchMysteriousModeShortcut == null) return;
+        binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
+        binding.switchMysteriousModeShortcut.setEnabled(false);
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<java.util.Map<String, Object>> statusResult = c.getVipRepository().mysteriousModeStatus();
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || !isAdded()) return;
+                if (statusResult == null || !statusResult.success || statusResult.data == null) {
+                    binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
+                    return;
+                }
+                java.util.Map<String, Object> status = statusResult.data;
+                boolean eligible = Boolean.TRUE.equals(status.get("eligible"));
+                boolean enabled = Boolean.TRUE.equals(status.get("enabled"));
+                if (!eligible) {
+                    binding.rowMysteriousModeShortcut.setVisibility(View.GONE);
+                    return;
+                }
+                binding.rowMysteriousModeShortcut.setVisibility(View.VISIBLE);
+                binding.switchMysteriousModeShortcut.setOnCheckedChangeListener(null);
+                binding.switchMysteriousModeShortcut.setChecked(enabled);
+                binding.switchMysteriousModeShortcut.setEnabled(true);
+                binding.tvMysteriousModeShortcutHint.setText(enabled
+                        ? "مفعّل — هويتك مخفية داخل الغرف"
+                        : "اشتراكك يسمح بالميزة — اضغط للتفعيل");
+                bindMysteriousModeShortcutListener(c);
+            });
+        });
+    }
+
+    private void bindMysteriousModeShortcutListener(AppContainer c) {
+        if (binding == null || binding.switchMysteriousModeShortcut == null) return;
+        binding.switchMysteriousModeShortcut.setOnCheckedChangeListener((button, checked) -> {
+            button.setEnabled(false);
+            c.getIoExecutor().execute(() -> {
+                Result<java.util.Map<String, Object>> changed = c.getVipRepository().setMysteriousMode(checked);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (binding == null || !isAdded()) return;
+                    if (changed != null && changed.success && changed.data != null) {
+                        boolean saved = Boolean.TRUE.equals(changed.data.get("enabled"));
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(saved);
+                        button.setEnabled(true);
+                        binding.tvMysteriousModeShortcutHint.setText(saved
+                                ? "مفعّل — هويتك مخفية داخل الغرف"
+                                : "متاح لاشتراكك — يمكنك تفعيله أو إلغاؤه");
+                        bindMysteriousModeShortcutListener(c);
+                    } else {
+                        button.setOnCheckedChangeListener(null);
+                        button.setChecked(!checked);
+                        button.setEnabled(true);
+                        bindMysteriousModeShortcutListener(c);
+                        Toast.makeText(requireContext(),
+                                "تعذر حفظ الإعداد، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        });
+    }
 
     private void loadAgencyAction() {
         if (!isAdded()) return;
