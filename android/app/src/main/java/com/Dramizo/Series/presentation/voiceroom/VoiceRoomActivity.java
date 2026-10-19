@@ -629,10 +629,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     String avatar = seat.user != null ? seat.user.avatarUrl : null;
                     String vipBadge = seat.user != null ? seat.user.vipBadgeUrl : null;
                     String hostBadge = seat.user != null ? seat.user.hostBadgeUrl : null;
-                    showUserCard(occupantId, name, avatar,
-                            vipBadge,
-                            isAgencyRoom ? hostBadge : null,
-                            vip, lv);
+                    // Staff tapping an occupied mic need moderation actions directly;
+                    // regular users keep the existing profile-card interaction.
+                    if (canManageSeats || canKickUsers || isPlatformManager() || isPlatformSuper()) {
+                        showChatUserActions(anchor, occupantId, name, avatar,
+                                vipBadge, vip, lv, null, null);
+                    } else {
+                        showUserCard(occupantId, name, avatar,
+                                vipBadge,
+                                isAgencyRoom ? hostBadge : null,
+                                vip, lv);
+                    }
                     return;
                 }
 
@@ -2501,7 +2508,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 || userId.equals(liveHostId)
                 || (liveRoom != null && userId.equals(liveRoom.activeHostId));
         boolean targetModerator = roomModeratorIds.contains(userId);
-        boolean canTarget = anotherUser && !protectedHost && (isOwner || !targetModerator);
+        boolean canTarget = anotherUser && !protectedHost
+                && (isOwner || isPlatformManager() || isPlatformSuper() || !targetModerator);
         RoomDtos.SeatDto targetSeat = null;
         if (currentSeats != null) {
             for (RoomDtos.SeatDto seat : currentSeats) {
