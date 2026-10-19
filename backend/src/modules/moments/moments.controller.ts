@@ -44,6 +44,12 @@ export class MomentsController {
     return this.moments.addComment(id, userId, body);
   }
 
+  @Post(':id/report')
+  @ApiOperation({ summary: 'Report a moment for administrator review' })
+  report(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string, @Body() body: { reason?: string; description?: string }) {
+    return this.moments.report(id, userId, body);
+  }
+
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
     return this.moments.remove(id, userId);
