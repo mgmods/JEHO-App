@@ -1,6 +1,6 @@
 <template>
   <div class="container-fluid">
-    <PageHeader title="الشارات" subtitle="إدارة كتالوج الشارات ومنحها للمستخدمين" />
+    <PageHeader title="الشارات والمداليات" subtitle="إدارة الشارات والإنجازات التلقائية ومنحها للمستخدمين" />
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <div class="glass p-3 mb-3">
       <h5 class="mb-3">{{ editingId ? 'تعديل شارة' : 'إضافة شارة جديدة' }}</h5>
