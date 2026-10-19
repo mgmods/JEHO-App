@@ -238,7 +238,7 @@ public class HomeMomentsFragment extends Fragment {
                 payload.put("body", body);
                 payload.put("imageUrl", imageUrl);
                 payload.put("visibility", values[Math.max(0, Math.min(selectedVisibility, values.length - 1))]);
-                Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().createMoment(payload).execute();
+                Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().createMoment(com.Dramizo.Series.util.ApiOrigin.apiV1() + "moments", payload).execute();
                 if (!response.isSuccessful() || response.body() == null || !response.body().success) {
                     String error = response != null ? UploadApi.errorMessage(response, "تعذر حفظ المنشور") : "تعذر حفظ المنشور";
                     throw new IllegalStateException(error);
