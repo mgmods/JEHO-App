@@ -189,7 +189,7 @@ public class HomeFragment extends Fragment {
         AssetIcons.load(binding.btnSearch, AssetIcons.HOME_SEARCH);
         AssetIcons.load(binding.imgFilterIcon, AssetIcons.HOME_FILTER);
         binding.btnMyRoomShortcut.setOnClickListener(v ->
-                com.Dramizo.Series.util.RoomOpenChooser.open(requireActivity()));
+                com.Dramizo.Series.util.MyRoomLauncher.open(requireActivity()));
         binding.btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), com.Dramizo.Series.presentation.search.SearchActivity.class)));
         binding.btnFilter.setOnClickListener(v -> showCountryPicker(false, null));
