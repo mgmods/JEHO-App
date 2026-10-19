@@ -150,7 +150,8 @@ export class VipService implements OnModuleInit {
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
-    const extra = (vip?.vipPlan?.benefits as any)?.extra;
+    const benefits = vip?.vipPlan?.benefits as any;
+    const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
     const enabled = Array.isArray(extra) && extra.includes('mysterious_man');
     return enabled ? vip : null;
   }
