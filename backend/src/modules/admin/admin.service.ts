@@ -253,6 +253,61 @@ export class AdminService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async getSupportChestConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    const defaults = {
+      enabled: false, iconVisible: true, goalMode: 'coins',
+      coinTarget: 100000, diamondTarget: 10000, giftIds: [],
+      rewardType: 'none', rewardItemId: '', rewardAmount: 0,
+      instructions: 'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.',
+    };
+    if (!row) return defaults;
+    try { return { ...defaults, ...JSON.parse(row.value) }; } catch { return defaults; }
+  }
+
+  async patchSupportChestConfig(input: Record<string, unknown>) {
+    const allowedModes = new Set(['coins', 'diamonds', 'both']);
+    const allowedRewards = new Set(['none', 'coins', 'diamonds', 'frame', 'badge']);
+    const goalMode = String(input.goalMode || 'coins');
+    const rewardType = String(input.rewardType || 'none');
+    if (!allowedModes.has(goalMode)) throw new BadRequestException('Invalid support chest goal mode');
+    if (!allowedRewards.has(rewardType)) throw new BadRequestException('Invalid support chest reward type');
+    const coinTarget = Math.max(0, Math.floor(Number(input.coinTarget) || 0));
+    const diamondTarget = Math.max(0, Math.floor(Number(input.diamondTarget) || 0));
+    if (goalMode === 'coins' && coinTarget < 1) throw new BadRequestException('Coin target must be positive');
+    if (goalMode === 'diamonds' && diamondTarget < 1) throw new BadRequestException('Diamond target must be positive');
+    if (goalMode === 'both' && (coinTarget < 1 || diamondTarget < 1)) throw new BadRequestException('Both targets must be positive');
+    const giftIds = Array.isArray(input.giftIds) ? [...new Set(input.giftIds.map(String).map(x => x.trim()).filter(Boolean))] : [];
+    if (giftIds.length) {
+      const activeGifts = await this.giftsRepo.find({ where: { isActive: true } });
+      const valid = new Set(activeGifts.map(g => g.id));
+      const invalid = giftIds.filter(id => !valid.has(id));
+      if (invalid.length) throw new BadRequestException('One or more gift IDs are not active JEHO catalog gifts');
+    }
+    const current = {
+      enabled: input.enabled === true,
+      iconVisible: input.iconVisible === true,
+      goalMode, coinTarget, diamondTarget, giftIds,
+      rewardType,
+      rewardItemId: String(input.rewardItemId || '').trim(),
+      rewardAmount: Math.max(0, Math.floor(Number(input.rewardAmount) || 0)),
+      instructions: String(input.instructions || '').slice(0, 3000),
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'JEHO support chest configuration';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'support_chest_config',
+        value: JSON.stringify(current),
+        description: 'JEHO support chest configuration',
+      }));
+    }
+    return current;
+  }
+
   async dashboard() {
     const [
       users,

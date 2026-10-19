@@ -1178,11 +1178,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     const hostIds = [...new Set(hostFollows.map((row) => row.hostId).filter(Boolean))];
     let agencyIds: string[] = [];
     try {
-      const rows = await this.dataSource.query(
+      const rows = (await this.dataSource.query(
         `SELECT "agencyId" FROM agency_follows WHERE "userId" = $1`,
         [followerId],
-      );
-      agencyIds = [...new Set((rows || []).map((row: any) => String(row.agencyId || '')).filter(Boolean))];
+      )) as Array<{ agencyId?: string | null }>;
+      const followedAgencyIds: string[] = rows
+        .map((row) => String(row.agencyId || ''))
+        .filter((id): id is string => id.length > 0);
+      agencyIds = Array.from(new Set<string>(followedAgencyIds));
     } catch {
       // agency_follows may not exist on older installations until agency service initializes.
     }

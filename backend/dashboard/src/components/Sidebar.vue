@@ -100,6 +100,7 @@ const sections = computed(() => [
     label: t('nav.liveRooms'),
     items: [
       { name: 'rooms', icon: 'bi-mic', label: t('nav.rooms') },
+      { name: 'support-chest', icon: 'bi-box2-heart', label: 'صندوق الدعم' },
       {
         name: 'settings',
         query: { tab: 'zego' },

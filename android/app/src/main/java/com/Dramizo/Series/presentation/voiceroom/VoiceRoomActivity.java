@@ -893,8 +893,21 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
         // Room side shortcuts. Keep the music shortcut on the existing music flow;
         // do not alter ZEGO, microphone routing, Redis, or voice connection settings.
+        View sideChest = findViewById(R.id.btnRoomSupportChest);
         View sideMusic = findViewById(R.id.btnRoomSideMusic);
         View sideGames = findViewById(R.id.btnRoomSideGames);
+        if (sideChest != null) {
+            sideChest.setOnClickListener(v -> showSupportChestSheet());
+            android.animation.ObjectAnimator chestWobble =
+                    android.animation.ObjectAnimator.ofFloat(sideChest, View.ROTATION, -5f, 5f, -5f);
+            chestWobble.setDuration(1900L);
+            chestWobble.setRepeatCount(android.animation.ValueAnimator.INFINITE);
+            chestWobble.setRepeatMode(android.animation.ValueAnimator.RESTART);
+            chestWobble.start();
+            sideChest.animate().scaleX(1.045f).scaleY(1.045f).setDuration(900L)
+                    .withEndAction(() -> sideChest.animate().scaleX(1f).scaleY(1f)
+                            .setDuration(900L).start()).start();
+        }
         View sideSettings = findViewById(R.id.btnRoomSideSettings);
         if (sideMusic != null) {
             sideMusic.setOnClickListener(v -> showSavedMusicLibrary());
@@ -1003,6 +1016,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (room == null) return;
             dismissRoomJoinLoading();
             roomId = room.id;
+            refreshSupportChestIcon();
             final int bindSeq = ++roomUiBindSeq;
             // Disk chat wipe + history restore: off main thread (ANR on mid-range MIUI).
             final String chatClearedAtIso = room.chatClearedAt;
@@ -1525,6 +1539,151 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         roomJoinLoading = com.Dramizo.Series.util.RoomJoinLoading.show(this, null);
         // Longer on weak networks — user should see loading, not a sudden eject.
         handler.postDelayed(this::dismissRoomJoinLoading, 20_000L);
+    }
+
+    /**
+     * The dashboard controls chest icon visibility. If the API is temporarily unavailable,
+     * keep the icon visible so the feature remains discoverable and can be retried.
+     */
+    private void refreshSupportChestIcon() {
+        final View chestIcon = findViewById(R.id.btnRoomSupportChest);
+        if (chestIcon == null || isFinishing() || isDestroyed()) return;
+        chestIcon.setVisibility(View.VISIBLE);
+        final String targetRoomId = roomId;
+        if (targetRoomId == null || targetRoomId.trim().isEmpty()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (isFinishing() || isDestroyed()
+                                    || !targetRoomId.equals(roomId)
+                                    || !response.isSuccessful()
+                                    || response.body() == null
+                                    || response.body().data == null) return;
+                            Object rawConfig = response.body().data.get("config");
+                            if (!(rawConfig instanceof Map)) return;
+                            Map<?, ?> config = (Map<?, ?>) rawConfig;
+                            if (!config.containsKey("iconVisible")) return;
+                            Object visibleValue = config.get("iconVisible");
+                            boolean visible = visibleValue instanceof Boolean
+                                    ? (Boolean) visibleValue
+                                    : Boolean.parseBoolean(String.valueOf(visibleValue));
+                            chestIcon.setVisibility(visible ? View.VISIBLE : View.GONE);
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            // Keep the fallback visible; transient API errors must not hide the icon.
+                        }
+                    });
+        } catch (Exception ignored) {
+            // Keep the fallback visible if the API client is not ready.
+        }
+    }
+
+    private void loadSupportChestState(@NonNull WebView web, @NonNull String targetRoomId) {
+        if (isFinishing() || isDestroyed()) return;
+        try {
+            ContainerProvider.from(VoiceRoomActivity.this).getGiftApi()
+                    .supportChest(targetRoomId)
+                    .enqueue(new retrofit2.Callback<ApiResponse<Map<String, Object>>>() {
+                        @Override
+                        public void onResponse(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                               retrofit2.Response<ApiResponse<Map<String, Object>>> response) {
+                            if (!response.isSuccessful() || response.body() == null
+                                    || response.body().data == null
+                                    || isFinishing() || isDestroyed()) return;
+                            Map<String, Object> data = response.body().data;
+                            Object rawConfig = data.get("config");
+                            Object rawState = data.get("state");
+                            String configJson = rawConfig instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawConfig).toString() : "{}";
+                            String stateJson = rawState instanceof Map
+                                    ? new org.json.JSONObject((Map<?, ?>) rawState).toString() : "{}";
+                            String script = "window.applySupportChestData && window.applySupportChestData("
+                                    + configJson + "," + stateJson + ");";
+                            runOnUiThread(() -> {
+                                if (!isFinishing() && !isDestroyed() && web != null) {
+                                    web.evaluateJavascript(script, null);
+                                }
+                            });
+                        }
+
+                        @Override
+                        public void onFailure(retrofit2.Call<ApiResponse<Map<String, Object>>> call,
+                                              Throwable error) {
+                            android.util.Log.w("SupportChest", "Could not load support chest data", error);
+                        }
+                    });
+        } catch (Exception error) {
+            android.util.Log.w("SupportChest", "Support chest request could not be started", error);
+        }
+    }
+
+    private void showSupportChestSheet() {
+        if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()) return;
+        final String chestRoomId = roomId;
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        FrameLayout host = new FrameLayout(this);
+        host.setBackgroundColor(Color.TRANSPARENT);
+        WebView web = new WebView(this);
+        web.setBackgroundColor(Color.TRANSPARENT);
+        WebSettings settings = web.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(false);
+        settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if ("file:///android_asset/support-chest.html".equals(url)) {
+                    loadSupportChestState(view, chestRoomId);
+                }
+            }
+        });
+        final Runnable refreshChest = new Runnable() {
+            @Override public void run() {
+                if (!dialog.isShowing() || isFinishing() || isDestroyed()) return;
+                loadSupportChestState(web, chestRoomId);
+                handler.postDelayed(this, 15000L);
+            }
+        };
+        web.loadUrl("file:///android_asset/support-chest.html");
+        host.addView(web, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        dialog.setContentView(host);
+        dialog.setCancelable(true);
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setOnDismissListener(d -> {
+            handler.removeCallbacks(refreshChest);
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+        });
+        dialog.setOnShowListener(d -> {
+            android.view.View bottomSheet = dialog.findViewById(
+                    com.google.android.material.R.id.design_bottom_sheet);
+            if (bottomSheet != null) {
+                bottomSheet.setBackground(new ColorDrawable(Color.TRANSPARENT));
+                int height = (int) (getResources().getDisplayMetrics().heightPixels * 0.58f);
+                bottomSheet.getLayoutParams().height = height;
+                bottomSheet.requestLayout();
+                com.google.android.material.bottomsheet.BottomSheetBehavior<?> behavior =
+                        com.google.android.material.bottomsheet.BottomSheetBehavior.from(bottomSheet);
+                behavior.setPeekHeight(height);
+                behavior.setFitToContents(true);
+                behavior.setHideable(true);
+                behavior.setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
+            }
+            handler.removeCallbacks(refreshChest);
+            handler.postDelayed(refreshChest, 15000L);
+        });
+        dialog.show();
     }
 
     private void ensureMusicUiReady() {

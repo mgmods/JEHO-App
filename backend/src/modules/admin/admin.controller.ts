@@ -126,6 +126,22 @@ export class AdminController {
     private readonly giftsService: GiftsService,
   ) {}
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('support-chest/config')
+  @ApiOperation({ summary: 'Get support chest configuration' })
+  getSupportChestConfig() {
+    return this.adminService.getSupportChestConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('support-chest/config')
+  @ApiOperation({ summary: 'Update support chest configuration' })
+  patchSupportChestConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchSupportChestConfig(body || {});
+  }
+
   // ─── Economy settings (dashboard-owned live config) ─────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()

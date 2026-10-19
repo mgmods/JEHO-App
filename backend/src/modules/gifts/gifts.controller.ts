@@ -50,6 +50,12 @@ export class GiftsController {
     return this.giftsService.sendAllMic(userId, dto);
   }
 
+  @Get('support-chest')
+  @ApiOperation({ summary: 'Read support chest config and room progress' })
+  supportChest(@Query('roomId') roomId: string) {
+    return this.giftsService.getSupportChestState(roomId);
+  }
+
   @Get('history')
   history(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.giftsService.history(userId, query);

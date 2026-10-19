@@ -1585,7 +1585,7 @@
                 android:src="@drawable/ic_room_video_more" />
         </FrameLayout>
     </LinearLayout>
-    <!-- Transparent side shortcuts: music, games, settings; aligned beside the bottom composer. -->
+    <!-- Transparent side shortcuts: support chest above music, then games and settings. -->
     <LinearLayout
         android:id="@+id/roomSideShortcuts"
         android:layout_width="56dp"
@@ -1599,6 +1599,17 @@
         android:elevation="24dp"
         app:layout_constraintBottom_toBottomOf="@id/bottomBar"
         app:layout_constraintLeft_toLeftOf="parent">
+
+        <ImageView
+            android:id="@+id/btnRoomSupportChest"
+            android:layout_width="49dp"
+            android:layout_height="49dp"
+            android:layout_marginBottom="-1dp"
+            android:contentDescription="صندوق الدعم"
+            android:padding="1dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_asset_chest_gold"
+            android:background="@android:color/transparent" />
 
         <ImageView
             android:id="@+id/btnRoomSideMusic"

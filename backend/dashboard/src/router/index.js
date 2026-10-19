@@ -46,6 +46,12 @@ const routes = [
         meta: { titleKey: 'routes.userDetail' },
       },
       {
+        path: 'support-chest',
+        name: 'support-chest',
+        component: () => import('@/views/SupportChestView.vue'),
+        meta: { title: 'صندوق الدعم' },
+      },
+      {
         path: 'rooms',
         name: 'rooms',
         component: () => import('@/views/RoomsView.vue'),

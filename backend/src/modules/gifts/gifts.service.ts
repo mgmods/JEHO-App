@@ -17,6 +17,9 @@ import { Gift, GiftType } from '../../database/entities/gift.entity';
 import { GiftCategory } from '../../database/entities/gift-category.entity';
 import { GiftSend } from '../../database/entities/gift-send.entity';
 import { Cosmetic, CosmeticType } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
+import { Badge } from '../../database/entities/badge.entity';
+import { UserBadge } from '../../database/entities/user-badge.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import {
   WalletTransaction,
@@ -1710,6 +1713,142 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
+  async getSupportChestState(roomId: string) {
+    if (!roomId || !/^[0-9a-f-]{36}$/i.test(roomId)) {
+      throw new BadRequestException('A valid roomId is required');
+    }
+    const configRow = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
+    const defaults = { enabled: false, iconVisible: true, goalMode: 'coins', coinTarget: 100000, diamondTarget: 10000, giftIds: [], rewardType: 'none', rewardItemId: '', rewardAmount: 0, instructions: '' };
+    let config: any = defaults;
+    try { if (configRow?.value) config = { ...defaults, ...JSON.parse(configRow.value) }; } catch {}
+    const key = 'support_chest_room:' + roomId;
+    let row = await this.settingsRepo.findOne({ where: { key } });
+    if (!row) {
+      await this.dataSource.query('INSERT INTO app_settings ("key", "value", "description") VALUES ($1, $2, $3) ON CONFLICT ("key") DO NOTHING', [key, JSON.stringify({ roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 }), 'Room support chest state']);
+      row = await this.settingsRepo.findOne({ where: { key } });
+    }
+    let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
+    try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
+    return { config, state };
+  }
+
+  async applySupportChestGift(roomId: string, giftId: string, coins: number, diamonds: number, senderId: string) {
+    const key = 'support_chest_room:' + roomId;
+    const result = await this.dataSource.transaction(async manager => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [key]);
+      const repo = manager.getRepository(AppSetting);
+      const cfgRow = await repo.findOne({ where: { key: 'support_chest_config' } });
+      if (!cfgRow) return null;
+      let cfg: any;
+      try { cfg = JSON.parse(cfgRow.value); } catch { return null; }
+      if (cfg.enabled !== true) return null;
+      const giftIds = Array.isArray(cfg.giftIds) ? cfg.giftIds.map(String) : [];
+      if (giftIds.length && !giftIds.includes(String(giftId))) return null;
+      let row = await repo.findOne({ where: { key } });
+      let state: any = { roomId, coins: 0, diamonds: 0, level: 1, cycle: 1 };
+      try { if (row?.value) state = { ...state, ...JSON.parse(row.value) }; } catch {}
+      state.coins = (Number(state.coins) || 0) + Math.max(0, Number(coins) || 0);
+      state.diamonds = (Number(state.diamonds) || 0) + Math.max(0, Number(diamonds) || 0);
+      state.lastSenderId = senderId;
+      state.updatedAt = new Date().toISOString();
+      const mode = String(cfg.goalMode || 'coins');
+      const c = Number(cfg.coinTarget) > 0 && state.coins >= Number(cfg.coinTarget);
+      const d = Number(cfg.diamondTarget) > 0 && state.diamonds >= Number(cfg.diamondTarget);
+      state.goalReached = mode === 'both' ? c && d : mode === 'diamonds' ? d : c;
+      if (state.goalReached) {
+        const rewardType = String(cfg.rewardType || 'none');
+        const amount = Math.max(0, Math.floor(Number(cfg.rewardAmount) || 0));
+        if ((rewardType === 'coins' || rewardType === 'diamonds') && amount > 0) {
+          const walletRepo = manager.getRepository(Wallet);
+          const wallet = await walletRepo.findOne({ where: { userId: senderId }, lock: { mode: 'pessimistic_write' } });
+          if (!wallet) throw new BadRequestException('Support chest winner wallet not found');
+          if (rewardType === 'coins') wallet.coins = Number(wallet.coins || 0) + amount;
+          else wallet.diamonds = Number(wallet.diamonds || 0) + amount;
+          await walletRepo.save(wallet);
+          const txRepo = manager.getRepository(WalletTransaction);
+          await txRepo.save(txRepo.create({
+            userId: senderId, type: TransactionType.ADMIN_ADJUST,
+            currency: rewardType === 'coins' ? CurrencyType.COINS : CurrencyType.DIAMONDS,
+            amount, balanceAfter: rewardType === 'coins' ? Number(wallet.coins) : Number(wallet.diamonds),
+            referenceType: 'support_chest_reward',
+            referenceId: roomId + ':' + String(state.cycle || 1),
+            description: 'JEHO support chest reward',
+            metadata: { roomId, cycle: state.cycle || 1, giftId },
+          }));
+          state.lastWinnerId = senderId;
+          state.lastRewardType = rewardType;
+          state.lastRewardAmount = amount;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+        } else if (rewardType === 'frame') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest frame reward requires rewardItemId');
+          const cosmetic = await manager.getRepository(Cosmetic).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!cosmetic) throw new BadRequestException('Support chest frame reward is not an active cosmetic');
+          const userCosmetics = manager.getRepository(UserCosmetic);
+          const owned = await userCosmetics.findOne({
+            where: { userId: senderId, cosmeticId: cosmetic.id },
+          });
+          if (!owned) {
+            await userCosmetics.save(userCosmetics.create({
+              userId: senderId, cosmeticId: cosmetic.id, equipped: false, expiresAt: null,
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'frame';
+          state.lastRewardItemId = cosmetic.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
+        } else if (rewardType === 'badge') {
+          if (!cfg.rewardItemId) throw new BadRequestException('Support chest badge reward requires rewardItemId');
+          const badge = await manager.getRepository(Badge).findOne({
+            where: { id: String(cfg.rewardItemId), isActive: true },
+          });
+          if (!badge) throw new BadRequestException('Support chest badge reward is not an active badge');
+          const userBadges = manager.getRepository(UserBadge);
+          const owned = await userBadges.findOne({
+            where: { userId: senderId, badgeId: badge.id },
+          });
+          if (!owned) {
+            await userBadges.save(userBadges.create({
+              userId: senderId, badgeId: badge.id, grantedByAdminId: null, source: 'support_chest',
+            }));
+          }
+          state.lastWinnerId = senderId;
+          state.lastRewardType = 'badge';
+          state.lastRewardItemId = badge.id;
+          state.lastRewardAmount = 1;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+          state.rewardPending = false;
+        } else if (rewardType === 'none' || amount <= 0) {
+          state.lastWinnerId = senderId;
+          state.coins = 0; state.diamonds = 0;
+          state.level = Math.max(1, Number(state.level) || 1) + 1;
+          state.cycle = Math.max(1, Number(state.cycle) || 1) + 1;
+          state.goalReached = false;
+        } else {
+          // Gift-inventory rewards are not supported yet; keep the goal pending rather than falsely marking paid.
+          state.rewardPending = true;
+          state.winnerId = senderId;
+        }
+      }
+      if (row) { row.value = JSON.stringify(state); await repo.save(row); }
+      else await repo.save(repo.create({ key, value: JSON.stringify(state), description: 'Room support chest state' }));
+      return { config: cfg, state };
+    });
+    if (result) this.realtime?.emitToRoom(roomId, 'room:event', { roomId, event: 'support_chest:updated', payload: result, at: new Date().toISOString() });
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -2303,6 +2442,13 @@ export class GiftsService implements OnModuleInit {
         }
       }
       this.realtime?.emitToUser(dto.receiverId, 'gift:animation', animationPayload);
+      if (dto.roomId) {
+        try {
+          await this.applySupportChestGift(dto.roomId, String(dto.giftId), Number(result.totalCoins || 0), Number(result.hostDiamonds || 0), senderId);
+        } catch (error) {
+          this.log.error('Support chest progress update failed', error instanceof Error ? error.stack : String(error));
+        }
+      }
       this.realtime?.emitToUser(senderId, 'gift:animation', animationPayload);
       return result;
     });
