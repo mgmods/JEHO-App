@@ -101,11 +101,11 @@ export class Room {
 
   @Index()
   @Column({ type: 'uuid', nullable: true })
-  hostId: string | null;
+  hostId: string;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'hostId' })
-  host: User | null;
+  host: User;
 
   @Column({ type: 'uuid', nullable: true })
   cohostId: string | null;
