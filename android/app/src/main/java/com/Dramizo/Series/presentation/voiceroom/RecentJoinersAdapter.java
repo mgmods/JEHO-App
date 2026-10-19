@@ -79,7 +79,19 @@ public class RecentJoinersAdapter extends RecyclerView.Adapter<RecentJoinersAdap
     public void onBindViewHolder(@NonNull VH h, int position) {
         Joiner j = items.get(position);
         if ("الرجل الغامض".equals(j.displayName)) {
-            h.b.imgJoinerAvatar.setImageResource(com.Dramizo.Series.R.drawable.ic_mysterious_man);
+            String sharedAvatar = h.itemView.getContext()
+                    .getSharedPreferences("jeho_mysterious_mode", android.content.Context.MODE_PRIVATE)
+                    .getString("avatar_url", "");
+            if (sharedAvatar != null && !sharedAvatar.trim().isEmpty()) {
+                com.bumptech.glide.Glide.with(h.b.imgJoinerAvatar)
+                        .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(sharedAvatar.trim()))
+                        .apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
+                        .placeholder(com.Dramizo.Series.R.drawable.ic_mysterious_man)
+                        .error(com.Dramizo.Series.R.drawable.ic_mysterious_man)
+                        .into(h.b.imgJoinerAvatar);
+            } else {
+                h.b.imgJoinerAvatar.setImageResource(com.Dramizo.Series.R.drawable.ic_mysterious_man);
+            }
             h.b.imgJoinerFrame.setVisibility(android.view.View.GONE);
         } else {
             AvatarCosmetics.bindWear(
