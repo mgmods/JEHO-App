@@ -159,12 +159,35 @@
                 <label class="form-label">{{ t('vip.benefits') }}</label>
                 <input v-model="planForm.benefitsText" class="form-control" />
               </div>
+              <div class="form-check form-switch my-3 p-3 rounded border">
+                <input id="mysteriousManEnabled" v-model="planForm.mysteriousManEnabled" class="form-check-input ms-0 me-2" type="checkbox" />
+                <label class="form-check-label fw-semibold" for="mysteriousManEnabled">🕵️ ميزة الرجل الغامض لهذا الاشتراك</label>
+                <div class="small text-secondary mt-1">عند التفعيل، يمنح هذا المستوى صلاحية وضع الهوية الغامضة داخل الروم.</div>
+              </div>
               <hr />
               <h6 class="mb-2">مظاهر هذا المستوى — ترفع مباشرة إلى VIP {{ planForm.level }}</h6>
               <div class="mb-3">
                 <label class="form-label">شارة / شعار VIP</label>
                 <input type="file" class="form-control" accept="image/*,.gif,.webp" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'badgeUrl')" />
                 <div v-if="planForm.badgeUrl" class="vip-upload-preview"><img :src="assetUrl(planForm.badgeUrl)" alt="معاينة شارة VIP" /></div>
+              </div>
+              <div class="p-3 rounded border mb-3">
+                <h6 class="mb-2">إطار الرجل الغامض</h6>
+                <label class="form-label">طريقة عرض الإطار</label>
+                <select v-model="planForm.visuals.mysteriousManFrameMode" class="form-select mb-3">
+                  <option value="custom">استخدام إطار خاص ترفعه الإدارة</option>
+                  <option value="user">استخدام إطار المستخدم الحالي</option>
+                </select>
+                <div v-if="planForm.visuals.mysteriousManFrameMode !== 'user'">
+                  <label class="form-label">رفع إطار الرجل الغامض (صورة أو GIF أو SVGA أو فيديو)</label>
+                  <input type="file" class="form-control" accept="image/*,video/mp4,video/webm,.gif,.webp,.mp4,.webm,.svga" :disabled="!!uploadingVisual" @change="uploadPlanVisual($event, 'mysteriousManFrameUrl')" />
+                  <div v-if="planForm.visuals.mysteriousManFrameUrl" class="vip-upload-preview mt-2">
+                    <video v-if="/\.(mp4|webm)(\?|$)/i.test(planForm.visuals.mysteriousManFrameUrl)" :src="assetUrl(planForm.visuals.mysteriousManFrameUrl)" muted autoplay loop playsinline />
+                    <img v-else :src="assetUrl(planForm.visuals.mysteriousManFrameUrl)" alt="معاينة إطار الرجل الغامض" />
+                    <button type="button" class="btn btn-sm btn-outline-danger mt-1" @click="planForm.visuals.mysteriousManFrameUrl = ''">إزالة الإطار الخاص</button>
+                  </div>
+                </div>
+                <div class="small text-secondary mt-2">يمكن اختيار إطار خاص أو الاحتفاظ بإطار المستخدم الحالي. تُحفظ الإعدادات مع اشتراك VIP هذا.</div>
               </div>
               <div class="row g-3">
                 <div v-for="asset in [
@@ -303,7 +326,8 @@ const showPlan = ref(false)
 const showAssign = ref(false)
 const planForm = reactive({
   id: null, name: '', price: 99, durationDays: 30, level: 1, benefitsText: '',
-  badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '' },
+  mysteriousManEnabled: false,
+  badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom' },
 })
 const uploadingVisual = ref('')
 const assignForm = reactive({ userId: '', planId: '' })
@@ -394,7 +418,8 @@ function openPlan(p = null) {
       price: p.coinPrice ?? p.price ?? 99,
       durationDays: p.durationDays || p.duration || 30,
       level: Math.max(1, Math.min(100, Number(p.level || 1))),
-      benefitsText: (p.benefits || p.perks || []).join(', '),
+      benefitsText: (p.benefits || p.perks || []).filter((b) => b !== 'mysterious_man').join(', '),
+      mysteriousManEnabled: (p.benefits || p.perks || []).includes('mysterious_man'),
       badgeUrl: p.badgeUrl || '',
       visuals: {
         vipFrameUrl: p.visuals?.vipFrameUrl || '',
@@ -402,12 +427,15 @@ function openPlan(p = null) {
         profileCardUrl: p.visuals?.profileCardUrl || '',
         chatBubbleUrl: p.visuals?.chatBubbleUrl || '',
         nameplateUrl: p.visuals?.nameplateUrl || '',
+        mysteriousManFrameUrl: p.visuals?.mysteriousManFrameUrl || '',
+        mysteriousManFrameMode: p.visuals?.mysteriousManFrameMode === 'user' ? 'user' : 'custom',
       },
     })
   } else {
     Object.assign(planForm, {
       id: null, name: '', price: 99, durationDays: 30, level: plans.value.length + 1, benefitsText: '',
-      badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '' },
+      mysteriousManEnabled: false,
+      badgeUrl: '', visuals: { vipFrameUrl: '', vipCardUrl: '', profileCardUrl: '', chatBubbleUrl: '', nameplateUrl: '', mysteriousManFrameUrl: '', mysteriousManFrameMode: 'custom' },
     })
   }
   showPlan.value = true
@@ -442,7 +470,10 @@ async function savePlan() {
     price: planForm.price,
     durationDays: planForm.durationDays,
     level: Math.max(1, Math.min(100, Number(planForm.level || 1))),
-    benefits: planForm.benefitsText.split(',').map((s) => s.trim()).filter(Boolean),
+    benefits: [
+      ...planForm.benefitsText.split(',').map((s) => s.trim()).filter((s) => s && s !== 'mysterious_man'),
+      ...(planForm.mysteriousManEnabled ? ['mysterious_man'] : []),
+    ],
     badgeUrl: planForm.badgeUrl || null,
     visuals: { ...planForm.visuals },
   }
