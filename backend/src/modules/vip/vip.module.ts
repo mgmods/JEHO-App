@@ -5,11 +5,12 @@ import { VipService } from './vip.service';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
 import { UserVip } from '../../database/entities/user-vip.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { User } from '../../database/entities/user.entity';
 import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([VipPlan, UserVip, Wallet]),
+    TypeOrmModule.forFeature([VipPlan, UserVip, Wallet, User]),
     CosmeticsModule,
   ],
   controllers: [VipController],
