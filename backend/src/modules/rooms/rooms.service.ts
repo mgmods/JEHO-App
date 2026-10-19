@@ -3161,17 +3161,15 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     // Use a conditional SQL update against the live occupant, then verify the
     // persisted row before broadcasting. Do not trust an in-memory entity/save
     // here: this action must empty the actual seat row for every room client.
-    const updateResult = await this.seatsRepo
-      .createQueryBuilder()
-      .update()
-      .set({
+    const updateResult = await this.seatsRepo.update(
+      { roomId, userId },
+      {
         userId: null,
         status: SeatStatus.EMPTY,
         isMuted: false,
         isModeratorMuted: false,
-      })
-      .where('roomId = :roomId AND userId = :userId', { roomId, userId })
-      .execute();
+      },
+    );
     await this.seatSignalsRepo.delete({ roomId, userId });
 
     const persistedSeat = await this.seatsRepo.findOne({ where: { roomId, seatIndex: seat.seatIndex } });
