@@ -184,6 +184,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Local mirror of room.chatZoneEnabled — prevents tip/composer from re-showing after OFF. */
     private boolean roomChatZoneVisible = true;
     private String myUserId;
+    @Nullable private volatile String mysteriousAvatarUrl;
+    @Nullable private volatile String mysteriousEntryEffectUrl;
+    @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
@@ -429,6 +432,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+        refreshMysteriousManMedia();
         // Critical path: HTTP join overlaps layout inflate.
         // Prefer room join started from Home/Search before Activity open (RoomJoinPrefetch).
         boolean canResume = roomId != null && !roomId.isEmpty()
@@ -2080,6 +2084,40 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Marker name for game/luck celebration rows (no white name / no profile photo). */
     private static final String CHAT_NAME_GAME_CEL = "\u200B#game_cel";
 
+    /** Refresh dashboard-owned shared media without blocking room entry. */
+    private void refreshMysteriousManMedia() {
+        AppContainer c = ContainerProvider.from(this);
+        c.getIoExecutor().execute(() -> {
+            try {
+                Result<MiscDtos.MysteriousManConfigDto> result =
+                        ApiCall.execute(c.getConfigApi().mysteriousMan());
+                if (result == null || !result.success || result.data == null) return;
+                MiscDtos.MysteriousManConfigDto cfg = result.data;
+                mysteriousAvatarUrl = cfg.avatarUrl;
+                mysteriousEntryEffectUrl = cfg.entryEffectUrl;
+                mysteriousMessageEffectUrl = cfg.messageEffectUrl;
+                android.content.SharedPreferences prefs =
+                        getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE);
+                prefs.edit()
+                        .putString("avatar_url", cfg.avatarUrl == null ? "" : cfg.avatarUrl)
+                        .putString("entry_effect_url", cfg.entryEffectUrl == null ? "" : cfg.entryEffectUrl)
+                        .putString("message_effect_url", cfg.messageEffectUrl == null ? "" : cfg.messageEffectUrl)
+                        .apply();
+            } catch (Exception ignored) {
+                // Retain last known dashboard media if the network is temporarily unavailable.
+            }
+        });
+    }
+
+    @Nullable
+    private String configuredMysteriousAvatarUrl() {
+        String url = mysteriousAvatarUrl;
+        if (url != null && !url.trim().isEmpty()) return url.trim();
+        String cached = getSharedPreferences("jeho_mysterious_mode", MODE_PRIVATE)
+                .getString("avatar_url", "");
+        return cached == null || cached.trim().isEmpty() ? null : cached.trim();
+    }
+
     private void appendChatLine(String name, String text, int vipLevel, int userLevel) {
         appendChatLine(name, text, vipLevel, userLevel, null);
     }
@@ -2261,7 +2299,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     resetChatWear(avatar, frameView, hostSignal);
                 } else if (mysteriousLine) {
                     avatar.setVisibility(View.VISIBLE);
-                    avatar.setImageResource(R.drawable.ic_mysterious_man);
+                    String sharedMysteriousAvatar = configuredMysteriousAvatarUrl();
+                    if (sharedMysteriousAvatar != null) {
+                        Glide.with(avatar).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(sharedMysteriousAvatar))
+                                .apply(com.Dramizo.Series.util.MediaAssetSync.requestOptions())
+                                .placeholder(R.drawable.ic_mysterious_man)
+                                .error(R.drawable.ic_mysterious_man).into(avatar);
+                    } else {
+                        avatar.setImageResource(R.drawable.ic_mysterious_man);
+                    }
                     avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
                     if (frameView != null) {
                         frameView.setVisibility(View.GONE);
