@@ -128,12 +128,14 @@ export class ConfigController {
   @ApiOperation({ summary: 'Public shared media assets for Mysterious Man mode' })
   async mysteriousMan() {
     const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    const defaults = { avatarUrl: '', entryEffectUrl: '', messageEffectUrl: '' };
+    const defaults = { avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
     if (!row?.value) return defaults;
     try {
       const parsed = JSON.parse(row.value);
       return {
         avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
+        entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
+        entryText: typeof parsed.entryText === 'string' ? parsed.entryText : 'دخل الرجل الغامض',
         entryEffectUrl: typeof parsed.entryEffectUrl === 'string' ? parsed.entryEffectUrl : '',
         messageEffectUrl: typeof parsed.messageEffectUrl === 'string' ? parsed.messageEffectUrl : '',
       };
