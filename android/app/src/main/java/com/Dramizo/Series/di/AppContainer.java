@@ -188,9 +188,12 @@ public class AppContainer {
                 ? HttpLoggingInterceptor.Level.BASIC
                 : HttpLoggingInterceptor.Level.NONE);
 
+        // Keep Retrofit rooted at /api/v1 even when a local/debug URL is
+        // configured as only the host. Otherwise relative endpoints can hit
+        // the wrong server path and return errors such as "Cannot POST /".
         String apiBase = ensureTrailingSlash(com.Dramizo.Series.util.ApiOrigin.apiV1());
-        if (BuildConfig.DEBUG && BuildConfig.API_BASE_URL != null && !BuildConfig.API_BASE_URL.isEmpty()) {
-            apiBase = ensureTrailingSlash(BuildConfig.API_BASE_URL);
+        if (BuildConfig.DEBUG && BuildConfig.API_BASE_URL != null && !BuildConfig.API_BASE_URL.trim().isEmpty()) {
+            apiBase = normalizeApiBase(BuildConfig.API_BASE_URL);
         }
         okhttp3.Cache httpCache = new okhttp3.Cache(
                 new java.io.File(appContext.getCacheDir(), "http_cache"),
@@ -322,6 +325,16 @@ public class AppContainer {
         getAgenciesUseCase = new GetAgenciesUseCase(agencyRepository);
         getRankingsUseCase = new GetRankingsUseCase(rankingRepository);
         getNotificationsUseCase = new GetNotificationsUseCase(notificationRepository);
+    }
+
+    private static String normalizeApiBase(String configured) {
+        String value = configured == null ? "" : configured.trim();
+        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
+        if (value.isEmpty() || !value.matches("(?i)^https?://.+")) {
+            return com.Dramizo.Series.util.ApiOrigin.apiV1();
+        }
+        if (!value.matches("(?i).*/api/v1$")) value += "/api/v1";
+        return value + "/";
     }
 
     private static String ensureTrailingSlash(String url) {
