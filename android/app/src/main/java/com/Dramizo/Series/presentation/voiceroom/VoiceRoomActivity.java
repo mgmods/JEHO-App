@@ -8273,6 +8273,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         clearSeatRequestsUi();
         clearTopSupportersUi();
+        // A full room exit ends this device's local chat session. Do not send
+        // a server-wide wipe: other users who remain in the room keep their chat.
+        clearRoomChatSession();
         handler.removeCallbacks(refreshRunnable);
         handler.removeCallbacks(retryRealtimeJoinRunnable);
         handler.removeCallbacks(retryHttpJoinRunnable);
