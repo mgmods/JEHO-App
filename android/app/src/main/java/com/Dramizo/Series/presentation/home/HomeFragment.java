@@ -198,7 +198,11 @@ public class HomeFragment extends Fragment {
             reapplyFeedPages();
         });
         binding.hotCountryDropdown.setOnClickListener(v ->
-                showCountryPicker(false, this::renderHotCountryChips));
+                showCountryPicker(false, () -> {
+                    renderHotCountryChips();
+                    selectLogicalTab(TAB_HOT);
+                    reapplyFeedPages();
+                }));
         renderHotCountryChips();
         setupOffersFloatingWidget();
         binding.swipe.setOnChildScrollUpCallback((parent, child) -> canActiveFeedScrollUp());
