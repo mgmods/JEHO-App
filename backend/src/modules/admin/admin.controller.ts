@@ -128,6 +128,22 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Get('mysterious-man/config')
+  @ApiOperation({ summary: 'Get shared Mysterious Man media configured by dashboard' })
+  getMysteriousManConfig() {
+    return this.adminService.getMysteriousManConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('mysterious-man/config')
+  @ApiOperation({ summary: 'Update shared Mysterious Man media configured by dashboard' })
+  patchMysteriousManConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchMysteriousManConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('support-chest/config')
   @ApiOperation({ summary: 'Get support chest configuration' })
   getSupportChestConfig() {
