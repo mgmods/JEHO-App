@@ -407,7 +407,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     return {
       userId,
-      username: user?.username || displayName,
+      username: mysteriousMode ? 'mysterious_man' : (user?.username || displayName),
       displayName,
       avatarUrl,
       vipLevel,
