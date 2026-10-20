@@ -313,6 +313,15 @@ export class AdminService {
         description: 'Dashboard-managed Mysterious Man shared media',
       }));
     }
+
+    // A global disable is a hard stop, not just a display policy: clear the
+    // persisted opt-in so users stay in their natural identity if the feature
+    // is enabled again later.
+    if (!current.enabled) {
+      await this.dataSource.query(
+        'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
+      );
+    }
     return current;
   }
 
