@@ -15,6 +15,29 @@
     <AlertMessage v-if="ok" :message="ok" type="success" class="mb-3" @dismiss="ok = ''" />
 
     <div class="glass p-3 mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+          <h5 class="mb-1">أيقونات الـID حسب النمط</h5>
+          <div class="small text-muted">تظهر الأيقونة بدل كلمة ID وبجانب الرقم في التطبيق، لكل الأرقام حسب نمطها.</div>
+        </div>
+        <button class="btn btn-aurora btn-sm" type="button" :disabled="globalIconsSaving" @click="saveGlobalIcons">
+          {{ globalIconsSaving ? 'جارٍ الحفظ…' : 'حفظ أيقونات الأنماط' }}
+        </button>
+      </div>
+      <div class="row g-3">
+        <div v-for="mode in globalIconModes" :key="mode.key" class="col-md-3">
+          <label class="form-label">{{ mode.label }}</label>
+          <input class="form-control form-control-sm" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="globalIconsSaving" @change="uploadIcon(globalIconTargets[mode.key], $event)" />
+          <div class="d-flex align-items-center gap-2 mt-2">
+            <img v-if="globalIconTargets[mode.key]._styleIconUrl" :src="iconPreviewUrl(globalIconTargets[mode.key]._styleIconUrl)" class="vanity-style-icon-preview" :alt="mode.label" />
+            <span v-else class="small text-muted">لم تُرفع أيقونة</span>
+            <button v-if="globalIconTargets[mode.key]._styleIconUrl" class="btn btn-sm btn-outline-secondary" type="button" @click="globalIconTargets[mode.key]._styleIconUrl = ''">إزالة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass p-3 mb-3">
       <div class="small text-muted mb-3">
         مدة الاشتراك: <strong>30 يوماً</strong> · التجديد قبل الانتهاء = نصف السعر · بعد الانتهاء = السعر الكامل
       </div>
@@ -172,6 +195,20 @@ const error = ref('')
 const ok = ref('')
 const filterStatus = ref('')
 const form = reactive({ publicId: '', priceCoins: 10000, styleMode: 'static', styleVipLevel: 1, styleColor1: '#52E8FF', styleColor2: '#C084FC', styleColor3: '#FF7AC8', styleGlow: true, styleIconUrl: '' })
+const globalIconModes = [
+  { key: 'none', label: 'آيدي عادي' },
+  { key: 'static', label: 'آيدي ملوّن ثابت' },
+  { key: 'animated', label: 'آيدي ملوّن متحرك' },
+  { key: 'vip', label: 'آيدي VIP' },
+]
+const globalIconTargets = reactive({
+  none: { _styleIconUrl: '' },
+  static: { _styleIconUrl: '' },
+  animated: { _styleIconUrl: '' },
+  vip: { _styleIconUrl: '' },
+})
+const globalIconsSaving = ref(false)
+
 
 const confirmOpen = ref(false)
 const confirmTitle = ref('')
@@ -238,6 +275,39 @@ function withPriceEdit(list) {
   }))
 }
 
+async function loadGlobalIcons() {
+  try {
+    const { data } = await api.get('/admin/settings')
+    const rows = Array.isArray(data) ? data : data?.data || []
+    const row = rows.find((item) => item?.key === 'vanity_id_icons')
+    const config = row?.value ? JSON.parse(row.value) : {}
+    for (const mode of globalIconModes) {
+      globalIconTargets[mode.key]._styleIconUrl =
+        typeof config?.[mode.key] === 'string' ? config[mode.key] : ''
+    }
+  } catch {
+    // Existing preview values remain available if the settings request fails.
+  }
+}
+
+async function saveGlobalIcons() {
+  globalIconsSaving.value = true
+  error.value = ''
+  try {
+    const config = Object.fromEntries(
+      globalIconModes.map((mode) => [mode.key, globalIconTargets[mode.key]._styleIconUrl || '']),
+    )
+    await api.patch('/admin/settings', { vanity_id_icons: JSON.stringify(config) })
+    ok.value = 'تم حفظ أيقونات الـID العامة، وستظهر في التطبيق حسب نمط الرقم'
+    toast().success(ok.value)
+  } catch (e) {
+    error.value = e?.message || 'تعذر حفظ أيقونات الـID'
+    toast().danger(error.value)
+  } finally {
+    globalIconsSaving.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -245,6 +315,7 @@ async function load() {
     const { data } = await api.get('/vanity-ids/admin/all')
     const raw = Array.isArray(data) ? data : data?.data || data?.items || []
     items.value = withPriceEdit(raw)
+    await loadGlobalIcons()
   } catch (e) {
     error.value = e?.message || 'تعذر التحميل'
     toast().danger(error.value)
