@@ -64,7 +64,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
     `);
     await manager.query(`ALTER TABLE "jeho_own"."moment_comments" ADD COLUMN IF NOT EXISTS "parentCommentId" uuid`);
     await manager.query(`
-      DO $
+      DO $$
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM pg_constraint
@@ -75,7 +75,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
             ADD CONSTRAINT "FK_moment_comments_parent"
             FOREIGN KEY ("parentCommentId") REFERENCES "jeho_own"."moment_comments"(id) ON DELETE CASCADE;
         END IF;
-      END $;
+      END $$;
     `);
     await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_parent" ON "jeho_own"."moment_comments" ("parentCommentId")`);
     await manager.query(`CREATE INDEX IF NOT EXISTS "IDX_moment_comments_moment_created" ON "jeho_own"."moment_comments" ("momentId", "createdAt" ASC)`);
