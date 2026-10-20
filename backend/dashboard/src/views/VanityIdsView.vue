@@ -180,6 +180,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import api from '@/api/client'
+import { resolveAsset } from '@/utils/assets'
 import { formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
@@ -357,12 +358,7 @@ async function create() {
 }
 
 function iconPreviewUrl(path) {
-  if (!path) return ''
-  if (/^https?:\/\//i.test(path)) return path
-  const base = String(api.defaults.baseURL || '/api/v1')
-    .replace(/\/$/, '')
-    .replace(/\/api\/v1$/i, '')
-  return `${base}${path.startsWith('/') ? path : `/${path}`}`
+  return resolveAsset(path)
 }
 
 async function uploadIcon(target, event) {
