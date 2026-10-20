@@ -195,7 +195,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private volatile String mysteriousEntryEffectUrl;
     @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
-    private volatile boolean luckyCannonEnabled = false;
+    private volatile boolean luckyCannonEnabled = true;
     private volatile boolean luckyCannonSoundEnabled = true;
     private volatile int luckyCannonDurationSeconds = 2;
     @Nullable private FrameLayout luckyCannonLayer;
@@ -9972,7 +9972,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         container.getIoExecutor().execute(() -> {
             Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
             boolean allowed = false;
-            boolean cannonEnabled = false;
+            // Keep the room cannon available when an older backend omits these optional fields.
+            // An explicit dashboard value of false still disables it.
+            boolean cannonEnabled = true;
             boolean cannonSound = true;
             int cannonDuration = 2;
             if (result.success && result.data != null) {
@@ -9980,7 +9982,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
                         || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
                 Object ce = result.data.get("luckyCannonEnabled");
-                cannonEnabled = Boolean.TRUE.equals(ce) || "true".equalsIgnoreCase(String.valueOf(ce)) || "1".equals(String.valueOf(ce));
+                if (ce != null) {
+                    cannonEnabled = Boolean.TRUE.equals(ce)
+                            || "true".equalsIgnoreCase(String.valueOf(ce))
+                            || "1".equals(String.valueOf(ce));
+                }
                 Object cs = result.data.get("luckyCannonSoundEnabled");
                 cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
                 Object cd = result.data.get("luckyCannonDurationSeconds");
