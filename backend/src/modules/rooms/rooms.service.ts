@@ -3220,6 +3220,14 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
     return { left: true, userId };
   }
 
+  /**
+   * Dedicated moderation path for removing a seated member while keeping them in the room.
+   * Shares the authoritative permission checks and seat/event handling with the legacy route.
+   */
+  async removeMemberFromMic(roomId: string, actorId: string, targetUserId: string, reason?: string) {
+    return this.forceLeaveSeatByModerator(roomId, actorId, targetUserId, reason || 'moderator_remove_mic');
+  }
+
   /** Host/moderator: remove someone from mic without kicking them from the room. */
   async forceLeaveSeatByModerator(
     roomId: string,
