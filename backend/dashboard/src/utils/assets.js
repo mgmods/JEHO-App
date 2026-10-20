@@ -22,8 +22,23 @@ export function resolveAsset(path) {
   if (!path) return ''
   const value = String(path).trim()
   if (!value) return ''
-  if (/^(https?:)?\/\//i.test(value) || /^(data|blob):/i.test(value)) return value
   const origin = apiOrigin()
+
+  // Uploaded media is served by this app's API, not by a browser route or a
+  // stale host saved by an older dashboard version. Normalize both relative
+  // and absolute /uploads URLs so previews survive revisiting the dashboard.
+  if (/^(https?:)?\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value, window.location.origin)
+      if (/\/uploads\//i.test(parsed.pathname)) {
+        return `${origin}${parsed.pathname}${parsed.search}${parsed.hash}`
+      }
+    } catch {
+      return value
+    }
+    return value
+  }
+  if (/^(data|blob):/i.test(value)) return value
   if (value.startsWith('/')) return `${origin}${value}`
   if (/^(assets|uploads)\//i.test(value)) return `${origin}/${value}`
   return value
