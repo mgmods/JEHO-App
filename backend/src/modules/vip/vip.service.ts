@@ -150,10 +150,33 @@ export class VipService implements OnModuleInit {
       relations: ['vipPlan'],
       order: { level: 'DESC' },
     });
-    const benefits = vip?.vipPlan?.benefits as any;
+    if (!vip) return null;
+
+    // Dashboard policy takes precedence when configured. It is additive-only and
+    // reads the existing settings row; no schema migration or user data reset.
+    const rows = await this.dataSource.query(
+      'SELECT value FROM settings WHERE key = $1 LIMIT 1',
+      ['mysterious_man_config'],
+    );
+    if (Array.isArray(rows) && rows.length > 0) {
+      let policy: any = {};
+      try {
+        policy = typeof rows[0]?.value === 'string'
+          ? JSON.parse(rows[0].value)
+          : (rows[0]?.value || {});
+      } catch {
+        policy = {};
+      }
+      const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+        ? policy.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7)
+        : [];
+      return policy.enabled === true && allowedLevels.includes(Number(vip.level)) ? vip : null;
+    }
+
+    // Backward compatibility until the dashboard saves its first policy.
+    const benefits = vip.vipPlan?.benefits as any;
     const extra = Array.isArray(benefits) ? benefits : benefits?.extra;
-    const enabled = Array.isArray(extra) && extra.includes('mysterious_man');
-    return enabled ? vip : null;
+    return Array.isArray(extra) && extra.includes('mysterious_man') ? vip : null;
   }
 
   async mysteriousModeStatus(userId: string) {
