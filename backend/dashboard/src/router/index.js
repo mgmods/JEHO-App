@@ -246,6 +246,12 @@ const routes = [
         meta: { titleKey: 'routes.notifications' },
       },
       {
+        path: 'mysterious-man',
+        name: 'mysterious-man',
+        component: () => import('@/views/MysteriousManView.vue'),
+        meta: { title: 'الرجل الغامض' },
+      },
+      {
         path: 'cp-settings',
         name: 'cp-settings',
         component: () => import('@/views/CpSettingsView.vue'),
