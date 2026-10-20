@@ -1,6 +1,8 @@
 package com.Dramizo.Series.presentation.notifications;
 
 import com.Dramizo.Series.util.ImagePlaceholder;
+import com.Dramizo.Series.util.AssetCatalog;
+import com.bumptech.glide.Glide;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -44,7 +46,16 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         holder.b.tvTitle.setText(n.title != null ? n.title : typeLabel);
         holder.b.tvBody.setText(n.body != null ? n.body : "");
         holder.b.tvTypeChip.setText(typeLabel);
-        holder.b.imgNotificationType.setImageResource(iconForType(n.type));
+        String badgeImage = badgeImageUrl(n);
+        if (badgeImage != null) {
+            Glide.with(holder.itemView).load(AssetCatalog.absoluteUrl(badgeImage))
+                    .placeholder(R.drawable.ic_medal_default)
+                    .error(R.drawable.ic_medal_default)
+                    .into(holder.b.imgNotificationType);
+        } else {
+            Glide.with(holder.itemView).clear(holder.b.imgNotificationType);
+            holder.b.imgNotificationType.setImageResource(iconForType(n.type));
+        }
         holder.b.imgNotificationType.setImageTintList(null);
         holder.b.imgNotificationType.clearColorFilter();
         String time = n.createdAt != null ? n.createdAt.replace('T', ' ') : "";
@@ -77,6 +88,14 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
             case "system": return context.getString(R.string.notification_system);
             default: return type;
         }
+    }
+
+    private static String badgeImageUrl(MiscDtos.NotificationDto n) {
+        if (n == null || n.data == null
+                || !"badge_earned".equalsIgnoreCase(String.valueOf(n.data.get("kind")))) return null;
+        Object value = n.data.get("imageUrl");
+        String url = value == null ? "" : String.valueOf(value).trim();
+        return url.isEmpty() ? null : url;
     }
 
     private static int iconForType(String type) {
