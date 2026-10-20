@@ -79,8 +79,9 @@ public final class VanityIdStyle {
     private static String resolveIconUrl(@Nullable String value) {
         if (value == null || value.trim().isEmpty()) return null;
         String url = value.trim();
-        if (url.startsWith("https://") || url.startsWith("http://") || url.startsWith("/api/v1/")) return url;
-        if (url.startsWith("/uploads/")) return "/api/v1" + url;
+        if (url.startsWith("https://") || url.startsWith("http://")
+                || url.startsWith("/api/v1/") || url.startsWith("/uploads/")) return url;
+        if (url.startsWith("uploads/")) return "/" + url;
         return url;
     }
 
