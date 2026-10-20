@@ -23,6 +23,46 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
+    <section class="glass p-3 mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+          <h5 class="mb-1">مدفع هدايا المحظوظ</h5>
+          <p class="small text-secondary mb-0">إعدادات الميزة التي تظهر بعد إرسال هدية محظوظ ناجحة داخل الروم.</p>
+        </div>
+        <button type="button" class="btn btn-aurora btn-sm" :disabled="cannonSaving || cannonLoading" @click="saveCannonConfig">
+          {{ cannonSaving ? 'جارٍ الحفظ…' : 'حفظ إعدادات المدفع' }}
+        </button>
+      </div>
+      <div v-if="cannonLoading" class="small text-secondary mt-3">جارٍ تحميل الإعدادات…</div>
+      <div v-else class="row g-3 mt-1">
+        <div class="col-md-4">
+          <div class="form-check form-switch border rounded-3 p-3 ps-5 h-100">
+            <input id="lucky-cannon-enabled" v-model="cannonConfig.enabled" class="form-check-input" type="checkbox" role="switch" />
+            <label class="form-check-label fw-semibold" for="lucky-cannon-enabled">تفعيل المدفع</label>
+            <div class="small text-secondary mt-1">عند التعطيل لن يظهر زر المدفع بعد إرسال هدية المحظوظ.</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="lucky-cannon-duration">مدة ظهور الزر</label>
+          <select id="lucky-cannon-duration" v-model.number="cannonConfig.durationSeconds" class="form-select">
+            <option :value="1">ثانية واحدة</option>
+            <option :value="2">ثانيتان</option>
+            <option :value="3">3 ثوانٍ</option>
+            <option :value="5">5 ثوانٍ</option>
+            <option :value="10">10 ثوانٍ</option>
+          </select>
+          <div class="small text-secondary mt-1">المدة تعود للبداية بعد كل إرسال ناجح.</div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-check form-switch border rounded-3 p-3 ps-5 h-100">
+            <input id="lucky-cannon-sound" v-model="cannonConfig.soundEnabled" class="form-check-input" type="checkbox" role="switch" />
+            <label class="form-check-label fw-semibold" for="lucky-cannon-sound">صوت الإطلاق</label>
+            <div class="small text-secondary mt-1">تحكم بصوت المؤثر فقط، دون تغيير إعدادات ZEGO.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <div class="glass p-3 mb-3">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
@@ -338,6 +378,10 @@ const catEditingId = ref(null)
 const bulkBusy = ref(false)
 const pendingCategory = ref(null)
 const importingEntries = ref(false)
+const cannonConfig = reactive({ enabled: true, durationSeconds: 2, soundEnabled: true })
+const cannonLoading = ref(false)
+const cannonSaving = ref(false)
+
 
 const CORE_KEYS = new Set(['normal', 'lucky', 'combo', 'premium', 'country'])
 function isCoreCategory(key) {
@@ -756,7 +800,40 @@ async function doRemoveCategory() {
   }
 }
 
-onMounted(load)
+async function loadCannonConfig() {
+  cannonLoading.value = true
+  const { data, error: err } = await giftsApi.luckyCannonConfig()
+  if (err) {
+    error.value = err.message
+  } else if (data) {
+    Object.assign(cannonConfig, {
+      enabled: data.enabled !== false,
+      durationSeconds: Math.max(1, Math.min(10, Number(data.durationSeconds) || 2)),
+      soundEnabled: data.soundEnabled !== false,
+    })
+  }
+  cannonLoading.value = false
+}
+
+async function saveCannonConfig() {
+  cannonSaving.value = true
+  const { data, error: err } = await giftsApi.saveLuckyCannonConfig({
+    enabled: cannonConfig.enabled === true,
+    durationSeconds: Math.max(1, Math.min(10, Number(cannonConfig.durationSeconds) || 2)),
+    soundEnabled: cannonConfig.soundEnabled !== false,
+  })
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+  } else if (data) {
+    Object.assign(cannonConfig, data)
+    success.value = 'تم حفظ إعدادات مدفع هدايا المحظوظ'
+    toast().success(success.value)
+  }
+  cannonSaving.value = false
+}
+
+onMounted(() => { load(); loadCannonConfig() })
 
 function giftTypeLabel(type) {
   const key = String(type || 'normal').toLowerCase()
