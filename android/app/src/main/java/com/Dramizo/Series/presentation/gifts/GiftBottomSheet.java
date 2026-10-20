@@ -1182,9 +1182,9 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             if (luckyGift) {
                 // Show the selected send quantity, not the lucky multiplier (which is unrelated).
                 // Keep comboCount at 1 so X7/X17/X77/X177 does not masquerade as a normal combo streak.
-                room.showGiftSendToast(
+                room.showGiftSendToastCountUp(
                         session.getDisplayName(), name, session.getAvatarUrl(), icon,
-                        1, 0, "أرسل هدية ×" + Math.max(1, qty));
+                        Math.max(1, qty));
                 // Center hero + simultaneous clones to selected/all mic seats.
                 try {
                     GiftAudioFx.playLuckyCoins(requireContext(), 1);
