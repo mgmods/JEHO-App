@@ -64,10 +64,26 @@ export class VipService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async reconcileMysteriousModes() {
-    const rows = await this.dataSource.query(
-      'SELECT value FROM settings WHERE key = $1 LIMIT 1',
-      ['mysterious_man_config'],
-    );
+    // Settings are stored by AppSetting in app_settings (inside the
+    // configured jeho_own schema). Never query a legacy/nonexistent settings table.
+    let rows: Array<{ value?: string | Record<string, unknown> }> = [];
+    try {
+      rows = await this.dataSource.query(
+        'SELECT value FROM app_settings WHERE key = $1 LIMIT 1',
+        ['mysterious_man_config'],
+      );
+    } catch (error) {
+      // Missing settings storage must not crash application startup or cause
+      // existing users to be switched out of mysterious mode unintentionally.
+      this.logger.warn(
+        `Mysterious Man reconciliation skipped: app_settings is unavailable (${error?.message || error})`,
+      );
+      return;
+    }
+    if (!rows?.length) {
+      // No saved policy yet: preserve user state until the dashboard creates one.
+      return;
+    }
     let policy: any = {};
     try {
       policy = typeof rows?.[0]?.value === 'string'
