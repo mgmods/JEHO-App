@@ -596,7 +596,11 @@ export class ContestsService implements OnModuleInit {
       contest.status = dto.status;
       await this.contestsRepo.save(contest);
       if (prev !== 'ended' && dto.status === 'ended') {
-        await this.settlePrizes(contest);
+        if (this.isTeamChallenge(contest)) {
+          if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+        } else {
+          await this.settlePrizes(contest);
+        }
       }
       return contest;
     }
@@ -609,7 +613,11 @@ export class ContestsService implements OnModuleInit {
     if (contest.status === 'ended') return contest;
     contest.status = 'ended';
     await this.contestsRepo.save(contest);
-    await this.settlePrizes(contest);
+    if (this.isTeamChallenge(contest)) {
+      if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+    } else {
+      await this.settlePrizes(contest);
+    }
     return contest;
   }
 
@@ -623,7 +631,11 @@ export class ContestsService implements OnModuleInit {
     for (const contest of open) {
       contest.status = 'ended';
       await this.contestsRepo.save(contest);
-      await this.settlePrizes(contest);
+      if (this.isTeamChallenge(contest)) {
+        if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+      } else {
+        await this.settlePrizes(contest);
+      }
       ended.push(contest);
     }
     return { ended: ended.length, items: ended };
@@ -804,8 +816,11 @@ export class ContestsService implements OnModuleInit {
         c.status = next;
         await this.contestsRepo.save(c);
         if (wasActive && next === 'ended') {
-          if (this.isTeamChallenge(c)) this.emitTeamChallengeEnded(c);
-          else await this.settlePrizes(c);
+          if (this.isTeamChallenge(c)) {
+            if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(c);
+          } else {
+            await this.settlePrizes(c);
+          }
         }
       }
     }
