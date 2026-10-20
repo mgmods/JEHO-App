@@ -158,6 +158,22 @@ export class AdminController {
     return this.adminService.patchSupportChestConfig(body || {});
   }
 
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('lucky-gift-cannon/config')
+  @ApiOperation({ summary: 'Get Lucky Gift Cannon configuration' })
+  getLuckyCannonConfig() {
+    return this.adminService.getLuckyCannonConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('lucky-gift-cannon/config')
+  @ApiOperation({ summary: 'Update Lucky Gift Cannon configuration' })
+  patchLuckyCannonConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchLuckyCannonConfig(body || {});
+  }
+
   // ─── Economy settings (dashboard-owned live config) ─────────────
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
