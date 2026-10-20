@@ -1200,14 +1200,14 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                         }
                     }
                     room.announceLuckyGiftChat(
-                            name, icon, session.getDisplayName(), 1,
+                                name, icon, session.getDisplayName(), Math.max(1, qty),
                             session.getUserId(), Math.max(0, session.getVipLevel()),
                             session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
                             session.getHostBadgeUrl());
                 } catch (OutOfMemoryError | Exception e) {
                     try {
                         room.announceLuckyGiftChat(
-                                name, icon, session.getDisplayName(), 1,
+                                name, icon, session.getDisplayName(), Math.max(1, qty),
                                 session.getUserId(), Math.max(0, session.getVipLevel()),
                                 session.getAvatarUrl(), Math.max(1, session.getUserLevel()),
                                 session.getHostBadgeUrl());
@@ -1272,6 +1272,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
             }
             final long wonCoins = wonCoinsResolved;
             final int mulFinal = mul;
+            final int sentQty = Math.max(1, result.quantity > 0 ? result.quantity : qty);
             final boolean softFinal = softReturn;
             final boolean didWin = wonCoins > 0;
             final Context sfxCtx = hostAct != null
@@ -1284,8 +1285,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 Runnable showSmallToast = () -> {
                     if (hostAct == null || hostAct.isFinishing() || !didWin) return;
                     String msg = softFinal
-                            ? ("مردود +" + wonCoins)
-                            : ("ضرب حظه ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                            ? ("أرسل هدية ×" + sentQty + " · مردود +" + wonCoins)
+                            : ("أرسل هدية ×" + sentQty + " · حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
                     room.showLuckyResultToast(
                             session.getDisplayName(),
                             session.getAvatarUrl(),
@@ -1297,8 +1298,8 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     String who = session.getDisplayName();
                     if (who == null || who.isEmpty()) who = "مستخدم";
                     String chat = softFinal
-                            ? ("ضرب حظه · مردود +" + wonCoins)
-                            : ("ضرب حظه وربح ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
+                            ? ("أرسل هدية ×" + sentQty + " · مردود +" + wonCoins)
+                            : ("أرسل هدية ×" + sentQty + " · حظ ×" + Math.max(1, mulFinal) + " · +" + wonCoins);
                     try {
                         room.announceLuckyWinChat(who, chat, session.getAvatarUrl());
                         String meId = session.getUserId();
