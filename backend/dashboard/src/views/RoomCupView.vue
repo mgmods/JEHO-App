@@ -120,6 +120,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { roomCupApi, settingsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { formatNumber } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
@@ -150,9 +151,7 @@ const askEnd = ref(false)
 const periodLabel = computed(() => (cfg.period === 'monthly' ? 'شهري' : 'أسبوعي'))
 
 function absUrl(u) {
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 
 function addPrize() {
