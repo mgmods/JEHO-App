@@ -13,6 +13,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.data.remote.dto.AuthDtos;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import com.Dramizo.Series.data.remote.dto.BadgeDto;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -23,6 +25,8 @@ import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import retrofit2.Response;
 
 /** Honour/medals (شارات) — VIP 1–7, system-bar safe. */
 public class MedalActivity extends ThemedActivity {
@@ -114,6 +118,32 @@ public class MedalActivity extends ThemedActivity {
                     all.add(row);
                 }
             }
+
+            // Dashboard-awarded achievement badges are also medals, not just VIP cosmetics.
+            // Keep the VIP rows intact and merge real badge ownership from the same API
+            // used by the profile page and badge notification.
+            if (me != null && me.id != null && !me.id.trim().isEmpty()) {
+                try {
+                    Response<ApiResponse<List<BadgeDto>>> response =
+                            c.getUserApi().badges(me.id).execute();
+                    if (response.isSuccessful() && response.body() != null
+                            && response.body().data != null) {
+                        int badgeIndex = 0;
+                        for (BadgeDto badge : response.body().data) {
+                            if (badge == null || badge.imageUrl == null || badge.imageUrl.trim().isEmpty()) continue;
+                            MedalRow row = toRow(
+                                    badge.name,
+                                    1000 + badgeIndex++,
+                                    badge.imageUrl);
+                            all.add(row);
+                            if (badge.earned) owned.add(row);
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Badge API failure must not hide the existing VIP medals.
+                }
+            }
+
             if (all.isEmpty()) {
                 for (int i = 1; i <= MAX_VIP; i++) {
                     all.add(toRow(null, i, null));
