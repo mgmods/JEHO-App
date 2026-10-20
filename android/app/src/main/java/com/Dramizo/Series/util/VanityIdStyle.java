@@ -38,7 +38,8 @@ public final class VanityIdStyle {
             view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
             view.setCompoundDrawablesRelative(null, null, null, null);
             return;
-        
+        }
+
         final String id = publicId.trim();
         view.setTag(R.id.tag_vanity_id_style_key, id);
         VanityDtos.Style cached = CACHE.get(id);
