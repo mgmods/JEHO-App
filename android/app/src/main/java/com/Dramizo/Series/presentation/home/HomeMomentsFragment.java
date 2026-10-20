@@ -76,14 +76,16 @@ public class HomeMomentsFragment extends Fragment {
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         container = ContainerProvider.from(requireActivity());
         profileUserId = getArguments() != null ? getArguments().getString(ARG_PROFILE_USER_ID) : null;
-        NestedScrollView scroll = new NestedScrollView(requireContext());
+        FrameLayout host = new FrameLayout(requireContext());
+        ScrollView scroll = new ScrollView(requireContext());
         scroll.setFillViewport(true);
-        scroll.setNestedScrollingEnabled(true);
         scroll.setSmoothScrollingEnabled(true);
+        scroll.setVerticalScrollBarEnabled(false);
         scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
+        host.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
         root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(12), dp(14), dp(24));
+        root.setPadding(dp(12), dp(10), dp(12), dp(88));
         root.setBackgroundColor(0xFFF7F7FA);
         scroll.addView(root);
         LinearLayout hero = new LinearLayout(requireContext());
@@ -188,11 +190,9 @@ public class HomeMomentsFragment extends Fragment {
         openComposerButton.setTextSize(22);
         openComposerButton.setMinWidth(dp(42));
         openComposerButton.setPadding(0, 0, 0, 0);
-        LinearLayout.LayoutParams openComposerLp = new LinearLayout.LayoutParams(dp(42), dp(42));
-        openComposerLp.gravity = Gravity.END;
-        openComposerLp.topMargin = dp(8);
-        openComposerLp.bottomMargin = dp(4);
-        root.addView(openComposerButton, openComposerLp);
+        FrameLayout.LayoutParams openComposerLp = new FrameLayout.LayoutParams(dp(52), dp(52), Gravity.BOTTOM | Gravity.END);
+        openComposerLp.setMargins(0, 0, dp(16), dp(18));
+        host.addView(openComposerButton, openComposerLp);
         openComposerButton.setOnClickListener(v -> {
             if (composerDialog != null && composerDialog.isShowing()) return;
             if (composerCard.getParent() instanceof ViewGroup) {
@@ -231,7 +231,7 @@ public class HomeMomentsFragment extends Fragment {
         feedContainer = new LinearLayout(requireContext());
         feedContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(feedContainer, matchWrap());
-        return scroll;
+        return host;
     }
 
     @Override public void onResume() { super.onResume(); loadFeed(); }
@@ -366,6 +366,12 @@ public class HomeMomentsFragment extends Fragment {
         loading.setText(posts.isEmpty() ? "لا توجد لحظات بعد — كن أول من ينشر" : "");
         for (Map<String, Object> post : posts) {
             LinearLayout item = card();
+            item.setPadding(dp(10), dp(10), dp(10), dp(9));
+            ViewGroup.LayoutParams itemParams = item.getLayoutParams();
+            if (itemParams instanceof LinearLayout.LayoutParams) {
+                ((LinearLayout.LayoutParams) itemParams).bottomMargin = dp(8);
+                item.setLayoutParams(itemParams);
+            }
             String name = string(post, "displayName");
             if (name.isEmpty()) name = string(post, "username");
             if (name.isEmpty()) name = "مستخدم";
@@ -410,11 +416,15 @@ public class HomeMomentsFragment extends Fragment {
             authorRow.addView(avatarStack);
             authorRow.addView(authorInfo, new LinearLayout.LayoutParams(0, -2, 1));
             Button followTop = button("＋ متابعة");
-            styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(18));
+            styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(14));
+            followTop.setTextSize(11);
+            followTop.setPadding(dp(6), 0, dp(6), 0);
+            followTop.setMinHeight(dp(30));
+            followTop.setMinimumHeight(dp(30));
             String myId = container.getSessionManager().getUserId();
             followTop.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
             followTop.setOnClickListener(v -> followAuthor(authorId, followTop));
-            authorRow.addView(followTop, new LinearLayout.LayoutParams(-2, dp(40)));
+            authorRow.addView(followTop, new LinearLayout.LayoutParams(dp(82), dp(32)));
             View.OnClickListener openAuthor = v -> {
                 if (authorId.isEmpty()) return;
                 Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class);
@@ -424,6 +434,21 @@ public class HomeMomentsFragment extends Fragment {
             authorRow.setOnClickListener(openAuthor);
             avatar.setOnClickListener(openAuthor);
             item.addView(authorRow, matchWrap());
+            Button report = button("⚑");
+            report.setContentDescription("الإبلاغ عن اللحظة");
+            report.setTextSize(10);
+            report.setPadding(dp(4), 0, dp(4), 0);
+            report.setMinHeight(dp(26));
+            report.setTextColor(0xFFB3261E);
+            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(9), dp(1)));
+            report.setOnClickListener(v -> askMomentReport(post));
+            LinearLayout reportRow = new LinearLayout(requireContext());
+            reportRow.setGravity(Gravity.END);
+            LinearLayout.LayoutParams reportRowLp = matchWrap();
+            reportRowLp.topMargin = dp(2);
+            reportRowLp.bottomMargin = dp(2);
+            reportRow.addView(report, new LinearLayout.LayoutParams(dp(30), dp(26)));
+            item.addView(reportRow, reportRowLp);
             String body = string(post, "body");
             if (!body.isEmpty()) {
                 TextView bodyText = text(body, 15, 0xFF33313A, false);
@@ -433,7 +458,7 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(132)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(124)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
@@ -444,9 +469,9 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(132));
-                photoLp.topMargin = dp(4);
-                photoLp.bottomMargin = dp(10);
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(124));
+                photoLp.topMargin = dp(3);
+                photoLp.bottomMargin = dp(7);
                 item.addView(photo, photoLp);
             }
             LinearLayout row = new LinearLayout(requireContext());
@@ -454,31 +479,25 @@ public class HomeMomentsFragment extends Fragment {
             boolean liked = Boolean.TRUE.equals(post.get("likedByMe"));
             Button like = button((liked ? "♥  " : "♡  ") + number(post.get("likeCount")));
             styleButton(like, liked ? 0xFFFFE1EA : 0xFFFFF5F8,
-                    liked ? 0xFFE51E55 : 0xFFB70F52, dp(12));
+                    liked ? 0xFFE51E55 : 0xFFB70F52, dp(10));
+            like.setTextSize(11);
+            like.setPadding(dp(4), 0, dp(4), 0);
+            like.setMinHeight(dp(32));
             like.setOnClickListener(v -> like(post));
             Button comments = button("💬  " + number(post.get("commentCount")));
+            comments.setTextSize(11);
+            comments.setPadding(dp(4), 0, dp(4), 0);
+            comments.setMinHeight(dp(32));
             comments.setOnClickListener(v -> comments(post));
-            row.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
-            row.addView(comments, new LinearLayout.LayoutParams(0, dp(42), 1));
+            row.addView(like, new LinearLayout.LayoutParams(0, dp(34), 1));
+            row.addView(comments, new LinearLayout.LayoutParams(0, dp(34), 1));
             View actionDivider = new View(requireContext());
             actionDivider.setBackgroundColor(0xFFF1EDF2);
             LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
-            dividerLp.topMargin = dp(8);
-            dividerLp.bottomMargin = dp(8);
+            dividerLp.topMargin = dp(5);
+            dividerLp.bottomMargin = dp(5);
             item.addView(actionDivider, dividerLp);
             item.addView(row, matchWrap());
-            Button report = button("⚑");
-            report.setContentDescription("الإبلاغ عن اللحظة");
-            report.setTextSize(10);
-            report.setPadding(dp(5), 0, dp(5), 0);
-            report.setMinHeight(dp(30));
-            report.setTextColor(0xFFB3261E);
-            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(10), dp(1)));
-            report.setOnClickListener(v -> askMomentReport(post));
-            LinearLayout reportRow = new LinearLayout(requireContext());
-            reportRow.setGravity(Gravity.END);
-            reportRow.addView(report, new LinearLayout.LayoutParams(dp(34), dp(30)));
-            item.addView(reportRow, matchWrap());
             item.setOnClickListener(v -> showMomentDetails(post));
             feedContainer.addView(item, matchWrap());
         }
@@ -996,9 +1015,9 @@ public class HomeMomentsFragment extends Fragment {
     private void styleButton(Button button, int backgroundColor, int textColor, int radiusDp) {
         button.setAllCaps(false);
         button.setTextColor(textColor);
-        button.setTextSize(13);
-        button.setPadding(dp(10), dp(4), dp(10), dp(4));
-        button.setMinHeight(dp(42));
+        button.setTextSize(12);
+        button.setPadding(dp(7), dp(2), dp(7), dp(2));
+        button.setMinHeight(dp(34));
         button.setBackground(rounded(backgroundColor, backgroundColor, radiusDp));
         if (android.os.Build.VERSION.SDK_INT >= 21) button.setStateListAnimator(null);
     }
@@ -1012,10 +1031,10 @@ public class HomeMomentsFragment extends Fragment {
     }
     private LinearLayout card() {
         LinearLayout box = new LinearLayout(requireContext()); box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(14), dp(14), dp(14), dp(12));
-        box.setBackground(rounded(0xFFFFFFFF, 0xFFF0EDF2, dp(18), dp(1)));
-        box.setElevation(dp(2));
-        LinearLayout.LayoutParams lp = matchWrap(); lp.bottomMargin = dp(14);
+        box.setPadding(dp(11), dp(11), dp(11), dp(10));
+        box.setBackground(rounded(0xFFFFFFFF, 0xFFF0EDF2, dp(14), dp(1)));
+        box.setElevation(dp(1));
+        LinearLayout.LayoutParams lp = matchWrap(); lp.bottomMargin = dp(8);
         box.setLayoutParams(lp); return box;
     }
     private TextView text(String value, int size, int color, boolean bold) {
