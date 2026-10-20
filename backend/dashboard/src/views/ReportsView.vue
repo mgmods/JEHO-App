@@ -1,6 +1,6 @@
 ﻿<template>
   <div>
-    <PageHeader :title="t('reports.title')" :subtitle="t('reports.subtitle')">
+    <PageHeader :title="route.name === 'moments' ? 'إدارة اللحظات' : t('reports.title')" :subtitle="route.name === 'moments' ? 'مراجعة وحذف منشورات اللحظات' : t('reports.subtitle')">
       <template #actions>
         <button class="btn btn-ghost btn-sm" type="button" @click="refreshAll" :disabled="loading || momentsLoading">{{ t('common.refresh') }}</button>
       </template>
@@ -139,6 +139,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { reportsApi, momentsAdminApi } from '@/api'
 import { extractList, formatDate } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
@@ -153,6 +154,7 @@ import BulkActionBar from '@/components/BulkActionBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 
 const reports = ref([])
 const moments = ref([])
