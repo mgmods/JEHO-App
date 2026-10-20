@@ -147,7 +147,7 @@ const sections = computed(() => [
       { name: 'lucky-boxes', icon: 'bi-box2-heart', label: t('nav.luckyBoxes') },
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
-      { name: 'contests', icon: 'bi-trophy', label: t('nav.contests') },
+      { name: 'contests', icon: 'bi-lightning-charge-fill', label: 'تحديات PK بين الرومات' },
       { name: 'ranking', icon: 'bi-bar-chart', label: t('nav.ranking') },
       { name: 'room-cup', icon: 'bi-trophy-fill', label: t('nav.roomCup') },
     ],
