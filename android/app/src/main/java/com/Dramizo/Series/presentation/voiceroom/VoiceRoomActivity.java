@@ -12130,7 +12130,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             lp.setMargins(dp(12), dp(64), dp(12), 0);
-            binding.root.addView(roomPkScoreBanner, lp);
+            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkScoreBanner, lp);
         }
         roomPkScoreBanner.setText(label + "\n" + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
                 + "  :  " + String.format(java.util.Locale.US, "%,d", scoreB) + "  " + nameB);
