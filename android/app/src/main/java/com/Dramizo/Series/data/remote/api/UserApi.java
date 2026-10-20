@@ -26,6 +26,9 @@ public interface UserApi {
     @POST
     Call<ApiResponse<Map<String, Object>>> createMoment(@Url String endpointUrl, @Body Map<String, Object> body);
 
+    @PATCH("moments/{id}")
+    Call<ApiResponse<Map<String, Object>>> updateMoment(@Path("id") String id, @Body Map<String, Object> body);
+
     @POST("moments/{id}/like")
     Call<ApiResponse<Map<String, Object>>> toggleMomentLike(@Path("id") String id);
 
