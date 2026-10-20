@@ -359,7 +359,9 @@ async function create() {
 function iconPreviewUrl(path) {
   if (!path) return ''
   if (/^https?:\/\//i.test(path)) return path
-  const base = String(api.defaults.baseURL || '/api/v1').replace(/\/$/, '')
+  const base = String(api.defaults.baseURL || '/api/v1')
+    .replace(/\/$/, '')
+    .replace(/\/api\/v1$/i, '')
   return `${base}${path.startsWith('/') ? path : `/${path}`}`
 }
 
