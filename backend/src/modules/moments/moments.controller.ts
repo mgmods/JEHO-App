@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CreateMomentDto, MomentsService } from './moments.service';
+import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('Moments')
 @ApiBearerAuth()
@@ -27,6 +28,12 @@ export class MomentsController {
   @ApiOperation({ summary: 'Publish a moment' })
   create(@CurrentUser('sub') userId: string, @Body() dto: CreateMomentDto) {
     return this.moments.create(userId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Edit an owned moment' })
+  update(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string, @Body() dto: CreateMomentDto) {
+    return this.moments.update(id, userId, dto);
   }
 
   @Post(':id/like')
@@ -54,5 +61,32 @@ export class MomentsController {
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
     return this.moments.remove(id, userId);
+  }
+}
+
+
+@ApiTags('Admin Moments')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, AdminGuard)
+@Controller('admin/moments')
+export class AdminMomentsController {
+  constructor(private readonly moments: MomentsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List recent moments for dashboard moderation' })
+  list(@Query('limit') limit?: string) {
+    return this.moments.adminList(Number(limit) || 100);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a moment and its likes/comments as administrator' })
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.moments.adminRemove(id);
+  }
+
+  @Delete()
+  @ApiOperation({ summary: 'Delete all moments and their likes/comments as administrator' })
+  removeAll() {
+    return this.moments.adminRemoveAll();
   }
 }
