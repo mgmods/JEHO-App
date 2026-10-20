@@ -159,14 +159,39 @@
         <div class="col-md-12">
           <div class="alert alert-info py-2 small mb-0">لتحدي «روم ضد روم»، ضع معرّف روم واحد في <code>roomIds</code> لكل طرف، ويجب أن يكون المعرّفان مختلفين. يتم احتساب النقاط من الهدايا المؤهلة المرسلة داخل الرومين.</div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label small">الطرف الأول (JSON object — روم واحد)</label>
-          <textarea v-model="form.sideAText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الروم الأول","roomIds":["ROOM_UUID_1"]}'></textarea>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label small">الطرف الثاني (JSON object — روم مختلف)</label>
-          <textarea v-model="form.sideBText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الروم الثاني","roomIds":["ROOM_UUID_2"]}'></textarea>
-        </div>
+        <template v-if="form.challengeType === 'room_vs_room'">
+          <div class="col-md-6">
+            <label class="form-label small">اسم الطرف الأول</label>
+            <input v-model="form.sideAName" class="form-control form-control-sm mb-2" placeholder="الروم الأول" />
+            <label class="form-label small">اختر الروم الأول</label>
+            <select v-model="form.sideARoomId" class="form-select form-select-sm" :disabled="roomOptionsLoading">
+              <option value="">اختر رومًا…</option>
+              <option v-for="room in roomOptions" :key="room.id" :value="room.id">{{ room.title || room.name || 'روم' }} · {{ room.displayRoomId || room.id }}</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">اسم الطرف الثاني</label>
+            <input v-model="form.sideBName" class="form-control form-control-sm mb-2" placeholder="الروم الثاني" />
+            <label class="form-label small">اختر الروم الثاني</label>
+            <select v-model="form.sideBRoomId" class="form-select form-select-sm" :disabled="roomOptionsLoading">
+              <option value="">اختر رومًا مختلفًا…</option>
+              <option v-for="room in roomOptions" :key="room.id" :value="room.id" :disabled="room.id === form.sideARoomId">{{ room.title || room.name || 'روم' }} · {{ room.displayRoomId || room.id }}</option>
+            </select>
+          </div>
+          <div class="col-12 small text-secondary">
+            {{ roomOptionsLoading ? 'جارٍ تحميل الرومات…' : roomOptions.length + ' روم متاح للاختيار' }}
+          </div>
+        </template>
+        <template v-else>
+          <div class="col-md-6">
+            <label class="form-label small">الطرف الأول (JSON object)</label>
+            <textarea v-model="form.sideAText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الطرف الأول"}'></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">الطرف الثاني (JSON object)</label>
+            <textarea v-model="form.sideBText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الطرف الثاني"}'></textarea>
+          </div>
+        </template>
         <div class="col-md-12">
           <label class="form-label small">{{ t('common.description') }}</label>
           <input v-model="form.description" class="form-control form-control-sm" />
@@ -336,7 +361,7 @@ import { useBulkSelection } from '@/composables/useBulkSelection'
 import { runBulk } from '@/composables/useBulk'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import BulkCheck from '@/components/BulkCheck.vue'
-import { contestsApi, settingsApi } from '@/api'
+import { contestsApi, settingsApi, roomsApi } from '@/api'
 
 const { t, locale } = useI18n()
 
@@ -356,6 +381,8 @@ const bulkBusy = ref(false)
 const roomPkEnabled = ref(false)
 const roomPkDraft = ref(false)
 const savingRoomPk = ref(false)
+const roomOptions = ref([])
+const roomOptionsLoading = ref(false)
 
 const {
   selectedIds,
@@ -406,6 +433,10 @@ const form = reactive({
   rulesText: '{}',
   sideAText: '{}',
   sideBText: '{}',
+  sideARoomId: '',
+  sideBRoomId: '',
+  sideAName: 'الروم الأول',
+  sideBName: 'الروم الثاني',
   isInteractive: false,
   category: 'rich',
   durationUnit: 'hours',
@@ -489,6 +520,10 @@ function resetForm() {
   form.rulesText = '{}'
   form.sideAText = '{}'
   form.sideBText = '{}'
+  form.sideARoomId = ''
+  form.sideBRoomId = ''
+  form.sideAName = 'الروم الأول'
+  form.sideBName = 'الروم الثاني'
   form.isInteractive = false
   form.category = 'rich'
   form.durationUnit = 'hours'
@@ -535,6 +570,10 @@ function openEdit(c) {
   form.rulesText = JSON.stringify(c.rules || {}, null, 2)
   form.sideAText = JSON.stringify(c.sideA || {}, null, 2)
   form.sideBText = JSON.stringify(c.sideB || {}, null, 2)
+  form.sideARoomId = c.sideA?.roomIds?.[0] || ''
+  form.sideBRoomId = c.sideB?.roomIds?.[0] || ''
+  form.sideAName = c.sideA?.name || 'الروم الأول'
+  form.sideBName = c.sideB?.name || 'الروم الثاني'
   form.isInteractive = c.isInteractive === true
   form.category = c.category || 'rich'
   form.durationUnit = 'hours'
@@ -617,8 +656,12 @@ async function saveContest() {
       milestones: JSON.parse(form.milestonesText || '[]'),
       prizes: JSON.parse(form.prizesText || '[]'),
       rules: JSON.parse(form.rulesText || '{}'),
-      sideA: JSON.parse(form.sideAText || '{}'),
-      sideB: JSON.parse(form.sideBText || '{}'),
+      sideA: form.challengeType === 'room_vs_room'
+        ? { name: form.sideAName.trim() || 'الروم الأول', roomIds: [form.sideARoomId].filter(Boolean) }
+        : JSON.parse(form.sideAText || '{}'),
+      sideB: form.challengeType === 'room_vs_room'
+        ? { name: form.sideBName.trim() || 'الروم الثاني', roomIds: [form.sideBRoomId].filter(Boolean) }
+        : JSON.parse(form.sideBText || '{}'),
     }
     if (!Array.isArray(advanced.allowedGiftIds) || !Array.isArray(advanced.milestones) || !Array.isArray(advanced.prizes) ||
         !advanced.rules || Array.isArray(advanced.rules) || typeof advanced.rules !== 'object' ||
@@ -789,8 +832,17 @@ async function reload() {
   if (selected.value) await openDetail(selected.value)
 }
 
+async function loadRoomOptions() {
+  roomOptionsLoading.value = true
+  const { data, error: err } = await roomsApi.list({ limit: 500 })
+  roomOptionsLoading.value = false
+  if (err) return
+  const payload = data?.data ?? data ?? {}
+  roomOptions.value = Array.isArray(payload.items) ? payload.items : Array.isArray(payload) ? payload : extractList(payload)
+}
+
 onMounted(async () => {
-  await Promise.all([loadContests(), loadRoomPkSetting()])
+  await Promise.all([loadContests(), loadRoomPkSetting(), loadRoomOptions()])
 })
 </script>
 
