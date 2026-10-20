@@ -610,6 +610,16 @@ function validateForm() {
     error.value = t('contests.agencyRequired')
     return false
   }
+  if (form.challengeType === 'room_vs_room') {
+    if (!form.sideARoomId || !form.sideBRoomId) {
+      error.value = 'اختر رومًا لكل طرف قبل إنشاء تحدي PK'
+      return false
+    }
+    if (form.sideARoomId === form.sideBRoomId) {
+      error.value = 'يجب اختيار رومين مختلفين لتحدي PK'
+      return false
+    }
+  }
   return true
 }
 
