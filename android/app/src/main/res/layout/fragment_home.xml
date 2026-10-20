@@ -44,29 +44,28 @@
                     android:paddingEnd="8dp">
 
 <LinearLayout
-                        android:id="@+id/tabMeWrap"
+                        android:id="@+id/tabHotWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="14dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
                         <TextView
-                            android:id="@+id/tvTabMe"
+                            android:id="@+id/tvTabHot"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:alpha="0.45"
-                            android:text="@string/tab_me_home"
+                            android:text="@string/tab_hot"
                             android:textColor="@color/text_primary"
                             android:textSize="17sp"
                             android:textStyle="bold" />
 
                         <View
-                            android:id="@+id/dotMe"
+                            android:id="@+id/dotHot"
                             android:layout_width="30dp"
                             android:layout_height="3dp"
                             android:layout_marginTop="5dp"
-                            android:background="@drawable/bg_tab_dot_active"
-                            android:visibility="invisible" />
+                            android:background="@drawable/bg_tab_dot_active" />
                     </LinearLayout>
 
 <LinearLayout
@@ -116,28 +115,29 @@
                     </LinearLayout>
 
 <LinearLayout
-                        android:id="@+id/tabHotWrap"
+                        android:id="@+id/tabMeWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="14dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
                         <TextView
-                            android:id="@+id/tvTabHot"
+                            android:id="@+id/tvTabMe"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/tab_hot"
+                            android:alpha="0.45"
+                            android:text="@string/tab_me_home"
                             android:textColor="@color/text_primary"
                             android:textSize="17sp"
                             android:textStyle="bold" />
 
                         <View
-                            android:id="@+id/dotHot"
+                            android:id="@+id/dotMe"
                             android:layout_width="30dp"
                             android:layout_height="3dp"
                             android:layout_marginTop="5dp"
-                            android:background="@drawable/bg_tab_dot_active" />
+                            android:background="@drawable/bg_tab_dot_active"
+                            android:visibility="invisible" />
                     </LinearLayout>
 
 <LinearLayout
