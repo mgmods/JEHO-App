@@ -3707,11 +3707,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         container.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> result;
             if (targets.size() > 1) {
-                result = ApiCall.execute(container.getGiftApi().sendAllMic(
-                        new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1)));
+                GiftDtos.SendAllMicRequest request =
+                        new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+                request.cannonLaunch = true;
+                result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
             } else {
-                result = ApiCall.execute(container.getGiftApi().send(
-                        new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1)));
+                GiftDtos.SendGiftRequest request =
+                        new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
+                request.cannonLaunch = true;
+                result = ApiCall.execute(container.getGiftApi().send(request));
             }
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
@@ -3722,9 +3726,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
                 }
-                if (luckyCannonView != null) luckyCannonView.fire();
-                if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(VoiceRoomActivity.this, 1);
-                playLuckyCannonFlights(icon, targets);
+                // The backend's existing room gift event triggers the flight on every room client.
+                // Reset the short visibility timer only after the send was confirmed.
                 showLuckyCannonAndScheduleHide();
             });
         });
