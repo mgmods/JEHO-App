@@ -19,6 +19,9 @@ import com.Dramizo.Series.databinding.ActivityContestDetailBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.realtime.RealtimeClient;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AvatarCosmetics;
 
@@ -32,6 +35,30 @@ public class ContestDetailActivity extends ThemedActivity {
     private ActivityContestDetailBinding binding;
     private AppContainer c;
     private String contestId;
+    private ContestDtos.ContestDto currentContest;
+    private final RealtimeClient.UserListener featureListener = new RealtimeClient.UserListener() {
+        @Override public void onUserEvent(String event, JsonObject payload) {
+            if (!"contest:pk-status".equals(event) || !isTeamChallenge(currentContest)) return;
+            boolean enabled = payload != null && payload.has("enabled")
+                    && !payload.get("enabled").isJsonNull() && payload.get("enabled").getAsBoolean();
+            if (!enabled) runOnUiThread(() -> {
+                Toast.makeText(ContestDetailActivity.this, "تم إيقاف تحديات PK من الإدارة", Toast.LENGTH_SHORT).show();
+                finish();
+            });
+        }
+    };
+    private final RealtimeClient.RoomListener teamListener = new RealtimeClient.RoomListener() {
+        @Override public void onRoomEvent(String eventRoomId, String event, JsonObject payload,
+                                          String fromUserId, String fromUsername) {
+            if (!"contest:team-score".equals(event) && !"contest:team-ended".equals(event)) return;
+            if (payload == null || currentContest == null || !currentContest.id.equals(
+                    payload.has("contestId") && !payload.get("contestId").isJsonNull()
+                            ? payload.get("contestId").getAsString() : null)) return;
+            runOnUiThread(() -> applyTeamUpdate(event, payload));
+        }
+        @Override public void onUserJoined(String eventRoomId, String userId, String username) {}
+        @Override public void onUserLeft(String eventRoomId, String userId) {}
+    };
     private final List<ContestDtos.LeaderRow> rows = new ArrayList<>();
     private BoardAdapter adapter;
 
@@ -55,6 +82,60 @@ public class ContestDetailActivity extends ThemedActivity {
         load();
     }
 
+    @Override protected void onStart() {
+        super.onStart();
+        RealtimeClient.getInstance().addUserListener(featureListener);
+        RealtimeClient.getInstance().addRoomListener(teamListener);
+    }
+
+    @Override protected void onStop() {
+        RealtimeClient.getInstance().removeUserListener(featureListener);
+        RealtimeClient.getInstance().removeRoomListener(teamListener);
+        super.onStop();
+    }
+
+    private static boolean isTeamChallenge(ContestDtos.ContestDto contest) {
+        return contest != null && ("room_vs_room".equals(contest.challengeType)
+                || "agency_vs_agency".equals(contest.challengeType));
+    }
+
+    private void applyTeamUpdate(String event, JsonObject payload) {
+        if (currentContest == null) return;
+        Gson gson = new Gson();
+        if (payload.has("sideA") && payload.get("sideA").isJsonObject()) {
+            currentContest.sideA = gson.fromJson(payload.getAsJsonObject("sideA"), ContestDtos.SideDto.class);
+        }
+        if (payload.has("sideB") && payload.get("sideB").isJsonObject()) {
+            currentContest.sideB = gson.fromJson(payload.getAsJsonObject("sideB"), ContestDtos.SideDto.class);
+        }
+        renderTeamScore();
+        if ("contest:team-ended".equals(event)) {
+            String winner = payload.has("winner") ? payload.get("winner").getAsString() : "draw";
+            Toast.makeText(this, "sideA".equals(winner) ? "فاز الروم الأول" :
+                    "sideB".equals(winner) ? "فاز الروم الثاني" : "انتهى التحدي بالتعادل",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void renderTeamScore() {
+        if (currentContest == null || !isTeamChallenge(currentContest)) return;
+        String a = currentContest.sideA != null && currentContest.sideA.name != null
+                ? currentContest.sideA.name : "الروم الأول";
+        String b = currentContest.sideB != null && currentContest.sideB.name != null
+                ? currentContest.sideB.name : "الروم الثاني";
+        long sa = currentContest.sideA != null ? currentContest.sideA.score : 0L;
+        long sb = currentContest.sideB != null ? currentContest.sideB.score : 0L;
+        String status = "active".equals(currentContest.status) ? "جارية"
+                : "upcoming".equals(currentContest.status) ? "قادمة" : "منتهية";
+        binding.tvMeta.setText(status + " · " + a + "  " + String.format(Locale.US, "%,d", sa)
+                + " : " + String.format(Locale.US, "%,d", sb) + "  " + b);
+        binding.btnJoin.setVisibility(View.GONE);
+        binding.tvEmpty.setText("تحدي PK بين الرومين — تتحدث النتيجة مباشرة عند إرسال الهدايا المؤهلة");
+        binding.tvEmpty.setVisibility(View.VISIBLE);
+        rows.clear();
+        adapter.notifyDataSetChanged();
+    }
+
     private void load() {
         c.getIoExecutor().execute(() -> {
             Result<ContestDtos.ContestDetail> r = ApiCall.execute(c.getContestsApi().get(contestId));
@@ -65,7 +146,13 @@ public class ContestDetailActivity extends ThemedActivity {
                     return;
                 }
                 ContestDtos.ContestDto c0 = r.data.contest;
+                currentContest = c0;
                 binding.tvTitle.setText(c0.title != null ? c0.title : "مسابقة");
+                if (isTeamChallenge(c0)) {
+                    binding.tvDesc.setText(c0.description != null ? c0.description : "تحدي PK بين الرومين");
+                    renderTeamScore();
+                    return;
+                }
                 binding.tvDesc.setText(c0.description != null ? c0.description : "");
                 String status = "active".equals(c0.status) ? "جارية"
                         : "upcoming".equals(c0.status) ? "قادمة" : "منتهية";
