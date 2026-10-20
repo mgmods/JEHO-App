@@ -17,6 +17,7 @@ export const ROUTE_MODULE = {
   withdrawals: 'withdrawals',
   'recharge-agents': 'rechargeAgents',
   vip: 'vip',
+  'mysterious-man': 'settings',
   badges: 'badges',
   'vanity-ids': 'vanityIds',
   cosmetics: 'cosmetics',
