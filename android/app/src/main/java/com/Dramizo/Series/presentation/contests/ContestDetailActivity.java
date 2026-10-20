@@ -141,8 +141,9 @@ public class ContestDetailActivity extends ThemedActivity {
             Result<ContestDtos.ContestDetail> r = ApiCall.execute(c.getContestsApi().get(contestId));
             runOnUiThread(() -> {
                 if (!r.success || r.data == null || r.data.contest == null) {
-                    Toast.makeText(this, r.error != null ? r.error : getString(R.string.error_generic),
-                            Toast.LENGTH_LONG).show();
+                    String error = r.error != null ? r.error : getString(R.string.error_generic);
+                    Toast.makeText(this, error, Toast.LENGTH_LONG).show();
+                    if (error.contains("تحديات PK متوقفة")) finish();
                     return;
                 }
                 ContestDtos.ContestDto c0 = r.data.contest;
