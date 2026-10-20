@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -202,6 +203,9 @@ public class HomeMomentsFragment extends Fragment {
                     .create();
             composerDialog.setOnDismissListener(d -> {
                 composerCard.setVisibility(View.GONE);
+                if (composerCard.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) composerCard.getParent()).removeView(composerCard);
+                }
                 if (isAdded() && composerCard.getParent() == null) {
                     root.addView(composerCard, Math.min(1, root.getChildCount()), matchWrap());
                 }
