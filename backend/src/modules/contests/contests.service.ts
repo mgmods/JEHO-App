@@ -317,11 +317,19 @@ export class ContestsService implements OnModuleInit {
     // the event's start/end boundary.
     const occurredAt = context.occurredAt ? new Date(context.occurredAt) : new Date();
     if (Number.isNaN(occurredAt.getTime())) return;
-    const active = await this.contestsRepo
+    const roomPkEnabled = await this.isRoomPkEnabled();
+    const activeQuery = this.contestsRepo
       .createQueryBuilder('contest')
       .where('contest.startAt <= :occurredAt', { occurredAt })
-      .andWhere('contest.endAt >= :occurredAt', { occurredAt })
-      .getMany();
+      .andWhere('contest.endAt >= :occurredAt', { occurredAt });
+    // When disabled, omit team challenges from gift-scoring queries to reduce DB work.
+    if (!roomPkEnabled) {
+      activeQuery.andWhere(
+        "(contest.challengeType IS NULL OR contest.challengeType NOT IN (:...teamTypes))",
+        { teamTypes: ['room_vs_room', 'agency_vs_agency'] },
+      );
+    }
+    const active = await activeQuery.getMany();
     for (const c of active) {
       const isTeamChallenge = this.isTeamChallenge(c);
       // Team challenges derive eligibility from sideA/sideB membership, not a single-room scope.
@@ -355,7 +363,7 @@ export class ContestsService implements OnModuleInit {
       // record; no user-provided room/agency IDs are trusted without matching
       // the dashboard's explicit side membership lists.
       if (this.isTeamChallenge(c)) {
-        if (!(await this.isRoomPkEnabled())) continue;
+        if (!roomPkEnabled) continue;
         const isRoomBattle = c.challengeType === 'room_vs_room';
         const key = isRoomBattle ? 'roomIds' : 'agencyIds';
         const candidate = isRoomBattle ? context.roomId : context.agencyId;
