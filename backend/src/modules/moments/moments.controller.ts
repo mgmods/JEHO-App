@@ -40,8 +40,9 @@ export class MomentsController {
   }
 
   @Post(':id/comments')
-  comment(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string, @Body('body') body: string) {
-    return this.moments.addComment(id, userId, body);
+  comment(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string,
+          @Body() body: { body?: string; parentCommentId?: string | null }) {
+    return this.moments.addComment(id, userId, body?.body, body?.parentCommentId);
   }
 
   @Post(':id/report')

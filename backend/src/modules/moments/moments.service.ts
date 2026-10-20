@@ -58,7 +58,7 @@ export class MomentsService {
     const safeLimit = Math.min(50, Math.max(1, Math.trunc(Number(limit) || 20)));
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
-              u.username, u."displayName", u."avatarUrl"
+              u.username, u."displayName", u."avatarUrl", u."publicId"
        FROM "jeho_own"."moments" m
        JOIN "jeho_own"."users" u ON u.id = m."userId"
        WHERE u.status = 'active'
@@ -77,7 +77,7 @@ export class MomentsService {
   async forUser(userId: string, viewerId: string) {
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
-              u.username, u."displayName", u."avatarUrl"
+              u.username, u."displayName", u."avatarUrl", u."publicId"
        FROM "jeho_own"."moments" m JOIN "jeho_own"."users" u ON u.id = m."userId"
        WHERE m."userId" = $1 AND u.status = 'active'
        ORDER BY m."createdAt" DESC, m.id DESC LIMIT 100`,
@@ -103,7 +103,7 @@ export class MomentsService {
       [userId, body, imageUrl, visibility],
     );
     const [author] = await this.dataSource.query(
-      'SELECT username, "displayName", "avatarUrl" FROM "jeho_own"."users" WHERE id = $1',
+      'SELECT username, "displayName", "avatarUrl", "publicId" FROM "jeho_own"."users" WHERE id = $1',
       [userId],
     );
     return { ...row, ...author, likeCount: 0, commentCount: 0, likedByMe: false };
@@ -139,26 +139,36 @@ export class MomentsService {
   async listComments(momentId: string, viewerId: string) {
     await this.visibleMoment(momentId, viewerId);
     return this.dataSource.query(
-      `SELECT c.id, c."momentId", c."userId", c.body, c."createdAt",
-              u.username, u."displayName", u."avatarUrl"
+      `SELECT c.id, c."momentId", c."userId", c."parentCommentId", c.body, c."createdAt",
+              u.username, u."displayName", u."avatarUrl", u."publicId"
        FROM "jeho_own"."moment_comments" c JOIN "jeho_own"."users" u ON u.id = c."userId"
        WHERE c."momentId" = $1 AND u.status = 'active'
-       ORDER BY c."createdAt" ASC LIMIT 200`,
+       ORDER BY c."createdAt" ASC LIMIT 300`,
       [momentId],
     );
   }
 
-  async addComment(momentId: string, userId: string, bodyValue: unknown) {
+  async addComment(momentId: string, userId: string, bodyValue: unknown, parentCommentValue?: unknown) {
     await this.visibleMoment(momentId, userId);
     const body = String(bodyValue ?? '').trim();
     if (!body || body.length > 1000) throw new BadRequestException('Comment must be between 1 and 1000 characters');
+    let parentCommentId: string | null = null;
+    if (parentCommentValue != null && String(parentCommentValue).trim()) {
+      parentCommentId = String(parentCommentValue).trim();
+      const [parent] = await this.dataSource.query(
+        'SELECT id FROM "jeho_own"."moment_comments" WHERE id = $1 AND "momentId" = $2',
+        [parentCommentId, momentId],
+      );
+      if (!parent) throw new BadRequestException('Reply target does not belong to this moment');
+    }
     const [row] = await this.dataSource.query(
-      `INSERT INTO "jeho_own"."moment_comments" ("momentId", "userId", body)
-       VALUES ($1, $2, $3) RETURNING id, "momentId", "userId", body, "createdAt"`,
-      [momentId, userId, body],
+      `INSERT INTO "jeho_own"."moment_comments" ("momentId", "userId", "parentCommentId", body)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, "momentId", "userId", "parentCommentId", body, "createdAt"`,
+      [momentId, userId, parentCommentId, body],
     );
     const [author] = await this.dataSource.query(
-      'SELECT username, "displayName", "avatarUrl" FROM "jeho_own"."users" WHERE id = $1',
+      'SELECT username, "displayName", "avatarUrl", "publicId" FROM "jeho_own"."users" WHERE id = $1',
       [userId],
     );
     return { ...row, ...author };

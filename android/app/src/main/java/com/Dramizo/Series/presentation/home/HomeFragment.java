@@ -176,6 +176,8 @@ public class HomeFragment extends Fragment {
             }
         });
 
+        binding.tvTabHot.setText("حفلة");
+        binding.tvTabMe.setText("ملكي");
         binding.tvTabMe.setOnClickListener(v -> selectLogicalTab(TAB_ME));
         binding.tvTabHot.setOnClickListener(v -> selectLogicalTab(TAB_HOT));
         binding.tvTabLocation.setOnClickListener(v -> selectLogicalTab(TAB_LOCATION));
