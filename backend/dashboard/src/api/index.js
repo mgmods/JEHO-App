@@ -343,6 +343,7 @@ export const badgesApi = {
   update: (id, data) => safeRequest(() => api.put(`/admin/badges/${id}`, data)),
   remove: (id) => safeRequest(() => api.delete(`/admin/badges/${id}`)),
   grant: (id, userId) => safeRequest(() => api.post(`/admin/badges/${id}/grant`, { userId })),
+  userBadges: (userId) => safeRequest(() => api.get(`/users/${encodeURIComponent(userId)}/badges`)),
   revoke: (id, userId) => safeRequest(() => api.delete(`/admin/badges/${id}/users/${encodeURIComponent(userId)}`)),
 }
 
