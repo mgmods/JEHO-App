@@ -650,6 +650,7 @@ import ZegoSettingsPanel from '@/components/settings/ZegoSettingsPanel.vue'
 import SectionBackgroundPanel from '@/components/settings/SectionBackgroundPanel.vue'
 import { setDashboardLocale } from '@/i18n'
 import { readDashboardLocale } from '@/utils/locale'
+import { resolveAsset } from '@/utils/assets'
 import { useAuthStore } from '@/stores/auth'
 import { DASHBOARD_MODULES } from '@/utils/dashboard-permissions'
 
@@ -694,11 +695,7 @@ const mysteryAssets = [
   { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'ملف تأثير اختياري موحد؛ يحتاج دعم مشغّل داخل التطبيق.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
 ]
 function previewMysteryUrl(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  const base = String(import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '')
-  return value.startsWith('/uploads/') ? base + value : value
+  return resolveAsset(raw)
 }
 function setMysteryInput(key, el) { if (el) mysteryInputs[key] = el }
 function chooseMysteryFile(key) { mysteryInputs[key]?.click() }
