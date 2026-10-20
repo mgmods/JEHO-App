@@ -99,7 +99,17 @@ public class HomeMomentsFragment extends Fragment {
         hero.addView(sub, matchWrap());
         root.addView(hero, matchWrap());
 
+        Button openComposerButton = button("＋  نشر لحظة");
+        openComposerButton.setTextSize(14);
+        openComposerButton.setTypeface(null, android.graphics.Typeface.BOLD);
+        styleButton(openComposerButton, 0xFFB70F52, 0xFFFFFFFF, dp(18));
+        LinearLayout.LayoutParams openComposerLp = new LinearLayout.LayoutParams(-1, dp(44));
+        openComposerLp.topMargin = dp(10);
+        openComposerLp.bottomMargin = dp(10);
+        root.addView(openComposerButton, openComposerLp);
+
         LinearLayout composerCard = card();
+        composerCard.setVisibility(View.GONE);
         composerCard.setPadding(dp(16), dp(15), dp(16), dp(15));
         composerCard.setBackground(rounded(0xFFFFFFFF, 0xFFF0E8EE, dp(20), dp(1)));
         if (android.os.Build.VERSION.SDK_INT >= 21) composerCard.setElevation(dp(3));
@@ -178,7 +188,22 @@ public class HomeMomentsFragment extends Fragment {
         publishLp.topMargin = dp(6);
         composerCard.addView(publishButton, publishLp);
         root.addView(composerCard, matchWrap());
+        openComposerButton.setOnClickListener(v -> {
+            boolean opening = composerCard.getVisibility() != View.VISIBLE;
+            composerCard.setVisibility(opening ? View.VISIBLE : View.GONE);
+            openComposerButton.setText(opening ? "×  إغلاق النشر" : "＋  نشر لحظة");
+            if (opening) {
+                composer.requestFocus();
+                composer.post(() -> {
+                    android.view.inputmethod.InputMethodManager imm =
+                            (android.view.inputmethod.InputMethodManager) requireContext()
+                                    .getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) imm.showSoftInput(composer, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+                });
+            }
+        });
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
+            openComposerButton.setVisibility(View.GONE);
             heading.setText("لحظاتي");
             sub.setText("المنشورات التي يسمح صاحب الحساب بعرضها");
             composerCard.setVisibility(View.GONE);
