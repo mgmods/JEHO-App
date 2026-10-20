@@ -2358,6 +2358,7 @@ export class GiftsService implements OnModuleInit {
       }
 
       const animationPayload: Record<string, unknown> = {
+        cannonLaunch: dto.cannonLaunch === true,
         giftId: gift.id,
         giftName: gift.name,
         giftType: gift.type,
@@ -2568,6 +2569,7 @@ export class GiftsService implements OnModuleInit {
         quantity: dto.quantity,
         roomId: dto.roomId,
         comboCount: dto.comboCount,
+        cannonLaunch: dto.cannonLaunch,
       });
     }
 
@@ -2922,6 +2924,7 @@ export class GiftsService implements OnModuleInit {
       );
       const at = new Date().toISOString();
       const animationPayload = {
+        cannonLaunch: dto.cannonLaunch === true,
         giftId: gift.id,
         giftName: gift.name,
         giftType: gift.type,
