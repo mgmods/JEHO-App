@@ -19,6 +19,7 @@ import { User } from '../../database/entities/user.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { Room, RoomKind } from '../../database/entities/room.entity';
 import { Agency } from '../../database/entities/agency.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import {
   WalletTransaction,
   TransactionType,
@@ -36,6 +37,7 @@ const VANITY_LEASE_DAYS = 30;
 export class VanityIdsController {
   constructor(
     @InjectRepository(VanityId) private readonly vanityRepo: Repository<VanityId>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
@@ -52,19 +54,42 @@ export class VanityIdsController {
     if (!/^\d{3,12}$/.test(publicId)) {
       throw new BadRequestException('الآيدي يجب أن يتكون من 3 إلى 12 رقماً');
     }
-    const row = await this.vanityRepo.findOne({ where: { publicId } });
+    const [row, iconSetting] = await Promise.all([
+      this.vanityRepo.findOne({ where: { publicId } }),
+      this.settingsRepo.findOne({ where: { key: 'vanity_id_icons' } }),
+    ]);
+    let icons: Record<string, string> = {};
+    try {
+      const parsed = iconSetting?.value ? JSON.parse(iconSetting.value) : {};
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) icons = parsed;
+    } catch {
+      icons = {};
+    }
+    const styleMode = row?.styleMode || 'none';
+    const fallbackIcon = typeof icons[styleMode] === 'string' && icons[styleMode].trim()
+      ? icons[styleMode].trim()
+      : null;
     if (!row) {
-      return { publicId, styleMode: 'none', styleVipLevel: 1, styleColor1: null, styleColor2: null, styleColor3: null, styleGlow: false, styleIconUrl: null };
+      return {
+        publicId,
+        styleMode: 'none',
+        styleVipLevel: 1,
+        styleColor1: null,
+        styleColor2: null,
+        styleColor3: null,
+        styleGlow: false,
+        styleIconUrl: fallbackIcon,
+      };
     }
     return {
       publicId,
-      styleMode: row.styleMode || 'none',
+      styleMode,
       styleVipLevel: Math.min(7, Math.max(1, Number(row.styleVipLevel) || 1)),
       styleColor1: row.styleColor1 || null,
       styleColor2: row.styleColor2 || null,
       styleColor3: row.styleColor3 || null,
       styleGlow: !!row.styleGlow,
-      styleIconUrl: row.styleIconUrl || null,
+      styleIconUrl: row.styleIconUrl || fallbackIcon,
     };
   }
 
