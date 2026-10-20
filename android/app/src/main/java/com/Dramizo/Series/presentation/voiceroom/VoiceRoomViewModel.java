@@ -258,9 +258,9 @@ public class VoiceRoomViewModel extends ViewModel {
         });
     }
 
-    public void forceLeaveSeat(String roomId, String userId) {
+    public void removeMemberFromMic(String roomId, String userId) {
         c.getIoExecutor().execute(() -> {
-            Result<Object> action = c.getRoomRepository().forceLeaveSeat(roomId, userId, "moderator");
+            Result<Object> action = c.getRoomRepository().removeMemberFromMic(roomId, userId, "moderator_remove_mic");
             if (!action.success) {
                 error.postValue(action.error != null ? action.error : "تعذر إنزال المستخدم من المايك");
                 return;
