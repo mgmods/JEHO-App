@@ -3732,6 +3732,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets) {
         if (binding == null || binding.giftOverlay == null || luckyCannonView == null) return;
+        binding.giftOverlay.setVisibility(View.VISIBLE);
+        binding.giftOverlay.bringToFront();
+        binding.giftOverlay.setElevation(36f);
+        markLuckyOverlayActive(3600L);
         int[] cannonLoc = new int[2];
         int[] overlayLoc = new int[2];
         luckyCannonView.getLocationOnScreen(cannonLoc);
