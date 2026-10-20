@@ -144,6 +144,12 @@ const routes = [
         redirect: { name: 'settings', query: { tab: 'zego' } },
       },
       {
+        path: 'mysterious-man',
+        name: 'mysterious-man',
+        component: () => import('@/views/MysteriousManView.vue'),
+        meta: { title: 'الرجل الغامض' },
+      },
+      {
         path: 'badges',
         name: 'badges',
         component: () => import('@/views/BadgesView.vue'),
