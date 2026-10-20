@@ -118,6 +118,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
@@ -132,9 +133,7 @@ const { t } = useI18n()
 const ORIGIN = 'https://api.adnova.bbs.tr'
 
 function mediaAbs(u) {
-  if (!u) return ''
-  if (String(u).startsWith('http')) return u
-  return `${ORIGIN}${String(u).startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 function isImageMedia(u) {
   const s = String(u || '').toLowerCase()
