@@ -3678,8 +3678,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showLuckyCannonAndScheduleHide() {
         if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        // Keep the cannon above room chrome, gift overlays, and seat layers.
         luckyCannonLayer.setVisibility(View.VISIBLE);
         luckyCannonLayer.setAlpha(1f);
+        luckyCannonLayer.setElevation(luckyCannonDp(80));
+        luckyCannonLayer.bringToFront();
+        luckyCannonLayer.requestLayout();
+        luckyCannonLayer.invalidate();
         hideLuckyCannonRunnable = this::hideLuckyCannon;
         handler.postDelayed(hideLuckyCannonRunnable, Math.max(1, luckyCannonDurationSeconds) * 1000L);
     }
