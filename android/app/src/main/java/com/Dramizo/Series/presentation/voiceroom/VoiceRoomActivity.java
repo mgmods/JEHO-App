@@ -11875,7 +11875,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             moderationUserListener = new RealtimeClient.UserListener() {
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
-                    if (payload == null || event == null) return;
+                    if (event == null) return;
+                    if ("contest:pk-status".equals(event)) {
+                        boolean enabled = payload != null && payload.has("enabled")
+                                && !payload.get("enabled").isJsonNull()
+                                && payload.get("enabled").getAsBoolean();
+                        if (!enabled) handler.post(() -> {
+                            handler.removeCallbacks(hideRoomPkScoreBanner);
+                            if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                        });
+                        return;
+                    }
+                    if (payload == null) return;
                     String rid = payload.has("roomId") && !payload.get("roomId").isJsonNull()
                             ? payload.get("roomId").getAsString() : null;
                     if (roomId == null || rid == null || !roomId.equals(rid)) return;
