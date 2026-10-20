@@ -55,8 +55,25 @@
           <section class="settings-card">
             <h3 class="settings-card-title">إعدادات الرجل الغامض</h3>
             <p class="form-text mb-3">
-              ارفع هوية موحّدة يستخدمها جميع الحسابات التي فعّلت وضع الرجل الغامض. هذه الإعدادات لا تغيّر صور الحسابات الأصلية.
+              ارفع هوية موحّدة للحسابات التي فعّلت وضع الرجل الغامض. عند إيقاف الميزة هنا، تُلغى فوراً لكل المستخدمين وتعود هوياتهم الأصلية، ولا تعود تلقائياً عند إعادة تشغيلها.
             </p>
+            <div class="border rounded-3 p-3 mb-3">
+              <div class="form-check form-switch">
+                <input id="mysterious-man-enabled" v-model="mysteryForm.enabled" class="form-check-input" type="checkbox" role="switch" />
+                <label class="form-check-label fw-semibold" for="mysterious-man-enabled">تفعيل ميزة الرجل الغامض لجميع المستخدمين</label>
+              </div>
+              <div class="small text-secondary mt-1">عند إيقاف هذا الخيار، سيتم إلغاء التفعيل المحفوظ لجميع الحسابات. يجب على المستخدم تفعيل الميزة مجدداً بعد تشغيلها، مع وجود اشتراك VIP مؤهل وساري.</div>
+            </div>
+            <div class="border rounded-3 p-3 mb-3">
+              <div class="fw-semibold mb-2">اشتراكات VIP المؤهلة للميزة</div>
+              <div class="d-flex flex-wrap gap-3">
+                <div v-for="level in [1,2,3,4,5,6,7]" :key="level" class="form-check">
+                  <input :id="'mysterious-vip-' + level" v-model="mysteryForm.eligibleVipLevels" class="form-check-input" type="checkbox" :value="level" />
+                  <label class="form-check-label" :for="'mysterious-vip-' + level">VIP{{ level }}</label>
+                </div>
+              </div>
+              <div class="small text-secondary mt-1">انتهاء الاشتراك أو إزالته من المستويات المؤهلة يعيد الحساب تلقائياً لوضعه الطبيعي.</div>
+            </div>
             <div class="row g-3 mb-3">
               <div class="col-md-4">
                 <label class="form-label">نوع الدخولية الموحدة</label>
