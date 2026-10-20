@@ -11010,10 +11010,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     1, 0, "أرسل هدية ×1");
             return;
         }
+        // Create the toast once so it stays beside the screen while the number changes.
+        // Re-showing it every frame would restart its entrance/crawl animation.
+        showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                1, 0, "أرسل هدية");
         final android.animation.ValueAnimator animator =
                 android.animation.ValueAnimator.ofInt(1, target);
         // Keep large batches very fast: X77 finishes in ~450 ms and X177 in ~600 ms.
-        // Smaller batches still get enough time for the count to be readable.
         long durationMs = target <= 7 ? 260L
                 : target <= 17 ? 330L
                 : target <= 77 ? 450L
@@ -11025,9 +11028,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 a.cancel();
                 return;
             }
-            int count = (Integer) a.getAnimatedValue();
-            showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
-                    1, 0, "أرسل هدية ×" + count);
+            if (binding != null && binding.comboGiftView != null) {
+                binding.comboGiftView.updateCountUp((Integer) a.getAnimatedValue());
+            }
         });
         animator.start();
     }
