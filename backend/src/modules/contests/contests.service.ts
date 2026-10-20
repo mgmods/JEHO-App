@@ -830,10 +830,10 @@ export class ContestsService implements OnModuleInit {
       else if (now > c.endAt) next = 'ended';
       else next = 'active';
       if (next !== c.status) {
-        const wasActive = c.status === 'active';
+        const wasNotEnded = c.status !== 'ended';
         c.status = next;
         await this.contestsRepo.save(c);
-        if (wasActive && next === 'ended') {
+        if (wasNotEnded && next === 'ended') {
           if (this.isTeamChallenge(c)) {
             if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(c);
           } else {
