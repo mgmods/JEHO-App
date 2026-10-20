@@ -274,7 +274,12 @@ export class AdminService {
   async patchMysteriousManConfig(input: Record<string, unknown>) {
     const cleanUrl = (value: unknown, key: string) => {
       const url = typeof value === 'string' ? value.trim() : '';
-      if (url && (!/^https?:\/\//i.test(url) || url.length > 2048)) {
+      // Dashboard uploads may return a same-origin /uploads/... path. Accept only
+      // safe upload paths or absolute HTTPS URLs; reject traversal and other schemes.
+      const safeUploadPath = /^\/uploads\/[A-Za-z0-9._/-]+(?:\?[A-Za-z0-9._=&%-]*)?$/.test(url)
+        && !url.split('?')[0].split('/').includes('..');
+      const safeAbsoluteUrl = /^https?:\/\//i.test(url);
+      if (url && ((!safeUploadPath && !safeAbsoluteUrl) || url.length > 2048)) {
         throw new BadRequestException(`Invalid ${key} URL`);
       }
       return url;
