@@ -2,20 +2,32 @@ const configuredApi = import.meta.env.VITE_API_URL || ''
 const configuredOrigin = import.meta.env.VITE_API_ORIGIN || ''
 
 function apiOrigin() {
+  const currentOrigin = window.location.origin.replace(/\/$/, '')
+  const isLegacyHost = (hostname) => String(hostname || '').toLowerCase() === 'api.adnova.bbs.tr'
+
   const explicit = String(configuredOrigin || '').trim()
-  if (explicit) return explicit.replace(/\/$/, '')
+  if (explicit) {
+    try {
+      const parsed = new URL(explicit, currentOrigin)
+      if (!isLegacyHost(parsed.hostname)) return parsed.origin
+    } catch {
+      // Ignore malformed/legacy overrides and use the active dashboard origin.
+    }
+  }
+
   const api = String(configuredApi || '').trim()
   if (api) {
     try {
-      const parsed = new URL(api, window.location.origin)
-      return parsed.origin
+      const parsed = new URL(api, currentOrigin)
+      if (!isLegacyHost(parsed.hostname)) return parsed.origin
     } catch {
       // Fall through to the dashboard's own origin when the API URL is malformed.
     }
   }
-  // The admin dashboard is served by the same backend in JEHO-OWN/Blitz.
-  // Never silently send uploaded media to the old api.adnova.bbs.tr host.
-  return window.location.origin.replace(/\/$/, '')
+
+  // JEHO-OWN/Blitz serves the dashboard and upload route from the same origin.
+  // Never send saved uploads to the retired api.adnova.bbs.tr host.
+  return currentOrigin
 }
 
 export function resolveAsset(path) {
