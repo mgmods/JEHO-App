@@ -70,4 +70,9 @@ export class SendAllMicGiftDto {
   @IsOptional()
   @IsBoolean()
   cannonLaunch?: boolean;
+
+  @ApiPropertyOptional({ description: 'Idempotency key for safe retry of the same gift send' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
