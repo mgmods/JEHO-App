@@ -3733,7 +3733,30 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
-    private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets) {
+    private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
+                                      long totalCoins, int quantity, int personCount,
+                                      boolean localSender) {
+        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonView == null) {
+            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
+                    Math.max(1, quantity), Math.max(1, personCount), null);
+            return;
+        }
+        boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
+        if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonView.fire();
+        if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
+        playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
+        if (!keepVisible) {
+            handler.postDelayed(() -> {
+                if (luckyCannonLayer != null && luckyCannonTargets.isEmpty()) {
+                    luckyCannonLayer.setVisibility(View.GONE);
+                }
+            }, 1800L);
+        }
+    }
+
+    private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets,
+                                        long totalCoins, int quantity, int personCount) {
         if (binding == null || binding.giftOverlay == null || luckyCannonView == null) return;
         binding.giftOverlay.setVisibility(View.VISIBLE);
         binding.giftOverlay.bringToFront();
@@ -3761,9 +3784,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             animated = true;
         }
         if (!animated) {
-            playLuckyGiftStage(icon, targets,
-                    (long) Math.max(0, luckyCannonGiftPrice) * Math.max(1, luckyCannonGiftQuantity) * targets.size(),
-                    luckyCannonGiftQuantity, targets.size(), null);
+            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
+                    Math.max(1, quantity), Math.max(1, personCount), null);
         }
     }
 
