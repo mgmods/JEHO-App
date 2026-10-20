@@ -62,6 +62,7 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.data.remote.dto.GameDtos;
+import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.databinding.ActivityVoiceRoomBinding;
 import com.Dramizo.Series.databinding.DialogRoomGamesBinding;
@@ -194,6 +195,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private volatile String mysteriousEntryEffectUrl;
     @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
+    private volatile boolean luckyCannonEnabled = false;
+    private volatile boolean luckyCannonSoundEnabled = true;
+    private volatile int luckyCannonDurationSeconds = 2;
+    @Nullable private FrameLayout luckyCannonLayer;
+    @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
+    @Nullable private Runnable hideLuckyCannonRunnable;
+    @Nullable private String luckyCannonGiftId;
+    @Nullable private String luckyCannonGiftIcon;
+    @Nullable private String luckyCannonGiftName;
+    private int luckyCannonGiftPrice;
+    private int luckyCannonGiftQuantity = 1;
+    private final List<String> luckyCannonTargets = new ArrayList<>();
+    private boolean luckyCannonSending;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -429,6 +443,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        setupLuckyCannonUi();
         applyRoomBottomSafeArea();
         initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
