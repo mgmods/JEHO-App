@@ -8,6 +8,7 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { Room } from '../../database/entities/room.entity';
 import { Agency } from '../../database/entities/agency.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import { AdminUser } from '../../database/entities/admin-user.entity';
 import { AuthModule } from '../auth/auth.module';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,7 +18,7 @@ import { RealtimeModule } from '../realtime/realtime.module';
   imports: [
     AuthModule,
     RealtimeModule,
-    TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction, Room, Agency, AdminUser]),
+    TypeOrmModule.forFeature([VanityId, User, Wallet, WalletTransaction, Room, Agency, AdminUser, AppSetting]),
   ],
   controllers: [VanityIdsController],
   providers: [VanityIdsService, JwtAuthGuard],
