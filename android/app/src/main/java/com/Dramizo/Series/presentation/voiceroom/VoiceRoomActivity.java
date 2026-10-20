@@ -10993,6 +10993,38 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 senderUserId, senderVipLevel, senderAvatarUrl, 1, null);
     }
 
+    /**
+     * Animated send-count toast for quantity gifts. Counts up quickly while the send is
+     * being presented, then leaves the final selected quantity visible in the normal toast.
+     */
+    public void showGiftSendToastCountUp(
+            @Nullable String senderName,
+            @Nullable String giftName,
+            @Nullable String senderAvatarUrl,
+            @Nullable String giftIconUrl,
+            int quantity
+    ) {
+        final int target = Math.max(1, quantity);
+        if (target <= 1) {
+            showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                    1, 0, "أرسل هدية ×1");
+            return;
+        }
+        final android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofInt(1, target);
+        animator.setDuration(Math.min(1500L, Math.max(500L, target * 9L)));
+        animator.addUpdateListener(a -> {
+            if (isFinishing() || isDestroyed()) {
+                a.cancel();
+                return;
+            }
+            int count = (Integer) a.getAnimatedValue();
+            showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                    1, 0, "أرسل هدية ×" + count);
+        });
+        animator.start();
+    }
+
     /** Gift send toast — profile + gift icon + combo xN (Mikoo crawl strip). */
     public void showGiftSendToast(@Nullable String senderName,
                                   @Nullable String giftName,
