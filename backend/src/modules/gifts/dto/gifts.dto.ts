@@ -1,4 +1,4 @@
-import { IsUUID, IsOptional, IsInt, Min, IsArray, ArrayMinSize } from 'class-validator';
+import { IsUUID, IsOptional, IsInt, Min, IsArray, ArrayMinSize, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SendGiftDto {
@@ -26,6 +26,16 @@ export class SendGiftDto {
   @IsInt()
   @Min(1)
   comboCount?: number;
+
+  @ApiPropertyOptional({ description: 'Mark the visual effect as a cannon launch' })
+  @IsOptional()
+  @IsBoolean()
+  cannonLaunch?: boolean;
+
+  @ApiPropertyOptional({ description: 'Idempotency key for safe retry of the same gift send' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 /** All-mic send: one charge, host 50% / mics 50% of diamond pool (after platform cut). */
@@ -55,4 +65,14 @@ export class SendAllMicGiftDto {
   @IsInt()
   @Min(1)
   comboCount?: number;
+
+  @ApiPropertyOptional({ description: 'Mark the visual effect as a cannon launch' })
+  @IsOptional()
+  @IsBoolean()
+  cannonLaunch?: boolean;
+
+  @ApiPropertyOptional({ description: 'Idempotency key for safe retry of the same gift send' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }

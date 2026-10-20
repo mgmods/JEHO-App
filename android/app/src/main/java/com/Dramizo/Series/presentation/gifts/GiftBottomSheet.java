@@ -1173,6 +1173,13 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                     : java.util.Collections.emptyList());
             boolean allMic = sendToAllMic && tgts.size() > 1;
             if (luckyGift) {
+                room.armLuckyGiftCannon(
+                        gift != null ? gift.id : (selected != null ? selected.id : null),
+                        icon, name,
+                        gift != null ? gift.coinPrice : (selected != null ? selected.coinPrice : 0),
+                        qty, tgts);
+            }
+            if (luckyGift) {
                 // Center hero + simultaneous clones to selected/all mic seats.
                 try {
                     GiftAudioFx.playLuckyCoins(requireContext(), 1);

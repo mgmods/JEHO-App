@@ -1251,7 +1251,13 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         return RecyclerView.NO_ID;
     }
 
-    @Override
+    /** Stable user lookup for lightweight gift-flight overlays. */
+    @Nullable
+    public String getUserIdAtPosition(int position) {
+        if (position < 0 || position >= items.size()) return null;
+        return seatUserId(items.get(position));
+    }
+
     public int getItemCount() {
         return items.size();
     }

@@ -92,6 +92,7 @@ export class GiftsService implements OnModuleInit {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
     await this.ensureGiftCategoriesTable();
+    await this.ensureGiftSendIdempotencySchema();
     await this.ensureDefaultGiftCategories();
     // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
     await this.healZeroDiamondCatalog();
@@ -186,6 +187,26 @@ export class GiftsService implements OnModuleInit {
     } catch (err) {
       this.log.warn(
         `healZeroDiamondCatalog: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Additive schema-only protection for retry-safe cannon sends. Existing gift history is untouched.
+   * One request key may cover many recipients, but the same key/recipient pair cannot be charged twice.
+   */
+  private async ensureGiftSendIdempotencySchema() {
+    try {
+      await this.dataSource.query(
+        'ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid',
+      );
+      await this.dataSource.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL',
+      );
+    } catch (err) {
+      this.log.warn(
+        'Gift-send idempotency schema setup skipped: ' +
+          (err instanceof Error ? err.message : String(err)),
       );
     }
   }
@@ -1692,7 +1713,28 @@ export class GiftsService implements OnModuleInit {
   }
 
   async giftPolicy() {
-    return { selfGiftAllowed: !(await this.isSelfGiftBlocked()) };
+    const [selfGiftAllowed, cannonRow] = await Promise.all([
+      this.isSelfGiftBlocked().then((blocked) => !blocked),
+      this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } }).catch(() => null),
+    ]);
+    const defaults = { enabled: true, durationSeconds: 2, soundEnabled: true };
+    let cannon = defaults;
+    try {
+      if (cannonRow?.value) {
+        const parsed = JSON.parse(cannonRow.value);
+        cannon = {
+          enabled: parsed.enabled !== false,
+          durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(parsed.durationSeconds) || 2))),
+          soundEnabled: parsed.soundEnabled !== false,
+        };
+      }
+    } catch {}
+    return {
+      selfGiftAllowed,
+      luckyCannonEnabled: cannon.enabled,
+      luckyCannonDurationSeconds: cannon.durationSeconds,
+      luckyCannonSoundEnabled: cannon.soundEnabled,
+    };
   }
 
   private async isSelfGiftBlocked(): Promise<boolean> {
@@ -1889,6 +1931,49 @@ export class GiftsService implements OnModuleInit {
     }
   }
 
+  private async findPriorCannonRequest(
+    senderId: string,
+    requestId: string,
+    receiverIds: string[],
+  ): Promise<any | null> {
+    const rows = await this.sendsRepo.find({ where: { requestId, senderId } });
+    if (!rows.length) return null;
+    const requested = [...new Set(receiverIds.map(String))].sort();
+    const recorded = [...new Set(rows.map((row) => String(row.receiverId)))].sort();
+    if (requested.length !== recorded.length || requested.some((id, i) => id !== recorded[i])) {
+      throw new BadRequestException('This gift request ID was already used for a different recipient list');
+    }
+    const first = rows[0];
+    const gift = first.giftId
+      ? await this.giftsRepo.findOne({ where: { id: first.giftId } })
+      : null;
+    const wallet = await this.walletsRepo.findOne({ where: { userId: senderId } });
+    return {
+      send: first,
+      sends: rows,
+      gift,
+      comboCount: first.comboCount,
+      luckyMultiplier: first.luckyMultiplier ? Number(first.luckyMultiplier) : null,
+      luckyCoinsWon: 0,
+      coinPrice: Number(gift?.coinPrice || 0),
+      quantity: first.quantity,
+      personCount: rows.length,
+      totalCoins: rows.reduce((sum, row) => sum + Number(row.totalCoins || 0), 0),
+      senderBalance: Number(wallet?.coins || 0),
+      success: true,
+      coinsSpent: 0,
+      receiverIds: rows.map((row) => row.receiverId),
+      wallet: wallet ? {
+        coins: Number(wallet.coins || 0),
+        diamonds: Number(wallet.diamonds || 0),
+        agencyDiamonds: Number((wallet as any).agencyDiamonds || 0),
+        silverCoins: Number(wallet.silverCoins || 0),
+        gamePoints: Number(wallet.gamePoints || 0),
+      } : null,
+      alreadyProcessed: true,
+    };
+  }
+
   async send(senderId: string, dto: SendGiftDto) {
     const selfGift = String(senderId) === String(dto.receiverId);
     const selfGiftBlocked = selfGift && (await this.isSelfGiftBlocked());
@@ -1896,6 +1981,10 @@ export class GiftsService implements OnModuleInit {
       throw new BadRequestException(
         'إرسال الهدية للنفس غير مسموح حاليًا من إعدادات المنصة',
       );
+    }
+    if (dto.requestId) {
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, [dto.receiverId]);
+      if (prior) return prior;
     }
     const gift = await this.giftsRepo.findOne({ where: { id: dto.giftId, isActive: true } });
     if (!gift) throw new NotFoundException('Gift not found');
@@ -1980,6 +2069,7 @@ export class GiftsService implements OnModuleInit {
           giftIconUrl: gift.iconUrl,
           senderId,
           receiverId: dto.receiverId,
+          requestId: dto.requestId || null,
           roomId: dto.roomId || null,
           quantity: qty,
           comboCount,
@@ -2337,6 +2427,7 @@ export class GiftsService implements OnModuleInit {
       }
 
       const animationPayload: Record<string, unknown> = {
+        cannonLaunch: dto.cannonLaunch === true,
         giftId: gift.id,
         giftName: gift.name,
         giftType: gift.type,
@@ -2540,6 +2631,10 @@ export class GiftsService implements OnModuleInit {
           : 'اختر مستلمًا صالحًا على المايك',
       );
     }
+    if (dto.requestId) {
+      const prior = await this.findPriorCannonRequest(senderId, dto.requestId, receiverIds);
+      if (prior) return prior;
+    }
     if (receiverIds.length === 1) {
       return this.send(senderId, {
         giftId: dto.giftId,
@@ -2547,6 +2642,8 @@ export class GiftsService implements OnModuleInit {
         quantity: dto.quantity,
         roomId: dto.roomId,
         comboCount: dto.comboCount,
+        cannonLaunch: dto.cannonLaunch,
+        requestId: dto.requestId,
       });
     }
 
@@ -2645,6 +2742,7 @@ export class GiftsService implements OnModuleInit {
             giftIconUrl: gift.iconUrl,
             senderId,
             receiverId: rid,
+            requestId: dto.requestId || null,
             roomId: dto.roomId,
             quantity: qty,
             comboCount,
@@ -2901,6 +2999,7 @@ export class GiftsService implements OnModuleInit {
       );
       const at = new Date().toISOString();
       const animationPayload = {
+        cannonLaunch: dto.cannonLaunch === true,
         giftId: gift.id,
         giftName: gift.name,
         giftType: gift.type,

@@ -37,6 +37,8 @@ public final class GiftDtos {
         @SerializedName("quantity") public int quantity;
         @SerializedName("roomId") public String roomId;
         @SerializedName("comboCount") public int comboCount;
+        @SerializedName("cannonLaunch") public boolean cannonLaunch;
+        @SerializedName("requestId") public String requestId;
 
         public SendGiftRequest(
                 String giftId,
@@ -58,6 +60,8 @@ public final class GiftDtos {
         @SerializedName("quantity") public int quantity;
         @SerializedName("roomId") public String roomId;
         @SerializedName("comboCount") public int comboCount;
+        @SerializedName("cannonLaunch") public boolean cannonLaunch;
+        @SerializedName("requestId") public String requestId;
 
         public SendAllMicRequest(
                 String giftId,

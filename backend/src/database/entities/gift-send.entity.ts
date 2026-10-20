@@ -41,6 +41,10 @@ export class GiftSend {
   @Column({ type: 'uuid' })
   receiverId: string;
 
+  /** Same idempotency key is shared by every recipient in one group send. */
+  @Column({ type: 'uuid', nullable: true })
+  requestId: string | null;
+
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'receiverId' })
   receiver: User;

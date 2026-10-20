@@ -62,6 +62,7 @@ import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.data.remote.dto.MiscDtos;
 import com.Dramizo.Series.data.remote.dto.RoomDtos;
 import com.Dramizo.Series.data.remote.dto.GameDtos;
+import com.Dramizo.Series.data.remote.dto.GiftDtos;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.databinding.ActivityVoiceRoomBinding;
 import com.Dramizo.Series.databinding.DialogRoomGamesBinding;
@@ -194,6 +195,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private volatile String mysteriousEntryEffectUrl;
     @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
+    private volatile boolean luckyCannonEnabled = false;
+    private volatile boolean luckyCannonSoundEnabled = true;
+    private volatile int luckyCannonDurationSeconds = 2;
+    @Nullable private FrameLayout luckyCannonLayer;
+    @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
+    @Nullable private Runnable hideLuckyCannonRunnable;
+    @Nullable private String luckyCannonGiftId;
+    @Nullable private String luckyCannonGiftIcon;
+    @Nullable private String luckyCannonGiftName;
+    private int luckyCannonGiftPrice;
+    private int luckyCannonGiftQuantity = 1;
+    private final List<String> luckyCannonTargets = new ArrayList<>();
+    private boolean luckyCannonSending;
+    @Nullable private String luckyCannonRequestId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -429,6 +444,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         EdgeToEdgeHelper.applyImmersiveDark(this);
         binding = ActivityVoiceRoomBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
+        setupLuckyCannonUi();
         applyRoomBottomSafeArea();
         initRoomFeedTabs();
         // Room id + ViewModel ASAP so network join can overlap with the rest of onCreate.
@@ -3606,6 +3622,178 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     /** Celebrations always allowed in chat (banner feature retired). */
     private boolean roomBannerEnabled() {
         return true;
+    }
+
+    private int luckyCannonDp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void setupLuckyCannonUi() {
+        ConstraintLayout root = binding.getRoot();
+        FrameLayout layer = new FrameLayout(this);
+        layer.setClipChildren(false);
+        layer.setClipToPadding(false);
+        layer.setClickable(false);
+        layer.setFocusable(false);
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
+                luckyCannonDp(76), luckyCannonDp(76));
+        lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.setMarginEnd(luckyCannonDp(8));
+        root.addView(layer, lp);
+        com.Dramizo.Series.util.LuckyCannonView cannon =
+                new com.Dramizo.Series.util.LuckyCannonView(this);
+        FrameLayout.LayoutParams cannonLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        cannonLp.gravity = Gravity.CENTER;
+        layer.addView(cannon, cannonLp);
+        layer.setElevation(luckyCannonDp(42));
+        layer.setVisibility(View.GONE);
+        cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        luckyCannonLayer = layer;
+        luckyCannonView = cannon;
+    }
+
+    /** Called only after the existing gift endpoint confirms a successful lucky gift send. */
+    public void armLuckyGiftCannon(@Nullable String giftId, @Nullable String giftIcon,
+                                   @Nullable String giftName, int unitPrice, int quantity,
+                                   @Nullable List<String> targetIds) {
+        if (!luckyCannonEnabled || isFinishing() || isDestroyed()
+                || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
+        luckyCannonRequestId = null;
+        luckyCannonGiftId = giftId;
+        luckyCannonGiftIcon = giftIcon;
+        luckyCannonGiftName = giftName;
+        luckyCannonGiftPrice = Math.max(0, unitPrice);
+        luckyCannonGiftQuantity = Math.max(1, Math.min(177, quantity));
+        luckyCannonTargets.clear();
+        for (String id : targetIds) {
+            if (id != null && !id.isEmpty() && !luckyCannonTargets.contains(id)) luckyCannonTargets.add(id);
+        }
+        if (luckyCannonTargets.isEmpty()) return;
+        showLuckyCannonAndScheduleHide();
+    }
+
+    private void showLuckyCannonAndScheduleHide() {
+        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonLayer.setAlpha(1f);
+        hideLuckyCannonRunnable = this::hideLuckyCannon;
+        handler.postDelayed(hideLuckyCannonRunnable, Math.max(1, luckyCannonDurationSeconds) * 1000L);
+    }
+
+    private void hideLuckyCannon() {
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        hideLuckyCannonRunnable = null;
+        if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
+        if (!luckyCannonSending) {
+            luckyCannonGiftId = null;
+            luckyCannonTargets.clear();
+        }
+    }
+
+    private void sendLuckyCannonGift() {
+        if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
+                || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
+        final AppContainer container;
+        try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
+        final String giftId = luckyCannonGiftId;
+        final String icon = luckyCannonGiftIcon;
+        if (luckyCannonRequestId == null) luckyCannonRequestId = java.util.UUID.randomUUID().toString();
+        final String requestId = luckyCannonRequestId;
+        final int quantity = luckyCannonGiftQuantity;
+        final List<String> targets = new ArrayList<>(luckyCannonTargets);
+        final String currentRoom = roomId;
+        luckyCannonSending = true;
+        if (luckyCannonView != null) luckyCannonView.setEnabled(false);
+        container.getIoExecutor().execute(() -> {
+            Result<GiftDtos.SendGiftResult> result;
+            if (targets.size() > 1) {
+                GiftDtos.SendAllMicRequest request =
+                        new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
+                request.cannonLaunch = true;
+                request.requestId = requestId;
+                result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
+            } else {
+                GiftDtos.SendGiftRequest request =
+                        new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
+                request.cannonLaunch = true;
+                request.requestId = requestId;
+                result = ApiCall.execute(container.getGiftApi().send(request));
+            }
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                luckyCannonSending = false;
+                if (luckyCannonView != null) luckyCannonView.setEnabled(true);
+                if (!result.success || result.data == null || !result.data.success) {
+                    BalanceRedirect.handle(VoiceRoomActivity.this,
+                            result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
+                    return;
+                }
+                if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
+                // The backend's existing room gift event triggers the flight on every room client.
+                // Reset the short visibility timer only after the send was confirmed.
+                showLuckyCannonAndScheduleHide();
+            });
+        });
+    }
+
+    private void playLuckyCannonEvent(@Nullable String icon, @NonNull List<String> targets,
+                                      long totalCoins, int quantity, int personCount,
+                                      boolean localSender) {
+        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonView == null) {
+            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
+                    Math.max(1, quantity), Math.max(1, personCount), null);
+            return;
+        }
+        boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
+        if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonView.fire();
+        if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
+        playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
+        if (!keepVisible) {
+            handler.postDelayed(() -> {
+                if (luckyCannonLayer != null && luckyCannonTargets.isEmpty()) {
+                    luckyCannonLayer.setVisibility(View.GONE);
+                }
+            }, 1800L);
+        }
+    }
+
+    private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets,
+                                        long totalCoins, int quantity, int personCount) {
+        if (binding == null || binding.giftOverlay == null || luckyCannonView == null) return;
+        binding.giftOverlay.setVisibility(View.VISIBLE);
+        binding.giftOverlay.bringToFront();
+        binding.giftOverlay.setElevation(36f);
+        markLuckyOverlayActive(3600L);
+        int[] cannonLoc = new int[2];
+        int[] overlayLoc = new int[2];
+        luckyCannonView.getLocationOnScreen(cannonLoc);
+        binding.giftOverlay.getLocationOnScreen(overlayLoc);
+        PointF from = new PointF(
+                cannonLoc[0] - overlayLoc[0] + luckyCannonView.getWidth() * 0.5f,
+                cannonLoc[1] - overlayLoc[1] + luckyCannonView.getHeight() * 0.5f);
+        boolean animated = false;
+        for (int i = 0; i < binding.recyclerSeats.getChildCount(); i++) {
+            View child = binding.recyclerSeats.getChildAt(i);
+            int position = binding.recyclerSeats.getChildAdapterPosition(child);
+            String uid = seatAdapter != null ? seatAdapter.getUserIdAtPosition(position) : null;
+            if (uid == null || !targets.contains(uid)) continue;
+            int[] seatLoc = new int[2];
+            child.getLocationOnScreen(seatLoc);
+            PointF to = new PointF(
+                    seatLoc[0] - overlayLoc[0] + child.getWidth() * 0.5f,
+                    seatLoc[1] - overlayLoc[1] + child.getHeight() * 0.5f);
+            GiftFlyAnimator.fly(binding.giftOverlay, icon, from, to, () -> {});
+            animated = true;
+        }
+        if (!animated) {
+            playLuckyGiftStage(icon, targets, Math.max(1L, totalCoins),
+                    Math.max(1, quantity), Math.max(1, personCount), null);
+        }
     }
 
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
@@ -9784,18 +9972,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         container.getIoExecutor().execute(() -> {
             Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
             boolean allowed = false;
+            boolean cannonEnabled = false;
+            boolean cannonSound = true;
+            int cannonDuration = 2;
             if (result.success && result.data != null) {
                 Object value = result.data.get("selfGiftAllowed");
                 allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
                         || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
+                Object ce = result.data.get("luckyCannonEnabled");
+                cannonEnabled = Boolean.TRUE.equals(ce) || "true".equalsIgnoreCase(String.valueOf(ce)) || "1".equals(String.valueOf(ce));
+                Object cs = result.data.get("luckyCannonSoundEnabled");
+                cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
+                Object cd = result.data.get("luckyCannonDurationSeconds");
+                try { cannonDuration = Math.max(1, Math.min(10, Integer.parseInt(String.valueOf(cd)))); } catch (Exception ignored) { cannonDuration = 2; }
             }
             final boolean next = allowed;
+            final boolean nextCannonEnabled = cannonEnabled;
+            final boolean nextCannonSound = cannonSound;
+            final int nextCannonDuration = cannonDuration;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (selfGiftAllowed != next) {
                     selfGiftAllowed = next;
                     notifyGiftSheetRecipientsChanged();
                 }
+                luckyCannonEnabled = nextCannonEnabled;
+                luckyCannonSoundEnabled = nextCannonSound;
+                luckyCannonDurationSeconds = nextCannonDuration;
+                if (!luckyCannonEnabled) hideLuckyCannon();
             });
         });
     }
@@ -11545,6 +11749,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onDestroy() {
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        if (luckyCannonView != null) luckyCannonView.release();
         unregisterAudioRouteReceiver();
         if (sAliveRoom != null && sAliveRoom.get() == this) {
             sAliveRoom.clear();
@@ -12413,7 +12619,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean localSenderEcho = myUserId != null
                     && (myUserId.equals(fromUserId) || myUserId.equals(senderId));
             String giftKind = memberStr(payload, "giftType");
-            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)) {
+            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)
+                    && !memberBool(payload, "cannonLaunch", false)) {
                 GiftAudioFx.playLuckyCoins(this, 3);
             }
             List<String> allReceivers = new ArrayList<>();
@@ -12444,11 +12651,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
                 appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
             }
+            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
+            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
+            boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
+            if (cannonLaunch) {
+                playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
+                        Math.max(1, personCount), localSenderEcho);
+                return;
+            }
             if (localSenderEcho) {
                 return; // Local send response already queued the sender's visual effect.
             }
-            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
-            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
             // Lucky: Mikoo center-hold → scatter (no JSON/Lottie pulse).
             if (isLuckyGift) {
                 anim = null;

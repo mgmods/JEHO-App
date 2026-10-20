@@ -325,6 +325,43 @@ export class AdminService {
     return current;
   }
 
+  async getLuckyCannonConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
+    const defaults = { enabled: true, durationSeconds: 2, soundEnabled: true };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      return {
+        enabled: parsed.enabled !== false,
+        durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(parsed.durationSeconds) || 2))),
+        soundEnabled: parsed.soundEnabled !== false,
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchLuckyCannonConfig(input: Record<string, unknown>) {
+    const current = {
+      enabled: input.enabled === true,
+      durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(input.durationSeconds) || 2))),
+      soundEnabled: input.soundEnabled !== false,
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed Lucky Gift Cannon configuration';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'lucky_gift_cannon_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed Lucky Gift Cannon configuration',
+      }));
+    }
+    return current;
+  }
+
   async getSupportChestConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'support_chest_config' } });
     const defaults = {

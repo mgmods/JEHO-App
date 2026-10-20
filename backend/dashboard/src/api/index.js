@@ -109,6 +109,8 @@ export const giftsApi = {
   /** Clone mall entry effects (الدخولية) into gift panel. */
   importEntryEffects: () =>
     safeRequest(() => api.post('/admin/gifts/import-entry-effects')),
+  luckyCannonConfig: () => safeRequest(() => api.get('/admin/lucky-gift-cannon/config')),
+  saveLuckyCannonConfig: (data) => safeRequest(() => api.patch('/admin/lucky-gift-cannon/config', data)),
 }
 
 export const walletApi = {
