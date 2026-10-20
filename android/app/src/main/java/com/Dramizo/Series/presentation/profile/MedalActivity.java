@@ -119,6 +119,13 @@ public class MedalActivity extends ThemedActivity {
                 }
             }
 
+            // Keep the legacy VIP catalogue fallback even when dashboard badges exist.
+            if (all.isEmpty()) {
+                for (int i = 1; i <= MAX_VIP; i++) {
+                    all.add(toRow(null, i, null));
+                }
+            }
+
             // Dashboard-awarded achievement badges are also medals, not just VIP cosmetics.
             // Keep the VIP rows intact and merge real badge ownership from the same API
             // used by the profile page and badge notification.
@@ -144,11 +151,6 @@ public class MedalActivity extends ThemedActivity {
                 }
             }
 
-            if (all.isEmpty()) {
-                for (int i = 1; i <= MAX_VIP; i++) {
-                    all.add(toRow(null, i, null));
-                }
-            }
             // خاصتي = current VIP badge only (not every lower tier).
             if (myVip >= 1) {
                 MedalRow current = null;
