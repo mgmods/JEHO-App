@@ -65,6 +65,7 @@ public class HomeMomentsFragment extends Fragment {
     private Uri selectedImage;
     private String uploadedImageUrl;
     private final List<Map<String, Object>> posts = new ArrayList<>();
+    private final List<ObjectAnimator> frameAnimators = new ArrayList<>();
     private boolean busy;
 
     public static HomeMomentsFragment newInstance() { return new HomeMomentsFragment(); }
@@ -357,12 +358,25 @@ public class HomeMomentsFragment extends Fragment {
         }
     }
 
+    private void cancelFrameAnimations() {
+        for (ObjectAnimator animator : frameAnimators) {
+            try { animator.cancel(); } catch (Exception ignored) {}
+        }
+        frameAnimators.clear();
+    }
+
+    @Override public void onDestroyView() {
+        cancelFrameAnimations();
+        super.onDestroyView();
+    }
+
     private void renderFeed() {
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
             renderProfileGrid();
             return;
         }
         if (feedContainer == null) return;
+        cancelFrameAnimations();
         feedContainer.removeAllViews();
         loading.setVisibility(posts.isEmpty() ? View.VISIBLE : View.GONE);
         loading.setText(posts.isEmpty() ? "لا توجد لحظات بعد — كن أول من ينشر" : "");
@@ -408,11 +422,13 @@ public class HomeMomentsFragment extends Fragment {
                 framePulse.setRepeatMode(ValueAnimator.REVERSE);
                 framePulse.setRepeatCount(ValueAnimator.INFINITE);
                 framePulse.start();
+                frameAnimators.add(framePulse);
                 ObjectAnimator frameTilt = ObjectAnimator.ofFloat(avatarFrame, View.ROTATION, -2f, 2f);
                 frameTilt.setDuration(1500);
                 frameTilt.setRepeatMode(ValueAnimator.REVERSE);
                 frameTilt.setRepeatCount(ValueAnimator.INFINITE);
                 frameTilt.start();
+                frameAnimators.add(frameTilt);
             }
             avatarStack.addView(avatar);
             avatarStack.addView(avatarFrame);
@@ -536,6 +552,7 @@ public class HomeMomentsFragment extends Fragment {
     }
 
     private void renderProfileGrid() {
+        cancelFrameAnimations();
         feedContainer.removeAllViews();
         loading.setVisibility(posts.isEmpty() ? View.VISIBLE : View.GONE);
         loading.setText(posts.isEmpty() ? "لا توجد لحظات ظاهرة لهذا الحساب" : "");
