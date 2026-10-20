@@ -52,13 +52,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { supportChestApi, giftsApi, cosmeticsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 const form = reactive({ enabled:false, iconVisible:true, goalMode:'coins', coinTarget:100000, diamondTarget:10000, giftIds:[], rewardType:'none', rewardItemId:'', rewardAmount:0, instructions:'كل هدية مؤهلة تساهم في هدف الصندوق. عند اكتماله يحصل مرسل الهدية الأخيرة على المكافأة.' })
 const catalogGifts=ref([]), catalogCosmetics=ref([]), catalogLoading=ref(false)
 const saving=ref(false), error=ref(''), notice=ref('')
 function unwrap(r){const d=r?.data?.data ?? r?.data ?? r;return Array.isArray(d)?d:(Array.isArray(d?.items)?d.items:(Array.isArray(d?.data)?d.data:[]))}
 function itemName(item){return item?.nameAr || item?.labelAr || item?.name || item?.title || item?.code || 'عنصر'}
 function itemImage(item){return item?.iconUrl || item?.previewUrl || item?.imageUrl || item?.animationUrl || item?.assetUrl || item?.url || ''}
-function assetUrl(value){if(!value)return '';if(/^https?:\/\//i.test(value))return value;return value.startsWith('/')?value:'/'.concat(value)}
+function assetUrl(value){return resolveAsset(value)}
 function isVideo(value){return /\.(mp4|webm)(\?|$)/i.test(String(value||''))}
 function toggleGift(id, checked){const key=String(id);form.giftIds=checked?[...new Set([...(form.giftIds||[]).map(String),key])]: (form.giftIds||[]).map(String).filter(x=>x!==key)}
 const rewardItems = computed(()=> {
