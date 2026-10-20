@@ -7597,7 +7597,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean showForceLeave = (canManageSeats || canKickUsers) && canTarget && targetSeat != null;
             actForceLeaveSeat.setVisibility(showForceLeave ? View.VISIBLE : View.GONE);
             if (showForceLeave) {
-                actForceLeaveSeat.setText("إنزال من المايك");
+                actForceLeaveSeat.setText("إزالة من المايك");
                 actForceLeaveSeat.setOnClickListener(v -> {
                     dialog.dismiss();
                     if (roomId == null || userId == null || userId.trim().isEmpty()) {
@@ -7606,7 +7606,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     }
                     // Run the server action immediately; the room:seat_left event stops
                     // the target's mic publisher while keeping them in the room.
-                    viewModel.forceLeaveSeat(roomId, userId);
+                    viewModel.removeMemberFromMic(roomId, userId);
                 });
             }
         }
