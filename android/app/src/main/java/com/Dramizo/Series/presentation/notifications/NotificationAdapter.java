@@ -42,7 +42,9 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
         MiscDtos.NotificationDto n = items.get(position);
-        String typeLabel = labelForType(holder.itemView.getContext(), n.type);
+        String typeLabel = isBadgeAward(n)
+                ? "شارة جديدة"
+                : labelForType(holder.itemView.getContext(), n.type);
         holder.b.tvTitle.setText(n.title != null ? n.title : typeLabel);
         holder.b.tvBody.setText(n.body != null ? n.body : "");
         holder.b.tvTypeChip.setText(typeLabel);
@@ -90,9 +92,13 @@ public class NotificationAdapter extends RecyclerView.Adapter<NotificationAdapte
         }
     }
 
+    private static boolean isBadgeAward(MiscDtos.NotificationDto n) {
+        return n != null && n.data != null
+                && "badge_earned".equalsIgnoreCase(String.valueOf(n.data.get("kind")));
+    }
+
     private static String badgeImageUrl(MiscDtos.NotificationDto n) {
-        if (n == null || n.data == null
-                || !"badge_earned".equalsIgnoreCase(String.valueOf(n.data.get("kind")))) return null;
+        if (!isBadgeAward(n)) return null;
         Object value = n.data.get("imageUrl");
         String url = value == null ? "" : String.valueOf(value).trim();
         return url.isEmpty() ? null : url;
