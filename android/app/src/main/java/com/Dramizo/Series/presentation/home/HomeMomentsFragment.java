@@ -182,10 +182,13 @@ public class HomeMomentsFragment extends Fragment {
         composerCard.addView(publishButton, publishLp);
         root.addView(composerCard, matchWrap());
         composerCard.setVisibility(View.GONE);
-        Button openComposerButton = button("＋  نشر لحظة");
+        Button openComposerButton = button("＋");
+        openComposerButton.setContentDescription("نشر لحظة");
         styleButton(openComposerButton, 0xFFB70F52, 0xFFFFFFFF, dp(20));
-        openComposerButton.setTextSize(13);
-        LinearLayout.LayoutParams openComposerLp = new LinearLayout.LayoutParams(-2, dp(42));
+        openComposerButton.setTextSize(22);
+        openComposerButton.setMinWidth(dp(42));
+        openComposerButton.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams openComposerLp = new LinearLayout.LayoutParams(dp(42), dp(42));
         openComposerLp.gravity = Gravity.END;
         openComposerLp.topMargin = dp(8);
         openComposerLp.bottomMargin = dp(4);
@@ -410,7 +413,7 @@ public class HomeMomentsFragment extends Fragment {
             styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(18));
             String myId = container.getSessionManager().getUserId();
             followTop.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
-            followTop.setOnClickListener(v -> followAuthor(authorId));
+            followTop.setOnClickListener(v -> followAuthor(authorId, followTop));
             authorRow.addView(followTop, new LinearLayout.LayoutParams(-2, dp(40)));
             View.OnClickListener openAuthor = v -> {
                 if (authorId.isEmpty()) return;
@@ -430,7 +433,7 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(176)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(132)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
@@ -441,7 +444,7 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(176));
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(132));
                 photoLp.topMargin = dp(4);
                 photoLp.bottomMargin = dp(10);
                 item.addView(photo, photoLp);
@@ -498,12 +501,12 @@ public class HomeMomentsFragment extends Fragment {
             tile.setGravity(Gravity.CENTER);
             tile.setBackgroundColor(0xFFFFFFFF);
             tile.setPadding(dp(5), dp(5), dp(5), dp(5));
-            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(0, dp(168), 1);
+            LinearLayout.LayoutParams tileLp = new LinearLayout.LayoutParams(0, dp(138), 1);
             tileLp.setMargins(dp(3), dp(3), dp(3), dp(3));
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(138)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(108)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 Glide.with(this).load(image).into(photo);
                 tile.addView(photo);
@@ -668,14 +671,22 @@ public class HomeMomentsFragment extends Fragment {
         });
     }
 
-    private void followAuthor(String authorId) {
+    private void followAuthor(String authorId, Button followButton) {
         if (authorId == null || authorId.trim().isEmpty()) return;
         runIo(() -> {
             try {
                 Response<ApiResponse<Object>> response = container.getUserApi().follow(authorId).execute();
                 if (!isAdded()) return;
-                requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(),
-                    response.isSuccessful() ? "تمت المتابعة" : "تعذر إتمام المتابعة", Toast.LENGTH_SHORT).show());
+                requireActivity().runOnUiThread(() -> {
+                    if (response.isSuccessful()) {
+                        followButton.setText("✓ تمت المتابعة");
+                        followButton.setEnabled(false);
+                        followButton.setTextSize(11);
+                        Toast.makeText(requireContext(), "تمت متابعة الحساب بنجاح", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(requireContext(), "تعذر إتمام المتابعة؛ حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+                    }
+                });
             } catch (Exception e) { showError("تعذر إتمام المتابعة"); }
         });
     }
