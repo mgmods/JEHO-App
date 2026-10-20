@@ -28,7 +28,6 @@ public final class LuckyCannonView extends View {
     public LuckyCannonView(Context context, @Nullable AttributeSet attrs, int defStyleAttr) { super(context, attrs, defStyleAttr); init(); }
 
     private void init() {
-        setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         setContentDescription("مدفع هدايا المحظوظ");
         setClickable(true);
         setFocusable(true);
