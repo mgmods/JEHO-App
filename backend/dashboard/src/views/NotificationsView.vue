@@ -226,6 +226,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { notificationsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { extractList, formatDate } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
@@ -255,11 +256,7 @@ const success = ref('')
 const API_ORIGIN = (import.meta.env.VITE_API_BASE || '').replace(/\/api\/?$/, '') || ''
 
 function absoluteUrl(url) {
-  if (!url) return ''
-  if (/^https?:\/\//i.test(url)) return url
-  if (url.startsWith('//')) return `https:${url}`
-  if (url.startsWith('/')) return `${API_ORIGIN}${url}`
-  return `${API_ORIGIN}/${url}`
+  return resolveAsset(url)
 }
 
 /** Basic client-side strip of script tags for live preview only (server sanitizes on send). */
