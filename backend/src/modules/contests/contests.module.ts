@@ -4,6 +4,7 @@ import { ContestsController } from './contests.controller';
 import { ContestsService } from './contests.service';
 import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
@@ -12,7 +13,7 @@ import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Contest, ContestEntry, Wallet, User, WalletTransaction]),
+    TypeOrmModule.forFeature([Contest, ContestEntry, Wallet, User, WalletTransaction, AppSetting]),
     RealtimeModule,
     CosmeticsModule,
   ],
