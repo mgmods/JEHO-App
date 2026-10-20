@@ -58,7 +58,10 @@ export class MomentsService {
     const safeLimit = Math.min(50, Math.max(1, Math.trunc(Number(limit) || 20)));
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
-              u.username, u."displayName", u."avatarUrl", u."publicId"
+              u.username, u."displayName", u."avatarUrl", u."publicId",
+              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                       to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                       to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
        FROM "jeho_own"."moments" m
        JOIN "jeho_own"."users" u ON u.id = m."userId"
        WHERE u.status = 'active'
@@ -77,7 +80,10 @@ export class MomentsService {
   async forUser(userId: string, viewerId: string) {
     const rows = await this.dataSource.query(
       `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
-              u.username, u."displayName", u."avatarUrl", u."publicId"
+              u.username, u."displayName", u."avatarUrl", u."publicId",
+              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                       to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                       to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
        FROM "jeho_own"."moments" m JOIN "jeho_own"."users" u ON u.id = m."userId"
        WHERE m."userId" = $1 AND u.status = 'active'
        ORDER BY m."createdAt" DESC, m.id DESC LIMIT 100`,
@@ -103,7 +109,11 @@ export class MomentsService {
       [userId, body, imageUrl, visibility],
     );
     const [author] = await this.dataSource.query(
-      'SELECT username, "displayName", "avatarUrl", "publicId" FROM "jeho_own"."users" WHERE id = $1',
+      'SELECT username, "displayName", "avatarUrl", "publicId",
+        COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
+                 to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
+                 to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
+       FROM "jeho_own"."users" WHERE id = $1',
       [userId],
     );
     return { ...row, ...author, likeCount: 0, commentCount: 0, likedByMe: false };
@@ -140,7 +150,10 @@ export class MomentsService {
     await this.visibleMoment(momentId, viewerId);
     return this.dataSource.query(
       `SELECT c.id, c."momentId", c."userId", c."parentCommentId", c.body, c."createdAt",
-              u.username, u."displayName", u."avatarUrl", u."publicId"
+              u.username, u."displayName", u."avatarUrl", u."publicId",
+              COALESCE(to_jsonb(u)->>'frameUrl', to_jsonb(u)->>'avatarFrameUrl',
+                       to_jsonb(u)->>'equippedFrameUrl', to_jsonb(u)->>'profileFrameUrl',
+                       to_jsonb(u)->>'frameImageUrl', to_jsonb(u)->>'currentFrameUrl') AS "frameUrl"
        FROM "jeho_own"."moment_comments" c JOIN "jeho_own"."users" u ON u.id = c."userId"
        WHERE c."momentId" = $1 AND u.status = 'active'
        ORDER BY c."createdAt" ASC LIMIT 300`,
@@ -168,7 +181,11 @@ export class MomentsService {
       [momentId, userId, parentCommentId, body],
     );
     const [author] = await this.dataSource.query(
-      'SELECT username, "displayName", "avatarUrl", "publicId" FROM "jeho_own"."users" WHERE id = $1',
+      'SELECT username, "displayName", "avatarUrl", "publicId",
+        COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
+                 to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
+                 to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
+       FROM "jeho_own"."users" WHERE id = $1',
       [userId],
     );
     return { ...row, ...author };
