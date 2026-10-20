@@ -687,7 +687,7 @@ const mysteryLoading = ref(false)
 const mysterySaving = ref(false)
 const mysteryUploading = ref('')
 const mysteryInputs = {}
-const mysteryForm = reactive({ avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' })
+const mysteryForm = reactive({ enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' })
 const mysteryAssets = [
   { key: 'avatarUrl', title: 'الصورة الشخصية الموحدة', help: 'تظهر بدل الصورة الأصلية في مواضع الهوية المخفية.', accept: 'image/png,image/jpeg,image/webp' },
   { key: 'entryEffectUrl', title: 'دخولية الرجل الغامض', help: 'فيديو/حركة الدخول الموحدة داخل الرومات.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
@@ -709,6 +709,8 @@ async function loadMysteryConfig() {
   if (err) { error.value = err.message; toast().danger(err.message); return }
   const cfg = data?.data || data || {}
   Object.assign(mysteryForm, {
+    enabled: cfg.enabled === true,
+    eligibleVipLevels: Array.isArray(cfg.eligibleVipLevels) ? cfg.eligibleVipLevels.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7) : [],
     avatarUrl: String(cfg.avatarUrl || ''),
     entryMode: cfg.entryMode === 'text' ? 'text' : 'video',
     entryText: String(cfg.entryText || 'دخل الرجل الغامض'),
