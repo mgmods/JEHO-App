@@ -30,8 +30,9 @@ export function resolveAsset(path) {
   if (/^(https?:)?\/\//i.test(value)) {
     try {
       const parsed = new URL(value, window.location.origin)
-      if (/\/uploads\//i.test(parsed.pathname)) {
-        return `${origin}${parsed.pathname}${parsed.search}${parsed.hash}`
+      const normalizedPath = parsed.pathname.replace(/^\/api\/v\d+(?=\/uploads\/)/i, '')
+      if (/^\/uploads\//i.test(normalizedPath)) {
+        return `${origin}${normalizedPath}${parsed.search}${parsed.hash}`
       }
     } catch {
       return value
@@ -39,7 +40,8 @@ export function resolveAsset(path) {
     return value
   }
   if (/^(data|blob):/i.test(value)) return value
-  if (value.startsWith('/')) return `${origin}${value}`
-  if (/^(assets|uploads)\//i.test(value)) return `${origin}/${value}`
+  const normalizedValue = value.replace(/^\/?api\/v\d+(?=\/uploads\/)/i, '')
+  if (normalizedValue.startsWith('/')) return `${origin}${normalizedValue}`
+  if (/^(assets|uploads)\//i.test(normalizedValue)) return `${origin}/${normalizedValue}`
   return value
 }
