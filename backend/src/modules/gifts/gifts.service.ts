@@ -1692,7 +1692,28 @@ export class GiftsService implements OnModuleInit {
   }
 
   async giftPolicy() {
-    return { selfGiftAllowed: !(await this.isSelfGiftBlocked()) };
+    const [selfGiftAllowed, cannonRow] = await Promise.all([
+      this.isSelfGiftBlocked().then((blocked) => !blocked),
+      this.settingsRepo.findOne({ where: { key: 'lucky_gift_cannon_config' } }).catch(() => null),
+    ]);
+    const defaults = { enabled: true, durationSeconds: 2, soundEnabled: true };
+    let cannon = defaults;
+    try {
+      if (cannonRow?.value) {
+        const parsed = JSON.parse(cannonRow.value);
+        cannon = {
+          enabled: parsed.enabled !== false,
+          durationSeconds: Math.max(1, Math.min(10, Math.floor(Number(parsed.durationSeconds) || 2))),
+          soundEnabled: parsed.soundEnabled !== false,
+        };
+      }
+    } catch {}
+    return {
+      selfGiftAllowed,
+      luckyCannonEnabled: cannon.enabled,
+      luckyCannonDurationSeconds: cannon.durationSeconds,
+      luckyCannonSoundEnabled: cannon.soundEnabled,
+    };
   }
 
   private async isSelfGiftBlocked(): Promise<boolean> {
