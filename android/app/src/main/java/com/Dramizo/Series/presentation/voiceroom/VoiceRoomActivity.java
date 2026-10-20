@@ -3623,6 +3623,143 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return true;
     }
 
+    private int luckyCannonDp(float value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void setupLuckyCannonUi() {
+        if (!(binding.getRoot() instanceof ConstraintLayout root)) return;
+        FrameLayout layer = new FrameLayout(this);
+        layer.setClipChildren(false);
+        layer.setClipToPadding(false);
+        layer.setClickable(false);
+        layer.setFocusable(false);
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
+                luckyCannonDp(76), luckyCannonDp(76));
+        lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
+        lp.setMarginEnd(luckyCannonDp(8));
+        root.addView(layer, lp);
+        com.Dramizo.Series.util.LuckyCannonView cannon =
+                new com.Dramizo.Series.util.LuckyCannonView(this);
+        FrameLayout.LayoutParams cannonLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        cannonLp.gravity = Gravity.CENTER;
+        layer.addView(cannon, cannonLp);
+        layer.setElevation(luckyCannonDp(42));
+        layer.setVisibility(View.GONE);
+        cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        luckyCannonLayer = layer;
+        luckyCannonView = cannon;
+    }
+
+    /** Called only after the existing gift endpoint confirms a successful lucky gift send. */
+    public void armLuckyGiftCannon(@Nullable String giftId, @Nullable String giftIcon,
+                                   @Nullable String giftName, int unitPrice, int quantity,
+                                   @Nullable List<String> targetIds) {
+        if (!luckyCannonEnabled || isFinishing() || isDestroyed()
+                || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
+        luckyCannonGiftId = giftId;
+        luckyCannonGiftIcon = giftIcon;
+        luckyCannonGiftName = giftName;
+        luckyCannonGiftPrice = Math.max(0, unitPrice);
+        luckyCannonGiftQuantity = Math.max(1, Math.min(177, quantity));
+        luckyCannonTargets.clear();
+        for (String id : targetIds) {
+            if (id != null && !id.isEmpty() && !luckyCannonTargets.contains(id)) luckyCannonTargets.add(id);
+        }
+        if (luckyCannonTargets.isEmpty()) return;
+        showLuckyCannonAndScheduleHide();
+    }
+
+    private void showLuckyCannonAndScheduleHide() {
+        if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonLayer.setAlpha(1f);
+        hideLuckyCannonRunnable = this::hideLuckyCannon;
+        handler.postDelayed(hideLuckyCannonRunnable, Math.max(1, luckyCannonDurationSeconds) * 1000L);
+    }
+
+    private void hideLuckyCannon() {
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        hideLuckyCannonRunnable = null;
+        if (luckyCannonLayer != null) luckyCannonLayer.setVisibility(View.GONE);
+        if (!luckyCannonSending) {
+            luckyCannonGiftId = null;
+            luckyCannonTargets.clear();
+        }
+    }
+
+    private void sendLuckyCannonGift() {
+        if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
+                || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
+        final AppContainer container;
+        try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
+        final String giftId = luckyCannonGiftId;
+        final String icon = luckyCannonGiftIcon;
+        final int quantity = luckyCannonGiftQuantity;
+        final List<String> targets = new ArrayList<>(luckyCannonTargets);
+        final String currentRoom = roomId;
+        luckyCannonSending = true;
+        if (luckyCannonView != null) luckyCannonView.setEnabled(false);
+        container.getIoExecutor().execute(() -> {
+            Result<GiftDtos.SendGiftResult> result;
+            if (targets.size() > 1) {
+                result = ApiCall.execute(container.getGiftApi().sendAllMic(
+                        new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1)));
+            } else {
+                result = ApiCall.execute(container.getGiftApi().send(
+                        new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1)));
+            }
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                luckyCannonSending = false;
+                if (luckyCannonView != null) luckyCannonView.setEnabled(true);
+                if (!result.success || result.data == null || !result.data.success) {
+                    BalanceRedirect.handle(VoiceRoomActivity.this,
+                            result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
+                    return;
+                }
+                if (luckyCannonView != null) luckyCannonView.fire();
+                if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(VoiceRoomActivity.this, 1);
+                playLuckyCannonFlights(icon, targets);
+                showLuckyCannonAndScheduleHide();
+            });
+        });
+    }
+
+    private void playLuckyCannonFlights(@Nullable String icon, @NonNull List<String> targets) {
+        if (binding == null || binding.giftOverlay == null || luckyCannonView == null) return;
+        int[] cannonLoc = new int[2];
+        int[] overlayLoc = new int[2];
+        luckyCannonView.getLocationOnScreen(cannonLoc);
+        binding.giftOverlay.getLocationOnScreen(overlayLoc);
+        PointF from = new PointF(
+                cannonLoc[0] - overlayLoc[0] + luckyCannonView.getWidth() * 0.5f,
+                cannonLoc[1] - overlayLoc[1] + luckyCannonView.getHeight() * 0.5f);
+        boolean animated = false;
+        for (int i = 0; i < binding.recyclerSeats.getChildCount(); i++) {
+            View child = binding.recyclerSeats.getChildAt(i);
+            int position = binding.recyclerSeats.getChildAdapterPosition(child);
+            String uid = seatAdapter != null ? seatAdapter.getUserIdAtPosition(position) : null;
+            if (uid == null || !targets.contains(uid)) continue;
+            int[] seatLoc = new int[2];
+            child.getLocationOnScreen(seatLoc);
+            PointF to = new PointF(
+                    seatLoc[0] - overlayLoc[0] + child.getWidth() * 0.5f,
+                    seatLoc[1] - overlayLoc[1] + child.getHeight() * 0.5f);
+            GiftFlyAnimator.fly(binding.giftOverlay, icon, from, to, () -> {});
+            animated = true;
+        }
+        if (!animated) {
+            playLuckyGiftStage(icon, targets,
+                    (long) Math.max(0, luckyCannonGiftPrice) * Math.max(1, luckyCannonGiftQuantity) * targets.size(),
+                    luckyCannonGiftQuantity, targets.size(), null);
+        }
+    }
+
     /** Highlight occupied seats matching gift recipients while the gift sheet is open. */
     public void setGiftSeatSelection(@Nullable java.util.Collection<String> userIds) {
         if (seatAdapter == null) return;
