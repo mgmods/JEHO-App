@@ -148,6 +148,7 @@ const sections = computed(() => [
       { name: 'tasks', icon: 'bi-list-check', label: t('nav.tasks') },
       { name: 'host-target', icon: 'bi-bullseye', label: t('nav.hostTarget') },
       { name: 'contests', icon: 'bi-lightning-charge-fill', label: 'تحديات PK بين الرومات' },
+      { name: 'moments', icon: 'bi-images', label: 'إدارة اللحظات' },
       { name: 'ranking', icon: 'bi-bar-chart', label: t('nav.ranking') },
       { name: 'room-cup', icon: 'bi-trophy-fill', label: t('nav.roomCup') },
     ],
