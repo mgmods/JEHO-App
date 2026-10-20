@@ -29,6 +29,7 @@ import com.Dramizo.Series.data.remote.api.UploadApi;
 import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
+import com.Dramizo.Series.util.AvatarCosmetics;
 import com.bumptech.glide.Glide;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -54,6 +55,7 @@ public class HomeMomentsFragment extends Fragment {
     private TextView privacySelector, imageStatus, loading;
     private ProgressBar publishProgress;
     private Button publishButton, imagePickerButton;
+    private AlertDialog composerDialog;
     private ImageView selectedPreview;
     private View selectedImagePanel;
     private int selectedVisibility = 0;
@@ -178,7 +180,39 @@ public class HomeMomentsFragment extends Fragment {
         publishLp.topMargin = dp(6);
         composerCard.addView(publishButton, publishLp);
         root.addView(composerCard, matchWrap());
+        composerCard.setVisibility(View.GONE);
+        Button openComposerButton = button("＋  نشر لحظة");
+        styleButton(openComposerButton, 0xFFB70F52, 0xFFFFFFFF, dp(20));
+        openComposerButton.setTextSize(13);
+        LinearLayout.LayoutParams openComposerLp = new LinearLayout.LayoutParams(-2, dp(42));
+        openComposerLp.gravity = Gravity.END;
+        openComposerLp.topMargin = dp(8);
+        openComposerLp.bottomMargin = dp(4);
+        root.addView(openComposerButton, openComposerLp);
+        openComposerButton.setOnClickListener(v -> {
+            if (composerDialog != null && composerDialog.isShowing()) return;
+            if (composerCard.getParent() instanceof ViewGroup) {
+                ((ViewGroup) composerCard.getParent()).removeView(composerCard);
+            }
+            composerCard.setVisibility(View.VISIBLE);
+            composerDialog = new AlertDialog.Builder(requireContext())
+                    .setTitle("إنشاء لحظة")
+                    .setView(composerCard)
+                    .setNegativeButton("إغلاق", null)
+                    .create();
+            composerDialog.setOnDismissListener(d -> {
+                composerCard.setVisibility(View.GONE);
+                if (isAdded() && composerCard.getParent() == null) {
+                    root.addView(composerCard, Math.min(1, root.getChildCount()), matchWrap());
+                }
+                openComposerButton.setVisibility(profileUserId == null || profileUserId.trim().isEmpty()
+                        ? View.VISIBLE : View.GONE);
+            });
+            openComposerButton.setVisibility(View.GONE);
+            composerDialog.show();
+        });
         if (profileUserId != null && !profileUserId.trim().isEmpty()) {
+            openComposerButton.setVisibility(View.GONE);
             heading.setText("لحظاتي");
             sub.setText("المنشورات التي يسمح صاحب الحساب بعرضها");
             composerCard.setVisibility(View.GONE);
@@ -261,6 +295,7 @@ public class HomeMomentsFragment extends Fragment {
                     setComposerEnabled(true);
                     Toast.makeText(requireContext(), "تم نشر اللحظة مع الصورة بنجاح", Toast.LENGTH_SHORT).show();
                     busy = false;
+                    if (composerDialog != null && composerDialog.isShowing()) composerDialog.dismiss();
                     loadFeed();
                 });
             } catch (Exception e) {
@@ -331,8 +366,11 @@ public class HomeMomentsFragment extends Fragment {
             LinearLayout authorRow = new LinearLayout(requireContext());
             authorRow.setOrientation(LinearLayout.HORIZONTAL);
             authorRow.setGravity(Gravity.CENTER_VERTICAL);
+            FrameLayout avatarStack = new FrameLayout(requireContext());
+            avatarStack.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
             ImageView avatar = new ImageView(requireContext());
-            avatar.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
+            FrameLayout.LayoutParams avatarLp = new FrameLayout.LayoutParams(dp(38), dp(38), Gravity.CENTER);
+            avatar.setLayoutParams(avatarLp);
             avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
             avatar.setBackground(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
             avatar.setClipToOutline(true);
@@ -340,6 +378,15 @@ public class HomeMomentsFragment extends Fragment {
             if (!avatarUrl.isEmpty()) Glide.with(this).load(avatarUrl).circleCrop()
                 .placeholder(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22))).into(avatar);
             else avatar.setImageDrawable(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
+            ImageView avatarFrame = new ImageView(requireContext());
+            avatarFrame.setLayoutParams(new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
+            avatarFrame.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            String frameUrl = string(post, "frameUrl");
+            if (frameUrl.isEmpty()) frameUrl = string(post, "avatarFrameUrl");
+            if (frameUrl.isEmpty()) frameUrl = string(post, "equippedFrameUrl");
+            AvatarCosmetics.bindStacked(avatar, avatarFrame, avatarUrl, frameUrl);
+            avatarStack.addView(avatar);
+            avatarStack.addView(avatarFrame);
             LinearLayout authorInfo = new LinearLayout(requireContext());
             authorInfo.setOrientation(LinearLayout.VERTICAL);
             authorInfo.setPadding(dp(10), 0, 0, 0);
@@ -353,7 +400,7 @@ public class HomeMomentsFragment extends Fragment {
             authorMeta.setPadding(0, dp(3), 0, 0);
             authorInfo.addView(author, matchWrap());
             authorInfo.addView(authorMeta, matchWrap());
-            authorRow.addView(avatar);
+            authorRow.addView(avatarStack);
             authorRow.addView(authorInfo, new LinearLayout.LayoutParams(0, -2, 1));
             Button followTop = button("＋ متابعة");
             styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(18));
@@ -379,7 +426,7 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(250)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(176)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
@@ -390,7 +437,7 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(250));
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(176));
                 photoLp.topMargin = dp(4);
                 photoLp.bottomMargin = dp(10);
                 item.addView(photo, photoLp);
