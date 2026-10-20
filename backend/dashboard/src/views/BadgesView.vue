@@ -6,7 +6,7 @@
       <h5 class="mb-3">{{ editingId ? 'تعديل شارة' : 'إضافة شارة جديدة' }}</h5>
       <form class="row g-3" @submit.prevent="save">
         <div class="col-md-4"><label class="form-label">اسم الشارة</label><input v-model.trim="form.name" class="form-control" maxlength="80" required /></div>
-        <div class="col-md-5"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /></div>
+        <div class="col-md-5"><label class="form-label">رابط صورة الشارة</label><input v-model.trim="form.imageUrl" class="form-control" maxlength="512" placeholder="https://... أو ارفع صورة" required /><img v-if="form.imageUrl" :src="resolveAsset(form.imageUrl)" alt="معاينة الشارة" style="display:block;width:64px;height:64px;object-fit:contain;margin-top:8px" /></div>
         <div class="col-md-3"><label class="form-label">رفع صورة من الجهاز</label><input class="form-control" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" :disabled="uploadingImage" @change="uploadImage" /><small v-if="uploadingImage" class="text-muted">جارٍ رفع الصورة…</small></div>
         <div class="col-md-6"><label class="form-label">الوصف</label><input v-model.trim="form.description" class="form-control" maxlength="500" /></div>
         <div class="col-md-2"><label class="form-label">الفئة</label><input v-model.trim="form.category" class="form-control" /></div>
@@ -30,7 +30,7 @@
     </div>
     <div class="glass p-0 overflow-hidden">
       <div class="table-responsive"><table class="table align-middle mb-0"><thead><tr><th>الشارة</th><th>الوصف</th><th>الفئة</th><th>الحالة</th><th>الإجراءات</th></tr></thead>
-      <tbody><tr v-for="b in badges" :key="b.id"><td><div class="d-flex align-items-center gap-2"><img :src="b.imageUrl" alt="" style="width:42px;height:42px;object-fit:contain" /><strong>{{ b.name }}</strong></div></td><td>{{ b.description || '—' }}</td><td>{{ b.category }}</td><td>{{ b.isActive ? 'مفعلة' : 'مخفية' }}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-2" @click="edit(b)">تعديل</button><button class="btn btn-sm btn-outline-danger" @click="remove(b)">حذف</button></td></tr><tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد شارات بعد. أضف أول شارة أعلاه.</td></tr></tbody></table></div>
+      <tbody><tr v-for="b in badges" :key="b.id"><td><div class="d-flex align-items-center gap-2"><img :src="resolveAsset(b.imageUrl)" alt="" style="width:42px;height:42px;object-fit:contain" /><strong>{{ b.name }}</strong></div></td><td>{{ b.description || '—' }}</td><td>{{ b.category }}</td><td>{{ b.isActive ? 'مفعلة' : 'مخفية' }}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary me-2" @click="edit(b)">تعديل</button><button class="btn btn-sm btn-outline-danger" @click="remove(b)">حذف</button></td></tr><tr v-if="!loading && !badges.length"><td colspan="5" class="text-center p-4">لا توجد شارات بعد. أضف أول شارة أعلاه.</td></tr></tbody></table></div>
     </div>
   </div>
 </template>
@@ -38,6 +38,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { badgesApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 
 const badges = ref([])
 const loading = ref(false)
@@ -65,7 +66,7 @@ async function uploadImage(event) {
     const response = await uploadsApi.upload(file)
     const payload = response?.data?.data ?? response?.data ?? {}
     if (!payload.url) throw new Error('لم يُرجع الخادم رابط الصورة.')
-    form.imageUrl = payload.url
+    form.imageUrl = resolveAsset(payload.url)
   } catch (e) {
     error.value = e?.response?.data?.message || e?.message || 'تعذر رفع صورة الشارة.'
   } finally {
