@@ -2658,7 +2658,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     (seatRef.isMuted || seatRef.isModeratorMuted) ? "فك كتم المايك" : "كتم المايك");
         }
         if ((canManageSeats || canKickUsers) && canTarget && seatRef != null) {
-            menu.getMenu().add(0, i++, 0, "إنزال من المايك");
+            menu.getMenu().add(0, i++, 0, "إزالة من المايك");
         }
         if ((canKickUsers || canBanUsers) && canTarget) {
             menu.getMenu().add(0, i++, 0, "طرد / إخراج");
@@ -2701,8 +2701,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     boolean currentlyMuted = seatRef.isMuted || seatRef.isModeratorMuted;
                     viewModel.setMic(roomId, !currentlyMuted, userId);
                 }
-            } else if ("إنزال من المايك".equals(t)) {
-                if (userId != null) viewModel.forceLeaveSeat(roomId, userId);
+            } else if ("إزالة من المايك".equals(t)) {
+                if (userId != null) viewModel.removeMemberFromMic(roomId, userId);
             } else if ("طرد / إخراج".equals(t)) {
                 showKickAndBanDialog(userId);
             } else if ("ترجمة التعليق".equals(t)) {
