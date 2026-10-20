@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
 import {
@@ -31,6 +32,7 @@ export class ContestsService implements OnModuleInit {
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(WalletTransaction)
@@ -39,6 +41,52 @@ export class ContestsService implements OnModuleInit {
     private readonly cosmetics: CosmeticsService,
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
+
+  private roomPkEnabledCache: { value: boolean; checkedAt: number } | null = null;
+
+  /** Dashboard-controlled kill switch. Cached briefly to avoid a settings DB read per gift. */
+  private async isRoomPkEnabled(): Promise<boolean> {
+    const now = Date.now();
+    if (this.roomPkEnabledCache && now - this.roomPkEnabledCache.checkedAt < 1500) {
+      return this.roomPkEnabledCache.value;
+    }
+    try {
+      const setting = await this.settingsRepo.findOne({ where: { key: 'features.room_pk_enabled' } });
+      const raw = String(setting?.value ?? 'false').trim().toLowerCase();
+      const value = ['1', 'true', 'yes', 'on'].includes(raw);
+      this.roomPkEnabledCache = { value, checkedAt: now };
+      return value;
+    } catch {
+      // Fail closed during DB/config errors: PK must not add load during an incident.
+      this.roomPkEnabledCache = { value: false, checkedAt: now };
+      return false;
+    }
+  }
+
+  private isTeamChallenge(contest: Pick<Contest, 'challengeType'>): boolean {
+    return contest.challengeType === 'room_vs_room' || contest.challengeType === 'agency_vs_agency';
+  }
+
+  private emitTeamChallengeEnded(contest: Contest) {
+    if (!this.realtime || contest.challengeType !== 'room_vs_room') return;
+    const sideA = (contest.sideA || {}) as Record<string, unknown>;
+    const sideB = (contest.sideB || {}) as Record<string, unknown>;
+    const scoreA = Math.max(0, Number(sideA.score || 0));
+    const scoreB = Math.max(0, Number(sideB.score || 0));
+    const winner = scoreA === scoreB ? 'draw' : scoreA > scoreB ? 'sideA' : 'sideB';
+    const roomIds = [...new Set([
+      ...(Array.isArray(sideA.roomIds) ? sideA.roomIds.map(String) : []),
+      ...(Array.isArray(sideB.roomIds) ? sideB.roomIds.map(String) : []),
+    ].filter(Boolean))];
+    for (const roomId of roomIds) {
+      this.realtime.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'contest:team-ended',
+        payload: { contestId: contest.id, title: contest.title, sideA: contest.sideA, sideB: contest.sideB, winner, scoreA, scoreB },
+        at: new Date().toISOString(),
+      });
+    }
+  }
 
   async onModuleInit() {
     // Additive migration only: retain existing contests and all user data.
@@ -119,7 +167,9 @@ export class ContestsService implements OnModuleInit {
         empty: '',
       });
     }
-    const items = await qb.getMany();
+    let items = await qb.getMany();
+    // Hide team-vs-team challenges from every client while the dashboard kill switch is off.
+    if (!(await this.isRoomPkEnabled())) items = items.filter((c) => !this.isTeamChallenge(c));
     let joined = new Set<string>();
     if (userId) {
       const mine = await this.entriesRepo.find({ where: { userId } });
@@ -136,6 +186,9 @@ export class ContestsService implements OnModuleInit {
   async get(id: string, userId?: string) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled())) {
+      throw new NotFoundException('تحديات PK متوقفة حالياً');
+    }
     const entries = await this.entriesRepo.find({
       where: { contestId: id },
       order: { score: 'DESC', joinedAt: 'ASC' },
@@ -180,6 +233,9 @@ export class ContestsService implements OnModuleInit {
         lock: { mode: 'pessimistic_write' },
       });
       if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+      if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled())) {
+        throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
+      }
       if (contest.status !== 'active') {
         throw new BadRequestException('المسابقة غير مفتوحة للانضمام');
       }
@@ -279,7 +335,8 @@ export class ContestsService implements OnModuleInit {
       // Team-vs-team challenges keep side totals on the configured challenge
       // record; no user-provided room/agency IDs are trusted without matching
       // the dashboard's explicit side membership lists.
-      if (c.challengeType === 'room_vs_room' || c.challengeType === 'agency_vs_agency') {
+      if (this.isTeamChallenge(c)) {
+        if (!(await this.isRoomPkEnabled())) continue;
         const isRoomBattle = c.challengeType === 'room_vs_room';
         const key = isRoomBattle ? 'roomIds' : 'agencyIds';
         const candidate = isRoomBattle ? context.roomId : context.agencyId;
@@ -288,26 +345,43 @@ export class ContestsService implements OnModuleInit {
         const sideBIds = Array.isArray((c.sideB as any)?.[key]) ? (c.sideB as any)[key].map(String) : [];
         const sideKey = sideAIds.includes(String(candidate)) ? 'sideA' : sideBIds.includes(String(candidate)) ? 'sideB' : null;
         if (!sideKey) continue;
-        const side = { ...((c[sideKey] as Record<string, unknown> | null) || {}) };
-        side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
-        (c as any)[sideKey] = side;
-        await this.contestsRepo.save(c);
+
+        // Serialize concurrent gifts for the same contest so simultaneous sends cannot overwrite scores.
+        const updated = await this.dataSource.transaction(async (manager) => {
+          const locked = await manager.findOne(Contest, {
+            where: { id: c.id },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!locked) return null;
+          const side = { ...(((locked as any)[sideKey] as Record<string, unknown> | null) || {}) };
+          side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
+          (locked as any)[sideKey] = side;
+          return manager.save(locked);
+        });
+        if (!updated) continue;
+
         const payload = {
-          contestId: c.id,
-          challengeType: c.challengeType,
-          sideA: c.sideA,
-          sideB: c.sideB,
+          contestId: updated.id,
+          challengeType: updated.challengeType,
+          sideA: updated.sideA,
+          sideB: updated.sideB,
           delta: scoreDelta,
           roomId: context.roomId || null,
           agencyId: context.agencyId || null,
           at: occurredAt.toISOString(),
         };
-        if (context.roomId) this.realtime?.emitToRoom(context.roomId, 'room:event', {
-          roomId: context.roomId,
-          event: 'contest:team-score',
-          payload,
-          at: payload.at,
-        });
+        // A room-vs-room score must fan out to both competing rooms, not only the sender's room.
+        const targetRoomIds = isRoomBattle
+          ? [...new Set([...sideAIds, ...sideBIds])]
+          : (context.roomId ? [context.roomId] : []);
+        for (const targetRoomId of targetRoomIds) {
+          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+            roomId: targetRoomId,
+            event: 'contest:team-score',
+            payload: { ...payload, roomId: targetRoomId },
+            at: payload.at,
+          });
+        }
         continue;
       }
       const entry = await this.entriesRepo.findOne({
@@ -568,6 +642,8 @@ export class ContestsService implements OnModuleInit {
 
   /** Pay top entrant prizeCoins + temporary contest badge (idempotent). */
   private async settlePrizes(contest: Contest) {
+    // Team challenge rewards are not individual contest-entry prizes.
+    if (this.isTeamChallenge(contest)) return;
     const prize = Math.max(0, Math.floor(Number(contest.prizeCoins) || 0));
     let winnerId: string | null = null;
 
@@ -728,7 +804,8 @@ export class ContestsService implements OnModuleInit {
         c.status = next;
         await this.contestsRepo.save(c);
         if (wasActive && next === 'ended') {
-          await this.settlePrizes(c);
+          if (this.isTeamChallenge(c)) this.emitTeamChallengeEnded(c);
+          else await this.settlePrizes(c);
         }
       }
     }
