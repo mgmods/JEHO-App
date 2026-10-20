@@ -55,7 +55,7 @@ public class RankingAdapter extends RecyclerView.Adapter<RankingAdapter.VH> {
                     ? entry.user.displayName : entry.user.username);
             AvatarCosmetics.bindWear(holder.b.imgAvatar, holder.b.imgFrame, entry.user);
             holder.b.tvSubtitle.setText("Lv." + Math.max(1, entry.user.level)
-                    + (entry.user.displayPublicId().isEmpty() ? "" : " · ID " + entry.user.displayPublicId()));
+                    + (entry.user.displayPublicId().isEmpty() ? "" : " · " + entry.user.displayPublicId()));
         } else {
             String name = entry.targetName != null ? entry.targetName
                     : (entry.userId != null ? entry.userId : entry.targetId);
