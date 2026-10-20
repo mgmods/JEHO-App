@@ -126,7 +126,7 @@ public class HomeMomentsFragment extends Fragment {
         selectedPreview = new ImageView(requireContext());
         selectedPreview.setScaleType(ImageView.ScaleType.CENTER_CROP);
         ((LinearLayout) selectedImagePanel).addView(selectedPreview,
-                new LinearLayout.LayoutParams(-1, dp(180)));
+                new LinearLayout.LayoutParams(-1, dp(140)));
         Button removePhoto = button("إزالة الصورة  ×");
         styleButton(removePhoto, 0xFFFFF0F4, 0xFFB70F52, dp(12));
         removePhoto.setOnClickListener(v -> clearSelectedImage());
@@ -379,7 +379,7 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(250)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(160)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
@@ -390,7 +390,7 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(250));
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(160));
                 photoLp.topMargin = dp(4);
                 photoLp.bottomMargin = dp(10);
                 item.addView(photo, photoLp);
@@ -452,14 +452,14 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(138)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(96)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 Glide.with(this).load(image).into(photo);
                 tile.addView(photo);
             } else {
                 TextView preview = text(string(post, "body"), 13, 0xFF33333A, false);
                 preview.setMaxLines(5);
-                tile.addView(preview, new LinearLayout.LayoutParams(-1, dp(138)));
+                tile.addView(preview, new LinearLayout.LayoutParams(-1, dp(96)));
             }
             tile.addView(text("♡ " + number(post.get("likeCount")), 12, 0xFFB9164B, true));
             tile.setOnClickListener(v -> showMomentDetails(post));
