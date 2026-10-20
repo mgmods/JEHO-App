@@ -173,6 +173,12 @@ export const rechargeAgentsApi = {
   updatePricing: (data) => safeRequest(() => api.patch('/admin/recharge-agent-pricing', data)),
 }
 
+export const momentsAdminApi = {
+  list: (params = {}) => safeRequest(() => api.get('/admin/moments', { params })),
+  remove: (id) => safeRequest(() => api.delete(`/admin/moments/${id}`)),
+  removeAll: () => safeRequest(() => api.delete('/admin/moments')),
+}
+
 export const reportsApi = {
   list: (params) => safeRequest(() => api.get('/admin/reports', { params })),
   get: (id) => safeRequest(() => api.get(`/admin/reports/${id}`)),
