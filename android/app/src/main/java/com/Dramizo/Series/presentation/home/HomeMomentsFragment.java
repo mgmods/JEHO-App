@@ -576,7 +576,10 @@ public class HomeMomentsFragment extends Fragment {
             preview.setMaxLines(3);
             postPreview.addView(preview, matchWrap());
         }
-        page.addView(postPreview, withMargins(matchWrap(), 0, dp(8), 0, dp(8)));
+        LinearLayout.LayoutParams postPreviewLp = matchWrap();
+        postPreviewLp.topMargin = dp(8);
+        postPreviewLp.bottomMargin = dp(8);
+        page.addView(postPreview, postPreviewLp);
 
         ScrollView scroll = new ScrollView(requireContext());
         scroll.setFillViewport(false);
