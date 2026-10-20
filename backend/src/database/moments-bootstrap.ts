@@ -12,7 +12,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
   }
   // Extend the existing shared reports enum additively so moment reports appear in the admin Reports page.
   await dataSource.query(`
-    DO $
+    DO $$
     DECLARE enum_name text;
     BEGIN
       SELECT t.typname INTO enum_name
@@ -26,7 +26,7 @@ export async function ensureMomentsTables(dataSource: DataSource): Promise<void>
       IF enum_name IS NOT NULL THEN
         EXECUTE format('ALTER TYPE %I.%I ADD VALUE IF NOT EXISTS %L', 'jeho_own', enum_name, 'moment');
       END IF;
-    END $;
+    END $$;
   `);
   await dataSource.transaction(async (manager) => {
     await manager.query(`
