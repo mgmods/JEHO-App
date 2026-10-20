@@ -94,7 +94,8 @@
     "settings": "الإعدادات العامة",
     "logs": "السجلات",
     "policyBrochure": "سياسة المنصة PDF",
-    "cpSettings": "إعدادات علاقات CP"
+    "cpSettings": "إعدادات علاقات CP",
+    "mysteriousMan": "الرجل الغامض"
   },
   "routes": {
     "login": "تسجيل الدخول",
@@ -102,7 +103,6 @@
     "users": "المستخدمون",
     "conversations": "جميع المحادثات",
     "userDetail": "تفاصيل المستخدم",
-    "conversations": "جميع المحادثات",
     "rooms": "الغرف",
     "streams": "البث المباشر",
     "gifts": "الهدايا",
@@ -134,7 +134,7 @@
     "genderVerifications": "تحقق المضيفات",
     "notifications": "الإشعارات",
     "cpSettings": "إعدادات علاقات CP",
-  "settings": "الإعدادات",
+    "settings": "الإعدادات",
     "logs": "السجلات",
     "policyBrochure": "سياسة المنصة PDF"
   },
@@ -770,7 +770,6 @@
     "imageUrl": "رابط الصورة",
     "link": "الرابط",
     "noData": "لا توجد بيانات بعد",
-    "saved": "تم الحفظ بنجاح",
     "deleted": "تم الحذف بنجاح",
     "failedLoad": "فشل التحميل",
     "untitled": "بدون عنوان",
