@@ -9799,18 +9799,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         container.getIoExecutor().execute(() -> {
             Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
             boolean allowed = false;
+            boolean cannonEnabled = false;
+            boolean cannonSound = true;
+            int cannonDuration = 2;
             if (result.success && result.data != null) {
                 Object value = result.data.get("selfGiftAllowed");
                 allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
                         || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
+                Object ce = result.data.get("luckyCannonEnabled");
+                cannonEnabled = Boolean.TRUE.equals(ce) || "true".equalsIgnoreCase(String.valueOf(ce)) || "1".equals(String.valueOf(ce));
+                Object cs = result.data.get("luckyCannonSoundEnabled");
+                cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
+                Object cd = result.data.get("luckyCannonDurationSeconds");
+                try { cannonDuration = Math.max(1, Math.min(10, Integer.parseInt(String.valueOf(cd)))); } catch (Exception ignored) { cannonDuration = 2; }
             }
             final boolean next = allowed;
+            final boolean nextCannonEnabled = cannonEnabled;
+            final boolean nextCannonSound = cannonSound;
+            final int nextCannonDuration = cannonDuration;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 if (selfGiftAllowed != next) {
                     selfGiftAllowed = next;
                     notifyGiftSheetRecipientsChanged();
                 }
+                luckyCannonEnabled = nextCannonEnabled;
+                luckyCannonSoundEnabled = nextCannonSound;
+                luckyCannonDurationSeconds = nextCannonDuration;
+                if (!luckyCannonEnabled) hideLuckyCannon();
             });
         });
     }
