@@ -50,6 +50,7 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UsersService } from '../users/users.service';
 import { GiftsService } from '../gifts/gifts.service';
+import { invalidateRoomPkEnabledCache } from '../contests/room-pk-feature';
 import { AgenciesService } from '../agencies/agencies.service';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { paginate, PaginationDto } from '../../common/dto/pagination.dto';
@@ -2406,6 +2407,14 @@ export class AdminService {
       if (description) setting.description = description;
     }
     const saved = await this.settingsRepo.save(setting);
+    if (key === 'features.room_pk_enabled') {
+      invalidateRoomPkEnabledCache();
+      const raw = String(nextValue || '').trim().toLowerCase();
+      this.realtimeGateway.emitToAll('contest:pk-status', {
+        enabled: ['1', 'true', 'yes', 'on'].includes(raw),
+        at: new Date().toISOString(),
+      });
+    }
     // New covers / catalog → force clients to drop Glide disk cache.
     if (key === 'app_games') {
       await this.bumpMediaAssetEpoch();

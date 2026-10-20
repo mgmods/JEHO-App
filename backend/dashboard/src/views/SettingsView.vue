@@ -460,6 +460,13 @@
               <h3 class="settings-card-title">{{ t('settings.appFeatures') }}</h3>
               <label class="settings-switch">
                 <div>
+                  <div class="settings-switch-title">تحديات PK بين الرومات</div>
+                  <div class="settings-switch-hint">عند الإيقاف تختفي تحديات PK من التطبيق ويتوقف احتساب نقاطها. يتطبق التغيير تلقائياً على الجميع خلال ثوانٍ، ويمكن استخدامه لإيقاف الميزة وقت ضغط السيرفر.</div>
+                </div>
+                <input v-model="form.roomPkEnabled" class="form-check-input" type="checkbox" role="switch" />
+              </label>
+              <label class="settings-switch">
+                <div>
                   <div class="settings-switch-title">{{ t('settings.luckyBoxesEnabled') }}</div>
                   <div class="settings-switch-hint">{{ t('settings.luckyBoxesHint') }}</div>
                 </div>
@@ -955,6 +962,7 @@ const form = reactive({
   gameWinRewardCoins: 100,
   selfGiftAllowed: false,
   luckyBoxEnabled: true,
+  roomPkEnabled: false,
   femaleOnlyVoiceHosts: false,
   genderVerificationAutoAccept: true,
   micWithoutHostApproval: true,
@@ -1070,6 +1078,7 @@ async function load() {
       !form.selfGiftAllowed,
     ),
     luckyBoxEnabled: bool(map['lucky_box.enabled'] ?? map.luckyBoxEnabled, form.luckyBoxEnabled),
+    roomPkEnabled: bool(map['features.room_pk_enabled'] ?? map.roomPkEnabled, form.roomPkEnabled),
     femaleOnlyVoiceHosts: bool(
       map['features.female_only_voice_hosts'] ?? map.femaleOnlyVoiceHosts,
       form.femaleOnlyVoiceHosts,
@@ -1150,6 +1159,7 @@ async function save() {
     'games.win_reward_coins': String(form.gameWinRewardCoins ?? 100),
     'economy.self_gift_blocked': String(!form.selfGiftAllowed),
     'lucky_box.enabled': String(!!form.luckyBoxEnabled),
+    'features.room_pk_enabled': String(!!form.roomPkEnabled),
     'features.female_only_voice_hosts': String(!!form.femaleOnlyVoiceHosts),
     'gender_verification.auto_accept': String(!!form.genderVerificationAutoAccept),
     'rooms.mic_without_host_approval': String(!!form.micWithoutHostApproval),

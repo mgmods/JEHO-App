@@ -159,6 +159,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean pendingSeatInviteDialog;
 
     private ActivityVoiceRoomBinding binding;
+    @Nullable private TextView roomPkScoreBanner;
+    private final Runnable hideRoomPkScoreBanner = () -> {
+        if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+    };
     private VoiceRoomViewModel viewModel;
     private SeatAdapter seatAdapter;
     @Nullable private RelationshipSeatEffectsOverlay relationshipSeatEffectsOverlay;
@@ -11871,7 +11875,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             moderationUserListener = new RealtimeClient.UserListener() {
                 @Override
                 public void onUserEvent(String event, JsonObject payload) {
-                    if (payload == null || event == null) return;
+                    if (event == null) return;
+                    if ("contest:pk-status".equals(event)) {
+                        boolean enabled = payload != null && payload.has("enabled")
+                                && !payload.get("enabled").isJsonNull()
+                                && payload.get("enabled").getAsBoolean();
+                        if (!enabled) handler.post(() -> {
+                            handler.removeCallbacks(hideRoomPkScoreBanner);
+                            if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                        });
+                        return;
+                    }
+                    if (payload == null) return;
                     String rid = payload.has("roomId") && !payload.get("roomId").isJsonNull()
                             ? payload.get("roomId").getAsString() : null;
                     if (roomId == null || rid == null || !roomId.equals(rid)) return;
@@ -12087,9 +12102,61 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return o.optDouble(key, fallback);
     }
 
+    private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
+        if (payload == null || binding == null) return;
+        JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
+                ? payload.getAsJsonObject("sideA") : new JsonObject();
+        JsonObject sideB = payload.has("sideB") && payload.get("sideB").isJsonObject()
+                ? payload.getAsJsonObject("sideB") : new JsonObject();
+        String nameA = firstNonEmpty(memberStr(sideA, "name"), "الروم الأول");
+        String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الثاني");
+        long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
+        long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
+        String label = "contest:team-ended".equals(event) ? "انتهى تحدي PK" : "تحدي PK مباشر";
+        if ("contest:team-ended".equals(event)) {
+            String winner = memberStr(payload, "winner");
+            label = "sideA".equals(winner) ? "انتهى التحدي — فاز الروم الأول"
+                    : "sideB".equals(winner) ? "انتهى التحدي — فاز الروم الثاني"
+                    : "انتهى التحدي بالتعادل";
+        }
+        if (roomPkScoreBanner == null) {
+            roomPkScoreBanner = new TextView(this);
+            roomPkScoreBanner.setTextColor(Color.WHITE);
+            roomPkScoreBanner.setTextSize(14f);
+            roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkScoreBanner.setGravity(Gravity.CENTER);
+            roomPkScoreBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(0xE61B2430);
+            bg.setCornerRadius(dp(14));
+            bg.setStroke(dp(1), 0xFFFFD166);
+            roomPkScoreBanner.setBackground(bg);
+            roomPkScoreBanner.setElevation(dp(80));
+            roomPkScoreBanner.setClickable(false);
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT,
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.setMargins(dp(12), dp(64), dp(12), 0);
+            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkScoreBanner, lp);
+        }
+        roomPkScoreBanner.setText(label + "\n" + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
+                + "  :  " + String.format(java.util.Locale.US, "%,d", scoreB) + "  " + nameB);
+        roomPkScoreBanner.setVisibility(View.VISIBLE);
+        handler.removeCallbacks(hideRoomPkScoreBanner);
+        handler.postDelayed(hideRoomPkScoreBanner, "contest:team-ended".equals(event) ? 12000L : 7000L);
+    }
+
     @SuppressLint("NewApi")
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
+        if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)) {
+            showRoomPkScoreBanner(event, payload);
+            return;
+        }
         if ("room:music_volume".equals(event)) {
             // The server broadcasts the room-wide value to every member. Apply it here,
             // including on the music controller, so all local players and the host mix

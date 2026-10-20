@@ -132,13 +132,16 @@
           <label class="form-label small">قواعد وشروط إضافية (JSON object)</label>
           <textarea v-model="form.rulesText" rows="2" class="form-control form-control-sm" placeholder='{"minimumDiamonds":100}'></textarea>
         </div>
-        <div class="col-md-6">
-          <label class="form-label small">الطرف الأول (JSON object)</label>
-          <textarea v-model="form.sideAText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الفريق الأول","roomIds":[]} '></textarea>
+        <div class="col-md-12">
+          <div class="alert alert-info py-2 small mb-0">لتحدي «روم ضد روم»، ضع معرّف روم واحد في <code>roomIds</code> لكل طرف، ويجب أن يكون المعرّفان مختلفين. يتم احتساب النقاط من الهدايا المؤهلة المرسلة داخل الرومين.</div>
         </div>
         <div class="col-md-6">
-          <label class="form-label small">الطرف الثاني (JSON object)</label>
-          <textarea v-model="form.sideBText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الفريق الثاني","roomIds":[]} '></textarea>
+          <label class="form-label small">الطرف الأول (JSON object — روم واحد)</label>
+          <textarea v-model="form.sideAText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الروم الأول","roomIds":["ROOM_UUID_1"]}'></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small">الطرف الثاني (JSON object — روم مختلف)</label>
+          <textarea v-model="form.sideBText" rows="2" class="form-control form-control-sm" placeholder='{"name":"الروم الثاني","roomIds":["ROOM_UUID_2"]}'></textarea>
         </div>
         <div class="col-md-12">
           <label class="form-label small">{{ t('common.description') }}</label>

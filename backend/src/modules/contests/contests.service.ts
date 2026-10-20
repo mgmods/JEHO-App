@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
+import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
 import {
@@ -19,6 +20,7 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
+import { cacheRoomPkEnabled, readCachedRoomPkEnabled } from './room-pk-feature';
 
 const SAFE_RICH_PRIZE = 5000;
 const SAFE_GIFTS_PRIZE = 8000;
@@ -31,6 +33,7 @@ export class ContestsService implements OnModuleInit {
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
+    @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
     @InjectRepository(WalletTransaction)
@@ -39,6 +42,67 @@ export class ContestsService implements OnModuleInit {
     private readonly cosmetics: CosmeticsService,
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
+
+  /** Dashboard-controlled kill switch. Cached briefly to avoid a settings DB read per gift. */
+  private async isRoomPkEnabled(forceRefresh = false): Promise<boolean> {
+    const now = Date.now();
+    const cached = forceRefresh ? null : readCachedRoomPkEnabled(now);
+    if (cached !== null) return cached;
+    try {
+      const setting = await this.settingsRepo.findOne({ where: { key: 'features.room_pk_enabled' } });
+      const raw = String(setting?.value ?? 'false').trim().toLowerCase();
+      const value = ['1', 'true', 'yes', 'on'].includes(raw);
+      cacheRoomPkEnabled(value, now);
+      return value;
+    } catch {
+      // Fail closed during DB/config errors: PK must not add load during an incident.
+      cacheRoomPkEnabled(false, now);
+      return false;
+    }
+  }
+
+  private isTeamChallenge(contest: Pick<Contest, 'challengeType'>): boolean {
+    return contest.challengeType === 'room_vs_room' || contest.challengeType === 'agency_vs_agency';
+  }
+
+  private validateRoomChallengeSides(
+    challengeType: string | null | undefined,
+    sideA: Record<string, unknown> | null | undefined,
+    sideB: Record<string, unknown> | null | undefined,
+  ) {
+    if (challengeType !== 'room_vs_room') return;
+    const rawA = sideA?.roomIds;
+    const rawB = sideB?.roomIds;
+    const idsA = Array.isArray(rawA) ? rawA.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    const idsB = Array.isArray(rawB) ? rawB.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    if (idsA.length !== 1 || idsB.length !== 1) {
+      throw new BadRequestException('تحدي PK يتطلب تحديد معرّف روم واحد لكل طرف داخل roomIds');
+    }
+    if (idsA[0] === idsB[0]) {
+      throw new BadRequestException('لا يمكن أن يتنافس الروم نفسه ضد نفسه');
+    }
+  }
+
+  private emitTeamChallengeEnded(contest: Contest) {
+    if (!this.realtime || contest.challengeType !== 'room_vs_room') return;
+    const sideA = (contest.sideA || {}) as Record<string, unknown>;
+    const sideB = (contest.sideB || {}) as Record<string, unknown>;
+    const scoreA = Math.max(0, Number(sideA.score || 0));
+    const scoreB = Math.max(0, Number(sideB.score || 0));
+    const winner = scoreA === scoreB ? 'draw' : scoreA > scoreB ? 'sideA' : 'sideB';
+    const roomIds = [...new Set([
+      ...(Array.isArray(sideA.roomIds) ? sideA.roomIds.map(String) : []),
+      ...(Array.isArray(sideB.roomIds) ? sideB.roomIds.map(String) : []),
+    ].filter(Boolean))];
+    for (const roomId of roomIds) {
+      this.realtime.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event: 'contest:team-ended',
+        payload: { contestId: contest.id, title: contest.title, sideA: contest.sideA, sideB: contest.sideB, winner, scoreA, scoreB },
+        at: new Date().toISOString(),
+      });
+    }
+  }
 
   async onModuleInit() {
     // Additive migration only: retain existing contests and all user data.
@@ -119,7 +183,9 @@ export class ContestsService implements OnModuleInit {
         empty: '',
       });
     }
-    const items = await qb.getMany();
+    let items = await qb.getMany();
+    // Hide team-vs-team challenges from every client while the dashboard kill switch is off.
+    if (!(await this.isRoomPkEnabled(true))) items = items.filter((c) => !this.isTeamChallenge(c));
     let joined = new Set<string>();
     if (userId) {
       const mine = await this.entriesRepo.find({ where: { userId } });
@@ -136,6 +202,9 @@ export class ContestsService implements OnModuleInit {
   async get(id: string, userId?: string) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled(true))) {
+      throw new NotFoundException('تحديات PK متوقفة حالياً');
+    }
     const entries = await this.entriesRepo.find({
       where: { contestId: id },
       order: { score: 'DESC', joinedAt: 'ASC' },
@@ -180,6 +249,9 @@ export class ContestsService implements OnModuleInit {
         lock: { mode: 'pessimistic_write' },
       });
       if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+      if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled(true))) {
+        throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
+      }
       if (contest.status !== 'active') {
         throw new BadRequestException('المسابقة غير مفتوحة للانضمام');
       }
@@ -245,16 +317,28 @@ export class ContestsService implements OnModuleInit {
     // the event's start/end boundary.
     const occurredAt = context.occurredAt ? new Date(context.occurredAt) : new Date();
     if (Number.isNaN(occurredAt.getTime())) return;
-    const active = await this.contestsRepo
+    const roomPkEnabled = await this.isRoomPkEnabled();
+    const activeQuery = this.contestsRepo
       .createQueryBuilder('contest')
       .where('contest.startAt <= :occurredAt', { occurredAt })
       .andWhere('contest.endAt >= :occurredAt', { occurredAt })
-      .getMany();
+      .andWhere('contest.status != :endedStatus', { endedStatus: 'ended' });
+    // When disabled, omit team challenges from gift-scoring queries to reduce DB work.
+    if (!roomPkEnabled) {
+      activeQuery.andWhere(
+        "(contest.challengeType IS NULL OR contest.challengeType NOT IN (:...teamTypes))",
+        { teamTypes: ['room_vs_room', 'agency_vs_agency'] },
+      );
+    }
+    const active = await activeQuery.getMany();
     for (const c of active) {
-      if (c.scope === 'room' && (!context.roomId || c.roomId !== context.roomId)) {
+      const isTeamChallenge = this.isTeamChallenge(c);
+      // Team challenges derive eligibility from sideA/sideB membership, not a single-room scope.
+      if (!isTeamChallenge && c.scope === 'room' && (!context.roomId || c.roomId !== context.roomId)) {
         continue;
       }
       if (
+        !isTeamChallenge &&
         c.scope === 'agency' &&
         (!context.agencyId || c.agencyId !== context.agencyId)
       ) {
@@ -279,7 +363,8 @@ export class ContestsService implements OnModuleInit {
       // Team-vs-team challenges keep side totals on the configured challenge
       // record; no user-provided room/agency IDs are trusted without matching
       // the dashboard's explicit side membership lists.
-      if (c.challengeType === 'room_vs_room' || c.challengeType === 'agency_vs_agency') {
+      if (this.isTeamChallenge(c)) {
+        if (!roomPkEnabled) continue;
         const isRoomBattle = c.challengeType === 'room_vs_room';
         const key = isRoomBattle ? 'roomIds' : 'agencyIds';
         const candidate = isRoomBattle ? context.roomId : context.agencyId;
@@ -288,26 +373,43 @@ export class ContestsService implements OnModuleInit {
         const sideBIds = Array.isArray((c.sideB as any)?.[key]) ? (c.sideB as any)[key].map(String) : [];
         const sideKey = sideAIds.includes(String(candidate)) ? 'sideA' : sideBIds.includes(String(candidate)) ? 'sideB' : null;
         if (!sideKey) continue;
-        const side = { ...((c[sideKey] as Record<string, unknown> | null) || {}) };
-        side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
-        (c as any)[sideKey] = side;
-        await this.contestsRepo.save(c);
+
+        // Serialize concurrent gifts for the same contest so simultaneous sends cannot overwrite scores.
+        const updated = await this.dataSource.transaction(async (manager) => {
+          const locked = await manager.findOne(Contest, {
+            where: { id: c.id },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!locked) return null;
+          const side = { ...(((locked as any)[sideKey] as Record<string, unknown> | null) || {}) };
+          side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
+          (locked as any)[sideKey] = side;
+          return manager.save(locked);
+        });
+        if (!updated) continue;
+
         const payload = {
-          contestId: c.id,
-          challengeType: c.challengeType,
-          sideA: c.sideA,
-          sideB: c.sideB,
+          contestId: updated.id,
+          challengeType: updated.challengeType,
+          sideA: updated.sideA,
+          sideB: updated.sideB,
           delta: scoreDelta,
           roomId: context.roomId || null,
           agencyId: context.agencyId || null,
           at: occurredAt.toISOString(),
         };
-        if (context.roomId) this.realtime?.emitToRoom(context.roomId, 'room:event', {
-          roomId: context.roomId,
-          event: 'contest:team-score',
-          payload,
-          at: payload.at,
-        });
+        // A room-vs-room score must fan out to both competing rooms, not only the sender's room.
+        const targetRoomIds = isRoomBattle
+          ? [...new Set([...sideAIds, ...sideBIds])]
+          : (context.roomId ? [context.roomId] : []);
+        for (const targetRoomId of targetRoomIds) {
+          this.realtime?.emitToRoom(targetRoomId, 'room:event', {
+            roomId: targetRoomId,
+            event: 'contest:team-score',
+            payload: { ...payload, roomId: targetRoomId },
+            at: payload.at,
+          });
+        }
         continue;
       }
       const entry = await this.entriesRepo.findOne({
@@ -397,13 +499,15 @@ export class ContestsService implements OnModuleInit {
     }
     const title = String(dto.title || '').trim();
     if (!title) throw new BadRequestException('عنوان المسابقة مطلوب');
-    const scope = dto.scope || 'global';
+    // A room-vs-room challenge must be visible and score in both rooms; it is global by design.
+    const scope = dto.challengeType === 'room_vs_room' ? 'global' : (dto.scope || 'global');
     if (scope === 'room' && !dto.roomId) {
       throw new BadRequestException('roomId مطلوب لمسابقات الروم');
     }
     if (scope === 'agency' && !dto.agencyId) {
       throw new BadRequestException('agencyId مطلوب لمسابقات الوكالة');
     }
+    this.validateRoomChallengeSides(dto.challengeType || 'individual', dto.sideA, dto.sideB);
     const row = await this.contestsRepo.save(
       this.contestsRepo.create({
         title,
@@ -513,16 +617,26 @@ export class ContestsService implements OnModuleInit {
     if (contest.scope === 'agency' && !contest.agencyId) {
       throw new BadRequestException('agencyId مطلوب لمسابقات الوكالة');
     }
-    if (contest.scope === 'global') {
+    if (contest.challengeType === 'room_vs_room') {
+      // A room battle is discoverable from either side, regardless of the editor's prior scope.
+      contest.scope = 'global';
+      contest.roomId = null;
+      contest.agencyId = null;
+    } else if (contest.scope === 'global') {
       contest.roomId = null;
       contest.agencyId = null;
     }
+    this.validateRoomChallengeSides(contest.challengeType, contest.sideA, contest.sideB);
     if (dto.status) {
       const prev = contest.status;
       contest.status = dto.status;
       await this.contestsRepo.save(contest);
       if (prev !== 'ended' && dto.status === 'ended') {
-        await this.settlePrizes(contest);
+        if (this.isTeamChallenge(contest)) {
+          if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+        } else {
+          await this.settlePrizes(contest);
+        }
       }
       return contest;
     }
@@ -535,7 +649,11 @@ export class ContestsService implements OnModuleInit {
     if (contest.status === 'ended') return contest;
     contest.status = 'ended';
     await this.contestsRepo.save(contest);
-    await this.settlePrizes(contest);
+    if (this.isTeamChallenge(contest)) {
+      if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+    } else {
+      await this.settlePrizes(contest);
+    }
     return contest;
   }
 
@@ -549,7 +667,11 @@ export class ContestsService implements OnModuleInit {
     for (const contest of open) {
       contest.status = 'ended';
       await this.contestsRepo.save(contest);
-      await this.settlePrizes(contest);
+      if (this.isTeamChallenge(contest)) {
+        if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(contest);
+      } else {
+        await this.settlePrizes(contest);
+      }
       ended.push(contest);
     }
     return { ended: ended.length, items: ended };
@@ -568,6 +690,8 @@ export class ContestsService implements OnModuleInit {
 
   /** Pay top entrant prizeCoins + temporary contest badge (idempotent). */
   private async settlePrizes(contest: Contest) {
+    // Team challenge rewards are not individual contest-entry prizes.
+    if (this.isTeamChallenge(contest)) return;
     const prize = Math.max(0, Math.floor(Number(contest.prizeCoins) || 0));
     let winnerId: string | null = null;
 
@@ -724,11 +848,15 @@ export class ContestsService implements OnModuleInit {
       else if (now > c.endAt) next = 'ended';
       else next = 'active';
       if (next !== c.status) {
-        const wasActive = c.status === 'active';
+        const shouldFinalize = next === 'ended';
         c.status = next;
         await this.contestsRepo.save(c);
-        if (wasActive && next === 'ended') {
-          await this.settlePrizes(c);
+        if (shouldFinalize) {
+          if (this.isTeamChallenge(c)) {
+            if (await this.isRoomPkEnabled(true)) this.emitTeamChallengeEnded(c);
+          } else {
+            await this.settlePrizes(c);
+          }
         }
       }
     }
