@@ -53,6 +53,13 @@ public class NotificationsActivity extends ThemedActivity {
                 .get(NotificationsViewModel.class);
         adapter = new NotificationAdapter(n -> {
             if (n != null && n.id != null && !n.isRead) vm.markRead(n.id);
+            if (isBadgeAwardNotification(n)) {
+                String currentUserId = ContainerProvider.from(this).getSessionManager().getUserId();
+                Intent badges = new Intent(this, com.Dramizo.Series.presentation.profile.BadgeActivity.class);
+                badges.putExtra(com.Dramizo.Series.presentation.profile.BadgeActivity.EXTRA_USER_ID, currentUserId);
+                startActivity(badges);
+                return;
+            }
             if (isCpRequestNotification(n)) {
                 showCpRequestPrompt(n);
                 return;
@@ -159,6 +166,11 @@ public class NotificationsActivity extends ThemedActivity {
         binding.tvEmpty.setVisibility(filtered.isEmpty() ? View.VISIBLE : View.GONE);
     }
 
+    private static boolean isBadgeAwardNotification(MiscDtos.NotificationDto n) {
+        if (n == null || n.data == null) return false;
+        return "badge_earned".equalsIgnoreCase(String.valueOf(n.data.get("kind")));
+    }
+
     private static boolean isCpRequestNotification(MiscDtos.NotificationDto n) {
         if (n == null || n.data == null) return false;
         return matchesCpRequest(n.data.get("type"))
@@ -179,6 +191,8 @@ public class NotificationsActivity extends ThemedActivity {
                 || "friend".equals(t) || "relation".equals(t) || "room".equals(t)) {
             return true;
         }
+        // A dashboard-awarded badge belongs in the recipient's personal inbox.
+        if (isBadgeAwardNotification(n)) return true;
         if (n.data != null) {
             Object nested = n.data.get("type");
             Object kind = n.data.get("notificationKind");
