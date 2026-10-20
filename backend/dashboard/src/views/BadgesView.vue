@@ -87,13 +87,50 @@ async function save() {
 }
 async function grantBadge() {
   error.value = ''
-  try { await badgesApi.grant(grant.badgeId, grant.userId); window.alert('تم منح الشارة للمستخدم.'); }
-  catch (e) { error.value = e?.response?.data?.message || 'تعذر منح الشارة.' }
+  const userId = grant.userId.trim()
+  try {
+    // safeRequest returns { data, error } instead of throwing on HTTP failures.
+    // Check the result explicitly so the dashboard never reports a false success.
+    const result = await badgesApi.grant(grant.badgeId, userId)
+    if (result?.error) {
+      error.value = result.error.message || 'رفض الخادم منح الشارة.'
+      return
+    }
+
+    // Verify persistence through the same endpoint the app profile uses.
+    const verification = await badgesApi.userBadges(userId)
+    if (verification?.error) {
+      error.value = 'أُرسل طلب المنح، لكن تعذّر التحقق من ظهور الشارة في حساب المستخدم: ' +
+        (verification.error.message || 'خطأ غير معروف')
+      return
+    }
+    const userBadges = Array.isArray(verification?.data)
+      ? verification.data
+      : Array.isArray(verification?.data?.data) ? verification.data.data : []
+    const owned = userBadges.some((badge) =>
+      String(badge?.id) === String(grant.badgeId) && badge?.earned === true
+    )
+    if (!owned) {
+      error.value = 'الخادم لم يؤكد تسجيل الشارة في حساب هذا المستخدم. لم نعرض رسالة نجاح كاذبة؛ تحقق من معرّف المستخدم ونشر الـBackend.'
+      return
+    }
+    window.alert('تم منح الشارة والتأكد من ظهورها في حساب المستخدم وقسم الشارات.')
+  } catch (e) {
+    error.value = e?.message || e?.response?.data?.message || 'تعذر منح الشارة.'
+  }
 }
 async function revokeBadge() {
   error.value = ''
-  try { await badgesApi.revoke(grant.badgeId, grant.userId); window.alert('تم سحب الشارة من المستخدم.'); }
-  catch (e) { error.value = e?.response?.data?.message || 'تعذر سحب الشارة.' }
+  try {
+    const result = await badgesApi.revoke(grant.badgeId, grant.userId.trim())
+    if (result?.error) {
+      error.value = result.error.message || 'رفض الخادم سحب الشارة.'
+      return
+    }
+    window.alert('تم سحب الشارة من المستخدم.')
+  } catch (e) {
+    error.value = e?.message || e?.response?.data?.message || 'تعذر سحب الشارة.'
+  }
 }
 async function remove(b) {
   if (!window.confirm('حذف الشارة "' + b.name + '" وسجلات ملكيتها؟')) return
