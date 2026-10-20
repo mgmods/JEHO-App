@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -357,7 +358,6 @@ public class HomeMomentsFragment extends Fragment {
             authorRow.setOrientation(LinearLayout.HORIZONTAL);
             authorRow.setGravity(Gravity.CENTER_VERTICAL);
             ImageView avatar = new ImageView(requireContext());
-            avatar.setLayoutParams(new LinearLayout.LayoutParams(dp(44), dp(44)));
             avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
             avatar.setBackground(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
             avatar.setClipToOutline(true);
@@ -365,6 +365,16 @@ public class HomeMomentsFragment extends Fragment {
             if (!avatarUrl.isEmpty()) Glide.with(this).load(avatarUrl).circleCrop()
                 .placeholder(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22))).into(avatar);
             else avatar.setImageDrawable(rounded(0xFFF3EAF0, 0xFFF3EAF0, dp(22)));
+            FrameLayout avatarStack = new FrameLayout(requireContext());
+            avatarStack.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
+            ImageView avatarFrame = new ImageView(requireContext());
+            FrameLayout.LayoutParams avatarLp = new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER);
+            avatarStack.addView(avatar, avatarLp);
+            FrameLayout.LayoutParams frameLp = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER);
+            avatarStack.addView(avatarFrame, frameLp);
+            String frameUrl = string(post, "frameUrl");
+            if (frameUrl.isEmpty()) frameUrl = string(post, "avatarFrameUrl");
+            AvatarCosmetics.bindStacked(avatar, avatarFrame, null, avatarUrl, frameUrl, null);
             LinearLayout authorInfo = new LinearLayout(requireContext());
             authorInfo.setOrientation(LinearLayout.VERTICAL);
             authorInfo.setPadding(dp(10), 0, 0, 0);
@@ -378,7 +388,7 @@ public class HomeMomentsFragment extends Fragment {
             authorMeta.setPadding(0, dp(3), 0, 0);
             authorInfo.addView(author, matchWrap());
             authorInfo.addView(authorMeta, matchWrap());
-            authorRow.addView(avatar);
+            authorRow.addView(avatarStack);
             authorRow.addView(authorInfo, new LinearLayout.LayoutParams(0, -2, 1));
             Button followTop = button("＋ متابعة");
             styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(18));
