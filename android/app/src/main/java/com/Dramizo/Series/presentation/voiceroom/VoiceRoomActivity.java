@@ -11012,7 +11012,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         final android.animation.ValueAnimator animator =
                 android.animation.ValueAnimator.ofInt(1, target);
-        animator.setDuration(Math.min(1500L, Math.max(500L, target * 9L)));
+        // Keep large batches very fast: X77 finishes in ~450 ms and X177 in ~600 ms.
+        // Smaller batches still get enough time for the count to be readable.
+        long durationMs = target <= 7 ? 260L
+                : target <= 17 ? 330L
+                : target <= 77 ? 450L
+                : 600L;
+        animator.setDuration(durationMs);
+        animator.setInterpolator(new android.view.animation.LinearInterpolator());
         animator.addUpdateListener(a -> {
             if (isFinishing() || isDestroyed()) {
                 a.cancel();
