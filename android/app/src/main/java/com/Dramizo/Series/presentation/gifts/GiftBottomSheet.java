@@ -1184,7 +1184,7 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
                 // Keep comboCount at 1 so X7/X17/X77/X177 does not masquerade as a normal combo streak.
                 room.showGiftSendToastCountUp(
                         session.getDisplayName(), name, session.getAvatarUrl(), icon,
-                        Math.max(1, qty));
+                        Math.max(1, result.quantity > 0 ? result.quantity : qty));
                 // Center hero + simultaneous clones to selected/all mic seats.
                 try {
                     GiftAudioFx.playLuckyCoins(requireContext(), 1);
