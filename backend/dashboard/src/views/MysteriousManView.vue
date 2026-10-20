@@ -59,8 +59,8 @@
               <h4 class="h6">{{ asset.title }}</h4>
               <p class="small text-secondary">{{ asset.help }}</p>
               <div class="rounded-3 bg-body-tertiary d-flex align-items-center justify-content-center overflow-hidden mb-3" style="min-height:150px">
-                <img v-if="asset.key === 'avatarUrl' && form[asset.key]" :src="previewUrl(form[asset.key])" alt="معاينة الصورة" style="max-width:100%;max-height:180px;object-fit:contain">
-                <video v-else-if="asset.key !== 'avatarUrl' && form[asset.key] && /\.(mp4|webm|mov)(\?|$)/i.test(form[asset.key])" :src="previewUrl(form[asset.key])" controls muted loop style="max-width:100%;max-height:180px"></video>
+                <img v-if="form[asset.key] && isImageUrl(form[asset.key])" :src="previewUrl(form[asset.key])" alt="معاينة الملف" style="max-width:100%;max-height:180px;object-fit:contain">
+                <video v-else-if="form[asset.key] && isVideoUrl(form[asset.key])" :src="previewUrl(form[asset.key])" controls muted loop style="max-width:100%;max-height:180px"></video>
                 <a v-else-if="form[asset.key]" :href="previewUrl(form[asset.key])" target="_blank" rel="noopener">فتح الملف للمعاينة</a>
                 <span v-else class="text-secondary small">لم يتم رفع ملف بعد</span>
               </div>
@@ -99,7 +99,7 @@ const form = reactive({ enabled: false, eligibleVipLevels: [], avatarUrl: '', en
 const assets = [
   { key: 'avatarUrl', title: 'الصورة الشخصية الموحدة', help: 'تظهر بدلاً من الصورة الأصلية في مواضع الهوية المخفية.', accept: 'image/png,image/jpeg,image/webp' },
   { key: 'entryEffectUrl', title: 'دخولية الرجل الغامض', help: 'فيديو أو حركة موحدة عند دخول الروم.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
-  { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'ملف تأثير اختياري.', accept: 'video/mp4,video/webm,video/quicktime,.svga' },
+  { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'يمكن رفع صورة ثابتة أو فيديو أو ملف SVGA.', accept: 'image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,.svga' },
 ]
 function previewUrl(raw) {
   const value = String(raw || '').trim()
@@ -108,6 +108,8 @@ function previewUrl(raw) {
   const base = String(import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '')
   return value.startsWith('/uploads/') ? base + value : value
 }
+function isImageUrl(raw) { return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(String(raw || '')) }
+function isVideoUrl(raw) { return /\.(mp4|webm|mov)(\?|$)/i.test(String(raw || '')) }
 function toggleLevel(level, checked) {
   const values = new Set(form.eligibleVipLevels)
   if (checked) values.add(level)
@@ -141,10 +143,13 @@ async function uploadAsset(asset, event) {
   const file = event?.target?.files?.[0]
   if (!file) return
   const isAvatar = asset.key === 'avatarUrl'
-  const max = isAvatar ? 8 : 40
+  const isMessageEffect = asset.key === 'messageEffectUrl'
+  const isImage = /\.(png|jpe?g|gif|webp)$/i.test(file.name)
+  const isVideo = /\.(mp4|webm|mov|svga)$/i.test(file.name)
+  const max = isAvatar || (isMessageEffect && isImage) ? 8 : 40
   if (file.size > max * 1024 * 1024) { toast().danger(`حجم الملف يجب ألا يتجاوز ${max} ميغابايت`); event.target.value = ''; return }
-  const valid = isAvatar ? /\.(png|jpe?g|webp)$/i.test(file.name) : /\.(mp4|webm|mov|svga)$/i.test(file.name)
-  if (!valid) { toast().danger(isAvatar ? 'اختر صورة PNG أو JPG أو WEBP' : 'اختر MP4 أو WEBM أو MOV أو SVGA'); event.target.value = ''; return }
+  const valid = isAvatar ? /\.(png|jpe?g|webp)$/i.test(file.name) : isMessageEffect ? (isImage || isVideo) : isVideo
+  if (!valid) { toast().danger(isAvatar ? 'اختر صورة PNG أو JPG أو WEBP' : isMessageEffect ? 'اختر صورة PNG أو JPG أو GIF أو WEBP، أو فيديو MP4 أو WEBM أو MOV أو SVGA' : 'اختر MP4 أو WEBM أو MOV أو SVGA'); event.target.value = ''; return }
   const { data, error: err } = await uploadsApi.upload(file)
   event.target.value = ''
   if (err) { toast().danger(err.message); return }
