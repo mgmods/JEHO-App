@@ -61,6 +61,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -76,9 +77,7 @@ const error = ref('')
 const success = ref('')
 
 function absUrl(u) {
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 
 function blankRow() {
