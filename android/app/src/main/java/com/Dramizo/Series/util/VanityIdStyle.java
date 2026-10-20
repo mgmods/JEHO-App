@@ -33,10 +33,12 @@ public final class VanityIdStyle {
                             @Nullable String publicId, int vipLevel) {
         if (view == null) return;
         if (publicId == null || publicId.trim().isEmpty()) {
+            view.setTag(R.id.tag_vanity_id_style_key, null);
             view.getPaint().setShader(null);
             view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
+            view.setCompoundDrawablesRelative(null, null, null, null);
             return;
-        }
+        
         final String id = publicId.trim();
         view.setTag(R.id.tag_vanity_id_style_key, id);
         VanityDtos.Style cached = CACHE.get(id);
