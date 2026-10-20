@@ -598,6 +598,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         applyRoomToolbarIcons();
         startRoomGmtClock();
         setupRealtime();
+        handler.postDelayed(this::loadRoomPkChallenge, 1200L);
         refreshSelfGiftPolicy();
         setupZegoListener();
         setupLuckyBoxUi();
@@ -12102,6 +12103,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return o.optDouble(key, fallback);
     }
 
+    /** Load an already-running room-vs-room PK when a user enters either room. */
+    private void loadRoomPkChallenge() {
+        if (roomId == null || roomId.isEmpty() || isFinishing() || exiting) return;
+        ContainerProvider.from(this).getContestsApi().listScoped(roomId, null)
+                .enqueue(new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
+                    @Override
+                    public void onResponse(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
+                        if (!response.isSuccessful() || response.body() == null || response.body().data == null
+                                || response.body().data.items == null || isFinishing() || exiting) return;
+                        for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                            if (contest == null || !"room_vs_room".equals(contest.challengeType)
+                                    || !"active".equalsIgnoreCase(contest.status)
+                                    || contest.sideA == null || contest.sideB == null) continue;
+                            boolean belongs = (contest.sideA.roomIds != null && contest.sideA.roomIds.contains(roomId))
+                                    || (contest.sideB.roomIds != null && contest.sideB.roomIds.contains(roomId));
+                            if (!belongs) continue;
+                            JsonObject payload = new JsonObject();
+                            if (contest.id != null) payload.addProperty("contestId", contest.id);
+                            payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
+                            payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
+                            handler.post(() -> showRoomPkScoreBanner("contest:team-score", payload));
+                            return;
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            Throwable error) {
+                        // PK status is optional UI; a network issue must never affect room voice.
+                    }
+                });
+    }
+
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
         if (payload == null || binding == null) return;
         JsonObject sideA = payload.has("sideA") && payload.get("sideA").isJsonObject()
@@ -12147,7 +12184,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 + "  :  " + String.format(java.util.Locale.US, "%,d", scoreB) + "  " + nameB);
         roomPkScoreBanner.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
-        handler.postDelayed(hideRoomPkScoreBanner, "contest:team-ended".equals(event) ? 12000L : 7000L);
+        handler.postDelayed(hideRoomPkScoreBanner, "contest:team-ended".equals(event) ? 12000L : 60000L);
     }
 
     @SuppressLint("NewApi")
