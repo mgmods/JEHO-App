@@ -20,6 +20,7 @@
 import { onMounted, ref } from 'vue'
 import api from '@/api/client'
 import { settingsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 
 const fileInput = ref(null)
 const selectedFile = ref(null)
@@ -31,10 +32,7 @@ const message = ref('')
 let themeConfig = {}
 
 function makeAbsoluteUrl(value) {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  const base = String(api.defaults.baseURL || '').replace(/\/api\/v\d+\/?$/i, '').replace(/\/+$/, '')
-  return value.startsWith('/') ? base + value : value
+  return resolveAsset(value)
 }
 
 async function loadTheme() {
