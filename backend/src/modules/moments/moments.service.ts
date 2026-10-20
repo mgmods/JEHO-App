@@ -240,7 +240,7 @@ export class MomentsService {
     const visibility = dto?.visibility === undefined ? existing.visibility : dto.visibility;
     if (!['public', 'followers', 'friends', 'private'].includes(visibility)) throw new BadRequestException('Invalid visibility');
     if (body.length > 2000) throw new BadRequestException('Moment text is too long');
-    if (imageUrl && (imageUrl.length > 1024 || !/^https?:\\/\\//i.test(imageUrl))) throw new BadRequestException('Image URL must be an uploaded HTTP(S) URL');
+    if (imageUrl && (imageUrl.length > 1024 || !/^https?:\/\//i.test(imageUrl))) throw new BadRequestException('Image URL must be an uploaded HTTP(S) URL');
     if (!body && !imageUrl) throw new BadRequestException('Add text or an image');
     const [row] = await this.dataSource.query(
       'UPDATE "jeho_own"."moments" SET body = $2, "imageUrl" = $3, visibility = $4 WHERE id = $1 RETURNING id, "userId", body, "imageUrl", visibility, "createdAt"',
