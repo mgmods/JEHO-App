@@ -390,7 +390,7 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = matchWrap();
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(250));
                 photoLp.topMargin = dp(4);
                 photoLp.bottomMargin = dp(10);
                 item.addView(photo, photoLp);
