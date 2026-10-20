@@ -31,6 +31,11 @@ export class SendGiftDto {
   @IsOptional()
   @IsBoolean()
   cannonLaunch?: boolean;
+
+  @ApiPropertyOptional({ description: 'Idempotency key for safe retry of the same gift send' })
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
 }
 
 /** All-mic send: one charge, host 50% / mics 50% of diamond pool (after platform cut). */
