@@ -12612,7 +12612,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             boolean localSenderEcho = myUserId != null
                     && (myUserId.equals(fromUserId) || myUserId.equals(senderId));
             String giftKind = memberStr(payload, "giftType");
-            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)) {
+            if (giftKind != null && "lucky".equalsIgnoreCase(giftKind)
+                    && !memberBool(payload, "cannonLaunch", false)) {
                 GiftAudioFx.playLuckyCoins(this, 3);
             }
             List<String> allReceivers = new ArrayList<>();
@@ -12643,11 +12644,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (personCount <= 1 && !allMic && receiverName != null && !receiverName.isEmpty()) {
                 appendGiftEconomyLine(sender + " أهدى " + receiverName + " " + name);
             }
+            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
+            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
+            boolean cannonLaunch = memberBool(payload, "cannonLaunch", false);
+            if (cannonLaunch) {
+                playLuckyCannonEvent(icon, allReceivers, totalCoins, qtyRemote,
+                        Math.max(1, personCount), localSenderEcho);
+                return;
+            }
             if (localSenderEcho) {
                 return; // Local send response already queued the sender's visual effect.
             }
-            boolean isLuckyGift = giftKind != null && "lucky".equalsIgnoreCase(giftKind);
-            int qtyRemote = Math.max(1, memberInt(payload, "quantity", 1));
             // Lucky: Mikoo center-hold → scatter (no JSON/Lottie pulse).
             if (isLuckyGift) {
                 anim = null;
