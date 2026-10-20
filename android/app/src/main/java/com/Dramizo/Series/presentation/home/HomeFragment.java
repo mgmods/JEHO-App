@@ -660,30 +660,42 @@ public class HomeFragment extends Fragment {
         return false;
     }
 
+    // The country filter is a picker, not a swipe page. Keep the four visible tabs
+    // adjacent so horizontal swipes never land on a hidden tab.
+    private static final int[] VISIBLE_PAGER_TABS = {
+            TAB_HOT, TAB_ME, TAB_ACTIVITIES, TAB_MOMENTS
+    };
+
     private int logicalTabFromPager(int pagerPos) {
-        return pagerPos;
+        if (pagerPos < 0 || pagerPos >= VISIBLE_PAGER_TABS.length) return TAB_HOT;
+        return VISIBLE_PAGER_TABS[pagerPos];
     }
 
     private int pagerPosFromLogicalTab(int tab) {
-        return tab;
+        for (int i = 0; i < VISIBLE_PAGER_TABS.length; i++) {
+            if (VISIBLE_PAGER_TABS[i] == tab) return i;
+        }
+        return 0;
     }
 
     private void setupFeedPager() {
         feedPagerAdapter = new FragmentStateAdapter(this) {
             @NonNull @Override
             public Fragment createFragment(int position) {
-                if (position == TAB_ME) return HomeMeFragment.newInstance();
-                if (position == TAB_ACTIVITIES) return HomeActivitiesFragment.newInstance();
-                if (position == TAB_MOMENTS) return HomeMomentsFragment.newInstance();
-                return HomeFeedPageFragment.newInstance(position);
+                int tab = logicalTabFromPager(position);
+                if (tab == TAB_ME) return HomeMeFragment.newInstance();
+                if (tab == TAB_ACTIVITIES) return HomeActivitiesFragment.newInstance();
+                if (tab == TAB_MOMENTS) return HomeMomentsFragment.newInstance();
+                return HomeFeedPageFragment.newInstance(tab);
             }
-            @Override public int getItemCount() { return TAB_COUNT; }
+            @Override public int getItemCount() { return VISIBLE_PAGER_TABS.length; }
         };
         binding.pagerFeed.setAdapter(feedPagerAdapter);
-        binding.pagerFeed.setUserInputEnabled(false);
+        // ViewPager2 handles horizontal gestures while child lists keep vertical scrolling.
+        binding.pagerFeed.setUserInputEnabled(true);
         binding.pagerFeed.setOffscreenPageLimit(3);
-        if (binding.pagerFeed.getCurrentItem() != TAB_HOT) {
-            binding.pagerFeed.setCurrentItem(TAB_HOT, false);
+        if (binding.pagerFeed.getCurrentItem() != pagerPosFromLogicalTab(TAB_HOT)) {
+            binding.pagerFeed.setCurrentItem(pagerPosFromLogicalTab(TAB_HOT), false);
         }
         if (browseCountry == null) {
             browseCountry = loadBrowseCountryCode();
@@ -695,17 +707,14 @@ public class HomeFragment extends Fragment {
         if (binding == null || binding.pagerFeed == null) return;
        
         if (tab == TAB_LOCATION) {
-            showCountryPicker(true, () -> {
-                onLogicalTabSelected(TAB_LOCATION);
-                if (binding != null && binding.pagerFeed.getCurrentItem() != TAB_LOCATION) {
-                    binding.pagerFeed.setCurrentItem(TAB_LOCATION, true);
-                }
-            });
+            // Legacy hidden country tab: choosing a country keeps the user on the Hot feed.
+            showCountryPicker(true, () -> selectLogicalTab(TAB_HOT));
             return;
         }
         onLogicalTabSelected(tab);
-        if (binding.pagerFeed.getCurrentItem() != tab) {
-            binding.pagerFeed.setCurrentItem(tab, true);
+        int pagerPosition = pagerPosFromLogicalTab(tab);
+        if (binding.pagerFeed.getCurrentItem() != pagerPosition) {
+            binding.pagerFeed.setCurrentItem(pagerPosition, true);
         }
     }
 
@@ -1196,7 +1205,7 @@ public class HomeFragment extends Fragment {
         }
         if (link.isEmpty()) return;
         if ("party".equals(link) || link.contains("room")) {
-            binding.pagerFeed.setCurrentItem(TAB_HOT, true);
+            binding.pagerFeed.setCurrentItem(pagerPosFromLogicalTab(TAB_HOT), true);
             return;
         }
         if ("wallet".equals(link) || link.contains("bag") || link.contains("recharge")) {
