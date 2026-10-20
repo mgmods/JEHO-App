@@ -14,7 +14,7 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
+import androidx.core.widget.NestedScrollView;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
@@ -72,8 +72,11 @@ public class HomeMomentsFragment extends Fragment {
             @Nullable ViewGroup parent, @Nullable Bundle state) {
         container = ContainerProvider.from(requireActivity());
         profileUserId = getArguments() != null ? getArguments().getString(ARG_PROFILE_USER_ID) : null;
-        ScrollView scroll = new ScrollView(requireContext());
+        NestedScrollView scroll = new NestedScrollView(requireContext());
         scroll.setFillViewport(true);
+        scroll.setNestedScrollingEnabled(true);
+        scroll.setSmoothScrollingEnabled(true);
+        scroll.setOverScrollMode(View.OVER_SCROLL_IF_CONTENT_SCROLLS);
         root = new LinearLayout(requireContext());
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(14), dp(12), dp(14), dp(24));
@@ -247,6 +250,10 @@ public class HomeMomentsFragment extends Fragment {
                     if (!isAdded()) return;
                     composer.setText("");
                     clearSelectedImage();
+                    if (imagePickerButton != null) {
+                        imagePickerButton.setEnabled(true);
+                        imagePickerButton.setText("＋  إضافة صورة");
+                    }
                     selectedVisibility = 0;
                     updatePrivacyLabel();
                     setPublishStatus("", false);
@@ -258,7 +265,10 @@ public class HomeMomentsFragment extends Fragment {
             } catch (Exception e) {
                 setPublishStatus("لم يكتمل النشر. احتفظنا بالنص والصورة لإعادة المحاولة.", false);
                 showError("تعذر نشر اللحظة؛ " + (e.getMessage() == null ? "تحقق من الاتصال والصورة" : e.getMessage()));
-                requireActivity().runOnUiThread(() -> setComposerEnabled(true));
+                requireActivity().runOnUiThread(() -> {
+                    setComposerEnabled(true);
+                    if (imagePickerButton != null) imagePickerButton.setEnabled(true);
+                });
             }
         });
     }
@@ -372,7 +382,9 @@ public class HomeMomentsFragment extends Fragment {
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
-                photo.setAdjustViewBounds(true);
+                photo.setAdjustViewBounds(false);
+                photo.setContentDescription("اضغط لعرض الصورة كاملة");
+                photo.setOnClickListener(v -> showFullImage(image, post));
                 Glide.with(this).load(image)
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
@@ -384,11 +396,12 @@ public class HomeMomentsFragment extends Fragment {
             }
             LinearLayout row = new LinearLayout(requireContext());
             row.setOrientation(LinearLayout.HORIZONTAL);
-            Button like = button((Boolean.TRUE.equals(post.get("likedByMe")) ? "♥  " : "♡  ")
-                    + number(post.get("likeCount")) + " إعجاب");
-            if (Boolean.TRUE.equals(post.get("likedByMe"))) styleButton(like, 0xFFFFE6EE, 0xFFB70F52, dp(12));
+            boolean liked = Boolean.TRUE.equals(post.get("likedByMe"));
+            Button like = button((liked ? "♥  " : "♡  ") + number(post.get("likeCount")));
+            styleButton(like, liked ? 0xFFFFE1EA : 0xFFFFF5F8,
+                    liked ? 0xFFE51E55 : 0xFFB70F52, dp(12));
             like.setOnClickListener(v -> like(post));
-            Button comments = button("تعليقات " + number(post.get("commentCount")));
+            Button comments = button("💬  " + number(post.get("commentCount")));
             comments.setOnClickListener(v -> comments(post));
             row.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(comments, new LinearLayout.LayoutParams(0, dp(42), 1));
@@ -399,13 +412,17 @@ public class HomeMomentsFragment extends Fragment {
             dividerLp.bottomMargin = dp(8);
             item.addView(actionDivider, dividerLp);
             item.addView(row, matchWrap());
-            Button report = button("⚑  إبلاغ");
+            Button report = button("⚑");
+            report.setContentDescription("الإبلاغ عن اللحظة");
+            report.setTextSize(10);
+            report.setPadding(dp(5), 0, dp(5), 0);
+            report.setMinHeight(dp(30));
             report.setTextColor(0xFFB3261E);
-            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(12), dp(1)));
+            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(10), dp(1)));
             report.setOnClickListener(v -> askMomentReport(post));
             LinearLayout reportRow = new LinearLayout(requireContext());
             reportRow.setGravity(Gravity.END);
-            reportRow.addView(report, new LinearLayout.LayoutParams(-2, dp(40)));
+            reportRow.addView(report, new LinearLayout.LayoutParams(dp(34), dp(30)));
             item.addView(reportRow, matchWrap());
             item.setOnClickListener(v -> showMomentDetails(post));
             feedContainer.addView(item, matchWrap());
@@ -453,29 +470,93 @@ public class HomeMomentsFragment extends Fragment {
     }
 
     private void showMomentDetails(Map<String, Object> post) {
+        String image = string(post, "imageUrl");
+        if (!image.isEmpty()) {
+            showFullImage(image, post);
+            return;
+        }
         LinearLayout detail = new LinearLayout(requireContext());
         detail.setOrientation(LinearLayout.VERTICAL);
         detail.setPadding(dp(16), dp(12), dp(16), dp(8));
-        String image = string(post, "imageUrl");
-        if (!image.isEmpty()) {
-            ImageView photo = new ImageView(requireContext());
-            photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(220)));
-            photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            Glide.with(this).load(image).into(photo);
-            detail.addView(photo);
-        }
         detail.addView(text(string(post, "body"), 15, 0xFF222222, false));
-        Button report = button("⚑  إبلاغ عن المنشور");
-        report.setTextColor(0xFFB3261E);
-        report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(12), dp(1)));
-        report.setOnClickListener(v -> {
-            askMomentReport(post);
-        });
-        detail.addView(report, matchWrap());
+        LinearLayout actions = new LinearLayout(requireContext());
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button like = button((Boolean.TRUE.equals(post.get("likedByMe")) ? "♥  " : "♡  ")
+                + number(post.get("likeCount")));
+        like.setTextColor(0xFFE51E55);
+        like.setOnClickListener(v -> { like(post); });
+        Button comment = button("💬  " + number(post.get("commentCount")));
+        comment.setOnClickListener(v -> comments(post));
+        actions.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
+        actions.addView(comment, new LinearLayout.LayoutParams(0, dp(42), 1));
+        detail.addView(actions, matchWrap());
+        Button report = button("⚑");
+        report.setContentDescription("الإبلاغ عن اللحظة");
+        report.setTextSize(10);
+        report.setMinHeight(dp(30));
+        report.setOnClickListener(v -> askMomentReport(post));
+        detail.addView(report, new LinearLayout.LayoutParams(dp(34), dp(30)));
         new AlertDialog.Builder(requireContext()).setTitle("اللحظة").setView(detail)
-            .setPositiveButton("إعجاب", (d, w) -> like(post))
-            .setNeutralButton("تعليق", (d, w) -> comments(post))
             .setNegativeButton("إغلاق", null).show();
+    }
+
+    private void showFullImage(String imageUrl, Map<String, Object> post) {
+        if (imageUrl == null || imageUrl.trim().isEmpty()) return;
+        android.app.Dialog dialog = new android.app.Dialog(requireContext(),
+                android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        LinearLayout page = new LinearLayout(requireContext());
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(0xFF08080B);
+        page.setPadding(dp(12), dp(14), dp(12), dp(12));
+        LinearLayout top = new LinearLayout(requireContext());
+        top.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        Button close = button("✕");
+        close.setTextColor(0xFFFFFFFF);
+        close.setBackground(rounded(0xFF29262D, 0xFF29262D, dp(18)));
+        close.setOnClickListener(v -> dialog.dismiss());
+        top.addView(close, new LinearLayout.LayoutParams(dp(42), dp(42)));
+        page.addView(top, matchWrap());
+        ImageView full = new ImageView(requireContext());
+        full.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        full.setAdjustViewBounds(false);
+        LinearLayout.LayoutParams imageLp = new LinearLayout.LayoutParams(-1, 0, 1);
+        imageLp.topMargin = dp(8);
+        imageLp.bottomMargin = dp(8);
+        page.addView(full, imageLp);
+        Glide.with(this).load(imageUrl).into(full);
+        String bodyText = string(post, "body");
+        if (!bodyText.isEmpty()) {
+            TextView caption = text(bodyText, 14, 0xFFF4F0F4, false);
+            caption.setMaxLines(3);
+            page.addView(caption, matchWrap());
+        }
+        LinearLayout actions = new LinearLayout(requireContext());
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        Button like = button((Boolean.TRUE.equals(post.get("likedByMe")) ? "♥  " : "♡  ")
+                + number(post.get("likeCount")));
+        styleButton(like, 0xFFFFE7EF, 0xFFE51E55, dp(18));
+        like.setOnClickListener(v -> {
+            like(post);
+            dialog.dismiss();
+        });
+        Button comment = button("💬  " + number(post.get("commentCount")));
+        styleButton(comment, 0xFF29262D, 0xFFFFFFFF, dp(18));
+        comment.setOnClickListener(v -> {
+            dialog.dismiss();
+            comments(post);
+        });
+        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(0, dp(46), 1);
+        actionLp.rightMargin = dp(6);
+        actions.addView(like, actionLp);
+        actions.addView(comment, new LinearLayout.LayoutParams(0, dp(46), 1));
+        page.addView(actions, matchWrap());
+        dialog.setContentView(page);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(-1, -1);
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.black);
+        }
     }
 
     private void askMomentReport(Map<String, Object> post) {
