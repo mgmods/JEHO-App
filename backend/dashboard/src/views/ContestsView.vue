@@ -25,6 +25,30 @@
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
 
+    <section class="glass p-3 mb-3 room-pk-control" aria-label="إدارة تحديات PK بين الرومات">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <i class="bi bi-lightning-charge-fill text-warning"></i>
+            <strong>تحديات PK بين الرومات</strong>
+            <span class="badge" :class="roomPkEnabled ? 'text-bg-success' : 'text-bg-secondary'">
+              {{ roomPkEnabled ? 'مفعّلة' : 'متوقفة' }}
+            </span>
+          </div>
+          <p class="small text-secondary mb-0">تحكم عام بالميزة. عند الإيقاف تختفي تحديات الرومات من التطبيق ويتوقف احتساب نقاطها. لا يؤثر هذا الخيار على الصوت أو المقاعد.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-check form-switch mb-0">
+            <input v-model="roomPkDraft" class="form-check-input" type="checkbox" role="switch" :disabled="savingRoomPk" />
+            <span class="form-check-label small">{{ roomPkDraft ? 'تشغيل' : 'إيقاف' }}</span>
+          </label>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="savingRoomPk || roomPkDraft === roomPkEnabled" @click="saveRoomPkSetting">
+            {{ savingRoomPk ? 'جارٍ الحفظ…' : 'حفظ الحالة' }}
+          </button>
+        </div>
+      </div>
+    </section>
+
     <div class="glass overflow-hidden mb-3">
       <img :src="banner" alt="Weekly contest" class="w-100 contest-banner" @error="onBannerError" />
     </div>
@@ -312,7 +336,7 @@ import { useBulkSelection } from '@/composables/useBulkSelection'
 import { runBulk } from '@/composables/useBulk'
 import BulkActionBar from '@/components/BulkActionBar.vue'
 import BulkCheck from '@/components/BulkCheck.vue'
-import { contestsApi } from '@/api'
+import { contestsApi, settingsApi } from '@/api'
 
 const { t, locale } = useI18n()
 
@@ -329,6 +353,9 @@ const saving = ref(false)
 const showEditor = ref(false)
 const editingId = ref(null)
 const bulkBusy = ref(false)
+const roomPkEnabled = ref(false)
+const roomPkDraft = ref(false)
+const savingRoomPk = ref(false)
 
 const {
   selectedIds,
@@ -730,12 +757,41 @@ async function doDeleteContest(c) {
   await loadContests()
 }
 
+async function loadRoomPkSetting() {
+  const { data, error: err } = await settingsApi.get()
+  if (err) return
+  const raw = data?.data ?? data ?? {}
+  const settings = raw.settings ?? raw.items ?? raw
+  const value = settings?.['features.room_pk_enabled'] ?? settings?.roomPkEnabled ?? false
+  roomPkEnabled.value = ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase())
+  roomPkDraft.value = roomPkEnabled.value
+}
+
+async function saveRoomPkSetting() {
+  savingRoomPk.value = true
+  const { error: err } = await settingsApi.update({ 'features.room_pk_enabled': String(!!roomPkDraft.value) })
+  savingRoomPk.value = false
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    roomPkDraft.value = roomPkEnabled.value
+    return
+  }
+  roomPkEnabled.value = !!roomPkDraft.value
+  success.value = roomPkEnabled.value ? 'تم تفعيل تحديات PK بين الرومات' : 'تم إيقاف تحديات PK بين الرومات'
+  toast().success(success.value)
+  await loadContests()
+}
+
 async function reload() {
+  await loadRoomPkSetting()
   await loadContests()
   if (selected.value) await openDetail(selected.value)
 }
 
-onMounted(loadContests)
+onMounted(async () => {
+  await Promise.all([loadContests(), loadRoomPkSetting()])
+})
 </script>
 
 <style scoped>
