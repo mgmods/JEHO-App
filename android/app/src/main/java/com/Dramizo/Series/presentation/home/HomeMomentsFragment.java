@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.graphics.drawable.GradientDrawable;
 import android.view.View;
 import android.view.ViewGroup;
@@ -398,6 +400,20 @@ public class HomeMomentsFragment extends Fragment {
             if (frameUrl.isEmpty()) frameUrl = string(post, "avatarFrameUrl");
             if (frameUrl.isEmpty()) frameUrl = string(post, "equippedFrameUrl");
             AvatarCosmetics.bindStacked(avatar, avatarFrame, avatarUrl, frameUrl);
+            if (!frameUrl.isEmpty()) {
+                // A light, view-local motion keeps profile frames visibly animated
+                // even when the equipped artwork is a still PNG.
+                ObjectAnimator framePulse = ObjectAnimator.ofFloat(avatarFrame, View.SCALE_X, 1f, 1.055f);
+                framePulse.setDuration(950);
+                framePulse.setRepeatMode(ValueAnimator.REVERSE);
+                framePulse.setRepeatCount(ValueAnimator.INFINITE);
+                framePulse.start();
+                ObjectAnimator frameTilt = ObjectAnimator.ofFloat(avatarFrame, View.ROTATION, -2f, 2f);
+                frameTilt.setDuration(1500);
+                frameTilt.setRepeatMode(ValueAnimator.REVERSE);
+                frameTilt.setRepeatCount(ValueAnimator.INFINITE);
+                frameTilt.start();
+            }
             avatarStack.addView(avatar);
             avatarStack.addView(avatarFrame);
             LinearLayout authorInfo = new LinearLayout(requireContext());
@@ -584,6 +600,10 @@ public class HomeMomentsFragment extends Fragment {
         if (string(post, "userId").equals(myId)) {
             addOwnerMomentActions(detail, post);
         } else {
+            Button message = button("مراسلة صاحب اللحظة");
+            styleButton(message, 0xFFF7F2F6, 0xFF8C2451, dp(12));
+            message.setOnClickListener(v -> openMomentAuthorChat(post));
+            detail.addView(message, new LinearLayout.LayoutParams(-1, dp(36)));
             Button report = button("⚑ إبلاغ");
             report.setContentDescription("الإبلاغ عن اللحظة");
             report.setTextSize(10);
@@ -644,6 +664,17 @@ public class HomeMomentsFragment extends Fragment {
         String myId = container.getSessionManager().getUserId();
         if (string(post, "userId").equals(myId)) {
             addOwnerMomentActions(actions, post);
+        } else {
+            Button message = button("مراسلة");
+            styleButton(message, 0xFF29262D, 0xFFFFFFFF, dp(12));
+            message.setTextSize(11);
+            message.setOnClickListener(v -> {
+                dialog.dismiss();
+                openMomentAuthorChat(post);
+            });
+            LinearLayout.LayoutParams messageLp = new LinearLayout.LayoutParams(-2, dp(36));
+            messageLp.rightMargin = dp(6);
+            actions.addView(message, messageLp);
         }
         Button report = button("⚑ إبلاغ");
         report.setContentDescription("الإبلاغ عن اللحظة");
