@@ -408,8 +408,7 @@ public class HomeMomentsFragment extends Fragment {
             String publicId = string(post, "publicId");
             String createdAt = string(post, "createdAt");
             String dateLabel = createdAt.isEmpty() ? "" : (createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt);
-            TextView authorMeta = text("ID: " + (publicId.isEmpty() ? "—" : publicId)
-                    + (dateLabel.isEmpty() ? "" : "   •   " + dateLabel), 11, 0xFF8B8491, false);
+            TextView authorMeta = text(dateLabel, 10, 0xFF8B8491, false);
             authorMeta.setPadding(0, dp(3), 0, 0);
             authorInfo.addView(author, matchWrap());
             authorInfo.addView(authorMeta, matchWrap());
@@ -424,7 +423,19 @@ public class HomeMomentsFragment extends Fragment {
             String myId = container.getSessionManager().getUserId();
             followTop.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
             followTop.setOnClickListener(v -> followAuthor(authorId, followTop));
-            authorRow.addView(followTop, new LinearLayout.LayoutParams(dp(82), dp(32)));
+            authorRow.addView(followTop, new LinearLayout.LayoutParams(dp(68), dp(28)));
+            followTop.setMinHeight(dp(28));
+            if (!authorId.isEmpty() && !authorId.equals(myId)) {
+                Button messageTop = button("مراسلة");
+                styleButton(messageTop, 0xFFF7F2F6, 0xFF8C2451, dp(12));
+                messageTop.setTextSize(10);
+                messageTop.setPadding(dp(3), 0, dp(3), 0);
+                messageTop.setMinHeight(dp(28));
+                messageTop.setOnClickListener(v -> openMomentAuthorChat(post));
+                LinearLayout.LayoutParams messageLp = new LinearLayout.LayoutParams(dp(62), dp(28));
+                messageLp.leftMargin = dp(4);
+                authorRow.addView(messageTop, messageLp);
+            }
             View.OnClickListener openAuthor = v -> {
                 if (authorId.isEmpty()) return;
                 Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class);
@@ -434,20 +445,25 @@ public class HomeMomentsFragment extends Fragment {
             authorRow.setOnClickListener(openAuthor);
             avatar.setOnClickListener(openAuthor);
             item.addView(authorRow, matchWrap());
-            Button report = button("⚑");
-            report.setContentDescription("الإبلاغ عن اللحظة");
-            report.setTextSize(10);
-            report.setPadding(dp(4), 0, dp(4), 0);
-            report.setMinHeight(dp(26));
-            report.setTextColor(0xFFB3261E);
-            report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(9), dp(1)));
-            report.setOnClickListener(v -> askMomentReport(post));
             LinearLayout reportRow = new LinearLayout(requireContext());
-            reportRow.setGravity(Gravity.END);
+            reportRow.setOrientation(LinearLayout.HORIZONTAL);
+            reportRow.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
             LinearLayout.LayoutParams reportRowLp = matchWrap();
             reportRowLp.topMargin = dp(2);
             reportRowLp.bottomMargin = dp(2);
-            reportRow.addView(report, new LinearLayout.LayoutParams(dp(30), dp(26)));
+            if (!authorId.isEmpty() && authorId.equals(myId)) {
+                addOwnerMomentActions(reportRow, post);
+            } else {
+                Button report = button("⚑ إبلاغ");
+                report.setContentDescription("الإبلاغ عن اللحظة");
+                report.setTextSize(10);
+                report.setPadding(dp(7), 0, dp(7), 0);
+                report.setMinHeight(dp(26));
+                report.setTextColor(0xFFB3261E);
+                report.setBackground(rounded(0xFFFFF4F4, 0xFFFFE2E2, dp(9), dp(1)));
+                report.setOnClickListener(v -> askMomentReport(post));
+                reportRow.addView(report, new LinearLayout.LayoutParams(-2, dp(27)));
+            }
             item.addView(reportRow, reportRowLp);
             String body = string(post, "body");
             if (!body.isEmpty()) {
@@ -458,7 +474,7 @@ public class HomeMomentsFragment extends Fragment {
             String image = string(post, "imageUrl");
             if (!image.isEmpty()) {
                 ImageView photo = new ImageView(requireContext());
-                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(124)));
+                photo.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(100)));
                 photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 photo.setBackground(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)));
                 photo.setClipToOutline(true);
@@ -469,7 +485,7 @@ public class HomeMomentsFragment extends Fragment {
                     .placeholder(rounded(0xFFF3F0F4, 0xFFF3F0F4, dp(14)))
                     .error(rounded(0xFFFFE7EF, 0xFFFFE7EF, dp(14)))
                     .centerCrop().into(photo);
-                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(124));
+                LinearLayout.LayoutParams photoLp = new LinearLayout.LayoutParams(-1, dp(100));
                 photoLp.topMargin = dp(3);
                 photoLp.bottomMargin = dp(7);
                 item.addView(photo, photoLp);
@@ -564,12 +580,17 @@ public class HomeMomentsFragment extends Fragment {
         actions.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
         actions.addView(comment, new LinearLayout.LayoutParams(0, dp(42), 1));
         detail.addView(actions, matchWrap());
-        Button report = button("⚑");
-        report.setContentDescription("الإبلاغ عن اللحظة");
-        report.setTextSize(10);
-        report.setMinHeight(dp(30));
-        report.setOnClickListener(v -> askMomentReport(post));
-        detail.addView(report, new LinearLayout.LayoutParams(dp(34), dp(30)));
+        String myId = container.getSessionManager().getUserId();
+        if (string(post, "userId").equals(myId)) {
+            addOwnerMomentActions(detail, post);
+        } else {
+            Button report = button("⚑ إبلاغ");
+            report.setContentDescription("الإبلاغ عن اللحظة");
+            report.setTextSize(10);
+            report.setMinHeight(dp(30));
+            report.setOnClickListener(v -> askMomentReport(post));
+            detail.addView(report, new LinearLayout.LayoutParams(-2, dp(30)));
+        }
         new AlertDialog.Builder(requireContext()).setTitle("اللحظة").setView(detail)
             .setNegativeButton("إغلاق", null).show();
     }
@@ -620,7 +641,11 @@ public class HomeMomentsFragment extends Fragment {
             dialog.dismiss();
             comments(post);
         });
-        Button report = button("⚑");
+        String myId = container.getSessionManager().getUserId();
+        if (string(post, "userId").equals(myId)) {
+            addOwnerMomentActions(actions, post);
+        }
+        Button report = button("⚑ إبلاغ");
         report.setContentDescription("الإبلاغ عن اللحظة");
         report.setTextSize(10);
         report.setTextColor(0xFFFF9BAF);
@@ -629,13 +654,14 @@ public class HomeMomentsFragment extends Fragment {
             dialog.dismiss();
             askMomentReport(post);
         });
+        if (string(post, "userId").equals(myId)) report.setVisibility(View.GONE);
         LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(0, dp(46), 1);
         actionLp.rightMargin = dp(6);
         actions.addView(like, actionLp);
         LinearLayout.LayoutParams commentLp = new LinearLayout.LayoutParams(0, dp(46), 1);
         commentLp.rightMargin = dp(6);
         actions.addView(comment, commentLp);
-        actions.addView(report, new LinearLayout.LayoutParams(dp(42), dp(40)));
+        actions.addView(report, new LinearLayout.LayoutParams(-2, dp(36)));
         page.addView(actions, matchWrap());
         dialog.setContentView(page);
         dialog.show();
@@ -643,6 +669,111 @@ public class HomeMomentsFragment extends Fragment {
             dialog.getWindow().setLayout(-1, -1);
             dialog.getWindow().setBackgroundDrawableResource(android.R.color.black);
         }
+    }
+
+    private void addOwnerMomentActions(LinearLayout parent, Map<String, Object> post) {
+        Button edit = button("✎ تعديل");
+        styleButton(edit, 0xFFF6F1F5, 0xFF8C2451, dp(10));
+        edit.setTextSize(10);
+        edit.setMinHeight(dp(28));
+        edit.setPadding(dp(7), 0, dp(7), 0);
+        edit.setOnClickListener(v -> editMoment(post));
+        Button delete = button("حذف");
+        styleButton(delete, 0xFFFFEEEE, 0xFFB3261E, dp(10));
+        delete.setTextSize(10);
+        delete.setMinHeight(dp(28));
+        delete.setPadding(dp(7), 0, dp(7), 0);
+        LinearLayout.LayoutParams editLp = new LinearLayout.LayoutParams(-2, dp(28));
+        editLp.rightMargin = dp(5);
+        parent.addView(edit, editLp);
+        parent.addView(delete, new LinearLayout.LayoutParams(-2, dp(28)));
+        delete.setOnClickListener(v -> new AlertDialog.Builder(requireContext())
+                .setTitle("حذف اللحظة")
+                .setMessage("هل تريد حذف هذه اللحظة نهائياً؟ ستختفي من جميع المستخدمين.")
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("حذف", (d, w) -> deleteMoment(post))
+                .show());
+    }
+
+    private void editMoment(Map<String, Object> post) {
+        EditText body = new EditText(requireContext());
+        body.setText(string(post, "body"));
+        body.setHint("اكتب نص اللحظة");
+        body.setMinLines(3);
+        body.setMaxLines(8);
+        body.setGravity(Gravity.TOP | Gravity.START);
+        body.setPadding(dp(12), dp(10), dp(12), dp(10));
+        new AlertDialog.Builder(requireContext())
+                .setTitle("تعديل اللحظة")
+                .setView(body)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("حفظ", (dialog, which) -> {
+                    String id = string(post, "id");
+                    Map<String, Object> payload = new HashMap<>();
+                    payload.put("body", body.getText().toString().trim());
+                    payload.put("imageUrl", string(post, "imageUrl").isEmpty() ? null : string(post, "imageUrl"));
+                    payload.put("visibility", string(post, "visibility").isEmpty() ? "public" : string(post, "visibility"));
+                    runIo(() -> {
+                        try {
+                            Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().updateMoment(id, payload).execute();
+                            if (!isAdded()) return;
+                            requireActivity().runOnUiThread(() -> {
+                                if (response.isSuccessful() && response.body() != null && response.body().success) {
+                                    Toast.makeText(requireContext(), "تم تعديل اللحظة", Toast.LENGTH_SHORT).show();
+                                    loadFeed();
+                                } else {
+                                    Toast.makeText(requireContext(), "تعذر تعديل اللحظة", Toast.LENGTH_LONG).show();
+                                }
+                            });
+                        } catch (Exception e) { showError("تعذر تعديل اللحظة، تحقق من الاتصال"); }
+                    });
+                }).show();
+    }
+
+    private void deleteMoment(Map<String, Object> post) {
+        String id = string(post, "id");
+        runIo(() -> {
+            try {
+                Response<ApiResponse<Map<String, Object>>> response = container.getUserApi().deleteMoment(id).execute();
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (response.isSuccessful() && response.body() != null && response.body().success) {
+                        Toast.makeText(requireContext(), "تم حذف اللحظة من جميع المستخدمين", Toast.LENGTH_SHORT).show();
+                        loadFeed();
+                    } else {
+                        Toast.makeText(requireContext(), "تعذر حذف اللحظة", Toast.LENGTH_LONG).show();
+                    }
+                });
+            } catch (Exception e) { showError("تعذر حذف اللحظة، تحقق من الاتصال"); }
+        });
+    }
+
+    private void openMomentAuthorChat(Map<String, Object> post) {
+        String peerId = string(post, "userId");
+        if (peerId.isEmpty()) return;
+        runIo(() -> {
+            try {
+                Map<String, String> payload = new HashMap<>();
+                payload.put("peerId", peerId);
+                Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto>> response =
+                        container.getChatApi().create(payload).execute();
+                if (!response.isSuccessful() || response.body() == null || !response.body().success
+                        || response.body().data == null || response.body().data.id == null) {
+                    throw new IllegalStateException("conversation unavailable");
+                }
+                com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationDto conversation = response.body().data;
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.chat.ChatConversationActivity.class);
+                    intent.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_CONVERSATION_ID, conversation.id);
+                    intent.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_PEER_ID, peerId);
+                    intent.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_TITLE,
+                            string(post, "displayName").isEmpty() ? string(post, "username") : string(post, "displayName"));
+                    intent.putExtra(com.Dramizo.Series.presentation.chat.ChatConversationActivity.EXTRA_AVATAR, string(post, "avatarUrl"));
+                    startActivity(intent);
+                });
+            } catch (Exception e) { showError("تعذر فتح المراسلة؛ تحقق من الاتصال أو إعدادات الرسائل"); }
+        });
     }
 
     private void askMomentReport(Map<String, Object> post) {
@@ -902,9 +1033,7 @@ public class HomeMomentsFragment extends Fragment {
         authorLine.setGravity(Gravity.CENTER_VERTICAL);
         TextView author = text(name, 13, 0xFF302B35, true);
         authorLine.addView(author, new LinearLayout.LayoutParams(0, -2, 1));
-        TextView id = text("ID " + (string(comment, "publicId").isEmpty() ? "—" : string(comment, "publicId")),
-                10, 0xFF918996, false);
-        authorLine.addView(id, new LinearLayout.LayoutParams(-2, -2));
+        
         card.addView(authorLine, matchWrap());
         TextView body = text(string(comment, "body"), 14, 0xFF413B46, false);
         body.setPadding(0, dp(3), 0, dp(5));
