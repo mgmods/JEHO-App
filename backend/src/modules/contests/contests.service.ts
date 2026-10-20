@@ -50,7 +50,7 @@ export class ContestsService implements OnModuleInit {
     if (cached !== null) return cached;
     try {
       const setting = await this.settingsRepo.findOne({ where: { key: 'features.room_pk_enabled' } });
-      const raw = String(setting?.value ?? 'false').trim().toLowerCase();
+      const raw = String(setting?.value ?? 'true').trim().toLowerCase();
       const value = ['1', 'true', 'yes', 'on'].includes(raw);
       cacheRoomPkEnabled(value, now);
       return value;

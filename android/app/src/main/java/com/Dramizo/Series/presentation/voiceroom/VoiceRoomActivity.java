@@ -195,7 +195,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private volatile String mysteriousEntryEffectUrl;
     @Nullable private volatile String mysteriousMessageEffectUrl;
     private volatile boolean selfGiftAllowed = false;
-    private volatile boolean luckyCannonEnabled = false;
+    private volatile boolean luckyCannonEnabled = true;
     private volatile boolean luckyCannonSoundEnabled = true;
     private volatile int luckyCannonDurationSeconds = 2;
     @Nullable private FrameLayout luckyCannonLayer;
@@ -3678,8 +3678,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showLuckyCannonAndScheduleHide() {
         if (!luckyCannonEnabled || luckyCannonLayer == null || luckyCannonTargets.isEmpty()) return;
         if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        // Keep the cannon above room chrome, gift overlays, and seat layers.
         luckyCannonLayer.setVisibility(View.VISIBLE);
         luckyCannonLayer.setAlpha(1f);
+        luckyCannonLayer.setElevation(luckyCannonDp(80));
+        luckyCannonLayer.bringToFront();
+        luckyCannonLayer.requestLayout();
+        luckyCannonLayer.invalidate();
         hideLuckyCannonRunnable = this::hideLuckyCannon;
         handler.postDelayed(hideLuckyCannonRunnable, Math.max(1, luckyCannonDurationSeconds) * 1000L);
     }
@@ -9972,7 +9977,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         container.getIoExecutor().execute(() -> {
             Result<Map<String, Object>> result = ApiCall.execute(container.getGiftApi().selfGiftPolicy());
             boolean allowed = false;
-            boolean cannonEnabled = false;
+            // Keep the room cannon available when an older backend omits these optional fields.
+            // An explicit dashboard value of false still disables it.
+            boolean cannonEnabled = true;
             boolean cannonSound = true;
             int cannonDuration = 2;
             if (result.success && result.data != null) {
@@ -9980,7 +9987,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
                         || "1".equals(String.valueOf(value)) || "yes".equalsIgnoreCase(String.valueOf(value));
                 Object ce = result.data.get("luckyCannonEnabled");
-                cannonEnabled = Boolean.TRUE.equals(ce) || "true".equalsIgnoreCase(String.valueOf(ce)) || "1".equals(String.valueOf(ce));
+                if (ce != null) {
+                    cannonEnabled = Boolean.TRUE.equals(ce)
+                            || "true".equalsIgnoreCase(String.valueOf(ce))
+                            || "1".equals(String.valueOf(ce));
+                }
                 Object cs = result.data.get("luckyCannonSoundEnabled");
                 cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
                 Object cd = result.data.get("luckyCannonDurationSeconds");
@@ -10985,6 +10996,48 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                         String senderAvatarUrl) {
         playGiftAnimationRemote(giftName, iconUrl, animationUrl, senderName, comboCount,
                 senderUserId, senderVipLevel, senderAvatarUrl, 1, null);
+    }
+
+    /**
+     * Animated send-count toast for quantity gifts. Counts up quickly while the send is
+     * being presented, then leaves the final selected quantity visible in the normal toast.
+     */
+    public void showGiftSendToastCountUp(
+            @Nullable String senderName,
+            @Nullable String giftName,
+            @Nullable String senderAvatarUrl,
+            @Nullable String giftIconUrl,
+            int quantity
+    ) {
+        final int target = Math.max(1, quantity);
+        if (target <= 1) {
+            showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                    1, 0, "أرسل هدية ×1");
+            return;
+        }
+        // Create the toast once so it stays beside the screen while the number changes.
+        // Re-showing it every frame would restart its entrance/crawl animation.
+        showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
+                1, 0, "أرسل هدية");
+        final android.animation.ValueAnimator animator =
+                android.animation.ValueAnimator.ofInt(1, target);
+        // Keep large batches very fast: X77 finishes in ~450 ms and X177 in ~600 ms.
+        long durationMs = target <= 7 ? 260L
+                : target <= 17 ? 330L
+                : target <= 77 ? 450L
+                : 600L;
+        animator.setDuration(durationMs);
+        animator.setInterpolator(new android.view.animation.LinearInterpolator());
+        animator.addUpdateListener(a -> {
+            if (isFinishing() || isDestroyed()) {
+                a.cancel();
+                return;
+            }
+            if (binding != null && binding.comboGiftView != null) {
+                binding.comboGiftView.updateCountUp((Integer) a.getAnimatedValue());
+            }
+        });
+        animator.start();
     }
 
     /** Gift send toast — profile + gift icon + combo xN (Mikoo crawl strip). */

@@ -113,6 +113,17 @@ public class ComboGiftView extends FrameLayout {
         playCrawl();
     }
 
+    /**
+     * Update the quantity number without restarting the toast's entrance/hold/exit animation.
+     */
+    public void updateCountUp(int count) {
+        if (comboNum == null) return;
+        int value = Math.max(1, count);
+        comboNum.setText(value >= 2 ? ("x" + value) : String.valueOf(value));
+        comboNum.setTextSize(value >= 10 ? 20f : 22f);
+        comboNum.setVisibility(VISIBLE);
+    }
+
     private void bindGiftIcon(@Nullable String giftIconUrl) {
         if (giftIcon == null) return;
         giftIcon.setVisibility(VISIBLE);

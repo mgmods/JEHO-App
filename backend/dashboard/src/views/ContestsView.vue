@@ -378,8 +378,8 @@ const saving = ref(false)
 const showEditor = ref(false)
 const editingId = ref(null)
 const bulkBusy = ref(false)
-const roomPkEnabled = ref(false)
-const roomPkDraft = ref(false)
+const roomPkEnabled = ref(true)
+const roomPkDraft = ref(true)
 const savingRoomPk = ref(false)
 const roomOptions = ref([])
 const roomOptionsLoading = ref(false)
@@ -815,7 +815,14 @@ async function loadRoomPkSetting() {
   if (err) return
   const raw = data?.data ?? data ?? {}
   const settings = raw.settings ?? raw.items ?? raw
-  const value = settings?.['features.room_pk_enabled'] ?? settings?.roomPkEnabled ?? false
+  // Admin settings may be returned as either a key/value object or an array of rows.
+  const row = Array.isArray(settings)
+    ? settings.find((item) => item?.key === 'features.room_pk_enabled')
+    : null
+  const value = row?.value
+    ?? settings?.['features.room_pk_enabled']
+    ?? settings?.roomPkEnabled
+    ?? true
   roomPkEnabled.value = ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase())
   roomPkDraft.value = roomPkEnabled.value
 }
