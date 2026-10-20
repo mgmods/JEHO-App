@@ -11713,6 +11713,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onDestroy() {
+        if (hideLuckyCannonRunnable != null) handler.removeCallbacks(hideLuckyCannonRunnable);
+        if (luckyCannonView != null) luckyCannonView.release();
         unregisterAudioRouteReceiver();
         if (sAliveRoom != null && sAliveRoom.get() == this) {
             sAliveRoom.clear();
