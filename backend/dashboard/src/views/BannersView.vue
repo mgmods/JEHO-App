@@ -184,6 +184,7 @@ import { useI18n } from 'vue-i18n'
 import { settingsApi, uploadsApi } from '@/api'
 import api from '@/api/client'
 import { toast } from '@/composables/useToast'
+import { resolveAsset } from '@/utils/assets'
 import { useBulkSelection } from '@/composables/useBulkSelection'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -246,15 +247,7 @@ const splashError = ref(false)
 let themeConfig = {}
 
 function splashAssetAbsUrl(url) {
-  if (!url) return ''
-  if (/^https?:\/\//i.test(url)) {
-    try {
-      const parsed = new URL(url)
-      if (/^\/uploads\//i.test(parsed.pathname)) return API_ORIGIN + parsed.pathname
-    } catch {}
-    return url
-  }
-  return API_ORIGIN + (url.startsWith('/') ? '' : '/') + url
+  return resolveAsset(url)
 }
 
 function splashAbsUrl(url) {
@@ -387,9 +380,7 @@ function onBulkAction(key) {
 }
 
 function absUrl(u) {
-  if (!u) return ''
-  if (/^https?:\/\//i.test(u)) return u
-  return `${ORIGIN}${u.startsWith('/') ? '' : '/'}${u}`
+  return resolveAsset(u)
 }
 
 function isKnownLink(link) {
