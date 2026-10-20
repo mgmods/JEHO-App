@@ -234,6 +234,12 @@ const routes = [
         meta: { titleKey: 'routes.reports' },
       },
       {
+        path: 'moments',
+        name: 'moments',
+        component: () => import('@/views/ReportsView.vue'),
+        meta: { title: 'إدارة اللحظات' },
+      },
+      {
         path: 'gender-verifications',
         name: 'gender-verifications',
         component: () => import('@/views/GenderVerificationsView.vue'),
