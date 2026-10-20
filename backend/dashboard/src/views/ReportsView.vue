@@ -2,12 +2,35 @@
   <div>
     <PageHeader :title="t('reports.title')" :subtitle="t('reports.subtitle')">
       <template #actions>
-        <button class="btn btn-ghost btn-sm" type="button" @click="load" :disabled="loading">{{ t('common.refresh') }}</button>
+        <button class="btn btn-ghost btn-sm" type="button" @click="refreshAll" :disabled="loading || momentsLoading">{{ t('common.refresh') }}</button>
       </template>
     </PageHeader>
 
     <AlertMessage v-if="error" :message="error" type="warning" @dismiss="error = ''" />
     <AlertMessage v-if="success" :message="success" type="success" @dismiss="success = ''" />
+
+    <div class="glass p-3 mb-3">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div><h5 class="mb-1">إدارة اللحظات</h5><div class="small text-muted">إدارة المنشورات وحذف لحظة أو جميع اللحظات مع التعليقات والإعجابات.</div></div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-secondary" type="button" @click="loadMoments" :disabled="momentsLoading">تحديث القائمة</button>
+          <button class="btn btn-sm btn-outline-danger" type="button" @click="confirmDeleteAllMoments" :disabled="momentsLoading || !moments.length">حذف جميع اللحظات</button>
+        </div>
+      </div>
+      <LoadingSpinner v-if="momentsLoading" />
+      <div v-else-if="!moments.length" class="empty-state">لا توجد لحظات منشورة.</div>
+      <div v-else class="table-responsive">
+        <table class="table table-glass table-hover align-middle">
+          <thead><tr><th>المنشور</th><th>الناشر</th><th>الخصوصية</th><th>التاريخ</th><th></th></tr></thead>
+          <tbody><tr v-for="m in moments" :key="m.id">
+            <td style="min-width:220px;max-width:420px"><div v-if="m.body" class="small text-break">{{ m.body }}</div><a v-if="m.imageUrl" :href="m.imageUrl" target="_blank" rel="noopener noreferrer" class="small">عرض الصورة</a><div class="small text-muted">{{ shortId(m.id) }}</div></td>
+            <td>{{ m.displayName || m.username || 'مستخدم محذوف' }}</td><td>{{ m.visibility || '—' }}</td><td>{{ formatDate(m.createdAt) }}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-danger" type="button" @click="confirmDeleteMoment(m)">حذف</button></td>
+          </tr></tbody>
+        </table>
+      </div>
+      <div class="small text-muted mt-2">تُعرض أحدث 100 لحظة. حذف المنشور يزيله من واجهات جميع المستخدمين.</div>
+    </div>
 
     <div class="glass p-3 mb-3">
       <div class="row g-2 align-items-end">
@@ -116,7 +139,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { reportsApi } from '@/api'
+import { reportsApi, momentsAdminApi } from '@/api'
 import { extractList, formatDate } from '@/composables/useUtils'
 import { toast } from '@/composables/useToast'
 import { askPrompt } from '@/composables/usePrompt'
@@ -132,6 +155,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const { t } = useI18n()
 
 const reports = ref([])
+const moments = ref([])
+const momentsLoading = ref(false)
 const loading = ref(false)
 const error = ref('')
 const success = ref('')
@@ -213,6 +238,37 @@ async function load() {
   reports.value = extractList(data)
 }
 
+async function loadMoments() {
+  momentsLoading.value = true
+  const { data, error: err } = await momentsAdminApi.list({ limit: 100 })
+  momentsLoading.value = false
+  if (err) { toast().danger(err.message || 'تعذر تحميل اللحظات'); return }
+  moments.value = extractList(data)
+}
+async function refreshAll() { await Promise.all([load(), loadMoments()]) }
+function confirmDeleteMoment(moment) {
+  confirmTitle.value = 'حذف اللحظة'
+  confirmMsg.value = 'هل تريد حذف هذه اللحظة نهائياً من جميع المستخدمين؟'
+  pendingAction.value = async () => {
+    const { error: err } = await momentsAdminApi.remove(moment.id)
+    if (err) { error.value = err.message; toast().danger(err.message) }
+    else { success.value = 'تم حذف اللحظة من التطبيق'; toast().success(success.value); await loadMoments() }
+  }
+  confirmOpen.value = true
+}
+function confirmDeleteAllMoments() {
+  confirmTitle.value = 'حذف جميع اللحظات'
+  confirmMsg.value = 'تحذير: سيتم حذف جميع اللحظات المنشورة مع التعليقات والإعجابات نهائياً. هل تريد المتابعة؟'
+  pendingAction.value = async () => {
+    momentsLoading.value = true
+    const { error: err } = await momentsAdminApi.removeAll()
+    momentsLoading.value = false
+    if (err) { error.value = err.message; toast().danger(err.message) }
+    else { success.value = 'تم حذف جميع اللحظات'; toast().success(success.value); moments.value = []; await load() }
+  }
+  confirmOpen.value = true
+}
+
 async function resolve(r) {
   const note = await askPrompt({
     title: t('reports.resolve'),
@@ -249,5 +305,5 @@ async function dismiss(r) {
   }
 }
 
-onMounted(load)
+onMounted(refreshAll)
 </script>
