@@ -323,10 +323,13 @@ export class ContestsService implements OnModuleInit {
       .andWhere('contest.endAt >= :occurredAt', { occurredAt })
       .getMany();
     for (const c of active) {
-      if (c.scope === 'room' && (!context.roomId || c.roomId !== context.roomId)) {
+      const isTeamChallenge = this.isTeamChallenge(c);
+      // Team challenges derive eligibility from sideA/sideB membership, not a single-room scope.
+      if (!isTeamChallenge && c.scope === 'room' && (!context.roomId || c.roomId !== context.roomId)) {
         continue;
       }
       if (
+        !isTeamChallenge &&
         c.scope === 'agency' &&
         (!context.agencyId || c.agencyId !== context.agencyId)
       ) {
@@ -487,7 +490,8 @@ export class ContestsService implements OnModuleInit {
     }
     const title = String(dto.title || '').trim();
     if (!title) throw new BadRequestException('عنوان المسابقة مطلوب');
-    const scope = dto.scope || 'global';
+    // A room-vs-room challenge must be visible and score in both rooms; it is global by design.
+    const scope = dto.challengeType === 'room_vs_room' ? 'global' : (dto.scope || 'global');
     if (scope === 'room' && !dto.roomId) {
       throw new BadRequestException('roomId مطلوب لمسابقات الروم');
     }
@@ -604,7 +608,12 @@ export class ContestsService implements OnModuleInit {
     if (contest.scope === 'agency' && !contest.agencyId) {
       throw new BadRequestException('agencyId مطلوب لمسابقات الوكالة');
     }
-    if (contest.scope === 'global') {
+    if (contest.challengeType === 'room_vs_room') {
+      // A room battle is discoverable from either side, regardless of the editor's prior scope.
+      contest.scope = 'global';
+      contest.roomId = null;
+      contest.agencyId = null;
+    } else if (contest.scope === 'global') {
       contest.roomId = null;
       contest.agencyId = null;
     }
