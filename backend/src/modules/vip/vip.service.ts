@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Optional, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, MoreThan } from 'typeorm';
 import { VipPlan } from '../../database/entities/vip-plan.entity';
@@ -38,14 +38,58 @@ export class PurchaseVipDto {
 }
 
 @Injectable()
-export class VipService implements OnModuleInit {
+export class VipService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VipService.name);
   private static readonly MAX_VIP_LEVEL = 7;
+  private mysteriousModeCleanupTimer?: ReturnType<typeof setInterval>;
 
   /** Additive compatibility patch for deployments that do not run SQL files automatically. */
   async onModuleInit() {
     await this.dataSource.query(
       'ALTER TABLE users ADD COLUMN IF NOT EXISTS "mysteriousMode" boolean NOT NULL DEFAULT false',
+    );
+    // Reconcile only opted-in accounts once a minute; this is a single bounded
+    // SQL update and guarantees expired VIP subscriptions lose anonymous mode.
+    this.mysteriousModeCleanupTimer = setInterval(() => {
+      void this.reconcileMysteriousModes().catch((error) => {
+        this.logger.warn(`Mysterious Man reconciliation failed: ${error?.message || error}`);
+      });
+    }, 60_000);
+    this.mysteriousModeCleanupTimer.unref?.();
+    await this.reconcileMysteriousModes();
+  }
+
+  onModuleDestroy() {
+    if (this.mysteriousModeCleanupTimer) clearInterval(this.mysteriousModeCleanupTimer);
+  }
+
+  private async reconcileMysteriousModes() {
+    const rows = await this.dataSource.query(
+      'SELECT value FROM settings WHERE key = $1 LIMIT 1',
+      ['mysterious_man_config'],
+    );
+    let policy: any = {};
+    try {
+      policy = typeof rows?.[0]?.value === 'string'
+        ? JSON.parse(rows[0].value)
+        : (rows?.[0]?.value || {});
+    } catch {
+      policy = {};
+    }
+    const allowedLevels = Array.isArray(policy.eligibleVipLevels)
+      ? [...new Set(policy.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))]
+      : [];
+    if (policy.enabled !== true || allowedLevels.length === 0) {
+      await this.dataSource.query(
+        'UPDATE users SET "mysteriousMode" = false WHERE "mysteriousMode" = true',
+      );
+      return;
+    }
+    await this.dataSource.query(
+      'UPDATE users u SET "mysteriousMode" = false WHERE u."mysteriousMode" = true AND NOT EXISTS (' +
+      'SELECT 1 FROM user_vips uv WHERE uv."userId" = u.id AND uv."isActive" = true AND uv."expiresAt" > NOW() AND uv.level = ANY($1::int[])' +
+      ')',
+      [allowedLevels],
     );
   }
 
