@@ -321,7 +321,8 @@ export class ContestsService implements OnModuleInit {
     const activeQuery = this.contestsRepo
       .createQueryBuilder('contest')
       .where('contest.startAt <= :occurredAt', { occurredAt })
-      .andWhere('contest.endAt >= :occurredAt', { occurredAt });
+      .andWhere('contest.endAt >= :occurredAt', { occurredAt })
+      .andWhere('contest.status != :endedStatus', { endedStatus: 'ended' });
     // When disabled, omit team challenges from gift-scoring queries to reduce DB work.
     if (!roomPkEnabled) {
       activeQuery.andWhere(
