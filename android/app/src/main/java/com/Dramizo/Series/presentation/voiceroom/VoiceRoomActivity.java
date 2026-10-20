@@ -3629,7 +3629,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void setupLuckyCannonUi() {
-        if (!(binding.getRoot() instanceof ConstraintLayout root)) return;
+        ConstraintLayout root = binding.getRoot();
         FrameLayout layer = new FrameLayout(this);
         layer.setClipChildren(false);
         layer.setClipToPadding(false);
