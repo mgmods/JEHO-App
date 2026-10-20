@@ -71,8 +71,10 @@ export class ContestsService implements OnModuleInit {
     sideB: Record<string, unknown> | null | undefined,
   ) {
     if (challengeType !== 'room_vs_room') return;
-    const idsA = Array.isArray(sideA?.roomIds) ? sideA!.roomIds.map(String).map((id) => id.trim()).filter(Boolean) : [];
-    const idsB = Array.isArray(sideB?.roomIds) ? sideB!.roomIds.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    const rawA = sideA?.roomIds;
+    const rawB = sideB?.roomIds;
+    const idsA = Array.isArray(rawA) ? rawA.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    const idsB = Array.isArray(rawB) ? rawB.map(String).map((id) => id.trim()).filter(Boolean) : [];
     if (idsA.length !== 1 || idsB.length !== 1) {
       throw new BadRequestException('تحدي PK يتطلب تحديد معرّف روم واحد لكل طرف داخل roomIds');
     }
