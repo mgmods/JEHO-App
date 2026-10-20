@@ -208,6 +208,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
+    @Nullable private String luckyCannonRequestId;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -3660,6 +3661,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                    @Nullable List<String> targetIds) {
         if (!luckyCannonEnabled || isFinishing() || isDestroyed()
                 || giftId == null || giftId.isEmpty() || targetIds == null || targetIds.isEmpty()) return;
+        luckyCannonRequestId = null;
         luckyCannonGiftId = giftId;
         luckyCannonGiftIcon = giftIcon;
         luckyCannonGiftName = giftName;
@@ -3699,6 +3701,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
         final String icon = luckyCannonGiftIcon;
+        if (luckyCannonRequestId == null) luckyCannonRequestId = java.util.UUID.randomUUID().toString();
+        final String requestId = luckyCannonRequestId;
         final int quantity = luckyCannonGiftQuantity;
         final List<String> targets = new ArrayList<>(luckyCannonTargets);
         final String currentRoom = roomId;
@@ -3710,11 +3714,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 GiftDtos.SendAllMicRequest request =
                         new GiftDtos.SendAllMicRequest(giftId, targets, quantity, currentRoom, 1);
                 request.cannonLaunch = true;
+                request.requestId = requestId;
                 result = ApiCall.execute(container.getGiftApi().sendAllMic(request));
             } else {
                 GiftDtos.SendGiftRequest request =
                         new GiftDtos.SendGiftRequest(giftId, targets.get(0), quantity, currentRoom, 1);
                 request.cannonLaunch = true;
+                request.requestId = requestId;
                 result = ApiCall.execute(container.getGiftApi().send(request));
             }
             runOnUiThread(() -> {
@@ -3726,6 +3732,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
                 }
+                if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 // The backend's existing room gift event triggers the flight on every room client.
                 // Reset the short visibility timer only after the send was confirmed.
                 showLuckyCannonAndScheduleHide();
