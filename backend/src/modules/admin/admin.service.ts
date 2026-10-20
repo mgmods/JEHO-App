@@ -275,11 +275,18 @@ export class AdminService {
 
   async patchMysteriousManConfig(input: Record<string, unknown>) {
     const cleanUrl = (value: unknown, key: string) => {
-      const url = typeof value === 'string' ? value.trim() : '';
-      if (url && (!/^https?:\/\//i.test(url) || url.length > 2048)) {
-        throw new BadRequestException(`Invalid ${key} URL`);
-      }
-      return url;
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (!raw) return '';
+      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
+      // The upload endpoint intentionally returns same-origin paths such as
+      // /uploads/<uuid>. Accept those paths as well as absolute public URLs.
+      // Reject arbitrary relative paths and non-HTTP schemes.
+      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+      } catch {}
+      throw new BadRequestException(`Invalid ${key} URL`);
     };
     const eligibleVipLevels = Array.isArray(input.eligibleVipLevels)
       ? [...new Set(input.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b)
