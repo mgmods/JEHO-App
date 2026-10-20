@@ -45,9 +45,9 @@ export class ContestsService implements OnModuleInit {
   private roomPkEnabledCache: { value: boolean; checkedAt: number } | null = null;
 
   /** Dashboard-controlled kill switch. Cached briefly to avoid a settings DB read per gift. */
-  private async isRoomPkEnabled(): Promise<boolean> {
+  private async isRoomPkEnabled(forceRefresh = false): Promise<boolean> {
     const now = Date.now();
-    if (this.roomPkEnabledCache && now - this.roomPkEnabledCache.checkedAt < 1500) {
+    if (!forceRefresh && this.roomPkEnabledCache && now - this.roomPkEnabledCache.checkedAt < 1500) {
       return this.roomPkEnabledCache.value;
     }
     try {
@@ -169,7 +169,7 @@ export class ContestsService implements OnModuleInit {
     }
     let items = await qb.getMany();
     // Hide team-vs-team challenges from every client while the dashboard kill switch is off.
-    if (!(await this.isRoomPkEnabled())) items = items.filter((c) => !this.isTeamChallenge(c));
+    if (!(await this.isRoomPkEnabled(true))) items = items.filter((c) => !this.isTeamChallenge(c));
     let joined = new Set<string>();
     if (userId) {
       const mine = await this.entriesRepo.find({ where: { userId } });
@@ -186,7 +186,7 @@ export class ContestsService implements OnModuleInit {
   async get(id: string, userId?: string) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
-    if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled())) {
+    if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled(true))) {
       throw new NotFoundException('تحديات PK متوقفة حالياً');
     }
     const entries = await this.entriesRepo.find({
@@ -233,7 +233,7 @@ export class ContestsService implements OnModuleInit {
         lock: { mode: 'pessimistic_write' },
       });
       if (!contest) throw new NotFoundException('المسابقة غير موجودة');
-      if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled())) {
+      if (this.isTeamChallenge(contest) && !(await this.isRoomPkEnabled(true))) {
         throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
       }
       if (contest.status !== 'active') {
