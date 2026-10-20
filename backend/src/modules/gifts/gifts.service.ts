@@ -92,6 +92,7 @@ export class GiftsService implements OnModuleInit {
     // Schema-only fix is always safe. Catalog seeds never run against live DB.
     await this.ensureGiftCategoryColumn();
     await this.ensureGiftCategoriesTable();
+    await this.ensureGiftSendIdempotencySchema();
     await this.ensureDefaultGiftCategories();
     // Critical: zero diamondValue + Math.min() previously awarded 0 diamonds on paid gifts.
     await this.healZeroDiamondCatalog();
@@ -186,6 +187,26 @@ export class GiftsService implements OnModuleInit {
     } catch (err) {
       this.log.warn(
         `healZeroDiamondCatalog: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Additive schema-only protection for retry-safe cannon sends. Existing gift history is untouched.
+   * One request key may cover many recipients, but the same key/recipient pair cannot be charged twice.
+   */
+  private async ensureGiftSendIdempotencySchema() {
+    try {
+      await this.dataSource.query(
+        'ALTER TABLE gift_sends ADD COLUMN IF NOT EXISTS "requestId" uuid',
+      );
+      await this.dataSource.query(
+        'CREATE UNIQUE INDEX IF NOT EXISTS uq_gift_sends_request_receiver ON gift_sends ("requestId", "receiverId") WHERE "requestId" IS NOT NULL',
+      );
+    } catch (err) {
+      this.log.warn(
+        'Gift-send idempotency schema setup skipped: ' +
+          (err instanceof Error ? err.message : String(err)),
       );
     }
   }
