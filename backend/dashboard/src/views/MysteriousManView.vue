@@ -83,6 +83,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { mysteriousManApi, uploadsApi, vipApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import { useAuthStore } from '@/stores/auth'
 import PageHeader from '@/components/PageHeader.vue'
@@ -102,11 +103,7 @@ const assets = [
   { key: 'messageEffectUrl', title: 'تأثير الرسائل', help: 'يمكن رفع صورة ثابتة أو فيديو أو ملف SVGA.', accept: 'image/png,image/jpeg,image/gif,image/webp,video/mp4,video/webm,video/quicktime,.svga' },
 ]
 function previewUrl(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  const base = String(import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '')
-  return value.startsWith('/uploads/') ? base + value : value
+  return resolveAsset(raw)
 }
 function isImageUrl(raw) { return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(String(raw || '')) }
 function isVideoUrl(raw) { return /\.(mp4|webm|mov)(\?|$)/i.test(String(raw || '')) }
