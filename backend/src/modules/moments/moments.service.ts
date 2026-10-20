@@ -228,6 +228,68 @@ export class MomentsService {
     return { submitted: true, reportId: created.id, status: created.status };
   }
 
+  async update(momentId: string, userId: string, dto: CreateMomentDto) {
+    const [existing] = await this.dataSource.query(
+      'SELECT id, "userId", body, "imageUrl", visibility FROM "jeho_own"."moments" WHERE id = $1',
+      [momentId],
+    );
+    if (!existing) throw new NotFoundException('Moment not found');
+    if (existing.userId !== userId) throw new ForbiddenException('Only the author can edit this moment');
+    const body = dto?.body === undefined ? String(existing.body ?? '') : String(dto.body ?? '').trim();
+    const imageUrl = dto?.imageUrl === undefined ? (existing.imageUrl ?? null) : (dto.imageUrl == null ? null : String(dto.imageUrl).trim());
+    const visibility = dto?.visibility === undefined ? existing.visibility : dto.visibility;
+    if (!['public', 'followers', 'friends', 'private'].includes(visibility)) throw new BadRequestException('Invalid visibility');
+    if (body.length > 2000) throw new BadRequestException('Moment text is too long');
+    if (imageUrl && (imageUrl.length > 1024 || !/^https?:\\/\\//i.test(imageUrl))) throw new BadRequestException('Image URL must be an uploaded HTTP(S) URL');
+    if (!body && !imageUrl) throw new BadRequestException('Add text or an image');
+    const [row] = await this.dataSource.query(
+      'UPDATE "jeho_own"."moments" SET body = $2, "imageUrl" = $3, visibility = $4 WHERE id = $1 RETURNING id, "userId", body, "imageUrl", visibility, "createdAt"',
+      [momentId, body, imageUrl, visibility],
+    );
+    const [author] = await this.dataSource.query(
+      `SELECT username, "displayName", "avatarUrl", "publicId",
+        COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
+                 to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
+                 to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
+       FROM "jeho_own"."users" WHERE id = $1`,
+      [userId],
+    );
+    return { ...row, ...author };
+  }
+
+  async adminList(limit = 100) {
+    const safeLimit = Math.min(200, Math.max(1, Math.trunc(Number(limit) || 100)));
+    return this.dataSource.query(
+      `SELECT m.id, m."userId", m.body, m."imageUrl", m.visibility, m."createdAt",
+              u.username, u."displayName", u."avatarUrl"
+       FROM "jeho_own"."moments" m
+       LEFT JOIN "jeho_own"."users" u ON u.id = m."userId"
+       ORDER BY m."createdAt" DESC LIMIT $1`,
+      [safeLimit],
+    );
+  }
+
+  async adminRemove(momentId: string) {
+    const [row] = await this.dataSource.query(
+      'SELECT id FROM "jeho_own"."moments" WHERE id = $1',
+      [momentId],
+    );
+    if (!row) throw new NotFoundException('Moment not found');
+    await this.dataSource.query('DELETE FROM "jeho_own"."moment_comments" WHERE "momentId" = $1', [momentId]);
+    await this.dataSource.query('DELETE FROM "jeho_own"."moment_likes" WHERE "momentId" = $1', [momentId]);
+    await this.dataSource.query('DELETE FROM "jeho_own"."moments" WHERE id = $1', [momentId]);
+    return { deleted: true };
+  }
+
+  async adminRemoveAll() {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('DELETE FROM "jeho_own"."moment_comments"');
+      await manager.query('DELETE FROM "jeho_own"."moment_likes"');
+      await manager.query('DELETE FROM "jeho_own"."moments"');
+    });
+    return { deleted: true, all: true };
+  }
+
   async remove(momentId: string, userId: string) {
     const [row] = await this.dataSource.query(
       'SELECT "userId" FROM "jeho_own"."moments" WHERE id = $1',
