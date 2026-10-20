@@ -47,7 +47,7 @@
                         android:id="@+id/tabHotWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -57,7 +57,7 @@
                             android:layout_height="wrap_content"
                             android:text="@string/tab_hot"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <View
@@ -73,7 +73,7 @@
                         android:visibility="gone"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -91,7 +91,7 @@
                                 android:alpha="0.45"
                                 android:text="أخرى"
                                 android:textColor="@color/text_primary"
-                                android:textSize="15sp"
+                                android:textSize="13sp"
                                 android:textStyle="bold" />
 
                             <ImageView
@@ -128,7 +128,7 @@
                             android:alpha="0.45"
                             android:text="@string/tab_me_home"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <View
@@ -144,7 +144,7 @@
                         android:id="@+id/tabActivitiesWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
 
@@ -155,7 +155,7 @@
                             android:alpha="0.45"
                             android:text="@string/tab_activities"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
 
                         <View
@@ -171,7 +171,7 @@
                         android:id="@+id/tabMomentsWrap"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="16dp"
+                        android:layout_marginStart="22dp"
                         android:gravity="center_horizontal"
                         android:orientation="vertical">
                         <TextView
@@ -181,7 +181,7 @@
                             android:alpha="0.45"
                             android:text="اللحظات"
                             android:textColor="@color/text_primary"
-                            android:textSize="15sp"
+                            android:textSize="13sp"
                             android:textStyle="bold" />
                         <View
                             android:id="@+id/dotMoments"
@@ -196,16 +196,16 @@
             </HorizontalScrollView>
 
             <FrameLayout
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:background="@android:color/transparent"
                 android:clickable="true"
                 android:focusable="true">
 
                 <ImageView
                     android:id="@+id/btnSearch"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="19dp"
+                    android:layout_height="19dp"
                     android:layout_gravity="center"
                     android:contentDescription="@string/search"
                     android:scaleType="fitCenter" />
@@ -213,8 +213,8 @@
 
             <FrameLayout
                 android:id="@+id/btnMyRoomShortcut"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
                 android:layout_marginEnd="2dp"
                 android:background="@android:color/transparent"
                 android:clickable="true"
@@ -226,7 +226,7 @@
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:text="🏠"
-                    android:textSize="19sp"
+                    android:textSize="16sp"
                     android:contentDescription="@string/my_room" />
             </FrameLayout>
 
