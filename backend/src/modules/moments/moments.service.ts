@@ -109,11 +109,11 @@ export class MomentsService {
       [userId, body, imageUrl, visibility],
     );
     const [author] = await this.dataSource.query(
-      'SELECT username, "displayName", "avatarUrl", "publicId",
+      `SELECT username, "displayName", "avatarUrl", "publicId",
         COALESCE(to_jsonb("users")->>'frameUrl', to_jsonb("users")->>'avatarFrameUrl',
                  to_jsonb("users")->>'equippedFrameUrl', to_jsonb("users")->>'profileFrameUrl',
                  to_jsonb("users")->>'frameImageUrl', to_jsonb("users")->>'currentFrameUrl') AS "frameUrl"
-       FROM "jeho_own"."users" WHERE id = $1',
+       FROM "jeho_own"."users" WHERE id = $1`,
       [userId],
     );
     return { ...row, ...author, likeCount: 0, commentCount: 0, likedByMe: false };
