@@ -334,17 +334,22 @@ public class HomeMomentsFragment extends Fragment {
             authorInfo.setPadding(dp(10), 0, 0, 0);
             TextView author = text(name, 15, 0xFF24212A, true);
             author.setPadding(0, 0, 0, 0);
-            TextView authorMeta = text("@" + string(post, "username"), 11, 0xFF8B8491, false);
-            authorMeta.setPadding(0, dp(2), 0, 0);
+            String publicId = string(post, "publicId");
+            String createdAt = string(post, "createdAt");
+            String dateLabel = createdAt.isEmpty() ? "" : (createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt);
+            TextView authorMeta = text("ID: " + (publicId.isEmpty() ? "—" : publicId)
+                    + (dateLabel.isEmpty() ? "" : "   •   " + dateLabel), 11, 0xFF8B8491, false);
+            authorMeta.setPadding(0, dp(3), 0, 0);
             authorInfo.addView(author, matchWrap());
             authorInfo.addView(authorMeta, matchWrap());
             authorRow.addView(avatar);
             authorRow.addView(authorInfo, new LinearLayout.LayoutParams(0, -2, 1));
-            String createdAt = string(post, "createdAt");
-            if (!createdAt.isEmpty()) {
-                String dateLabel = createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt;
-                authorRow.addView(text(dateLabel, 10, 0xFF9A94A0, false));
-            }
+            Button followTop = button("＋ متابعة");
+            styleButton(followTop, 0xFFE51E55, 0xFFFFFFFF, dp(18));
+            String myId = container.getSessionManager().getUserId();
+            followTop.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
+            followTop.setOnClickListener(v -> followAuthor(authorId));
+            authorRow.addView(followTop, new LinearLayout.LayoutParams(-2, dp(40)));
             View.OnClickListener openAuthor = v -> {
                 if (authorId.isEmpty()) return;
                 Intent intent = new Intent(requireContext(), com.Dramizo.Series.presentation.profile.ProfileActivity.class);
@@ -385,16 +390,8 @@ public class HomeMomentsFragment extends Fragment {
             like.setOnClickListener(v -> like(post));
             Button comments = button("تعليقات " + number(post.get("commentCount")));
             comments.setOnClickListener(v -> comments(post));
-            Button follow = button("متابعة");
-            String myId = container.getSessionManager().getUserId();
-            follow.setEnabled(!authorId.isEmpty() && !authorId.equals(myId));
-            follow.setOnClickListener(v -> followAuthor(authorId));
-            Button share = button("مشاركة");
-            share.setOnClickListener(v -> sharePost(post));
             row.addView(like, new LinearLayout.LayoutParams(0, dp(42), 1));
             row.addView(comments, new LinearLayout.LayoutParams(0, dp(42), 1));
-            row.addView(follow, new LinearLayout.LayoutParams(0, dp(42), 1));
-            row.addView(share, new LinearLayout.LayoutParams(0, dp(42), 1));
             View actionDivider = new View(requireContext());
             actionDivider.setBackgroundColor(0xFFF1EDF2);
             LinearLayout.LayoutParams dividerLp = new LinearLayout.LayoutParams(-1, dp(1));
@@ -410,6 +407,7 @@ public class HomeMomentsFragment extends Fragment {
             reportRow.setGravity(Gravity.END);
             reportRow.addView(report, new LinearLayout.LayoutParams(-2, dp(40)));
             item.addView(reportRow, matchWrap());
+            item.setOnClickListener(v -> showMomentDetails(post));
             feedContainer.addView(item, matchWrap());
         }
     }
@@ -537,16 +535,6 @@ public class HomeMomentsFragment extends Fragment {
         });
     }
 
-    private void sharePost(Map<String, Object> post) {
-        String body = string(post, "body");
-        String image = string(post, "imageUrl");
-        String content = body + (image.isEmpty() ? "" : "\n" + image);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("text/plain");
-        intent.putExtra(Intent.EXTRA_TEXT, content.trim());
-        startActivity(Intent.createChooser(intent, "مشاركة اللحظة"));
-    }
-
     private void like(Map<String, Object> post) {
         String id = string(post, "id");
         runIo(() -> {
@@ -558,21 +546,217 @@ public class HomeMomentsFragment extends Fragment {
     }
 
     private void comments(Map<String, Object> post) {
-        String id = string(post, "id");
+        final String momentId = string(post, "id");
+        final android.app.Dialog dialog = new android.app.Dialog(requireContext());
+        LinearLayout page = new LinearLayout(requireContext());
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setBackgroundColor(0xFFF7F7FA);
+        page.setPadding(dp(16), dp(12), dp(16), dp(12));
+
+        LinearLayout header = new LinearLayout(requireContext());
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text("التعليقات والردود", 20, 0xFF25232A, true);
+        header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
+        Button close = button("إغلاق  ×");
+        close.setOnClickListener(v -> dialog.dismiss());
+        header.addView(close, new LinearLayout.LayoutParams(-2, dp(40)));
+        page.addView(header, matchWrap());
+
+        LinearLayout postPreview = new LinearLayout(requireContext());
+        postPreview.setOrientation(LinearLayout.VERTICAL);
+        postPreview.setPadding(dp(12), dp(10), dp(12), dp(10));
+        postPreview.setBackground(rounded(0xFFFFFFFF, 0xFFECE7ED, dp(14), dp(1)));
+        String authorName = string(post, "displayName");
+        if (authorName.isEmpty()) authorName = string(post, "username");
+        postPreview.addView(text(authorName, 13, 0xFFB70F52, true), matchWrap());
+        String previewBody = string(post, "body");
+        if (!previewBody.isEmpty()) {
+            TextView preview = text(previewBody, 14, 0xFF38343D, false);
+            preview.setMaxLines(3);
+            postPreview.addView(preview, matchWrap());
+        }
+        page.addView(postPreview, withMargins(matchWrap(), 0, dp(8), 0, dp(8)));
+
+        ScrollView scroll = new ScrollView(requireContext());
+        scroll.setFillViewport(false);
+        LinearLayout commentsList = new LinearLayout(requireContext());
+        commentsList.setOrientation(LinearLayout.VERTICAL);
+        scroll.addView(commentsList);
+        page.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final String[] replyTarget = {""};
+        final String[] replyName = {""};
+        TextView replyStatus = text("", 12, 0xFFB70F52, true);
+        replyStatus.setVisibility(View.GONE);
+        page.addView(replyStatus, matchWrap());
+        LinearLayout composerRow = new LinearLayout(requireContext());
+        composerRow.setOrientation(LinearLayout.HORIZONTAL);
+        composerRow.setGravity(Gravity.CENTER_VERTICAL);
+        composerRow.setPadding(0, dp(8), 0, 0);
         EditText input = new EditText(requireContext());
-        input.setHint("اكتب تعليقاً");
-        new AlertDialog.Builder(requireContext()).setTitle("التعليقات")
-            .setView(input).setPositiveButton("إرسال", (d, w) -> {
-                String body = input.getText().toString().trim();
-                if (body.isEmpty()) return;
-                runIo(() -> {
-                    try {
-                        Map<String, String> payload = new HashMap<>(); payload.put("body", body);
-                        container.getUserApi().commentOnMoment(id, payload).execute();
-                        if (isAdded()) requireActivity().runOnUiThread(this::loadFeed);
-                    } catch (Exception e) { showError("تعذر إرسال التعليق"); }
+        input.setHint("اكتب تعليقك بأدب واحترام…");
+        input.setTextSize(14);
+        input.setMinLines(1);
+        input.setMaxLines(4);
+        input.setPadding(dp(13), dp(10), dp(13), dp(10));
+        input.setBackground(rounded(0xFFFFFFFF, 0xFFE4DCE5, dp(22), dp(1)));
+        composerRow.addView(input, new LinearLayout.LayoutParams(0, -2, 1));
+        Button send = button("إرسال  ➤");
+        styleButton(send, 0xFFB70F52, 0xFFFFFFFF, dp(20));
+        LinearLayout.LayoutParams sendLp = new LinearLayout.LayoutParams(-2, dp(46));
+        sendLp.leftMargin = dp(8);
+        composerRow.addView(send, sendLp);
+        page.addView(composerRow, matchWrap());
+
+        Runnable[] refreshComments = new Runnable[1];
+        refreshComments[0] = () -> runIo(() -> {
+            try {
+                Response<ApiResponse<List<Map<String, Object>>>> response =
+                    container.getUserApi().momentComments(momentId).execute();
+                List<Map<String, Object>> rows = response.isSuccessful() && response.body() != null
+                    ? response.body().data : null;
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (!dialog.isShowing()) return;
+                    commentsList.removeAllViews();
+                    if (rows == null || rows.isEmpty()) {
+                        TextView empty = text("كن أول من يكتب تعليقاً على هذه اللحظة", 14, 0xFF8A8490, false);
+                        empty.setGravity(Gravity.CENTER);
+                        commentsList.addView(empty, new LinearLayout.LayoutParams(-1, dp(100)));
+                        return;
+                    }
+                    Map<String, List<Map<String, Object>>> replies = new HashMap<>();
+                    List<Map<String, Object>> topLevel = new ArrayList<>();
+                    for (Map<String, Object> comment : rows) {
+                        String parent = string(comment, "parentCommentId");
+                        if (parent.isEmpty()) topLevel.add(comment);
+                        else {
+                            if (!replies.containsKey(parent)) replies.put(parent, new ArrayList<>());
+                            replies.get(parent).add(comment);
+                        }
+                    }
+                    for (Map<String, Object> comment : topLevel) {
+                        addCommentCard(commentsList, comment, replyTarget, replyName, replyStatus, input);
+                        List<Map<String, Object>> children = replies.get(string(comment, "id"));
+                        if (children != null) {
+                            for (Map<String, Object> child : children) {
+                                addCommentCard(commentsList, child, replyTarget, replyName, replyStatus, input);
+                            }
+                        }
+                    }
+                    for (Map<String, Object> comment : rows) {
+                        String parent = string(comment, "parentCommentId");
+                        if (!parent.isEmpty() && !containsCommentId(topLevel, parent)) {
+                            addCommentCard(commentsList, comment, replyTarget, replyName, replyStatus, input);
+                        }
+                    }
                 });
-            }).setNegativeButton("إغلاق", null).show();
+            } catch (Exception e) {
+                if (isAdded()) requireActivity().runOnUiThread(() ->
+                    Toast.makeText(requireContext(), "تعذر تحميل التعليقات، تحقق من الاتصال", Toast.LENGTH_LONG).show());
+            }
+        });
+        send.setOnClickListener(v -> {
+            String body = input.getText().toString().trim();
+            if (body.isEmpty()) {
+                input.setError("اكتب تعليقاً أولاً");
+                return;
+            }
+            send.setEnabled(false);
+            runIo(() -> {
+                try {
+                    Map<String, String> payload = new HashMap<>();
+                    payload.put("body", body);
+                    if (!replyTarget[0].isEmpty()) payload.put("parentCommentId", replyTarget[0]);
+                    Response<ApiResponse<Map<String, Object>>> response =
+                        container.getUserApi().commentOnMoment(momentId, payload).execute();
+                    if (!response.isSuccessful() || response.body() == null || !response.body().success) {
+                        throw new IllegalStateException("comment rejected");
+                    }
+                    if (!isAdded()) return;
+                    requireActivity().runOnUiThread(() -> {
+                        input.setText("");
+                        replyTarget[0] = "";
+                        replyName[0] = "";
+                        replyStatus.setVisibility(View.GONE);
+                        send.setEnabled(true);
+                        refreshComments[0].run();
+                        loadFeed();
+                    });
+                } catch (Exception e) {
+                    if (isAdded()) requireActivity().runOnUiThread(() -> {
+                        send.setEnabled(true);
+                        Toast.makeText(requireContext(), "تعذر إرسال التعليق؛ حاول مرة أخرى", Toast.LENGTH_LONG).show();
+                    });
+                }
+            });
+        });
+
+        dialog.setContentView(page);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.white);
+            dialog.getWindow().setLayout(-1, -1);
+            dialog.getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        refreshComments[0].run();
+    }
+
+    private void addCommentCard(LinearLayout parent, Map<String, Object> comment,
+            String[] replyTarget, String[] replyName, TextView replyStatus, EditText input) {
+        String name = string(comment, "displayName");
+        if (name.isEmpty()) name = string(comment, "username");
+        if (name.isEmpty()) name = "مستخدم";
+        final String commentId = string(comment, "id");
+        final String displayName = name;
+        String parentId = string(comment, "parentCommentId");
+        LinearLayout card = new LinearLayout(requireContext());
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(parentId.isEmpty() ? 12 : 10), dp(9), dp(12), dp(8));
+        card.setBackground(rounded(parentId.isEmpty() ? 0xFFFFFFFF : 0xFFFFF0F5,
+                parentId.isEmpty() ? 0xFFECE7ED : 0xFFFFD8E5, dp(14), dp(1)));
+        LinearLayout.LayoutParams cardLp = matchWrap();
+        cardLp.bottomMargin = dp(8);
+        if (!parentId.isEmpty()) cardLp.leftMargin = dp(24);
+        LinearLayout authorLine = new LinearLayout(requireContext());
+        authorLine.setOrientation(LinearLayout.HORIZONTAL);
+        authorLine.setGravity(Gravity.CENTER_VERTICAL);
+        TextView author = text(name, 13, 0xFF302B35, true);
+        authorLine.addView(author, new LinearLayout.LayoutParams(0, -2, 1));
+        TextView id = text("ID " + (string(comment, "publicId").isEmpty() ? "—" : string(comment, "publicId")),
+                10, 0xFF918996, false);
+        authorLine.addView(id, new LinearLayout.LayoutParams(-2, -2));
+        card.addView(authorLine, matchWrap());
+        TextView body = text(string(comment, "body"), 14, 0xFF413B46, false);
+        body.setPadding(0, dp(3), 0, dp(5));
+        card.addView(body, matchWrap());
+        Button reply = button("رد على التعليق");
+        reply.setTextColor(0xFFB70F52);
+        reply.setBackground(rounded(0xFFFFF0F5, 0xFFFFD8E5, dp(12), dp(1)));
+        reply.setOnClickListener(v -> {
+            replyTarget[0] = commentId;
+            replyName[0] = displayName;
+            replyStatus.setText("الرد على " + displayName + "  ×");
+            replyStatus.setVisibility(View.VISIBLE);
+            replyStatus.setOnClickListener(x -> {
+                replyTarget[0] = "";
+                replyName[0] = "";
+                replyStatus.setVisibility(View.GONE);
+            });
+            input.setHint("اكتب ردك على " + displayName + "…");
+            input.requestFocus();
+        });
+        LinearLayout replyRow = new LinearLayout(requireContext());
+        replyRow.setGravity(Gravity.END);
+        replyRow.addView(reply, new LinearLayout.LayoutParams(-2, dp(34)));
+        card.addView(replyRow, matchWrap());
+        parent.addView(card, cardLp);
+    }
+
+    private boolean containsCommentId(List<Map<String, Object>> comments, String id) {
+        for (Map<String, Object> comment : comments) if (id.equals(string(comment, "id"))) return true;
+        return false;
     }
 
     private void setComposerEnabled(boolean enabled) {
