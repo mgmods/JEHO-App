@@ -292,7 +292,7 @@ public class ProfileActivity extends ThemedActivity {
             bindGenderIcon(binding.imgGender, user.gender);
 
             final String publicId = user.displayPublicId();
-            binding.tvUsername.setText(publicId.isEmpty() ? "ID:—" : ("ID:" + publicId));
+            binding.tvUsername.setText(publicId.isEmpty() ? "—" : publicId);
             com.Dramizo.Series.util.VanityIdStyle.bind(binding.tvUsername,
                     container.getVanityApi(), publicId, user.vipLevel);
             binding.btnCopyId.setOnClickListener(v -> {
