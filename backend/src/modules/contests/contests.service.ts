@@ -20,6 +20,7 @@ import {
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
+import { cacheRoomPkEnabled, readCachedRoomPkEnabled } from './room-pk-feature';
 
 const SAFE_RICH_PRIZE = 5000;
 const SAFE_GIFTS_PRIZE = 8000;
@@ -42,23 +43,20 @@ export class ContestsService implements OnModuleInit {
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
 
-  private roomPkEnabledCache: { value: boolean; checkedAt: number } | null = null;
-
   /** Dashboard-controlled kill switch. Cached briefly to avoid a settings DB read per gift. */
   private async isRoomPkEnabled(forceRefresh = false): Promise<boolean> {
     const now = Date.now();
-    if (!forceRefresh && this.roomPkEnabledCache && now - this.roomPkEnabledCache.checkedAt < 1500) {
-      return this.roomPkEnabledCache.value;
-    }
+    const cached = forceRefresh ? null : readCachedRoomPkEnabled(now);
+    if (cached !== null) return cached;
     try {
       const setting = await this.settingsRepo.findOne({ where: { key: 'features.room_pk_enabled' } });
       const raw = String(setting?.value ?? 'false').trim().toLowerCase();
       const value = ['1', 'true', 'yes', 'on'].includes(raw);
-      this.roomPkEnabledCache = { value, checkedAt: now };
+      cacheRoomPkEnabled(value, now);
       return value;
     } catch {
       // Fail closed during DB/config errors: PK must not add load during an incident.
-      this.roomPkEnabledCache = { value: false, checkedAt: now };
+      cacheRoomPkEnabled(false, now);
       return false;
     }
   }
