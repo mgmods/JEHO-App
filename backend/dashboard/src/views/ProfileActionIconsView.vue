@@ -33,6 +33,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { settingsApi, uploadsApi } from '@/api'
+import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -56,9 +57,7 @@ const error = ref('')
 const success = ref('')
 
 function absUrl(value) {
-  if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
-  return ORIGIN + (value.startsWith('/') ? '' : '/') + value
+  return resolveAsset(value)
 }
 function storedUrl(value) {
   if (!value) return ''
