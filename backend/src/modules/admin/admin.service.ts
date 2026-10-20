@@ -255,11 +255,13 @@ export class AdminService {
 
   async getMysteriousManConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
-    const defaults = { avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
+    const defaults = { enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
     if (!row?.value) return defaults;
     try {
       const parsed = JSON.parse(row.value);
       return {
+        enabled: parsed.enabled === true,
+        eligibleVipLevels: Array.isArray(parsed.eligibleVipLevels) ? [...new Set(parsed.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b) : [],
         avatarUrl: typeof parsed.avatarUrl === 'string' ? parsed.avatarUrl : '',
         entryMode: parsed.entryMode === 'text' ? 'text' : 'video',
         entryText: typeof parsed.entryText === 'string' ? parsed.entryText.slice(0, 160) : 'دخل الرجل الغامض',
@@ -279,7 +281,12 @@ export class AdminService {
       }
       return url;
     };
+    const eligibleVipLevels = Array.isArray(input.eligibleVipLevels)
+      ? [...new Set(input.eligibleVipLevels.map(Number).filter((level: number) => Number.isInteger(level) && level >= 1 && level <= 7))].sort((a: number, b: number) => a - b)
+      : [];
     const current = {
+      enabled: input.enabled === true,
+      eligibleVipLevels,
       avatarUrl: cleanUrl(input.avatarUrl, 'avatar'),
       entryMode: input.entryMode === 'text' ? 'text' : 'video',
       entryText: (typeof input.entryText === 'string' ? input.entryText.trim() : 'دخل الرجل الغامض').slice(0, 160) || 'دخل الرجل الغامض',
