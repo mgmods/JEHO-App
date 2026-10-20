@@ -65,6 +65,22 @@ export class ContestsService implements OnModuleInit {
     return contest.challengeType === 'room_vs_room' || contest.challengeType === 'agency_vs_agency';
   }
 
+  private validateRoomChallengeSides(
+    challengeType: string | null | undefined,
+    sideA: Record<string, unknown> | null | undefined,
+    sideB: Record<string, unknown> | null | undefined,
+  ) {
+    if (challengeType !== 'room_vs_room') return;
+    const idsA = Array.isArray(sideA?.roomIds) ? sideA!.roomIds.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    const idsB = Array.isArray(sideB?.roomIds) ? sideB!.roomIds.map(String).map((id) => id.trim()).filter(Boolean) : [];
+    if (idsA.length !== 1 || idsB.length !== 1) {
+      throw new BadRequestException('تحدي PK يتطلب تحديد معرّف روم واحد لكل طرف داخل roomIds');
+    }
+    if (idsA[0] === idsB[0]) {
+      throw new BadRequestException('لا يمكن أن يتنافس الروم نفسه ضد نفسه');
+    }
+  }
+
   private emitTeamChallengeEnded(contest: Contest) {
     if (!this.realtime || contest.challengeType !== 'room_vs_room') return;
     const sideA = (contest.sideA || {}) as Record<string, unknown>;
@@ -476,6 +492,7 @@ export class ContestsService implements OnModuleInit {
     if (scope === 'agency' && !dto.agencyId) {
       throw new BadRequestException('agencyId مطلوب لمسابقات الوكالة');
     }
+    this.validateRoomChallengeSides(dto.challengeType || 'individual', dto.sideA, dto.sideB);
     const row = await this.contestsRepo.save(
       this.contestsRepo.create({
         title,
@@ -589,6 +606,7 @@ export class ContestsService implements OnModuleInit {
       contest.roomId = null;
       contest.agencyId = null;
     }
+    this.validateRoomChallengeSides(contest.challengeType, contest.sideA, contest.sideB);
     if (dto.status) {
       const prev = contest.status;
       contest.status = dto.status;
