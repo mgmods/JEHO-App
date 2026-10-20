@@ -208,6 +208,14 @@ public class RoomRepositoryImpl implements RoomRepository {
     }
 
     @Override
+    public Result<Object> removeMemberFromMic(String id, String userId, String reason) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("userId", userId);
+        body.put("reason", reason != null ? reason : "moderator_remove_mic");
+        return ApiCall.execute(api.removeMemberFromMic(id, body));
+    }
+
+    @Override
     public Result<RoomDtos.RoomDto> lockSeat(String id, int seatIndex, boolean locked) {
         Map<String, Object> body = new HashMap<>();
         body.put("seatIndex", seatIndex);
