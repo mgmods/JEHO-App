@@ -170,6 +170,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private android.view.View roomPkProgressB;
     @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
     private boolean roomPkSeatSplitApplied;
+    private final Runnable roomPkRosterPoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || exiting || roomPkCurrentContestId == null
+                    || roomPkCurrentContestId.isEmpty() || "pending".equals(roomPkCurrentContestId)) return;
+            loadRoomPkRosters();
+            handler.postDelayed(this, 3000L);
+        }
+    };
     @Nullable private TextView roomPkActionButton;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
@@ -209,6 +217,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.removeCallbacks(updateRoomPkBannerClock);
         if (roomPkSplitContainer != null) roomPkSplitContainer.setVisibility(View.GONE);
         if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+        handler.removeCallbacks(roomPkRosterPoll);
         hideRoomPkSeatSplit();
     };
     private VoiceRoomViewModel viewModel;
@@ -12965,6 +12974,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
                             payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
                             roomPkCurrentContestId = contest.id;
+                            handler.removeCallbacks(roomPkRosterPoll);
+                            handler.postDelayed(roomPkRosterPoll, 300L);
                             handler.post(() -> {
                                 ensureRoomPkActionButton();
                                 showRoomPkScoreBanner("contest:team-score", payload);
@@ -12980,6 +12991,97 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         // PK status is optional UI; a network issue must never affect room voice.
                     }
                 });
+    }
+
+
+    /** Reads actual rival-room seats without entering or changing its voice connection. */
+    private void loadRoomPkRosters() {
+        final String contestId = roomPkCurrentContestId;
+        if (contestId == null || contestId.isEmpty() || "pending".equals(contestId)
+                || isFinishing() || exiting) return;
+        ContainerProvider.from(this).getContestsApi().roomPkRosters(contestId)
+                .enqueue(new retrofit2.Callback<ApiResponse<JsonObject>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<JsonObject>> call,
+                            retrofit2.Response<ApiResponse<JsonObject>> response) {
+                        if (isFinishing() || exiting || !response.isSuccessful()
+                                || response.body() == null || response.body().data == null
+                                || !contestId.equals(roomPkCurrentContestId)) return;
+                        JsonObject data = response.body().data;
+                        JsonObject a = data.has("roomA") && data.get("roomA").isJsonObject()
+                                ? data.getAsJsonObject("roomA") : new JsonObject();
+                        JsonObject b = data.has("roomB") && data.get("roomB").isJsonObject()
+                                ? data.getAsJsonObject("roomB") : new JsonObject();
+                        String aId = a.has("id") && !a.get("id").isJsonNull() ? a.get("id").getAsString() : "";
+                        JsonObject rival = roomId != null && roomId.equals(aId) ? b : a;
+                        String rivalName = rival.has("title") && !rival.get("title").isJsonNull()
+                                ? rival.get("title").getAsString() : "الروم المنافس";
+                        JsonArray seats = rival.has("seats") && rival.get("seats").isJsonArray()
+                                ? rival.getAsJsonArray("seats") : new JsonArray();
+                        handler.post(() -> renderRoomPkOpponentSeats(rivalName, seats));
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<JsonObject>> call, Throwable error) {
+                        // Keep the latest roster if a temporary network error occurs.
+                    }
+                });
+    }
+
+    private void renderRoomPkOpponentSeats(String rivalName, JsonArray roster) {
+        if (roomPkOpponentSeatPanel == null || isFinishing() || exiting) return;
+        View title = roomPkOpponentSeatPanel.findViewWithTag("room_pk_opponent_title");
+        if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(rivalName, "الروم المنافس"));
+        if (roomPkOpponentSeatPanel.getChildCount() < 2) return;
+        View rowsView = roomPkOpponentSeatPanel.getChildAt(1);
+        if (!(rowsView instanceof android.widget.LinearLayout)) return;
+        android.widget.LinearLayout rows = (android.widget.LinearLayout) rowsView;
+        java.util.Map<Integer, JsonObject> seatsByIndex = new java.util.HashMap<>();
+        for (int i = 0; i < roster.size(); i++) {
+            if (!roster.get(i).isJsonObject()) continue;
+            JsonObject seat = roster.get(i).getAsJsonObject();
+            if (seat.has("seatIndex") && !seat.get("seatIndex").isJsonNull())
+                seatsByIndex.put(seat.get("seatIndex").getAsInt(), seat);
+        }
+        for (int row = 0; row < rows.getChildCount(); row++) {
+            View rowView = rows.getChildAt(row);
+            if (!(rowView instanceof android.widget.LinearLayout)) continue;
+            android.widget.LinearLayout seatRow = (android.widget.LinearLayout) rowView;
+            for (int col = 0; col < seatRow.getChildCount(); col++) {
+                View slotView = seatRow.getChildAt(col);
+                if (!(slotView instanceof android.widget.LinearLayout)) continue;
+                int seatIndex = row * 2 + col + 1;
+                JsonObject seat = seatsByIndex.get(seatIndex);
+                JsonObject user = seat != null && seat.has("user") && seat.get("user").isJsonObject()
+                        ? seat.getAsJsonObject("user") : null;
+                String name = user != null && user.has("displayName") && !user.get("displayName").isJsonNull()
+                        ? user.get("displayName").getAsString() : "فارغ";
+                android.widget.LinearLayout slot = (android.widget.LinearLayout) slotView;
+                if (slot.getChildCount() < 2 || !(slot.getChildAt(0) instanceof FrameLayout)
+                        || !(slot.getChildAt(1) instanceof TextView)) continue;
+                FrameLayout avatar = (FrameLayout) slot.getChildAt(0);
+                avatar.removeAllViews();
+                String avatarUrl = user != null && user.has("avatarUrl") && !user.get("avatarUrl").isJsonNull()
+                        ? user.get("avatarUrl").getAsString() : "";
+                if (!avatarUrl.trim().isEmpty()) {
+                    ImageView photo = new ImageView(this);
+                    photo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    avatar.addView(photo, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                    try { com.bumptech.glide.Glide.with(VoiceRoomActivity.this).load(avatarUrl).circleCrop().into(photo); }
+                    catch (Exception ignored) { }
+                } else {
+                    TextView fallback = new TextView(this);
+                    fallback.setText(user == null ? String.valueOf(seatIndex) : (name.isEmpty() ? "?" : name.substring(0, 1)));
+                    fallback.setTextColor(0xFFEAF4FF);
+                    fallback.setTextSize(11f);
+                    fallback.setGravity(Gravity.CENTER);
+                    avatar.addView(fallback, new FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                }
+                TextView label = (TextView) slot.getChildAt(1);
+                label.setText(name);
+                label.setTextColor(user == null ? 0xFFB8D8FF : Color.WHITE);
+            }
+        }
+        if (roomPkOpponentSeatPanel.getChildCount() > 2
+                && roomPkOpponentSeatPanel.getChildAt(2) instanceof TextView)
+            ((TextView) roomPkOpponentSeatPanel.getChildAt(2)).setText("مقاعد المنافس المباشرة");
     }
 
     private void showRoomPkScoreBanner(String event, @Nullable JsonObject payload) {
