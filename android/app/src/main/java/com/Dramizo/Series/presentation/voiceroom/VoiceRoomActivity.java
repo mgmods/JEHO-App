@@ -164,6 +164,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkActionButton;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private final Set<String> shownRoomPkInvites = new HashSet<>();
     private final Runnable roomPkPendingTimeout = () -> {
         if ("pending".equals(roomPkCurrentContestId)) {
@@ -235,7 +236,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
     @Nullable private String luckyCannonRequestId;
-    private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
     private MikooHashBridge hashBridge;
