@@ -90,6 +90,13 @@ public class HomeFragment extends Fragment {
     private String browseCountry;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private RealtimeClient.RoomListener roomListListener;
+    private final Runnable roomPkRefreshRunnable = new Runnable() {
+        @Override public void run() {
+            if (binding == null || !isAdded()) return;
+            refreshRoomPkStatuses();
+            handler.postDelayed(this, 30000);
+        }
+    };
     private final Runnable roomRefreshRunnable = new Runnable() {
         @Override public void run() {
             if (binding != null && (activeTab == TAB_HOT || activeTab == TAB_LOCATION) && viewModel != null) {
@@ -1275,6 +1282,9 @@ public class HomeFragment extends Fragment {
             handler.postDelayed(bannerAutoScroll, 4500);
         }
         loadWalletBalance();
+        handler.removeCallbacks(roomPkRefreshRunnable);
+        refreshRoomPkStatuses();
+        handler.postDelayed(roomPkRefreshRunnable, 30000);
         if (viewModel == null) return;
         // Resume / return from Games/etc → silent background refresh (no top spinner).
         // Pull-to-refresh still uses loadRooms() / loadFollowingRooms() with visible indicator.
@@ -1299,6 +1309,52 @@ public class HomeFragment extends Fragment {
             attachRoomListRealtime();
             handler.removeCallbacks(roomRefreshRunnable);
             handler.postDelayed(roomRefreshRunnable, 12000);
+        }
+    }
+
+    /** Fetch the authoritative active PK set so every visible room card can show its badge. */
+    private void refreshRoomPkStatuses() {
+        if (!isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            try {
+                retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response =
+                        c.getContestsApi().list().execute();
+                if (!response.isSuccessful() || response.body() == null
+                        || !response.body().success || response.body().data == null
+                        || response.body().data.items == null) return;
+                java.util.Set<String> activeRooms = new java.util.HashSet<>();
+                for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                    if (contest == null || !"room_vs_room".equals(contest.challengeType)
+                            || !"active".equalsIgnoreCase(contest.status)
+                            || contest.sideA == null || contest.sideB == null) continue;
+                    if (contest.sideA.roomIds != null) activeRooms.addAll(contest.sideA.roomIds);
+                    if (contest.sideB.roomIds != null) activeRooms.addAll(contest.sideB.roomIds);
+                }
+                java.util.Set<String> before = com.Dramizo.Series.util.RoomPkState.snapshot();
+                if (before.equals(activeRooms)) return;
+                com.Dramizo.Series.util.RoomPkState.replaceActiveRooms(activeRooms);
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    if (binding == null) return;
+                    notifyRoomCardLists(binding.getRoot());
+                });
+            } catch (Exception ignored) {
+                // PK badges are optional UI and must never block home or voice features.
+            }
+        });
+    }
+
+    private void notifyRoomCardLists(@NonNull View root) {
+        if (root instanceof RecyclerView) {
+            RecyclerView recycler = (RecyclerView) root;
+            if (recycler.getAdapter() != null) recycler.getAdapter().notifyDataSetChanged();
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                notifyRoomCardLists(group.getChildAt(i));
+            }
         }
     }
 
@@ -1353,6 +1409,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onPause() {
         handler.removeCallbacks(roomRefreshRunnable);
+        handler.removeCallbacks(roomPkRefreshRunnable);
         handler.removeCallbacks(offersGiftAnimation);
         handler.removeCallbacks(bannerAutoScroll);
         detachRoomListRealtime();
@@ -1362,6 +1419,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onDestroyView() {
         handler.removeCallbacks(roomRefreshRunnable);
+        handler.removeCallbacks(roomPkRefreshRunnable);
         handler.removeCallbacks(offersGiftAnimation);
         handler.removeCallbacks(bannerAutoScroll);
         detachRoomListRealtime();
