@@ -155,7 +155,10 @@ public final class VanityIdStyle {
         animator.setRepeatCount(ValueAnimator.INFINITE);
         animator.setRepeatMode(ValueAnimator.REVERSE);
         animator.addUpdateListener(a -> {
-            if (!id.equals(view.getTag(R.id.tag_vanity_id_style_key)) || !view.isAttachedToWindow()) { a.cancel(); return; }
+            if (!id.equals(view.getTag(R.id.tag_vanity_id_style_key)) || !view.isAttachedToWindow()) {
+                cancelAnimation(view);
+                return;
+            }
             float f = (float) a.getAnimatedValue();
             float width = Math.max(1f, view.getWidth());
             view.getPaint().setShader(new LinearGradient(-width * f, 0f, width * (1f - f) + width, 0f, colors, null, Shader.TileMode.MIRROR));
@@ -165,8 +168,18 @@ public final class VanityIdStyle {
             ANIMATORS.put(view, animator);
         }
         view.post(() -> {
-            if (id.equals(view.getTag(R.id.tag_vanity_id_style_key)) && view.isAttachedToWindow()) animator.start();
-            else cancelAnimation(view);
+            boolean current;
+            synchronized (ANIMATORS) {
+                current = ANIMATORS.get(view) == animator;
+            }
+            if (!current) {
+                animator.cancel();
+            } else if (id.equals(view.getTag(R.id.tag_vanity_id_style_key))
+                    && view.isAttachedToWindow()) {
+                animator.start();
+            } else {
+                cancelAnimation(view);
+            }
         });
     }
 }
