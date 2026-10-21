@@ -96,11 +96,11 @@ public class ProfileActivity extends ThemedActivity {
             adminEntry.setTextColor(Color.WHITE);
             adminEntry.setGravity(Gravity.CENTER);
             adminEntry.setPadding(16, 16, 16, 16);
-            adminEntry.setBackground(new GradientDrawable(
+            GradientDrawable adminBackground = new GradientDrawable(
                     GradientDrawable.Orientation.RIGHT_LEFT,
-                    new int[] { 0xFF282C63, 0xFF6A4CC4 }).apply {
-                setCornerRadius(18f * getResources().getDisplayMetrics().density);
-            });
+                    new int[] { 0xFF282C63, 0xFF6A4CC4 });
+            adminBackground.setCornerRadius(18f * getResources().getDisplayMetrics().density);
+            adminEntry.setBackground(adminBackground);
             LinearLayout.LayoutParams adminLp = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             adminLp.setMargins(16, 16, 16, 12);
