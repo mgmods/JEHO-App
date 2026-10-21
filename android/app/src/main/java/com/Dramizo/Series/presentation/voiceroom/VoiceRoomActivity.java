@@ -3706,6 +3706,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         root.addView(layer, lp);
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
+        // The enclosing layer owns touch/click so the uploaded icon overlay and drag gesture
+        // share one hit target without intercepting the existing gift send action.
+        cannon.setClickable(false);
+        cannon.setFocusable(false);
         FrameLayout.LayoutParams cannonLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         cannonLp.gravity = Gravity.CENTER;
