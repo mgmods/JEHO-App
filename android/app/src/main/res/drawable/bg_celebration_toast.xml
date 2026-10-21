@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Premium global lucky-win banner: ruby, sapphire and rose with a fine gold edge. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <corners android:radius="18dp" />
-    <gradient
-        android:angle="0"
-        android:startColor="#F52B1027"
-        android:centerColor="#F52B2357"
-        android:endColor="#F56C1B46"
-        android:type="linear" />
-    <stroke
-        android:width="1.5dp"
-        android:color="#F4D8A05A" />
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
 </shape>
