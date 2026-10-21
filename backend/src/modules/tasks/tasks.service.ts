@@ -496,6 +496,19 @@ export class TasksService {
     const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
       ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
       : null;
+    const dayCards = await Promise.all(config.days.map(async (d: any) => {
+      const item = d.type === 'cosmetic' && d.cosmeticCode
+        ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: d.cosmeticCode } })
+        : null;
+      return {
+        ...d,
+        name: item?.name || d.label,
+        previewUrl: item?.previewUrl || null,
+        animationUrl: item?.animationUrl || null,
+        cosmeticType: item?.type || null,
+        claimed: alreadyClaimed && d.day <= state.streak,
+      };
+    }));
     return {
       enabled: config.enabled,
       shouldShow: config.enabled && !alreadyClaimed,
@@ -504,7 +517,7 @@ export class TasksService {
       currentDay: nextDay,
       today,
       reward: day ? { ...day, previewUrl: cosmetic?.previewUrl || null, animationUrl: cosmetic?.animationUrl || null, cosmeticType: cosmetic?.type || null, name: cosmetic?.name || day.label } : null,
-      days: config.days.map((d: any) => ({ ...d, claimed: alreadyClaimed && d.day <= state.streak })),
+      days: dayCards,
     };
   }
 
