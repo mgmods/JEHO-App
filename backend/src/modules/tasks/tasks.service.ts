@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { Wallet } from '../../database/entities/wallet.entity';
+import { Cosmetic } from '../../database/entities/cosmetic.entity';
+import { UserCosmetic } from '../../database/entities/user-cosmetic.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { User } from '../../database/entities/user.entity';
 import {
@@ -410,6 +412,151 @@ export class TasksService {
     await this.settings.save(row);
     this.enabledCache = { value: enabled, at: Date.now() };
     return enabled;
+  }
+
+  private static readonly DAILY_LOGIN_KEY = 'daily_login_rewards.v1';
+  private dailyLoginStateKey(userId: string) { return `daily_login_state:${userId}`; }
+  private defaultDailyLoginConfig() {
+    return {
+      enabled: true,
+      days: [
+        { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
+        { day: 2, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'إطار مؤقت' },
+        { day: 3, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'دخوليّة مؤقتة' },
+        { day: 4, type: 'coins', amount: 200, label: 'عملات ذهبية' },
+        { day: 5, type: 'cosmetic', cosmeticCode: '', durationDays: 1, label: 'كرت دخول' },
+        { day: 6, type: 'coins', amount: 300, label: 'عملات ذهبية' },
+        { day: 7, type: 'coins', amount: 500, label: 'الجائزة الكبرى' },
+      ],
+    };
+  }
+
+  async getDailyLoginConfig() {
+    const row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
+    const fallback = this.defaultDailyLoginConfig();
+    if (!row?.value) return fallback;
+    try {
+      const parsed = JSON.parse(row.value);
+      const days = Array.isArray(parsed?.days) ? parsed.days : fallback.days;
+      return {
+        enabled: parsed?.enabled !== false,
+        days: Array.from({ length: 7 }, (_, i) => {
+          const candidate = days.find((d: any) => Number(d?.day) === i + 1) || fallback.days[i];
+          return { ...fallback.days[i], ...candidate, day: i + 1 };
+        }),
+      };
+    } catch { return fallback; }
+  }
+
+  async saveDailyLoginConfig(input: any) {
+    if (!input || !Array.isArray(input.days) || input.days.length !== 7) {
+      throw new BadRequestException('يجب إعداد مكافآت الأيام السبعة كاملة');
+    }
+    const allowed = new Set(['coins', 'cosmetic']);
+    const days = input.days.map((raw: any, i: number) => {
+      const type = String(raw?.type || 'coins');
+      if (!allowed.has(type)) throw new BadRequestException(`نوع مكافأة اليوم ${i + 1} غير صالح`);
+      const amount = Math.max(0, Math.min(1_000_000_000, Math.floor(Number(raw?.amount) || 0)));
+      const durationDays = Math.max(1, Math.min(365, Math.floor(Number(raw?.durationDays) || 7)));
+      const cosmeticCode = String(raw?.cosmeticCode || '').trim().slice(0, 64);
+      if (type === 'coins' && amount < 1) throw new BadRequestException(`حدد كمية العملات لليوم ${i + 1}`);
+      if (type === 'cosmetic' && !cosmeticCode) throw new BadRequestException(`اختر عنصرًا من كتالوج المتجر لليوم ${i + 1}`);
+      return { day: i + 1, type, amount, cosmeticCode, durationDays, label: String(raw?.label || '').trim().slice(0, 100) };
+    });
+    for (const day of days.filter((d: any) => d.type === 'cosmetic')) {
+      const cosmetic = await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode, isActive: true } });
+      if (!cosmetic) throw new BadRequestException(`العنصر المحدد لليوم ${day.day} غير موجود أو غير نشط`);
+    }
+    const value = JSON.stringify({ enabled: input.enabled !== false, days });
+    let row = await this.settings.findOne({ where: { key: TasksService.DAILY_LOGIN_KEY } });
+    if (!row) row = this.settings.create({ key: TasksService.DAILY_LOGIN_KEY, value, description: 'Seven-day daily login rewards configuration' });
+    else row.value = value;
+    await this.settings.save(row);
+    return JSON.parse(value);
+  }
+
+  private async readDailyLoginState(userId: string) {
+    const row = await this.settings.findOne({ where: { key: this.dailyLoginStateKey(userId) } });
+    if (!row?.value) return { lastClaimDate: '', streak: 0 };
+    try {
+      const state = JSON.parse(row.value);
+      return { lastClaimDate: String(state.lastClaimDate || ''), streak: Math.max(0, Number(state.streak) || 0) };
+    } catch { return { lastClaimDate: '', streak: 0 }; }
+  }
+
+  async dailyLoginStatus(userId: string) {
+    const config = await this.getDailyLoginConfig();
+    const state = await this.readDailyLoginState(userId);
+    const today = this.dayKey();
+    const yesterdayDate = new Date(Date.now() - 86400000);
+    const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
+    const alreadyClaimed = state.lastClaimDate === today;
+    const nextDay = alreadyClaimed ? Math.min(7, Math.max(1, state.streak)) : state.lastClaimDate === yesterday ? (state.streak >= 7 ? 1 : state.streak + 1) : 1;
+    const day = config.days.find((d: any) => d.day === nextDay) || config.days[0];
+    const cosmetic = day?.type === 'cosmetic' && day.cosmeticCode
+      ? await this.dataSource.getRepository(Cosmetic).findOne({ where: { code: day.cosmeticCode } })
+      : null;
+    return {
+      enabled: config.enabled,
+      shouldShow: config.enabled && !alreadyClaimed,
+      alreadyClaimed,
+      streak: state.streak,
+      currentDay: nextDay,
+      today,
+      reward: day ? { ...day, previewUrl: cosmetic?.previewUrl || null, animationUrl: cosmetic?.animationUrl || null, cosmeticType: cosmetic?.type || null, name: cosmetic?.name || day.label } : null,
+      days: config.days.map((d: any) => ({ ...d, claimed: alreadyClaimed && d.day <= state.streak })),
+    };
+  }
+
+  async claimDailyLogin(userId: string) {
+    const config = await this.getDailyLoginConfig();
+    if (!config.enabled) throw new BadRequestException('مكافآت تسجيل الدخول متوقفة حاليًا');
+    const today = this.dayKey();
+    const stateKey = this.dailyLoginStateKey(userId);
+    const yesterdayDate = new Date(Date.now() - 86400000);
+    const yesterday = `${yesterdayDate.getUTCFullYear()}-${String(yesterdayDate.getUTCMonth() + 1).padStart(2, '0')}-${String(yesterdayDate.getUTCDate()).padStart(2, '0')}`;
+    const result = await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`daily-login:${userId}:${today}`]);
+      let stateRow = await manager.findOne(AppSetting, { where: { key: stateKey }, lock: { mode: 'pessimistic_write' } });
+      let state = { lastClaimDate: '', streak: 0 };
+      try { if (stateRow?.value) state = { ...state, ...JSON.parse(stateRow.value) }; } catch {}
+      if (state.lastClaimDate === today) throw new BadRequestException('تم استلام مكافأة اليوم مسبقًا');
+      const dayNo = state.lastClaimDate === yesterday ? (Number(state.streak) >= 7 ? 1 : Number(state.streak) + 1) : 1;
+      const reward: any = config.days.find((d: any) => d.day === dayNo);
+      if (!reward) throw new BadRequestException('مكافأة اليوم غير متاحة');
+      let rewardResult: any = { type: reward.type, amount: 0 };
+      if (reward.type === 'coins') {
+        const amount = Math.max(0, Math.floor(Number(reward.amount) || 0));
+        if (amount < 1) throw new BadRequestException('كمية المكافأة غير صالحة');
+        let wallet = await manager.findOne(Wallet, { where: { userId }, lock: { mode: 'pessimistic_write' } });
+        if (!wallet) wallet = await manager.save(manager.create(Wallet, { userId, coins: 0, diamonds: 0, gamePoints: 0 }));
+        wallet.coins = Number(wallet.coins || 0) + amount;
+        await manager.save(wallet);
+        await manager.save(manager.create(WalletTransaction, {
+          userId, type: TransactionType.LUCKY_REWARD, currency: CurrencyType.COINS, amount,
+          balanceAfter: Number(wallet.coins), referenceType: 'daily_login_reward', referenceId: `${today}:${dayNo}`,
+          description: `مكافأة تسجيل الدخول اليومي - اليوم ${dayNo}`, metadata: { day: dayNo, date: today },
+        }));
+        rewardResult = { type: 'coins', amount, balance: Number(wallet.coins) };
+      } else {
+        const cosmetic = await manager.findOne(Cosmetic, { where: { code: reward.cosmeticCode, isActive: true } });
+        if (!cosmetic) throw new BadRequestException('العنصر المحدد للمكافأة لم يعد متاحًا');
+        const now = new Date();
+        let owned = await manager.findOne(UserCosmetic, { where: { userId, cosmeticId: cosmetic.id }, lock: { mode: 'pessimistic_write' } });
+        const expiry = new Date(now.getTime() + Math.max(1, Number(reward.durationDays) || 7) * 86400000);
+        if (!owned) owned = manager.create(UserCosmetic, { userId, cosmeticId: cosmetic.id, equipped: false, expiresAt: expiry });
+        else if (owned.expiresAt !== null) owned.expiresAt = new Date(Math.max(now.getTime(), new Date(owned.expiresAt || 0).getTime()) + Math.max(1, Number(reward.durationDays) || 7) * 86400000);
+        await manager.save(owned);
+        rewardResult = { type: 'cosmetic', code: cosmetic.code, name: cosmetic.name, previewUrl: cosmetic.previewUrl, expiresAt: owned.expiresAt };
+      }
+      const nextState = { lastClaimDate: today, streak: dayNo };
+      if (!stateRow) stateRow = manager.create(AppSetting, { key: stateKey, value: JSON.stringify(nextState), description: `Daily login streak for ${userId}` });
+      else stateRow.value = JSON.stringify(nextState);
+      await manager.save(stateRow);
+      return { ok: true, message: 'تم الاستلام بنجاح', day: dayNo, reward: rewardResult, streak: dayNo };
+    });
+    if (result.reward?.type === 'coins') this.realtime?.emitToUser(userId, 'wallet:updated', { coins: result.reward.balance, amount: result.reward.amount, reason: 'daily_login_reward' });
+    return result;
   }
 
   private async assertEnabled() {
