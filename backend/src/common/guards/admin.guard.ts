@@ -70,6 +70,11 @@ export class AdminGuard implements CanActivate {
         /\/admin\/mysterious-man(?:\/|$)/.test(path) ||
         /\/admin\/lucky-gift-cannon(?:\/|$)/.test(path) ||
         /\/admin\/support-chest(?:\/|$)/.test(path) ||
+        // Generic account mutation endpoints do not distinguish temporary bans
+        // from permanent bans, so only Super Admin may use them until a dedicated
+        // <=24h temporary-ban API is implemented.
+        (method === 'PATCH' && /\/admin\/users\/[^/]+(?:\/|$)/.test(path)) ||
+        /\/admin\/users\/[^/]+\/(?:ban|unban)(?:\/|$)/.test(path) ||
         /\/admin\/settings(?:\/|$)/.test(path) ||
         /\/admin\/(?:payment-settings|payments|binance-pay|fourthwall|sham-cash|zego|livekit|cp-settings)(?:\/|$)/.test(path) ||
         /\/admin\/coin-packages(?:\/|$)/.test(path) ||
