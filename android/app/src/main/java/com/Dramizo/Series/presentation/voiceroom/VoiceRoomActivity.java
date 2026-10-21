@@ -3937,7 +3937,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Keep one economy request in flight. Rapid presses are queued and each gets its
         // own idempotency key, so taps feel instant without duplicate charges or request storms.
         if (luckyCannonSending) {
-            if (queuedLuckyCannonPresses < 20) queuedLuckyCannonPresses++;
+            queuedLuckyCannonPresses++;
             return;
         }
         final AppContainer container;
