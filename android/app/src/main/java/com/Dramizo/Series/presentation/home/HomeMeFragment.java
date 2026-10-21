@@ -158,6 +158,12 @@ public class HomeMeFragment extends Fragment {
     private boolean keepOnlyAllowedHomeMeViews(View view) {
         if (view == null) return false;
         int id = view.getId();
+        // The admin entry belongs to the native app's "أنا" area. Preserve its
+        // role-gated visibility set by setupAdminConsoleEntry(); never expose it
+        // to regular users just because this screen filters the rest of the profile.
+        if (id == R.id.actionAdminConsole) {
+            return view.getVisibility() == View.VISIBLE;
+        }
         if (id == R.id.myRoomCardMe
                 || id == R.id.actionActivities
                 || id == R.id.subRecentWrap || id == R.id.tvSubRecent || id == R.id.dotSubRecent

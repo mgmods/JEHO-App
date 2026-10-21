@@ -109,6 +109,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(15), dp(16), dp(15))
             background = GradientDrawable(
@@ -119,6 +120,8 @@ class AdminConsoleActivity : ThemedActivity() {
         backButton = TextView(this).apply {
             text = "‹ رجوع"
             textSize = 14f
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(10), dp(10), dp(10))
@@ -150,8 +153,15 @@ class AdminConsoleActivity : ThemedActivity() {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
         }
         root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
-        val scroll = ScrollView(this).apply { clipToPadding = false; setPadding(dp(14), dp(12), dp(14), dp(24)) }
-        body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this).apply {
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            clipToPadding = false
+            setPadding(dp(14), dp(12), dp(14), dp(24))
+        }
+        body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
@@ -199,7 +209,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         brandRow.addView(brandMark)
         val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        addText(brandCopy, "JEHO  •  ADMIN CENTER", 10f, true, 0xFFD9D0FF.toInt())
+        addText(brandCopy, "مركز إدارة JEHO", 10f, true, 0xFFD9D0FF.toInt())
         addText(brandCopy, "مساحة الإدارة والتحكم", 15f, true, Color.WHITE)
         brandRow.addView(brandCopy, LinearLayout.LayoutParams(0, -2, 1f))
         val rolePill = TextView(this).apply {
@@ -427,10 +437,13 @@ class AdminConsoleActivity : ThemedActivity() {
         if (key != "users") module?.let { addSectionIntro(it) }
         when (key) {
             "users" -> {
-                val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 val search = EditText(this).apply {
                     hint = "ابحث بالاسم أو المعرّف"
-                    textSize = 14f
+                    textSize = 15f
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                     setSingleLine(true)
                     setTextColor(TEXT)
                     setHintTextColor(MUTED)
@@ -2368,12 +2381,16 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun formFields(labels: List<String>): Pair<LinearLayout, List<EditText>> {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
             setPadding(dp(20), dp(8), dp(20), dp(4))
         }
         val inputs = labels.map { label ->
             val input = EditText(this).apply {
                 hint = label
-                textSize = 14f
+                textSize = 15f
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                textDirection = View.TEXT_DIRECTION_RTL
+                gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                 setSingleLine(label != "نص الإشعار" && label != "محتوى الرسالة")
                 setTextColor(TEXT)
                 setHintTextColor(MUTED)
@@ -2469,7 +2486,43 @@ class AdminConsoleActivity : ThemedActivity() {
         "level" -> "المستوى"
         "coinPrice" -> "السعر"
         "diamondValue" -> "قيمة الألماس"
-        else -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        "active" -> "نشط"
+        "inactive" -> "غير نشط"
+        "pending" -> "قيد المراجعة"
+        "approved" -> "مقبول"
+        "rejected" -> "مرفوض"
+        "suspended" -> "موقوف مؤقتًا"
+        "banned", "blocked" -> "محظور"
+        "status" -> "الحالة"
+        "id", "userId" -> "المعرّف"
+        "roomId" -> "معرّف الروم"
+        "name", "title" -> "الاسم"
+        "description" -> "الوصف"
+        "message" -> "الرسالة"
+        "type" -> "النوع"
+        "amount" -> "المبلغ"
+        "duration" -> "المدة"
+        "expiresAt" -> "تاريخ الانتهاء"
+        "updatedAt" -> "تاريخ التحديث"
+        "ownerId" -> "معرّف المالك"
+        "ownerName" -> "اسم المالك"
+        "isActive" -> "حالة التفعيل"
+        "isVerified" -> "موثّق"
+        "country" -> "الدولة"
+        "phone" -> "رقم الهاتف"
+        "email" -> "البريد الإلكتروني"
+        "reason" -> "السبب"
+        "adminNote" -> "ملاحظة الإدارة"
+        "reporterId" -> "معرّف المُبلّغ"
+        "targetId" -> "معرّف المُبلّغ عنه"
+        "category" -> "التصنيف"
+        "count" -> "العدد"
+        "total" -> "الإجمالي"
+        "page" -> "الصفحة"
+        "limit" -> "عدد النتائج"
+        else -> key.replace(Regex("([a-z])([A-Z])"), "$1 $2")
+            .replace('_', ' ')
+            .let { raw -> raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
     }
 
     private fun copyToClipboard(label: String, value: String) {
@@ -2503,6 +2556,9 @@ class AdminConsoleActivity : ThemedActivity() {
         val view = TextView(this).apply {
             this.text = text
             textSize = size
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
             setPadding(0, dp(2), 0, dp(3))
@@ -2510,17 +2566,41 @@ class AdminConsoleActivity : ThemedActivity() {
         parent.addView(view)
     }
 
+    /**
+     * Shared JEHO-native action button. One visual language across admin
+     * sections, with RTL layout, rounded surface and visible press feedback.
+     */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
-        textSize = 13f
+        textSize = 14f
         isAllCaps = false
-        minHeight = dp(46)
+        gravity = Gravity.CENTER
+        minHeight = dp(48)
+        minimumHeight = dp(48)
         minWidth = 0
         setTextColor(Color.WHITE)
-        background = roundRect(ACCENT, 14)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textDirection = View.TEXT_DIRECTION_RTL
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+        val shape = GradientDrawable().apply {
+            setColor(ACCENT)
+            cornerRadius = dp(15).toFloat()
+            setStroke(dp(1), 0xFF8069D0.toInt())
+        }
+        val pressed = GradientDrawable().apply {
+            setColor(0xFF4F369D.toInt())
+            cornerRadius = dp(15).toFloat()
+        }
+        background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(0x33FFFFFF),
+            shape,
+            pressed
+        )
         backgroundTintList = null
-        elevation = dp(1).toFloat()
-        setPadding(dp(14), dp(4), dp(14), dp(4))
+        elevation = dp(2).toFloat()
+        stateListAnimator = null
+        setPadding(dp(16), dp(8), dp(16), dp(8))
+        contentDescription = label
         setOnClickListener { action() }
     }
 
