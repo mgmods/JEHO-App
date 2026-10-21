@@ -75,9 +75,9 @@ export class AdminGuard implements CanActivate {
         // Generic account edits and status changes remain Super Admin only.
         // Dedicated temporary-ban endpoints stay available to Admin; ownership
         // and expiry are enforced by SecurityShieldService.
-        ((method === 'PATCH' || method === 'DELETE') && /\\/admin\\/users\\/[^/]+$/.test(path)) ||
-        (method === 'PATCH' && /\\/admin\\/users\\/[^/]+\\/status(?:\\/|$)/.test(path)) ||
-        /\\/admin\\/users\\/[^/]+\\/(?:ban|unban)(?:\\/|$)/.test(path) ||
+        ((method === 'PATCH' || method === 'DELETE') && /\/admin\/users\/[^/]+$/.test(path)) ||
+        (method === 'PATCH' && /\/admin\/users\/[^/]+\/status(?:\/|$)/.test(path)) ||
+        /\/admin\/users\/[^/]+\/(?:ban|unban)(?:\/|$)/.test(path) ||
         /\/admin\/security\/ban-user(?:\/|$)/.test(path) ||
         /\/admin\/settings(?:\/|$)/.test(path) ||
         /\/admin\/(?:payment-settings|payments|binance-pay|fourthwall|sham-cash|zego|livekit|cp-settings)(?:\/|$)/.test(path) ||
