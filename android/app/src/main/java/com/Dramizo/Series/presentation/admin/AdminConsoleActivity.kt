@@ -86,11 +86,7 @@ class AdminConsoleActivity : ThemedActivity() {
         // Only leave the admin console when already on its home screen.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentSection != "home") {
-                    showHome()
-                } else {
-                    finish()
-                }
+                handleAdminBack()
             }
         })
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
@@ -127,7 +123,7 @@ class AdminConsoleActivity : ThemedActivity() {
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(10), dp(10), dp(10))
             visibility = View.GONE
-            setOnClickListener { showHome() }
+            setOnClickListener { handleAdminBack() }
         }
         val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = TextView(this).apply {
@@ -1021,7 +1017,7 @@ class AdminConsoleActivity : ThemedActivity() {
             when (type) {
                 "users", "rooms" -> if (!id.isNullOrBlank()) {
                     card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
-                        showEntityDetailDialog(item, type)
+                        showEntityDetailScreen(item, type)
                     })
                     addText(card, if (type == "users") {
                         when (currentRole) {
@@ -1302,9 +1298,24 @@ class AdminConsoleActivity : ThemedActivity() {
      * Native, grouped detail sheet for users and rooms. Mutations still use the existing
      * AdminApi and are authorized by AdminGuard on the server.
      */
-    private fun showEntityDetailDialog(item: Any, type: String) {
+    private var detailReturnSection = "home"
+
+    private fun handleAdminBack() {
+        when (currentSection) {
+            "userDetail", "roomDetail" -> openModule(detailReturnSection)
+            "home" -> finish()
+            else -> showHome()
+        }
+    }
+
+    private fun showEntityDetailScreen(item: Any, type: String) {
         val id = value(item, "id", "userId", "roomId") ?: return
         val isUser = type == "users"
+        detailReturnSection = type
+        currentSection = if (isUser) "userDetail" else "roomDetail"
+        titleView.text = if (isUser) "تفاصيل المستخدم" else "تفاصيل الروم"
+        backButton.visibility = View.VISIBLE
+        body.removeAllViews()
         val name = value(item, "displayName", "name", "title", "username", "email", "roomName")
             ?: if (isUser) "مستخدم" else "روم"
         val status = value(item, "status", "state", "isActive", "type") ?: "غير محدد"
@@ -1419,15 +1430,7 @@ class AdminConsoleActivity : ThemedActivity() {
             })
         }
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            addView(content)
-        }
-        AlertDialog.Builder(this)
-            .setTitle(if (isUser) "تفاصيل المستخدم" else "تفاصيل الروم")
-            .setView(scroll)
-            .setPositiveButton("إغلاق", null)
-            .show()
+        body.addView(content)
     }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
