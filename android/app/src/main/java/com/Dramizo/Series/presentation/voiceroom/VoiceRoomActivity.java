@@ -165,6 +165,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Fallback poll so a host still sees an invitation if a room event arrives during reconnect. */
+    private final Runnable roomPkInvitationPoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || exiting || !isOwner || roomId == null || roomId.isEmpty()) return;
+            loadRoomPkInvitations();
+            handler.postDelayed(this, 5000L);
+        }
+    };
     private final Set<String> shownRoomPkInvites = new HashSet<>();
     private final Runnable roomPkPendingTimeout = () -> {
         if ("pending".equals(roomPkCurrentContestId)) {
@@ -11366,6 +11374,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
         if (binding != null && binding.webHostSignal != null) {
@@ -11389,6 +11398,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onResume() {
         super.onResume();
         sRoomUiVisible = true;
+        handler.removeCallbacks(roomPkInvitationPoll);
+        if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;
         // UI is back — stop FGS owner and restore intended mic (never force open).
         try {
@@ -12418,12 +12429,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
                             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT,
                             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
-            lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-            lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
-            lp.setMargins(0, dp(116), dp(12), 0);
+            lp.topToBottom = R.id.tvRoomViewerCount;
+            lp.startToStart = R.id.tvRoomViewerCount;
+            lp.endToEnd = R.id.tvRoomViewerCount;
+            lp.setMargins(0, dp(6), 0, 0);
             ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkActionButton, lp);
         }
-        boolean canStart = isOwner;
+        boolean canStart = isOwner && roomPkFeatureEnabled;
         roomPkActionButton.setVisibility(canStart && roomPkCurrentContestId == null ? View.VISIBLE : View.GONE);
     }
 
