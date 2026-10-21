@@ -15,6 +15,7 @@ import com.Dramizo.Series.data.remote.dto.ApiResponse;
 import com.Dramizo.Series.data.remote.dto.VanityDtos;
 
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import retrofit2.Call;
@@ -26,12 +27,15 @@ public final class VanityIdStyle {
     private static final Map<String, VanityDtos.Style> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Long> CACHE_AT = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> LOADING = new ConcurrentHashMap<>();
-    private static final long CACHE_TTL_MS = 30_000L;
+    private static final long CACHE_TTL_MS = 5 * 60_000L;
+    // Recycled ID views must never accumulate multiple infinite shimmer animators.
+    private static final Map<TextView, ValueAnimator> ANIMATORS = new WeakHashMap<>();
     private VanityIdStyle() {}
 
     public static void bind(@Nullable TextView view, @Nullable VanityApi api,
                             @Nullable String publicId, int vipLevel) {
         if (view == null) return;
+        cancelAnimation(view);
         if (publicId == null || publicId.trim().isEmpty()) {
             view.setTag(R.id.tag_vanity_id_style_key, null);
             view.getPaint().setShader(null);
@@ -44,18 +48,19 @@ public final class VanityIdStyle {
         view.setTag(R.id.tag_vanity_id_style_key, id);
         VanityDtos.Style cached = CACHE.get(id);
         Long cachedAt = CACHE_AT.get(id);
-        if (cached != null && cachedAt != null
-                && System.currentTimeMillis() - cachedAt < CACHE_TTL_MS) {
-            ServerAssets.loadCompoundStart(view, resolveIconUrl(cached.styleIconUrl), 14);
-            if ("none".equals(cached.styleMode)) clear(view);
-            else if ("vip".equals(cached.styleMode)) apply(view, id, vipColors(cached.styleVipLevel), false, cached.styleGlow);
-            else apply(view, id, colors(cached), "animated".equals(cached.styleMode), cached.styleGlow);
-            return;
-        }
+        boolean fresh = cached != null && cachedAt != null
+                && System.currentTimeMillis() - cachedAt < CACHE_TTL_MS;
+
+        // Stale-while-revalidate: keep the last known style on screen while refreshing.
+        // This avoids IDs flashing unstyled while the API responds.
         if (cached != null) {
-            CACHE.remove(id);
-            CACHE_AT.remove(id);
+            applyStyle(view, id, cached, vipLevel);
+            if (fresh) return;
+        } else if (vipLevel > 0) {
+            // Render a lightweight VIP fallback immediately; special dashboard styles can replace it.
+            apply(view, id, vipColors(vipLevel), false, false);
         }
+
         if (api == null || !id.matches("\\d{3,16}")) return;
         if (LOADING.putIfAbsent(id, Boolean.TRUE) != null) return;
         api.style(id).enqueue(new Callback<ApiResponse<VanityDtos.Style>>() {
@@ -68,13 +73,33 @@ public final class VanityIdStyle {
                 CACHE_AT.put(id, System.currentTimeMillis());
                 Object current = view.getTag(R.id.tag_vanity_id_style_key);
                 if (!id.equals(current)) return;
-                ServerAssets.loadCompoundStart(view, resolveIconUrl(style.styleIconUrl), 14);
-                if ("none".equals(style.styleMode)) clear(view);
-                else if ("vip".equals(style.styleMode)) apply(view, id, vipColors(style.styleVipLevel), false, style.styleGlow);
-                else apply(view, id, colors(style), "animated".equals(style.styleMode), style.styleGlow);
+                applyStyle(view, id, style, vipLevel);
             }
-            @Override public void onFailure(Call<ApiResponse<VanityDtos.Style>> call, Throwable error) { LOADING.remove(id); }
+            @Override public void onFailure(Call<ApiResponse<VanityDtos.Style>> call, Throwable error) {
+                LOADING.remove(id);
+            }
         });
+    }
+
+    private static void applyStyle(TextView view, String id, VanityDtos.Style style, int vipLevel) {
+        ServerAssets.loadCompoundStart(view, resolveIconUrl(style.styleIconUrl), 14);
+        if ("none".equals(style.styleMode)) clear(view);
+        else if ("vip".equals(style.styleMode)) {
+            int level = style.styleVipLevel > 0 ? style.styleVipLevel : vipLevel;
+            apply(view, id, vipColors(level), false, style.styleGlow);
+        } else {
+            apply(view, id, colors(style), "animated".equals(style.styleMode), style.styleGlow);
+        }
+    }
+
+    private static void cancelAnimation(TextView view) {
+        ValueAnimator old;
+        synchronized (ANIMATORS) {
+            old = ANIMATORS.remove(view);
+        }
+        if (old != null) {
+            old.cancel();
+        }
     }
 
     private static String resolveIconUrl(@Nullable String value) {
@@ -105,11 +130,13 @@ public final class VanityIdStyle {
         try { return value == null ? fallback : Color.parseColor(value); } catch (Exception ignored) { return fallback; }
     }
     private static void clear(TextView view) {
+        cancelAnimation(view);
         view.getPaint().setShader(null);
         view.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
         view.invalidate();
     }
     private static void apply(TextView view, String id, int[] colors, boolean animated, boolean glow) {
+        cancelAnimation(view);
         view.setShadowLayer(glow ? 7f : 0f, 0f, 0f, colors[1]);
         if (!animated) {
             // The profile screen can bind the style before the TextView has completed layout.
@@ -134,6 +161,12 @@ public final class VanityIdStyle {
             view.getPaint().setShader(new LinearGradient(-width * f, 0f, width * (1f - f) + width, 0f, colors, null, Shader.TileMode.MIRROR));
             view.invalidate();
         });
-        view.post(animator::start);
+        synchronized (ANIMATORS) {
+            ANIMATORS.put(view, animator);
+        }
+        view.post(() -> {
+            if (id.equals(view.getTag(R.id.tag_vanity_id_style_key)) && view.isAttachedToWindow()) animator.start();
+            else cancelAnimation(view);
+        });
     }
 }
