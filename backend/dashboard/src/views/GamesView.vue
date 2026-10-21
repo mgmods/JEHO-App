@@ -121,8 +121,14 @@
     <div id="game-catalog" class="glass p-3">
       <LoadingSpinner v-if="loading && !games.length" />
       <div v-else-if="!games.length" class="empty-state p-5 text-center">
-        {{ t('games.noGames') }}
-        <button class="btn btn-outline-light btn-sm mt-3" type="button" @click="load">إعادة المحاولة</button>
+        <i class="bi bi-controller fs-1 d-block mb-2"></i>
+        <strong class="d-block">قائمة الألعاب فارغة — استعد القائمة الأساسية</strong>
+        <p class="small text-muted mt-2 mb-3">استعادة القائمة لا تغيّر إعدادات نسب الفوز. بعد الاستعادة اضغط «حفظ إلى التطبيق» لتثبيت الألعاب في الخادم.</p>
+        <div class="d-flex justify-content-center flex-wrap gap-2">
+          <button class="btn btn-outline-light btn-sm" type="button" @click="load">إعادة تحميل البيانات</button>
+          <button class="btn btn-aurora btn-sm" type="button" @click="resetDefaults">استعادة الألعاب الأساسية</button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="resetDefaults(); save()">استعادة وحفظ الألعاب</button>
+        </div>
       </div>
       <div v-else class="catalog-grid widget-grid">
         <article
@@ -684,6 +690,11 @@ async function load() {
     error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تظهر القائمة الافتراضية مؤقتاً. ' + (err?.message || String(err))
     games.value = defaults.map(normalizeGame)
   } finally {
+    // Never leave the admin catalog blank if the stored setting is empty or malformed.
+    // Keep the built-in catalog visible and editable; saving explicitly persists it.
+    if (!Array.isArray(games.value) || games.value.length === 0) {
+      games.value = defaults.map(normalizeGame)
+    }
     loading.value = false
   }
 }
