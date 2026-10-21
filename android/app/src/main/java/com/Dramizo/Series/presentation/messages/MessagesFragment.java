@@ -149,9 +149,6 @@ public class MessagesFragment extends Fragment {
         binding.btnQuickVisitors.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), VisitorsActivity.class)));
 
-        loadPendingRequestBadge();
-        loadUnreadNotificationBadge();
-
         if (binding.officialNewsCardMsg != null) {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
                     startActivity(new Intent(requireContext(), OfficialNewsActivity.class)));
