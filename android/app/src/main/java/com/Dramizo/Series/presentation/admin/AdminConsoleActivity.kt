@@ -199,7 +199,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         brandRow.addView(brandMark)
         val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        addText(brandCopy, "JEHO  •  ADMIN CENTER", 10f, true, 0xFFD9D0FF.toInt())
+        addText(brandCopy, "مركز إدارة JEHO", 10f, true, 0xFFD9D0FF.toInt())
         addText(brandCopy, "مساحة الإدارة والتحكم", 15f, true, Color.WHITE)
         brandRow.addView(brandCopy, LinearLayout.LayoutParams(0, -2, 1f))
         val rolePill = TextView(this).apply {
@@ -427,10 +427,13 @@ class AdminConsoleActivity : ThemedActivity() {
         if (key != "users") module?.let { addSectionIntro(it) }
         when (key) {
             "users" -> {
-                val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                 val search = EditText(this).apply {
                     hint = "ابحث بالاسم أو المعرّف"
-                    textSize = 14f
+                    textSize = 15f
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    textDirection = View.TEXT_DIRECTION_RTL
+                    gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                     setSingleLine(true)
                     setTextColor(TEXT)
                     setHintTextColor(MUTED)
@@ -2528,6 +2531,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
         setPadding(dp(16), dp(15), dp(16), dp(15))
         background = GradientDrawable().apply {
             setColor(Color.WHITE)
@@ -2542,6 +2546,9 @@ class AdminConsoleActivity : ThemedActivity() {
         val view = TextView(this).apply {
             this.text = text
             textSize = size
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
             setTextColor(color)
             if (bold) setTypeface(typeface, Typeface.BOLD)
             setPadding(0, dp(2), 0, dp(3))
