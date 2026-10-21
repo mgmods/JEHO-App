@@ -31,8 +31,8 @@
     </nav>
 
     <div id="game-catalog" class="glass p-3">
-      <LoadingSpinner v-if="loading && !games.length" />
-      <div v-else-if="!games.length" class="empty-state p-5 text-center">
+      <LoadingSpinner v-if="loading && !safeGames.length" />
+      <div v-else-if="!safeGames.length" class="empty-state p-5 text-center">
         <i class="bi bi-controller fs-1 d-block mb-2"></i>
         <strong class="d-block">قائمة الألعاب فارغة — استعد القائمة الأساسية</strong>
         <p class="small text-muted mt-2 mb-3">استعادة القائمة لا تغيّر إعدادات نسب الفوز. بعد الاستعادة اضغط «حفظ إلى التطبيق» لتثبيت الألعاب في الخادم.</p>
@@ -44,7 +44,7 @@
       </div>
       <div v-else class="catalog-grid widget-grid">
         <article
-          v-for="(g, idx) in games"
+          v-for="(g, idx) in safeGames"
           :key="g.id || idx"
           class="catalog-card widget-card"
           :class="{ 'is-off': g.enabled === false }"
@@ -332,6 +332,10 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const { t } = useI18n()
 
 const games = ref([])
+// Never let malformed/null rows from a stale catalog crash the entire admin page.
+const safeGames = computed(() => (Array.isArray(games.value) ? games.value : [])
+  .filter((game) => game && typeof game === 'object' && !Array.isArray(game))
+  .map((game, index) => ({ ...game, id: String(game.id || `recovered-game-${index}`) })))
 const storeItems = ref([])
 const loading = ref(false)
 const loadingStore = ref(false)
