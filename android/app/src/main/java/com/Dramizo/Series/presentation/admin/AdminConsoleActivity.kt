@@ -42,6 +42,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private lateinit var titleView: TextView
     private lateinit var backButton: TextView
     private var currentSection = "home"
+    private var currentRole = StaffRoleHelper.NONE
     private var notificationImageUrl: String? = null
     private var notificationImageStatus: TextView? = null
     private var notificationImageUploadInProgress = false
@@ -62,7 +63,9 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("notifications", "الرسائل والإشعارات", "رسائل عامة أو خاصة بعنوان ومحتوى", "🔔"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
-        Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑")
+        Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
+        Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
+        Module("operators", "إدارة صلاحيات الإدارة", "إدارة حسابات الإدارة المحدودة — للسوبر أدمن فقط", "🛡️")
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,11 +82,12 @@ class AdminConsoleActivity : ThemedActivity() {
             }
         })
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
-        if (!StaffRoleHelper.isSuper(user)) {
-            Toast.makeText(this, "هذه الصفحة مخصصة للسوبر أدمن فقط", Toast.LENGTH_LONG).show()
+        if (!StaffRoleHelper.isStaff(user)) {
+            Toast.makeText(this, "هذه الصفحة مخصصة لفريق إدارة JEHO", Toast.LENGTH_LONG).show()
             finish()
             return
         }
+        currentRole = StaffRoleHelper.normalize(user)
         api = ContainerProvider.from(this).adminApi
         buildShell()
         showHome()
@@ -162,7 +166,7 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
         }
         val heroEyebrow = TextView(this).apply {
-            text = "JEHO  •  SUPER ADMIN"
+            text = "JEHO  •  " + when (currentRole) { StaffRoleHelper.SUPER -> "SUPER ADMIN"; StaffRoleHelper.ADMIN -> "ADMIN"; else -> "MANAGER" }
             textSize = 10f
             letterSpacing = 0.12f
             setTextColor(0xFFDCD4FF.toInt())
@@ -204,7 +208,12 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
         addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
-        val rows = modules.chunked(2)
+        val visibleModules = when (currentRole) {
+            StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
+            StaffRoleHelper.ADMIN -> modules.filter { it.key != "operators" }
+            else -> modules
+        }
+        val rows = visibleModules.chunked(2)
         rows.forEach { pair ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -248,6 +257,11 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun openModule(key: String) {
+        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams")) ||
+            (currentRole == StaffRoleHelper.ADMIN && key == "operators")) {
+            toast("صلاحية المانجر تقتصر على الرومات والبث المباشر")
+            return
+        }
         currentSection = key
         val module = modules.firstOrNull { it.key == key }
         titleView.text = module?.title ?: "مركز إدارة JEHO"
