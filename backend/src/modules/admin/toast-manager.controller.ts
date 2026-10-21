@@ -12,9 +12,9 @@ const DEFAULT_TOAST_STYLE = {
   frameGlowEnabled: true,
   durationSeconds: 3,
   version: 1,
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
 };
 
@@ -46,7 +46,7 @@ export class ToastManagerController {
     const giftSend = {
       backgroundUrl: cleanUrl(parsed.giftSend?.backgroundUrl, cleanUrl(parsed.backgroundUrl)),
       shineEnabled: parsed.giftSend?.shineEnabled !== false && parsed.shineEnabled !== false,
-      frameGlowEnabled: parsed.giftSend?.frameGlowEnabled !== false && parsed.frameGlowEnabled !== false,
+      frameGlowEnabled: false,
       durationSeconds: clampSeconds(parsed.giftSend?.durationSeconds, oldDuration),
       avatarX: clampPercent(parsed.giftSend?.avatarX, 8),
       avatarY: clampPercent(parsed.giftSend?.avatarY, 50),
@@ -61,7 +61,7 @@ export class ToastManagerController {
     const winDefaults = (source: any, fallback: any) => ({
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
       shineEnabled: source?.shineEnabled !== false,
-      frameGlowEnabled: source?.frameGlowEnabled !== false,
+      frameGlowEnabled: false,
       durationSeconds: clampSeconds(source?.durationSeconds, fallback.durationSeconds),
       avatarX: clampPercent(source?.avatarX, fallback.avatarX),
       avatarY: clampPercent(source?.avatarY, fallback.avatarY),
@@ -92,7 +92,7 @@ export class ToastManagerController {
     const giftSend = {
       backgroundUrl: cleanUrl(body?.giftSend?.backgroundUrl, cleanUrl(body?.backgroundUrl, oldGift.backgroundUrl)),
       shineEnabled: typeof body?.giftSend?.shineEnabled === 'boolean' ? body.giftSend.shineEnabled : (typeof body?.shineEnabled === 'boolean' ? body.shineEnabled : oldGift.shineEnabled),
-      frameGlowEnabled: typeof body?.giftSend?.frameGlowEnabled === 'boolean' ? body.giftSend.frameGlowEnabled : (typeof body?.frameGlowEnabled === 'boolean' ? body.frameGlowEnabled : oldGift.frameGlowEnabled),
+      frameGlowEnabled: false,
       durationSeconds: clampSeconds(body?.giftSend?.durationSeconds ?? body?.durationSeconds, oldGift.durationSeconds),
       avatarX: clampPercent(body?.giftSend?.avatarX, oldGift.avatarX ?? 8),
       avatarY: clampPercent(body?.giftSend?.avatarY, oldGift.avatarY ?? 50),
@@ -110,7 +110,7 @@ export class ToastManagerController {
       return {
         backgroundUrl: cleanUrl(input.backgroundUrl, old.backgroundUrl),
         shineEnabled: typeof input.shineEnabled === 'boolean' ? input.shineEnabled : old.shineEnabled,
-        frameGlowEnabled: typeof input.frameGlowEnabled === 'boolean' ? input.frameGlowEnabled : old.frameGlowEnabled,
+        frameGlowEnabled: false,
         durationSeconds: clampSeconds(input.durationSeconds, old.durationSeconds),
         avatarX: clampPercent(input.avatarX, old.avatarX),
         avatarY: clampPercent(input.avatarY, old.avatarY),
