@@ -262,6 +262,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private ImageView luckyCannonIconView;
     @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
+    /** Refresh dashboard button styling while the room is visible; animations remain device-local. */
+    private final Runnable luckyButtonStylePoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed() || !sRoomUiVisible) return;
+            refreshLuckyToastButtonStyle();
+            handler.postDelayed(this, 15_000L);
+        }
+    };
     @Nullable private String luckyCannonGiftId;
     @Nullable private String luckyCannonGiftIcon;
     @Nullable private String luckyCannonGiftName;
@@ -11544,6 +11552,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
@@ -11568,6 +11577,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onResume() {
         super.onResume();
         sRoomUiVisible = true;
+        handler.removeCallbacks(luckyButtonStylePoll);
+        handler.postDelayed(luckyButtonStylePoll, 15_000L);
         handler.removeCallbacks(roomPkInvitationPoll);
         if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;
