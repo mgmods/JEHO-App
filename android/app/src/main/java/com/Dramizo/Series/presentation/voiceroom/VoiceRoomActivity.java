@@ -3937,7 +3937,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
         if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
-        luckyCannonView.fire();
+        // The sender already received immediate local press feedback; other room members
+        // still animate when the shared launch event arrives.
+        if (!localSender) luckyCannonView.fire();
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
         if (!keepVisible) {
