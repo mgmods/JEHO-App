@@ -88,7 +88,13 @@ export class AdminGuard implements CanActivate {
         if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams'].includes(resolved.module)) {
           throw new ForbiddenException('Manager access is limited to rooms and live streams');
         }
-        if (/\/admin\/rooms\/platform(?:\/|$)/.test(path) || /platform-moderators/.test(path) || /\/force-end(?:\/|$)/.test(path)) {
+        if (
+          /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
+          /platform-moderators/.test(path) ||
+          /\/admin\/rooms\/[^/]+\/(?:close|customer-service)(?:\/|$)/.test(path) ||
+          (method !== 'GET' && /\/admin\/rooms\/[^/]+(?:\/|$)/.test(path)) ||
+          /\/force-end(?:\/|$)/.test(path)
+        ) {
           throw new ForbiddenException('This room operation requires Admin or Super Admin');
         }
         return true;
