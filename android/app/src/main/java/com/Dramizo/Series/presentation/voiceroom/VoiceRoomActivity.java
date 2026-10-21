@@ -15037,8 +15037,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
 
         int rows = guestCount <= 0 ? 1 : (guestCount + columns - 1) / columns;
-        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 70
-                : scale == SeatAdapter.SCALE_MEDIUM ? 76 : 86;
+        int rowHeightDp = scale == SeatAdapter.SCALE_COMPACT ? 64
+                : scale == SeatAdapter.SCALE_MEDIUM ? 74 : 84;
         int totalHeightPx = dp(rows * rowHeightDp + 8);
         // Skip requestLayout on mute-only room refreshes — that was blinking seats.
         int layoutKey = (guestCount << 16) ^ (scale << 8) ^ totalHeightPx;
@@ -15049,7 +15049,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             clp.height = totalHeightPx;
             clp.matchConstraintMaxHeight = 0;
             clp.matchConstraintMinHeight = 0;
-            clp.topMargin = dp(4);
+            clp.topMargin = dp(0);
             binding.recyclerSeats.setLayoutParams(clp);
         }
         binding.recyclerSeats.setNestedScrollingEnabled(false);
