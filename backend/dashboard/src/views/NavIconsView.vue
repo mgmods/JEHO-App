@@ -67,6 +67,31 @@
       </article>
     </div>
 
+    <PageHeader title="أيقونات قنوات الدردشات" subtitle="غيّر شعارات الأخبار الرسمية ورسائل الإدارة وأيقونة الإشعارات، وتُطبّق الإعدادات على جميع المستخدمين." />
+    <div class="nav-icons-grid mb-4">
+      <article v-for="channel in channelList" :key="channel.key" class="glass p-3 nav-icon-card">
+        <h3 class="h6 mb-2">{{ channel.label }}</h3>
+        <div class="icon-slot">
+          <div class="icon-preview">
+            <img v-if="channelIcons[channel.key]" :src="absUrl(channelIcons[channel.key])" alt="" />
+            <span v-else class="text-muted small">الأيقونة الافتراضية</span>
+          </div>
+          <label class="form-label small mb-1">أيقونة القناة</label>
+          <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml,.png,.jpg,.jpeg,.webp,.svg"
+            class="form-control form-control-sm" @change="(e) => onChannelFile(e, channel.key)" />
+          <button v-if="channelIcons[channel.key]" class="btn btn-link btn-sm text-danger px-0" type="button"
+            @click="channelIcons[channel.key] = ''">إزالة الأيقونة المخصصة</button>
+          <label v-if="channel.key !== 'notifications'" class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" v-model="verification[channel.key]" />
+            <span class="form-check-label">إظهار علامة التوثيق البنفسجية عند الجميع</span>
+          </label>
+          <div v-if="channel.key !== 'notifications'" class="small text-secondary mt-1">
+            {{ verification[channel.key] ? 'القناة موثّقة' : 'القناة غير موثّقة' }} — يتحدّث ظهور العلامة لجميع المستخدمين بعد الحفظ.
+          </div>
+        </div>
+      </article>
+    </div>
+
     <PageHeader title="أيقونات قسم أنا" subtitle="ارفع أيقونات مربعات الملف الشخصي لتظهر داخل التطبيق." />
     <div class="nav-icons-grid">
       <article v-for="action in profileActionsList" :key="action.key" class="glass p-3 nav-icon-card">
@@ -118,6 +143,13 @@ function emptyForm() {
 
 const form = reactive(emptyForm())
 const profileIcons = reactive({ events: '', agency: '', recharge: '', tasks: '', settings: '', support: '' })
+const channelIcons = reactive({ officialNews: '', adminMessages: '', notifications: '' })
+const verification = reactive({ officialNews: true, adminMessages: true })
+const channelList = [
+  { key: 'officialNews', label: 'الأخبار الرسمية' },
+  { key: 'adminMessages', label: 'رسائل الإدارة' },
+  { key: 'notifications', label: 'الإشعارات' },
+]
 const profileActionsList = [
   { key: 'events', label: 'فعالياتي' },
   { key: 'agency', label: 'فتح وكالة' },
@@ -178,6 +210,11 @@ function applyConfig(cfg) {
   for (const action of profileActionsList) {
     profileIcons[action.key] = (cfg && cfg.profileActions && cfg.profileActions[action.key]) || ''
   }
+  for (const key of Object.keys(channelIcons)) {
+    channelIcons[key] = (cfg && cfg.channelIcons && cfg.channelIcons[key]) || ''
+  }
+  verification.officialNews = cfg?.officialNewsVerified !== false
+  verification.adminMessages = cfg?.adminMessagesVerified !== false
 }
 
 async function load() {
@@ -220,6 +257,34 @@ async function onFile(e, tabKey, field) {
     return
   }
   form[tabKey][field] = url
+  toast().success(t('app.success'))
+}
+
+async function onChannelFile(e, channelKey) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  if (!file) return
+  const name = (file.name || '').toLowerCase()
+  const ok = file.type === 'image/png' || file.type === 'image/jpeg' ||
+    file.type === 'image/webp' || file.type === 'image/svg+xml' ||
+    /\.(png|jpe?g|webp|svg)$/i.test(name)
+  if (!ok) {
+    error.value = t('navIcons.badFormat')
+    toast().danger(t('navIcons.badFormat'))
+    return
+  }
+  const { data, error: err } = await uploadsApi.upload(file)
+  if (err) {
+    error.value = err.message
+    toast().danger(err.message)
+    return
+  }
+  const url = storedUrl(data?.path || data?.url || data?.data?.path || data?.data?.url || '')
+  if (!url) {
+    toast().danger(t('app.error'))
+    return
+  }
+  channelIcons[channelKey] = url
   toast().success(t('app.success'))
 }
 
@@ -269,6 +334,9 @@ async function save() {
     chat: { ...form.chat },
     me: { ...form.me },
     profileActions: { ...profileIcons },
+    channelIcons: { ...channelIcons },
+    officialNewsVerified: verification.officialNews,
+    adminMessagesVerified: verification.adminMessages,
   }
   const { error: err } = await settingsApi.update({
     app_nav_icons: JSON.stringify(body),
