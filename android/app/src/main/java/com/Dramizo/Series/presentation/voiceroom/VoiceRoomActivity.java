@@ -12416,12 +12416,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.setMargins(0, dp(116), dp(12), 0);
             ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkActionButton, lp);
         }
-        boolean canStart = isOwner || isHost;
+        boolean canStart = isOwner;
         roomPkActionButton.setVisibility(canStart && roomPkCurrentContestId == null ? View.VISIBLE : View.GONE);
     }
 
     private void showRoomPkChallengeDialog() {
-        if (roomId == null || roomId.isEmpty() || !(isOwner || isHost)) {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
             Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -12495,7 +12495,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void loadRoomPkInvitations() {
-        if (roomId == null || roomId.isEmpty() || !(isOwner || isHost) || isFinishing() || exiting) return;
+        if (roomId == null || roomId.isEmpty() || !isOwner || isFinishing() || exiting) return;
         ContainerProvider.from(this).getContestsApi().roomPkInvitations(roomId).enqueue(
                 new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
                     @Override public void onResponse(
@@ -12689,7 +12689,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if ("contest:pk-invite".equals(event)) {
             String targetRoomId = memberStr(payload, "targetRoomId");
-            if ((isOwner || isHost) && roomId != null && roomId.equals(targetRoomId)) {
+            if (isOwner && roomId != null && roomId.equals(targetRoomId)) {
                 String id = memberStr(payload, "contestId");
                 if (id != null && shownRoomPkInvites.add(id)) {
                     com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto invite =
