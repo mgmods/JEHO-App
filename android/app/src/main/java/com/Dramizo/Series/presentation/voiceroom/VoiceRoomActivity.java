@@ -161,6 +161,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private ActivityVoiceRoomBinding binding;
     @Nullable private TextView roomPkScoreBanner;
+    @Nullable private android.widget.LinearLayout roomPkSplitContainer;
+    @Nullable private TextView roomPkTeamAName;
+    @Nullable private TextView roomPkTeamAScore;
+    @Nullable private TextView roomPkTeamBName;
+    @Nullable private TextView roomPkTeamBScore;
+    @Nullable private android.view.View roomPkProgressA;
+    @Nullable private android.view.View roomPkProgressB;
     @Nullable private TextView roomPkActionButton;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
@@ -185,18 +192,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean roomPkBannerEnded;
     private final Runnable updateRoomPkBannerClock = new Runnable() {
         @Override public void run() {
-            if (roomPkScoreBanner == null || roomPkScoreBanner.getVisibility() != View.VISIBLE
+            if (roomPkScoreBanner == null || roomPkSplitContainer == null
+                    || roomPkSplitContainer.getVisibility() != View.VISIBLE
                     || roomPkBannerEnded || isFinishing() || exiting) return;
             long remaining = roomPkEndsAtMs > 0L ? roomPkEndsAtMs - System.currentTimeMillis() : -1L;
             String clock = remaining > 0L
                     ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
                     : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
-            roomPkScoreBanner.setText(roomPkBannerBaseText + "\n⏱ الوقت المتبقي: " + clock);
+            roomPkScoreBanner.setText(roomPkBannerBaseText + "   •   ⏱ " + clock);
             if (remaining > 0L) handler.postDelayed(this, 1000L);
         }
     };
     private final Runnable hideRoomPkScoreBanner = () -> {
         handler.removeCallbacks(updateRoomPkBannerClock);
+        if (roomPkSplitContainer != null) roomPkSplitContainer.setVisibility(View.GONE);
         if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
     };
     private VoiceRoomViewModel viewModel;
@@ -12916,16 +12925,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ? payload.getAsJsonObject("sideA") : new JsonObject();
         JsonObject sideB = payload.has("sideB") && payload.get("sideB").isJsonObject()
                 ? payload.getAsJsonObject("sideB") : new JsonObject();
-        String nameA = firstNonEmpty(memberStr(sideA, "name"), "الروم الأول");
-        String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الثاني");
+        String nameA = firstNonEmpty(memberStr(sideA, "name"), "الروم الأحمر");
+        String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الأزرق");
         long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
         long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
         boolean ended = "contest:team-ended".equals(event);
-        String label = "⚔ تحدّي الرومات مباشر";
+        String label = "⚔ تحدّي PK مباشر";
         if (ended) {
             String winner = memberStr(payload, "winner");
-            label = "sideA".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الأول"
-                    : "sideB".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الثاني"
+            label = "sideA".equals(winner) ? "🏆 فاز الفريق الأحمر"
+                    : "sideB".equals(winner) ? "🏆 فاز الفريق الأزرق"
                     : "🤝 انتهى التحدّي بالتعادل";
         }
         if (payload.has("endAt") && !payload.get("endAt").isJsonNull()) {
@@ -12933,22 +12942,94 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (parsed > 0L) roomPkEndsAtMs = parsed;
         }
         roomPkBannerEnded = ended;
-        if (roomPkScoreBanner == null) {
+
+        if (roomPkSplitContainer == null) {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            panel.setPadding(dp(10), dp(8), dp(10), dp(10));
+            panel.setElevation(dp(18));
+            panel.setBackground(roundRoomPkDrawable(0xF0181B2B, 0xFFFFD166, 18));
+            panel.setClickable(false);
+            panel.setContentDescription("واجهة تحدّي PK مقسومة بين الفريق الأحمر والفريق الأزرق");
+
             roomPkScoreBanner = new TextView(this);
             roomPkScoreBanner.setTextColor(Color.WHITE);
             roomPkScoreBanner.setTextSize(13f);
             roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkScoreBanner.setGravity(Gravity.CENTER);
-            roomPkScoreBanner.setPadding(dp(12), dp(10), dp(12), dp(10));
-            roomPkScoreBanner.setMaxLines(5);
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(0xF01B2430);
-            bg.setCornerRadius(dp(16));
-            bg.setStroke(dp(1), 0xFFFFD166);
-            roomPkScoreBanner.setBackground(bg);
-            roomPkScoreBanner.setElevation(dp(80));
-            roomPkScoreBanner.setClickable(false);
-            roomPkScoreBanner.setContentDescription("نتيجة تحدي PK بين الرومات");
+            roomPkScoreBanner.setPadding(dp(4), dp(2), dp(4), dp(8));
+            panel.addView(roomPkScoreBanner, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            android.widget.LinearLayout teams = new android.widget.LinearLayout(this);
+            teams.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            teams.setGravity(Gravity.CENTER);
+            android.widget.LinearLayout.LayoutParams teamsLp = new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+            teamsLp.bottomMargin = dp(8);
+            panel.addView(teams, teamsLp);
+
+            android.widget.LinearLayout cardA = new android.widget.LinearLayout(this);
+            cardA.setOrientation(android.widget.LinearLayout.VERTICAL);
+            cardA.setGravity(Gravity.CENTER);
+            cardA.setPadding(dp(8), dp(10), dp(8), dp(10));
+            cardA.setBackground(roundRoomPkDrawable(0xFF5A1725, 0xFFFF5268, 14));
+            android.widget.LinearLayout cardB = new android.widget.LinearLayout(this);
+            cardB.setOrientation(android.widget.LinearLayout.VERTICAL);
+            cardB.setGravity(Gravity.CENTER);
+            cardB.setPadding(dp(8), dp(10), dp(8), dp(10));
+            cardB.setBackground(roundRoomPkDrawable(0xFF142D5A, 0xFF54A8FF, 14));
+            android.widget.LinearLayout.LayoutParams cardLp = new android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            teams.addView(cardA, cardLp);
+            android.widget.LinearLayout.LayoutParams gapLp = new android.widget.LinearLayout.LayoutParams(dp(8), 1);
+            teams.addView(new android.view.View(this), gapLp);
+            teams.addView(cardB, new android.widget.LinearLayout.LayoutParams(
+                    0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            roomPkTeamAName = new TextView(this);
+            roomPkTeamAName.setTextColor(Color.WHITE);
+            roomPkTeamAName.setTextSize(12f);
+            roomPkTeamAName.setGravity(Gravity.CENTER);
+            roomPkTeamAName.setMaxLines(1);
+            roomPkTeamAName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            roomPkTeamAScore = new TextView(this);
+            roomPkTeamAScore.setTextColor(Color.WHITE);
+            roomPkTeamAScore.setTextSize(23f);
+            roomPkTeamAScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkTeamAScore.setGravity(Gravity.CENTER);
+            cardA.addView(roomPkTeamAName);
+            cardA.addView(roomPkTeamAScore);
+
+            roomPkTeamBName = new TextView(this);
+            roomPkTeamBName.setTextColor(Color.WHITE);
+            roomPkTeamBName.setTextSize(12f);
+            roomPkTeamBName.setGravity(Gravity.CENTER);
+            roomPkTeamBName.setMaxLines(1);
+            roomPkTeamBName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            roomPkTeamBScore = new TextView(this);
+            roomPkTeamBScore.setTextColor(Color.WHITE);
+            roomPkTeamBScore.setTextSize(23f);
+            roomPkTeamBScore.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkTeamBScore.setGravity(Gravity.CENTER);
+            cardB.addView(roomPkTeamBName);
+            cardB.addView(roomPkTeamBScore);
+
+            android.widget.LinearLayout progress = new android.widget.LinearLayout(this);
+            progress.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+            progress.setBackground(roundRoomPkDrawable(0xFF303746, 0xFF303746, 4));
+            progress.setClipToOutline(true);
+            roomPkProgressA = new android.view.View(this);
+            roomPkProgressA.setBackground(roundRoomPkDrawable(0xFFFF405D, 0xFFFF405D, 4));
+            roomPkProgressB = new android.view.View(this);
+            roomPkProgressB.setBackground(roundRoomPkDrawable(0xFF398BFF, 0xFF398BFF, 4));
+            progress.addView(roomPkProgressA, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
+            progress.addView(roomPkProgressB, new android.widget.LinearLayout.LayoutParams(1, dp(6), 1f));
+            panel.addView(progress, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(6)));
+
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
                             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT,
@@ -12957,24 +13038,43 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             lp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             lp.setMargins(dp(12), dp(64), dp(12), 0);
-            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkScoreBanner, lp);
+            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(panel, lp);
+            roomPkSplitContainer = panel;
         }
-        long total = Math.max(1L, scoreA + scoreB);
-        int filled = (int) Math.round((scoreA * 1.0d / total) * 16d);
-        StringBuilder bar = new StringBuilder();
-        for (int i = 0; i < 16; i++) bar.append(i < filled ? "▰" : "▱");
-        roomPkBannerBaseText = label + "\n🔴 " + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
-                + "       " + String.format(java.util.Locale.US, "%,d", scoreB) + "  🔵 " + nameB
-                + "\n" + bar;
-        roomPkScoreBanner.setText(roomPkBannerBaseText);
+
+        roomPkBannerBaseText = label;
+        roomPkTeamAName.setText("🔴 " + nameA);
+        roomPkTeamAScore.setText(String.format(java.util.Locale.US, "%,d", scoreA));
+        roomPkTeamBName.setText("🔵 " + nameB);
+        roomPkTeamBScore.setText(String.format(java.util.Locale.US, "%,d", scoreB));
+        float ratioA = scoreA + scoreB <= 0L ? 0.5f
+                : Math.max(0.04f, Math.min(0.96f, (float) ((double) scoreA / ((double) scoreA + (double) scoreB))));
+        float ratioB = 1f - ratioA;
+        android.widget.LinearLayout.LayoutParams progressA =
+                new android.widget.LinearLayout.LayoutParams(1, dp(6), ratioA);
+        android.widget.LinearLayout.LayoutParams progressB =
+                new android.widget.LinearLayout.LayoutParams(1, dp(6), ratioB);
+        roomPkProgressA.setLayoutParams(progressA);
+        roomPkProgressB.setLayoutParams(progressB);
+
         roomPkScoreBanner.setVisibility(View.VISIBLE);
+        roomPkSplitContainer.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
         handler.removeCallbacks(updateRoomPkBannerClock);
         if (ended) {
+            roomPkScoreBanner.setText(label);
             handler.postDelayed(hideRoomPkScoreBanner, 12000L);
         } else {
             updateRoomPkBannerClock.run();
         }
+    }
+
+    private GradientDrawable roundRoomPkDrawable(int fill, int stroke, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(dp(radiusDp));
+        if (stroke != fill) drawable.setStroke(dp(1), stroke);
+        return drawable;
     }
 
     private long parseRoomPkEndAt(@Nullable String value) {
