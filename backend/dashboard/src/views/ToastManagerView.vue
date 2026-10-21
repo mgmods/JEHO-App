@@ -245,8 +245,19 @@ async function uploadAsset(event) {
   const url = String(uploaded.url || uploaded.path || (uploaded.filename ? '/uploads/' + uploaded.filename : '')).trim()
   if (!url) { toast().danger('تم الرفع لكن لم يصل رابط الصورة من الخادم'); return }
   if (activeTab.value === 'luckyButton') form.luckyButton.iconUrl = url
-  else currentStyle.value.backgroundUrl = url
-  toast().success('تم رفع الصورة. اضغط حفظ وتطبيق لاعتمادها.')
+  else {
+    currentStyle.value.backgroundUrl = url
+    // Match the canvas to the uploaded artwork's aspect ratio instead of stretching it to screen dimensions.
+    const artwork = new Image()
+    artwork.onload = () => {
+      if (artwork.naturalWidth > 0 && artwork.naturalHeight > 0) {
+        currentStyle.value.widthDp = 340
+        currentStyle.value.heightDp = Math.max(60, Math.min(180, Math.round(340 * artwork.naturalHeight / artwork.naturalWidth)))
+      }
+    }
+    artwork.src = resolveAsset(url)
+  }
+  toast().success('تم رفع الصورة. ضُبطت المعاينة على نسبة أبعاد التصميم؛ يمكنك تعديل الحجم وسحب العناصر ثم الحفظ.')
 }
 async function save() {
   if (!canWriteSettings.value) { toast().danger('لا تملك صلاحية تعديل إعدادات الداشبورد'); return }
