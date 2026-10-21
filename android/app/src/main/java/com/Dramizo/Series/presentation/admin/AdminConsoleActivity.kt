@@ -896,8 +896,48 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun renderItems(data: Any?, type: String) {
         val items = extractItems(data)
         if (items.isEmpty()) {
-            val empty = card()
-            addText(empty, "لا توجد بيانات للعرض أو أن الخادم أعاد قائمة فارغة.", 14f, false, MUTED)
+            val empty = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(22), dp(25), dp(22), dp(25))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(dp(1), 0xFFE8E7F2.toInt())
+                }
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+            }
+            val emptyIcon = TextView(this).apply {
+                text = when (type) {
+                    "users" -> "👥"
+                    "rooms" -> "🏠"
+                    "reports" -> "🛡️"
+                    "logs" -> "🧾"
+                    else -> "📂"
+                }
+                textSize = 28f
+                gravity = Gravity.CENTER
+                background = roundRect(0xFFF0ECFB.toInt(), 18)
+                layoutParams = LinearLayout.LayoutParams(dp(62), dp(62)).apply { bottomMargin = dp(12) }
+            }
+            empty.addView(emptyIcon)
+            addText(empty, when (type) {
+                "users" -> "لم يتم العثور على مستخدمين"
+                "rooms" -> "لا توجد رومات لعرضها"
+                "reports" -> "لا توجد بلاغات في القائمة الحالية"
+                "logs" -> "لا توجد عمليات مسجلة للعرض"
+                else -> "لا توجد عناصر حالياً"
+            }, 15f, true, TEXT)
+            val explanation = TextView(this).apply {
+                text = "قد تكون القائمة فارغة حالياً. يمكنك تحديث القسم أو تجربة بحث مختلف."
+                textSize = 12f
+                setTextColor(MUTED)
+                gravity = Gravity.CENTER
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, dp(5), 0, 0)
+            }
+            empty.addView(explanation)
             body.addView(empty)
             return
         }
