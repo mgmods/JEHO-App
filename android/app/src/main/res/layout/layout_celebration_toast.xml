@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Home celebration strip: avatar/gift icon | مبروك line | times badge (no Go chip). -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Compact global win toast: image remains inside its reserved frame; shimmer is a light overlay. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="12dp"
     android:background="@drawable/bg_celebration_toast"
-    android:elevation="14dp"
-    android:gravity="center_vertical"
-    android:orientation="horizontal"
-    android:paddingStart="8dp"
-    android:paddingTop="8dp"
-    android:paddingEnd="8dp"
-    android:paddingBottom="8dp">
+    android:clipChildren="true"
+    android:clipToPadding="true"
+    android:elevation="14dp">
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="8dp">
     <FrameLayout
         android:layout_width="48dp"
         android:layout_height="48dp">
@@ -99,4 +104,15 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone" />
-</LinearLayout>
+    </LinearLayout>
+
+    <View
+        android:id="@+id/viewCelebrationSheen"
+        android:layout_width="34dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:alpha="0"
+        android:clickable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+</FrameLayout>
