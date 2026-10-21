@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -448,10 +449,7 @@ public final class GlobalCelebrationToast {
             tvTitle.setSelected(true);
         }
         String line;
-        if ("lucky_hit".equalsIgnoreCase(kind) && body != null && !body.trim().isEmpty()) {
-            // Preserve server wording such as partial refund/return and the actual X result.
-            line = body.trim();
-        } else if (gameOrLucky && coinsWon > 0L) {
+        if (gameOrLucky && coinsWon > 0L) {
             line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
         } else {
             line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
@@ -479,14 +477,10 @@ public final class GlobalCelebrationToast {
         if (avatar != null) {
             if (absLeft != null && !absLeft.isEmpty()) {
                 try {
-                    // Profile pictures must remain circular even when the uploaded toast
-                    // background is a custom image and the dashboard changes avatar size/position.
-                    avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
-                    avatar.setClipToOutline(true);
                     Glide.with(activity)
                             .load(absLeft)
                             .override(128, 128)
-                            .circleCrop()
+                            .transform(new CircleCrop())
                             .placeholder(gameOrLucky || planet
                                     ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
                             .error(gameOrLucky || planet
@@ -497,8 +491,6 @@ public final class GlobalCelebrationToast {
                     avatar.setImageResource(R.drawable.ic_screen_chat_lottery);
                 }
             } else {
-                avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
-                avatar.setClipToOutline(true);
                 avatar.setImageResource(gameOrLucky || planet
                         ? R.drawable.ic_screen_chat_lottery
                         : R.drawable.jeho_logo);
@@ -519,10 +511,7 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        // A winning/refund event should never lose its X badge because a decimal
-        // multiplier (for example 0.5) was truncated while parsing the socket payload.
-        int displayMultiplier = giftSend ? Math.max(1, multiplier)
-                : luckyWin && coinsWon > 0L ? Math.max(1, multiplier) : multiplier;
+        int displayMultiplier = giftSend ? Math.max(1, multiplier) : multiplier;
         boolean showTimes = displayMultiplier >= 1 && (gameOrLucky || giftSend || displayMultiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
@@ -576,6 +565,15 @@ public final class GlobalCelebrationToast {
         int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
         int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
         int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
+        // Keep the text elements content-sized like the dashboard's draggable preview.
+        // Full-width TextViews cannot be positioned by their left-edge percentage.
+        int textMaxWidth = Math.max(dp(activity, 84), Math.round(toastWidth * 0.66f));
+        if (tvTitle != null) tvTitle.setMaxWidth(textMaxWidth);
+        if (tvBody != null) tvBody.setMaxWidth(textMaxWidth);
+        if (avatar != null) {
+            avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
+            avatar.setClipToOutline(true);
+        }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.topMargin = dp(activity, topMarginDp);
@@ -697,10 +695,13 @@ public final class GlobalCelebrationToast {
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
-        float currentX = targetLocation[0] - containerLocation[0] + (centerX ? target.getWidth() / 2f : 0f);
-        float currentY = targetLocation[1] - containerLocation[1] + target.getHeight() / 2f;
-        target.setTranslationX(target.getTranslationX() + desiredX - currentX);
-        target.setTranslationY(target.getTranslationY() + desiredY - currentY);
+        // Dashboard preview stores the avatar/count center but the text's left edge.
+        // Remove existing translations before deriving the layout baseline so repeated
+        // live-style refreshes are idempotent and never push elements off the artwork.
+        float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
+        float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
+        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
