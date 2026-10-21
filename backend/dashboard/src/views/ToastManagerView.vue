@@ -72,10 +72,6 @@
             <div><div class="settings-switch-title">لمعة ذهبية متحركة</div><div class="settings-switch-hint">تُرسم محلياً على الجهاز، بدون طلبات متكررة للخادم.</div></div>
             <input v-model="currentStyle.shineEnabled" class="form-check-input" type="checkbox" role="switch" />
           </label>
-          <label class="settings-switch">
-            <div><div class="settings-switch-title">توهج إطار التوست</div><div class="settings-switch-hint">توهج خفيف حول الإطار.</div></div>
-            <input v-model="currentStyle.frameGlowEnabled" class="form-check-input" type="checkbox" role="switch" />
-          </label>
           <div class="mt-3">
             <label class="form-label">مدة ظهور التوست: {{ currentStyle.durationSeconds }} ثانية</label>
             <input v-model.number="currentStyle.durationSeconds" class="form-range" type="range" min="1" max="12" step="1" />
