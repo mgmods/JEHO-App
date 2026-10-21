@@ -6,6 +6,12 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Outline
 import android.graphics.Typeface
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
@@ -19,6 +25,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -169,6 +176,7 @@ class MainActivity : ThemedActivity() {
         loadAgencyAction(container)
         highlightPage(0)
         loadDramaConfig(container)
+        maybeShowDailyLoginReward(container)
 
         intent?.let { openFromIntentExtras(it) }
 
@@ -467,6 +475,187 @@ class MainActivity : ThemedActivity() {
     /**
      * Drama tab show/hide comes only from dashboard drama config.enabled.
      */
+    private fun maybeShowDailyLoginReward(container: AppContainer) {
+        val prefs = getSharedPreferences("daily_login_popup", MODE_PRIVATE)
+        container.ioExecutor.execute {
+            val result = ApiCall.execute(container.getTasksApi().dailyLoginStatus())
+            runOnUiThread {
+                if (isFinishing || isDestroyed || !result.success) return@runOnUiThread
+                val status = result.data ?: return@runOnUiThread
+                val today = status.today ?: return@runOnUiThread
+                if (!status.enabled || !status.shouldShow || prefs.getString("seen_date", "") == today) return@runOnUiThread
+                showDailyLoginRewardDialog(container, status, prefs)
+            }
+        }
+    }
+
+    private fun showDailyLoginRewardDialog(
+        container: AppContainer,
+        status: MiscDtos.DailyLoginStatusDto,
+        prefs: SharedPreferences,
+    ) {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad, pad, pad)
+            background = roundedBackground(Color.rgb(22, 27, 46), 24, Color.rgb(83, 93, 132))
+        }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val heading = TextView(this).apply {
+            text = "مكافآت تسجيل الدخول"
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+        }
+        val close = TextView(this).apply {
+            text = "×"
+            textSize = 28f
+            setTextColor(Color.LTGRAY)
+            gravity = Gravity.CENTER
+            setPadding(pad / 2, 0, pad / 2, 0)
+        }
+        top.addView(heading)
+        top.addView(close)
+        root.addView(top)
+
+        val subtitle = TextView(this).apply {
+            text = "سجّل دخولك 7 أيام متتالية لتحصل على مكافآت مميزة"
+            textSize = 13f
+            setTextColor(Color.rgb(195, 202, 220))
+            setPadding(0, pad / 3, 0, pad)
+        }
+        root.addView(subtitle)
+
+        val daysScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
+        val daysRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val dayList = status.days ?: emptyList()
+        for (day in dayList) {
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(pad / 2, pad / 2, pad / 2, pad / 2)
+                background = roundedBackground(
+                    if (day.day == status.currentDay) Color.rgb(71, 60, 31) else Color.rgb(35, 41, 62),
+                    14,
+                    if (day.day == status.currentDay) Color.rgb(226, 187, 76) else Color.rgb(67, 76, 105),
+                )
+                layoutParams = LinearLayout.LayoutParams((72 * resources.displayMetrics.density).toInt(), (88 * resources.displayMetrics.density).toInt()).apply {
+                    marginEnd = pad / 3
+                }
+            }
+            tile.addView(TextView(this).apply {
+                text = "اليوم ${day.day}"
+                textSize = 11f
+                setTextColor(Color.WHITE)
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            tile.addView(TextView(this).apply {
+                text = if (day.type == "coins") "🪙" else "🎁"
+                textSize = 24f
+                setPadding(0, pad / 5, 0, pad / 5)
+            })
+            tile.addView(TextView(this).apply {
+                text = if (day.claimed) "تم" else if (day.type == "coins") "${day.amount}" else "هدية"
+                textSize = 10f
+                setTextColor(if (day.claimed) Color.rgb(114, 224, 164) else Color.rgb(238, 210, 125))
+            })
+            daysRow.addView(tile)
+        }
+        daysScroll.addView(daysRow)
+        root.addView(daysScroll)
+
+        val reward = status.reward
+        val rewardPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(pad, pad, pad, pad)
+            background = roundedBackground(Color.rgb(30, 36, 58), 18, Color.rgb(72, 82, 115))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = pad }
+        }
+        val rewardImage = ImageView(this).apply {
+            layoutParams = LinearLayout.LayoutParams((82 * resources.displayMetrics.density).toInt(), (82 * resources.displayMetrics.density).toInt())
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        val previewUrl = reward?.previewUrl ?: reward?.animationUrl
+        if (!previewUrl.isNullOrBlank()) {
+            Glide.with(this).load(previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(rewardImage)
+        } else {
+            rewardImage.setImageResource(android.R.drawable.ic_menu_gallery)
+            rewardImage.contentDescription = if (reward?.type == "coins") "كوينزات" else "هدية يومية"
+        }
+        rewardPanel.addView(rewardImage)
+        rewardPanel.addView(TextView(this).apply {
+            text = reward?.name ?: reward?.label ?: "مكافأة اليوم"
+            textSize = 17f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, pad / 3, 0, pad / 5)
+        })
+        rewardPanel.addView(TextView(this).apply {
+            text = if (reward?.type == "coins") "${reward.amount} كوينز" else "عنصر تجميلي مؤقت · ${reward?.durationDays ?: 7} أيام"
+            textSize = 13f
+            setTextColor(Color.rgb(231, 195, 97))
+            gravity = Gravity.CENTER
+        })
+        root.addView(rewardPanel)
+
+        val claimButton = Button(this).apply {
+            text = "استلام"
+            isAllCaps = false
+            textSize = 16f
+            setTextColor(Color.WHITE)
+            background = roundedBackground(Color.rgb(194, 145, 43), 16, Color.rgb(230, 190, 83))
+            layoutParams = LinearLayout.LayoutParams(-1, (50 * resources.displayMetrics.density).toInt()).apply { topMargin = pad }
+        }
+        root.addView(claimButton)
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(root)
+        }
+        val dialog = AlertDialog.Builder(this).setView(scroll).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        close.setOnClickListener {
+            prefs.edit().putString("seen_date", status.today).apply()
+            dialog.dismiss()
+        }
+        dialog.setOnDismissListener { prefs.edit().putString("seen_date", status.today).apply() }
+        claimButton.setOnClickListener {
+            claimButton.isEnabled = false
+            claimButton.text = "جارٍ الاستلام…"
+            container.ioExecutor.execute {
+                val result = ApiCall.execute(container.getTasksApi().claimDailyLogin())
+                runOnUiThread {
+                    if (isFinishing || isDestroyed) return@runOnUiThread
+                    if (result.success) {
+                        claimButton.text = "تم الاستلام ✓"
+                        claimButton.isEnabled = false
+                        prefs.edit().putString("seen_date", status.today).apply()
+                        Toast.makeText(this, "تم الاستلام بنجاح!", Toast.LENGTH_LONG).show()
+                    } else {
+                        claimButton.text = "استلام"
+                        claimButton.isEnabled = true
+                        Toast.makeText(this, result.error ?: "تعذر استلام المكافأة، حاول مجددًا", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun roundedBackground(fill: Int, radiusDp: Int, stroke: Int): GradientDrawable {
+        val drawable = GradientDrawable()
+        drawable.setColor(fill)
+        drawable.cornerRadius = radiusDp * resources.displayMetrics.density
+        drawable.setStroke((1 * resources.displayMetrics.density).toInt().coerceAtLeast(1), stroke)
+        return drawable
+    }
+
     private fun loadDramaConfig(container: AppContainer) {
         container.ioExecutor.execute {
             val r: Result<DramaDtos.DramaConfigDto> =
