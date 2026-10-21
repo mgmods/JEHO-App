@@ -30,6 +30,8 @@ import com.Dramizo.Series.presentation.chat.ChatPreviewAdapter;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.presentation.friends.FriendsActivity;
+import com.Dramizo.Series.presentation.notifications.NotificationsActivity;
+import com.Dramizo.Series.presentation.profile.VisitorsActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
@@ -138,7 +140,17 @@ public class MessagesFragment extends Fragment {
             binding.tvRequestBadge.setOnClickListener(openHub);
         }
 
+        // Social shortcuts open existing app destinations; no placeholder screens.
+        binding.btnQuickFriends.setOnClickListener(v -> openFriendsTab(FriendsActivity.TAB_FRIENDS));
+        binding.btnQuickNotifications.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), NotificationsActivity.class)));
+        binding.btnQuickRequests.setOnClickListener(v ->
+                openFriendsTab(FriendsActivity.TAB_REQ_FOLLOW));
+        binding.btnQuickVisitors.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), VisitorsActivity.class)));
+
         loadPendingRequestBadge();
+        loadUnreadNotificationBadge();
 
         if (binding.officialNewsCardMsg != null) {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
@@ -280,6 +292,7 @@ public class MessagesFragment extends Fragment {
         // Soft reload: keep list visible; force only via pull-to-refresh.
         if (viewModel != null) viewModel.load(false);
         loadPendingRequestBadge();
+        loadUnreadNotificationBadge();
         loadOfficialNewsPreview();
         loadAdminMessagesPreview();
         registerOfficialNewsReceiver();
@@ -310,31 +323,57 @@ public class MessagesFragment extends Fragment {
     }
 
     private void loadPendingRequestBadge() {
-        if (binding == null || binding.tvRequestBadge == null) return;
+        if (binding == null) return;
         AppContainer c = ContainerProvider.from(requireActivity());
         c.getIoExecutor().execute(() -> {
-            int total = 0;
+            int count = 0;
             try {
-                // Friend requests first (what users expect from the badge).
-                Result<java.util.List<MiscDtos.SocialRequestDto>> friend =
-                        ApiCall.execute(c.getUserApi().requests("friend"));
-                if (friend.success && friend.data != null) total += friend.data.size();
-                for (String type : new String[]{"follow", "relation"}) {
-                    Result<java.util.List<MiscDtos.SocialRequestDto>> r =
-                            ApiCall.execute(c.getUserApi().requests(type));
-                    if (r.success && r.data != null) total += r.data.size();
+                Result<java.util.List<MiscDtos.SocialRequestDto>> r =
+                        ApiCall.execute(c.getUserApi().requests("follow"));
+                if (r.success && r.data != null) count = r.data.size();
+            } catch (Exception ignored) {
+            }
+            final int pending = count;
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null) return;
+                String label = pending > 9 ? "9+" : String.valueOf(pending);
+                if (binding.tvRequestBadge != null) {
+                    binding.tvRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
+                    binding.tvRequestBadge.setText(label);
+                }
+                if (binding.tvQuickRequestBadge != null) {
+                    binding.tvQuickRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
+                    binding.tvQuickRequestBadge.setText(label);
+                }
+            });
+        });
+    }
+
+    private void loadUnreadNotificationBadge() {
+        if (binding == null || !isAdded()) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            int unread = 0;
+            try {
+                Result<MiscDtos.ListResult<MiscDtos.NotificationDto>> r =
+                        ApiCall.execute(c.getNotificationsUseCase().execute(1));
+                if (r.success && r.data != null && r.data.items != null) {
+                    for (MiscDtos.NotificationDto item : r.data.items) {
+                        if (item != null && !item.isRead) unread++;
+                    }
                 }
             } catch (Exception ignored) {
             }
-            final int count = total;
+            final int count = unread;
             if (!isAdded()) return;
             requireActivity().runOnUiThread(() -> {
-                if (binding == null || binding.tvRequestBadge == null) return;
+                if (binding == null || binding.tvQuickNotificationBadge == null) return;
                 if (count > 0) {
-                    binding.tvRequestBadge.setVisibility(View.VISIBLE);
-                    binding.tvRequestBadge.setText(count > 9 ? "9+" : String.valueOf(count));
+                    binding.tvQuickNotificationBadge.setVisibility(View.VISIBLE);
+                    binding.tvQuickNotificationBadge.setText(count > 99 ? "99+" : String.valueOf(count));
                 } else {
-                    binding.tvRequestBadge.setVisibility(View.GONE);
+                    binding.tvQuickNotificationBadge.setVisibility(View.GONE);
                 }
             });
         });
