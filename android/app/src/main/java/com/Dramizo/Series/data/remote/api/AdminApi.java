@@ -107,6 +107,24 @@ public interface AdminApi {
     @POST("admin/notifications/send")
     Call<ApiResponse<Object>> sendNotification(@Body Map<String, String> body);
 
+    @GET("admin/mysterious-man/config")
+    Call<ApiResponse<Object>> mysteriousManConfig();
+
+    @PATCH("admin/mysterious-man/config")
+    Call<ApiResponse<Object>> updateMysteriousManConfig(@Body Map<String, Object> body);
+
+    @GET("admin/lucky-gift-cannon/config")
+    Call<ApiResponse<Object>> luckyCannonConfig();
+
+    @PATCH("admin/lucky-gift-cannon/config")
+    Call<ApiResponse<Object>> updateLuckyCannonConfig(@Body Map<String, Object> body);
+
+    @GET("admin/support-chest/config")
+    Call<ApiResponse<Object>> supportChestConfig();
+
+    @PATCH("admin/support-chest/config")
+    Call<ApiResponse<Object>> updateSupportChestConfig(@Body Map<String, Object> body);
+
     @GET("admin/toast-manager")
     Call<ApiResponse<Object>> toastManagerConfig();
 
