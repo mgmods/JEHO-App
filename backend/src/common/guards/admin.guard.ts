@@ -85,7 +85,7 @@ export class AdminGuard implements CanActivate {
       }
       if (role === 'admin') return true;
       if (role === 'manager') {
-        if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams'].includes(resolved.module)) {
+        if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams', 'reports'].includes(resolved.module)) {
           throw new ForbiddenException('Manager access is limited to rooms and live streams');
         }
         if (
