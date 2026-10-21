@@ -2040,10 +2040,15 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(13), dp(14), dp(13))
-        background = roundRect(Color.WHITE, 18)
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+        setPadding(dp(16), dp(15), dp(16), dp(15))
+        background = GradientDrawable().apply {
+            setColor(Color.WHITE)
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), 0xFFE8E7F2.toInt())
+        }
         elevation = dp(1).toFloat()
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(11) }
     }
 
     private fun addText(parent: LinearLayout, text: String, size: Float, bold: Boolean, color: Int) {
@@ -2059,11 +2064,15 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
-        textSize = 12f
+        textSize = 13f
         isAllCaps = false
+        minHeight = dp(46)
+        minWidth = 0
         setTextColor(Color.WHITE)
-        background = roundRect(ACCENT, 12)
-        setPadding(dp(10), dp(2), dp(10), dp(2))
+        background = roundRect(ACCENT, 14)
+        backgroundTintList = null
+        elevation = dp(1).toFloat()
+        setPadding(dp(14), dp(4), dp(14), dp(4))
         setOnClickListener { action() }
     }
 
