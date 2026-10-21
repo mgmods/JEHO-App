@@ -195,7 +195,7 @@ export class ContestsService implements OnModuleInit {
   }
 
   async listRoomPkInvitations(userId: string, roomReference: string) {
-    if (!(await this.isRoomPkEnabled(true))) return { items: [] };
+    if (!(await this.isRoomPkEnabled(true))) return { items: [], roomPkEnabled: false };
     const room = await this.findRoomByPkReference(roomReference);
     if (room.hostId !== userId) throw new BadRequestException('استقبال دعوات PK متاح لمضيف الروم فقط');
     const pending = await this.contestsRepo.find({
