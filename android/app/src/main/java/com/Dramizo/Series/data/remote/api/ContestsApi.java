@@ -28,6 +28,9 @@ public interface ContestsApi {
     @POST("contests/{id}/room-pk-response")
     Call<ApiResponse<Object>> respondRoomPk(@Path("id") String id, @Body Map<String, Object> body);
 
+    @GET("contests/{id}/room-pk/rosters")
+    Call<ApiResponse<com.google.gson.JsonObject>> roomPkRosters(@Path("id") String id);
+
     @GET("contests/{id}")
     Call<ApiResponse<ContestDtos.ContestDetail>> get(@Path("id") String id);
 

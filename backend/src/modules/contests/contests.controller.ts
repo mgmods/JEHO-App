@@ -47,6 +47,12 @@ export class ContestsController {
     return this.contests.respondRoomPkChallenge(userId, id, dto.accept === true);
   }
 
+  @Get(':id/room-pk/rosters')
+  @ApiOperation({ summary: 'Read live room seat rosters for an active PK challenge' })
+  roomPkRosters(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {
+    return this.contests.getRoomPkRosters(userId, id);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Contest details + leaderboard' })
   get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('sub') userId: string) {

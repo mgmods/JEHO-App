@@ -11,6 +11,8 @@ import { DataSource, In, Repository } from 'typeorm';
 import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
 import { Room } from '../../database/entities/room.entity';
+import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { RoomAccess, RoomAccessGrant } from '../../database/entities/room-access.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
@@ -38,6 +40,8 @@ export class ContestsService implements OnModuleInit {
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
     @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
+    @InjectRepository(RoomSeat) private readonly roomSeatsRepo: Repository<RoomSeat>,
+    @InjectRepository(RoomAccess) private readonly roomAccessRepo: Repository<RoomAccess>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -309,6 +313,60 @@ export class ContestsService implements OnModuleInit {
       { kind: 'room_pk_invitation', contestId: saved.id, roomId: target.id, sourceRoomId: source.id,
         targetRoomId: target.id, sourceRoomName: source.title, targetRoomName: target.title, durationMinutes, scoringMode, goalScore });
     return { contest: saved, message: 'تم إرسال دعوة تحدّي PK إلى الروم المنافس' };
+  }
+
+
+  /** Return the actual seat occupants for both active PK rooms, without joining the rival voice channel. */
+  async getRoomPkRosters(userId: string, contestId: string) {
+    const contest = await this.contestsRepo.findOne({ where: { id: contestId } });
+    if (!contest || contest.challengeType !== 'room_vs_room' || contest.status !== 'active') {
+      throw new NotFoundException('تحدّي PK النشط غير موجود');
+    }
+    const sideA = (contest.sideA || {}) as Record<string, unknown>;
+    const sideB = (contest.sideB || {}) as Record<string, unknown>;
+    const roomAId = Array.isArray(sideA.roomIds) ? String(sideA.roomIds[0] || '') : '';
+    const roomBId = Array.isArray(sideB.roomIds) ? String(sideB.roomIds[0] || '') : '';
+    if (!roomAId || !roomBId || roomAId === roomBId) throw new BadRequestException('بيانات طرفي تحدّي PK غير صالحة');
+    const [roomA, roomB, ownSeats, ownAccess] = await Promise.all([
+      this.roomsRepo.findOne({ where: { id: roomAId } }),
+      this.roomsRepo.findOne({ where: { id: roomBId } }),
+      this.roomSeatsRepo.find({ where: [{ roomId: roomAId, userId }, { roomId: roomBId, userId }] }),
+      this.roomAccessRepo.find({ where: [{ roomId: roomAId, userId }, { roomId: roomBId, userId }] }),
+    ]);
+    if (!roomA || !roomB) throw new NotFoundException('أحد الرومين لم يعد متاحاً');
+    const now = Date.now();
+    const hasRoomAccess = ownAccess.some((access) => access.grantType === RoomAccessGrant.PERMANENT || !access.expiresAt || access.expiresAt.getTime() > now);
+    if (roomA.hostId !== userId && roomA.activeHostId !== userId && roomB.hostId !== userId && roomB.activeHostId !== userId && ownSeats.length === 0 && !hasRoomAccess && !roomA.isPublic && !roomB.isPublic) {
+      throw new BadRequestException('عرض مقاعد التحدّي متاح لأعضاء الرومين فقط');
+    }
+    const [seatsA, seatsB] = await Promise.all([
+      this.roomSeatsRepo.find({ where: { roomId: roomAId }, relations: { user: true }, order: { seatIndex: 'ASC' } }),
+      this.roomSeatsRepo.find({ where: { roomId: roomBId }, relations: { user: true }, order: { seatIndex: 'ASC' } }),
+    ]);
+    const shape = (seat: RoomSeat) => {
+      const user = seat.user;
+      const hidden = !!user?.mysteriousMode;
+      return {
+        id: seat.id, seatIndex: seat.seatIndex, status: seat.status,
+        isMuted: seat.isMuted, isModeratorMuted: seat.isModeratorMuted,
+        isLocked: seat.status === 'locked', userId: seat.userId,
+        user: user ? {
+          id: user.id,
+          displayName: hidden ? 'الرجل الغامض' : (user.displayName || user.username),
+          username: hidden ? 'الرجل الغامض' : user.username,
+          avatarUrl: hidden ? null : user.avatarUrl,
+          mysteriousMan: hidden,
+          level: user.level,
+          publicId: hidden ? null : user.publicId,
+        } : null,
+      };
+    };
+    return {
+      contestId: contest.id,
+      roomA: { id: roomA.id, title: roomA.title, seats: seatsA.map(shape) },
+      roomB: { id: roomB.id, title: roomB.title, seats: seatsB.map(shape) },
+      updatedAt: new Date().toISOString(),
+    };
   }
 
   async respondRoomPkChallenge(userId: string, contestId: string, accept: boolean) {
