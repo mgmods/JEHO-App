@@ -52,14 +52,14 @@ export class AdminGuard implements CanActivate {
       }
       const path = url.split('?')[0].toLowerCase();
       const superOnlyPath =
-        /\\/admin\\/users\\/maintenance\\/reset-all-baseline(?:\\/|$)/.test(path) ||
-        /\\/admin\\/users\\/[^/]+\\/reset-baseline(?:\\/|$)/.test(path) ||
-        /\\/admin\\/security\\/ban-ip(?:\\/|$)/.test(path) ||
-        /\\/admin\\/economy\\/settings\\/reset(?:\\/|$)/.test(path) ||
-        /\\/admin\\/economy\\/renormalize-gifts(?:\\/|$)/.test(path) ||
-        /\\/admin\\/gifts\\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\\/|$)/.test(path) ||
-        /\\/admin\\/rooms\\/platform(?:\\/|$)/.test(path) ||
-        /\\/admin\\/rooms\\/[^/]+\\/platform-moderators(?:\\/|$)/.test(path);
+        /\/admin\/users\/maintenance\/reset-all-baseline(?:\/|$)/.test(path) ||
+        /\/admin\/users\/[^/]+\/reset-baseline(?:\/|$)/.test(path) ||
+        /\/admin\/security\/ban-ip(?:\/|$)/.test(path) ||
+        /\/admin\/economy\/settings\/reset(?:\/|$)/.test(path) ||
+        /\/admin\/economy\/renormalize-gifts(?:\/|$)/.test(path) ||
+        /\/admin\/gifts\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\/|$)/.test(path) ||
+        /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
+        /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path);
       if (role === 'admin' && superOnlyPath) {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
