@@ -25,6 +25,13 @@ export class BadgesController {
     return this.service.catalogForIdentifier(userId);
   }
 
+  @Get('users/:userId/badges/earned')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get persisted earned badges for a profile user' })
+  earnedBadges(@Param('userId') userId: string) {
+    return this.service.earnedForIdentifier(userId);
+  }
+
   @Get('admin/badges')
   @UseGuards(JwtAuthGuard, AdminGuard)
   listAdmin() { return this.service.listAdmin(); }
