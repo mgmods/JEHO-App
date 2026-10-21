@@ -256,6 +256,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private volatile boolean luckyCannonEnabled = true;
     private volatile boolean luckyCannonSoundEnabled = true;
     private volatile int luckyCannonDurationSeconds = 2;
+    private volatile boolean luckyCannonPulseEnabled = true;
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
     @Nullable private ImageView luckyCannonIconView;
@@ -3796,9 +3797,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     catch (Exception ignored) { }
                     final int nextDuration = duration;
                     final String nextIconUrl = iconUrl;
+                    final boolean nextPulseEnabled = !Boolean.FALSE.equals(button.get("pulseEnabled"));
                     runOnUiThread(() -> {
                         if (isFinishing() || isDestroyed()) return;
                         luckyCannonDurationSeconds = nextDuration;
+                        luckyCannonPulseEnabled = nextPulseEnabled;
                         luckyCannonRemoteIconUrl = nextIconUrl;
                         if (luckyCannonIconView == null) return;
                         if (nextIconUrl.isEmpty()) {
@@ -3877,8 +3880,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
         // Tactile press feedback is local-only and does not affect the send request.
-        if (luckyCannonView != null) luckyCannonView.fire();
-        if (luckyCannonLayer != null) {
+        if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+        if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
             luckyCannonLayer.animate().cancel();
             luckyCannonLayer.setScaleX(0.94f);
             luckyCannonLayer.setScaleY(0.94f);
@@ -3943,7 +3946,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
         // The sender already received immediate local press feedback; other room members
         // still animate when the shared launch event arrives.
-        if (!localSender) luckyCannonView.fire();
+        if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
         if (!keepVisible) {
