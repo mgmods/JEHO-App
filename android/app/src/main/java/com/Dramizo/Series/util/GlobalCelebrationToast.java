@@ -2,6 +2,7 @@ package com.Dramizo.Series.util;
 
 import android.app.Activity;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.graphics.drawable.GradientDrawable;
 import android.view.animation.LinearInterpolator;
 import android.os.Handler;
@@ -336,7 +337,18 @@ public final class GlobalCelebrationToast {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
             wrapTimes.setScaleY(0.82f);
-            tvTimes.setText(giftSend ? String.format(Locale.US, "X%d", multiplier) : String.format(Locale.US, "×%d", multiplier));
+            if (giftSend && multiplier > 1) {
+                tvTimes.setText("X1");
+                ValueAnimator countUp = ValueAnimator.ofInt(1, multiplier);
+                countUp.setDuration(Math.min(1200L, Math.max(350L, multiplier * 8L)));
+                countUp.addUpdateListener(animation ->
+                        tvTimes.setText(String.format(Locale.US, "X%d", (Integer) animation.getAnimatedValue())));
+                countUp.start();
+            } else {
+                tvTimes.setText(giftSend
+                        ? String.format(Locale.US, "X%d", multiplier)
+                        : String.format(Locale.US, "×%d", multiplier));
+            }
             if (badge != null) {
                 if (giftSend) {
                     String giftIcon = AssetCatalog.absoluteUrl(badgeUrl);
