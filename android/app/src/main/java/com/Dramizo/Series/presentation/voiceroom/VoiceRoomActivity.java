@@ -12167,9 +12167,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         boolean enabled = payload != null && payload.has("enabled")
                                 && !payload.get("enabled").isJsonNull()
                                 && payload.get("enabled").getAsBoolean();
-                        if (!enabled) handler.post(() -> {
-                            handler.removeCallbacks(hideRoomPkScoreBanner);
-                            if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                        handler.post(() -> {
+                            roomPkFeatureEnabled = enabled;
+                            if (!enabled) {
+                                handler.removeCallbacks(hideRoomPkScoreBanner);
+                                handler.removeCallbacks(updateRoomPkBannerClock);
+                                roomPkCurrentContestId = null;
+                                if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                            }
+                            ensureRoomPkActionButton();
+                            if (enabled) handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
                         });
                         return;
                     }
