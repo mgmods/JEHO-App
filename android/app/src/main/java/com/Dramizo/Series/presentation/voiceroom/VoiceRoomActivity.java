@@ -3636,11 +3636,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setClickable(false);
         layer.setFocusable(false);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
-                luckyCannonDp(76), luckyCannonDp(76));
-        lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
+                luckyCannonDp(96), luckyCannonDp(96));
+        lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
-        lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
-        lp.setMarginEnd(luckyCannonDp(8));
         root.addView(layer, lp);
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
@@ -3648,9 +3646,58 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         cannonLp.gravity = Gravity.CENTER;
         layer.addView(cannon, cannonLp);
-        layer.setElevation(luckyCannonDp(42));
+        layer.setElevation(luckyCannonDp(80));
         layer.setVisibility(View.GONE);
+
+        // Initial position: above the existing gift button with a comfortable gap.
+        // The user can then drag it anywhere within the room bounds.
+        root.post(() -> {
+            if (binding == null || binding.btnGift == null || layer.getWidth() <= 0 || layer.getHeight() <= 0) return;
+            int[] rootLoc = new int[2];
+            int[] giftLoc = new int[2];
+            root.getLocationOnScreen(rootLoc);
+            binding.btnGift.getLocationOnScreen(giftLoc);
+            float x = giftLoc[0] - rootLoc[0] + binding.btnGift.getWidth() / 2f - layer.getWidth() / 2f;
+            float y = giftLoc[1] - rootLoc[1] - layer.getHeight() - luckyCannonDp(42);
+            layer.setX(Math.max(0f, Math.min(x, root.getWidth() - layer.getWidth())));
+            layer.setY(Math.max(0f, Math.min(y, root.getHeight() - layer.getHeight())));
+        });
+
+        final float[] downRawX = new float[1];
+        final float[] downRawY = new float[1];
+        final float[] startX = new float[1];
+        final float[] startY = new float[1];
+        final boolean[] dragged = new boolean[1];
         cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        cannon.setOnTouchListener((v, event) -> {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    downRawX[0] = event.getRawX();
+                    downRawY[0] = event.getRawY();
+                    startX[0] = layer.getX();
+                    startY[0] = layer.getY();
+                    dragged[0] = false;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    float dx = event.getRawX() - downRawX[0];
+                    float dy = event.getRawY() - downRawY[0];
+                    if (!dragged[0] && Math.hypot(dx, dy) >= luckyCannonDp(6)) dragged[0] = true;
+                    if (dragged[0]) {
+                        float maxX = Math.max(0f, root.getWidth() - layer.getWidth());
+                        float maxY = Math.max(0f, root.getHeight() - layer.getHeight());
+                        layer.setX(Math.max(0f, Math.min(startX[0] + dx, maxX)));
+                        layer.setY(Math.max(0f, Math.min(startY[0] + dy, maxY)));
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!dragged[0]) v.performClick();
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    return true;
+                default:
+                    return true;
+            }
+        });
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
     }
@@ -3672,7 +3719,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (id != null && !id.isEmpty() && !luckyCannonTargets.contains(id)) luckyCannonTargets.add(id);
         }
         if (luckyCannonTargets.isEmpty()) return;
-        showLuckyCannonAndScheduleHide();
+        // Keep the launcher available for dragging and tapping until the user fires it.
+        showLuckyCannon();
+    }
+
+    private void showLuckyCannon() {
+        if (!luckyCannonEnabled || luckyCannonLayer == null) return;
+        luckyCannonLayer.setVisibility(View.VISIBLE);
+        luckyCannonLayer.setAlpha(1f);
+        luckyCannonLayer.setElevation(luckyCannonDp(80));
+        luckyCannonLayer.bringToFront();
+        luckyCannonLayer.requestLayout();
+        luckyCannonLayer.invalidate();
     }
 
     private void showLuckyCannonAndScheduleHide() {
