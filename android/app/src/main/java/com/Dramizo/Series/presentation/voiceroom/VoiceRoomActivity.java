@@ -3671,11 +3671,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setClickable(false);
         layer.setFocusable(false);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
-                luckyCannonDp(76), luckyCannonDp(76));
+                luckyCannonDp(68), luckyCannonDp(68));
+        // Default position: bottom-center of the room content, with room for the control bar.
+        lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
-        lp.topToTop = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.bottomToBottom = ConstraintLayout.LayoutParams.PARENT_ID;
-        lp.setMarginEnd(luckyCannonDp(8));
+        lp.bottomMargin = luckyCannonDp(104);
         root.addView(layer, lp);
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
@@ -3686,6 +3687,50 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setElevation(luckyCannonDp(42));
         layer.setVisibility(View.GONE);
         cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        // Drag the floating control anywhere inside the room without firing on a drag.
+        layer.setOnTouchListener(new View.OnTouchListener() {
+            private float downRawX, downRawY, startTx, startTy;
+            private boolean dragging;
+            private final int touchSlop = luckyCannonDp(6);
+            @Override public boolean onTouch(View view, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downRawX = event.getRawX();
+                        downRawY = event.getRawY();
+                        startTx = view.getTranslationX();
+                        startTy = view.getTranslationY();
+                        dragging = false;
+                        return false;
+                    case MotionEvent.ACTION_MOVE: {
+                        float dx = event.getRawX() - downRawX;
+                        float dy = event.getRawY() - downRawY;
+                        if (!dragging && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
+                            dragging = true;
+                            view.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                        if (dragging && root.getWidth() > 0 && root.getHeight() > 0) {
+                            float minX = -view.getLeft();
+                            float maxX = root.getWidth() - view.getRight();
+                            float minY = -view.getTop();
+                            float maxY = root.getHeight() - view.getBottom();
+                            view.setTranslationX(Math.max(minX, Math.min(maxX, startTx + dx)));
+                            view.setTranslationY(Math.max(minY, Math.min(maxY, startTy + dy)));
+                            return true;
+                        }
+                        return false;
+                    }
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (dragging) {
+                            view.getParent().requestDisallowInterceptTouchEvent(false);
+                            return true;
+                        }
+                        return false;
+                    default:
+                        return dragging;
+                }
+            }
+        });
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
     }
