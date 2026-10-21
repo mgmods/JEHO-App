@@ -151,9 +151,9 @@ export class ConfigController {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
     let parsed: any = {};
@@ -180,6 +180,13 @@ export class ConfigController {
       avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarY)) ? Number(oldGift.avatarY) : 50))),
       textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
       textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textY)) ? Number(oldGift.textY) : 50))),
+      bodyX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.bodyX)) ? Number(oldGift.bodyX) : 25))),
+      bodyY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.bodyY)) ? Number(oldGift.bodyY) : 67))),
+      countX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.countX)) ? Number(oldGift.countX) : 88))),
+      countY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.countY)) ? Number(oldGift.countY) : 50))),
+      widthDp: Math.max(220, Math.min(360, Math.round(Number(oldGift.widthDp) || 340))),
+      heightDp: Math.max(60, Math.min(180, Math.round(Number(oldGift.heightDp) || 100))),
+      avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(oldGift.avatarSizeDp) || 44))),
     };
     const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
       const value = parsed[key] || {};
@@ -193,6 +200,13 @@ export class ConfigController {
         avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarY)) ? Number(value.avatarY) : fallback.avatarY))),
         textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.textX))),
         textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textY)) ? Number(value.textY) : fallback.textY))),
+        bodyX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.bodyX)) ? Number(value.bodyX) : fallback.bodyX))),
+        bodyY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.bodyY)) ? Number(value.bodyY) : fallback.bodyY))),
+        countX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.countX)) ? Number(value.countX) : fallback.countX))),
+        countY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.countY)) ? Number(value.countY) : fallback.countY))),
+        widthDp: Math.max(220, Math.min(360, Math.round(Number(value.widthDp) || fallback.widthDp))),
+        heightDp: Math.max(60, Math.min(180, Math.round(Number(value.heightDp) || fallback.heightDp))),
+        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(value.avatarSizeDp) || fallback.avatarSizeDp))),
       };
     };
     const button = parsed.luckyButton || {};
