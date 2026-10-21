@@ -55,10 +55,16 @@ public final class GlobalCelebrationToast {
     private static volatile int remoteLuckyNormalDurationSeconds = 4;
     private static volatile int remoteLuckyHighDurationSeconds = 5;
     private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
-    private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 50f;
-    private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 50f;
-    private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 50f;
-    private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 50f;
+    private static volatile float remoteGiftBodyX = 25f, remoteGiftBodyY = 67f, remoteGiftCountX = 88f, remoteGiftCountY = 50f;
+    private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 42f;
+    private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 42f, remoteLuckyNormalBodyX = 25f, remoteLuckyNormalBodyY = 62f;
+    private static volatile float remoteLuckyNormalCountX = 88f, remoteLuckyNormalCountY = 50f;
+    private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 42f;
+    private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 42f, remoteLuckyHighBodyX = 25f, remoteLuckyHighBodyY = 62f;
+    private static volatile float remoteLuckyHighCountX = 88f, remoteLuckyHighCountY = 50f;
+    private static volatile int remoteGiftWidthDp = 340, remoteGiftHeightDp = 100, remoteGiftAvatarSizeDp = 44;
+    private static volatile int remoteLuckyNormalWidthDp = 340, remoteLuckyNormalHeightDp = 100, remoteLuckyNormalAvatarSizeDp = 44;
+    private static volatile int remoteLuckyHighWidthDp = 340, remoteLuckyHighHeightDp = 100, remoteLuckyHighAvatarSizeDp = 44;
     private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
@@ -123,7 +129,7 @@ public final class GlobalCelebrationToast {
         if (background != null) {
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 background.setVisibility(View.VISIBLE);
-                try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(background); }
+                try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(background); }
                 catch (Exception ignored) { background.setVisibility(View.GONE); }
             } else background.setVisibility(View.GONE);
         }
@@ -157,11 +163,18 @@ public final class GlobalCelebrationToast {
             final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
             final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
             final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            resizeAvatar(activity, avatar, avatarSize);
             active.post(() -> {
                 if (active.getParent() == null) return;
                 positionViewPercent(avatar, active, avatarX, avatarY, true);
                 positionViewPercent(title, active, textX, textY, false);
-                positionViewPercent(body, active, textX, textY + 17f, false);
+                positionViewPercent(body, active, bodyX, bodyY, false);
+                positionViewPercent(active.findViewById(R.id.wrapCelebrationTimes), active, countX, countY, true);
             });
         }
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
@@ -210,6 +223,13 @@ public final class GlobalCelebrationToast {
                     remoteGiftAvatarY = floatValue(gift.get("avatarY"), 50f);
                     remoteGiftTextX = floatValue(gift.get("textX"), 25f);
                     remoteGiftTextY = floatValue(gift.get("textY"), 50f);
+                    remoteGiftBodyX = floatValue(gift.get("bodyX"), 25f);
+                    remoteGiftBodyY = floatValue(gift.get("bodyY"), 67f);
+                    remoteGiftCountX = floatValue(gift.get("countX"), 88f);
+                    remoteGiftCountY = floatValue(gift.get("countY"), 50f);
+                    remoteGiftWidthDp = dimensionValue(gift.get("widthDp"), 340, 220, 360);
+                    remoteGiftHeightDp = dimensionValue(gift.get("heightDp"), 100, 60, 180);
+                    remoteGiftAvatarSizeDp = dimensionValue(gift.get("avatarSizeDp"), 44, 20, 76);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -221,11 +241,25 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalAvatarX = floatValue(normal.get("avatarX"), 8f);
                     remoteLuckyNormalAvatarY = floatValue(normal.get("avatarY"), 50f);
                     remoteLuckyNormalTextX = floatValue(normal.get("textX"), 25f);
-                    remoteLuckyNormalTextY = floatValue(normal.get("textY"), 50f);
+                    remoteLuckyNormalTextY = floatValue(normal.get("textY"), 42f);
+                    remoteLuckyNormalBodyX = floatValue(normal.get("bodyX"), 25f);
+                    remoteLuckyNormalBodyY = floatValue(normal.get("bodyY"), 62f);
+                    remoteLuckyNormalCountX = floatValue(normal.get("countX"), 88f);
+                    remoteLuckyNormalCountY = floatValue(normal.get("countY"), 50f);
+                    remoteLuckyNormalWidthDp = dimensionValue(normal.get("widthDp"), 340, 220, 360);
+                    remoteLuckyNormalHeightDp = dimensionValue(normal.get("heightDp"), 100, 60, 180);
+                    remoteLuckyNormalAvatarSizeDp = dimensionValue(normal.get("avatarSizeDp"), 44, 20, 76);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
-                    remoteLuckyHighTextY = floatValue(high.get("textY"), 50f);
+                    remoteLuckyHighTextY = floatValue(high.get("textY"), 42f);
+                    remoteLuckyHighBodyX = floatValue(high.get("bodyX"), 25f);
+                    remoteLuckyHighBodyY = floatValue(high.get("bodyY"), 62f);
+                    remoteLuckyHighCountX = floatValue(high.get("countX"), 88f);
+                    remoteLuckyHighCountY = floatValue(high.get("countY"), 50f);
+                    remoteLuckyHighWidthDp = dimensionValue(high.get("widthDp"), 340, 220, 360);
+                    remoteLuckyHighHeightDp = dimensionValue(high.get("heightDp"), 100, 60, 180);
+                    remoteLuckyHighAvatarSizeDp = dimensionValue(high.get("avatarSizeDp"), 44, 20, 76);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -503,8 +537,11 @@ public final class GlobalCelebrationToast {
         }
 
         int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
-        int toastWidth = Math.min(dp(activity, 360), Math.max(dp(activity, 260), screenWidth - dp(activity, 24)));
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : remoteLuckyNormalWidthDp;
+        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
+        int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
+        int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
@@ -517,7 +554,7 @@ public final class GlobalCelebrationToast {
             String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 toastBackground.setVisibility(View.VISIBLE);
-                try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(toastBackground); }
+                try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
             } else toastBackground.setVisibility(View.GONE);
         }
@@ -566,17 +603,49 @@ public final class GlobalCelebrationToast {
             final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
             final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
             final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            final float bodyX = giftSend ? remoteGiftBodyX : luckyHigh ? remoteLuckyHighBodyX : remoteLuckyNormalBodyX;
+            final float bodyY = giftSend ? remoteGiftBodyY : luckyHigh ? remoteLuckyHighBodyY : remoteLuckyNormalBodyY;
+            final float countX = giftSend ? remoteGiftCountX : luckyHigh ? remoteLuckyHighCountX : remoteLuckyNormalCountX;
+            final float countY = giftSend ? remoteGiftCountY : luckyHigh ? remoteLuckyHighCountY : remoteLuckyNormalCountY;
+            final int avatarSize = giftSend ? remoteGiftAvatarSizeDp : luckyHigh ? remoteLuckyHighAvatarSizeDp : remoteLuckyNormalAvatarSizeDp;
+            resizeAvatar(activity, avatar, avatarSize);
             banner.post(() -> {
                 if (banner.getParent() == null) return;
                 positionViewPercent(avatar, banner, avatarX, avatarY, true);
                 positionViewPercent(tvTitle, banner, textX, textY, false);
-                positionViewPercent(tvBody, banner, textX, textY + 17f, false);
+                positionViewPercent(tvBody, banner, bodyX, bodyY, false);
+                positionViewPercent(wrapTimes, banner, countX, countY, true);
             });
         }
         hideRunnable = () -> removeBanner(banner);
         MAIN.postDelayed(hideRunnable, customToastStyle
                 ? Math.max(1, Math.min(12, customDuration)) * 1000L
                 : (canOpenRoom ? 6200L : 5200L));
+    }
+
+    private static int dimensionValue(Object value, int fallback, int min, int max) {
+        try { return Math.max(min, Math.min(max, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
+        catch (Exception ignored) { return fallback; }
+    }
+
+    private static void resizeAvatar(Activity activity, ImageView avatar, int sizeDp) {
+        if (avatar == null) return;
+        int size = dp(activity, Math.max(20, Math.min(76, sizeDp)));
+        ViewGroup.LayoutParams params = avatar.getLayoutParams();
+        if (params != null) {
+            params.width = size;
+            params.height = size;
+            avatar.setLayoutParams(params);
+        }
+        View parent = (View) avatar.getParent();
+        if (parent != null) {
+            ViewGroup.LayoutParams parentParams = parent.getLayoutParams();
+            if (parentParams != null) {
+                parentParams.width = size;
+                parentParams.height = size;
+                parent.setLayoutParams(parentParams);
+            }
+        }
     }
 
     private static void positionViewPercent(View target, View container, float xPercent, float yPercent, boolean centerX) {
