@@ -578,10 +578,14 @@ public final class GlobalCelebrationToast {
         if (target == null || container == null || container.getWidth() <= 0 || container.getHeight() <= 0) return;
         float desiredX = container.getWidth() * Math.max(0f, Math.min(100f, xPercent)) / 100f;
         float desiredY = container.getHeight() * Math.max(0f, Math.min(100f, yPercent)) / 100f;
-        float currentX = target.getX() + (centerX ? target.getWidth() / 2f : 0f);
-        float currentY = target.getY() + target.getHeight() / 2f;
-        target.setTranslationX(desiredX - currentX);
-        target.setTranslationY(desiredY - currentY);
+        int[] targetLocation = new int[2];
+        int[] containerLocation = new int[2];
+        target.getLocationOnScreen(targetLocation);
+        container.getLocationOnScreen(containerLocation);
+        float currentX = targetLocation[0] - containerLocation[0] + (centerX ? target.getWidth() / 2f : 0f);
+        float currentY = targetLocation[1] - containerLocation[1] + target.getHeight() / 2f;
+        target.setTranslationX(target.getTranslationX() + desiredX - currentX);
+        target.setTranslationY(target.getTranslationY() + desiredY - currentY);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
