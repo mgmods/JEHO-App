@@ -372,6 +372,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     val tile = LinearLayout(this).apply {
                         orientation = LinearLayout.VERTICAL
                         layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        minimumHeight = dp(160)
                         setPadding(dp(14), dp(14), dp(14), dp(14))
                         background = GradientDrawable().apply {
                             setColor(Color.WHITE)
@@ -396,17 +397,17 @@ class AdminConsoleActivity : ThemedActivity() {
                         layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { bottomMargin = dp(11) }
                     }
                     tile.addView(icon)
-                    addText(tile, module.title, 14f, true, TEXT)
+                    addText(tile, module.title, 15f, true, TEXT)
                     val description = TextView(this).apply {
                         text = module.subtitle
-                        textSize = 11f
+                        textSize = 12f
                         setTextColor(MUTED)
-                        maxLines = 2
+                        maxLines = 3
                         setLineSpacing(dp(2).toFloat(), 1f)
                         setPadding(0, dp(3), 0, dp(9))
                     }
                     tile.addView(description)
-                    addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                    addText(tile, "فتح القسم  ←", 12f, true, ACCENT)
                     row.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply {
                         bottomMargin = dp(9)
                         if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
