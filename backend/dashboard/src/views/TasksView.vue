@@ -331,10 +331,10 @@ const cosmeticsLoading = ref(false)
 const dailyLoginEnabled = ref(true)
 const dailyLoginDays = ref([
   { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
-  { day: 2, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'إطار مؤقت' },
-  { day: 3, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'دخوليّة مؤقتة' },
+  { day: 2, type: 'coins', amount: 150, label: 'مكافأة يومية' },
+  { day: 3, type: 'coins', amount: 200, label: 'مكافأة يومية' },
   { day: 4, type: 'coins', amount: 200, label: 'عملات ذهبية' },
-  { day: 5, type: 'cosmetic', cosmeticCode: '', durationDays: 1, label: 'كرت دخول' },
+  { day: 5, type: 'coins', amount: 250, label: 'مكافأة يومية' },
   { day: 6, type: 'coins', amount: 300, label: 'عملات ذهبية' },
   { day: 7, type: 'coins', amount: 500, label: 'الجائزة الكبرى' },
 ])
