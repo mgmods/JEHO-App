@@ -210,6 +210,7 @@ export class ContestsService implements OnModuleInit {
         const fresh = Number.isFinite(createdAt) && Date.now() - createdAt < 60_000;
         return rules.invitationStatus === 'pending' && fresh && String(rules.targetRoomId || '') === room.id;
       }),
+      roomPkEnabled: true,
     };
   }
 
