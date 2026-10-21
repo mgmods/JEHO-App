@@ -12535,6 +12535,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         LinearLayout.LayoutParams scoringLabelParams = new LinearLayout.LayoutParams(-1, -2);
         scoringLabelParams.topMargin = dp(18);
         form.addView(scoringLabel, scoringLabelParams);
+        TextView goalLabel = roomPkFormLabel("هدف الفوز بالكوينز");
+        LinearLayout.LayoutParams goalLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        goalLabelParams.topMargin = dp(18);
+        form.addView(goalLabel, goalLabelParams);
         TextView[] scoringChips = new TextView[4];
         for (int row = 0; row < 2; row++) {
             LinearLayout scoringRow = new LinearLayout(this);
@@ -12552,6 +12556,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 scoringRow.addView(chip, chipParams);
                 chip.setOnClickListener(v -> {
                     selectedScoring[0] = scoringModes[choiceIndex];
+                    goalLabel.setText("هدف الفوز بال" + ("diamonds".equals(selectedScoring[0]) ? "ألماسات"
+                            : "gifts".equals(selectedScoring[0]) ? "هدايا"
+                            : "points".equals(selectedScoring[0]) ? "نقاط" : "كوينز"));
                     for (int j = 0; j < scoringChips.length; j++) {
                         boolean chosen = j == choiceIndex;
                         scoringChips[j].setBackground(roomPkRoundedBackground(
@@ -12562,6 +12569,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 });
             }
         }
+
+        EditText goalScoreInput = new EditText(this);
+        goalScoreInput.setSingleLine(true);
+        goalScoreInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        goalScoreInput.setText("100000");
+        goalScoreInput.setTextSize(15f);
+        goalScoreInput.setTextColor(0xFF172033);
+        goalScoreInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        goalScoreInput.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFD7DCE8, 13));
+        LinearLayout.LayoutParams goalInputParams = new LinearLayout.LayoutParams(-1, dp(50));
+        goalInputParams.topMargin = dp(7);
+        form.addView(goalScoreInput, goalInputParams);
+        TextView goalHint = new TextView(this);
+        goalHint.setText("ينتهي التحدّي عند بلوغ الهدف أو عند انتهاء الوقت، أيهما أسبق.");
+        goalHint.setTextColor(0xFF7A8497);
+        goalHint.setTextSize(11f);
+        goalHint.setPadding(dp(2), dp(5), dp(2), 0);
+        form.addView(goalHint);
 
         TextView footer = new TextView(this);
         footer.setText("🔔 سيصل إشعار فوري لمضيف الروم المنافس، ولن يبدأ التحدّي إلا بعد قبول الدعوة.");
@@ -12598,8 +12623,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 java.util.Map<String, Object> body = new java.util.HashMap<>();
                 body.put("roomId", roomId);
                 body.put("targetRoomId", target);
+                long goalScore;
+                try {
+                    goalScore = Long.parseLong(goalScoreInput.getText().toString().trim());
+                } catch (Exception invalid) {
+                    goalScore = 0L;
+                }
+                if (goalScore < 1L || goalScore > 1_000_000_000L) {
+                    goalScoreInput.setError("أدخل هدفًا بين 1 و1,000,000,000");
+                    return;
+                }
                 body.put("durationMinutes", selectedMinutes[0]);
                 body.put("scoringMode", selectedScoring[0]);
+                body.put("goalScore", goalScore);
                 send.setEnabled(false);
                 send.setText("جارٍ إرسال الدعوة…");
                 ContainerProvider.from(this).getContestsApi().createRoomPk(body).enqueue(
@@ -12695,12 +12731,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (isFinishing() || contest == null || contest.id == null) return;
         String sourceName = contest.sideA != null ? firstNonEmpty(contest.sideA.name, "الروم المنافس") : "الروم المنافس";
         int minutes = 10;
+        long goalScore = 100000L;
         String mode = firstNonEmpty(contest.scoringMode, "coins");
         if (contest.rules != null) {
             Object duration = contest.rules.get("durationMinutes");
             if (duration instanceof Number) minutes = Math.max(1, ((Number) duration).intValue());
             Object scoring = contest.rules.get("scoringMode");
             if (scoring != null) mode = String.valueOf(scoring);
+            Object goal = contest.rules.get("goalScore");
+            if (goal instanceof Number) goalScore = Math.max(0L, ((Number) goal).longValue());
         }
         String modeLabel = "diamonds".equals(mode) ? "💎 الألماسات"
                 : "gifts".equals(mode) ? "🎁 عدد الهدايا"
@@ -12770,6 +12809,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         scoringParams.leftMargin = dp(8);
         stats.addView(scoring, scoringParams);
         card.addView(stats);
+        String goalUnit = "diamonds".equals(mode) ? "ألماسة"
+                : "gifts".equals(mode) ? "هدية"
+                : "points".equals(mode) ? "نقطة" : "كوينز";
+        TextView goal = new TextView(this);
+        goal.setText("🏁  هدف الفوز: " + String.format(java.util.Locale.US, "%,d", goalScore) + " " + goalUnit);
+        goal.setGravity(Gravity.CENTER);
+        goal.setTextColor(0xFFC52250);
+        goal.setTextSize(13f);
+        goal.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        goal.setPadding(dp(8), dp(11), dp(8), dp(11));
+        goal.setBackground(roomPkRoundedBackground(0xFFFFEAF0, 0xFFF4C2D0, 11));
+        LinearLayout.LayoutParams goalParams = new LinearLayout.LayoutParams(-1, -2);
+        goalParams.topMargin = dp(9);
+        card.addView(goal, goalParams);
 
         TextView note = new TextView(this);
         note.setText("عند القبول يبدأ التحدّي مباشرة ويظهر شريط النتيجة والوقت في الرومين.");
@@ -12970,6 +13023,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         invite.rules.put("durationMinutes", payload.get("durationMinutes").getAsInt());
                     }
                     if (invite.scoringMode != null) invite.rules.put("scoringMode", invite.scoringMode);
+                    if (payload.has("goalScore") && !payload.get("goalScore").isJsonNull()) {
+                        invite.rules.put("goalScore", payload.get("goalScore").getAsLong());
+                    }
                     handler.post(() -> showRoomPkInviteDialog(invite));
                 }
             }
