@@ -107,6 +107,12 @@ public interface AdminApi {
     @POST("admin/notifications/send")
     Call<ApiResponse<Object>> sendNotification(@Body Map<String, String> body);
 
+    @GET("admin/toast-manager")
+    Call<ApiResponse<Object>> toastManagerConfig();
+
+    @PATCH("admin/toast-manager")
+    Call<ApiResponse<Object>> updateToastManagerConfig(@Body Map<String, Object> body);
+
     @GET("admin/operators")
     Call<ApiResponse<Object>> operators();
     @POST("admin/operators")
