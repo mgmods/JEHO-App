@@ -18,8 +18,9 @@ import {
 
 /**
  * Browser admin dashboard + /admin/* APIs.
- * Super: full access. Operator: modules granted in dashboardPermissions.
- * Managers (in-app only) never pass.
+ * Dashboard sessions retain their operator ACL. Authenticated app staff use a
+ * separate role policy: Super = full, Admin = all non-super-only modules,
+ * Manager = room and live-stream operations only.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -33,10 +34,38 @@ export class AdminGuard implements CanActivate {
       authSource?: string;
     } | null;
 
-    if (!user || user.authSource !== 'dashboard' || !hasDashboardAccess(user)) {
-      throw new ForbiddenException(
-        'Dashboard access required — Super or limited admin only',
-      );
+    if (!user) {
+      throw new ForbiddenException('Staff access required');
+    }
+
+    const method = String(request.method || 'GET');
+    const url = String(request.originalUrl || request.url || '');
+
+    // Native Android admin console uses the regular app session. Never treat
+    // ordinary users as staff; JwtAuthGuard reloads the current DB role first.
+    if (user.authSource === 'app') {
+      const role = String(user.staffRole || '').toLowerCase();
+      if (role === 'super' || user.isSuperAdmin) return true;
+      const resolved = resolveAdminRequest(method, url);
+      if (resolved.kind === 'deny' || resolved.kind === 'self' || resolved.kind === 'super') {
+        throw new ForbiddenException('This action is reserved for Super Admin');
+      }
+      if (role === 'admin') return true;
+      if (role === 'manager') {
+        const path = url.split('?')[0].toLowerCase();
+        if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams'].includes(resolved.module)) {
+          throw new ForbiddenException('Manager access is limited to rooms and live streams');
+        }
+        if (/\/admin\/rooms\/platform(?:\/|$)/.test(path) || /platform-moderators/.test(path) || /\/force-end(?:\/|$)/.test(path)) {
+          throw new ForbiddenException('This room operation requires Admin or Super Admin');
+        }
+        return true;
+      }
+      throw new ForbiddenException('Staff access required');
+    }
+
+    if (user.authSource !== 'dashboard' || !hasDashboardAccess(user)) {
+      throw new ForbiddenException('Dashboard access required — Super or limited admin only');
     }
 
     if (isDashboardSuper(user) || user.isSuperAdmin) {
@@ -51,8 +80,6 @@ export class AdminGuard implements CanActivate {
       );
     }
 
-    const method = String(request.method || 'GET');
-    const url = String(request.originalUrl || request.url || '');
     const resolved = resolveAdminRequest(method, url);
 
     if (resolved.kind === 'self') {
