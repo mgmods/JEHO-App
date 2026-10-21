@@ -331,6 +331,24 @@
                     <TextView style="@style/ProfileLuxuryArrow" android:text="‹"/>
                 </LinearLayout>
                 <View style="@style/ProfileLuxuryDivider"/>
+                <TextView
+                    android:id="@+id/actionAdminConsole"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_profile_lux_chip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp"
+                    android:text="🛡️  مركز إدارة JEHO  ·  لوحة تحكم أصلية"
+                    android:textColor="#45317F"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
                 <LinearLayout android:id="@+id/actionActivities" style="@style/ProfileLuxuryMenuRow" android:orientation="horizontal" android:layoutDirection="rtl">
                     <TextView style="@style/ProfileLuxuryEmoji" android:text="✨"/>
                     <TextView style="@style/ProfileLuxuryMenuLabel" android:text="فعالياتي ومركز المهام"/>

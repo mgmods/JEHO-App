@@ -117,7 +117,11 @@ export class JwtAuthGuard implements CanActivate {
       const dashboardAccess = hasDashboardAccess(user);
       const permissions = superAdmin
         ? fullPermissions()
-        : normalizePermissions(user.dashboardPermissions);
+        : staffRole === 'admin'
+          ? fullPermissions()
+          : staffRole === 'manager'
+            ? normalizePermissions({ dashboard: 'read', rooms: 'write', streams: 'write' })
+            : normalizePermissions(user.dashboardPermissions);
       request.user = {
         ...payload,
         sub: user.id,
@@ -128,6 +132,7 @@ export class JwtAuthGuard implements CanActivate {
         permissions,
         role: dashboardAccess ? 'admin' : 'user',
         isGuest: user.isGuest,
+        authSource: 'app',
       };
       return true;
     } catch (error) {

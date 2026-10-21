@@ -24,6 +24,8 @@ import com.Dramizo.Series.databinding.FragmentHomeMeBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.presentation.common.ContainerProvider;
 import com.Dramizo.Series.presentation.common.ViewModelFactory;
+import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
+import com.Dramizo.Series.util.StaffRoleHelper;
 import com.Dramizo.Series.util.MyRoomCardBinder;
 import com.Dramizo.Series.util.RemoteTheme;
 import com.Dramizo.Series.util.RecentRoomsStore;
@@ -62,6 +64,7 @@ public class HomeMeFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
         applySectionWallpaper();
         bindProfileDashboard();
+        setupAdminConsoleEntry();
         keepOnlyMyRoomActivityAndRoomLists();
         viewModel = new ViewModelProvider(requireParentFragment(),
                 new ViewModelFactory(ContainerProvider.from(requireActivity())))
@@ -174,6 +177,20 @@ public class HomeMeFragment extends Fragment {
         }
         view.setVisibility(View.GONE);
         return false;
+    }
+
+    private void setupAdminConsoleEntry() {
+        if (binding == null) return;
+        AuthDtos.UserDto me = ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+        boolean allowed = StaffRoleHelper.isStaff(me);
+        binding.actionAdminConsole.setVisibility(allowed ? View.VISIBLE : View.GONE);
+        binding.actionAdminConsole.setOnClickListener(v -> {
+            if (!StaffRoleHelper.isStaff(ContainerProvider.from(requireActivity()).getSessionManager().getUser())) {
+                Toast.makeText(requireContext(), "هذه الصفحة مخصصة لفريق إدارة JEHO", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            startActivity(new Intent(requireContext(), AdminConsoleActivity.class));
+        });
     }
 
     private void bindProfileDashboard() {

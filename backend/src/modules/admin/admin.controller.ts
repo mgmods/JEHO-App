@@ -126,6 +126,30 @@ export class AdminController {
     private readonly giftsService: GiftsService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('staff-identity/public')
+  @ApiOperation({ summary: 'Read public staff role identity assets for profile and room rendering' })
+  getPublicStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('staff-identity')
+  @ApiOperation({ summary: 'Read native platform staff identity assets' })
+  getStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('staff-identity')
+  @ApiOperation({ summary: 'Update native platform staff identity assets' })
+  patchStaffIdentityConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchStaffIdentityConfig(body || {});
+  }
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('mysterious-man/config')

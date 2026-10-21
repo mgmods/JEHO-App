@@ -12,6 +12,12 @@ import android.animation.ValueAnimator;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Gravity;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.graphics.drawable.Drawable;
 import android.widget.Toast;
 
@@ -21,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
@@ -41,6 +48,8 @@ import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.ServerAssets;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
+import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
@@ -78,6 +87,35 @@ public class ProfileActivity extends ThemedActivity {
                 .get(ProfileViewModel.class);
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
         String myId = container.getSessionManager().getUserId();
+        AuthDtos.UserDto signedInUser = container.getSessionManager().getUser();
+        if (myId != null && myId.equals(userId == null || userId.isEmpty() ? myId : userId)
+                && StaffRoleHelper.isStaff(signedInUser)) {
+            TextView adminEntry = new TextView(this);
+            String roleLabel = StaffRoleHelper.badgeAr(signedInUser);
+            adminEntry.setText("🛡️  مركز إدارة JEHO  ·  " + roleLabel);
+            adminEntry.setTextSize(14f);
+            adminEntry.setTypeface(adminEntry.getTypeface(), Typeface.BOLD);
+            adminEntry.setTextColor(Color.WHITE);
+            adminEntry.setGravity(Gravity.CENTER);
+            adminEntry.setPadding(16, 16, 16, 16);
+            GradientDrawable adminBackground = new GradientDrawable(
+                    GradientDrawable.Orientation.RIGHT_LEFT,
+                    new int[] { 0xFF282C63, 0xFF6A4CC4 });
+            adminBackground.setCornerRadius(18f * getResources().getDisplayMetrics().density);
+            adminEntry.setBackground(adminBackground);
+            LinearLayout.LayoutParams adminLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            adminLp.setMargins(16, 16, 16, 12);
+            binding.contentRoot.addView(adminEntry, adminLp);
+            adminEntry.setOnClickListener(v -> {
+                AuthDtos.UserDto latest = container.getSessionManager().getUser();
+                if (!StaffRoleHelper.isStaff(latest)) {
+                    Toast.makeText(this, "لم تعد لديك صلاحية الوصول إلى مركز الإدارة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(this, AdminConsoleActivity.class));
+            });
+        }
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
@@ -473,12 +511,31 @@ public class ProfileActivity extends ThemedActivity {
         String label = StaffRoleHelper.isStaff(user)
                 ? StaffRoleHelper.badgeAr(user)
                 : (rechargeAgent ? "وكيل شحن" : "وكالة");
+        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
+        if (StaffRoleHelper.isStaff(user) && !identity.label.isEmpty()) label = identity.label;
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
+        binding.tvStaffBadge.setTag(StaffRoleHelper.isStaff(user) ? role : null);
         binding.tvStaffBadge.setText(label);
         binding.tvStaffBadge.setBackgroundResource(
                 StaffRoleHelper.SUPER.equals(role)
                         ? R.drawable.bg_chip_staff_super
                         : R.drawable.bg_chip_staff_manager);
+        if (StaffRoleHelper.isStaff(user)) {
+            final String fallbackLabel = StaffRoleHelper.badgeAr(user);
+            StaffIdentityConfigCache.load(this, () -> {
+                if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
+                StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+                binding.tvStaffBadge.setText(latest.label.isEmpty() ? fallbackLabel : latest.label);
+                if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
+                    try {
+                        binding.imgFrame.setVisibility(View.VISIBLE);
+                        com.bumptech.glide.Glide.with(this)
+                                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
+                                .into(binding.imgFrame);
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
     }
 
     private void bindAgencyStrip(

@@ -254,6 +254,75 @@ export class AdminService {
     private readonly dataSource: DataSource,
   ) {}
 
+  private staffIdentityDefaults() {
+    const role = (label: string, accentColor: string) => ({
+      label, accentColor, badgeUrl: '', frameUrl: '', nameplateUrl: '', entryEffectUrl: '',
+    });
+    return {
+      super: role('Super Admin', '#D8B35B'),
+      admin: role('Admin', '#9AA8C7'),
+      manager: role('Manager', '#37A889'),
+    };
+  }
+
+  async getStaffIdentityConfig() {
+    const defaults = this.staffIdentityDefaults();
+    const row = await this.settingsRepo.findOne({ where: { key: 'staff_identity_config' } });
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      const clean = (role: string) => {
+        const source = parsed?.[role] && typeof parsed[role] === 'object' ? parsed[role] : {};
+        const fallback = defaults[role as keyof typeof defaults];
+        const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
+        const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
+        const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
+        return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), entryEffectUrl: url('entryEffectUrl') };
+      };
+      return { super: clean('super'), admin: clean('admin'), manager: clean('manager') };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchStaffIdentityConfig(input: Record<string, unknown>) {
+    const current = await this.getStaffIdentityConfig();
+    const allowed = ['badgeUrl', 'frameUrl', 'nameplateUrl', 'entryEffectUrl'];
+    const url = (value: unknown, key: string) => {
+      if (value === undefined) return undefined;
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      if (raw.length > 2048 || !(/^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(raw))) {
+        throw new BadRequestException('Invalid staff identity asset URL: ' + key);
+      }
+      return raw;
+    };
+    const next: Record<string, any> = {};
+    for (const role of ['super', 'admin', 'manager'] as const) {
+      const patch = input[role] && typeof input[role] === 'object' ? input[role] as Record<string, unknown> : {};
+      const base = current[role];
+      const label = patch.label === undefined ? base.label : String(patch.label || '').trim().slice(0, 32);
+      if (!label) throw new BadRequestException('Role label cannot be empty');
+      const accentColor = patch.accentColor === undefined ? base.accentColor : String(patch.accentColor || '');
+      if (!/^#[0-9a-f]{6}$/i.test(accentColor)) throw new BadRequestException('Accent color must be a hex color');
+      const assets: Record<string, string> = {};
+      for (const key of allowed) assets[key] = url(patch[key], key) ?? base[key as keyof typeof base] as string;
+      next[role] = { label, accentColor, ...assets };
+    }
+    const key = 'staff_identity_config';
+    const existing = await this.settingsRepo.findOne({ where: { key } });
+    if (existing) {
+      existing.value = JSON.stringify(next);
+      existing.description = 'Native admin role identity assets and labels';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key, value: JSON.stringify(next), description: 'Native admin role identity assets and labels',
+      }));
+    }
+    return next;
+  }
+
   async getMysteriousManConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
     const defaults = { enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };

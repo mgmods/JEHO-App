@@ -11,13 +11,15 @@ public final class StaffRoleHelper {
     private StaffRoleHelper() {}
 
     public static final String SUPER = "super";
+    public static final String ADMIN = "admin";
     public static final String MANAGER = "manager";
     public static final String NONE = "none";
 
     public static String normalize(@Nullable AuthDtos.UserDto user) {
         if (user == null) return NONE;
-        if (user.isAdmin) return SUPER;
-        return normalize(user.staffRole);
+        String role = normalize(user.staffRole);
+        if (!NONE.equals(role)) return role;
+        return user.isAdmin ? SUPER : NONE;
     }
 
     public static String normalize(@Nullable String raw) {
@@ -25,9 +27,10 @@ public final class StaffRoleHelper {
         String r = raw.trim().toLowerCase(Locale.US);
         if (r.isEmpty() || "none".equals(r) || "null".equals(r)) return NONE;
         if ("super".equals(r) || "super_admin".equals(r) || "superadmin".equals(r)
-                || "admin".equals(r)) {
+                 ) {
             return SUPER;
         }
+        if ("admin".equals(r)) return ADMIN;
         if ("manager".equals(r) || "moderator".equals(r) || "mod".equals(r)) {
             return MANAGER;
         }
@@ -36,11 +39,15 @@ public final class StaffRoleHelper {
 
     public static boolean isStaff(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
-        return SUPER.equals(r) || MANAGER.equals(r);
+        return SUPER.equals(r) || ADMIN.equals(r) || MANAGER.equals(r);
     }
 
     public static boolean isSuper(@Nullable AuthDtos.UserDto user) {
         return SUPER.equals(normalize(user));
+    }
+
+    public static boolean isAdmin(@Nullable AuthDtos.UserDto user) {
+        return ADMIN.equals(normalize(user));
     }
 
     public static boolean isManager(@Nullable AuthDtos.UserDto user) {
@@ -51,6 +58,7 @@ public final class StaffRoleHelper {
     public static String badgeAr(@Nullable AuthDtos.UserDto user) {
         String r = normalize(user);
         if (SUPER.equals(r)) return "Super Admin";
+        if (ADMIN.equals(r)) return "Admin";
         if (MANAGER.equals(r)) return "Manager";
         return "";
     }
@@ -61,8 +69,11 @@ public final class StaffRoleHelper {
         if (SUPER.equals(r)) {
             return "صلاحيات سوبر أدمن كاملة: إدارة الغرف كلها (كتم · طرد · حظر · إعدادات · موسيقى · ألعاب) + مركز الإدارة داخل التطبيق (لك وحدك — لا يُمنح لأي شخص عادي أو مانجر).";
         }
+        if (ADMIN.equals(r)) {
+            return "صلاحيات الأدمن: إدارة المستخدمين والرومات والوكالات والرسائل والهدايا ضمن حدود النظام؛ لا يستطيع تعديل السوبر أدمن أو صلاحياته.";
+        }
         if (MANAGER.equals(r)) {
-            return "صلاحيات مانجر داخل الغرف فقط: كتم · طرد · حظر · مقاعد · دعوات. بدون لوحة الإدارة على المتصفح وبدون إعدادات الغرفة الكاملة.";
+            return "صلاحيات مانجر داخل الرومات والبث المباشر فقط؛ لا يستطيع إدارة رتب الإدارة أو الوكالات أو الاقتصاد.";
         }
         return "";
     }

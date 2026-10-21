@@ -201,6 +201,15 @@ public interface AdminApi {
     @POST("admin/wallet/recharges/{id}/cancel")
     Call<ApiResponse<Object>> cancelRecharge(@Path("id") String id);
 
+    @GET("admin/staff-identity/public")
+    Call<ApiResponse<Object>> publicStaffIdentity();
+
+    @GET("admin/staff-identity")
+    Call<ApiResponse<Object>> staffIdentity();
+
+    @PATCH("admin/staff-identity")
+    Call<ApiResponse<Object>> updateStaffIdentity(@Body Map<String, Object> body);
+
     @GET("admin/logs")
     Call<ApiResponse<Object>> logs(@Query("page") int page, @Query("limit") int limit);
 }
