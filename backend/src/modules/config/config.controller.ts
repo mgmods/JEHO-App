@@ -151,9 +151,9 @@ export class ConfigController {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, nameX: 25, nameY: 35, rewardX: 25, rewardY: 65, multiplierX: 88, multiplierY: 50, textX: 25, textY: 50 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, nameX: 25, nameY: 35, rewardX: 25, rewardY: 65, multiplierX: 88, multiplierY: 50, textX: 25, textY: 50 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, nameX: 25, nameY: 35, rewardX: 25, rewardY: 65, multiplierX: 88, multiplierY: 50, textX: 25, textY: 50 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
     };
     let parsed: any = {};
@@ -178,6 +178,12 @@ export class ConfigController {
       durationSeconds: Math.max(1, Math.min(12, Math.round(Number(oldGift.durationSeconds) || 3))),
       avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarX)) ? Number(oldGift.avatarX) : 8))),
       avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarY)) ? Number(oldGift.avatarY) : 50))),
+      nameX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.nameX)) ? Number(oldGift.nameX) : Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
+      nameY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.nameY)) ? Number(oldGift.nameY) : 35))),
+      rewardX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.rewardX)) ? Number(oldGift.rewardX) : Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
+      rewardY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.rewardY)) ? Number(oldGift.rewardY) : 65))),
+      multiplierX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.multiplierX)) ? Number(oldGift.multiplierX) : 88))),
+      multiplierY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.multiplierY)) ? Number(oldGift.multiplierY) : 50))),
       textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
       textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textY)) ? Number(oldGift.textY) : 50))),
     };
@@ -191,6 +197,12 @@ export class ConfigController {
         durationSeconds: Math.max(1, Math.min(12, Math.round(Number(value.durationSeconds) || fallback.durationSeconds))),
         avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarX)) ? Number(value.avatarX) : fallback.avatarX))),
         avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarY)) ? Number(value.avatarY) : fallback.avatarY))),
+        nameX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.nameX)) ? Number(value.nameX) : Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.nameX))),
+        nameY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.nameY)) ? Number(value.nameY) : fallback.nameY))),
+        rewardX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.rewardX)) ? Number(value.rewardX) : Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.rewardX))),
+        rewardY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.rewardY)) ? Number(value.rewardY) : fallback.rewardY))),
+        multiplierX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.multiplierX)) ? Number(value.multiplierX) : fallback.multiplierX))),
+        multiplierY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.multiplierY)) ? Number(value.multiplierY) : fallback.multiplierY))),
         textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.textX))),
         textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textY)) ? Number(value.textY) : fallback.textY))),
       };
