@@ -69,6 +69,14 @@
             <input v-model.number="currentStyle.countSizeSp" class="form-range" type="range" min="8" max="30" step="1" />
           </div>
           <div class="position-control">
+            <label class="form-label">الموضع الأفقي لاسم المرسل/الفائز: {{ currentStyle.textX }}%</label>
+            <input v-model.number="currentStyle.textX" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">الموضع الأفقي لكتابة «أرسل هدية»/المردود: {{ currentStyle.bodyX }}%</label>
+            <input v-model.number="currentStyle.bodyX" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">الموضع الأفقي لعداد X: {{ currentStyle.countX }}%</label>
+            <input v-model.number="currentStyle.countX" class="form-range" type="range" min="0" max="100" step="1" />
+          </div>
+          <div class="position-control">
             <label class="form-label">ارتفاع كتابة «أرسل هدية»/المردود: {{ currentStyle.bodyY }}%</label>
             <input v-model.number="currentStyle.bodyY" class="form-range" type="range" min="0" max="100" step="1" />
             <label class="form-label">ارتفاع اسم المرسل/الفائز: {{ currentStyle.textY }}%</label>
@@ -160,8 +168,8 @@ const tabs = [
 const activeTab = ref('giftSend')
 const form = reactive({
   giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
+  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   version: 1,
 })
