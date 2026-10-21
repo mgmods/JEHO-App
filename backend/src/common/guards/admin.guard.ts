@@ -50,9 +50,21 @@ export class AdminGuard implements CanActivate {
       if (resolved.kind === 'deny' || resolved.kind === 'self' || resolved.kind === 'super') {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
+      const path = url.split('?')[0].toLowerCase();
+      const superOnlyPath =
+        /\\/admin\\/users\\/maintenance\\/reset-all-baseline(?:\\/|$)/.test(path) ||
+        /\\/admin\\/users\\/[^/]+\\/reset-baseline(?:\\/|$)/.test(path) ||
+        /\\/admin\\/security\\/ban-ip(?:\\/|$)/.test(path) ||
+        /\\/admin\\/economy\\/settings\\/reset(?:\\/|$)/.test(path) ||
+        /\\/admin\\/economy\\/renormalize-gifts(?:\\/|$)/.test(path) ||
+        /\\/admin\\/gifts\\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\\/|$)/.test(path) ||
+        /\\/admin\\/rooms\\/platform(?:\\/|$)/.test(path) ||
+        /\\/admin\\/rooms\\/[^/]+\\/platform-moderators(?:\\/|$)/.test(path);
+      if (role === 'admin' && superOnlyPath) {
+        throw new ForbiddenException('This action is reserved for Super Admin');
+      }
       if (role === 'admin') return true;
       if (role === 'manager') {
-        const path = url.split('?')[0].toLowerCase();
         if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams'].includes(resolved.module)) {
           throw new ForbiddenException('Manager access is limited to rooms and live streams');
         }
