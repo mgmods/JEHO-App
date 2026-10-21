@@ -17,8 +17,9 @@ public final class StaffRoleHelper {
 
     public static String normalize(@Nullable AuthDtos.UserDto user) {
         if (user == null) return NONE;
-        if (user.isAdmin) return SUPER;
-        return normalize(user.staffRole);
+        String role = normalize(user.staffRole);
+        if (!NONE.equals(role)) return role;
+        return user.isAdmin ? SUPER : NONE;
     }
 
     public static String normalize(@Nullable String raw) {
