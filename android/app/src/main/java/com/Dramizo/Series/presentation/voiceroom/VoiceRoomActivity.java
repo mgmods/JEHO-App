@@ -3920,37 +3920,46 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void sendLuckyCannonGift() {
+        sendLuckyCannonGift(true);
+    }
+
+    /**
+     * Give immediate local press feedback, then serialize economy requests. Fast repeated taps
+     * are queued locally; only one gift request reaches the server at a time.
+     */
+    private void sendLuckyCannonGift(boolean animatePress) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
-        // Immediate local feedback; no network work is done by the animation.
-        if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
-        if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
-            luckyCannonLayer.animate().cancel();
-            luckyCannonLayer.setScaleX(0.96f);
-            luckyCannonLayer.setScaleY(0.96f);
-            luckyCannonLayer.animate().scaleX(1.045f).scaleY(1.045f).setDuration(55L)
-                    .withEndAction(() -> {
-                        if (luckyCannonLayer != null) luckyCannonLayer.animate()
-                                .scaleX(1f).scaleY(1f).setDuration(75L).start();
-                    }).start();
+        if (animatePress) {
+            if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+            if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
+                luckyCannonLayer.animate().cancel();
+                luckyCannonLayer.setScaleX(0.96f);
+                luckyCannonLayer.setScaleY(0.96f);
+                luckyCannonLayer.animate().scaleX(1.045f).scaleY(1.045f).setDuration(55L)
+                        .withEndAction(() -> {
+                            if (luckyCannonLayer != null) luckyCannonLayer.animate()
+                                    .scaleX(1f).scaleY(1f).setDuration(75L).start();
+                        }).start();
+            }
         }
-        // Keep one economy request in flight. Rapid presses are queued and each gets its
-        // own idempotency key, so taps feel instant without duplicate charges or request storms.
+
+        // Never drop a tap because another send is in flight. The queue is client-side and
+        // drained sequentially, preventing a burst of simultaneous requests against Blitz.
         if (luckyCannonSending) {
-            queuedLuckyCannonPresses++;
+            if (queuedLuckyCannonPresses < Integer.MAX_VALUE) queuedLuckyCannonPresses++;
             return;
         }
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
-        final String icon = luckyCannonGiftIcon;
         if (luckyCannonRequestId == null) luckyCannonRequestId = java.util.UUID.randomUUID().toString();
         final String requestId = luckyCannonRequestId;
         final int quantity = luckyCannonGiftQuantity;
         final List<String> targets = new ArrayList<>(luckyCannonTargets);
         final String currentRoom = roomId;
         luckyCannonSending = true;
-        if (luckyCannonView != null) luckyCannonView.setEnabled(false);
+        if (luckyCannonView != null) luckyCannonView.setEnabled(true);
         container.getIoExecutor().execute(() -> {
             Result<GiftDtos.SendGiftResult> result;
             if (targets.size() > 1) {
@@ -3969,21 +3978,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 luckyCannonSending = false;
-                if (luckyCannonView != null) luckyCannonView.setEnabled(true);
+                if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
                 if (!result.success || result.data == null || !result.data.success) {
+                    // Do not keep charging/retrying queued taps after a balance or server error.
                     queuedLuckyCannonPresses = 0;
-                    luckyCannonRequestId = null;
                     BalanceRedirect.handle(VoiceRoomActivity.this,
                             result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
                 }
-                if (requestId.equals(luckyCannonRequestId)) luckyCannonRequestId = null;
-                // The backend's existing room gift event triggers the flight on every room client.
-                // Reset the short visibility timer only after the send was confirmed.
+                // Server emits the canonical room gift event; animation is rendered locally by
+                // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
                 if (queuedLuckyCannonPresses > 0) {
                     queuedLuckyCannonPresses--;
-                    handler.post(this::sendLuckyCannonGift);
+                    handler.post(() -> sendLuckyCannonGift(false));
                 }
             });
         });
