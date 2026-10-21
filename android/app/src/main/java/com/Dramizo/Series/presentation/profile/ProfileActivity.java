@@ -27,6 +27,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
+import com.Dramizo.Series.data.remote.dto.AuthDtos;
 import com.Dramizo.Series.databinding.ActivityProfileBinding;
 import com.Dramizo.Series.di.AppContainer;
 import com.Dramizo.Series.domain.model.Result;
