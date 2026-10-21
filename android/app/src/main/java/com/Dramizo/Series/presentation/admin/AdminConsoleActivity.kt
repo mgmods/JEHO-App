@@ -392,61 +392,78 @@ class AdminConsoleActivity : ThemedActivity() {
             body.addView(groupHeader)
             searchableHeaders.add(groupHeader to groupModules)
 
-            groupModules.chunked(2).forEach { pair ->
+            groupModules.forEach { module ->
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.TOP
+                    gravity = Gravity.CENTER_VERTICAL
                     layoutDirection = View.LAYOUT_DIRECTION_RTL
                 }
-                pair.forEachIndexed { index, module ->
-                    val tile = LinearLayout(this).apply {
-                        orientation = LinearLayout.VERTICAL
-                        layoutDirection = View.LAYOUT_DIRECTION_RTL
-                        minimumHeight = dp(160)
-                        setPadding(dp(14), dp(14), dp(14), dp(14))
-                        background = GradientDrawable().apply {
-                            setColor(Color.WHITE)
-                            cornerRadius = dp(18).toFloat()
-                            setStroke(dp(1), 0xFFE8E7F2.toInt())
-                        }
-                        elevation = dp(1).toFloat()
-                        isClickable = true
-                        isFocusable = true
-                        foreground = android.util.TypedValue().let {
-                            val out = android.util.TypedValue()
-                            theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                            if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
-                        }
-                        setOnClickListener { openModule(module.key) }
+                val tile = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    minimumHeight = dp(84)
+                    setPadding(dp(13), dp(11), dp(13), dp(11))
+                    background = GradientDrawable().apply {
+                        setColor(Color.WHITE)
+                        cornerRadius = dp(17).toFloat()
+                        setStroke(dp(1), 0xFFE6E7F0.toInt())
                     }
-                    val icon = TextView(this).apply {
-                        text = module.icon
-                        textSize = 25f
-                        gravity = Gravity.CENTER
-                        setBackground(roundRect(0xFFF0ECFB.toInt(), 13))
-                        layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { bottomMargin = dp(11) }
+                    elevation = dp(1).toFloat()
+                    isClickable = true
+                    isFocusable = true
+                    foreground = android.util.TypedValue().let {
+                        val out = android.util.TypedValue()
+                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
                     }
-                    tile.addView(icon)
-                    searchableTiles.add(tile to module)
-                    addText(tile, module.title, 15f, true, TEXT)
-                    val description = TextView(this).apply {
-                        text = module.subtitle
-                        textSize = 12f
-                        setTextColor(MUTED)
-                        maxLines = 3
-                        setLineSpacing(dp(2).toFloat(), 1f)
-                        setPadding(0, dp(3), 0, dp(9))
-                    }
-                    tile.addView(description)
-                    addText(tile, "فتح القسم  ←", 12f, true, ACCENT)
-                    row.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply {
-                        bottomMargin = dp(9)
-                        if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
-                    })
+                    setOnClickListener { openModule(module.key) }
                 }
-                if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+                val icon = TextView(this).apply {
+                    text = module.icon
+                    textSize = 22f
+                    gravity = Gravity.CENTER
+                    setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
+                    layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                        marginStart = dp(12)
+                    }
+                }
+                tile.addView(icon)
+                searchableTiles.add(tile to module)
+
+                val copy = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                }
+                addText(copy, module.title, 14f, true, TEXT)
+                val description = TextView(this).apply {
+                    text = module.subtitle
+                    textSize = 11.5f
+                    setTextColor(MUTED)
+                    maxLines = 2
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    setLineSpacing(dp(1).toFloat(), 1f)
+                    setPadding(0, dp(2), 0, 0)
+                }
+                copy.addView(description)
+                tile.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+
+                val chevron = TextView(this).apply {
+                    text = "‹"
+                    textSize = 27f
+                    gravity = Gravity.CENTER
+                    setTextColor(ACCENT)
+                    layoutParams = LinearLayout.LayoutParams(dp(26), dp(42)).apply {
+                        marginStart = dp(5)
+                    }
+                }
+                tile.addView(chevron)
+                row.addView(tile, LinearLayout.LayoutParams(-1, -2).apply {
+                    bottomMargin = dp(8)
+                })
                 body.addView(row)
-                searchableRows.add(row to pair)
+                searchableRows.add(row to listOf(module))
             }
         }
         sectionSearch.addTextChangedListener(object : android.text.TextWatcher {
