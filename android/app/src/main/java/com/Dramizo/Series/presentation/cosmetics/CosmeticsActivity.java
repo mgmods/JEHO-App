@@ -4,6 +4,8 @@ import android.annotation.SuppressLint;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -44,6 +46,10 @@ public class CosmeticsActivity extends ThemedActivity {
     @Nullable private String mallOrigin;
     @Nullable private String localFallbackUrl;
     private boolean triedLocalFallback;
+    private boolean mallMainFrameLoaded;
+    @Nullable private String mallRemoteUrl;
+    private final Handler mallFallbackHandler = new Handler(Looper.getMainLooper());
+    @Nullable private Runnable mallFallbackRunnable;
 
     @SuppressLint({"SetJavaScriptEnabled", "JavascriptInterface"})
     @Override
@@ -116,6 +122,17 @@ public class CosmeticsActivity extends ThemedActivity {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (url != null && (url.equals(mallRemoteUrl) || url.equals(localFallbackUrl))) {
+                    mallMainFrameLoaded = true;
+                    if (mallFallbackRunnable != null) {
+                        mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
+                    }
+                }
+            }
+
+            @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         android.webkit.WebResourceError error) {
                 super.onReceivedError(view, request, error);
@@ -150,8 +167,8 @@ public class CosmeticsActivity extends ThemedActivity {
         String section = getIntent().getStringExtra("store_section");
         if ("level".equals(section) || "badges".equals(section)
                 || "id".equals(section) || "vip".equals(section)) {
-            localFallbackUrl = "https://appassets.androidplatform.net/assets/mall/" + section + ".html";
-            webView.loadUrl(mallOrigin + "/mall/" + section + ".html");
+            String fallback = "https://appassets.androidplatform.net/assets/mall/" + section + ".html";
+            loadRemoteWithFastLocalFallback(webView, mallOrigin + "/mall/" + section + ".html", fallback);
             return;
         }
         Uri.Builder page = Uri.parse(mallOrigin + "/mall/index.html")
@@ -168,8 +185,29 @@ public class CosmeticsActivity extends ThemedActivity {
         if (roomId != null && !roomId.isEmpty()) {
             localPage.appendQueryParameter("roomId", roomId);
         }
-        localFallbackUrl = localPage.build().toString();
-        webView.loadUrl(page.build().toString());
+        loadRemoteWithFastLocalFallback(webView, page.build().toString(), localPage.build().toString());
+    }
+
+    /**
+     * Prefer the hosted page when it responds quickly, but don't leave the store blank while
+     * Blitz is waking from idle. Fall back to the bundled shell after a short first-load budget.
+     */
+    private void loadRemoteWithFastLocalFallback(WebView view, String remoteUrl, String fallbackUrl) {
+        mallRemoteUrl = remoteUrl;
+        localFallbackUrl = fallbackUrl;
+        triedLocalFallback = false;
+        mallMainFrameLoaded = false;
+        if (mallFallbackRunnable != null) mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
+        mallFallbackRunnable = () -> {
+            if (mallWebView != view || mallMainFrameLoaded || triedLocalFallback || isFinishing() || isDestroyed()) {
+                return;
+            }
+            triedLocalFallback = true;
+            try { view.stopLoading(); } catch (Exception ignored) {}
+            view.loadUrl(fallbackUrl);
+        };
+        view.loadUrl(remoteUrl);
+        mallFallbackHandler.postDelayed(mallFallbackRunnable, 850L);
     }
 
     /** The app uses the system back gesture/button; the HTML intentionally has no top back button. */
@@ -180,6 +218,7 @@ public class CosmeticsActivity extends ThemedActivity {
 
     @Override
     protected void onDestroy() {
+        if (mallFallbackRunnable != null) mallFallbackHandler.removeCallbacks(mallFallbackRunnable);
         WebView webView = mallWebView;
         mallWebView = null;
         if (webView != null) {
