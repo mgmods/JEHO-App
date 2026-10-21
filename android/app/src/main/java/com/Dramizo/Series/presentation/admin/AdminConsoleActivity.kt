@@ -226,7 +226,7 @@ class AdminConsoleActivity : ThemedActivity() {
             "vip", "logs", "staffIdentity", "operators"
         )
         val visibleModules = when (currentRole) {
-            StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
+            StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" || it.key == "reports" }
             StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnlyModules }
             else -> modules
         }
@@ -279,9 +279,9 @@ class AdminConsoleActivity : ThemedActivity() {
             "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
             "vip", "logs", "staffIdentity", "operators"
         )
-        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams")) ||
+        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams", "reports")) ||
             (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
-            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر" else "هذا القسم مخصص للسوبر أدمن")
+            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر والبلاغات" else "هذا القسم مخصص للسوبر أدمن")
             return
         }
         currentSection = key
