@@ -132,7 +132,7 @@
           <select v-model="form.challengeType" class="form-select form-select-sm">
             <option value="individual">مستخدم ضد مستخدم</option>
             <option value="host">مضيفون</option>
-            <option value="room_vs_room">روم ضد روم</option>
+            <option value="room_vs_room" disabled>PK (يُدار من داخل الروم)</option>
             <option value="agency_vs_agency">وكالة ضد وكالة</option>
           </select>
         </div>
@@ -157,31 +157,11 @@
           <textarea v-model="form.rulesText" rows="2" class="form-control form-control-sm" placeholder='{"minimumDiamonds":100}'></textarea>
         </div>
         <div class="col-md-12">
-          <div class="alert alert-info py-2 small mb-0">لتحدي «روم ضد روم»، ضع معرّف روم واحد في <code>roomIds</code> لكل طرف، ويجب أن يكون المعرّفان مختلفين. يتم احتساب النقاط من الهدايا المؤهلة المرسلة داخل الرومين.</div>
+          <div class="alert alert-info py-2 small mb-0">تحديات PK يتم إنشاؤها وإدارتها من داخل الروم، ويمكن إيقاف الميزة بالكامل من مفتاح التفعيل أعلاه.</div>
         </div>
-        <template v-if="form.challengeType === 'room_vs_room'">
-          <div class="col-md-6">
-            <label class="form-label small">اسم الطرف الأول</label>
-            <input v-model="form.sideAName" class="form-control form-control-sm mb-2" placeholder="الروم الأول" />
-            <label class="form-label small">اختر الروم الأول</label>
-            <select v-model="form.sideARoomId" class="form-select form-select-sm" :disabled="roomOptionsLoading">
-              <option value="">اختر رومًا…</option>
-              <option v-for="room in roomOptions" :key="room.id" :value="room.id">{{ room.title || room.name || 'روم' }} · {{ room.displayRoomId || room.id }}</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small">اسم الطرف الثاني</label>
-            <input v-model="form.sideBName" class="form-control form-control-sm mb-2" placeholder="الروم الثاني" />
-            <label class="form-label small">اختر الروم الثاني</label>
-            <select v-model="form.sideBRoomId" class="form-select form-select-sm" :disabled="roomOptionsLoading">
-              <option value="">اختر رومًا مختلفًا…</option>
-              <option v-for="room in roomOptions" :key="room.id" :value="room.id" :disabled="room.id === form.sideARoomId">{{ room.title || room.name || 'روم' }} · {{ room.displayRoomId || room.id }}</option>
-            </select>
-          </div>
-          <div class="col-12 small text-secondary">
-            {{ roomOptionsLoading ? 'جارٍ تحميل الرومات…' : roomOptions.length + ' روم متاح للاختيار' }}
-          </div>
-        </template>
+        <div v-if="form.challengeType === 'room_vs_room'" class="col-12 alert alert-info py-2 small mb-0">
+          تحديات PK الجديدة وإعداداتها تتم من داخل الروم. الداشبورد مخصص لتفعيل الميزة أو إيقافها فقط.
+        </div>
         <template v-else>
           <div class="col-md-6">
             <label class="form-label small">الطرف الأول (JSON object)</label>
