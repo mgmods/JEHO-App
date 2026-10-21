@@ -346,6 +346,25 @@ class AdminConsoleActivity : ThemedActivity() {
 
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
         addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
+        val sectionSearch = EditText(this).apply {
+            hint = "ابحث عن قسم الإدارة…"
+            textSize = 14f
+            singleLine = true
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = roundRect(Color.WHITE, 14)
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+        }
+        body.addView(sectionSearch, LinearLayout.LayoutParams(-1, dp(50)).apply {
+            topMargin = dp(10)
+            bottomMargin = dp(4)
+        })
+        val searchableTiles = mutableListOf<Pair<View, Module>>()
+        val searchableRows = mutableListOf<Pair<View, List<Module>>>()
+        val searchableHeaders = mutableListOf<Pair<View, List<Module>>>()
         val groups = listOf(
             "إدارة المجتمع" to listOf("users", "genderVerifications", "rooms", "streams", "reports"),
             "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents", "recharges", "withdrawals"),
@@ -371,6 +390,7 @@ class AdminConsoleActivity : ThemedActivity() {
             groupHeader.addView(groupDot)
             addText(groupHeader, groupTitle, 15f, true, TEXT)
             body.addView(groupHeader)
+            searchableHeaders.add(groupHeader to groupModules)
 
             groupModules.chunked(2).forEach { pair ->
                 val row = LinearLayout(this).apply {
@@ -407,6 +427,7 @@ class AdminConsoleActivity : ThemedActivity() {
                         layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { bottomMargin = dp(11) }
                     }
                     tile.addView(icon)
+                    searchableTiles.add(tile to module)
                     addText(tile, module.title, 15f, true, TEXT)
                     val description = TextView(this).apply {
                         text = module.subtitle
@@ -425,8 +446,31 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
                 body.addView(row)
+                searchableRows.add(row to pair)
             }
         }
+        sectionSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim()?.lowercase(java.util.Locale.ROOT).orEmpty()
+                val matches: (Module) -> Boolean = { module ->
+                    query.isEmpty() ||
+                        module.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.subtitle.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        module.key.lowercase(java.util.Locale.ROOT).contains(query)
+                }
+                searchableTiles.forEach { (tile, module) ->
+                    tile.visibility = if (matches(module)) View.VISIBLE else View.GONE
+                }
+                searchableRows.forEach { (row, rowModules) ->
+                    row.visibility = if (rowModules.any(matches)) View.VISIBLE else View.GONE
+                }
+                searchableHeaders.forEach { (header, groupModules) ->
+                    header.visibility = if (groupModules.any(matches)) View.VISIBLE else View.GONE
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
     }
 
     private fun openModule(key: String) {
