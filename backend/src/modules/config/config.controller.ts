@@ -185,10 +185,10 @@ export class ConfigController {
         shineEnabled: value.shineEnabled !== false,
         frameGlowEnabled: value.frameGlowEnabled !== false,
         durationSeconds: Math.max(1, Math.min(12, Math.round(Number(value.durationSeconds) || fallback.durationSeconds))),
-        avatarX: Math.max(0, Math.min(100, Math.round(Number(value.avatarX) || fallback.avatarX))),
-        avatarY: Math.max(0, Math.min(100, Math.round(Number(value.avatarY) || fallback.avatarY))),
-        textX: Math.max(0, Math.min(100, Math.round(Number(value.textX) || fallback.textX))),
-        textY: Math.max(0, Math.min(100, Math.round(Number(value.textY) || fallback.textY))),
+        avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarX)) ? Number(value.avatarX) : fallback.avatarX))),
+        avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarY)) ? Number(value.avatarY) : fallback.avatarY))),
+        textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.textX))),
+        textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textY)) ? Number(value.textY) : fallback.textY))),
       };
     };
     const button = parsed.luckyButton || {};
