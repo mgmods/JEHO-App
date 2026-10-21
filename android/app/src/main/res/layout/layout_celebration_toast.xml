@@ -43,6 +43,7 @@
             android:layout_height="44dp"
             android:layout_gravity="center"
             android:background="@drawable/bg_notification_avatar"
+            android:clipToOutline="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop"
             android:src="@drawable/ic_screen_chat_lottery" />
@@ -61,7 +62,7 @@
 
         <TextView
             android:id="@+id/tvCelebrationTitle"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
@@ -72,7 +73,7 @@
 
         <TextView
             android:id="@+id/tvCelebrationBody"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:ellipsize="end"
