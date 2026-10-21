@@ -14,7 +14,7 @@
           <div class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
           <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : 'الفائز المحظوظ' }}</strong>
           <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : (activeTab === 'luckyWinHigh' ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
-          <span v-if="activeTab === 'giftSend'" class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">X77</span>
+          <span class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">{{ activeTab === 'giftSend' ? 'X77' : (activeTab === 'luckyWinHigh' ? '×25' : '×3') }}</span>
           <div v-if="currentStyle.shineEnabled" class="preview-shine"></div>
         </div>
         <div v-else class="button-preview-wrap">
@@ -49,7 +49,7 @@
       <div class="col-xl-7">
         <section class="settings-card h-100">
           <h3 class="settings-card-title">موضع الصورة والكتابة</h3>
-          <p class="small text-secondary">اسحب الصورة والكتابة والعداد مباشرة داخل المعاينة. كل عنصر مستقل، ويمكن ترتيب النص بجانب الصورة أو فوقه/تحته.</p>
+          <p class="small text-secondary">اسحب الصورة والاسم والمردود وعداد X مباشرة داخل المعاينة في كل نوع توست، بما فيها أرباح المحظوظ العادية والعالية. كل عنصر مستقل؛ احفظ التعديلات لتبقى مواضعها محفوظة وتُطبّق على التطبيق.</p>
           <div class="position-control">
             <label class="form-label">عرض التوست: {{ currentStyle.widthDp }} dp</label>
             <input v-model.number="currentStyle.widthDp" class="form-range" type="range" min="220" max="360" step="5" />
@@ -61,7 +61,7 @@
             <input v-model.number="currentStyle.avatarSizeDp" class="form-range" type="range" min="20" max="76" step="2" />
           </div>
           <div class="position-control small text-secondary">
-            اسحب كل عنصر داخل الصورة لتحديد مكانه. تغييرات المواضع محفوظة كنسب مئوية وتظهر في المعاينة.
+            اسحب الصورة والاسم والمردود وعداد X إلى أي مكان داخل التوست. موضع كل عنصر محفوظ بشكل مستقل كنسبة مئوية، ويُستخدم نفسه في معاينة الداشبورد والتوست الفعلي بالتطبيق.
           </div>
         </section>
       </div>
