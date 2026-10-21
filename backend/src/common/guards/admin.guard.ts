@@ -70,7 +70,10 @@ export class AdminGuard implements CanActivate {
         /\/admin\/mysterious-man(?:\/|$)/.test(path) ||
         /\/admin\/lucky-gift-cannon(?:\/|$)/.test(path) ||
         /\/admin\/support-chest(?:\/|$)/.test(path) ||
-        /\/admin\/settings(?:\/|$)/.test(path);
+        /\/admin\/settings(?:\/|$)/.test(path) ||
+        /\/admin\/(?:payment-settings|payments|binance-pay|fourthwall|sham-cash|zego|livekit|cp-settings)(?:\/|$)/.test(path) ||
+        /\/admin\/coin-packages(?:\/|$)/.test(path) ||
+        /\/admin\/bulk(?:\/|$)/.test(path);
       if (role === 'admin' && superOnlyPath) {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
