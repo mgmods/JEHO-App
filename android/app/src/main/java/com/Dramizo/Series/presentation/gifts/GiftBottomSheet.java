@@ -1166,6 +1166,11 @@ public class GiftBottomSheet extends BottomSheetDialogFragment {
         android.app.Activity hostAct = getActivity();
         if (hostAct instanceof VoiceRoomActivity room) {
             SessionManager session = ContainerProvider.from(hostAct).getSessionManager();
+            // Compact global top toast: avatar + gift icon + real selected quantity.
+            // This is UI-only and does not change sending, balance deduction, or seat logic.
+            com.Dramizo.Series.util.GlobalCelebrationToast.showGiftCount(
+                    hostAct, session.getDisplayName(), name, session.getAvatarUrl(), icon,
+                    Math.max(1, result.quantity > 0 ? result.quantity : qty));
             List<String> tgts = !lastTargets.isEmpty()
                     ? new ArrayList<>(lastTargets)
                     : (receiverId != null
