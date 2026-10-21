@@ -1,6 +1,9 @@
 package com.Dramizo.Series.util;
 
 import android.app.Activity;
+import android.animation.ObjectAnimator;
+import android.graphics.drawable.GradientDrawable;
+import android.view.animation.LinearInterpolator;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
@@ -20,6 +23,11 @@ import com.bumptech.glide.Glide;
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
 import java.util.Locale;
+import java.util.Map;
+import com.Dramizo.Series.data.remote.dto.ApiResponse;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 /**
  * Global celebration toast on Home / outside rooms.
@@ -33,6 +41,11 @@ public final class GlobalCelebrationToast {
     private static long lastShownAt;
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static boolean showing;
+    private static volatile String remoteBackgroundUrl = "";
+    private static volatile boolean remoteShineEnabled = true;
+    private static volatile boolean remoteFrameGlowEnabled = true;
+    private static volatile int remoteDurationSeconds = 3;
+    private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
         final WeakReference<Activity> activity;
@@ -65,6 +78,49 @@ public final class GlobalCelebrationToast {
     }
 
     private GlobalCelebrationToast() {}
+
+    public static void showGiftCount(@Nullable Activity activity,
+                                     @Nullable String senderName,
+                                     @Nullable String giftName,
+                                     @Nullable String avatarUrl,
+                                     @Nullable String giftIconUrl,
+                                     int quantity) {
+        int count = Math.max(1, quantity);
+        String body = (giftName == null || giftName.trim().isEmpty() ? "هدية" : giftName.trim()) + " · تم الإرسال";
+        show(activity, senderName, body, avatarUrl, giftIconUrl,
+                "gift-send-" + System.currentTimeMillis(), 28, count, 0L,
+                senderName, "gift_send", null);
+    }
+
+    private static void refreshToastStyle(Activity activity) {
+        long now = System.currentTimeMillis();
+        if (now - lastStyleFetchAt < 15_000L) return;
+        lastStyleFetchAt = now;
+        try {
+            com.Dramizo.Series.AuraLiveApp app =
+                    (com.Dramizo.Series.AuraLiveApp) activity.getApplicationContext();
+            app.getContainer().getConfigApi().toastStyle(now).enqueue(new Callback<ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(Call<ApiResponse<Map<String, Object>>> call,
+                                                  Response<ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null || response.body().data == null) return;
+                    Map<String, Object> cfg = response.body().data;
+                    Object bg = cfg.get("backgroundUrl");
+                    remoteBackgroundUrl = bg instanceof String ? ((String) bg).trim() : "";
+                    remoteShineEnabled = !Boolean.FALSE.equals(cfg.get("shineEnabled"));
+                    remoteFrameGlowEnabled = !Boolean.FALSE.equals(cfg.get("frameGlowEnabled"));
+                    try {
+                        remoteDurationSeconds = Math.max(2, Math.min(8,
+                                (int) Math.round(Double.parseDouble(String.valueOf(cfg.get("durationSeconds"))))));
+                    } catch (Exception ignored) { remoteDurationSeconds = 3; }
+                }
+                @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
+                    // Keep the last known style and native fallback while the free host sleeps.
+                }
+            });
+        } catch (Exception ignored) {
+            // Network settings are optional; toast display must never depend on them.
+        }
+    }
 
     public static void show(
             @Nullable Activity activity,
@@ -129,6 +185,7 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
+        refreshToastStyle(activity);
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
             return;
