@@ -44,6 +44,64 @@
       {{ t('tasks.hint') }}
     </div>
 
+    <section class="glass p-3 mb-3 daily-login-admin">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+        <div>
+          <h5 class="mb-1">مكافآت تسجيل الدخول اليومي</h5>
+          <div class="small text-muted">دورة ثابتة من 7 أيام. اختر المكافآت من صور المتجر وحدد الكميات والمدد دون كتابة أكواد.</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-check-label small" for="dailyLoginEnabled">تفعيل النظام</label>
+          <input id="dailyLoginEnabled" v-model="dailyLoginEnabled" class="form-check-input" type="checkbox" />
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="dailyLoginSaving" @click="saveDailyLogin">
+            <i class="bi bi-save me-1"></i>{{ dailyLoginSaving ? 'جارٍ الحفظ…' : 'حفظ مكافآت الأيام السبعة' }}
+          </button>
+        </div>
+      </div>
+      <div v-if="dailyLoginError" class="alert alert-warning py-2">{{ dailyLoginError }}</div>
+      <div v-if="dailyLoginSuccess" class="alert alert-success py-2">{{ dailyLoginSuccess }}</div>
+      <LoadingSpinner v-if="dailyLoginLoading" />
+      <div v-else class="daily-login-grid">
+        <article v-for="(reward, idx) in dailyLoginDays" :key="reward.day" class="daily-login-card">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="daily-login-day">اليوم {{ reward.day }}</span>
+            <i class="bi bi-calendar-check text-warning"></i>
+          </div>
+          <div class="daily-login-preview">
+            <template v-if="reward.type === 'coins'">
+              <i class="bi bi-coin daily-login-coin"></i>
+              <strong>{{ Number(reward.amount || 0).toLocaleString() }}</strong>
+              <span>كوينز</span>
+            </template>
+            <template v-else-if="cosmeticByCode(reward.cosmeticCode)?.previewUrl || cosmeticByCode(reward.cosmeticCode)?.animationUrl">
+              <img :src="cosmeticByCode(reward.cosmeticCode).previewUrl || cosmeticByCode(reward.cosmeticCode).animationUrl" :alt="cosmeticByCode(reward.cosmeticCode).name" />
+            </template>
+            <template v-else>
+              <i class="bi bi-gift daily-login-placeholder"></i>
+              <span>اختر صورة المكافأة</span>
+            </template>
+          </div>
+          <label class="form-label small mt-2">نوع المكافأة</label>
+          <select v-model="reward.type" class="form-select form-select-sm">
+            <option value="coins">كوينزات</option>
+            <option value="cosmetic">عنصر تجميلي من المتجر</option>
+          </select>
+          <template v-if="reward.type === 'coins'">
+            <label class="form-label small mt-2">كمية الكوينزات</label>
+            <input v-model.number="reward.amount" class="form-control form-control-sm" type="number" min="1" max="1000000000" />
+          </template>
+          <template v-else>
+            <div class="small fw-semibold mt-2 text-truncate">{{ cosmeticByCode(reward.cosmeticCode)?.name || 'لم يتم اختيار عنصر' }}</div>
+            <button class="btn btn-outline-info btn-sm w-100 mt-1" type="button" @click="openCosmeticPicker(idx, 'daily')">
+              <i class="bi bi-images me-1"></i>اختيار ومعاينة العنصر
+            </button>
+            <label class="form-label small mt-2">مدة الصلاحية بالأيام</label>
+            <input v-model.number="reward.durationDays" class="form-control form-control-sm" type="number" min="1" max="365" />
+          </template>
+        </article>
+      </div>
+    </section>
+
     <LoadingSpinner v-if="loading" />
     <div v-else class="glass p-0 overflow-hidden" :class="{ 'opacity-50': !tasksEnabled }">
       <div class="table-responsive">
@@ -248,7 +306,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { tasksApi, cosmeticsApi } from '@/api'
+import { tasksApi, cosmeticsApi, dailyLoginRewardsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -270,6 +328,21 @@ const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
 const cosmetics = ref([])
 const cosmeticsLoading = ref(false)
+const dailyLoginEnabled = ref(true)
+const dailyLoginDays = ref([
+  { day: 1, type: 'coins', amount: 100, label: 'عملات ذهبية' },
+  { day: 2, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'إطار مؤقت' },
+  { day: 3, type: 'cosmetic', cosmeticCode: '', durationDays: 3, label: 'دخوليّة مؤقتة' },
+  { day: 4, type: 'coins', amount: 200, label: 'عملات ذهبية' },
+  { day: 5, type: 'cosmetic', cosmeticCode: '', durationDays: 1, label: 'كرت دخول' },
+  { day: 6, type: 'coins', amount: 300, label: 'عملات ذهبية' },
+  { day: 7, type: 'coins', amount: 500, label: 'الجائزة الكبرى' },
+])
+const dailyLoginLoading = ref(false)
+const dailyLoginSaving = ref(false)
+const dailyLoginError = ref('')
+const dailyLoginSuccess = ref('')
+const cosmeticTargetMode = ref('task')
 const cosmeticPickerOpen = ref(false)
 const cosmeticTargetIdx = ref(-1)
 const selectedCosmeticCode = ref('')
@@ -315,9 +388,12 @@ async function loadCosmetics() {
   cosmetics.value = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : []
 }
 
-function openCosmeticPicker(idx) {
+function openCosmeticPicker(idx, mode = 'task') {
+  cosmeticTargetMode.value = mode
   cosmeticTargetIdx.value = idx
-  selectedCosmeticCode.value = tasks.value[idx]?.rewardCosmeticCode || ''
+  selectedCosmeticCode.value = mode === 'daily'
+    ? dailyLoginDays.value[idx]?.cosmeticCode || ''
+    : tasks.value[idx]?.rewardCosmeticCode || ''
   cosmeticSearch.value = ''
   cosmeticPickerOpen.value = true
   if (!cosmetics.value.length) loadCosmetics()
@@ -325,10 +401,52 @@ function openCosmeticPicker(idx) {
 
 function selectCosmetic(item) {
   if (cosmeticTargetIdx.value < 0 || !item?.code) return
-  const row = tasks.value[cosmeticTargetIdx.value]
-  if (row) row.rewardCosmeticCode = item.code
+  if (cosmeticTargetMode.value === 'daily') {
+    const reward = dailyLoginDays.value[cosmeticTargetIdx.value]
+    if (reward) {
+      reward.cosmeticCode = item.code
+      reward.label = item.name || reward.label
+    }
+  } else {
+    const row = tasks.value[cosmeticTargetIdx.value]
+    if (row) row.rewardCosmeticCode = item.code
+  }
   selectedCosmeticCode.value = item.code
   cosmeticPickerOpen.value = false
+}
+
+async function loadDailyLogin() {
+  dailyLoginLoading.value = true
+  dailyLoginError.value = ''
+  const { data, error: err } = await dailyLoginRewardsApi.get()
+  dailyLoginLoading.value = false
+  if (err) {
+    dailyLoginError.value = err.message || 'تعذر تحميل إعدادات تسجيل الدخول اليومي'
+    return
+  }
+  const payload = data?.data ?? data ?? {}
+  dailyLoginEnabled.value = payload.enabled !== false
+  if (Array.isArray(payload.days) && payload.days.length === 7) {
+    dailyLoginDays.value = payload.days.map((day, i) => ({ ...dailyLoginDays.value[i], ...day, day: i + 1 }))
+  }
+}
+
+async function saveDailyLogin() {
+  dailyLoginSaving.value = true
+  dailyLoginError.value = ''
+  dailyLoginSuccess.value = ''
+  const { error: err } = await dailyLoginRewardsApi.save({
+    enabled: dailyLoginEnabled.value,
+    days: dailyLoginDays.value,
+  })
+  dailyLoginSaving.value = false
+  if (err) {
+    dailyLoginError.value = err.message || 'تعذر حفظ مكافآت تسجيل الدخول'
+    toast().danger(dailyLoginError.value)
+    return
+  }
+  dailyLoginSuccess.value = 'تم حفظ مكافآت تسجيل الدخول اليومية بنجاح'
+  toast().success(dailyLoginSuccess.value)
 }
 
 async function load() {
@@ -414,5 +532,5 @@ async function save() {
   }
 }
 
-onMounted(load)
+onMounted(() => { load(); loadDailyLogin() })
 </script>
