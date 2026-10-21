@@ -25,7 +25,8 @@ function clampSeconds(value: unknown, fallback: number): number {
   return Math.max(1, Math.min(12, Math.round(Number(value) || fallback)));
 }
 function clampPercent(value: unknown, fallback: number): number {
-  return Math.max(0, Math.min(100, Math.round(Number(value) || fallback)));
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : fallback;
 }
 
 @ApiTags('Admin Toast Manager')
