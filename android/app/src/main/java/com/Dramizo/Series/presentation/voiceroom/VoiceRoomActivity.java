@@ -150,6 +150,8 @@ import java.util.Set;
 @OptIn(markerClass = UnstableApi.class)
 public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSource {
     public static final String EXTRA_ROOM_ID = "room_id";
+    public static final String EXTRA_ROOM_DISPLAY_ID = "room_display_id";
+    public static final String EXTRA_ROOM_IS_AGENCY = "room_is_agency";
     /** True while any VoiceRoomActivity is started (for global invite routing). */
     private static volatile boolean sRoomUiVisible;
     /** Alive room activity (may be paused/minimized) — for world celebration delivery. */
@@ -520,6 +522,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
+        // The tapped room card already knows this ID, so show it on first paint instead of
+        // waiting for the network join response to carry the same value back.
+        String earlyDisplayId = getIntent().getStringExtra(EXTRA_ROOM_DISPLAY_ID);
+        if (earlyDisplayId != null && !earlyDisplayId.trim().isEmpty()) {
+            String earlyLabel = getIntent().getBooleanExtra(EXTRA_ROOM_IS_AGENCY, false)
+                    ? "GID:" : "ID:";
+            binding.tvRoomId.setText(earlyLabel + earlyDisplayId.trim());
+        }
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
