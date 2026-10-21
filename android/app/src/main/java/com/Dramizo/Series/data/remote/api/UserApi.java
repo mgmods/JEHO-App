@@ -62,6 +62,9 @@ public interface UserApi {
     @GET("users/{id}/badges")
     Call<ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> badges(@Path("id") String id);
 
+    @GET("users/{id}/badges/earned")
+    Call<ApiResponse<List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> earnedBadges(@Path("id") String id);
+
     @PATCH("users/me")
     Call<ApiResponse<AuthDtos.UserDto>> updateProfile(@Body MiscDtos.UpdateProfileRequest body);
 
