@@ -8,14 +8,13 @@
         <button v-for="tab in tabs" :key="tab.key" type="button" class="toast-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
       </div>
       <div class="toast-preview-wrap mt-3 mb-3">
-        <div v-if="activeTab !== 'luckyButton'" class="toast-preview" :style="previewStyle">
-          <div v-if="activeTab === 'giftSend'" class="preview-avatar">🎁</div>
-          <div v-else class="preview-avatar" :style="avatarPreviewStyle">🧑</div>
-          <div class="preview-copy" :style="textPreviewStyle">
-            <strong>{{ activeTab === 'giftSend' ? 'اسم المرسل' : 'الفائز المحظوظ' }}</strong>
-            <span>{{ activeTab === 'giftSend' ? 'أرسل هدية' : (activeTab === 'luckyWinHigh' ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
-          </div>
-          <span v-if="activeTab === 'giftSend'" class="preview-count">X77</span>
+        <div v-if="activeTab !== 'luckyButton'" class="toast-canvas" :style="canvasStyle"
+             @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag">
+          <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
+          <div class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
+          <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : 'الفائز المحظوظ' }}</strong>
+          <span class="preview-body drag-item" :style="bodyPreviewStyle" @pointerdown.stop="startDrag('body', $event)">{{ activeTab === 'giftSend' ? 'أرسل هدية' : (activeTab === 'luckyWinHigh' ? 'ربح عالي · +12,500 كوين' : 'مبروك الربح · +250 كوين') }}</span>
+          <span v-if="activeTab === 'giftSend'" class="preview-count drag-item" :style="countPreviewStyle" @pointerdown.stop="startDrag('count', $event)">X77</span>
           <div v-if="currentStyle.shineEnabled" class="preview-shine"></div>
         </div>
         <div v-else class="button-preview-wrap">
@@ -50,18 +49,21 @@
       <div class="col-xl-7">
         <section class="settings-card h-100">
           <h3 class="settings-card-title">موضع الصورة والكتابة</h3>
-          <p class="small text-secondary">حرّك عناصر المعاينة لتضع صورة الفائز داخل إطارها والكتابة في المساحة المناسبة. القيم محفوظة كنسب مئوية لتناسب أحجام الشاشات المختلفة.</p>
+          <p class="small text-secondary">اسحب الصورة والكتابة والعداد مباشرة داخل المعاينة. كل عنصر مستقل، ويمكن ترتيب النص بجانب الصورة أو فوقه/تحته.</p>
           <div class="position-control">
-            <label class="form-label">موضع الصورة أفقيًا: {{ currentStyle.avatarX }}%</label>
-            <input v-model.number="currentStyle.avatarX" class="form-range" type="range" min="0" max="100" step="1" />
-            <label class="form-label">موضع الصورة عموديًا: {{ currentStyle.avatarY }}%</label>
-            <input v-model.number="currentStyle.avatarY" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">عرض التوست: {{ currentStyle.widthDp }} dp</label>
+            <input v-model.number="currentStyle.widthDp" class="form-range" type="range" min="220" max="360" step="5" />
+            <label class="form-label">ارتفاع التوست: {{ currentStyle.heightDp }} dp</label>
+            <input v-model.number="currentStyle.heightDp" class="form-range" type="range" min="60" max="180" step="2" />
           </div>
           <div class="position-control">
-            <label class="form-label">موضع الكتابة أفقيًا: {{ currentStyle.textX }}%</label>
-            <input v-model.number="currentStyle.textX" class="form-range" type="range" min="0" max="100" step="1" />
-            <label class="form-label">موضع الكتابة عموديًا: {{ currentStyle.textY }}%</label>
-            <input v-model.number="currentStyle.textY" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
+            <input v-model.number="currentStyle.avatarSizeDp" class="form-range" type="range" min="20" max="76" step="2" />
+            <label class="form-label">المسافة بين سطري الكتابة: {{ currentStyle.bodyOffsetY }}%</label>
+            <input v-model.number="currentStyle.bodyOffsetY" class="form-range" type="range" min="-5" max="45" step="1" />
+          </div>
+          <div class="position-control small text-secondary">
+            اسحب كل عنصر داخل الصورة لتحديد مكانه. تغييرات المواضع محفوظة كنسب مئوية وتظهر في المعاينة.
           </div>
         </section>
       </div>
@@ -147,9 +149,9 @@ const tabs = [
 ]
 const activeTab = ref('giftSend')
 const form = reactive({
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
+  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, bodyOffsetY: 17 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
   version: 1,
 })
@@ -160,15 +162,34 @@ const uploading = ref(false)
 const error = ref('')
 const success = ref('')
 const resolveStyleUrl = (style) => resolveAsset(style?.backgroundUrl)
-const previewStyle = computed(() => {
-  const url = resolveStyleUrl(currentStyle.value)
-  return {
-    backgroundImage: url ? 'url("' + url.replace(/"/g, '%22') + '")' : 'linear-gradient(100deg,#351126,#98264a 55%,#34204e)',
-    boxShadow: currentStyle.value.frameGlowEnabled ? '0 0 0 1px rgba(255,211,111,.9),0 0 18px rgba(255,191,64,.45)' : '0 0 0 1px rgba(255,211,111,.35)',
-  }
-})
-const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%' }))
-const textPreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%' }))
+const canvasStyle = computed(() => ({
+  width: Math.max(220, Math.min(360, Number(currentStyle.value.widthDp) || 340)) + 'px',
+  height: Math.max(60, Math.min(180, Number(currentStyle.value.heightDp) || 100)) + 'px',
+  boxShadow: currentStyle.value.frameGlowEnabled ? '0 0 0 1px rgba(255,211,111,.9),0 0 18px rgba(255,191,64,.45)' : '0 0 0 1px rgba(255,211,111,.35)',
+}))
+const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
+const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%' }))
+const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%' }))
+const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%' }))
+const dragTarget = ref('')
+function startDrag(target, event) {
+  if (activeTab.value === 'luckyButton') return
+  dragTarget.value = target
+  try { event.currentTarget.setPointerCapture(event.pointerId) } catch {}
+}
+function moveDrag(event) {
+  if (!dragTarget.value) return
+  const rect = event.currentTarget.getBoundingClientRect()
+  if (!rect.width || !rect.height) return
+  const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
+  const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
+  const s = currentStyle.value
+  if (dragTarget.value === 'avatar') { s.avatarX = Math.round(x); s.avatarY = Math.round(y) }
+  if (dragTarget.value === 'title') { s.textX = Math.round(x); s.textY = Math.round(y) }
+  if (dragTarget.value === 'body') { s.bodyX = Math.round(x); s.bodyY = Math.round(y) }
+  if (dragTarget.value === 'count') { s.countX = Math.round(x); s.countY = Math.round(y) }
+}
+function stopDrag() { dragTarget.value = '' }
 
 async function load() {
   loading.value = true
@@ -189,6 +210,14 @@ async function load() {
       avatarY: Number.isFinite(Number(incoming.avatarY)) ? Number(incoming.avatarY) : 50,
       textX: Number.isFinite(Number(incoming.textX)) ? Number(incoming.textX) : 25,
       textY: Number.isFinite(Number(incoming.textY)) ? Number(incoming.textY) : 50,
+      bodyX: Number.isFinite(Number(incoming.bodyX)) ? Number(incoming.bodyX) : 25,
+      bodyY: Number.isFinite(Number(incoming.bodyY)) ? Number(incoming.bodyY) : 67,
+      countX: Number.isFinite(Number(incoming.countX)) ? Number(incoming.countX) : 88,
+      countY: Number.isFinite(Number(incoming.countY)) ? Number(incoming.countY) : 50,
+      widthDp: Math.max(220, Math.min(360, Number(incoming.widthDp) || 340)),
+      heightDp: Math.max(60, Math.min(180, Number(incoming.heightDp) || 100)),
+      avatarSizeDp: Math.max(20, Math.min(76, Number(incoming.avatarSizeDp) || 44)),
+      bodyOffsetY: Math.max(-5, Math.min(45, Number(incoming.bodyOffsetY) || 17)),
     })
   }
   Object.assign(form.luckyButton, {
@@ -249,12 +278,14 @@ onMounted(load)
 .toast-tabs{display:flex;flex-wrap:wrap;gap:8px}
 .toast-tab{border:1px solid rgba(255,211,111,.28);border-radius:10px;padding:9px 13px;background:rgba(20,18,31,.55);color:inherit;font-size:.92rem}
 .toast-tab.active{border-color:#f5ca69;background:linear-gradient(110deg,rgba(125,22,54,.8),rgba(90,43,103,.7));box-shadow:0 0 12px rgba(255,191,64,.18)}
-.toast-preview-wrap{padding:24px 10px;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:hidden}
-.toast-preview{position:relative;height:100px;border:1px solid rgba(255,213,122,.9);border-radius:13px;background-size:cover;background-position:center;overflow:hidden;color:#fff}
-.preview-avatar{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;width:44px;height:44px;border:2px solid #f9d77e;border-radius:50%;background:rgba(35,15,28,.82);font-size:22px;z-index:1}
-.preview-copy{position:absolute;transform:translate(-0%,-50%);display:flex;min-width:105px;max-width:62%;flex-direction:column;gap:4px;text-shadow:0 1px 4px #160711;z-index:1}
-.preview-copy strong,.preview-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.preview-count{position:absolute;right:10px;top:50%;transform:translateY(-50%);padding:7px 9px;border:1px solid #ffe3a0;border-radius:10px;background:linear-gradient(#8f183b,#3a102d);font-weight:800;color:#ffe6a4;z-index:1}
+.toast-preview-wrap{padding:18px 10px;border-radius:16px;background:linear-gradient(135deg,#191a25,#2b2232);overflow:auto}
+.toast-canvas{position:relative;max-width:100%;min-width:220px;margin:0 auto;border:1px solid rgba(255,213,122,.9);border-radius:10px;background:linear-gradient(100deg,#351126,#98264a 55%,#34204e);overflow:hidden;color:#fff;touch-action:none;isolation:isolate}
+.toast-canvas-image{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;pointer-events:none;user-select:none}
+.drag-item{touch-action:none;cursor:grab;user-select:none}
+.drag-item:active{cursor:grabbing}
+.preview-avatar{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid #f9d77e;border-radius:50%;background:rgba(35,15,28,.82);font-size:22px;z-index:2}
+.preview-title,.preview-body{position:absolute;transform:translate(0,-50%);max-width:68%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 1px 4px #160711;z-index:2;color:#fff;font-size:12px;font-weight:800}
+.preview-count{position:absolute;transform:translate(-50%,-50%);padding:5px 7px;border:1px solid #ffe3a0;border-radius:8px;background:linear-gradient(#8f183b,#3a102d);font-weight:800;color:#ffe6a4;z-index:2;font-size:12px}
 .preview-shine{position:absolute;top:-20%;bottom:-20%;left:-30%;width:34px;transform:skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,255,255,.68),transparent);animation:toast-shine 2.4s linear infinite;pointer-events:none}
 .button-preview-wrap{display:flex;min-height:140px;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;color:#b9b4c6}
 .button-preview{width:82px;height:82px;border-radius:50%;display:grid;place-items:center;border:3px solid #f8d77d;background:radial-gradient(circle at 30% 25%,#ffcf79,#c62c56 48%,#3c0d37);box-shadow:0 0 20px rgba(255,190,65,.45);font-size:34px;overflow:hidden}
