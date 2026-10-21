@@ -2796,7 +2796,10 @@ export class AdminService {
       let isSuperAdmin =
         admin.role === AdminRole.SUPER ||
         normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
-      let perms = normalizePermissions(admin.dashboardPermissions);
+      let staffRole = normalizeStaffRole({ staffRole: admin.staffRole });
+      let perms = staffRole === 'admin' || isSuperAdmin
+        ? fullPermissions()
+        : normalizePermissions(admin.dashboardPermissions);
       if (!isSuperAdmin && !hasAnyPermission(perms)) {
         const legacyQuery = this.usersRepo
           .createQueryBuilder('u')
@@ -2810,17 +2813,19 @@ export class AdminService {
           );
         }
         const legacy = await legacyQuery.getOne();
+        const legacyRole = normalizeStaffRole(legacy);
         if (
           legacy &&
           legacy.passwordHash &&
-          isDashboardSuper(legacy) &&
+          (legacyRole === 'super' || legacyRole === 'admin') &&
           (await bcrypt.compare(password, legacy.passwordHash))
         ) {
-          admin.role = AdminRole.SUPER;
-          admin.staffRole = 'super';
+          admin.role = legacyRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR;
+          admin.staffRole = legacyRole;
           admin.dashboardPermissions = fullPermissions() as Record<string, string>;
           await this.adminUsersRepo.save(admin);
-          isSuperAdmin = true;
+          isSuperAdmin = legacyRole === 'super';
+          staffRole = legacyRole;
           perms = normalizePermissions(admin.dashboardPermissions);
         }
       }
