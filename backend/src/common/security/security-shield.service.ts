@@ -99,13 +99,12 @@ export class SecurityShieldService {
       expiresAt,
     });
     const key = `${BAN_USER_PREFIX}${userId}`;
-    const existing = await this.redis.get(key);
-    if (existing) {
-      throw new BadRequestException('An active ban already exists for this account; Super Admin review is required');
-    }
-    await this.redis.set(key, value, safeHours * 3600);
-    const saved = await this.redis.get(key);
-    if (!saved) {
+    const created = await this.redis.setIfAbsent(key, value, safeHours * 3600);
+    if (!created) {
+      const existing = await this.redis.get(key);
+      if (existing) {
+        throw new BadRequestException('An active ban already exists for this account; Super Admin review is required');
+      }
       throw new BadRequestException('Temporary-ban storage is unavailable; no ban was applied');
     }
     return { userId, hours: safeHours, expiresAt, actorId };
