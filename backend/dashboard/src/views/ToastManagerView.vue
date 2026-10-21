@@ -18,7 +18,7 @@
           </div>
           <div class="mb-3">
             <label class="form-label">صورة خلفية التوست</label>
-            <input ref="fileInput" class="form-control" type="file" accept="image/png,image/jpeg,image/webp" :disabled="uploading" @change="uploadBackground" />
+            <input ref="fileInput" class="form-control" type="file" accept="image/png,image/jpeg,image/webp" :disabled="uploading || !canWriteSettings" @change="uploadBackground" />
             <div class="form-text">PNG أو JPG أو WEBP، بحد أقصى 8 ميغابايت. يفضّل تصميم أفقي بنسبة 3:1.</div>
           </div>
           <div v-if="form.backgroundUrl" class="d-flex align-items-center gap-2 mb-3">
@@ -26,7 +26,7 @@
             <button class="btn btn-outline-danger btn-sm" type="button" @click="form.backgroundUrl = ''">إزالة الخلفية</button>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-aurora" type="button" :disabled="saving || loading" @click="save">
+            <button class="btn btn-aurora" type="button" :disabled="saving || loading || !canWriteSettings" @click="save">
               <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
               حفظ وتطبيق
             </button>
@@ -69,9 +69,12 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { toastManagerApi, uploadsApi } from '@/api'
 import { resolveAsset } from '@/utils/assets'
 import { toast } from '@/composables/useToast'
+import { useAuthStore } from '@/stores/auth'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 
+const auth = useAuthStore()
+const canWriteSettings = computed(() => auth.can('settings', 'write'))
 const form = reactive({ backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1 })
 const loading = ref(false)
 const saving = ref(false)
@@ -102,6 +105,7 @@ async function load() {
   })
 }
 async function uploadBackground(event) {
+  if (!canWriteSettings.value) { toast().danger('لا تملك صلاحية تعديل إعدادات الداشبورد'); return }
   const file = event?.target?.files?.[0]
   if (!file) return
   if (file.size > 8 * 1024 * 1024 || !/\.(png|jpe?g|webp)$/i.test(file.name)) {
@@ -121,6 +125,7 @@ async function uploadBackground(event) {
   toast().success('تم رفع الخلفية. اضغط حفظ وتطبيق لاعتمادها.')
 }
 async function save() {
+  if (!canWriteSettings.value) { toast().danger('لا تملك صلاحية تعديل إعدادات الداشبورد'); return }
   saving.value = true
   error.value = ''
   success.value = ''
