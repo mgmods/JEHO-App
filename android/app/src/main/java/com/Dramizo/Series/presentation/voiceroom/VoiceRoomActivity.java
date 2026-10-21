@@ -258,6 +258,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private volatile int luckyCannonDurationSeconds = 2;
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
+    @Nullable private ImageView luckyCannonIconView;
+    @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
     @Nullable private String luckyCannonGiftId;
     @Nullable private String luckyCannonGiftIcon;
@@ -3708,11 +3710,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         cannonLp.gravity = Gravity.CENTER;
         layer.addView(cannon, cannonLp);
+        ImageView uploadedIcon = new ImageView(this);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
+                luckyCannonDp(42), luckyCannonDp(42), Gravity.CENTER);
+        uploadedIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        uploadedIcon.setClickable(false);
+        uploadedIcon.setFocusable(false);
+        uploadedIcon.setVisibility(View.GONE);
+        layer.addView(uploadedIcon, iconLp);
         layer.setElevation(luckyCannonDp(42));
         layer.setVisibility(View.GONE);
-        cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        layer.setOnClickListener(v -> sendLuckyCannonGift());
         // Drag the floating control anywhere inside the room without firing on a drag.
-        cannon.setOnTouchListener(new View.OnTouchListener() {
+        layer.setOnTouchListener(new View.OnTouchListener() {
             private float downRawX, downRawY, startTx, startTy;
             private boolean dragging;
             private final int touchSlop = luckyCannonDp(6);
@@ -3757,6 +3767,62 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
+        luckyCannonIconView = uploadedIcon;
+        refreshLuckyToastButtonStyle();
+    }
+
+    /** One lightweight config fetch per room setup; animation stays local on this device. */
+    @SuppressWarnings("unchecked")
+    private void refreshLuckyToastButtonStyle() {
+        try {
+            AppContainer container = ContainerProvider.from(this);
+            container.getConfigApi().toastStyle(System.currentTimeMillis()).enqueue(
+                    new retrofit2.Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null || response.body().data == null) return;
+                    Map<String, Object> config = response.body().data;
+                    Object buttonValue = config.get("luckyButton");
+                    if (!(buttonValue instanceof Map)) return;
+                    Map<String, Object> button = (Map<String, Object>) buttonValue;
+                    String iconUrl = button.get("iconUrl") instanceof String ? ((String) button.get("iconUrl")).trim() : "";
+                    int duration = luckyCannonDurationSeconds;
+                    try { duration = Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(button.get("durationSeconds")))))); }
+                    catch (Exception ignored) { }
+                    final int nextDuration = duration;
+                    final String nextIconUrl = iconUrl;
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        luckyCannonDurationSeconds = nextDuration;
+                        luckyCannonRemoteIconUrl = nextIconUrl;
+                        if (luckyCannonIconView == null) return;
+                        if (nextIconUrl.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        String absolute = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(nextIconUrl);
+                        if (absolute == null || absolute.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        try {
+                            com.bumptech.glide.Glide.with(getApplicationContext())
+                                    .load(absolute).override(128, 128).fitCenter().dontAnimate()
+                                    .into(luckyCannonIconView);
+                            luckyCannonIconView.setVisibility(View.VISIBLE);
+                        } catch (Exception ignored) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                        }
+                    });
+                }
+                @Override public void onFailure(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        Throwable error) {
+                    // Keep the locally drawn gem and existing duration if the free host is asleep.
+                }
+            });
+        } catch (Exception ignored) { }
     }
 
     /** Called only after the existing gift endpoint confirms a successful lucky gift send. */
