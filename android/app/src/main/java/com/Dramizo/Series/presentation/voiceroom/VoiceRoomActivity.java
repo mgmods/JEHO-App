@@ -161,7 +161,42 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private ActivityVoiceRoomBinding binding;
     @Nullable private TextView roomPkScoreBanner;
+    @Nullable private TextView roomPkActionButton;
+    @Nullable private String roomPkCurrentContestId;
+    private boolean roomPkFeatureEnabled = true;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    /** Fallback poll so a host still sees an invitation if a room event arrives during reconnect. */
+    private final Runnable roomPkInvitationPoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || exiting || !isOwner || roomId == null || roomId.isEmpty()) return;
+            loadRoomPkInvitations();
+            handler.postDelayed(this, 5000L);
+        }
+    };
+    private final Set<String> shownRoomPkInvites = new HashSet<>();
+    private final Runnable roomPkPendingTimeout = () -> {
+        if ("pending".equals(roomPkCurrentContestId)) {
+            roomPkCurrentContestId = null;
+            ensureRoomPkActionButton();
+        }
+    };
+    private String roomPkBannerBaseText = "";
+    private long roomPkEndsAtMs;
+    private boolean roomPkBannerEnded;
+    private final Runnable updateRoomPkBannerClock = new Runnable() {
+        @Override public void run() {
+            if (roomPkScoreBanner == null || roomPkScoreBanner.getVisibility() != View.VISIBLE
+                    || roomPkBannerEnded || isFinishing() || exiting) return;
+            long remaining = roomPkEndsAtMs > 0L ? roomPkEndsAtMs - System.currentTimeMillis() : -1L;
+            String clock = remaining > 0L
+                    ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
+                    : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
+            roomPkScoreBanner.setText(roomPkBannerBaseText + "\n⏱ الوقت المتبقي: " + clock);
+            if (remaining > 0L) handler.postDelayed(this, 1000L);
+        }
+    };
     private final Runnable hideRoomPkScoreBanner = () -> {
+        handler.removeCallbacks(updateRoomPkBannerClock);
         if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
     };
     private VoiceRoomViewModel viewModel;
@@ -209,7 +244,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
     @Nullable private String luckyCannonRequestId;
-    private final Handler handler = new Handler(Looper.getMainLooper());
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
     private MikooHashBridge hashBridge;
@@ -1092,6 +1126,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
+            handler.post(() -> { ensureRoomPkActionButton(); loadRoomPkInvitations(); });
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
             canChangeFrames = fullStaff;
@@ -11339,6 +11374,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
         if (binding != null && binding.webHostSignal != null) {
@@ -11362,6 +11398,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onResume() {
         super.onResume();
         sRoomUiVisible = true;
+        handler.removeCallbacks(roomPkInvitationPoll);
+        if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;
         // UI is back — stop FGS owner and restore intended mic (never force open).
         try {
@@ -12140,9 +12178,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         boolean enabled = payload != null && payload.has("enabled")
                                 && !payload.get("enabled").isJsonNull()
                                 && payload.get("enabled").getAsBoolean();
-                        if (!enabled) handler.post(() -> {
-                            handler.removeCallbacks(hideRoomPkScoreBanner);
-                            if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                        handler.post(() -> {
+                            roomPkFeatureEnabled = enabled;
+                            if (!enabled) {
+                                handler.removeCallbacks(hideRoomPkScoreBanner);
+                                handler.removeCallbacks(updateRoomPkBannerClock);
+                                roomPkCurrentContestId = null;
+                                if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+                            }
+                            ensureRoomPkActionButton();
+                            if (enabled) handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
                         });
                         return;
                     }
@@ -12363,8 +12408,467 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     /** Load an already-running room-vs-room PK when a user enters either room. */
+    private void ensureRoomPkActionButton() {
+        if (binding == null) return;
+        if (roomPkActionButton == null) {
+            roomPkActionButton = new TextView(this);
+            roomPkActionButton.setText("⚔ تحدّي PK");
+            roomPkActionButton.setTextColor(Color.WHITE);
+            roomPkActionButton.setTextSize(12f);
+            roomPkActionButton.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            roomPkActionButton.setGravity(Gravity.CENTER);
+            roomPkActionButton.setPadding(dp(12), dp(8), dp(12), dp(8));
+            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFFE53955, 0xFF7C3AED, 0xFFDAA520});
+            bg.setCornerRadius(dp(18));
+            bg.setStroke(dp(1), 0xFFFFE6A6);
+            roomPkActionButton.setBackground(bg);
+            roomPkActionButton.setElevation(dp(24));
+            roomPkActionButton.setOnClickListener(v -> showRoomPkChallengeDialog());
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT,
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            lp.topToBottom = R.id.tvRoomViewerCount;
+            lp.startToStart = R.id.tvRoomViewerCount;
+            lp.endToEnd = R.id.tvRoomViewerCount;
+            lp.setMargins(0, dp(6), 0, 0);
+            binding.headerRoom.addView(roomPkActionButton, lp);
+        }
+        boolean canStart = isOwner && roomPkFeatureEnabled;
+        roomPkActionButton.setVisibility(canStart && roomPkCurrentContestId == null ? View.VISIBLE : View.GONE);
+    }
+
+    private void showRoomPkChallengeDialog() {
+        if (roomId == null || roomId.isEmpty() || !isOwner) {
+            Toast.makeText(this, "بدء تحدّي PK متاح لمضيف الروم فقط", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final int[] selectedMinutes = {10};
+        final String[] selectedScoring = {"coins"};
+        final String[] scoringModes = {"coins", "diamonds", "gifts", "points"};
+        final String[] scoringLabels = {"🪙 الكوينز", "💎 الألماسات", "🎁 الهدايا", "⭐ النقاط"};
+
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(18), dp(12), dp(18), dp(16));
+        form.setBackground(roomPkRoundedBackground(0xFFF7F8FC, 0xFFE3E7F0, 22));
+        scroll.addView(form);
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setPadding(dp(16), dp(15), dp(16), dp(15));
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
+        ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
+        TextView heroTitle = new TextView(this);
+        heroTitle.setText("⚔  تحدّي روم ضد روم");
+        heroTitle.setTextColor(Color.WHITE);
+        heroTitle.setTextSize(19f);
+        heroTitle.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        hero.addView(heroTitle);
+        TextView heroSubtitle = new TextView(this);
+        heroSubtitle.setText("وجّه الدعوة للروم المنافس، وبعد القبول تبدأ المواجهة والعدّ التنازلي مباشرة.");
+        heroSubtitle.setTextColor(0xFFFCECF3);
+        heroSubtitle.setTextSize(12f);
+        heroSubtitle.setPadding(0, dp(5), 0, 0);
+        hero.addView(heroSubtitle);
+        form.addView(hero, new LinearLayout.LayoutParams(-1, -2));
+
+        TextView roomLabel = roomPkFormLabel("معرّف الروم المنافس");
+        LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+        labelParams.topMargin = dp(18);
+        form.addView(roomLabel, labelParams);
+        EditText targetId = new EditText(this);
+        targetId.setSingleLine(true);
+        targetId.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        targetId.setHint("أدخل Room ID");
+        targetId.setTextSize(15f);
+        targetId.setTextColor(0xFF172033);
+        targetId.setHintTextColor(0xFF8A93A5);
+        targetId.setPadding(dp(14), dp(12), dp(14), dp(12));
+        targetId.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFD7DCE8, 13));
+        LinearLayout.LayoutParams inputParams = new LinearLayout.LayoutParams(-1, dp(50));
+        inputParams.topMargin = dp(7);
+        form.addView(targetId, inputParams);
+        TextView idHint = new TextView(this);
+        idHint.setText("أدخل الـ ID العام للروم، وليس اسم المضيف.");
+        idHint.setTextColor(0xFF7A8497);
+        idHint.setTextSize(11f);
+        idHint.setPadding(dp(2), dp(5), dp(2), 0);
+        form.addView(idHint);
+
+        TextView durationLabel = roomPkFormLabel("مدة التحدّي");
+        LinearLayout.LayoutParams durationLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        durationLabelParams.topMargin = dp(17);
+        form.addView(durationLabel, durationLabelParams);
+        TextView[] durationChips = new TextView[5];
+        int[] minuteValues = {5, 10, 15, 30, 60};
+        LinearLayout durationRow = new LinearLayout(this);
+        durationRow.setOrientation(LinearLayout.HORIZONTAL);
+        durationRow.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams choiceRowParams = new LinearLayout.LayoutParams(-1, -2);
+        choiceRowParams.topMargin = dp(8);
+        form.addView(durationRow, choiceRowParams);
+        for (int i = 0; i < minuteValues.length; i++) {
+            final int minutes = minuteValues[i];
+            TextView chip = roomPkChoiceChip(minutes + " د", minutes == selectedMinutes[0]);
+            durationChips[i] = chip;
+            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(42), 1f);
+            if (i > 0) chipParams.leftMargin = dp(5);
+            durationRow.addView(chip, chipParams);
+            chip.setOnClickListener(v -> {
+                selectedMinutes[0] = minutes;
+                for (int j = 0; j < durationChips.length; j++) {
+                    boolean chosen = minuteValues[j] == minutes;
+                    durationChips[j].setBackground(roomPkRoundedBackground(
+                            chosen ? 0xFFFFE4EC : Color.WHITE,
+                            chosen ? 0xFFEA416A : 0xFFDCE1EB, 12));
+                    durationChips[j].setTextColor(chosen ? 0xFFC52250 : 0xFF596477);
+                }
+            });
+        }
+
+        TextView scoringLabel = roomPkFormLabel("طريقة احتساب نتيجة الفوز");
+        LinearLayout.LayoutParams scoringLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        scoringLabelParams.topMargin = dp(18);
+        form.addView(scoringLabel, scoringLabelParams);
+        TextView goalLabel = roomPkFormLabel("هدف الفوز بالكوينز");
+        LinearLayout.LayoutParams goalLabelParams = new LinearLayout.LayoutParams(-1, -2);
+        goalLabelParams.topMargin = dp(18);
+        form.addView(goalLabel, goalLabelParams);
+        TextView[] scoringChips = new TextView[4];
+        for (int row = 0; row < 2; row++) {
+            LinearLayout scoringRow = new LinearLayout(this);
+            scoringRow.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+            rowParams.topMargin = dp(7);
+            form.addView(scoringRow, rowParams);
+            for (int col = 0; col < 2; col++) {
+                int index = row * 2 + col;
+                final int choiceIndex = index;
+                TextView chip = roomPkChoiceChip(scoringLabels[index], scoringModes[index].equals(selectedScoring[0]));
+                scoringChips[index] = chip;
+                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(0, dp(44), 1f);
+                if (col == 1) chipParams.leftMargin = dp(7);
+                scoringRow.addView(chip, chipParams);
+                chip.setOnClickListener(v -> {
+                    selectedScoring[0] = scoringModes[choiceIndex];
+                    goalLabel.setText("هدف الفوز بال" + ("diamonds".equals(selectedScoring[0]) ? "ألماسات"
+                            : "gifts".equals(selectedScoring[0]) ? "هدايا"
+                            : "points".equals(selectedScoring[0]) ? "نقاط" : "كوينز"));
+                    for (int j = 0; j < scoringChips.length; j++) {
+                        boolean chosen = j == choiceIndex;
+                        scoringChips[j].setBackground(roomPkRoundedBackground(
+                                chosen ? 0xFFFFE4EC : Color.WHITE,
+                                chosen ? 0xFFEA416A : 0xFFDCE1EB, 12));
+                        scoringChips[j].setTextColor(chosen ? 0xFFC52250 : 0xFF596477);
+                    }
+                });
+            }
+        }
+
+        EditText goalScoreInput = new EditText(this);
+        goalScoreInput.setSingleLine(true);
+        goalScoreInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        goalScoreInput.setText("100000");
+        goalScoreInput.setTextSize(15f);
+        goalScoreInput.setTextColor(0xFF172033);
+        goalScoreInput.setPadding(dp(14), dp(12), dp(14), dp(12));
+        goalScoreInput.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFD7DCE8, 13));
+        LinearLayout.LayoutParams goalInputParams = new LinearLayout.LayoutParams(-1, dp(50));
+        goalInputParams.topMargin = dp(7);
+        form.addView(goalScoreInput, goalInputParams);
+        TextView goalHint = new TextView(this);
+        goalHint.setText("ينتهي التحدّي عند بلوغ الهدف أو عند انتهاء الوقت، أيهما أسبق.");
+        goalHint.setTextColor(0xFF7A8497);
+        goalHint.setTextSize(11f);
+        goalHint.setPadding(dp(2), dp(5), dp(2), 0);
+        form.addView(goalHint);
+
+        TextView footer = new TextView(this);
+        footer.setText("🔔 سيصل إشعار فوري لمضيف الروم المنافس، ولن يبدأ التحدّي إلا بعد قبول الدعوة.");
+        footer.setTextColor(0xFF586276);
+        footer.setTextSize(12f);
+        footer.setPadding(dp(12), dp(11), dp(12), dp(11));
+        footer.setBackground(roomPkRoundedBackground(0xFFEFF3FA, 0xFFDCE4F2, 12));
+        LinearLayout.LayoutParams footerParams = new LinearLayout.LayoutParams(-1, -2);
+        footerParams.topMargin = dp(18);
+        form.addView(footer, footerParams);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(scroll)
+                .setNegativeButton("إلغاء", null)
+                .setPositiveButton("إرسال الدعوة  ➜", null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            android.widget.Button send = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE);
+            android.widget.Button cancel = dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE);
+            send.setTextColor(0xFFC52250);
+            send.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            cancel.setTextColor(0xFF697386);
+            send.setOnClickListener(v -> {
+                String target = targetId.getText() != null ? targetId.getText().toString().trim() : "";
+                if (target.isEmpty()) {
+                    targetId.setError("أدخل ID الروم المنافس");
+                    targetId.requestFocus();
+                    return;
+                }
+                if (target.equals(roomId)) {
+                    targetId.setError("لا يمكنك تحدّي الروم نفسه");
+                    return;
+                }
+                java.util.Map<String, Object> body = new java.util.HashMap<>();
+                body.put("roomId", roomId);
+                body.put("targetRoomId", target);
+                long goalScore;
+                try {
+                    goalScore = Long.parseLong(goalScoreInput.getText().toString().trim());
+                } catch (Exception invalid) {
+                    goalScore = 0L;
+                }
+                if (goalScore < 1L || goalScore > 1_000_000_000L) {
+                    goalScoreInput.setError("أدخل هدفًا بين 1 و1,000,000,000");
+                    return;
+                }
+                body.put("durationMinutes", selectedMinutes[0]);
+                body.put("scoringMode", selectedScoring[0]);
+                body.put("goalScore", goalScore);
+                send.setEnabled(false);
+                send.setText("جارٍ إرسال الدعوة…");
+                ContainerProvider.from(this).getContestsApi().createRoomPk(body).enqueue(
+                        new retrofit2.Callback<ApiResponse<Object>>() {
+                            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                                    retrofit2.Response<ApiResponse<Object>> response) {
+                                boolean ok = response.isSuccessful() && response.body() != null && response.body().success;
+                                if (!ok) {
+                                    send.setEnabled(true);
+                                    send.setText("إرسال الدعوة  ➜");
+                                    Toast.makeText(VoiceRoomActivity.this,
+                                            response.body() != null && response.body().message != null
+                                                    ? response.body().message : "تعذّر إرسال الدعوة، تحقق من ID الروم",
+                                            Toast.LENGTH_LONG).show();
+                                    return;
+                                }
+                                dialog.dismiss();
+                                roomPkCurrentContestId = "pending";
+                                handler.removeCallbacks(roomPkPendingTimeout);
+                                handler.postDelayed(roomPkPendingTimeout, 60000L);
+                                ensureRoomPkActionButton();
+                                Toast.makeText(VoiceRoomActivity.this,
+                                        "تم إرسال الدعوة إلى مضيف الروم المنافس 🔔", Toast.LENGTH_LONG).show();
+                                handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
+                            }
+                            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                                send.setEnabled(true);
+                                send.setText("إرسال الدعوة  ➜");
+                                Toast.makeText(VoiceRoomActivity.this,
+                                        "تعذّر الاتصال. حاول إرسال الدعوة مرة ثانية.", Toast.LENGTH_LONG).show();
+                            }
+                        });
+            });
+        });
+        dialog.show();
+    }
+
+    private GradientDrawable roomPkRoundedBackground(int fill, int stroke, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fill);
+        drawable.setCornerRadius(dp(radiusDp));
+        drawable.setStroke(dp(1), stroke);
+        return drawable;
+    }
+
+    private TextView roomPkFormLabel(String text) {
+        TextView label = new TextView(this);
+        label.setText(text);
+        label.setTextColor(0xFF202A3D);
+        label.setTextSize(14f);
+        label.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        return label;
+    }
+
+    private TextView roomPkChoiceChip(String text, boolean selected) {
+        TextView chip = new TextView(this);
+        chip.setText(text);
+        chip.setGravity(Gravity.CENTER);
+        chip.setSingleLine(true);
+        chip.setTextSize(12f);
+        chip.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        chip.setPadding(dp(4), dp(7), dp(4), dp(7));
+        chip.setBackground(roomPkRoundedBackground(selected ? 0xFFFFE4EC : Color.WHITE,
+                selected ? 0xFFEA416A : 0xFFDCE1EB, 12));
+        chip.setTextColor(selected ? 0xFFC52250 : 0xFF596477);
+        return chip;
+    }
+
+    private void loadRoomPkInvitations() {
+        if (roomId == null || roomId.isEmpty() || !isOwner || isFinishing() || exiting) return;
+        ContainerProvider.from(this).getContestsApi().roomPkInvitations(roomId).enqueue(
+                new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
+                    @Override public void onResponse(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
+                        if (!response.isSuccessful() || response.body() == null || !response.body().success
+                                || response.body().data == null || response.body().data.items == null) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null || response.body().data.roomPkEnabled;
+                        ensureRoomPkActionButton();
+                        for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
+                            if (contest == null || contest.id == null || !shownRoomPkInvites.add(contest.id)) continue;
+                            handler.post(() -> showRoomPkInviteDialog(contest));
+                            break;
+                        }
+                    }
+                    @Override public void onFailure(
+                            retrofit2.Call<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> call,
+                            Throwable error) { }
+                });
+    }
+
+    private void showRoomPkInviteDialog(com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest) {
+        if (isFinishing() || contest == null || contest.id == null) return;
+        String sourceName = contest.sideA != null ? firstNonEmpty(contest.sideA.name, "الروم المنافس") : "الروم المنافس";
+        int minutes = 10;
+        long goalScore = 100000L;
+        String mode = firstNonEmpty(contest.scoringMode, "coins");
+        if (contest.rules != null) {
+            Object duration = contest.rules.get("durationMinutes");
+            if (duration instanceof Number) minutes = Math.max(1, ((Number) duration).intValue());
+            Object scoring = contest.rules.get("scoringMode");
+            if (scoring != null) mode = String.valueOf(scoring);
+            Object goal = contest.rules.get("goalScore");
+            if (goal instanceof Number) goalScore = Math.max(0L, ((Number) goal).longValue());
+        }
+        String modeLabel = "diamonds".equals(mode) ? "💎 الألماسات"
+                : "gifts".equals(mode) ? "🎁 عدد الهدايا"
+                : "points".equals(mode) ? "⭐ النقاط" : "🪙 الكوينز";
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(14), dp(18), dp(12));
+        card.setBackground(roomPkRoundedBackground(0xFFF7F8FC, 0xFFE2E7F0, 20));
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(dp(14), dp(16), dp(14), dp(16));
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
+        ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
+        TextView icon = new TextView(this);
+        icon.setText("⚔");
+        icon.setTextSize(28f);
+        icon.setTextColor(Color.WHITE);
+        hero.addView(icon);
+        TextView title = new TextView(this);
+        title.setText("دعوة تحدّي روم ضد روم");
+        title.setTextSize(18f);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        hero.addView(title);
+        TextView subtitle = new TextView(this);
+        subtitle.setText("وصلتك مواجهة جديدة — هل أنت مستعد؟");
+        subtitle.setTextSize(12f);
+        subtitle.setTextColor(0xFFFFEEF3);
+        subtitle.setPadding(0, dp(4), 0, 0);
+        hero.addView(subtitle);
+        card.addView(hero);
+
+        TextView challenge = new TextView(this);
+        challenge.setText("🏠  " + sourceName + "\nيتحدّى رومك ويريد بدء المواجهة.");
+        challenge.setTextColor(0xFF202A3D);
+        challenge.setTextSize(15f);
+        challenge.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        challenge.setPadding(dp(13), dp(13), dp(13), dp(13));
+        challenge.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFDCE2ED, 13));
+        LinearLayout.LayoutParams challengeParams = new LinearLayout.LayoutParams(-1, -2);
+        challengeParams.topMargin = dp(12);
+        card.addView(challenge, challengeParams);
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setPadding(0, dp(11), 0, 0);
+        TextView duration = new TextView(this);
+        duration.setText("⏱  " + minutes + " دقيقة");
+        duration.setGravity(Gravity.CENTER);
+        duration.setTextColor(0xFF4E5870);
+        duration.setTextSize(12f);
+        duration.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        duration.setPadding(dp(7), dp(10), dp(7), dp(10));
+        stats.addView(duration, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView scoring = new TextView(this);
+        scoring.setText(modeLabel);
+        scoring.setGravity(Gravity.CENTER);
+        scoring.setTextColor(0xFF4E5870);
+        scoring.setTextSize(12f);
+        scoring.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        scoring.setPadding(dp(7), dp(10), dp(7), dp(10));
+        LinearLayout.LayoutParams scoringParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        scoringParams.leftMargin = dp(8);
+        stats.addView(scoring, scoringParams);
+        card.addView(stats);
+        String goalUnit = "diamonds".equals(mode) ? "ألماسة"
+                : "gifts".equals(mode) ? "هدية"
+                : "points".equals(mode) ? "نقطة" : "كوينز";
+        TextView goal = new TextView(this);
+        goal.setText("🏁  هدف الفوز: " + String.format(java.util.Locale.US, "%,d", goalScore) + " " + goalUnit);
+        goal.setGravity(Gravity.CENTER);
+        goal.setTextColor(0xFFC52250);
+        goal.setTextSize(13f);
+        goal.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        goal.setPadding(dp(8), dp(11), dp(8), dp(11));
+        goal.setBackground(roomPkRoundedBackground(0xFFFFEAF0, 0xFFF4C2D0, 11));
+        LinearLayout.LayoutParams goalParams = new LinearLayout.LayoutParams(-1, -2);
+        goalParams.topMargin = dp(9);
+        card.addView(goal, goalParams);
+
+        TextView note = new TextView(this);
+        note.setText("عند القبول يبدأ التحدّي مباشرة ويظهر شريط النتيجة والوقت في الرومين.");
+        note.setTextColor(0xFF727C8F);
+        note.setTextSize(11f);
+        note.setPadding(dp(3), dp(11), dp(3), 0);
+        card.addView(note);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(card)
+                .setPositiveButton("قبول التحدّي", (d, which) -> respondToRoomPkInvite(contest.id, true))
+                .setNegativeButton("رفض الدعوة", (d, which) -> respondToRoomPkInvite(contest.id, false))
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setTextColor(0xFFC52250);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                    .setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).setTextColor(0xFF687386);
+        });
+        dialog.show();
+    }
+
+    private void respondToRoomPkInvite(String contestId, boolean accept) {
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("accept", accept);
+        ContainerProvider.from(this).getContestsApi().respondRoomPk(contestId, body).enqueue(
+                new retrofit2.Callback<ApiResponse<Object>>() {
+                    @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call,
+                            retrofit2.Response<ApiResponse<Object>> response) {
+                        boolean ok = response.isSuccessful() && response.body() != null && response.body().success;
+                        Toast.makeText(VoiceRoomActivity.this,
+                                ok ? (accept ? "تم قبول التحدّي" : "تم رفض الدعوة")
+                                        : "تعذّرت معالجة دعوة التحدّي",
+                                Toast.LENGTH_SHORT).show();
+                        if (ok && accept) handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 500L);
+                    }
+                    @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable error) {
+                        Toast.makeText(VoiceRoomActivity.this, "تعذّر الاتصال لمعالجة الدعوة", Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
     private void loadRoomPkChallenge() {
         if (roomId == null || roomId.isEmpty() || isFinishing() || exiting) return;
+        ensureRoomPkActionButton();
+        loadRoomPkInvitations();
         ContainerProvider.from(this).getContestsApi().listScoped(roomId, null)
                 .enqueue(new retrofit2.Callback<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>>() {
                     @Override
@@ -12373,6 +12877,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
                         if (!response.isSuccessful() || response.body() == null || response.body().data == null
                                 || response.body().data.items == null || isFinishing() || exiting) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null
+                                || response.body().data.roomPkEnabled;
+                        handler.post(VoiceRoomActivity.this::ensureRoomPkActionButton);
                         for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
                             if (contest == null || !"room_vs_room".equals(contest.challengeType)
                                     || !"active".equalsIgnoreCase(contest.status)
@@ -12382,9 +12889,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             if (!belongs) continue;
                             JsonObject payload = new JsonObject();
                             if (contest.id != null) payload.addProperty("contestId", contest.id);
+                            if (contest.endAt != null) payload.addProperty("endAt", contest.endAt);
                             payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
                             payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
-                            handler.post(() -> showRoomPkScoreBanner("contest:team-score", payload));
+                            roomPkCurrentContestId = contest.id;
+                            handler.post(() -> {
+                                ensureRoomPkActionButton();
+                                showRoomPkScoreBanner("contest:team-score", payload);
+                            });
                             return;
                         }
                     }
@@ -12408,27 +12920,35 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الثاني");
         long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
         long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
-        String label = "contest:team-ended".equals(event) ? "انتهى تحدي PK" : "تحدي PK مباشر";
-        if ("contest:team-ended".equals(event)) {
+        boolean ended = "contest:team-ended".equals(event);
+        String label = "⚔ تحدّي الرومات مباشر";
+        if (ended) {
             String winner = memberStr(payload, "winner");
-            label = "sideA".equals(winner) ? "انتهى التحدي — فاز الروم الأول"
-                    : "sideB".equals(winner) ? "انتهى التحدي — فاز الروم الثاني"
-                    : "انتهى التحدي بالتعادل";
+            label = "sideA".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الأول"
+                    : "sideB".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الثاني"
+                    : "🤝 انتهى التحدّي بالتعادل";
         }
+        if (payload.has("endAt") && !payload.get("endAt").isJsonNull()) {
+            long parsed = parseRoomPkEndAt(memberStr(payload, "endAt"));
+            if (parsed > 0L) roomPkEndsAtMs = parsed;
+        }
+        roomPkBannerEnded = ended;
         if (roomPkScoreBanner == null) {
             roomPkScoreBanner = new TextView(this);
             roomPkScoreBanner.setTextColor(Color.WHITE);
-            roomPkScoreBanner.setTextSize(14f);
+            roomPkScoreBanner.setTextSize(13f);
             roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkScoreBanner.setGravity(Gravity.CENTER);
-            roomPkScoreBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
+            roomPkScoreBanner.setPadding(dp(12), dp(10), dp(12), dp(10));
+            roomPkScoreBanner.setMaxLines(5);
             GradientDrawable bg = new GradientDrawable();
-            bg.setColor(0xE61B2430);
-            bg.setCornerRadius(dp(14));
+            bg.setColor(0xF01B2430);
+            bg.setCornerRadius(dp(16));
             bg.setStroke(dp(1), 0xFFFFD166);
             roomPkScoreBanner.setBackground(bg);
             roomPkScoreBanner.setElevation(dp(80));
             roomPkScoreBanner.setClickable(false);
+            roomPkScoreBanner.setContentDescription("نتيجة تحدي PK بين الرومات");
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
                             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT,
@@ -12439,18 +12959,83 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.setMargins(dp(12), dp(64), dp(12), 0);
             ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkScoreBanner, lp);
         }
-        roomPkScoreBanner.setText(label + "\n" + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
-                + "  :  " + String.format(java.util.Locale.US, "%,d", scoreB) + "  " + nameB);
+        long total = Math.max(1L, scoreA + scoreB);
+        int filled = (int) Math.round((scoreA * 1.0d / total) * 16d);
+        StringBuilder bar = new StringBuilder();
+        for (int i = 0; i < 16; i++) bar.append(i < filled ? "▰" : "▱");
+        roomPkBannerBaseText = label + "\n🔴 " + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
+                + "       " + String.format(java.util.Locale.US, "%,d", scoreB) + "  🔵 " + nameB
+                + "\n" + bar;
+        roomPkScoreBanner.setText(roomPkBannerBaseText);
         roomPkScoreBanner.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
-        handler.postDelayed(hideRoomPkScoreBanner, "contest:team-ended".equals(event) ? 12000L : 60000L);
+        handler.removeCallbacks(updateRoomPkBannerClock);
+        if (ended) {
+            handler.postDelayed(hideRoomPkScoreBanner, 12000L);
+        } else {
+            updateRoomPkBannerClock.run();
+        }
+    }
+
+    private long parseRoomPkEndAt(@Nullable String value) {
+        if (value == null || value.length() < 19) return 0L;
+        try {
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US);
+            format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            java.util.Date date = format.parse(value.substring(0, 19));
+            return date != null ? date.getTime() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     @SuppressLint("NewApi")
     private void handleRoomEvent(String event, JsonObject payload, String fromUserId, String fromUsername) {
         if (payload == null) payload = new JsonObject();
-        if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)) {
-            showRoomPkScoreBanner(event, payload);
+        if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)
+                || "contest:pk-started".equals(event)) {
+            handler.removeCallbacks(roomPkPendingTimeout);
+            if (payload.has("contestId") && !payload.get("contestId").isJsonNull()) {
+                roomPkCurrentContestId = payload.get("contestId").getAsString();
+            }
+            ensureRoomPkActionButton();
+            showRoomPkScoreBanner("contest:pk-started".equals(event) ? "contest:team-score" : event, payload);
+            if ("contest:team-ended".equals(event)) {
+                roomPkCurrentContestId = null;
+                handler.postDelayed(this::ensureRoomPkActionButton, 12000L);
+            }
+            return;
+        }
+        if ("contest:pk-invite".equals(event)) {
+            String targetRoomId = memberStr(payload, "targetRoomId");
+            if (isOwner && roomId != null && roomId.equals(targetRoomId)) {
+                String id = memberStr(payload, "contestId");
+                if (id != null && shownRoomPkInvites.add(id)) {
+                    com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto invite =
+                            new com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto();
+                    invite.id = id;
+                    invite.title = memberStr(payload, "title");
+                    invite.sideA = new com.Dramizo.Series.data.remote.dto.ContestDtos.SideDto();
+                    invite.sideA.name = memberStr(payload, "sourceRoomName");
+                    invite.scoringMode = memberStr(payload, "scoringMode");
+                    invite.rules = new java.util.HashMap<>();
+                    if (payload.has("durationMinutes") && !payload.get("durationMinutes").isJsonNull()) {
+                        invite.rules.put("durationMinutes", payload.get("durationMinutes").getAsInt());
+                    }
+                    if (invite.scoringMode != null) invite.rules.put("scoringMode", invite.scoringMode);
+                    if (payload.has("goalScore") && !payload.get("goalScore").isJsonNull()) {
+                        invite.rules.put("goalScore", payload.get("goalScore").getAsLong());
+                    }
+                    handler.post(() -> showRoomPkInviteDialog(invite));
+                }
+            }
+            return;
+        }
+        if ("contest:pk-rejected".equals(event)) {
+            Toast.makeText(this, "تم رفض دعوة تحدّي PK", Toast.LENGTH_LONG).show();
+            handler.removeCallbacks(roomPkPendingTimeout);
+            roomPkCurrentContestId = null;
+            handler.post(this::ensureRoomPkActionButton);
             return;
         }
         if ("room:music_volume".equals(event)) {

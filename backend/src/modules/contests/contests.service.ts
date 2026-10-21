@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
@@ -9,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
+import { Room } from '../../database/entities/room.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
@@ -18,6 +20,8 @@ import {
   CurrencyType,
 } from '../../database/entities/wallet-transaction.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { cacheRoomPkEnabled, readCachedRoomPkEnabled } from './room-pk-feature';
@@ -33,6 +37,7 @@ export class ContestsService implements OnModuleInit {
   constructor(
     @InjectRepository(Contest) private readonly contestsRepo: Repository<Contest>,
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
+    @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -40,6 +45,7 @@ export class ContestsService implements OnModuleInit {
     private readonly txRepo: Repository<WalletTransaction>,
     private readonly dataSource: DataSource,
     private readonly cosmetics: CosmeticsService,
+    private readonly notifications: NotificationsService,
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
 
@@ -156,6 +162,204 @@ export class ContestsService implements OnModuleInit {
     });
   }
 
+  private async findRoomByPkReference(reference: string): Promise<Room> {
+    const value = String(reference || '').trim();
+    if (!value) throw new BadRequestException('معرّف الروم مطلوب');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    const room = isUuid
+      ? await this.roomsRepo.findOne({ where: { id: value } })
+      : await this.roomsRepo.findOne({ where: { publicId: value } });
+    if (!room) throw new NotFoundException('لم يتم العثور على الروم بهذا الـ ID');
+    return room;
+  }
+
+  private roomPkRoomIds(contest: Contest): string[] {
+    const a = (contest.sideA || {}) as Record<string, unknown>;
+    const b = (contest.sideB || {}) as Record<string, unknown>;
+    return [...new Set([
+      ...(Array.isArray(a.roomIds) ? a.roomIds.map(String) : []),
+      ...(Array.isArray(b.roomIds) ? b.roomIds.map(String) : []),
+    ])];
+  }
+
+  private emitRoomPkEvent(roomIds: string[], event: string, payload: Record<string, unknown>) {
+    if (!this.realtime) return;
+    for (const roomId of [...new Set(roomIds.filter(Boolean))]) {
+      this.realtime.emitToRoom(roomId, 'room:event', {
+        roomId,
+        event,
+        payload,
+        at: new Date().toISOString(),
+      });
+    }
+  }
+
+  async listRoomPkInvitations(userId: string, roomReference: string) {
+    if (!(await this.isRoomPkEnabled(true))) return { items: [], roomPkEnabled: false };
+    const room = await this.findRoomByPkReference(roomReference);
+    if (room.hostId !== userId) throw new BadRequestException('استقبال دعوات PK متاح لمضيف الروم فقط');
+    const pending = await this.contestsRepo.find({
+      where: { challengeType: 'room_vs_room', status: 'upcoming' },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+    return {
+      items: pending.filter((contest) => {
+        const rules = (contest.rules || {}) as Record<string, unknown>;
+        const createdAt = Date.parse(String(rules.createdAt || contest.createdAt || ''));
+        const fresh = Number.isFinite(createdAt) && Date.now() - createdAt < 60_000;
+        return rules.invitationStatus === 'pending' && fresh && String(rules.targetRoomId || '') === room.id;
+      }),
+      roomPkEnabled: true,
+    };
+  }
+
+  async createRoomPkChallenge(userId: string, input: {
+    roomId: string;
+    targetRoomId: string;
+    durationMinutes?: number;
+    scoringMode?: string;
+    goalScore?: number;
+  }) {
+    if (!(await this.isRoomPkEnabled(true))) throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
+    const source = await this.findRoomByPkReference(input.roomId);
+    const target = await this.findRoomByPkReference(input.targetRoomId);
+    if (source.id === target.id) throw new BadRequestException('لا يمكن تحدّي الروم نفسه');
+    if (source.hostId !== userId) throw new BadRequestException('بدء تحدّي PK متاح لمضيف الروم فقط');
+    if (target.status === 'closed' || !target.isPublic) throw new BadRequestException('الروم المنافس غير متاح للتحدّي');
+    const durationMinutes = Math.max(1, Math.min(120, Math.floor(Number(input.durationMinutes) || 10)));
+    const scoringMode = ['coins', 'diamonds', 'gifts', 'points'].includes(String(input.scoringMode))
+      ? String(input.scoringMode) : 'coins';
+    const goalScore = Math.max(0, Math.min(1_000_000_000, Math.floor(Number(input.goalScore) || 0)));
+    const existing = await this.contestsRepo.find({
+      where: { challengeType: 'room_vs_room', status: In(['active', 'upcoming']) },
+      take: 500,
+    });
+    for (const contest of existing) {
+      const rules = { ...((contest.rules || {}) as Record<string, unknown>) };
+      const pending = rules.invitationStatus === 'pending';
+      const createdAt = Date.parse(String(rules.createdAt || contest.createdAt || ''));
+      if (pending && Number.isFinite(createdAt) && Date.now() - createdAt >= 60_000) {
+        rules.invitationStatus = 'expired';
+        rules.expiredAt = new Date().toISOString();
+        contest.rules = rules;
+        contest.status = 'ended';
+        contest.endAt = new Date();
+        await this.contestsRepo.save(contest);
+        continue;
+      }
+      if (this.roomPkRoomIds(contest).some((id) => id === source.id || id === target.id)
+          && (contest.status === 'active' || pending)) {
+        throw new ConflictException('أحد الرومين لديه تحدٍّ نشط أو دعوة معلّقة بالفعل');
+      }
+    }
+    const now = new Date();
+    const contest = this.contestsRepo.create({
+      title: 'PK: ' + source.title + ' × ' + target.title,
+      description: 'تحدّي مباشر بين رومين',
+      category: 'gifts',
+      status: 'upcoming',
+      entryFeeCoins: 0,
+      prizeCoins: 0,
+      prizeLabel: null,
+      startAt: new Date('2099-01-01T00:00:00.000Z'),
+      endAt: new Date('2099-01-02T00:00:00.000Z'),
+      entrantsCount: 0,
+      scope: 'global',
+      roomId: null,
+      agencyId: null,
+      kind: 'challenge',
+      bannerUrl: null,
+      goalDiamonds: 0,
+      scoringMode,
+      challengeType: 'room_vs_room',
+      allowedGiftIds: null,
+      milestones: null,
+      prizes: null,
+      sideA: { name: source.title, roomIds: [source.id], score: 0, logoUrl: source.coverUrl || null },
+      sideB: { name: target.title, roomIds: [target.id], score: 0, logoUrl: target.coverUrl || null },
+      rules: {
+        invitationStatus: 'pending',
+        sourceRoomId: source.id,
+        targetRoomId: target.id,
+        invitedByUserId: userId,
+        durationMinutes,
+        scoringMode,
+        goalScore,
+        createdAt: now.toISOString(),
+      },
+      isInteractive: true,
+    });
+    const saved = await this.contestsRepo.save(contest);
+    const payload = {
+      contestId: saved.id,
+      title: saved.title,
+      sourceRoomId: source.id,
+      targetRoomId: target.id,
+      sourceRoomName: source.title,
+      targetRoomName: target.title,
+      durationMinutes,
+      scoringMode,
+      goalScore,
+      status: 'pending',
+    };
+    this.emitRoomPkEvent([source.id, target.id], 'contest:pk-invite', payload);
+    this.notifications.notifyUser(target.hostId, NotificationType.ROOM, '⚔ دعوة تحدّي PK جديدة',
+      source.title + ' يتحدّى رومك لمدة ' + durationMinutes + ' دقيقة. افتح الروم لقبول الدعوة أو رفضها.',
+      { kind: 'room_pk_invitation', contestId: saved.id, roomId: target.id, sourceRoomId: source.id,
+        targetRoomId: target.id, sourceRoomName: source.title, targetRoomName: target.title, durationMinutes, scoringMode, goalScore });
+    return { contest: saved, message: 'تم إرسال دعوة تحدّي PK إلى الروم المنافس' };
+  }
+
+  async respondRoomPkChallenge(userId: string, contestId: string, accept: boolean) {
+    if (!(await this.isRoomPkEnabled(true))) throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
+    const contest = await this.contestsRepo.findOne({ where: { id: contestId } });
+    if (!contest || contest.challengeType !== 'room_vs_room') throw new NotFoundException('دعوة PK غير موجودة');
+    const rules = { ...((contest.rules || {}) as Record<string, unknown>) };
+    if (rules.invitationStatus !== 'pending') throw new BadRequestException('تمت معالجة هذه الدعوة مسبقاً');
+    const targetRoomId = String(rules.targetRoomId || '');
+    const sourceRoomId = String(rules.sourceRoomId || '');
+    const [targetRoom, sourceRoom] = await Promise.all([
+      this.roomsRepo.findOne({ where: { id: targetRoomId } }),
+      this.roomsRepo.findOne({ where: { id: sourceRoomId } }),
+    ]);
+    if (!targetRoom || targetRoom.hostId !== userId) throw new BadRequestException('قبول الدعوة متاح لمضيف الروم المنافس فقط');
+    const now = new Date();
+    const durationMinutes = Math.max(1, Math.min(120, Math.floor(Number(rules.durationMinutes) || 10)));
+    rules.invitationStatus = accept ? 'accepted' : 'rejected';
+    rules.respondedAt = now.toISOString();
+    if (accept) {
+      contest.status = 'active';
+      contest.startAt = now;
+      contest.endAt = new Date(now.getTime() + durationMinutes * 60_000);
+    } else {
+      contest.status = 'ended';
+      contest.endAt = now;
+    }
+    contest.rules = rules;
+    const saved = await this.contestsRepo.save(contest);
+    const payload = {
+      contestId: saved.id,
+      title: saved.title,
+      sideA: saved.sideA,
+      sideB: saved.sideB,
+      endAt: saved.endAt.toISOString(),
+      durationMinutes,
+      goalScore: Math.max(0, Number(rules.goalScore || 0)),
+      winner: 'draw',
+      status: accept ? 'active' : 'rejected',
+    };
+    this.emitRoomPkEvent([sourceRoomId, targetRoomId], accept ? 'contest:pk-started' : 'contest:pk-rejected', payload);
+    if (sourceRoom && sourceRoom.hostId) {
+      this.notifications.notifyUser(sourceRoom.hostId, NotificationType.ROOM,
+        accept ? '⚔ تم قبول تحدّي PK' : 'تم رفض دعوة تحدّي PK',
+        accept ? targetRoom.title + ' قبل التحدّي. بدأت المواجهة الآن!' : targetRoom.title + ' رفض دعوة التحدّي.',
+        { kind: accept ? 'room_pk_accepted' : 'room_pk_rejected', contestId: saved.id,
+          roomId: sourceRoomId, sourceRoomId, targetRoomId });
+    }
+    return { contest: saved, message: accept ? 'تم قبول التحدّي وبدأ العدّ التنازلي' : 'تم رفض دعوة التحدّي' };
+  }
+
   async list(userId?: string, roomId?: string, agencyId?: string) {
     await this.ensureDefaults();
     await this.refreshStatuses();
@@ -192,6 +396,7 @@ export class ContestsService implements OnModuleInit {
       joined = new Set(mine.map((e) => e.contestId));
     }
     return {
+      roomPkEnabled: await this.isRoomPkEnabled(true),
       items: items.map((c) => ({
         ...c,
         joined: joined.has(c.id),
@@ -380,10 +585,18 @@ export class ContestsService implements OnModuleInit {
             where: { id: c.id },
             lock: { mode: 'pessimistic_write' },
           });
-          if (!locked) return null;
+          if (!locked || locked.status !== 'active') return null;
           const side = { ...(((locked as any)[sideKey] as Record<string, unknown> | null) || {}) };
           side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
           (locked as any)[sideKey] = side;
+          const rules = (locked.rules || {}) as Record<string, unknown>;
+          const goal = Math.max(0, Number(rules.goalScore || 0));
+          const aScore = Math.max(0, Number(((locked.sideA || {}) as Record<string, unknown>).score || 0));
+          const bScore = Math.max(0, Number(((locked.sideB || {}) as Record<string, unknown>).score || 0));
+          if (goal > 0 && (aScore >= goal || bScore >= goal)) {
+            locked.status = 'ended';
+            locked.endAt = new Date();
+          }
           return manager.save(locked);
         });
         if (!updated) continue;
@@ -410,6 +623,7 @@ export class ContestsService implements OnModuleInit {
             at: payload.at,
           });
         }
+        if (updated.status === 'ended') this.emitTeamChallengeEnded(updated);
         continue;
       }
       const entry = await this.entriesRepo.findOne({
@@ -481,6 +695,9 @@ export class ContestsService implements OnModuleInit {
     rules?: Record<string, unknown> | null;
     isInteractive?: boolean;
   }) {
+    if (dto.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُنشأ وتُدار من داخل الروم؛ الداشبورد مخصص لتفعيل الميزة أو إيقافها');
+    }
     const now = new Date();
     const hoursRaw = dto.hours != null ? Number(dto.hours) : NaN;
     const useHours = Number.isFinite(hoursRaw) && hoursRaw > 0;
@@ -500,7 +717,7 @@ export class ContestsService implements OnModuleInit {
     const title = String(dto.title || '').trim();
     if (!title) throw new BadRequestException('عنوان المسابقة مطلوب');
     // A room-vs-room challenge must be visible and score in both rooms; it is global by design.
-    const scope = dto.challengeType === 'room_vs_room' ? 'global' : (dto.scope || 'global');
+    const scope = dto.scope || 'global';
     if (scope === 'room' && !dto.roomId) {
       throw new BadRequestException('roomId مطلوب لمسابقات الروم');
     }
@@ -574,6 +791,9 @@ export class ContestsService implements OnModuleInit {
   ) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (contest.challengeType === 'room_vs_room' || dto.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُدار من داخل الروم فقط؛ استخدم الداشبورد لتفعيل الميزة أو إيقافها');
+    }
     if (dto.title != null) contest.title = String(dto.title).trim();
     if (dto.description !== undefined) contest.description = dto.description?.trim() || null;
     if (dto.category != null) contest.category = dto.category;
@@ -660,9 +880,9 @@ export class ContestsService implements OnModuleInit {
   /** End every non-ended contest (settle prizes where applicable). */
   async adminEndAll() {
     await this.refreshStatuses();
-    const open = await this.contestsRepo.find({
+    const open = (await this.contestsRepo.find({
       where: [{ status: 'active' }, { status: 'upcoming' }],
-    });
+    })).filter((contest) => contest.challengeType !== 'room_vs_room');
     const ended: Contest[] = [];
     for (const contest of open) {
       contest.status = 'ended';
@@ -681,6 +901,9 @@ export class ContestsService implements OnModuleInit {
   async adminDelete(id: string) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (contest.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُدار من داخل الروم فقط؛ لا يمكن حذفها من الداشبورد');
+    }
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(ContestEntry, { contestId: id });
       await manager.delete(Contest, { id });
