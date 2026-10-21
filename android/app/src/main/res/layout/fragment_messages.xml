@@ -186,8 +186,8 @@
                     android:padding="4dp">
                     <ImageView
                         android:id="@+id/imgQuickOfficialNews"
-                        android:layout_width="34dp"
-                        android:layout_height="32dp"
+                        android:layout_width="44dp"
+                        android:layout_height="42dp"
                         android:contentDescription="الأخبار الرسمية"
                         android:scaleType="fitCenter"
                         android:src="@drawable/jeho_logo" />
@@ -206,8 +206,8 @@
                             android:textStyle="bold" />
                         <ImageView
                             android:id="@+id/imgQuickOfficialNewsVerified"
-                            android:layout_width="12dp"
-                            android:layout_height="12dp"
+                            android:layout_width="15dp"
+                            android:layout_height="15dp"
                             android:layout_marginStart="2dp"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_official_news_verified" />
@@ -237,8 +237,8 @@
                     android:padding="4dp">
                     <ImageView
                         android:id="@+id/imgQuickAdminMessages"
-                        android:layout_width="34dp"
-                        android:layout_height="32dp"
+                        android:layout_width="44dp"
+                        android:layout_height="42dp"
                         android:contentDescription="رسائل الإدارة"
                         android:scaleType="fitCenter"
                         android:src="@drawable/jeho_logo" />
@@ -257,8 +257,8 @@
                             android:textStyle="bold" />
                         <ImageView
                             android:id="@+id/imgQuickAdminMessagesVerified"
-                            android:layout_width="12dp"
-                            android:layout_height="12dp"
+                            android:layout_width="15dp"
+                            android:layout_height="15dp"
                             android:layout_marginStart="2dp"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_official_news_verified" />
