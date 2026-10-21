@@ -10,6 +10,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -110,6 +113,27 @@ public class MessagesFragment extends Fragment {
         binding.recycler.setNestedScrollingEnabled(true);
         binding.recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
+        // Local inbox search: filters the already-loaded conversation list without extra API calls.
+        binding.etChatSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (binding == null || adapter == null) return;
+                String query = s != null ? s.toString().trim() : "";
+                binding.btnClearChatSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                adapter.setSearchQuery(query);
+                updateChatSearchEmptyState();
+            }
+            @Override public void afterTextChanged(Editable s) { }
+        });
+        binding.btnClearChatSearch.setOnClickListener(v -> binding.etChatSearch.setText(""));
+        binding.etChatSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                v.clearFocus();
+                return true;
+            }
+            return false;
+        });
+
         binding.swipe.setColorSchemeResources(R.color.gift_accent);
         binding.swipe.setOnChildScrollUpCallback((parent, child) ->
                 binding.recycler != null && binding.recycler.canScrollVertically(-1));
@@ -166,8 +190,10 @@ public class MessagesFragment extends Fragment {
             adapter.submit(list);
             boolean empty = list == null || list.isEmpty();
             if (binding.tvEmpty != null) {
+                binding.tvEmpty.setText(R.string.msg_empty_chats);
                 binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
             }
+            updateChatSearchEmptyState();
             binding.swipe.setRefreshing(false);
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
@@ -177,6 +203,22 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void updateChatSearchEmptyState() {
+        if (binding == null || adapter == null || binding.tvEmpty == null) return;
+        boolean noResults = adapter.getItemCount() == 0;
+        String query = binding.etChatSearch != null && binding.etChatSearch.getText() != null
+                ? binding.etChatSearch.getText().toString().trim() : "";
+        if (noResults && !query.isEmpty()) {
+            binding.tvEmpty.setText(R.string.chat_search_no_results);
+            binding.tvEmpty.setVisibility(View.VISIBLE);
+        } else if (noResults) {
+            binding.tvEmpty.setText(R.string.msg_empty_chats);
+            binding.tvEmpty.setVisibility(View.VISIBLE);
+        } else {
+            binding.tvEmpty.setVisibility(View.GONE);
+        }
     }
 
     /** Applies the shared wallpaper only to the inbox list, never to opened conversations. */
