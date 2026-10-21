@@ -314,7 +314,7 @@
 <script setup>
 import { computed, onMounted, onErrorCaptured, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { settingsApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
+import { gamesCatalogApi, gameStoreApi, uploadsApi, gameOddsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
@@ -638,18 +638,16 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-  const { data, error: err } = await settingsApi.get()
+  const { data, error: err } = await gamesCatalogApi.get()
   if (err) {
     error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تظهر القائمة الافتراضية مؤقتاً. ' + err.message
     games.value = defaults.map(normalizeGame)
     return
   }
-  const rows = Array.isArray(data) ? data : (data?.data || data || [])
-  let found = null
-  if (Array.isArray(rows)) found = rows.find((r) => r.key === 'app_games')
-  if (found?.value) {
+  const savedCatalog = String(data?.value || '')
+  if (savedCatalog) {
     try {
-      const parsed = JSON.parse(found.value)
+      const parsed = JSON.parse(savedCatalog)
       const filtered = (Array.isArray(parsed) ? parsed : [])
         .filter((g) => !isLegacyHtmlGame(g))
         .map(normalizeGame)
@@ -730,7 +728,7 @@ async function save() {
       sortOrder: i + 1,
       enabled: g.enabled !== false,
     }))
-  const { error: err } = await settingsApi.update({ app_games: JSON.stringify(payload) })
+  const { error: err } = await gamesCatalogApi.save(JSON.stringify(payload))
   saving.value = false
   if (err) {
     error.value = err.message
