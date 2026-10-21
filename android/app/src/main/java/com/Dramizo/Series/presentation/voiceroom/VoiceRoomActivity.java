@@ -279,6 +279,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
+    /** Coalesce rapid taps into ordered single-send requests; never drop a valid press. */
+    private int queuedLuckyCannonPresses;
     @Nullable private String luckyCannonRequestId;
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -3918,19 +3920,25 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void sendLuckyCannonGift() {
-        if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
+        if (!luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
-        // Tactile press feedback is local-only and does not affect the send request.
+        // Immediate local feedback; no network work is done by the animation.
         if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
         if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
             luckyCannonLayer.animate().cancel();
-            luckyCannonLayer.setScaleX(0.94f);
-            luckyCannonLayer.setScaleY(0.94f);
-            luckyCannonLayer.animate().scaleX(1.06f).scaleY(1.06f).setDuration(110L)
+            luckyCannonLayer.setScaleX(0.96f);
+            luckyCannonLayer.setScaleY(0.96f);
+            luckyCannonLayer.animate().scaleX(1.045f).scaleY(1.045f).setDuration(55L)
                     .withEndAction(() -> {
                         if (luckyCannonLayer != null) luckyCannonLayer.animate()
-                                .scaleX(1f).scaleY(1f).setDuration(180L).start();
+                                .scaleX(1f).scaleY(1f).setDuration(75L).start();
                     }).start();
+        }
+        // Keep one economy request in flight. Rapid presses are queued and each gets its
+        // own idempotency key, so taps feel instant without duplicate charges or request storms.
+        if (luckyCannonSending) {
+            if (queuedLuckyCannonPresses < 20) queuedLuckyCannonPresses++;
+            return;
         }
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
@@ -3963,6 +3971,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 luckyCannonSending = false;
                 if (luckyCannonView != null) luckyCannonView.setEnabled(true);
                 if (!result.success || result.data == null || !result.data.success) {
+                    queuedLuckyCannonPresses = 0;
+                    luckyCannonRequestId = null;
                     BalanceRedirect.handle(VoiceRoomActivity.this,
                             result.error != null ? result.error : "تعذر إرسال الهدية، حاول مجدداً");
                     return;
@@ -3971,6 +3981,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // The backend's existing room gift event triggers the flight on every room client.
                 // Reset the short visibility timer only after the send was confirmed.
                 showLuckyCannonAndScheduleHide();
+                if (queuedLuckyCannonPresses > 0) {
+                    queuedLuckyCannonPresses--;
+                    handler.post(this::sendLuckyCannonGift);
+                }
             });
         });
     }
