@@ -9,13 +9,15 @@ import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
 import { WalletTransaction } from '../../database/entities/wallet-transaction.entity';
 import { Room } from '../../database/entities/room.entity';
+import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { RoomAccess } from '../../database/entities/room-access.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { CosmeticsModule } from '../cosmetics/cosmetics.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Contest, ContestEntry, Wallet, User, WalletTransaction, AppSetting, Room]),
+    TypeOrmModule.forFeature([Contest, ContestEntry, Wallet, User, WalletTransaction, AppSetting, Room, RoomSeat, RoomAccess]),
     RealtimeModule,
     CosmeticsModule,
     NotificationsModule,
