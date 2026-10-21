@@ -187,16 +187,10 @@ public class HomeMeFragment extends Fragment {
 
     private void setupAdminConsoleEntry() {
         if (binding == null) return;
-        AuthDtos.UserDto me = ContainerProvider.from(requireActivity()).getSessionManager().getUser();
-        boolean allowed = StaffRoleHelper.isStaff(me);
-        binding.actionAdminConsole.setVisibility(allowed ? View.VISIBLE : View.GONE);
-        binding.actionAdminConsole.setOnClickListener(v -> {
-            if (!StaffRoleHelper.isStaff(ContainerProvider.from(requireActivity()).getSessionManager().getUser())) {
-                Toast.makeText(requireContext(), "هذه الصفحة مخصصة لفريق إدارة JEHO", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            startActivity(new Intent(requireContext(), AdminConsoleActivity.class));
-        });
+        // The admin entry belongs only to the actual profile page (ProfileFragment).
+        // This tab is the rooms/activity feed and must never show a second admin shortcut.
+        binding.actionAdminConsole.setVisibility(View.GONE);
+        binding.actionAdminConsole.setOnClickListener(null);
     }
 
     private void bindProfileDashboard() {
