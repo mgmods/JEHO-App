@@ -130,6 +130,13 @@ const sections = computed(() => [
     ],
   },
   {
+    id: 'store',
+    label: 'إدارة المتجر',
+    items: [
+      { name: 'cosmetics', icon: 'bi-shop-window', label: 'إعدادات المتجر: الإطارات والدخوليات' },
+    ],
+  },
+  {
     id: 'memberships',
     label: t('nav.memberships'),
     items: [
