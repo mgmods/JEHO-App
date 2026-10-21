@@ -369,8 +369,8 @@ onMounted(load)
   min-width: 120px;
 }
 .icon-preview {
-  width: 64px;
-  height: 64px;
+  width: 88px;
+  height: 88px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -381,8 +381,8 @@ onMounted(load)
   overflow: hidden;
 }
 .icon-preview img {
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   object-fit: contain;
 }
 </style>
