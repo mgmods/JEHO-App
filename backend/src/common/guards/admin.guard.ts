@@ -7,6 +7,7 @@ import {
 import {
   hasDashboardAccess,
   isDashboardSuper,
+  normalizeStaffRole,
 } from '../staff-role';
 import {
   canAccessModule,
@@ -44,7 +45,10 @@ export class AdminGuard implements CanActivate {
     // Native Android admin console uses the regular app session. Never treat
     // ordinary users as staff; JwtAuthGuard reloads the current DB role first.
     if (user.authSource === 'app') {
-      const role = String(user.staffRole || '').toLowerCase();
+      // Re-normalize the current DB-backed role at the guard boundary. This also
+      // supports legacy staff accounts whose role field is empty but whose legacy
+      // isAdmin flag still grants Super Admin, avoiding false 403s in the native app.
+      const role = normalizeStaffRole(user);
       if (role === 'super' || user.isSuperAdmin) return true;
       const resolved = resolveAdminRequest(method, url);
       if (resolved.kind === 'deny' || resolved.kind === 'self' || resolved.kind === 'super') {
