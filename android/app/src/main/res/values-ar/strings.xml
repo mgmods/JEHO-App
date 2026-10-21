@@ -1285,4 +1285,8 @@
 <string name="admin_messages_footer">هذه القناة مخصصة لرسائل السوبر أدمن</string>
     <string name="support_website">الموقع الرسمي</string>
     <string name="home_hot_all">شائع 🔥</string>
+    <string name="chat_hub_friends">الأصدقاء</string>
+    <string name="chat_hub_notifications">الإشعارات</string>
+    <string name="chat_hub_follow_requests">طلبات المتابعة</string>
+    <string name="chat_hub_visitors">الزوار</string>
 </resources>
