@@ -3116,9 +3116,9 @@ export class GiftsService implements OnModuleInit {
       * Math.max(1, Math.floor(Number(opts.quantity) || 1));
     const mul = Number(opts.luckyMultiplier) || 0;
     const won = Math.max(0, Math.floor(Number(opts.luckyCoinsWon) || 0));
-    // Broadcast wins that feel notable — 100+ stake with return, ×3+, or won ≥ 200.
-    const notable = won > 0 && (stake >= 100 || mul >= 3 || won >= 200);
-    if (!notable || !this.realtime) return;
+    // Every positive lucky-gift return gets a global toast, including small wins.
+    // Keep the payload lightweight: one compact event, no media or animation data.
+    if (won <= 0 || !this.realtime) return;
     const name = (opts.displayName || 'لاعب').trim() || 'لاعب';
     const soft = mul > 0 && mul < 1;
     const times = Math.max(1, Math.round(mul));
