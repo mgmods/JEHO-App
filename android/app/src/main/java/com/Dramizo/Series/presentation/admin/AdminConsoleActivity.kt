@@ -1455,7 +1455,9 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             if (currentRole == StaffRoleHelper.SUPER) {
                 actions.addView(button("تعديل الرتبة والحالة") { showUserAccessDialog(id, role, status) })
-                val banned = status.contains("banned", true)
+                val normalizedStatus = status.trim().lowercase()
+                val banned = normalizedStatus.contains("banned") || normalizedStatus.contains("blocked") ||
+                    normalizedStatus.contains("محظور") || normalizedStatus == "ban" || normalizedStatus == "1"
                 actions.addView(button(if (banned) "إلغاء الحظر الدائم" else "حظر المستخدم") {
                     confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
                         load(if (banned) api.unbanUser(id) else api.banUser(id)) {
@@ -1477,17 +1479,24 @@ class AdminConsoleActivity : ThemedActivity() {
             }
         } else {
             val actions = section("إجراءات الروم", "التغييرات تُرسل إلى الخادم ولا تغيّر منطق الصوت أو اتصال ZEGO.")
-            actions.addView(button("تعديل إعدادات الروم") {
-                showEditRoomDialog(id, roomTitle, accessMode, entryFee)
-            })
-            actions.addView(button("إغلاق الروم") {
-                confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
-                    load(api.closeRoom(id)) {
-                        toast("تم إرسال طلب إغلاق الروم")
-                        openModule("rooms")
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                actions.addView(button("تعديل إعدادات الروم") {
+                    showEditRoomDialog(id, roomTitle, accessMode, entryFee)
+                })
+            }
+            if (currentRole == StaffRoleHelper.SUPER) {
+                actions.addView(button("إغلاق الروم") {
+                    confirm("سيتم إغلاق الروم على الخادم. هذا الإجراء قد يؤثر على الموجودين فيه. هل تريد المتابعة؟") {
+                        load(api.closeRoom(id)) {
+                            toast("استجاب الخادم لطلب إغلاق الروم")
+                            openModule("rooms")
+                        }
                     }
-                }
-            })
+                })
+            }
+            if (currentRole == StaffRoleHelper.MANAGER) {
+                addText(actions, "وضع إشرافي: لا تتوفر هنا إجراءات تعديل أو إغلاق الروم لهذه الرتبة.", 12f, false, MUTED)
+            }
         }
 
         body.addView(content)
