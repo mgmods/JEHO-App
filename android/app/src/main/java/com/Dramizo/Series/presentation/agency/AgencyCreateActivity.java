@@ -200,8 +200,8 @@ public class AgencyCreateActivity extends ThemedActivity {
         // application intentionally asks for only three fields.
         r.description = "طلب فتح وكالة JEHO باسم " + r.proposedName + " في " + r.country + ".";
         r.businessPlan = ("طلب وكالة JEHO: " + r.proposedName + "، الدولة " + r.country
-                + ". سيتم التواصل مع مقدم الطلب على رقم الهاتف المسجل لمراجعة الطلب. ")
-                .repeat(2);
+                + ". سيتم التواصل مع مقدم الطلب على رقم الهاتف المسجل لمراجعة الطلب. "
+                + "سيتم مراجعة الطلب من فريق JEHO والتواصل على رقم الهاتف المدخل.");
         r.experience = "طلب وكالة عبر التطبيق";
         r.contactEmail = "agency.application@jeho.chat";
         r.expectedHostCount = 1;
