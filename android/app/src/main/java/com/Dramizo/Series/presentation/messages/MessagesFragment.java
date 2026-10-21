@@ -382,10 +382,6 @@ public class MessagesFragment extends Fragment {
                     binding.tvRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
                     binding.tvRequestBadge.setText(label);
                 }
-                if (binding.tvQuickRequestBadge != null) {
-                    binding.tvQuickRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
-                    binding.tvQuickRequestBadge.setText(label);
-                }
             });
         });
     }
