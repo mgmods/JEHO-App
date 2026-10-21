@@ -915,7 +915,16 @@ class AdminConsoleActivity : ThemedActivity() {
                 if (response.isSuccessful && envelope != null && envelope.success) {
                     onSuccess(envelope.data)
                 } else {
+                    // Prefer the backend's authorization reason over the generic HTTP code.
+                    // This makes role/module mismatches diagnosable instead of showing only 403.
+                    val serverMessage = try {
+                        response.errorBody()?.string()?.let { raw ->
+                            org.json.JSONObject(raw).optString("message")
+                                .takeIf { it.isNotBlank() && it != "null" }
+                        }
+                    } catch (_: Exception) { null }
                     val message = envelope?.message?.takeIf { it.isNotBlank() }
+                        ?: serverMessage
                         ?: "تعذر تنفيذ الطلب (HTTP ${response.code()})"
                     showError(message)
                 }
@@ -2512,15 +2521,31 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
-        textSize = 13f
+        textSize = 14f
         isAllCaps = false
-        minHeight = dp(46)
+        minHeight = dp(48)
         minWidth = 0
+        minimumHeight = dp(48)
+        minimumWidth = 0
+        gravity = Gravity.CENTER
         setTextColor(Color.WHITE)
-        background = roundRect(ACCENT, 14)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        letterSpacing = 0f
+        // Remove Material's default insets/tint so admin actions use the same
+        // compact, rounded JEHO action treatment on every Android version.
+        insetTop = 0
+        insetBottom = 0
         backgroundTintList = null
-        elevation = dp(1).toFloat()
-        setPadding(dp(14), dp(4), dp(14), dp(4))
+        background = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(ACCENT, 0xFF6F55D9.toInt())
+        ).apply {
+            cornerRadius = dp(16).toFloat()
+            setStroke(dp(1), 0x22745CE8)
+        }
+        stateListAnimator = null
+        elevation = dp(2).toFloat()
+        setPadding(dp(16), dp(8), dp(16), dp(8))
         setOnClickListener { action() }
     }
 
