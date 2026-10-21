@@ -148,7 +148,10 @@ public final class GlobalCelebrationToast {
         if (showing) return;
         ToastRequest request = PENDING.pollFirst();
         if (request == null) return;
-        Activity activity = request.activity.get();
+        Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            activity = request.activity.get();
+        }
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             showNext();
             return;
