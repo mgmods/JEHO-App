@@ -12964,6 +12964,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     invite.title = memberStr(payload, "title");
                     invite.sideA = new com.Dramizo.Series.data.remote.dto.ContestDtos.SideDto();
                     invite.sideA.name = memberStr(payload, "sourceRoomName");
+                    invite.scoringMode = memberStr(payload, "scoringMode");
+                    invite.rules = new java.util.HashMap<>();
+                    if (payload.has("durationMinutes") && !payload.get("durationMinutes").isJsonNull()) {
+                        invite.rules.put("durationMinutes", payload.get("durationMinutes").getAsInt());
+                    }
+                    if (invite.scoringMode != null) invite.rules.put("scoringMode", invite.scoringMode);
                     handler.post(() -> showRoomPkInviteDialog(invite));
                 }
             }
