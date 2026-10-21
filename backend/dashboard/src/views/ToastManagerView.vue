@@ -200,7 +200,8 @@ function startPreviewDrag(event, element) {
 }
 function movePreviewElement(event) {
   if (!dragElement.value) return
-  const rect = event.currentTarget.getBoundingClientRect()
+  const preview = event.currentTarget.closest('.toast-preview')
+  const rect = preview ? preview.getBoundingClientRect() : event.currentTarget.getBoundingClientRect()
   if (!rect.width || !rect.height) return
   const x = Math.max(0, Math.min(100, Math.round((event.clientX - rect.left) / rect.width * 100)))
   const y = Math.max(0, Math.min(100, Math.round((event.clientY - rect.top) / rect.height * 100)))
