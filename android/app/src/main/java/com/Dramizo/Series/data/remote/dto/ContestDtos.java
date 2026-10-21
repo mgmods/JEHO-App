@@ -2,6 +2,7 @@ package com.Dramizo.Series.data.remote.dto;
 
 import com.google.gson.annotations.SerializedName;
 import java.util.List;
+import java.util.Map;
 
 public final class ContestDtos {
     private ContestDtos() {}
@@ -30,6 +31,7 @@ public final class ContestDtos {
         @SerializedName("isInteractive") public boolean isInteractive;
         @SerializedName("sideA") public SideDto sideA;
         @SerializedName("sideB") public SideDto sideB;
+        @SerializedName("rules") public Map<String, Object> rules;
         @SerializedName("milestones") public List<MilestoneDto> milestones;
         @SerializedName("prizes") public List<PrizeDto> prizes;
     }
