@@ -519,13 +519,15 @@ export class AdminController {
       throw new BadRequestException('Only Admin or Super Admin can issue a temporary global ban');
     }
     const requestedHours = Number(body?.hours);
-    if (!Number.isFinite(requestedHours) || requestedHours < 1 || requestedHours > 24) {
-      throw new BadRequestException('Temporary ban duration must be between 1 and 24 hours');
+    if (!Number.isInteger(requestedHours) || requestedHours < 1 || requestedHours > 24) {
+      throw new BadRequestException('Temporary ban duration must be a whole number between 1 and 24 hours');
     }
+    const reason = String(body?.reason || '').trim();
+    if (!reason) throw new BadRequestException('A reason is required for temporary bans');
     const result = await this.shield.createStaffTemporaryBan(
       id,
       requestedHours,
-      String(body?.reason || 'admin temporary ban'),
+      reason,
       actor.sub,
     );
     await this.shield.recordAbuse({
@@ -534,7 +536,7 @@ export class AdminController {
       severity: AbuseSeverity.HIGH,
       targetType: 'user',
       targetId: id,
-      details: JSON.stringify({ targetUserId: id, hours: result.hours, expiresAt: result.expiresAt, reason: String(body?.reason || '').slice(0, 500) }),
+      details: JSON.stringify({ targetUserId: id, hours: result.hours, expiresAt: result.expiresAt, reason: reason.slice(0, 500) }),
     });
     return { ok: true, ...result };
   }
