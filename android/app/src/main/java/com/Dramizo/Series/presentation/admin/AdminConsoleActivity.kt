@@ -860,6 +860,38 @@ class AdminConsoleActivity : ThemedActivity() {
         copy.addView(description)
         panel.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
         body.addView(panel)
+
+        val accessCard = card().apply {
+            setPadding(dp(13), dp(11), dp(13), dp(11))
+        }
+        val accessTop = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        val roleLabel = when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن"
+            StaffRoleHelper.ADMIN -> "أدمن"
+            else -> "مانجر"
+        }
+        val rolePill = TextView(this).apply {
+            text = "صلاحياتك · $roleLabel"
+            textSize = 11f
+            setTextColor(ACCENT)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            background = roundRect(0xFFF0ECFB.toInt(), 18)
+        }
+        accessTop.addView(rolePill, LinearLayout.LayoutParams(0, -2, 1f))
+        accessTop.addView(button("↻ تحديث") { openModule(module.key) })
+        accessCard.addView(accessTop)
+        val scopeText = when (currentRole) {
+            StaffRoleHelper.SUPER -> "صلاحيات الإدارة الكاملة المتاحة لهذا القسم، مع تأكيد العمليات الحساسة."
+            StaffRoleHelper.ADMIN -> "تظهر لك إجراءات الإشراف المسموحة لرتبتك؛ التحقق النهائي يتم على الخادم."
+            else -> "وصول إشرافي محدود حسب القسم؛ لا تتوفر أدوات السوبر أدمن أو تغيير الإعدادات العامة."
+        }
+        addText(accessCard, scopeText, 11f, false, MUTED)
+        body.addView(accessCard)
     }
 
     private fun loadUsers(search: String) {
@@ -893,6 +925,29 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun renderItems(data: Any?, type: String) {
         val items = extractItems(data)
+        val countPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(13), dp(9), dp(13), dp(9))
+            background = GradientDrawable().apply {
+                setColor(0xFFF0ECFB.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+        }
+        addText(countPanel, "النتائج المعروضة", 12f, true, TEXT)
+        val count = TextView(this).apply {
+            text = items.size.toString()
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ACCENT)
+            gravity = Gravity.CENTER
+            background = roundRect(Color.WHITE, 20)
+            setPadding(dp(11), dp(4), dp(11), dp(4))
+        }
+        countPanel.addView(count, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        body.addView(countPanel)
         if (items.isEmpty()) {
             val empty = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
