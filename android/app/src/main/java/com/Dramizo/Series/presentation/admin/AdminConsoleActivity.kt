@@ -354,9 +354,12 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun showRoomPkSettings() {
         load(api.adminSettings()) { raw ->
             val root = featureMap(raw)
-            val settings = featureMap(root["settings"] ?: root["items"] ?: root)
-            val row = (settings as? Map<*, *>)?.get("features.room_pk_enabled")
-            val rawValue = if (row is Map<*, *>) row["value"] else row
+            val settingsValue = root["settings"] ?: root["items"] ?: raw
+            val settings = settingsValue as? Map<*, *>
+            val row = (settingsValue as? List<*>)?.firstOrNull {
+                it is Map<*, *> && it["key"]?.toString() == "features.room_pk_enabled"
+            } as? Map<*, *>
+            val rawValue = settings?.get("features.room_pk_enabled") ?: row?.get("value")
             val enabledNow = when (rawValue?.toString()?.lowercase()) {
                 "0", "false", "no", "off" -> false
                 "1", "true", "yes", "on" -> true
