@@ -13047,7 +13047,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             for (int col = 0; col < seatRow.getChildCount(); col++) {
                 View slotView = seatRow.getChildAt(col);
                 if (!(slotView instanceof android.widget.LinearLayout)) continue;
-                int seatIndex = row * 2 + col + 1;
+                int seatIndex = row * 2 + col;
                 JsonObject seat = seatsByIndex.get(seatIndex);
                 JsonObject user = seat != null && seat.has("user") && seat.get("user").isJsonObject()
                         ? seat.getAsJsonObject("user") : null;
@@ -13271,12 +13271,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
             android.widget.LinearLayout seats = new android.widget.LinearLayout(this);
             seats.setOrientation(android.widget.LinearLayout.VERTICAL);
-            for (int row = 0; row < 5; row++) {
+            for (int row = 0; row < 6; row++) {
                 android.widget.LinearLayout seatRow = new android.widget.LinearLayout(this);
                 seatRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
                 seatRow.setGravity(Gravity.CENTER);
                 for (int col = 0; col < 2; col++) {
-                    final int seatIndex = row * 2 + col + 1;
+                    final int seatIndex = row * 2 + col;
                     android.widget.LinearLayout slot = new android.widget.LinearLayout(this);
                     slot.setOrientation(android.widget.LinearLayout.VERTICAL);
                     slot.setGravity(Gravity.CENTER);
