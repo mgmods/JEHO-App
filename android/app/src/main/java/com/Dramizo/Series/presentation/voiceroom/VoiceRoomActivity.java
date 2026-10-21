@@ -161,7 +161,23 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     private ActivityVoiceRoomBinding binding;
     @Nullable private TextView roomPkScoreBanner;
+    private String roomPkBannerBaseText = "";
+    private long roomPkEndsAtMs;
+    private boolean roomPkBannerEnded;
+    private final Runnable updateRoomPkBannerClock = new Runnable() {
+        @Override public void run() {
+            if (roomPkScoreBanner == null || roomPkScoreBanner.getVisibility() != View.VISIBLE
+                    || roomPkBannerEnded || isFinishing() || exiting) return;
+            long remaining = roomPkEndsAtMs > 0L ? roomPkEndsAtMs - System.currentTimeMillis() : -1L;
+            String clock = remaining > 0L
+                    ? String.format(java.util.Locale.US, "%02d:%02d", remaining / 60000L, (remaining / 1000L) % 60L)
+                    : (roomPkEndsAtMs > 0L ? "بانتظار تثبيت النتيجة" : "مباشر");
+            roomPkScoreBanner.setText(roomPkBannerBaseText + "\n⏱ الوقت المتبقي: " + clock);
+            if (remaining > 0L) handler.postDelayed(this, 1000L);
+        }
+    };
     private final Runnable hideRoomPkScoreBanner = () -> {
+        handler.removeCallbacks(updateRoomPkBannerClock);
         if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
     };
     private VoiceRoomViewModel viewModel;
@@ -12382,6 +12398,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             if (!belongs) continue;
                             JsonObject payload = new JsonObject();
                             if (contest.id != null) payload.addProperty("contestId", contest.id);
+                            if (contest.endAt != null) payload.addProperty("endAt", contest.endAt);
                             payload.add("sideA", new com.google.gson.Gson().toJsonTree(contest.sideA).getAsJsonObject());
                             payload.add("sideB", new com.google.gson.Gson().toJsonTree(contest.sideB).getAsJsonObject());
                             handler.post(() -> showRoomPkScoreBanner("contest:team-score", payload));
@@ -12408,27 +12425,35 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         String nameB = firstNonEmpty(memberStr(sideB, "name"), "الروم الثاني");
         long scoreA = Math.max(0L, memberLong(sideA, "score", memberLong(payload, "scoreA", 0L)));
         long scoreB = Math.max(0L, memberLong(sideB, "score", memberLong(payload, "scoreB", 0L)));
-        String label = "contest:team-ended".equals(event) ? "انتهى تحدي PK" : "تحدي PK مباشر";
-        if ("contest:team-ended".equals(event)) {
+        boolean ended = "contest:team-ended".equals(event);
+        String label = "⚔ تحدّي الرومات مباشر";
+        if (ended) {
             String winner = memberStr(payload, "winner");
-            label = "sideA".equals(winner) ? "انتهى التحدي — فاز الروم الأول"
-                    : "sideB".equals(winner) ? "انتهى التحدي — فاز الروم الثاني"
-                    : "انتهى التحدي بالتعادل";
+            label = "sideA".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الأول"
+                    : "sideB".equals(winner) ? "🏆 انتهى التحدّي — فاز الروم الثاني"
+                    : "🤝 انتهى التحدّي بالتعادل";
         }
+        if (payload.has("endAt") && !payload.get("endAt").isJsonNull()) {
+            long parsed = parseRoomPkEndAt(memberStr(payload, "endAt"));
+            if (parsed > 0L) roomPkEndsAtMs = parsed;
+        }
+        roomPkBannerEnded = ended;
         if (roomPkScoreBanner == null) {
             roomPkScoreBanner = new TextView(this);
             roomPkScoreBanner.setTextColor(Color.WHITE);
-            roomPkScoreBanner.setTextSize(14f);
+            roomPkScoreBanner.setTextSize(13f);
             roomPkScoreBanner.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             roomPkScoreBanner.setGravity(Gravity.CENTER);
-            roomPkScoreBanner.setPadding(dp(14), dp(10), dp(14), dp(10));
+            roomPkScoreBanner.setPadding(dp(12), dp(10), dp(12), dp(10));
+            roomPkScoreBanner.setMaxLines(5);
             GradientDrawable bg = new GradientDrawable();
-            bg.setColor(0xE61B2430);
-            bg.setCornerRadius(dp(14));
+            bg.setColor(0xF01B2430);
+            bg.setCornerRadius(dp(16));
             bg.setStroke(dp(1), 0xFFFFD166);
             roomPkScoreBanner.setBackground(bg);
             roomPkScoreBanner.setElevation(dp(80));
             roomPkScoreBanner.setClickable(false);
+            roomPkScoreBanner.setContentDescription("نتيجة تحدي PK بين الرومات");
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
                     new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
                             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.MATCH_PARENT,
@@ -12439,11 +12464,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.setMargins(dp(12), dp(64), dp(12), 0);
             ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkScoreBanner, lp);
         }
-        roomPkScoreBanner.setText(label + "\n" + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
-                + "  :  " + String.format(java.util.Locale.US, "%,d", scoreB) + "  " + nameB);
+        long total = Math.max(1L, scoreA + scoreB);
+        int filled = (int) Math.round((scoreA * 1.0d / total) * 16d);
+        StringBuilder bar = new StringBuilder();
+        for (int i = 0; i < 16; i++) bar.append(i < filled ? "▰" : "▱");
+        roomPkBannerBaseText = label + "\n🔴 " + nameA + "  " + String.format(java.util.Locale.US, "%,d", scoreA)
+                + "       " + String.format(java.util.Locale.US, "%,d", scoreB) + "  🔵 " + nameB
+                + "\n" + bar;
+        roomPkScoreBanner.setText(roomPkBannerBaseText);
         roomPkScoreBanner.setVisibility(View.VISIBLE);
         handler.removeCallbacks(hideRoomPkScoreBanner);
-        handler.postDelayed(hideRoomPkScoreBanner, "contest:team-ended".equals(event) ? 12000L : 60000L);
+        handler.removeCallbacks(updateRoomPkBannerClock);
+        if (ended) {
+            handler.postDelayed(hideRoomPkScoreBanner, 12000L);
+        } else {
+            updateRoomPkBannerClock.run();
+        }
+    }
+
+    private long parseRoomPkEndAt(@Nullable String value) {
+        if (value == null || value.length() < 19) return 0L;
+        try {
+            java.text.SimpleDateFormat format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US);
+            format.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            java.util.Date date = format.parse(value.substring(0, 19));
+            return date != null ? date.getTime() : 0L;
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     @SuppressLint("NewApi")
