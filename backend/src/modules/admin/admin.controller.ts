@@ -1485,6 +1485,39 @@ export class AdminController {
     return this.adminService.paidMessageStats();
   }
 
+  // Dedicated game catalog endpoints: use the games ACL module, not general settings.
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Get('games/catalog')
+  @ApiOperation({ summary: 'Read the app game catalog without exposing unrelated settings' })
+  async getGameCatalog() {
+    const rows = await this.adminService.getSettings();
+    const row = Array.isArray(rows) ? rows.find((item) => item?.key === 'app_games') : null;
+    return { value: row?.value || '' };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('games/catalog')
+  @ApiOperation({ summary: 'Save the app game catalog using games-module permissions' })
+  async patchGameCatalog(@Body() body: { value?: string }) {
+    const value = String(body?.value || '');
+    if (value.length > 200000) {
+      throw new BadRequestException('Game catalog is too large');
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      throw new BadRequestException('Invalid game catalog JSON');
+    }
+    if (!Array.isArray(parsed)) {
+      throw new BadRequestException('Game catalog must be a list');
+    }
+    await this.adminService.patchSettings({ app_games: JSON.stringify(parsed) });
+    return { value: JSON.stringify(parsed) };
+  }
+
   @Get('settings')
   getSettings() {
     return this.adminService.getSettings();
