@@ -165,6 +165,12 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
     private final Set<String> shownRoomPkInvites = new HashSet<>();
+    private final Runnable roomPkPendingTimeout = () -> {
+        if ("pending".equals(roomPkCurrentContestId)) {
+            roomPkCurrentContestId = null;
+            ensureRoomPkActionButton();
+        }
+    };
     private String roomPkBannerBaseText = "";
     private long roomPkEndsAtMs;
     private boolean roomPkBannerEnded;
@@ -12472,7 +12478,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                                                     : (response.message() != null ? response.message() : "تعذّر إرسال دعوة PK"),
                                             Toast.LENGTH_LONG).show();
                                     if (ok) {
-                                        if (roomPkActionButton != null) roomPkActionButton.setVisibility(View.GONE);
+                                        roomPkCurrentContestId = "pending";
+                                        handler.removeCallbacks(roomPkPendingTimeout);
+                                        handler.postDelayed(roomPkPendingTimeout, 60000L);
+                                        ensureRoomPkActionButton();
                                         handler.postDelayed(VoiceRoomActivity.this::loadRoomPkChallenge, 800L);
                                     }
                                 }
@@ -12666,6 +12675,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (payload == null) payload = new JsonObject();
         if ("contest:team-score".equals(event) || "contest:team-ended".equals(event)
                 || "contest:pk-started".equals(event)) {
+            handler.removeCallbacks(roomPkPendingTimeout);
             if (payload.has("contestId") && !payload.get("contestId").isJsonNull()) {
                 roomPkCurrentContestId = payload.get("contestId").getAsString();
             }
@@ -12695,6 +12705,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         if ("contest:pk-rejected".equals(event)) {
             Toast.makeText(this, "تم رفض دعوة تحدّي PK", Toast.LENGTH_LONG).show();
+            handler.removeCallbacks(roomPkPendingTimeout);
             roomPkCurrentContestId = null;
             handler.post(this::ensureRoomPkActionButton);
             return;
