@@ -61,6 +61,7 @@ public final class RoomCardBinder {
 
         RoomUiHelper.bindLockOverlay(b.flLock, room);
         bindRoomLevelBadge(b, room);
+        bindRoomPkBadge(b, room);
         bindOfficialBadge(b, room);
         bindHotTop(b, room);
         bindCountryFlag(b, room);
@@ -93,6 +94,47 @@ public final class RoomCardBinder {
             return hostName;
         }
         return "غرفة";
+    }
+
+    /** A compact, high-contrast badge shown only while this room has an active PK. */
+    private static void bindRoomPkBadge(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
+        if (b.itemCard == null) return;
+        Object cached = b.itemCard.getTag(R.id.tag_room_cover_url);
+        android.widget.TextView badge = cached instanceof android.widget.TextView
+                ? (android.widget.TextView) cached : null;
+        if (badge == null) {
+            badge = new android.widget.TextView(b.itemCard.getContext());
+            badge.setText("⚔ PK LIVE");
+            badge.setTextColor(android.graphics.Color.WHITE);
+            badge.setTextSize(10f);
+            badge.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            badge.setGravity(android.view.Gravity.CENTER);
+            badge.setPadding(dp(b.itemCard, 8), dp(b.itemCard, 5), dp(b.itemCard, 8), dp(b.itemCard, 5));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[]{0xFFE53955, 0xFF7C3AED, 0xFFDAA520});
+            bg.setCornerRadius(dp(b.itemCard, 12));
+            bg.setStroke(dp(b.itemCard, 1), 0xFFFFE6A6);
+            badge.setBackground(bg);
+            badge.setElevation(dp(b.itemCard, 12));
+            badge.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+            badge.setContentDescription("هذا الروم يشارك في تحدي PK مباشر");
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.topToTop = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            lp.setMargins(dp(b.itemCard, 7), dp(b.itemCard, 7), 0, 0);
+            b.itemCard.addView(badge, lp);
+            b.itemCard.setTag(R.id.tag_room_cover_url, badge);
+        }
+        boolean active = RoomPkState.isRoomChallenging(room.id);
+        badge.setVisibility(active ? View.VISIBLE : View.GONE);
+        if (active) badge.bringToFront();
+    }
+
+    private static int dp(View view, int value) {
+        return Math.round(value * view.getResources().getDisplayMetrics().density);
     }
 
     /** Numeric Lv.N above viewer count — never an image (room frames would cover images). */
@@ -196,6 +238,7 @@ public final class RoomCardBinder {
     public static void bindViewerOnly(ItemPartyRoomBinding b, @Nullable RoomDtos.RoomDto room) {
         if (b == null || room == null) return;
         bindViewerCount(b, room);
+        bindRoomPkBadge(b, room);
     }
 
     private static void bindViewerCount(ItemPartyRoomBinding b, RoomDtos.RoomDto room) {
