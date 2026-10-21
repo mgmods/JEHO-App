@@ -666,27 +666,44 @@ public class ProfileFragment extends Fragment {
             }
         }
         if (binding.btnOpenSuperAdminDashboard != null) {
-            boolean isSuper = StaffRoleHelper.isSuper(user);
+            // One native entry point, only inside the user's actual profile screen.
+            // The same authenticated console adapts its available modules to the server role.
             android.widget.TextView adminEntry = binding.btnOpenSuperAdminDashboard;
             int density = getResources().getDisplayMetrics().densityDpi;
-            int horizontalPadding = Math.round(16 * density / 160f);
-            int verticalPadding = Math.round(13 * density / 160f);
-            adminEntry.setText("✦  لوحة سوبر أدمن");
+            int horizontalPadding = Math.round(18 * density / 160f);
+            int verticalPadding = Math.round(14 * density / 160f);
+            String roleLabel = StaffRoleHelper.SUPER.equals(role) ? "السوبر أدمن"
+                    : StaffRoleHelper.ADMIN.equals(role) ? "الأدمن" : "المانجر";
+            adminEntry.setText("✦  لوحة التحكم  ·  " + roleLabel);
             adminEntry.setTextColor(android.graphics.Color.WHITE);
-            adminEntry.setTextSize(16f);
-            adminEntry.setTypeface(adminEntry.getTypeface(), android.graphics.Typeface.BOLD);
+            adminEntry.setTextSize(15f);
+            adminEntry.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                    android.graphics.Typeface.BOLD));
             adminEntry.setGravity(android.view.Gravity.CENTER);
+            adminEntry.setMinHeight(Math.round(52 * getResources().getDisplayMetrics().density));
             adminEntry.setPadding(horizontalPadding, verticalPadding, horizontalPadding, verticalPadding);
             android.graphics.drawable.GradientDrawable adminBackground =
                     new android.graphics.drawable.GradientDrawable(
-                            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                            new int[]{0xFF5841A8, 0xFF7B5CD6});
-            adminBackground.setCornerRadius(14 * getResources().getDisplayMetrics().density);
-            adminEntry.setBackground(adminBackground);
-            adminEntry.setElevation(2 * getResources().getDisplayMetrics().density);
-            adminEntry.setVisibility(isSuper ? View.VISIBLE : View.GONE);
+                            android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                            new int[]{0xFF272A58, 0xFF6849C8});
+            adminBackground.setCornerRadius(16 * getResources().getDisplayMetrics().density);
+            adminBackground.setStroke(Math.round(getResources().getDisplayMetrics().density),
+                    0x557B68D8);
+            adminEntry.setBackground(new android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(0x33FFFFFF),
+                    adminBackground, null));
+            adminEntry.setElevation(3 * getResources().getDisplayMetrics().density);
+            adminEntry.setVisibility(isStaff ? View.VISIBLE : View.GONE);
             adminEntry.setOnClickListener(v -> {
-                if (!StaffRoleHelper.isSuper(user) || !isAdded()) return;
+                if (!isAdded()) return;
+                com.Dramizo.Series.data.remote.dto.AuthDtos.UserDto current =
+                        ContainerProvider.from(requireActivity()).getSessionManager().getUser();
+                if (!StaffRoleHelper.isStaff(current)) {
+                    android.widget.Toast.makeText(requireContext(),
+                            "صلاحية لوحة التحكم غير متاحة لهذا الحساب",
+                            android.widget.Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 startActivity(new Intent(requireContext(),
                         com.Dramizo.Series.presentation.admin.AdminConsoleActivity.class));
             });
