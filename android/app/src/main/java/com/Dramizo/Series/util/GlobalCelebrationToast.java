@@ -148,19 +148,25 @@ public final class GlobalCelebrationToast {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
 
-        String line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
+        String winnerName = firstNonEmpty(displayName, title);
+        if (tvTitle != null) {
+            tvTitle.setVisibility(View.VISIBLE);
+            tvTitle.setText(winnerName != null ? winnerName : "مبروك الفوز!");
+            tvTitle.setSelected(true);
+        }
+        String line;
+        if (gameOrLucky && coinsWon > 0L) {
+            line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
+        } else {
+            line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
+        }
         if (tvBody != null) {
             tvBody.setText(line);
             tvBody.setSelected(true);
         }
-        if (tvTitle != null) {
-            tvTitle.setText(title != null && !title.isEmpty() ? title : "مبروك!");
-        }
 
-        // Game/luck home strip: game cover/gift icon only — never a personal portrait bubble.
-        String leftUrl = gameOrLucky
-                ? firstNonEmpty(badgeUrl, null)
-                : firstNonEmpty(avatarUrl, badgeUrl);
+        // Lucky/game wins prioritize the actual winner's portrait; use the gift/game icon only as fallback.
+        String leftUrl = firstNonEmpty(avatarUrl, badgeUrl);
         String absLeft = AssetCatalog.absoluteUrl(leftUrl);
         if (absLeft != null) {
             com.Dramizo.Series.util.CosmeticMedia.Kind badgeKind =
@@ -203,10 +209,10 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean showTimes = multiplier >= 2;
+        boolean showTimes = multiplier >= 1 && (gameOrLucky || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
-            tvTimes.setText(String.format(Locale.US, "%d\nمرات", multiplier));
+            tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
             if (badge != null) badge.setVisibility(View.GONE);
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
@@ -236,17 +242,18 @@ public final class GlobalCelebrationToast {
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
-        banner.setTranslationX(dp(activity, 80));
+        banner.setTranslationX(dp(activity, 140));
         root.addView(banner);
         current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
                 .translationX(0f)
-                .setDuration(220)
+                .setDuration(420)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
                 .start();
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6500L : 4800L);
+        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6200L : 5200L);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
@@ -290,15 +297,21 @@ public final class GlobalCelebrationToast {
 
     private static void removeBanner(View banner) {
         if (banner == null) return;
+        if (hideRunnable != null) {
+            MAIN.removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
-                .alpha(0.85f)
+                .alpha(0f)
                 .translationX(out)
-                .setDuration(1600)
+                .setDuration(480)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .withEndAction(() -> {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
                     }
+                    if (current.get() == banner) current = new WeakReference<>(null);
                 })
                 .start();
     }
