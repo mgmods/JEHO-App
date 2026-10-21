@@ -2533,8 +2533,6 @@ class AdminConsoleActivity : ThemedActivity() {
         letterSpacing = 0f
         // Remove Material's default insets/tint so admin actions use the same
         // compact, rounded JEHO action treatment on every Android version.
-        insetTop = 0
-        insetBottom = 0
         backgroundTintList = null
         background = GradientDrawable(
             GradientDrawable.Orientation.LEFT_RIGHT,
