@@ -20,6 +20,7 @@ import androidx.annotation.Nullable;
 import com.Dramizo.Series.R;
 import com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.bitmap.CircleCrop;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -74,14 +75,14 @@ public final class GlobalCelebrationToast {
         final String avatarUrl;
         final String badgeUrl;
         final int topMarginDp;
-        final int multiplier;
+        final double multiplier;
         final long coinsWon;
         final String displayName;
         final String kind;
         final String roomId;
 
         ToastRequest(Activity activity, String title, String body, String avatarUrl,
-                     String badgeUrl, int topMarginDp, int multiplier, long coinsWon,
+                     String badgeUrl, int topMarginDp, double multiplier, long coinsWon,
                      String displayName, String kind, String roomId) {
             this.activity = new WeakReference<>(activity);
             this.title = title;
@@ -316,7 +317,7 @@ public final class GlobalCelebrationToast {
             @Nullable String badgeUrl,
             @Nullable String dedupeKey,
             int topMarginDp,
-            int multiplier,
+            double multiplier,
             long coinsWon,
             @Nullable String displayName,
             @Nullable String kind
@@ -333,7 +334,7 @@ public final class GlobalCelebrationToast {
             @Nullable String badgeUrl,
             @Nullable String dedupeKey,
             int topMarginDp,
-            int multiplier,
+            double multiplier,
             long coinsWon,
             @Nullable String displayName,
             @Nullable String kind,
@@ -389,7 +390,7 @@ public final class GlobalCelebrationToast {
             @Nullable String avatarUrl,
             @Nullable String badgeUrl,
             int topMarginDp,
-            int multiplier,
+            double multiplier,
             long coinsWon,
             @Nullable String displayName,
             @Nullable String kind,
@@ -430,7 +431,7 @@ public final class GlobalCelebrationToast {
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
         boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
-        boolean luckyHigh = luckyWin && (multiplier >= 10 || coinsWon >= 1000L);
+        boolean luckyHigh = luckyWin && (multiplier >= 10d || coinsWon >= 1000L);
         String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
         banner.setTag(toastKindTag);
         boolean customToastStyle = giftSend || luckyWin;
@@ -449,7 +450,11 @@ public final class GlobalCelebrationToast {
         }
         String line;
         if (gameOrLucky && coinsWon > 0L) {
-            line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
+            if (luckyWin && body != null && body.contains("مردود جزئي")) {
+                line = "↩ مردود جزئي · " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
+            } else {
+                line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
+            }
         } else {
             line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
         }
@@ -479,7 +484,7 @@ public final class GlobalCelebrationToast {
                     Glide.with(activity)
                             .load(absLeft)
                             .override(128, 128)
-                            .centerCrop()
+                            .transform(new CircleCrop())
                             .placeholder(gameOrLucky || planet
                                     ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
                             .error(gameOrLucky || planet
@@ -510,8 +515,8 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        int displayMultiplier = giftSend ? Math.max(1, multiplier) : multiplier;
-        boolean showTimes = displayMultiplier >= 1 && (gameOrLucky || giftSend || displayMultiplier >= 2);
+        int displayMultiplier = giftSend ? Math.max(1, (int) Math.round(multiplier)) : (int) Math.max(0, Math.round(multiplier));
+        boolean showTimes = giftSend ? displayMultiplier >= 1 : gameOrLucky ? multiplier > 0d : displayMultiplier >= 2;
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
@@ -526,7 +531,7 @@ public final class GlobalCelebrationToast {
             } else {
                 tvTimes.setText(giftSend
                         ? String.format(Locale.US, "X%d", displayMultiplier)
-                        : String.format(Locale.US, "×%d", displayMultiplier));
+                        : "×" + formatMultiplier(multiplier));
             }
             if (badge != null) {
                 if (giftSend) {
@@ -564,6 +569,15 @@ public final class GlobalCelebrationToast {
         int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
         int toastWidth = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
         int toastHeight = customToastStyle ? dp(activity, requestedHeightDp) : ViewGroup.LayoutParams.WRAP_CONTENT;
+        // Keep the text elements content-sized like the dashboard's draggable preview.
+        // Full-width TextViews cannot be positioned by their left-edge percentage.
+        int textMaxWidth = Math.max(dp(activity, 84), Math.round(toastWidth * 0.66f));
+        if (tvTitle != null) tvTitle.setMaxWidth(textMaxWidth);
+        if (tvBody != null) tvBody.setMaxWidth(textMaxWidth);
+        if (avatar != null) {
+            avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
+            avatar.setClipToOutline(true);
+        }
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(toastWidth, toastHeight);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.topMargin = dp(activity, topMarginDp);
@@ -652,6 +666,13 @@ public final class GlobalCelebrationToast {
                 : (canOpenRoom ? 6200L : 5200L));
     }
 
+    private static String formatMultiplier(double multiplier) {
+        if (Math.abs(multiplier - Math.rint(multiplier)) < 0.0001d) {
+            return String.format(Locale.US, "%.0f", multiplier);
+        }
+        return String.format(Locale.US, "%.2f", multiplier).replaceAll("0+$", "").replaceAll("\\.$", "");
+    }
+
     private static int dimensionValue(Object value, int fallback, int min, int max) {
         try { return Math.max(min, Math.min(max, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
         catch (Exception ignored) { return fallback; }
@@ -685,10 +706,13 @@ public final class GlobalCelebrationToast {
         int[] containerLocation = new int[2];
         target.getLocationOnScreen(targetLocation);
         container.getLocationOnScreen(containerLocation);
-        float currentX = targetLocation[0] - containerLocation[0] + (centerX ? target.getWidth() / 2f : 0f);
-        float currentY = targetLocation[1] - containerLocation[1] + target.getHeight() / 2f;
-        target.setTranslationX(target.getTranslationX() + desiredX - currentX);
-        target.setTranslationY(target.getTranslationY() + desiredY - currentY);
+        // Dashboard preview stores the avatar/count center but the text's left edge.
+        // Remove existing translations before deriving the layout baseline so repeated
+        // live-style refreshes are idempotent and never push elements off the artwork.
+        float baseX = targetLocation[0] - containerLocation[0] - target.getTranslationX();
+        float baseY = targetLocation[1] - containerLocation[1] - target.getTranslationY();
+        target.setTranslationX(desiredX - baseX - (centerX ? target.getWidth() / 2f : 0f));
+        target.setTranslationY(desiredY - baseY - target.getHeight() / 2f);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
@@ -697,7 +721,7 @@ public final class GlobalCelebrationToast {
             @Nullable String displayName,
             @Nullable String body,
             long coinsWon,
-            int multiplier
+            double multiplier
     ) {
         String name = displayName != null ? displayName.trim() : "";
         if ("planet_summon".equalsIgnoreCase(kind)) {
@@ -707,8 +731,8 @@ public final class GlobalCelebrationToast {
         }
         if ("lucky_hit".equalsIgnoreCase(kind)) {
             if (!name.isEmpty() && coinsWon > 0) {
-                if (multiplier >= 2) {
-                    return "مبروك " + name + " حصل على " + coinsWon + " · ×" + multiplier;
+                if (multiplier >= 2d) {
+                    return "مبروك " + name + " حصل على " + coinsWon + " · ×" + formatMultiplier(multiplier);
                 }
                 return "مبروك " + name + " حصل على " + coinsWon;
             }

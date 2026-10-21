@@ -245,28 +245,55 @@ public class AuraLiveApp extends Application {
                             && container.getSessionManager().isMuteCelebrationPopups()) {
                         return;
                     }
-                    String title = jsonString(payload, "title", "مبروك!");
-                    String body = jsonString(payload, "body", "");
-                    String avatar = jsonString(payload, "avatarUrl", null);
-                    String displayName = jsonString(payload, "displayName", null);
-                    String kind = jsonString(payload, "kind", null);
-                    String roomId = jsonString(payload, "roomId", null);
-                    String badgeCandidate = jsonString(payload, "giftIconUrl", null);
-                    if (badgeCandidate == null || badgeCandidate.isEmpty()) {
-                        badgeCandidate = jsonString(payload, "gameIconUrl", null);
+                    // Event payloads have existed in both generic and lucky-specific shapes.
+                    // Normalize them here so the global toast always receives the winner portrait,
+                    // name, coin amount and X multiplier instead of rendering an empty template.
+                    String kindValue = jsonStringAny(payload, null, "kind", "eventType", "type");
+                    if ("lucky:hit".equalsIgnoreCase(kindValue) || "lucky_hit_win".equalsIgnoreCase(kindValue)) {
+                        kindValue = "lucky_hit";
                     }
-                    if (badgeCandidate == null || badgeCandidate.isEmpty()) {
-                        badgeCandidate = jsonString(payload, "gameCoverUrl", null);
+                    String displayNameValue = jsonStringAny(payload, null,
+                            "displayName", "winnerName", "senderName", "username", "userName", "name");
+                    String titleValue = jsonStringAny(payload, null, "title", "headline");
+                    if (titleValue == null || titleValue.trim().isEmpty()
+                            || "مبروك!".equals(titleValue.trim()) || "مبروك".equals(titleValue.trim())) {
+                        titleValue = displayNameValue != null ? displayNameValue : "مبروك الفوز!";
                     }
+                    String bodyValue = jsonStringAny(payload, null, "body", "message", "description", "resultText");
+                    String avatarValue = jsonStringAny(payload, null,
+                            "avatarUrl", "senderAvatarUrl", "winnerAvatarUrl", "profileImageUrl",
+                            "profilePictureUrl", "avatar", "photoUrl", "imageUrl");
+                    String roomIdValue = jsonStringAny(payload, null, "roomId", "targetRoomId");
+                    String badgeCandidate = jsonStringAny(payload, null,
+                            "giftIconUrl", "gameIconUrl", "gameCoverUrl", "giftImageUrl");
                     final String badge = badgeCandidate;
-                    String dedupe = jsonString(payload, "id", body);
-                    long coinsWon = jsonLong(payload, "coinsWon", 0L);
-                    if (coinsWon <= 0L) coinsWon = jsonLong(payload, "winCoins", 0L);
-                    String gameTitle = jsonString(payload, "gameTitle", null);
-                    int multiplier = (int) Math.max(0L, jsonLong(payload, "multiplier", 0L));
-                    final long coinsFinal = coinsWon;
-                    final String gameFinal = gameTitle;
-                    final int mulFinal = multiplier;
+                    long coinsValue = jsonLongAny(payload, 0L,
+                            "coinsWon", "winCoins", "luckyCoinsWon", "wonCoins", "coins", "amount");
+                    String gameTitleValue = jsonStringAny(payload, null, "gameTitle", "gameName");
+                    double multiplierValue = Math.max(0d, jsonDoubleAny(payload, 0d,
+                            "multiplier", "luckyMultiplier", "winMultiplier", "times", "x", "count"));
+                    if ("lucky_hit".equalsIgnoreCase(kindValue)) {
+                        if (coinsValue <= 0L) coinsValue = jsonLongAny(payload, 0L, "rewardCoins", "winAmount");
+                        if (multiplierValue <= 0d) multiplierValue = Math.max(0d,
+                                jsonDoubleAny(payload, 0d, "luckyX", "multiplierX", "xCount"));
+                        if (bodyValue == null || bodyValue.trim().isEmpty()) {
+                            bodyValue = coinsValue > 0L
+                                    ? ("فاز بـ " + String.format(java.util.Locale.US, "%,d", coinsValue) + " كوينز")
+                                    : "مبروك الفوز بهدية الحظ";
+                        }
+                    } else if (bodyValue == null) {
+                        bodyValue = "";
+                    }
+                    final String kind = kindValue;
+                    final String displayName = displayNameValue;
+                    final String title = titleValue;
+                    final String body = bodyValue;
+                    final String avatar = avatarValue;
+                    final String roomId = roomIdValue;
+                    final String dedupe = jsonStringAny(payload, body, "id", "eventId", "dedupeKey");
+                    final long coinsFinal = coinsValue;
+                    final String gameFinal = gameTitleValue;
+                    final double mulFinal = multiplierValue;
                     final String roomFinal = roomId;
                     final boolean appVisible = isAppInForeground();
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
@@ -432,6 +459,87 @@ public class AuraLiveApp extends Application {
                 if (s != null && !s.isEmpty()) return Long.parseLong(s.trim());
             }
         } catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private static double jsonDouble(JsonObject object, String key, double fallback) {
+        try {
+            JsonElement value = object.get(key);
+            if (value != null && !value.isJsonNull() && value.isJsonPrimitive()) {
+                double parsed = value.getAsDouble();
+                if (Double.isFinite(parsed)) return parsed;
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private static double jsonDoubleAny(JsonObject object, double fallback, String... keys) {
+        if (object == null || keys == null) return fallback;
+        for (String key : keys) {
+            double value = jsonDouble(object, key, Double.NaN);
+            if (Double.isFinite(value) && value > 0d) return value;
+        }
+        for (String nestedKey : new String[] {"winner", "user", "sender", "reward", "result"}) {
+            try {
+                JsonElement nested = object.get(nestedKey);
+                if (nested == null || !nested.isJsonObject()) continue;
+                JsonObject nestedObject = nested.getAsJsonObject();
+                for (String key : keys) {
+                    double value = jsonDouble(nestedObject, key, Double.NaN);
+                    if (Double.isFinite(value) && value > 0d) return value;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    /** Read the first non-empty value across current and legacy event payload keys. */
+    private static String jsonStringAny(JsonObject object, String fallback, String... keys) {
+        if (object == null || keys == null) return fallback;
+        for (String key : keys) {
+            String value = jsonString(object, key, null);
+            if (value != null && !value.trim().isEmpty() && !"null".equalsIgnoreCase(value.trim())) {
+                return value.trim();
+            }
+        }
+        for (String nestedKey : new String[] {"winner", "user", "sender", "profile"}) {
+            try {
+                JsonElement nested = object.get(nestedKey);
+                if (nested == null || !nested.isJsonObject()) continue;
+                JsonObject nestedObject = nested.getAsJsonObject();
+                for (String key : keys) {
+                    String value = jsonString(nestedObject, key, null);
+                    if (value != null && !value.trim().isEmpty() && !"null".equalsIgnoreCase(value.trim())) {
+                        return value.trim();
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    /** Read the first positive numeric value across current and legacy event payload keys. */
+    private static long jsonLongAny(JsonObject object, long fallback, String... keys) {
+        if (object == null || keys == null) return fallback;
+        for (String key : keys) {
+            long value = jsonLong(object, key, 0L);
+            if (value > 0L) return value;
+        }
+        for (String nestedKey : new String[] {"winner", "user", "sender", "reward", "result"}) {
+            try {
+                JsonElement nested = object.get(nestedKey);
+                if (nested == null || !nested.isJsonObject()) continue;
+                JsonObject nestedObject = nested.getAsJsonObject();
+                for (String key : keys) {
+                    long value = jsonLong(nestedObject, key, 0L);
+                    if (value > 0L) return value;
+                }
+            } catch (Exception ignored) {
+            }
         }
         return fallback;
     }
