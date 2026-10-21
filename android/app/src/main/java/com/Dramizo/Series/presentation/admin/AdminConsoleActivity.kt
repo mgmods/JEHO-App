@@ -2373,7 +2373,10 @@ class AdminConsoleActivity : ThemedActivity() {
         val inputs = labels.map { label ->
             val input = EditText(this).apply {
                 hint = label
-                textSize = 14f
+                textSize = 15f
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                textDirection = View.TEXT_DIRECTION_RTL
+                gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
                 setSingleLine(label != "نص الإشعار" && label != "محتوى الرسالة")
                 setTextColor(TEXT)
                 setHintTextColor(MUTED)
@@ -2469,7 +2472,43 @@ class AdminConsoleActivity : ThemedActivity() {
         "level" -> "المستوى"
         "coinPrice" -> "السعر"
         "diamondValue" -> "قيمة الألماس"
-        else -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        "active" -> "نشط"
+        "inactive" -> "غير نشط"
+        "pending" -> "قيد المراجعة"
+        "approved" -> "مقبول"
+        "rejected" -> "مرفوض"
+        "suspended" -> "موقوف مؤقتًا"
+        "banned", "blocked" -> "محظور"
+        "status" -> "الحالة"
+        "id", "userId" -> "المعرّف"
+        "roomId" -> "معرّف الروم"
+        "name", "title" -> "الاسم"
+        "description" -> "الوصف"
+        "message" -> "الرسالة"
+        "type" -> "النوع"
+        "amount" -> "المبلغ"
+        "duration" -> "المدة"
+        "expiresAt" -> "تاريخ الانتهاء"
+        "updatedAt" -> "تاريخ التحديث"
+        "ownerId" -> "معرّف المالك"
+        "ownerName" -> "اسم المالك"
+        "isActive" -> "حالة التفعيل"
+        "isVerified" -> "موثّق"
+        "country" -> "الدولة"
+        "phone" -> "رقم الهاتف"
+        "email" -> "البريد الإلكتروني"
+        "reason" -> "السبب"
+        "adminNote" -> "ملاحظة الإدارة"
+        "reporterId" -> "معرّف المُبلّغ"
+        "targetId" -> "معرّف المُبلّغ عنه"
+        "category" -> "التصنيف"
+        "count" -> "العدد"
+        "total" -> "الإجمالي"
+        "page" -> "الصفحة"
+        "limit" -> "عدد النتائج"
+        else -> key.replace(Regex("([a-z])([A-Z])"), "$1 $2")
+            .replace('_', ' ')
+            .let { raw -> raw.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } }
     }
 
     private fun copyToClipboard(label: String, value: String) {
@@ -2510,17 +2549,41 @@ class AdminConsoleActivity : ThemedActivity() {
         parent.addView(view)
     }
 
+    /**
+     * Shared JEHO-native action button. One visual language across admin
+     * sections, with RTL layout, rounded surface and visible press feedback.
+     */
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
-        textSize = 13f
+        textSize = 14f
         isAllCaps = false
-        minHeight = dp(46)
+        gravity = Gravity.CENTER
+        minHeight = dp(48)
+        minimumHeight = dp(48)
         minWidth = 0
         setTextColor(Color.WHITE)
-        background = roundRect(ACCENT, 14)
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        textDirection = View.TEXT_DIRECTION_RTL
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+        val shape = GradientDrawable().apply {
+            setColor(ACCENT)
+            cornerRadius = dp(15).toFloat()
+            setStroke(dp(1), 0xFF8069D0.toInt())
+        }
+        val pressed = GradientDrawable().apply {
+            setColor(0xFF4F369D.toInt())
+            cornerRadius = dp(15).toFloat()
+        }
+        background = android.graphics.drawable.RippleDrawable(
+            android.content.res.ColorStateList.valueOf(0x33FFFFFF),
+            shape,
+            pressed
+        )
         backgroundTintList = null
-        elevation = dp(1).toFloat()
-        setPadding(dp(14), dp(4), dp(14), dp(4))
+        elevation = dp(2).toFloat()
+        stateListAnimator = null
+        setPadding(dp(16), dp(8), dp(16), dp(8))
+        contentDescription = label
         setOnClickListener { action() }
     }
 
