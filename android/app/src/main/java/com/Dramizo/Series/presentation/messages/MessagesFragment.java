@@ -164,14 +164,15 @@ public class MessagesFragment extends Fragment {
             binding.tvRequestBadge.setOnClickListener(openHub);
         }
 
-        // Social shortcuts open existing app destinations; no placeholder screens.
-        binding.btnQuickFriends.setOnClickListener(v -> openFriendsTab(FriendsActivity.TAB_FRIENDS));
+        // Inbox shortcuts are the only social channels shown here: Official News,
+        // Admin Messages, and Notifications. Friends/requests/visitors are removed.
+        binding.btnQuickFriends.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), OfficialNewsActivity.class)));
         binding.btnQuickNotifications.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), NotificationsActivity.class)));
         binding.btnQuickRequests.setOnClickListener(v ->
-                openFriendsTab(FriendsActivity.TAB_REQ_FOLLOW));
-        binding.btnQuickVisitors.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), VisitorsActivity.class)));
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.notifications.AdminMessagesActivity.class)));
 
         if (binding.officialNewsCardMsg != null) {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
@@ -380,10 +381,6 @@ public class MessagesFragment extends Fragment {
                 if (binding.tvRequestBadge != null) {
                     binding.tvRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
                     binding.tvRequestBadge.setText(label);
-                }
-                if (binding.tvQuickRequestBadge != null) {
-                    binding.tvQuickRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
-                    binding.tvQuickRequestBadge.setText(label);
                 }
             });
         });
