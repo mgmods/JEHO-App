@@ -134,9 +134,14 @@ public class MessagesFragment extends Fragment {
                     updateChatSearchEmptyState();
                     return;
                 }
+                if (query.length() < 2) {
+                    adapter.submit(viewModel.getConversations().getValue());
+                    adapter.setSearchQuery(query);
+                    updateChatSearchEmptyState();
+                    return;
+                }
                 adapter.setSearchQuery(query);
                 updateChatSearchEmptyState();
-                if (query.length() < 2) return;
                 pendingGlobalSearch = () -> runGlobalSearch(query, sequence);
                 searchHandler.postDelayed(pendingGlobalSearch, 320L);
             }
