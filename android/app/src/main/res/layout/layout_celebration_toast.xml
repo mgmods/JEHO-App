@@ -25,13 +25,17 @@
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:paddingStart="8dp"
         android:paddingTop="8dp"
         android:paddingEnd="8dp"
         android:paddingBottom="8dp">
     <FrameLayout
         android:layout_width="48dp"
-        android:layout_height="48dp">
+        android:layout_height="48dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <ImageView
             android:id="@+id/imgCelebrationAvatar"
@@ -51,7 +55,9 @@
         android:layout_marginEnd="6dp"
         android:layout_weight="1"
         android:gravity="center_vertical"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <TextView
             android:id="@+id/tvCelebrationTitle"
@@ -91,6 +97,8 @@
         android:id="@+id/wrapCelebrationTimes"
         android:layout_width="48dp"
         android:layout_height="44dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:background="@drawable/bg_lucky_multiplier_badge"
         android:visibility="gone"
         tools:visibility="visible">
