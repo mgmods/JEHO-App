@@ -30,6 +30,18 @@
       <a class="btn btn-outline-light btn-sm" href="#game-store">متجر الألعاب</a>
     </nav>
 
+    <div id="game-runtime-controls" class="glass p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div><h3 class="h6 mb-1">التحكم بتشغيل وإيقاف كل الألعاب</h3><p class="small text-muted mb-0">كل لعبة لها مفتاح مستقل. احفظ التغييرات لتطبيق حالة التشغيل من إعدادات الخادم.</p><div class="small text-muted mt-1">عدد الألعاب المتاحة للإدارة: {{ manageableGames.length }}</div></div>
+        <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(false)">إيقاف الكل</button><button class="btn btn-outline-light btn-sm" type="button" :disabled="savingOdds" @click="setAllGamesEnabled(true)">تشغيل الكل</button><button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button></div>
+      </div>
+      <div class="row g-2">
+        <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
+          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input v-model="disabledGames" class="form-check-input" type="checkbox" :value="game.id" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
+        </div>
+      </div>
+    </div>
+
     <div id="game-odds" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
         <div>
@@ -165,18 +177,6 @@
             <p class="catalog-card__sub">{{ g.titleEn && g.titleEn !== g.title ? g.titleEn : g.id }}</p>
           </div>
         </article>
-      </div>
-    </div>
-
-    <div id="game-runtime-controls" class="glass p-3 mb-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-        <div><h3 class="h6 mb-1">التحكم الفعلي بتشغيل الألعاب</h3><p class="small text-muted mb-0">إلغاء التحديد يعطّل اللعبة من الخادم لجميع المستخدمين، وليس إخفاءها فقط.</p></div>
-        <button class="btn btn-aurora btn-sm" type="button" :disabled="savingOdds" @click="saveOdds">حفظ حالة الألعاب</button>
-      </div>
-      <div class="row g-2">
-        <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input v-model="disabledGames" class="form-check-input" type="checkbox" :value="game.id" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
-        </div>
       </div>
     </div>
 
@@ -406,6 +406,10 @@ async function loadOdds() {
   } catch (err) {
     error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + (err?.message || String(err))
   }
+}
+
+function setAllGamesEnabled(enabled) {
+  disabledGames.value = enabled ? [] : manageableGames.map((game) => game.id)
 }
 
 async function saveOdds() {
