@@ -313,7 +313,10 @@ export class ContestsService implements OnModuleInit {
     if (rules.invitationStatus !== 'pending') throw new BadRequestException('تمت معالجة هذه الدعوة مسبقاً');
     const targetRoomId = String(rules.targetRoomId || '');
     const sourceRoomId = String(rules.sourceRoomId || '');
-    const targetRoom = await this.roomsRepo.findOne({ where: { id: targetRoomId } });
+    const [targetRoom, sourceRoom] = await Promise.all([
+      this.roomsRepo.findOne({ where: { id: targetRoomId } }),
+      this.roomsRepo.findOne({ where: { id: sourceRoomId } }),
+    ]);
     if (!targetRoom || targetRoom.hostId !== userId) throw new BadRequestException('قبول الدعوة متاح لمضيف الروم المنافس فقط');
     const now = new Date();
     const durationMinutes = Math.max(1, Math.min(120, Math.floor(Number(rules.durationMinutes) || 10)));
@@ -340,6 +343,13 @@ export class ContestsService implements OnModuleInit {
       status: accept ? 'active' : 'rejected',
     };
     this.emitRoomPkEvent([sourceRoomId, targetRoomId], accept ? 'contest:pk-started' : 'contest:pk-rejected', payload);
+    if (sourceRoom && sourceRoom.hostId) {
+      this.notifications.notifyUser(sourceRoom.hostId, NotificationType.ROOM,
+        accept ? '⚔ تم قبول تحدّي PK' : 'تم رفض دعوة تحدّي PK',
+        accept ? targetRoom.title + ' قبل التحدّي. بدأت المواجهة الآن!' : targetRoom.title + ' رفض دعوة التحدّي.',
+        { kind: accept ? 'room_pk_accepted' : 'room_pk_rejected', contestId: saved.id,
+          roomId: sourceRoomId, sourceRoomId, targetRoomId });
+    }
     return { contest: saved, message: accept ? 'تم قبول التحدّي وبدأ العدّ التنازلي' : 'تم رفض دعوة التحدّي' };
   }
 
