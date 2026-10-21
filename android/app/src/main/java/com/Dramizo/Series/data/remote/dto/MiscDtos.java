@@ -7,6 +7,31 @@ import java.util.Map;
 public final class MiscDtos {
     private MiscDtos() {}
 
+    public static class DailyLoginStatusDto {
+        @SerializedName("enabled") public boolean enabled;
+        @SerializedName("shouldShow") public boolean shouldShow;
+        @SerializedName("alreadyClaimed") public boolean alreadyClaimed;
+        @SerializedName("streak") public int streak;
+        @SerializedName("currentDay") public int currentDay;
+        @SerializedName("today") public String today;
+        @SerializedName("reward") public DailyLoginRewardDto reward;
+        @SerializedName("days") public List<DailyLoginRewardDto> days;
+    }
+
+    public static class DailyLoginRewardDto {
+        @SerializedName("day") public int day;
+        @SerializedName("type") public String type;
+        @SerializedName("amount") public long amount;
+        @SerializedName("label") public String label;
+        @SerializedName("name") public String name;
+        @SerializedName("cosmeticCode") public String cosmeticCode;
+        @SerializedName("durationDays") public int durationDays;
+        @SerializedName("previewUrl") public String previewUrl;
+        @SerializedName("animationUrl") public String animationUrl;
+        @SerializedName("cosmeticType") public String cosmeticType;
+        @SerializedName("claimed") public boolean claimed;
+    }
+
     public static class MysteriousManConfigDto {
         @SerializedName("avatarUrl") public String avatarUrl;
         @SerializedName("entryMode") public String entryMode;
