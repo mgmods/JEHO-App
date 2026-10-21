@@ -1,12 +1,15 @@
 package com.Dramizo.Series.util;
 
 import android.app.Activity;
+import android.animation.ObjectAnimator;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -202,6 +205,7 @@ public final class GlobalCelebrationToast {
         View wrapTimes = banner.findViewById(R.id.wrapCelebrationTimes);
         TextView tvTimes = banner.findViewById(R.id.tvCelebrationTimes);
         TextView btnGo = banner.findViewById(R.id.btnCelebrationGo);
+        View sheen = banner.findViewById(R.id.viewCelebrationSheen);
 
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean gameOrLucky = kind != null && (
@@ -306,16 +310,40 @@ public final class GlobalCelebrationToast {
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
+        banner.setScaleX(0.985f);
+        banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         root.addView(banner);
         current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
                 .translationX(0f)
                 .setDuration(420)
                 .setInterpolator(new android.view.animation.DecelerateInterpolator())
                 .start();
+        // A restrained, lightweight sheen passes across the toast twice; it does not block touches.
+        if (sheen != null) {
+            sheen.setVisibility(View.VISIBLE);
+            GradientDrawable shine = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[] { 0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF });
+            sheen.setBackground(shine);
+            sheen.setRotation(12f);
+            sheen.setAlpha(0.78f);
+            banner.post(() -> {
+                if (sheen.getParent() != banner || banner.getParent() == null) return;
+                int offset = dp(activity, 52);
+                ObjectAnimator sweep = ObjectAnimator.ofFloat(
+                        sheen, View.TRANSLATION_X, -offset, banner.getWidth() + offset);
+                sweep.setDuration(1450L);
+                sweep.setRepeatCount(1);
+                sweep.setInterpolator(new LinearInterpolator());
+                sweep.start();
+            });
+        }
         if (wrapTimes != null && wrapTimes.getVisibility() == View.VISIBLE) {
             wrapTimes.animate()
                     .scaleX(1f)
