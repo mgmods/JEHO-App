@@ -137,14 +137,22 @@ public final class LuckyCannonView extends View {
         canvas.drawPath(diamond, paint);
         paint.setStyle(Paint.Style.FILL);
 
-        // Tiny gold sparkle accents; only drawn during launch for low overhead.
-        if (fireProgress > 0f && fireProgress < 0.55f) {
-            float alpha = 1f - fireProgress / 0.55f;
-            paint.setColor(((int) (255 * alpha) << 24) | 0x00FFE8A0);
-            for (int i = 0; i < 4; i++) {
-                float x = (i % 2 == 0) ? 20 + i * 3 : 77 - i * 2;
-                float y = (i < 2) ? 30 + i * 8 : 59 - i * 5;
-                canvas.drawCircle(x, y, 1.6f + alpha, paint);
+        // Tiny gold/cyan particles fly out from the button during the local press pulse.
+        if (fireProgress > 0f && fireProgress < 0.72f) {
+            float progress = fireProgress / 0.72f;
+            float alpha = 1f - progress;
+            int[] particleColors = {0xFFFFE8A0, 0xFF7CF7FF, 0xFFFF8BB2, 0xFFFFFFFF,
+                    0xFFFFD15C, 0xFF92DFFF, 0xFFFFA6CB, 0xFFFFF2C1};
+            for (int i = 0; i < 8; i++) {
+                double angle = Math.toRadians(-90 + i * 45);
+                float distance = 17f + progress * 29f;
+                float x = 50f + (float) Math.cos(angle) * distance;
+                float y = 47f + (float) Math.sin(angle) * distance;
+                paint.setColor(((int) (255 * alpha) << 24) | (particleColors[i] & 0x00FFFFFF));
+                canvas.drawCircle(x, y, 1.2f + alpha * 1.5f, paint);
+                paint.setStrokeWidth(1.1f);
+                canvas.drawLine(x, y, x - (float) Math.cos(angle) * (3f + progress * 3f),
+                        y - (float) Math.sin(angle) * (3f + progress * 3f), paint);
             }
         }
         canvas.restore();

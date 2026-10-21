@@ -145,6 +145,67 @@ export class ConfigController {
   }
 
   @Public()
+  @Get('toast-style')
+  @ApiOperation({ summary: 'Public dashboard-managed gift and lucky-win toast appearance' })
+  async toastStyle() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    const defaults = {
+      backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+    };
+    let parsed: any = {};
+    try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
+    const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-backend.mgs.blitz.cloud')
+      .trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
+    const normalize = (value: unknown): string => {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      let url = raw;
+      if (raw.startsWith('/uploads/') && !raw.startsWith('//')) url = apiBase + raw;
+      else if (/^uploads\//i.test(raw)) url = apiBase + '/' + raw;
+      if (!url) return '';
+      if (!/^https?:\/\//i.test(url)) return '';
+      const separator = url.includes('?') ? '&' : '?';
+      return url + separator + 'toast_v=' + Math.max(1, Number(parsed.version) || 1);
+    };
+    const oldGift = parsed.giftSend || parsed;
+    const giftSend = {
+      backgroundUrl: normalize(oldGift.backgroundUrl),
+      shineEnabled: oldGift.shineEnabled !== false,
+      frameGlowEnabled: oldGift.frameGlowEnabled !== false,
+      durationSeconds: Math.max(1, Math.min(12, Math.round(Number(oldGift.durationSeconds) || 3))),
+      avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarX)) ? Number(oldGift.avatarX) : 8))),
+      avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarY)) ? Number(oldGift.avatarY) : 50))),
+      textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
+      textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textY)) ? Number(oldGift.textY) : 50))),
+    };
+    const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
+      const value = parsed[key] || {};
+      const fallback = defaults[key];
+      return {
+        backgroundUrl: normalize(value.backgroundUrl),
+        shineEnabled: value.shineEnabled !== false,
+        frameGlowEnabled: value.frameGlowEnabled !== false,
+        durationSeconds: Math.max(1, Math.min(12, Math.round(Number(value.durationSeconds) || fallback.durationSeconds))),
+        avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarX)) ? Number(value.avatarX) : fallback.avatarX))),
+        avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.avatarY)) ? Number(value.avatarY) : fallback.avatarY))),
+        textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textX)) ? Number(value.textX) : fallback.textX))),
+        textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(value.textY)) ? Number(value.textY) : fallback.textY))),
+      };
+    };
+    const button = parsed.luckyButton || {};
+    const luckyButton = {
+      iconUrl: normalize(button.iconUrl),
+      durationSeconds: Math.max(1, Math.min(12, Math.round(Number(button.durationSeconds) || 5))),
+      pulseEnabled: button.pulseEnabled !== false,
+    };
+    return { ...defaults, ...giftSend, giftSend, luckyWinNormal: win('luckyWinNormal'), luckyWinHigh: win('luckyWinHigh'), luckyButton,
+      version: Math.max(1, Math.round(Number(parsed.version) || 1)) };
+  }
+
+  @Public()
   @Get('features')
   @ApiOperation({ summary: 'App feature flags for clients' })
   async features() {
