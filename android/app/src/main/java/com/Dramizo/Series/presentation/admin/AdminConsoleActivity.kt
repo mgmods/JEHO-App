@@ -164,60 +164,153 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView.text = "مركز إدارة JEHO"
         backButton.visibility = View.GONE
         body.removeAllViews()
+        body.layoutDirection = View.LAYOUT_DIRECTION_RTL
+
+        val roleLabel = when (currentRole) {
+            StaffRoleHelper.SUPER -> "السوبر أدمن"
+            StaffRoleHelper.ADMIN -> "الأدمن"
+            else -> "المانجر"
+        }
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setPadding(dp(20), dp(20), dp(20), dp(20))
             background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF20254F.toInt(), 0xFF5541A4.toInt(), 0xFF8062D5.toInt())
-            ).apply { cornerRadius = dp(22).toFloat() }
-            elevation = dp(3).toFloat()
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF171A3B.toInt(), 0xFF34266E.toInt(), 0xFF6849C8.toInt())
+            ).apply { cornerRadius = dp(24).toFloat() }
+            elevation = dp(4).toFloat()
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(18) }
         }
-        val heroEyebrow = TextView(this).apply {
-            text = "JEHO  •  " + when (currentRole) { StaffRoleHelper.SUPER -> "SUPER ADMIN"; StaffRoleHelper.ADMIN -> "ADMIN"; else -> "MANAGER" }
-            textSize = 10f
-            letterSpacing = 0.12f
-            setTextColor(0xFFDCD4FF.toInt())
-            setTypeface(typeface, Typeface.BOLD)
+        val brandRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
-        hero.addView(heroEyebrow)
-        val heroTitle = TextView(this).apply {
-            text = "مركز التحكم الرئيسي"
-            textSize = 23f
+        val brandMark = TextView(this).apply {
+            text = "J"
+            textSize = 22f
+            gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, dp(7), 0, dp(5))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF9C83FF.toInt(), 0xFF6046C7.toInt())
+            ).apply { cornerRadius = dp(15).toFloat() }
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(12) }
         }
-        hero.addView(heroTitle)
-        val heroCopy = TextView(this).apply {
-            text = "إدارة المستخدمين والرومات والوكالات والرسائل والهدايا من مكان واحد."
-            textSize = 13f
-            setTextColor(0xFFF0EDFF.toInt())
-            setLineSpacing(dp(3).toFloat(), 1f)
-        }
-        hero.addView(heroCopy)
-        val secureLine = TextView(this).apply {
-            text = "●  متصل بالخادم  •  الصلاحيات تُتحقق على الخادم"
+        brandRow.addView(brandMark)
+        val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(brandCopy, "JEHO  •  ADMIN CENTER", 10f, true, 0xFFD9D0FF.toInt())
+        addText(brandCopy, "مساحة الإدارة والتحكم", 15f, true, Color.WHITE)
+        brandRow.addView(brandCopy, LinearLayout.LayoutParams(0, -2, 1f))
+        val rolePill = TextView(this).apply {
+            text = roleLabel
             textSize = 11f
-            setTextColor(0xFFD7F7E8.toInt())
-            setPadding(0, dp(13), 0, 0)
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp(11), dp(8), dp(11), dp(8))
+            background = GradientDrawable().apply {
+                setColor(0x332FFFFFF.toInt())
+                cornerRadius = dp(30).toFloat()
+                setStroke(dp(1), 0x66FFFFFF)
+            }
+        }
+        brandRow.addView(rolePill)
+        hero.addView(brandRow)
+
+        addText(hero, "كل أدواتك الإدارية في مكان واحد", 22f, true, Color.WHITE)
+        val intro = TextView(this).apply {
+            text = "تابع المستخدمين والرومات والعمليات المهمة من واجهة واحدة مصممة للموبايل."
+            textSize = 13f
+            setTextColor(0xFFE9E4FF.toInt())
+            setLineSpacing(dp(3).toFloat(), 1.05f)
+            setPadding(0, dp(5), 0, dp(13))
+        }
+        hero.addView(intro)
+        val secureLine = TextView(this).apply {
+            text = "●  اتصال الإدارة عبر الخادم  ·  صلاحيات محمية"
+            textSize = 11f
+            setTextColor(0xFFB9F6D5.toInt())
+            setPadding(0, dp(10), 0, 0)
         }
         hero.addView(secureLine)
         body.addView(hero)
+
+        addText(body, "نظرة عامة", 18f, true, TEXT)
+        addText(body, "ملخص البيانات المتاحة من الخادم", 12f, false, MUTED)
+        val metricsHost = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(9); bottomMargin = dp(10) }
+        }
+        body.addView(metricsHost)
         load(api.overview()) { data ->
             val stats = mapOfEntries(data)
-            if (stats.isNotEmpty()) {
-                val card = card()
-                addText(card, "نظرة عامة", 16f, true, TEXT)
-                val display = stats.entries.take(6).joinToString("\n") { (k, v) -> "${prettyKey(k)}: ${v ?: "—"}" }
-                addText(card, display, 13f, false, MUTED)
-                body.addView(card)
+            metricsHost.removeAllViews()
+            if (stats.isEmpty()) {
+                val empty = card()
+                addText(empty, "تعذر تحميل الإحصائيات الآن", 13f, true, MUTED)
+                addText(empty, "يمكنك متابعة الأقسام، ثم تحديث الشاشة لاحقًا.", 12f, false, MUTED)
+                metricsHost.addView(empty)
+            } else {
+                val metricSpecs = listOf(
+                    Triple("المستخدمون", listOf("users", "usersCount", "totalUsers"), "👥"),
+                    Triple("الرومات", listOf("rooms", "roomsCount", "totalRooms"), "🏠"),
+                    Triple("البث المباشر", listOf("activeStreams", "streamsCount", "liveStreams"), "📡"),
+                    Triple("الوكالات", listOf("agencies", "agenciesCount", "totalAgencies"), "🏢")
+                )
+                val known = metricSpecs.mapNotNull { spec ->
+                    val key = spec.second.firstOrNull { stats.containsKey(it) }
+                    if (key == null) null else Triple(spec.first, stats[key]?.toString() ?: "—", spec.third)
+                }
+                val displayMetrics = if (known.isNotEmpty()) known else stats.entries.take(4).map { Triple(prettyKey(it.key), it.value?.toString() ?: "—", "✦") }
+                displayMetrics.chunked(2).forEach { pair ->
+                    val metricRow = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    }
+                    pair.forEachIndexed { index, metric ->
+                        val metricCard = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            layoutDirection = View.LAYOUT_DIRECTION_RTL
+                            setPadding(dp(14), dp(13), dp(14), dp(13))
+                            background = GradientDrawable().apply {
+                                setColor(Color.WHITE)
+                                cornerRadius = dp(18).toFloat()
+                                setStroke(dp(1), 0xFFE8E7F2.toInt())
+                            }
+                            elevation = dp(1).toFloat()
+                            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                                bottomMargin = dp(9)
+                                if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
+                            }
+                        }
+                        val top = LinearLayout(this).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        }
+                        val metricIcon = TextView(this).apply {
+                            text = metric.third
+                            textSize = 20f
+                            gravity = Gravity.CENTER
+                            background = roundRect(0xFFF0ECFB.toInt(), 12)
+                            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginStart = dp(9) }
+                        }
+                        top.addView(metricIcon)
+                        addText(top, metric.first, 12f, true, MUTED)
+                        metricCard.addView(top)
+                        addText(metricCard, metric.second, 24f, true, TEXT)
+                        metricRow.addView(metricCard)
+                    }
+                    if (pair.size == 1) metricRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+                    metricsHost.addView(metricRow)
+                }
             }
         }
-        addText(body, "أدوات الإدارة", 18f, true, TEXT)
-        addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
+
         // Keep privileged account-granting and global configuration tools out of
         // Admin/Manager navigation. Backend authorization remains authoritative.
         val superOnlyModules = listOf(
@@ -230,46 +323,86 @@ class AdminConsoleActivity : ThemedActivity() {
             StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnlyModules }
             else -> modules
         }
-        val rows = visibleModules.chunked(2)
-        rows.forEach { pair ->
-            val row = LinearLayout(this).apply {
+
+        addText(body, "أدوات الإدارة", 18f, true, TEXT)
+        addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
+        val groups = listOf(
+            "إدارة المجتمع" to listOf("users", "rooms", "streams", "reports"),
+            "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents"),
+            "الرسائل وتجربة المستخدم" to listOf("notifications", "toastManager", "mysteriousMan", "luckyCannon", "supportChest", "roomPkSettings"),
+            "العضويات والمظهر" to listOf("vanityIds", "grantCosmetics", "vip", "staffIdentity"),
+            "الإدارة والأمان" to listOf("logs", "operators")
+        )
+        groups.forEach { (groupTitle, keys) ->
+            val groupModules = visibleModules.filter { it.key in keys }
+            if (groupModules.isEmpty()) return@forEach
+            val groupHeader = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.TOP
+                gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(0, dp(12), 0, dp(9))
             }
-            pair.forEachIndexed { index, module ->
-                val tile = card().apply {
-                    setPadding(dp(14), dp(15), dp(14), dp(15))
-                    isClickable = true
-                    isFocusable = true
-                    foreground = android.util.TypedValue().let {
-                        val out = android.util.TypedValue()
-                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+            val groupDot = View(this).apply {
+                background = roundRect(ACCENT, 4)
+                layoutParams = LinearLayout.LayoutParams(dp(4), dp(21)).apply { marginStart = dp(9) }
+            }
+            groupHeader.addView(groupDot)
+            addText(groupHeader, groupTitle, 15f, true, TEXT)
+            body.addView(groupHeader)
+
+            groupModules.chunked(2).forEach { pair ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.TOP
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                }
+                pair.forEachIndexed { index, module ->
+                    val tile = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        setPadding(dp(14), dp(14), dp(14), dp(14))
+                        background = GradientDrawable().apply {
+                            setColor(Color.WHITE)
+                            cornerRadius = dp(18).toFloat()
+                            setStroke(dp(1), 0xFFE8E7F2.toInt())
+                        }
+                        elevation = dp(1).toFloat()
+                        isClickable = true
+                        isFocusable = true
+                        foreground = android.util.TypedValue().let {
+                            val out = android.util.TypedValue()
+                            theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                            if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+                        }
+                        setOnClickListener { openModule(module.key) }
                     }
-                    setOnClickListener { openModule(module.key) }
+                    val icon = TextView(this).apply {
+                        text = module.icon
+                        textSize = 25f
+                        gravity = Gravity.CENTER
+                        setBackground(roundRect(0xFFF0ECFB.toInt(), 13))
+                        layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { bottomMargin = dp(11) }
+                    }
+                    tile.addView(icon)
+                    addText(tile, module.title, 14f, true, TEXT)
+                    val description = TextView(this).apply {
+                        text = module.subtitle
+                        textSize = 11f
+                        setTextColor(MUTED)
+                        maxLines = 2
+                        setLineSpacing(dp(2).toFloat(), 1f)
+                        setPadding(0, dp(3), 0, dp(9))
+                    }
+                    tile.addView(description)
+                    addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                    row.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                        bottomMargin = dp(9)
+                        if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
+                    })
                 }
-                val icon = TextView(this).apply {
-                    text = module.icon
-                    textSize = 27f
-                    gravity = Gravity.CENTER
-                    setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
-                    layoutParams = LinearLayout.LayoutParams(dp(52), dp(52))
-                }
-                tile.addView(icon)
-                addText(tile, module.title, 15f, true, TEXT)
-                addText(tile, module.subtitle, 12f, false, MUTED)
-                addText(tile, "فتح الإدارة  ←", 12f, true, ACCENT)
-                val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
-                    bottomMargin = dp(10)
-                    if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
-                }
-                row.addView(tile, lp)
+                if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+                body.addView(row)
             }
-            if (pair.size == 1) {
-                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
-            }
-            body.addView(row)
         }
     }
 
