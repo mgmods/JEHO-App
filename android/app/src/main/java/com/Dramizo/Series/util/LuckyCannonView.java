@@ -38,7 +38,7 @@ public final class LuckyCannonView extends View {
     public void fire() {
         if (fireAnimator != null) fireAnimator.cancel();
         fireAnimator = ValueAnimator.ofFloat(0f, 1f);
-        fireAnimator.setDuration(420L);
+        fireAnimator.setDuration(175L);
         fireAnimator.setInterpolator(new DecelerateInterpolator());
         fireAnimator.addUpdateListener(a -> {
             fireProgress = (float) a.getAnimatedValue();
