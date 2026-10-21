@@ -12,6 +12,7 @@ import { Contest } from '../../database/entities/contest.entity';
 import { ContestEntry } from '../../database/entities/contest-entry.entity';
 import { Room } from '../../database/entities/room.entity';
 import { RoomSeat } from '../../database/entities/room-seat.entity';
+import { RoomAccess, RoomAccessGrant } from '../../database/entities/room-access.entity';
 import { AppSetting } from '../../database/entities/app-setting.entity';
 import { Wallet } from '../../database/entities/wallet.entity';
 import { User } from '../../database/entities/user.entity';
@@ -40,6 +41,7 @@ export class ContestsService implements OnModuleInit {
     @InjectRepository(ContestEntry) private readonly entriesRepo: Repository<ContestEntry>,
     @InjectRepository(Room) private readonly roomsRepo: Repository<Room>,
     @InjectRepository(RoomSeat) private readonly roomSeatsRepo: Repository<RoomSeat>,
+    @InjectRepository(RoomAccess) private readonly roomAccessRepo: Repository<RoomAccess>,
     @InjectRepository(AppSetting) private readonly settingsRepo: Repository<AppSetting>,
     @InjectRepository(Wallet) private readonly walletsRepo: Repository<Wallet>,
     @InjectRepository(User) private readonly usersRepo: Repository<User>,
@@ -325,13 +327,16 @@ export class ContestsService implements OnModuleInit {
     const roomAId = Array.isArray(sideA.roomIds) ? String(sideA.roomIds[0] || '') : '';
     const roomBId = Array.isArray(sideB.roomIds) ? String(sideB.roomIds[0] || '') : '';
     if (!roomAId || !roomBId || roomAId === roomBId) throw new BadRequestException('بيانات طرفي تحدّي PK غير صالحة');
-    const [roomA, roomB, ownSeats] = await Promise.all([
+    const [roomA, roomB, ownSeats, ownAccess] = await Promise.all([
       this.roomsRepo.findOne({ where: { id: roomAId } }),
       this.roomsRepo.findOne({ where: { id: roomBId } }),
       this.roomSeatsRepo.find({ where: [{ roomId: roomAId, userId }, { roomId: roomBId, userId }] }),
+      this.roomAccessRepo.find({ where: [{ roomId: roomAId, userId }, { roomId: roomBId, userId }] }),
     ]);
     if (!roomA || !roomB) throw new NotFoundException('أحد الرومين لم يعد متاحاً');
-    if (roomA.hostId !== userId && roomA.activeHostId !== userId && roomB.hostId !== userId && roomB.activeHostId !== userId && ownSeats.length === 0) {
+    const now = Date.now();
+    const hasRoomAccess = ownAccess.some((access) => access.grantType === RoomAccessGrant.PERMANENT || !access.expiresAt || access.expiresAt.getTime() > now);
+    if (roomA.hostId !== userId && roomA.activeHostId !== userId && roomB.hostId !== userId && roomB.activeHostId !== userId && ownSeats.length === 0 && !hasRoomAccess) {
       throw new BadRequestException('عرض مقاعد التحدّي متاح لأعضاء الرومين فقط');
     }
     const [seatsA, seatsB] = await Promise.all([
