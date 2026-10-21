@@ -206,6 +206,11 @@ export const mysteriousManApi = {
   update: (data) => safeRequest(() => api.patch('/admin/mysterious-man/config', data)),
 }
 
+export const toastManagerApi = {
+  get: () => safeRequest(() => api.get('/admin/toast-manager')),
+  save: (data) => safeRequest(() => api.patch('/admin/toast-manager', data)),
+}
+
 export const settingsApi = {
   get: () => safeRequest(() => api.get('/admin/settings')),
   update: (data) => safeRequest(() => api.patch('/admin/settings', data)),
