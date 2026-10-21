@@ -1793,8 +1793,8 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val roleValues = listOf("none", "manager", "super")
-        val roleLabels = listOf("بدون رتبة إدارية", "مانجر", "سوبر أدمن")
+        val roleValues = listOf("none", "manager", "admin", "super")
+        val roleLabels = listOf("بدون رتبة إدارية", "مانجر", "أدمن", "سوبر أدمن")
         val statusValues = listOf("active", "suspended", "banned")
         val statusLabels = listOf("نشط", "موقوف مؤقتاً", "محظور")
         fun makeSpinner(labels: List<String>, selected: Int): Spinner = Spinner(this).apply {
@@ -1828,7 +1828,7 @@ class AdminConsoleActivity : ThemedActivity() {
             })
             addView(statusSpinner, LinearLayout.LayoutParams(-1, dp(50)))
             addView(TextView(this@AdminConsoleActivity).apply {
-                text = "تأكد من اختيار الدور والحالة الصحيحين. ستُطبّق التغييرات عبر الخادم وفق الصلاحيات المعتمدة."
+                text = "اختر الدور والحالة معًا. إذا كان الحساب موقوفًا أو محظورًا، فلن يعمل تسجيل الدخول حتى تختار «نشط» صراحةً. يظل الخادم مسؤولًا عن التحقق من الصلاحيات."
                 textSize = 12f
                 setTextColor(MUTED)
                 setLineSpacing(dp(3).toFloat(), 1f)
