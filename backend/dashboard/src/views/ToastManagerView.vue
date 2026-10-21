@@ -8,8 +8,8 @@
         <button v-for="tab in tabs" :key="tab.key" type="button" class="toast-tab" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
       </div>
       <div class="toast-preview-wrap mt-3 mb-3">
-        <div v-if="activeTab !== 'luckyButton'" class="toast-canvas" :style="canvasStyle"
-             @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag">
+        <div v-if="activeTab !== 'luckyButton'" ref="canvasRef" class="toast-canvas" :style="canvasStyle"
+             @pointermove="moveDrag" @pointerup="stopDrag" @pointercancel="stopDrag" @lostpointercapture="stopDrag">
           <img v-if="currentStyle.backgroundUrl" class="toast-canvas-image" :src="resolveAsset(currentStyle.backgroundUrl)" alt="تصميم التوست" draggable="false" />
           <div class="preview-avatar drag-item" :style="avatarPreviewStyle" @pointerdown.stop="startDrag('avatar', $event)">🧑</div>
           <strong class="preview-title drag-item" :style="titlePreviewStyle" @pointerdown.stop="startDrag('title', $event)">{{ activeTab === 'giftSend' ? 'اسم المرسل' : 'الفائز المحظوظ' }}</strong>
@@ -59,6 +59,22 @@
           <div class="position-control">
             <label class="form-label">حجم صورة المستخدم: {{ currentStyle.avatarSizeDp }} dp</label>
             <input v-model.number="currentStyle.avatarSizeDp" class="form-range" type="range" min="20" max="76" step="2" />
+          </div>
+          <div class="position-control">
+            <label class="form-label">حجم اسم المرسل/الفائز: {{ currentStyle.titleSizeSp }} sp</label>
+            <input v-model.number="currentStyle.titleSizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+            <label class="form-label">حجم كتابة «أرسل هدية»/المردود: {{ currentStyle.bodySizeSp }} sp</label>
+            <input v-model.number="currentStyle.bodySizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+            <label class="form-label">حجم عداد X: {{ currentStyle.countSizeSp }} sp</label>
+            <input v-model.number="currentStyle.countSizeSp" class="form-range" type="range" min="8" max="30" step="1" />
+          </div>
+          <div class="position-control">
+            <label class="form-label">ارتفاع كتابة «أرسل هدية»/المردود: {{ currentStyle.bodyY }}%</label>
+            <input v-model.number="currentStyle.bodyY" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">ارتفاع اسم المرسل/الفائز: {{ currentStyle.textY }}%</label>
+            <input v-model.number="currentStyle.textY" class="form-range" type="range" min="0" max="100" step="1" />
+            <label class="form-label">ارتفاع عداد X: {{ currentStyle.countY }}%</label>
+            <input v-model.number="currentStyle.countY" class="form-range" type="range" min="0" max="100" step="1" />
           </div>
           <div class="position-control small text-secondary">
             اسحب الصورة والاسم والمردود وعداد X إلى أي مكان داخل التوست. موضع كل عنصر محفوظ بشكل مستقل كنسبة مئوية، ويُستخدم نفسه في معاينة الداشبورد والتوست الفعلي بالتطبيق.
@@ -143,7 +159,7 @@ const tabs = [
 ]
 const activeTab = ref('giftSend')
 const form = reactive({
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44, titleSizeSp: 13, bodySizeSp: 12, countSizeSp: 12 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: false, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
@@ -162,18 +178,19 @@ const canvasStyle = computed(() => ({
   boxShadow: 'none',
 }))
 const avatarPreviewStyle = computed(() => ({ left: currentStyle.value.avatarX + '%', top: currentStyle.value.avatarY + '%', width: currentStyle.value.avatarSizeDp + 'px', height: currentStyle.value.avatarSizeDp + 'px' }))
-const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%' }))
-const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%' }))
-const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%' }))
+const titlePreviewStyle = computed(() => ({ left: currentStyle.value.textX + '%', top: currentStyle.value.textY + '%', fontSize: (Number(currentStyle.value.titleSizeSp) || 13) + 'px' }))
+const bodyPreviewStyle = computed(() => ({ left: currentStyle.value.bodyX + '%', top: currentStyle.value.bodyY + '%', fontSize: (Number(currentStyle.value.bodySizeSp) || 12) + 'px' }))
+const countPreviewStyle = computed(() => ({ left: currentStyle.value.countX + '%', top: currentStyle.value.countY + '%', fontSize: (Number(currentStyle.value.countSizeSp) || 12) + 'px' }))
+const canvasRef = ref(null)
 const dragTarget = ref('')
 function startDrag(target, event) {
   if (activeTab.value === 'luckyButton') return
   dragTarget.value = target
-  try { event.currentTarget.setPointerCapture(event.pointerId) } catch {}
+  try { (canvasRef.value || event.currentTarget).setPointerCapture(event.pointerId) } catch {}
 }
 function moveDrag(event) {
   if (!dragTarget.value) return
-  const rect = event.currentTarget.getBoundingClientRect()
+  const rect = (canvasRef.value || event.currentTarget).getBoundingClientRect()
   if (!rect.width || !rect.height) return
   const x = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100))
   const y = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
@@ -211,6 +228,9 @@ async function load() {
       widthDp: Math.max(220, Math.min(360, Number(incoming.widthDp) || 340)),
       heightDp: Math.max(60, Math.min(180, Number(incoming.heightDp) || 100)),
       avatarSizeDp: Math.max(20, Math.min(76, Number(incoming.avatarSizeDp) || 44)),
+      titleSizeSp: Math.max(8, Math.min(30, Number(incoming.titleSizeSp) || 13)),
+      bodySizeSp: Math.max(8, Math.min(30, Number(incoming.bodySizeSp) || 12)),
+      countSizeSp: Math.max(8, Math.min(30, Number(incoming.countSizeSp) || 12)),
     })
   }
   Object.assign(form.luckyButton, {
