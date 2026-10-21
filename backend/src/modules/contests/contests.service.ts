@@ -218,6 +218,7 @@ export class ContestsService implements OnModuleInit {
     targetRoomId: string;
     durationMinutes?: number;
     scoringMode?: string;
+    goalScore?: number;
   }) {
     if (!(await this.isRoomPkEnabled(true))) throw new BadRequestException('تحديات PK متوقفة حالياً من الإدارة');
     const source = await this.findRoomByPkReference(input.roomId);
@@ -228,6 +229,7 @@ export class ContestsService implements OnModuleInit {
     const durationMinutes = Math.max(1, Math.min(120, Math.floor(Number(input.durationMinutes) || 10)));
     const scoringMode = ['coins', 'diamonds', 'gifts', 'points'].includes(String(input.scoringMode))
       ? String(input.scoringMode) : 'coins';
+    const goalScore = Math.max(0, Math.min(1_000_000_000, Math.floor(Number(input.goalScore) || 0)));
     const existing = await this.contestsRepo.find({
       where: { challengeType: 'room_vs_room', status: In(['active', 'upcoming']) },
       take: 500,
@@ -282,6 +284,7 @@ export class ContestsService implements OnModuleInit {
         invitedByUserId: userId,
         durationMinutes,
         scoringMode,
+        goalScore,
         createdAt: now.toISOString(),
       },
       isInteractive: true,
@@ -295,13 +298,15 @@ export class ContestsService implements OnModuleInit {
       sourceRoomName: source.title,
       targetRoomName: target.title,
       durationMinutes,
+      scoringMode,
+      goalScore,
       status: 'pending',
     };
     this.emitRoomPkEvent([source.id, target.id], 'contest:pk-invite', payload);
     this.notifications.notifyUser(target.hostId, NotificationType.ROOM, '⚔ دعوة تحدّي PK جديدة',
       source.title + ' يتحدّى رومك لمدة ' + durationMinutes + ' دقيقة. افتح الروم لقبول الدعوة أو رفضها.',
       { kind: 'room_pk_invitation', contestId: saved.id, roomId: target.id, sourceRoomId: source.id,
-        targetRoomId: target.id, sourceRoomName: source.title, targetRoomName: target.title, durationMinutes, scoringMode });
+        targetRoomId: target.id, sourceRoomName: source.title, targetRoomName: target.title, durationMinutes, scoringMode, goalScore });
     return { contest: saved, message: 'تم إرسال دعوة تحدّي PK إلى الروم المنافس' };
   }
 
@@ -339,6 +344,7 @@ export class ContestsService implements OnModuleInit {
       sideB: saved.sideB,
       endAt: saved.endAt.toISOString(),
       durationMinutes,
+      goalScore: Math.max(0, Number(rules.goalScore || 0)),
       winner: 'draw',
       status: accept ? 'active' : 'rejected',
     };
@@ -578,10 +584,18 @@ export class ContestsService implements OnModuleInit {
             where: { id: c.id },
             lock: { mode: 'pessimistic_write' },
           });
-          if (!locked) return null;
+          if (!locked || locked.status !== 'active') return null;
           const side = { ...(((locked as any)[sideKey] as Record<string, unknown> | null) || {}) };
           side.score = Math.max(0, Number(side.score || 0)) + scoreDelta;
           (locked as any)[sideKey] = side;
+          const rules = (locked.rules || {}) as Record<string, unknown>;
+          const goal = Math.max(0, Number(rules.goalScore || 0));
+          const aScore = Math.max(0, Number(((locked.sideA || {}) as Record<string, unknown>).score || 0));
+          const bScore = Math.max(0, Number(((locked.sideB || {}) as Record<string, unknown>).score || 0));
+          if (goal > 0 && (aScore >= goal || bScore >= goal)) {
+            locked.status = 'ended';
+            locked.endAt = new Date();
+          }
           return manager.save(locked);
         });
         if (!updated) continue;
@@ -608,6 +622,7 @@ export class ContestsService implements OnModuleInit {
             at: payload.at,
           });
         }
+        if (updated.status === 'ended') this.emitTeamChallengeEnded(updated);
         continue;
       }
       const entry = await this.entriesRepo.findOne({
