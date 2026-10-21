@@ -64,7 +64,13 @@ export class AdminGuard implements CanActivate {
         // review catalogs but cannot mint VIP, cosmetics, or vanity IDs.
         /\/admin\/vip\/assign(?:\/|$)/.test(path) ||
         /\/admin\/cosmetics\/grant(?:\/|$)/.test(path) ||
-        /\/vanity-ids\/admin\/assign(?:\/|$)/.test(path);
+        /\/vanity-ids\/admin\/assign(?:\/|$)/.test(path) ||
+        /\/admin\/notifications\/send(?:\/|$)/.test(path) ||
+        /\/admin\/toast-manager(?:\/|$)/.test(path) ||
+        /\/admin\/mysterious-man(?:\/|$)/.test(path) ||
+        /\/admin\/lucky-gift-cannon(?:\/|$)/.test(path) ||
+        /\/admin\/support-chest(?:\/|$)/.test(path) ||
+        /\/admin\/settings(?:\/|$)/.test(path);
       if (role === 'admin' && superOnlyPath) {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
