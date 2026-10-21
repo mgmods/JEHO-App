@@ -60,6 +60,9 @@ export class AdminGuard implements CanActivate {
         /\/admin\/gifts\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path) ||
+        // Closing a room disrupts everyone in it; keep it Super Admin only,
+        // matching the native console's visible action policy.
+        (method === 'POST' && /\\/admin\\/rooms\\/[^/]+\\/close(?:\\/|$)/.test(path)) ||
         // Deleting rooms is destructive; keep it Super Admin only.
         (method === 'DELETE' && /\/admin\/rooms\/[^/]+(?:\/|$)/.test(path)) ||
         // Granting account-bound benefits is Super Admin only; staff may
