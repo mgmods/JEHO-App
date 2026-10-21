@@ -68,6 +68,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("mysteriousMan", "الرجل الغامض", "تفعيل الهوية الموحدة ومستويات VIP", "🕶️"),
         Module("luckyCannon", "مدفع المحظوظ", "التفعيل ومدة الظهور والصوت", "💎"),
         Module("supportChest", "صندوق الدعم", "الهدف والمكافأة وظهور الأيقونة", "🎁"),
+        Module("roomPkSettings", "تحديات PK بين الرومات", "تشغيل الميزة أو إيقافها للجميع", "⚔️"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
@@ -339,6 +340,7 @@ class AdminConsoleActivity : ThemedActivity() {
             "mysteriousMan" -> showMysteriousManSettings()
             "luckyCannon" -> showLuckyCannonSettings()
             "supportChest" -> showSupportChestSettings()
+            "roomPkSettings" -> showRoomPkSettings()
             "notifications" -> {
                 body.addView(button("＋ رسالة عامة أو خاصة + إشعار") { showNotificationDialog() })
                 body.addView(button("✉ رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
@@ -346,6 +348,32 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
             "staffIdentity" -> showStaffIdentityEditor()
+        }
+    }
+
+    private fun showRoomPkSettings() {
+        load(api.adminSettings()) { raw ->
+            val root = featureMap(raw)
+            val settings = featureMap(root["settings"] ?: root["items"] ?: root)
+            val row = (settings as? Map<*, *>)?.get("features.room_pk_enabled")
+            val rawValue = if (row is Map<*, *>) row["value"] else row
+            val enabledNow = when (rawValue?.toString()?.lowercase()) {
+                "0", "false", "no", "off" -> false
+                "1", "true", "yes", "on" -> true
+                else -> true
+            }
+            val panel = card()
+            addText(panel, "تحديات PK بين الرومات", 17f, true, TEXT)
+            addText(panel, "هذا المفتاح عام فقط. عند الإيقاف تتوقف تحديات الرومات للجميع، ولا يتغير اتصال ZEGO أو الصوت أو المقاعد.", 12f, false, MUTED)
+            val enabled = featureCheck(panel, "تفعيل تحديات PK", enabledNow)
+            body.addView(panel)
+            body.addView(button("حفظ حالة تحديات PK") {
+                val payload = mapOf("features.room_pk_enabled" to enabled.isChecked.toString())
+                load(api.updateAdminSettings(payload)) {
+                    toast(if (enabled.isChecked) "تم تفعيل تحديات PK" else "تم إيقاف تحديات PK")
+                    openModule("roomPkSettings")
+                }
+            })
         }
     }
 
