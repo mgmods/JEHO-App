@@ -355,6 +355,47 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async searchConversations(userId: string, rawQuery: string, query: PaginationDto) {
+    const term = String(rawQuery || '').trim().slice(0, 120);
+    if (term.length < 2) return paginate([], 0, query.page || 1, query.limit || 20);
+    const needle = `%${term.toLocaleLowerCase() .replace(/\\\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+    const qb = this.partRepo
+      .createQueryBuilder('p')
+      .innerJoinAndSelect('p.conversation', 'c')
+      .leftJoinAndSelect('c.participants', 'parts')
+      .leftJoinAndSelect('parts.user', 'u')
+      .leftJoinAndSelect('u.profile', 'up')
+      .leftJoin('c.participants', 'peerPart', 'peerPart.userId <> :userId', { userId })
+      .leftJoin('peerPart.user', 'peer')
+      .leftJoin('peer.profile', 'peerProfile')
+      .leftJoin('c.messages', 'matchedMessage', 'matchedMessage.isUnsent = false')
+      .where('p.userId = :userId', { userId })
+      .andWhere('p.isDeleted = false')
+      .andWhere('p.isArchived = false')
+      .andWhere(
+        "(LOWER(COALESCE(peer.username, '')) LIKE :needle ESCAPE '\\\\' OR LOWER(COALESCE(peerProfile.displayName, '')) LIKE :needle ESCAPE '\\\\' OR LOWER(CAST(peer.id AS text)) LIKE :needle ESCAPE '\\\\' OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle ESCAPE '\\\\')",
+        { needle },
+      )
+      .distinct(true)
+      .orderBy('p.isPinned', 'DESC')
+      .addOrderBy('c.lastMessageAt', 'DESC', 'NULLS LAST')
+      .skip(query.skip)
+      .take(Math.min(Math.max(query.limit || 20, 1), 50));
+
+    const [parts, total] = await qb.getManyAndCount();
+    const peerIds: string[] = [];
+    for (const part of parts) {
+      for (const peer of part.conversation?.participants || []) {
+        if (peer.userId && peer.userId !== userId) peerIds.push(peer.userId);
+      }
+    }
+    const vipByUser = await this.vipMapForUsers(peerIds);
+    const items = await Promise.all(
+      parts.map((p) => this.decorateConversation(p.conversation, userId, vipByUser)),
+    );
+    return paginate(items, total, query.page || 1, Math.min(Math.max(query.limit || 20, 1), 50));
+  }
+
   async listConversations(userId: string, query: PaginationDto) {
     const qb = this.partRepo
       .createQueryBuilder('p')
