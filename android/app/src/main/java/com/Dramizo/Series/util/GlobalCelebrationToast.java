@@ -185,7 +185,7 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
-        refreshToastStyle(activity);
+        if ("gift_send".equalsIgnoreCase(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
             return;
@@ -265,6 +265,7 @@ public final class GlobalCelebrationToast {
         boolean planet = kind != null && "planet_summon".equalsIgnoreCase(kind);
         boolean gameOrLucky = kind != null && (
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
+        boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
@@ -330,7 +331,6 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
         boolean showTimes = multiplier >= 1 && (gameOrLucky || giftSend || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
@@ -379,15 +379,15 @@ public final class GlobalCelebrationToast {
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String imageUrl = AssetCatalog.absoluteUrl(remoteBackgroundUrl);
+            String imageUrl = giftSend ? AssetCatalog.absoluteUrl(remoteBackgroundUrl) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 toastBackground.setVisibility(View.VISIBLE);
                 try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
             } else toastBackground.setVisibility(View.GONE);
         }
-        banner.setElevation(dp(activity, remoteFrameGlowEnabled ? 20 : 14));
-        if (sheen != null && remoteShineEnabled) {
+        banner.setElevation(dp(activity, giftSend && remoteFrameGlowEnabled ? 20 : 14));
+        if (sheen != null && giftSend && remoteShineEnabled) {
             sheen.setVisibility(View.VISIBLE);
             GradientDrawable shine = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
@@ -427,7 +427,9 @@ public final class GlobalCelebrationToast {
                     .start();
         }
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L);
+        MAIN.postDelayed(hideRunnable, giftSend
+                ? Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L
+                : (canOpenRoom ? 6200L : 5200L));
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
