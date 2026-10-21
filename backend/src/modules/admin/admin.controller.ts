@@ -128,6 +128,22 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Get('staff-identity')
+  @ApiOperation({ summary: 'Read native platform staff identity assets' })
+  getStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Patch('staff-identity')
+  @ApiOperation({ summary: 'Update native platform staff identity assets' })
+  patchStaffIdentityConfig(@Body() body: Record<string, unknown>) {
+    return this.adminService.patchStaffIdentityConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('mysterious-man/config')
   @ApiOperation({ summary: 'Get shared Mysterious Man media configured by dashboard' })
   getMysteriousManConfig() {
