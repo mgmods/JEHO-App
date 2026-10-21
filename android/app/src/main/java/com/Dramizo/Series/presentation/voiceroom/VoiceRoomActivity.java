@@ -9852,6 +9852,19 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 showModeratorTools();
             });
         }
+        TextView btnRoomPk = sheet.findViewById(R.id.btnRoomPkChallenge);
+        if (btnRoomPk != null) {
+            boolean canStartPk = isOwner && roomPkFeatureEnabled && roomPkCurrentContestId == null;
+            btnRoomPk.setVisibility(canStartPk ? View.VISIBLE : View.GONE);
+            btnRoomPk.setOnClickListener(v -> {
+                if (!isOwner || !roomPkFeatureEnabled) {
+                    Toast.makeText(this, "تحدّي PK غير متاح حالياً", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                dialog.dismiss();
+                showRoomPkChallengeDialog();
+            });
+        }
         wireGiftSoundsSwitch(sheet);
         dialog.show();
     }
@@ -12682,36 +12695,13 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         return o.optDouble(key, fallback);
     }
 
-    /** Load an already-running room-vs-room PK when a user enters either room. */
+    /** PK challenge is launched from Room Settings, not floated over the room header. */
     private void ensureRoomPkActionButton() {
-        if (binding == null) return;
-        if (roomPkActionButton == null) {
-            roomPkActionButton = new TextView(this);
-            roomPkActionButton.setText("⚔ تحدّي PK");
-            roomPkActionButton.setTextColor(Color.WHITE);
-            roomPkActionButton.setTextSize(12f);
-            roomPkActionButton.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-            roomPkActionButton.setGravity(Gravity.CENTER);
-            roomPkActionButton.setPadding(dp(12), dp(8), dp(12), dp(8));
-            GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                    new int[]{0xFFE53955, 0xFF7C3AED, 0xFFDAA520});
-            bg.setCornerRadius(dp(18));
-            bg.setStroke(dp(1), 0xFFFFE6A6);
-            roomPkActionButton.setBackground(bg);
-            roomPkActionButton.setElevation(dp(24));
-            roomPkActionButton.setOnClickListener(v -> showRoomPkChallengeDialog());
-            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams lp =
-                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(
-                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT,
-                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
-            lp.topToBottom = R.id.tvRoomViewerCount;
-            lp.startToStart = R.id.tvRoomViewerCount;
-            lp.endToEnd = R.id.tvRoomViewerCount;
-            lp.setMargins(0, dp(6), 0, 0);
-            binding.headerRoom.addView(roomPkActionButton, lp);
+        if (roomPkActionButton != null) {
+            ViewGroup parent = (ViewGroup) roomPkActionButton.getParent();
+            if (parent != null) parent.removeView(roomPkActionButton);
+            roomPkActionButton = null;
         }
-        boolean canStart = isOwner && roomPkFeatureEnabled;
-        roomPkActionButton.setVisibility(canStart && roomPkCurrentContestId == null ? View.VISIBLE : View.GONE);
     }
 
     private void showRoomPkChallengeDialog() {
