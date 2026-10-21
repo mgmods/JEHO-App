@@ -12694,13 +12694,103 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void showRoomPkInviteDialog(com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest) {
         if (isFinishing() || contest == null || contest.id == null) return;
         String sourceName = contest.sideA != null ? firstNonEmpty(contest.sideA.name, "الروم المنافس") : "الروم المنافس";
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("⚔ وصلتك دعوة تحدّي PK")
-                .setMessage(sourceName + " يتحدّى رومك. هل تقبل التحدّي؟")
+        int minutes = 10;
+        String mode = firstNonEmpty(contest.scoringMode, "coins");
+        if (contest.rules != null) {
+            Object duration = contest.rules.get("durationMinutes");
+            if (duration instanceof Number) minutes = Math.max(1, ((Number) duration).intValue());
+            Object scoring = contest.rules.get("scoringMode");
+            if (scoring != null) mode = String.valueOf(scoring);
+        }
+        String modeLabel = "diamonds".equals(mode) ? "💎 الألماسات"
+                : "gifts".equals(mode) ? "🎁 عدد الهدايا"
+                : "points".equals(mode) ? "⭐ النقاط" : "🪙 الكوينز";
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(14), dp(18), dp(12));
+        card.setBackground(roomPkRoundedBackground(0xFFF7F8FC, 0xFFE2E7F0, 20));
+
+        LinearLayout hero = new LinearLayout(this);
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(dp(14), dp(16), dp(14), dp(16));
+        hero.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                new int[]{0xFFEF315B, 0xFF8B36C9, 0xFFD9A62E}));
+        ((GradientDrawable) hero.getBackground()).setCornerRadius(dp(18));
+        TextView icon = new TextView(this);
+        icon.setText("⚔");
+        icon.setTextSize(28f);
+        icon.setTextColor(Color.WHITE);
+        hero.addView(icon);
+        TextView title = new TextView(this);
+        title.setText("دعوة تحدّي روم ضد روم");
+        title.setTextSize(18f);
+        title.setTextColor(Color.WHITE);
+        title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        hero.addView(title);
+        TextView subtitle = new TextView(this);
+        subtitle.setText("وصلتك مواجهة جديدة — هل أنت مستعد؟");
+        subtitle.setTextSize(12f);
+        subtitle.setTextColor(0xFFFFEEF3);
+        subtitle.setPadding(0, dp(4), 0, 0);
+        hero.addView(subtitle);
+        card.addView(hero);
+
+        TextView challenge = new TextView(this);
+        challenge.setText("🏠  " + sourceName + "\nيتحدّى رومك ويريد بدء المواجهة.");
+        challenge.setTextColor(0xFF202A3D);
+        challenge.setTextSize(15f);
+        challenge.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        challenge.setPadding(dp(13), dp(13), dp(13), dp(13));
+        challenge.setBackground(roomPkRoundedBackground(Color.WHITE, 0xFFDCE2ED, 13));
+        LinearLayout.LayoutParams challengeParams = new LinearLayout.LayoutParams(-1, -2);
+        challengeParams.topMargin = dp(12);
+        card.addView(challenge, challengeParams);
+
+        LinearLayout stats = new LinearLayout(this);
+        stats.setOrientation(LinearLayout.HORIZONTAL);
+        stats.setPadding(0, dp(11), 0, 0);
+        TextView duration = new TextView(this);
+        duration.setText("⏱  " + minutes + " دقيقة");
+        duration.setGravity(Gravity.CENTER);
+        duration.setTextColor(0xFF4E5870);
+        duration.setTextSize(12f);
+        duration.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        duration.setPadding(dp(7), dp(10), dp(7), dp(10));
+        stats.addView(duration, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView scoring = new TextView(this);
+        scoring.setText(modeLabel);
+        scoring.setGravity(Gravity.CENTER);
+        scoring.setTextColor(0xFF4E5870);
+        scoring.setTextSize(12f);
+        scoring.setBackground(roomPkRoundedBackground(0xFFEEF2F9, 0xFFDCE3EF, 11));
+        scoring.setPadding(dp(7), dp(10), dp(7), dp(10));
+        LinearLayout.LayoutParams scoringParams = new LinearLayout.LayoutParams(0, -2, 1f);
+        scoringParams.leftMargin = dp(8);
+        stats.addView(scoring, scoringParams);
+        card.addView(stats);
+
+        TextView note = new TextView(this);
+        note.setText("عند القبول يبدأ التحدّي مباشرة ويظهر شريط النتيجة والوقت في الرومين.");
+        note.setTextColor(0xFF727C8F);
+        note.setTextSize(11f);
+        note.setPadding(dp(3), dp(11), dp(3), 0);
+        card.addView(note);
+
+        androidx.appcompat.app.AlertDialog dialog = new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setView(card)
                 .setPositiveButton("قبول التحدّي", (d, which) -> respondToRoomPkInvite(contest.id, true))
-                .setNegativeButton("رفض", (d, which) -> respondToRoomPkInvite(contest.id, false))
-                .setOnCancelListener(d -> shownRoomPkInvites.remove(contest.id))
-                .show();
+                .setNegativeButton("رفض الدعوة", (d, which) -> respondToRoomPkInvite(contest.id, false))
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setTextColor(0xFFC52250);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                    .setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).setTextColor(0xFF687386);
+        });
+        dialog.setOnCancelListener(d -> shownRoomPkInvites.remove(contest.id));
+        dialog.show();
     }
 
     private void respondToRoomPkInvite(String contestId, boolean accept) {
