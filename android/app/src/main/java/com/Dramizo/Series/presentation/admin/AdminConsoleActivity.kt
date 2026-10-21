@@ -65,6 +65,9 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("rechargeAgents", "وكلاء الشحن", "إضافة الوكلاء وإدارة حالتهم", "💰"),
         Module("notifications", "الرسائل والإشعارات", "رسائل عامة أو خاصة بعنوان ومحتوى", "🔔"),
         Module("toastManager", "التوستات والمؤثرات", "خلفيات التوستات واللمعة والمدة وزر المحظوظ", "✨"),
+        Module("mysteriousMan", "الرجل الغامض", "تفعيل الهوية الموحدة ومستويات VIP", "🕶️"),
+        Module("luckyCannon", "مدفع المحظوظ", "التفعيل ومدة الظهور والصوت", "💎"),
+        Module("supportChest", "صندوق الدعم", "الهدف والمكافأة وظهور الأيقونة", "🎁"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
@@ -333,6 +336,9 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(plansButton)
             }
             "toastManager" -> showToastManager()
+            "mysteriousMan" -> showMysteriousManSettings()
+            "luckyCannon" -> showLuckyCannonSettings()
+            "supportChest" -> showSupportChestSettings()
             "notifications" -> {
                 body.addView(button("＋ رسالة عامة أو خاصة + إشعار") { showNotificationDialog() })
                 body.addView(button("✉ رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
@@ -340,6 +346,131 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
             "staffIdentity" -> showStaffIdentityEditor()
+        }
+    }
+
+    private fun featureField(parent: LinearLayout, label: String, value: String, hint: String = ""): EditText {
+        addText(parent, label, 13f, true, TEXT)
+        val input = EditText(this).apply {
+            setSingleLine(true)
+            textSize = 13f
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            this.hint = hint
+            background = roundRect(Color.WHITE, 12)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            setText(value)
+        }
+        parent.addView(input, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        return input
+    }
+
+    private fun featureCheck(parent: LinearLayout, label: String, value: Boolean): android.widget.CheckBox {
+        return android.widget.CheckBox(this).apply {
+            text = label
+            isChecked = value
+            setTextColor(TEXT)
+            textSize = 13f
+            parent.addView(this)
+        }
+    }
+
+    private fun featureMap(data: Any?): Map<*, *> = data as? Map<*, *> ?: emptyMap<Any, Any>()
+    private fun featureString(map: Map<*, *>, key: String, fallback: String = ""): String =
+        map[key]?.toString() ?: fallback
+    private fun featureBool(map: Map<*, *>, key: String, fallback: Boolean = false): Boolean =
+        map[key] as? Boolean ?: fallback
+
+    private fun showMysteriousManSettings() {
+        load(api.mysteriousManConfig()) { raw ->
+            val cfg = featureMap(raw)
+            val panel = card()
+            addText(panel, "إعدادات الرجل الغامض", 17f, true, TEXT)
+            addText(panel, "إيقاف الميزة من هنا يلغي وضع الهوية الغامضة للمستخدمين على الخادم.", 12f, false, MUTED)
+            val enabled = featureCheck(panel, "تفعيل الميزة عالمياً", featureBool(cfg, "enabled"))
+            val levels = featureField(panel, "مستويات VIP المسموحة (مثال: 1,2,3)", (cfg["eligibleVipLevels"] as? List<*>)?.joinToString(",") ?: "")
+            val avatar = featureField(panel, "رابط الصورة الموحدة", featureString(cfg, "avatarUrl"), "https://… أو /uploads/…")
+            val entryMode = featureField(panel, "نوع الدخولية: video أو text", featureString(cfg, "entryMode", "video"))
+            val entryText = featureField(panel, "نص الدخولية", featureString(cfg, "entryText", "دخل الرجل الغامض"))
+            val entryEffect = featureField(panel, "رابط الدخولية المتحركة", featureString(cfg, "entryEffectUrl"), "https://… أو /uploads/…")
+            val messageEffect = featureField(panel, "رابط تأثير الرسائل", featureString(cfg, "messageEffectUrl"), "https://… أو /uploads/…")
+            body.addView(panel)
+            body.addView(button("حفظ إعدادات الرجل الغامض") {
+                val payload = linkedMapOf<String, Any>(
+                    "enabled" to enabled.isChecked,
+                    "eligibleVipLevels" to levels.text.toString().split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 1..7 }.distinct().sorted(),
+                    "avatarUrl" to avatar.text.toString().trim(),
+                    "entryMode" to if (entryMode.text.toString().trim().equals("text", true)) "text" else "video",
+                    "entryText" to entryText.text.toString().trim(),
+                    "entryEffectUrl" to entryEffect.text.toString().trim(),
+                    "messageEffectUrl" to messageEffect.text.toString().trim()
+                )
+                load(api.updateMysteriousManConfig(payload)) {
+                    toast("تم حفظ إعدادات الرجل الغامض")
+                    openModule("mysteriousMan")
+                }
+            })
+        }
+    }
+
+    private fun showLuckyCannonSettings() {
+        load(api.luckyCannonConfig()) { raw ->
+            val cfg = featureMap(raw)
+            val panel = card()
+            addText(panel, "مدفع هدايا المحظوظ", 17f, true, TEXT)
+            addText(panel, "تُطبّق الإعدادات على زر المحظوظ فقط، ولا تغيّر إرسال الهدايا أو خصم العملات.", 12f, false, MUTED)
+            val enabled = featureCheck(panel, "تفعيل زر المحظوظ داخل الرومات", featureBool(cfg, "enabled", true))
+            val duration = featureField(panel, "مدة الظهور بالثواني (1–10)", featureString(cfg, "durationSeconds", "2"))
+            val sound = featureCheck(panel, "صوت ضغط خفيف", featureBool(cfg, "soundEnabled", true))
+            body.addView(panel)
+            body.addView(button("حفظ إعدادات مدفع المحظوظ") {
+                val payload = linkedMapOf<String, Any>(
+                    "enabled" to enabled.isChecked,
+                    "durationSeconds" to (duration.text.toString().toIntOrNull() ?: 2).coerceIn(1, 10),
+                    "soundEnabled" to sound.isChecked
+                )
+                load(api.updateLuckyCannonConfig(payload)) {
+                    toast("تم حفظ إعدادات مدفع المحظوظ")
+                    openModule("luckyCannon")
+                }
+            })
+        }
+    }
+
+    private fun showSupportChestSettings() {
+        load(api.supportChestConfig()) { raw ->
+            val cfg = featureMap(raw)
+            val panel = card()
+            addText(panel, "صندوق الدعم اليومي", 17f, true, TEXT)
+            val enabled = featureCheck(panel, "تفعيل الصندوق", featureBool(cfg, "enabled"))
+            val iconVisible = featureCheck(panel, "إظهار أيقونة الصندوق", featureBool(cfg, "iconVisible", true))
+            val mode = featureField(panel, "نوع الهدف: coins أو diamonds أو both", featureString(cfg, "goalMode", "coins"))
+            val coinTarget = featureField(panel, "هدف العملات", featureString(cfg, "coinTarget", "100000"))
+            val diamondTarget = featureField(panel, "هدف الماسات", featureString(cfg, "diamondTarget", "10000"))
+            val giftIds = featureField(panel, "معرّفات الهدايا المؤهلة (مفصولة بفواصل)", (cfg["giftIds"] as? List<*>)?.joinToString(",") ?: "")
+            val rewardType = featureField(panel, "نوع المكافأة: none / coins / diamonds / frame / badge", featureString(cfg, "rewardType", "none"))
+            val rewardItem = featureField(panel, "معرّف عنصر المكافأة (للإطار أو الشارة)", featureString(cfg, "rewardItemId"))
+            val rewardAmount = featureField(panel, "قيمة المكافأة", featureString(cfg, "rewardAmount", "0"))
+            val instructions = featureField(panel, "تعليمات الصندوق", featureString(cfg, "instructions", ""))
+            body.addView(panel)
+            body.addView(button("حفظ إعدادات صندوق الدعم") {
+                val payload = linkedMapOf<String, Any>(
+                    "enabled" to enabled.isChecked,
+                    "iconVisible" to iconVisible.isChecked,
+                    "goalMode" to mode.text.toString().trim().lowercase().let { if (it in listOf("coins", "diamonds", "both")) it else "coins" },
+                    "coinTarget" to (coinTarget.text.toString().toLongOrNull() ?: 100000L),
+                    "diamondTarget" to (diamondTarget.text.toString().toLongOrNull() ?: 10000L),
+                    "giftIds" to giftIds.text.toString().split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+                    "rewardType" to rewardType.text.toString().trim().lowercase().let { if (it in listOf("none", "coins", "diamonds", "frame", "badge")) it else "none" },
+                    "rewardItemId" to rewardItem.text.toString().trim(),
+                    "rewardAmount" to (rewardAmount.text.toString().toLongOrNull() ?: 0L),
+                    "instructions" to instructions.text.toString().trim()
+                )
+                load(api.updateSupportChestConfig(payload)) {
+                    toast("تم حفظ إعدادات صندوق الدعم")
+                    openModule("supportChest")
+                }
+            })
         }
     }
 
