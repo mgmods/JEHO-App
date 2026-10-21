@@ -143,8 +143,8 @@ public final class RemoteNavIcons {
     public static boolean isChannelVerified(@Nullable String key) {
         MiscDtos.NavIconsDto cfg = cached;
         if (cfg == null) return true;
-        if ("officialNews".equals(key)) return cfg.officialNewsVerified;
-        if ("adminMessages".equals(key)) return cfg.adminMessagesVerified;
+        if ("officialNews".equals(key)) return cfg.officialNewsVerified == null || cfg.officialNewsVerified;
+        if ("adminMessages".equals(key)) return cfg.adminMessagesVerified == null || cfg.adminMessagesVerified;
         return false;
     }
 
