@@ -128,7 +128,7 @@ class AdminConsoleActivity : ThemedActivity() {
             visibility = View.GONE
             setOnClickListener { handleAdminBack() }
         }
-        val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         titleView = TextView(this).apply {
             text = "مركز إدارة JEHO"
             textSize = 19f
@@ -208,7 +208,7 @@ class AdminConsoleActivity : ThemedActivity() {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(12) }
         }
         brandRow.addView(brandMark)
-        val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         addText(brandCopy, "مركز إدارة JEHO", 10f, true, 0xFFD9D0FF.toInt())
         addText(brandCopy, "مساحة الإدارة والتحكم", 15f, true, Color.WHITE)
         brandRow.addView(brandCopy, LinearLayout.LayoutParams(0, -2, 1f))
@@ -2137,7 +2137,7 @@ class AdminConsoleActivity : ThemedActivity() {
         form.second[1].setSingleLine(false)
         form.second[1].minLines = 3
         form.second[1].minHeight = dp(92)
-        val imageRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val imageRow = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
         imageRow.addView(button("＋ رفع صورة من الجهاز") {
             val pick = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
             startActivityForResult(Intent.createChooser(pick, "اختيار صورة الرسالة"), notificationImageRequestCode)
@@ -2296,7 +2296,7 @@ class AdminConsoleActivity : ThemedActivity() {
                     val fieldKey = "$roleKey.$assetKey"
                     val input = identityInput(assetLabel, roleData[assetKey]?.toString().orEmpty())
                     staffIdentityFields[fieldKey] = input
-                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
                     row.addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
                     row.addView(button("رفع") {
                         pendingIdentityFieldKey = fieldKey
