@@ -40,6 +40,7 @@
           </span>
           <span class="uc__chip">{{ genderLabel }}</span>
           <span v-if="staffRole === 'super'" class="uc__chip uc__chip--gold">{{ t('users.roleSuper') }}</span>
+          <span v-else-if="staffRole === 'admin'" class="uc__chip uc__chip--cyan">أدمن</span>
           <span v-else-if="staffRole === 'manager'" class="uc__chip uc__chip--cyan">{{ t('users.roleManager') }}</span>
           <span v-if="user.genderVerified" class="uc__chip uc__chip--ok">موثّقة</span>
         </div>
@@ -146,6 +147,7 @@ const popularityScore = computed(() => props.user.popularityScore ?? 0)
 const staffRole = computed(() => {
   const raw = String(props.user.staffRole || '').toLowerCase()
   if (raw === 'super' || raw === 'super_admin' || props.user.isSuperAdmin) return 'super'
+  if (raw === 'admin') return 'admin'
   if (raw === 'manager' || props.user.isManager) return 'manager'
   if (props.user.isAdmin) return 'super'
   return 'none'
