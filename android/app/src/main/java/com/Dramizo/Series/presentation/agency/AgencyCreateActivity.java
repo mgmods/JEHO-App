@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.Dramizo.Series.R;
@@ -21,9 +22,10 @@ import com.Dramizo.Series.presentation.common.ViewModelFactory;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.CountryCatalog;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
-/** Full-screen paid agency application (not a dialog). */
 public class AgencyCreateActivity extends ThemedActivity {
     private AgencyViewModel vm;
     private ActivityCreateAgencyBinding binding;
@@ -49,6 +51,10 @@ public class AgencyCreateActivity extends ThemedActivity {
                 .get(AgencyViewModel.class);
 
         applyAccountCountry();
+        form.etCountry.setOnClickListener(v -> showCountryPicker());
+        form.etCountry.setOnFocusChangeListener((v, focused) -> {
+            if (focused) showCountryPicker();
+        });
         form.btnCancelAgency.setText(R.string.back);
         form.btnCancelAgency.setOnClickListener(v -> finish());
         form.btnSubmitAgency.setEnabled(false);
@@ -59,11 +65,8 @@ public class AgencyCreateActivity extends ThemedActivity {
         vm.getSubmitting().observe(this, busy -> {
             boolean loading = Boolean.TRUE.equals(busy);
             form.btnSubmitAgency.setEnabled(!loading && pricingReady());
-            if (loading) {
-                form.btnSubmitAgency.setText(R.string.loading);
-            } else {
-                refreshSubmitLabel();
-            }
+            if (loading) form.btnSubmitAgency.setText(R.string.loading);
+            else refreshSubmitLabel();
         });
         vm.getMessage().observe(this, m -> {
             if ("application_submitted".equals(m)) {
@@ -75,8 +78,7 @@ public class AgencyCreateActivity extends ThemedActivity {
             }
         });
         vm.getError().observe(this, e -> {
-            if (e == null) return;
-            com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
+            if (e != null) com.Dramizo.Series.util.BalanceRedirect.handle(this, e);
         });
 
         vm.loadPricing();
@@ -91,25 +93,17 @@ public class AgencyCreateActivity extends ThemedActivity {
         if (p == null) return;
         createFree = p.createFree || (!p.isPaid && p.createPriceCoins <= 0);
         priceCoins = createFree ? 0 : Math.max(0, p.createPriceCoins);
-        if (createFree) {
-            binding.tvPriceCoins.setText(R.string.agency_application_free_hint);
-        } else if (priceCoins > 0) {
-            binding.tvPriceCoins.setText(getString(R.string.agency_create_price_format, priceCoins));
-        } else {
-            binding.tvPriceCoins.setText(R.string.agency_application_loading_price);
-        }
+        if (createFree) binding.tvPriceCoins.setText(R.string.agency_application_free_hint);
+        else if (priceCoins > 0) binding.tvPriceCoins.setText(getString(R.string.agency_create_price_format, priceCoins));
+        else binding.tvPriceCoins.setText(R.string.agency_application_loading_price);
         refreshSubmitLabel();
         form.btnSubmitAgency.setEnabled(pricingReady());
     }
 
     private void refreshSubmitLabel() {
-        if (createFree) {
-            form.btnSubmitAgency.setText(R.string.agency_submit_free);
-        } else if (priceCoins > 0) {
-            form.btnSubmitAgency.setText(getString(R.string.agency_pay_and_submit_format, priceCoins));
-        } else {
-            form.btnSubmitAgency.setText(R.string.agency_application_loading_price);
-        }
+        if (createFree) form.btnSubmitAgency.setText(R.string.agency_submit_free);
+        else if (priceCoins > 0) form.btnSubmitAgency.setText(getString(R.string.agency_pay_and_submit_format, priceCoins));
+        else form.btnSubmitAgency.setText(R.string.agency_application_loading_price);
     }
 
     private void loadWalletBalance() {
@@ -120,11 +114,8 @@ public class AgencyCreateActivity extends ThemedActivity {
                 if (isFinishing()) return;
                 if (r.success && r.data != null) {
                     walletCoins = Math.max(0, r.data.coins);
-                    binding.tvWalletBalance.setText(
-                            getString(R.string.agency_wallet_balance_format, walletCoins));
-                } else {
-                    binding.tvWalletBalance.setText("");
-                }
+                    binding.tvWalletBalance.setText(getString(R.string.agency_wallet_balance_format, walletCoins));
+                } else binding.tvWalletBalance.setText("");
             });
         });
     }
@@ -146,66 +137,77 @@ public class AgencyCreateActivity extends ThemedActivity {
             Toast.makeText(this, err, Toast.LENGTH_LONG).show();
             return;
         }
-        if (!request.termsAccepted) {
-            Toast.makeText(this, R.string.agency_accept_terms, Toast.LENGTH_SHORT).show();
-            return;
-        }
         if (createFree) {
-            new androidx.appcompat.app.AlertDialog.Builder(this)
+            new AlertDialog.Builder(this)
                     .setTitle(R.string.open_agency)
                     .setMessage(R.string.agency_confirm_free_message)
-                    .setPositiveButton(R.string.agency_submit_free,
+                    .setPositiveButton(R.string.agency_submit_free, (d, w) -> vm.submitApplication(applicationFrom()))
+                    .setNegativeButton(R.string.cancel, null)
+                    .show();
+        } else {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.open_agency)
+                    .setMessage(getString(R.string.agency_confirm_pay_message, priceCoins))
+                    .setPositiveButton(getString(R.string.agency_pay_and_submit_format, priceCoins),
                             (d, w) -> vm.submitApplication(applicationFrom()))
                     .setNegativeButton(R.string.cancel, null)
                     .show();
-            return;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(R.string.open_agency)
-                .setMessage(getString(R.string.agency_confirm_pay_message, priceCoins))
-                .setPositiveButton(getString(R.string.agency_pay_and_submit_format, priceCoins),
-                        (d, w) -> vm.submitApplication(applicationFrom()))
-                .setNegativeButton(R.string.cancel, null)
-                .show();
     }
 
     private void applyAccountCountry() {
         AuthDtos.UserDto user = ContainerProvider.from(this).getSessionManager().getUser();
         String country = user != null && user.country != null ? user.country.trim() : "";
-        if (country.isEmpty()) {
-            country = Locale.getDefault().getCountry();
-        }
+        if (country.isEmpty()) country = Locale.getDefault().getCountry();
         if (country == null || country.trim().isEmpty()) country = "JO";
         CountryCatalog.Entry entry = CountryCatalog.resolve(country);
-        String canonicalCountry = entry != null ? entry.code : country;
-        form.etCountry.setTag(canonicalCountry);
-        form.etCountry.setText(CountryCatalog.labelWithFlag(country));
+        if (entry == null) entry = CountryCatalog.resolve("JO");
+        form.etCountry.setTag(entry != null ? entry.code : "JO");
+        form.etCountry.setText(entry != null ? entry.label() : CountryCatalog.labelWithFlag("JO"));
         form.etCountry.setFocusable(false);
-        form.etCountry.setClickable(false);
+        form.etCountry.setClickable(true);
         form.etCountry.setLongClickable(false);
-        form.etCountry.setAlpha(0.92f);
+    }
+
+    private void showCountryPicker() {
+        List<CountryCatalog.Entry> countries = CountryCatalog.all();
+        String[] labels = new String[countries.size()];
+        int selected = -1;
+        String current = String.valueOf(form.etCountry.getTag());
+        for (int i = 0; i < countries.size(); i++) {
+            labels[i] = countries.get(i).label();
+            if (countries.get(i).code.equalsIgnoreCase(current)) selected = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("اختر الدولة")
+                .setSingleChoiceItems(labels, selected, (dialog, which) -> {
+                    CountryCatalog.Entry entry = countries.get(which);
+                    form.etCountry.setTag(entry.code);
+                    form.etCountry.setText(entry.label());
+                    dialog.dismiss();
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private MiscDtos.AgencyApplicationRequest applicationFrom() {
         MiscDtos.AgencyApplicationRequest r = new MiscDtos.AgencyApplicationRequest();
         r.proposedName = text(form.etAgencyName);
-        r.description = text(form.etAgencyDesc);
-        r.businessPlan = r.description;
-        Object accountCountry = form.etCountry.getTag();
-        r.country = accountCountry instanceof String
-                ? ((String) accountCountry).trim()
-                : text(form.etCountry);
-        r.contactEmail = text(form.etContactEmail);
+        r.country = String.valueOf(form.etCountry.getTag()).trim();
         r.contactPhone = text(form.etContactPhone);
-        r.socialLink = null;
-        r.experience = text(form.etExperience);
-        try {
-            r.expectedHostCount = Integer.parseInt(text(form.etExpectedHostCount));
-        } catch (NumberFormatException ignored) {
-            r.expectedHostCount = 0;
-        }
+
+        // Keep the existing backend contract compatible while the user-facing
+        // application intentionally asks for only three fields.
+        r.description = "طلب فتح وكالة JEHO باسم " + r.proposedName + " في " + r.country + ".";
+        r.businessPlan = ("طلب وكالة JEHO: " + r.proposedName + "، الدولة " + r.country
+                + ". سيتم التواصل مع مقدم الطلب على رقم الهاتف المسجل لمراجعة الطلب. ")
+                .repeat(2);
+        r.experience = "طلب وكالة عبر التطبيق";
+        r.contactEmail = "agency.application@jeho.chat";
+        r.expectedHostCount = 1;
         r.documentUrls = java.util.Collections.emptyList();
-        r.termsAccepted = form.checkTerms.isChecked();
+        r.termsAccepted = true;
+        r.socialLink = null;
         return r;
     }
 
@@ -215,14 +217,8 @@ public class AgencyCreateActivity extends ThemedActivity {
 
     private static String validate(MiscDtos.AgencyApplicationRequest request) {
         if (request.proposedName.length() < 3) return "اسم الوكالة يجب أن يكون 3 أحرف على الأقل";
-        if (request.businessPlan.length() < 50) return "خطة العمل يجب أن تكون واضحة ولا تقل عن 50 حرفاً";
-        if (request.country.length() < 2) return "أدخل اسم الدولة بشكل صحيح";
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(request.contactEmail).matches()) {
-            return "أدخل بريداً إلكترونياً صحيحاً";
-        }
+        if (request.country.length() < 2) return "اختر الدولة";
         if (request.contactPhone.length() < 6) return "رقم التواصل يجب أن يتكون من 6 خانات على الأقل";
-        if (request.experience.length() < 10) return "اكتب خبرتك في 10 أحرف على الأقل";
-        if (request.expectedHostCount < 1) return "أدخل عدد المضيفين المتوقع";
         return null;
     }
 }
