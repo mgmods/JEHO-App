@@ -12,6 +12,12 @@ import android.animation.ValueAnimator;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Gravity;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.graphics.drawable.Drawable;
 import android.widget.Toast;
 
@@ -41,6 +47,7 @@ import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.ServerAssets;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
@@ -78,6 +85,35 @@ public class ProfileActivity extends ThemedActivity {
                 .get(ProfileViewModel.class);
         String userId = getIntent().getStringExtra(EXTRA_USER_ID);
         String myId = container.getSessionManager().getUserId();
+        AuthDtos.UserDto signedInUser = container.getSessionManager().getUser();
+        if (myId != null && myId.equals(userId == null || userId.isEmpty() ? myId : userId)
+                && StaffRoleHelper.isStaff(signedInUser)) {
+            TextView adminEntry = new TextView(this);
+            String roleLabel = StaffRoleHelper.badgeAr(signedInUser);
+            adminEntry.setText("🛡️  مركز إدارة JEHO  ·  " + roleLabel);
+            adminEntry.setTextSize(14f);
+            adminEntry.setTypeface(adminEntry.getTypeface(), Typeface.BOLD);
+            adminEntry.setTextColor(Color.WHITE);
+            adminEntry.setGravity(Gravity.CENTER);
+            adminEntry.setPadding(16, 16, 16, 16);
+            adminEntry.setBackground(new GradientDrawable(
+                    GradientDrawable.Orientation.RIGHT_LEFT,
+                    new int[] { 0xFF282C63, 0xFF6A4CC4 }).apply {
+                setCornerRadius(18f * getResources().getDisplayMetrics().density);
+            });
+            LinearLayout.LayoutParams adminLp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            adminLp.setMargins(16, 16, 16, 12);
+            binding.contentRoot.addView(adminEntry, adminLp);
+            adminEntry.setOnClickListener(v -> {
+                AuthDtos.UserDto latest = container.getSessionManager().getUser();
+                if (!StaffRoleHelper.isStaff(latest)) {
+                    Toast.makeText(this, "لم تعد لديك صلاحية الوصول إلى مركز الإدارة", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                startActivity(new Intent(this, AdminConsoleActivity.class));
+            });
+        }
         final String[] targetUserIdHold = {
                 userId != null && !userId.isEmpty() ? userId : (myId != null ? myId : "")
         };
