@@ -59,6 +59,7 @@ class AdminConsoleActivity : ThemedActivity() {
     // Other backend/dashboard tools remain untouched and are not deleted.
     private val modules = listOf(
         Module("users", "المستخدمون", "بحث بالـ ID وتقييد الحساب أو حظره", "👥"),
+        Module("genderVerifications", "طلبات التحقق", "مراجعة طلبات التحقق المعلّقة", "🪪"),
         Module("rooms", "إدارة الرومات", "تعديل الرومات وإغلاقها", "🏠"),
         Module("streams", "البث المباشر", "متابعة البث وإنهاؤه عند الحاجة", "📡"),
         Module("reports", "البلاغات والمراجعة", "مراجعة بلاغات المستخدمين وتصعيد الحالات", "🛡️"),
@@ -66,6 +67,10 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات لتفعيل وكالة جديدة", "📨"),
         Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة الطلبات وقبولها أو رفضها", "💳"),
         Module("rechargeAgents", "وكلاء الشحن", "إضافة الوكلاء وإدارة حالتهم", "💰"),
+        Module("recharges", "عمليات الشحن", "مراجعة عمليات الشحن المسجلة", "💳"),
+        Module("withdrawals", "طلبات السحب", "مراجعة طلبات السحب وحالاتها", "🏦"),
+        Module("walletTransactions", "حركة المحفظة", "متابعة سجل معاملات العملات", "🧾"),
+        Module("walletAdjust", "تعديل رصيد المحفظة", "تعديل رصيد بمبرر وتأكيد", "🪙"),
         Module("notifications", "الرسائل والإشعارات", "رسائل عامة أو خاصة بعنوان ومحتوى", "🔔"),
         Module("toastManager", "التوستات والمؤثرات", "خلفيات التوستات واللمعة والمدة وزر المحظوظ", "✨"),
         Module("mysteriousMan", "الرجل الغامض", "تفعيل الهوية الموحدة ومستويات VIP", "🕶️"),
@@ -73,6 +78,8 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("supportChest", "صندوق الدعم", "الهدف والمكافأة وظهور الأيقونة", "🎁"),
         Module("roomPkSettings", "تحديات PK بين الرومات", "تشغيل الميزة أو إيقافها للجميع", "⚔️"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
+        Module("cosmetics", "كتالوج المميزات", "مراجعة المميزات المتاحة في المتجر", "🖼️"),
+        Module("gifts", "كتالوج الهدايا", "مراجعة الهدايا المتاحة في النظام", "🎁"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
@@ -324,7 +331,8 @@ class AdminConsoleActivity : ThemedActivity() {
         val superOnlyModules = listOf(
             "notifications", "toastManager", "mysteriousMan", "luckyCannon",
             "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
-            "vip", "logs", "staffIdentity", "operators"
+            "vip", "logs", "staffIdentity", "operators", "genderVerifications",
+            "recharges", "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts"
         )
         val visibleModules = when (currentRole) {
             StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" || it.key == "reports" }
@@ -339,8 +347,10 @@ class AdminConsoleActivity : ThemedActivity() {
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
         addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
         val groups = listOf(
-            "إدارة المجتمع" to listOf("users", "rooms", "streams", "reports"),
-            "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents"),
+            "إدارة المجتمع" to listOf("users", "genderVerifications", "rooms", "streams", "reports"),
+            "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents", "recharges", "withdrawals"),
+            "المالية والمحفظة" to listOf("walletTransactions", "walletAdjust"),
+            "المتجر والهدايا" to listOf("cosmetics", "gifts"),
             "الرسائل وتجربة المستخدم" to listOf("notifications", "toastManager", "mysteriousMan", "luckyCannon", "supportChest", "roomPkSettings"),
             "العضويات والمظهر" to listOf("vanityIds", "grantCosmetics", "vip", "staffIdentity"),
             "الإدارة والأمان" to listOf("logs", "operators")
@@ -423,7 +433,8 @@ class AdminConsoleActivity : ThemedActivity() {
         val superOnlyModules = listOf(
             "notifications", "toastManager", "mysteriousMan", "luckyCannon",
             "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
-            "vip", "logs", "staffIdentity", "operators"
+            "vip", "logs", "staffIdentity", "operators", "genderVerifications",
+            "recharges", "withdrawals", "walletTransactions", "walletAdjust", "cosmetics", "gifts"
         )
         if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams", "reports")) ||
             (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
