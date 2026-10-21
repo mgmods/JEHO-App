@@ -532,5 +532,5 @@ async function save() {
   }
 }
 
-onMounted(() => { load(); loadDailyLogin() })
+onMounted(() => { load(); loadDailyLogin(); loadCosmetics() })
 </script>
