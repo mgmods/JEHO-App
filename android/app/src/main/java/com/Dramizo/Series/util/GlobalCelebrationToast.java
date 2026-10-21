@@ -448,7 +448,10 @@ public final class GlobalCelebrationToast {
             tvTitle.setSelected(true);
         }
         String line;
-        if (gameOrLucky && coinsWon > 0L) {
+        if ("lucky_hit".equalsIgnoreCase(kind) && body != null && !body.trim().isEmpty()) {
+            // Preserve server wording such as partial refund/return and the actual X result.
+            line = body.trim();
+        } else if (gameOrLucky && coinsWon > 0L) {
             line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
         } else {
             line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
@@ -476,10 +479,14 @@ public final class GlobalCelebrationToast {
         if (avatar != null) {
             if (absLeft != null && !absLeft.isEmpty()) {
                 try {
+                    // Profile pictures must remain circular even when the uploaded toast
+                    // background is a custom image and the dashboard changes avatar size/position.
+                    avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
+                    avatar.setClipToOutline(true);
                     Glide.with(activity)
                             .load(absLeft)
                             .override(128, 128)
-                            .centerCrop()
+                            .circleCrop()
                             .placeholder(gameOrLucky || planet
                                     ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
                             .error(gameOrLucky || planet
@@ -490,6 +497,8 @@ public final class GlobalCelebrationToast {
                     avatar.setImageResource(R.drawable.ic_screen_chat_lottery);
                 }
             } else {
+                avatar.setBackgroundResource(R.drawable.bg_notification_avatar);
+                avatar.setClipToOutline(true);
                 avatar.setImageResource(gameOrLucky || planet
                         ? R.drawable.ic_screen_chat_lottery
                         : R.drawable.jeho_logo);
@@ -510,7 +519,10 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        int displayMultiplier = giftSend ? Math.max(1, multiplier) : multiplier;
+        // A winning/refund event should never lose its X badge because a decimal
+        // multiplier (for example 0.5) was truncated while parsing the socket payload.
+        int displayMultiplier = giftSend ? Math.max(1, multiplier)
+                : luckyWin && coinsWon > 0L ? Math.max(1, multiplier) : multiplier;
         boolean showTimes = displayMultiplier >= 1 && (gameOrLucky || giftSend || displayMultiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
