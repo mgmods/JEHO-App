@@ -64,8 +64,11 @@ public final class GlobalCelebrationToast {
     private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 42f, remoteLuckyHighBodyX = 25f, remoteLuckyHighBodyY = 62f;
     private static volatile float remoteLuckyHighCountX = 88f, remoteLuckyHighCountY = 50f;
     private static volatile int remoteGiftWidthDp = 340, remoteGiftHeightDp = 100, remoteGiftAvatarSizeDp = 44;
+    private static volatile float remoteGiftTitleSizeSp = 13f, remoteGiftBodySizeSp = 12f, remoteGiftCountSizeSp = 12f;
     private static volatile int remoteLuckyNormalWidthDp = 340, remoteLuckyNormalHeightDp = 100, remoteLuckyNormalAvatarSizeDp = 44;
+    private static volatile float remoteLuckyNormalTitleSizeSp = 13f, remoteLuckyNormalBodySizeSp = 12f, remoteLuckyNormalCountSizeSp = 12f;
     private static volatile int remoteLuckyHighWidthDp = 340, remoteLuckyHighHeightDp = 100, remoteLuckyHighAvatarSizeDp = 44;
+    private static volatile float remoteLuckyHighTitleSizeSp = 13f, remoteLuckyHighBodySizeSp = 12f, remoteLuckyHighCountSizeSp = 12f;
     private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
@@ -245,6 +248,9 @@ public final class GlobalCelebrationToast {
                     remoteGiftWidthDp = dimensionValue(gift.get("widthDp"), 340, 220, 360);
                     remoteGiftHeightDp = dimensionValue(gift.get("heightDp"), 100, 60, 180);
                     remoteGiftAvatarSizeDp = dimensionValue(gift.get("avatarSizeDp"), 44, 20, 76);
+                    remoteGiftTitleSizeSp = dimensionValue(gift.get("titleSizeSp"), 13, 8, 30);
+                    remoteGiftBodySizeSp = dimensionValue(gift.get("bodySizeSp"), 12, 8, 30);
+                    remoteGiftCountSizeSp = dimensionValue(gift.get("countSizeSp"), 12, 8, 30);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -264,6 +270,9 @@ public final class GlobalCelebrationToast {
                     remoteLuckyNormalWidthDp = dimensionValue(normal.get("widthDp"), 340, 220, 360);
                     remoteLuckyNormalHeightDp = dimensionValue(normal.get("heightDp"), 100, 60, 180);
                     remoteLuckyNormalAvatarSizeDp = dimensionValue(normal.get("avatarSizeDp"), 44, 20, 76);
+                    remoteLuckyNormalTitleSizeSp = dimensionValue(normal.get("titleSizeSp"), 13, 8, 30);
+                    remoteLuckyNormalBodySizeSp = dimensionValue(normal.get("bodySizeSp"), 12, 8, 30);
+                    remoteLuckyNormalCountSizeSp = dimensionValue(normal.get("countSizeSp"), 12, 8, 30);
                     remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
                     remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
                     remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
@@ -275,6 +284,9 @@ public final class GlobalCelebrationToast {
                     remoteLuckyHighWidthDp = dimensionValue(high.get("widthDp"), 340, 220, 360);
                     remoteLuckyHighHeightDp = dimensionValue(high.get("heightDp"), 100, 60, 180);
                     remoteLuckyHighAvatarSizeDp = dimensionValue(high.get("avatarSizeDp"), 44, 20, 76);
+                    remoteLuckyHighTitleSizeSp = dimensionValue(high.get("titleSizeSp"), 13, 8, 30);
+                    remoteLuckyHighBodySizeSp = dimensionValue(high.get("bodySizeSp"), 12, 8, 30);
+                    remoteLuckyHighCountSizeSp = dimensionValue(high.get("countSizeSp"), 12, 8, 30);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -461,6 +473,14 @@ public final class GlobalCelebrationToast {
         if (tvBody != null) {
             tvBody.setText(line);
             tvBody.setSelected(true);
+        }
+        if (customToastStyle) {
+            float titleSize = giftSend ? remoteGiftTitleSizeSp : luckyHigh ? remoteLuckyHighTitleSizeSp : remoteLuckyNormalTitleSizeSp;
+            float bodySize = giftSend ? remoteGiftBodySizeSp : luckyHigh ? remoteLuckyHighBodySizeSp : remoteLuckyNormalBodySizeSp;
+            float countSize = giftSend ? remoteGiftCountSizeSp : luckyHigh ? remoteLuckyHighCountSizeSp : remoteLuckyNormalCountSizeSp;
+            if (tvTitle != null) tvTitle.setTextSize(titleSize);
+            if (tvBody != null) tvBody.setTextSize(bodySize);
+            if (tvTimes != null) tvTimes.setTextSize(countSize);
         }
 
         // Lucky/game wins prioritize the actual winner's portrait; use the gift/game icon only as fallback.
