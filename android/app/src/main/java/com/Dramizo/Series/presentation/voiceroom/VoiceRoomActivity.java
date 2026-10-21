@@ -173,7 +173,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkMovingTicker;
     @Nullable private TextView roomPkCenterVersusBadge;
     @Nullable private android.graphics.drawable.Drawable roomPkOriginalSeatsBackground;
-    @Nullable private ObjectAnimator roomPkTickerAnimator;
     private boolean roomPkSeatSplitApplied;
     private final Runnable roomPkRosterPoll = new Runnable() {
         @Override public void run() {
@@ -13343,6 +13342,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             TextView ticker = new TextView(this);
             ticker.setId(View.generateViewId());
             ticker.setSingleLine(true);
+            ticker.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
+            ticker.setMarqueeRepeatLimit(-1);
+            ticker.setSelected(true);
+            ticker.setFocusable(true);
+            ticker.setFocusableInTouchMode(true);
             ticker.setGravity(Gravity.CENTER_VERTICAL);
             ticker.setTextColor(Color.WHITE);
             ticker.setTextSize(11f);
@@ -13399,14 +13403,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.recyclerSeats.setVisibility(View.VISIBLE);
         if (roomPkMovingTicker != null) {
             roomPkMovingTicker.setVisibility(View.VISIBLE);
-            if (roomPkTickerAnimator == null) {
-                roomPkTickerAnimator = ObjectAnimator.ofFloat(roomPkMovingTicker, View.TRANSLATION_X, dp(150), -dp(150));
-                roomPkTickerAnimator.setDuration(6500L);
-                roomPkTickerAnimator.setRepeatCount(ValueAnimator.INFINITE);
-                roomPkTickerAnimator.setRepeatMode(ValueAnimator.RESTART);
-                roomPkTickerAnimator.setInterpolator(new android.view.animation.LinearInterpolator());
-            }
-            if (!roomPkTickerAnimator.isStarted()) roomPkTickerAnimator.start();
+            roomPkMovingTicker.setSelected(true);
         }
         if (roomPkCenterVersusBadge != null) roomPkCenterVersusBadge.setVisibility(View.VISIBLE);
     }
@@ -13415,10 +13412,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (!roomPkSeatSplitApplied || binding == null) {
             if (roomPkOpponentSeatPanel != null) roomPkOpponentSeatPanel.setVisibility(View.GONE);
             return;
-        }
-        if (roomPkTickerAnimator != null) {
-            roomPkTickerAnimator.cancel();
-            roomPkTickerAnimator = null;
         }
         roomPkMovingTicker = null;
         roomPkCenterVersusBadge = null;
