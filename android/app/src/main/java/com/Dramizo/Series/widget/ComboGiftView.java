@@ -87,7 +87,7 @@ public class ComboGiftView extends FrameLayout {
         int combo = Math.max(1, comboCount);
         if (comboNum != null) {
             // Mikoo: "x" + count to the right of gift strip digits.
-            comboNum.setText(combo >= 2 ? ("x" + combo) : String.valueOf(combo));
+            comboNum.setText("X" + combo);
             comboNum.setTextSize(combo >= 10 ? 20f : 22f);
             comboNum.setVisibility(VISIBLE);
             comboNum.animate().cancel();
@@ -119,7 +119,7 @@ public class ComboGiftView extends FrameLayout {
     public void updateCountUp(int count) {
         if (comboNum == null) return;
         int value = Math.max(1, count);
-        comboNum.setText(value >= 2 ? ("x" + value) : String.valueOf(value));
+        comboNum.setText("X" + value);
         comboNum.setTextSize(value >= 10 ? 20f : 22f);
         comboNum.setVisibility(VISIBLE);
     }
