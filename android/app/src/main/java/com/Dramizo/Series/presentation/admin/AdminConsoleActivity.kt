@@ -239,7 +239,7 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             pair.forEachIndexed { index, module ->
                 val tile = card().apply {
-                    setPadding(dp(12), dp(13), dp(12), dp(13))
+                    setPadding(dp(14), dp(15), dp(14), dp(15))
                     isClickable = true
                     isFocusable = true
                     foreground = android.util.TypedValue().let {
@@ -251,15 +251,15 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 val icon = TextView(this).apply {
                     text = module.icon
-                    textSize = 23f
+                    textSize = 27f
                     gravity = Gravity.CENTER
                     setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
-                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
+                    layoutParams = LinearLayout.LayoutParams(dp(52), dp(52))
                 }
                 tile.addView(icon)
-                addText(tile, module.title, 14f, true, TEXT)
-                addText(tile, module.subtitle, 11f, false, MUTED)
-                addText(tile, "فتح الإدارة  ←", 11f, true, ACCENT)
+                addText(tile, module.title, 15f, true, TEXT)
+                addText(tile, module.subtitle, 12f, false, MUTED)
+                addText(tile, "فتح الإدارة  ←", 12f, true, ACCENT)
                 val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
                     bottomMargin = dp(10)
                     if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
