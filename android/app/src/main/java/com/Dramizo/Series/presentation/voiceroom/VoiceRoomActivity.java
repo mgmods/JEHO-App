@@ -1426,7 +1426,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.getRoot().post(() -> {
             if (isFinishing() || isDestroyed() || exiting) return;
             if (joinRoomId == null || !joinRoomId.equals(roomId)) return;
-            showRoomJoinLoading();
+            // Keep the room shell interactive and visible while the join request completes.
+            // A full-screen modal here hid the seats and room ID for the entire network round-trip.
             // Prefetch finished before observers were attached — apply now.
             if (pendingPrefetchSession != null) {
                 RoomDtos.JoinRoomResult pre = pendingPrefetchSession;
