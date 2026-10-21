@@ -322,15 +322,9 @@ class AdminConsoleActivity : ThemedActivity() {
             else -> modules
         }
 
-        val homeActions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
-        }
-        homeActions.addView(button("↻ تحديث النظرة العامة") { showHome() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(4) })
-        homeActions.addView(button("إعادة تحميل الأقسام") { showHome() }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(4) })
-        body.addView(homeActions)
+        body.addView(button("↻ تحديث لوحة الإدارة والإحصائيات") { showHome() }.apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) }
+        })
 
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
         addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
