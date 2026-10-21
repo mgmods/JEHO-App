@@ -218,7 +218,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnQuickRequests"
                 android:layout_width="0dp"
-                android:layout_height="76dp"
+                android:layout_height="84dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="3dp"
                 android:clickable="true"
@@ -269,7 +269,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnQuickNotifications"
                 android:layout_width="0dp"
-                android:layout_height="76dp"
+                android:layout_height="84dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="3dp"
                 android:clickable="true"
@@ -291,8 +291,8 @@
                         android:padding="4dp">
                         <ImageView
                             android:id="@+id/imgQuickNotifications"
-                            android:layout_width="42dp"
-                            android:layout_height="40dp"
+                            android:layout_width="52dp"
+                            android:layout_height="50dp"
                             android:contentDescription="الإشعارات"
                             android:scaleType="fitCenter"
                             android:src="@drawable/ic_notification" />
