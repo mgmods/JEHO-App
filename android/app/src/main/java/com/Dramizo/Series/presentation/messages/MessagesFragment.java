@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,6 +40,7 @@ import com.Dramizo.Series.presentation.profile.VisitorsActivity;
 import com.Dramizo.Series.presentation.notifications.OfficialNewsActivity;
 import com.Dramizo.Series.util.ApiCall;
 import com.Dramizo.Series.util.AppLoadingOverlay;
+import com.Dramizo.Series.util.RemoteNavIcons;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -52,6 +55,9 @@ public class MessagesFragment extends Fragment {
     private FragmentMessagesBinding binding;
     private MessagesViewModel viewModel;
     private ChatPreviewAdapter adapter;
+    private final Handler searchHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingGlobalSearch;
+    private int globalSearchSequence = 0;
     private final BroadcastReceiver officialNewsReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -113,15 +119,31 @@ public class MessagesFragment extends Fragment {
         binding.recycler.setNestedScrollingEnabled(true);
         binding.recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
-        // Local inbox search: filters the already-loaded conversation list without extra API calls.
+        // Search names and message history on the server; debounce typing to keep the app smooth.
         binding.etChatSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (binding == null || adapter == null) return;
                 String query = s != null ? s.toString().trim() : "";
                 binding.btnClearChatSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                int sequence = ++globalSearchSequence;
+                if (pendingGlobalSearch != null) searchHandler.removeCallbacks(pendingGlobalSearch);
+                if (query.isEmpty()) {
+                    adapter.setSearchQuery("");
+                    viewModel.load(false);
+                    updateChatSearchEmptyState();
+                    return;
+                }
+                if (query.length() < 2) {
+                    adapter.submit(viewModel.getConversations().getValue());
+                    adapter.setSearchQuery(query);
+                    updateChatSearchEmptyState();
+                    return;
+                }
                 adapter.setSearchQuery(query);
                 updateChatSearchEmptyState();
+                pendingGlobalSearch = () -> runGlobalSearch(query, sequence);
+                searchHandler.postDelayed(pendingGlobalSearch, 320L);
             }
             @Override public void afterTextChanged(Editable s) { }
         });
@@ -164,14 +186,15 @@ public class MessagesFragment extends Fragment {
             binding.tvRequestBadge.setOnClickListener(openHub);
         }
 
-        // Social shortcuts open existing app destinations; no placeholder screens.
-        binding.btnQuickFriends.setOnClickListener(v -> openFriendsTab(FriendsActivity.TAB_FRIENDS));
+        // Shared inbox channels: Official News, Admin Messages, Notifications.
+        binding.btnQuickFriends.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(), OfficialNewsActivity.class)));
+        binding.btnQuickRequests.setOnClickListener(v ->
+                startActivity(new Intent(requireContext(),
+                        com.Dramizo.Series.presentation.notifications.AdminMessagesActivity.class)));
         binding.btnQuickNotifications.setOnClickListener(v ->
                 startActivity(new Intent(requireContext(), NotificationsActivity.class)));
-        binding.btnQuickRequests.setOnClickListener(v ->
-                openFriendsTab(FriendsActivity.TAB_REQ_FOLLOW));
-        binding.btnQuickVisitors.setOnClickListener(v ->
-                startActivity(new Intent(requireContext(), VisitorsActivity.class)));
+        loadChannelBranding();
 
         if (binding.officialNewsCardMsg != null) {
             binding.officialNewsCardMsg.getRoot().setOnClickListener(v ->
@@ -187,8 +210,10 @@ public class MessagesFragment extends Fragment {
         }
 
         viewModel.getConversations().observe(getViewLifecycleOwner(), list -> {
-            adapter.submit(list);
-            boolean empty = list == null || list.isEmpty();
+            String currentQuery = binding != null && binding.etChatSearch.getText() != null
+                    ? binding.etChatSearch.getText().toString().trim() : "";
+            if (currentQuery.isEmpty()) adapter.submit(list);
+            boolean empty = adapter.getItemCount() == 0;
             if (binding.tvEmpty != null) {
                 binding.tvEmpty.setText(R.string.msg_empty_chats);
                 binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -203,6 +228,50 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void loadChannelBranding() {
+        AppContainer c = ContainerProvider.from(requireActivity());
+        RemoteNavIcons.hydrateFromCache(c);
+        bindChannelBranding();
+        c.getIoExecutor().execute(() -> {
+            RemoteNavIcons.refreshBlocking(c);
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(this::bindChannelBranding);
+        });
+    }
+
+    private void bindChannelBranding() {
+        if (binding == null) return;
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickOfficialNews, "officialNews", R.drawable.jeho_logo);
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickAdminMessages, "adminMessages", R.drawable.jeho_logo);
+        RemoteNavIcons.bindChannelIcon(binding.imgQuickNotifications, "notifications", R.drawable.ic_notification);
+        binding.imgQuickOfficialNewsVerified.setVisibility(
+                RemoteNavIcons.isChannelVerified("officialNews") ? View.VISIBLE : View.GONE);
+        binding.imgQuickAdminMessagesVerified.setVisibility(
+                RemoteNavIcons.isChannelVerified("adminMessages") ? View.VISIBLE : View.GONE);
+    }
+
+    private void runGlobalSearch(String query, int sequence) {
+        if (!isAdded() || binding == null) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || sequence != globalSearchSequence) return;
+                String current = binding.etChatSearch.getText() != null
+                        ? binding.etChatSearch.getText().toString().trim() : "";
+                if (!query.equals(current)) return;
+                if (result.success && result.data != null) {
+                    adapter.submitSearchResults(result.data.items, query);
+                } else if (result.error != null) {
+                    Toast.makeText(requireContext(), result.error, Toast.LENGTH_SHORT).show();
+                }
+                updateChatSearchEmptyState();
+            });
+        });
     }
 
     private void updateChatSearchEmptyState() {
@@ -380,10 +449,6 @@ public class MessagesFragment extends Fragment {
                 if (binding.tvRequestBadge != null) {
                     binding.tvRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
                     binding.tvRequestBadge.setText(label);
-                }
-                if (binding.tvQuickRequestBadge != null) {
-                    binding.tvQuickRequestBadge.setVisibility(pending > 0 ? View.VISIBLE : View.GONE);
-                    binding.tvQuickRequestBadge.setText(label);
                 }
             });
         });

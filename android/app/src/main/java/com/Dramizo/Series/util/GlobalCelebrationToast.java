@@ -137,9 +137,14 @@ public final class GlobalCelebrationToast {
         String imageUrl = AssetCatalog.absoluteUrl(chosenBackground);
         if (background != null) {
             if (imageUrl != null && !imageUrl.isEmpty()) {
+                active.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+                background.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 background.setVisibility(View.VISIBLE);
-                try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(background); }
-                catch (Exception ignored) { background.setVisibility(View.GONE); }
+                try {
+                    Glide.with(activity).load(imageUrl).dontTransform().into(background);
+                } catch (Exception ignored) {
+                    background.setVisibility(View.GONE);
+                }
             } else background.setVisibility(View.GONE);
         }
         boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
@@ -456,6 +461,10 @@ public final class GlobalCelebrationToast {
         // Lucky/game wins prioritize the actual winner's portrait; use the gift/game icon only as fallback.
         String leftUrl = firstNonEmpty(avatarUrl, badgeUrl);
         String absLeft = AssetCatalog.absoluteUrl(leftUrl);
+        // If the profile URL is malformed, try the secondary image rather than skipping both.
+        if ((absLeft == null || absLeft.isEmpty()) && badgeUrl != null && !badgeUrl.trim().isEmpty()) {
+            absLeft = AssetCatalog.absoluteUrl(badgeUrl);
+        }
         if (absLeft != null) {
             com.Dramizo.Series.util.CosmeticMedia.Kind badgeKind =
                     com.Dramizo.Series.util.CosmeticMedia.kind(absLeft);
@@ -467,10 +476,14 @@ public final class GlobalCelebrationToast {
         if (avatar != null) {
             if (absLeft != null && !absLeft.isEmpty()) {
                 try {
-                    Glide.with(activity.getApplicationContext())
+                    Glide.with(activity)
                             .load(absLeft)
                             .override(128, 128)
                             .centerCrop()
+                            .placeholder(gameOrLucky || planet
+                                    ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
+                            .error(gameOrLucky || planet
+                                    ? R.drawable.ic_screen_chat_lottery : R.drawable.jeho_logo)
                             .dontAnimate()
                             .into(avatar);
                 } catch (Exception ignored) {
@@ -497,22 +510,23 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean showTimes = multiplier >= 1 && (gameOrLucky || giftSend || multiplier >= 2);
+        int displayMultiplier = giftSend ? Math.max(1, multiplier) : multiplier;
+        boolean showTimes = displayMultiplier >= 1 && (gameOrLucky || giftSend || displayMultiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
             wrapTimes.setScaleY(0.82f);
-            if (giftSend && multiplier > 1) {
+            if (giftSend && displayMultiplier > 1) {
                 tvTimes.setText("X1");
-                ValueAnimator countUp = ValueAnimator.ofInt(1, multiplier);
-                countUp.setDuration(Math.min(1200L, Math.max(350L, multiplier * 8L)));
+                ValueAnimator countUp = ValueAnimator.ofInt(1, displayMultiplier);
+                countUp.setDuration(Math.min(1200L, Math.max(350L, displayMultiplier * 8L)));
                 countUp.addUpdateListener(animation ->
                         tvTimes.setText(String.format(Locale.US, "X%d", (Integer) animation.getAnimatedValue())));
                 countUp.start();
             } else {
                 tvTimes.setText(giftSend
-                        ? String.format(Locale.US, "X%d", multiplier)
-                        : String.format(Locale.US, "×%d", multiplier));
+                        ? String.format(Locale.US, "X%d", displayMultiplier)
+                        : String.format(Locale.US, "×%d", displayMultiplier));
             }
             if (badge != null) {
                 if (giftSend) {
@@ -562,10 +576,16 @@ public final class GlobalCelebrationToast {
             String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
             String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
+                // The uploaded artwork owns its pixels, edges and alpha channel. Do not add
+                // the built-in rounded frame behind a transparent PNG/WebP design.
+                banner.setBackground(null);
+                toastBackground.setBackgroundColor(android.graphics.Color.TRANSPARENT);
                 toastBackground.setVisibility(View.VISIBLE);
                 try { Glide.with(activity.getApplicationContext()).load(imageUrl).dontTransform().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
-            } else toastBackground.setVisibility(View.GONE);
+            } else {
+                toastBackground.setVisibility(View.GONE);
+            }
         }
         banner.setElevation(dp(activity, customToastStyle && remoteGlow ? 20 : 14));
         if (sheen != null && customToastStyle && remoteShine) {

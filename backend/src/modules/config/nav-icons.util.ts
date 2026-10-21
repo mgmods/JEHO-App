@@ -6,6 +6,8 @@
 export type NavTabKey = 'party' | 'drama' | 'games' | 'chat' | 'me';
 export const PROFILE_ACTION_KEYS = ['events', 'agency', 'recharge', 'tasks', 'settings', 'support'] as const;
 export type ProfileActionKey = typeof PROFILE_ACTION_KEYS[number];
+export const CHANNEL_ICON_KEYS = ['officialNews', 'adminMessages', 'notifications'] as const;
+export type ChannelIconKey = typeof CHANNEL_ICON_KEYS[number];
 
 export type NavIconPair = {
   /** Default / unselected icon URL (png/jpg). */
@@ -26,6 +28,10 @@ export type NavIconsConfig = {
   me?: NavIconPair;
   /** Single uploaded icon for each shortcut in the profile (أنا) grid. */
   profileActions?: Partial<Record<ProfileActionKey, string>>;
+  /** Shared icons and global verification state for chat inbox channels. */
+  channelIcons?: Partial<Record<ChannelIconKey, string>>;
+  officialNewsVerified?: boolean;
+  adminMessagesVerified?: boolean;
 };
 
 export const NAV_TAB_KEYS: NavTabKey[] = ['party', 'drama', 'games', 'chat', 'me'];
@@ -94,6 +100,9 @@ export function defaultNavIconsConfig(
     chat: pair('chat'),
     me: pair('me'),
     profileActions: {},
+    channelIcons: {},
+    officialNewsVerified: true,
+    adminMessagesVerified: true,
   };
 }
 
@@ -130,6 +139,15 @@ export function sanitizeNavIconsConfig(raw: unknown): NavIconsConfig {
     if (url) profileActions[key] = url;
   }
   out.profileActions = profileActions;
+  const rawChannelIcons = src.channelIcons && typeof src.channelIcons === 'object' ? src.channelIcons : {};
+  const channelIcons: Partial<Record<ChannelIconKey, string>> = {};
+  for (const key of CHANNEL_ICON_KEYS) {
+    const url = cleanUrl(rawChannelIcons[key]);
+    if (url) channelIcons[key] = url;
+  }
+  out.channelIcons = channelIcons;
+  out.officialNewsVerified = obj.officialNewsVerified !== false;
+  out.adminMessagesVerified = obj.adminMessagesVerified !== false;
   return out;
 }
 
@@ -172,6 +190,11 @@ export function navIconsClientPayload(
     profileActions: Object.fromEntries(
       PROFILE_ACTION_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.profileActions?.[key] }, false, origin) || '']),
     ),
+    channelIcons: Object.fromEntries(
+      CHANNEL_ICON_KEYS.map((key) => [key, resolveNavIconUrl({ icon: cfg.channelIcons?.[key] }, false, origin) || '']),
+    ),
+    officialNewsVerified: cfg.officialNewsVerified !== false,
+    adminMessagesVerified: cfg.adminMessagesVerified !== false,
     /** Hint for clients / docs. */
     formats: ['png', 'jpg', 'jpeg', 'webp', 'svg'],
   };

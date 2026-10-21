@@ -153,73 +153,133 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Compact social hub: real destinations, badges only when there is unread work. -->
+        <!-- Three compact shared inbox channels: official news, admin messages, notifications. -->
         <LinearLayout
             android:id="@+id/quickActionsRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:paddingStart="9dp"
-            android:paddingTop="10dp"
+            android:paddingTop="8dp"
             android:paddingEnd="9dp"
-            android:paddingBottom="10dp">
+            android:paddingBottom="8dp">
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnQuickFriends"
                 android:layout_width="0dp"
-                android:layout_height="78dp"
+                android:layout_height="84dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="3dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#F6F5FA"
+                app:cardBackgroundColor="#F4F0FF"
                 app:cardCornerRadius="15dp"
                 app:cardElevation="0dp"
-                app:strokeColor="#E7E4F0"
+                app:strokeColor="#D9CCFF"
                 app:strokeWidth="1dp">
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="5dp">
-                    <TextView
-                        android:layout_width="38dp"
-                        android:layout_height="34dp"
-                        android:background="#E5E9FF"
-                        android:gravity="center"
-                        android:text="👥"
-                        android:textSize="20sp" />
-                    <TextView
+                    android:padding="4dp">
+                    <ImageView
+                        android:id="@+id/imgQuickOfficialNews"
+                        android:layout_width="52dp"
+                        android:layout_height="50dp"
+                        android:contentDescription="الأخبار الرسمية"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/jeho_logo" />
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
                         android:gravity="center"
-                        android:maxLines="1"
-                        android:text="@string/chat_hub_friends"
-                        android:textColor="@color/text_primary"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxLines="1"
+                            android:text="الأخبار الرسمية"
+                            android:textColor="@color/text_primary"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <ImageView
+                            android:id="@+id/imgQuickOfficialNewsVerified"
+                            android:layout_width="17dp"
+                            android:layout_height="17dp"
+                            android:layout_marginStart="2dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_official_news_verified" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btnQuickRequests"
+                android:layout_width="0dp"
+                android:layout_height="76dp"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="3dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                app:cardBackgroundColor="#F1F4FF"
+                app:cardCornerRadius="15dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#D6DEFF"
+                app:strokeWidth="1dp">
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="4dp">
+                    <ImageView
+                        android:id="@+id/imgQuickAdminMessages"
+                        android:layout_width="52dp"
+                        android:layout_height="50dp"
+                        android:contentDescription="رسائل الإدارة"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/jeho_logo" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxLines="1"
+                            android:text="رسائل الإدارة"
+                            android:textColor="@color/text_primary"
+                            android:textSize="10sp"
+                            android:textStyle="bold" />
+                        <ImageView
+                            android:id="@+id/imgQuickAdminMessagesVerified"
+                            android:layout_width="15dp"
+                            android:layout_height="15dp"
+                            android:layout_marginStart="2dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_official_news_verified" />
+                    </LinearLayout>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btnQuickNotifications"
                 android:layout_width="0dp"
-                android:layout_height="78dp"
+                android:layout_height="76dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="3dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#FFF3F6"
+                app:cardBackgroundColor="#FFF2F6"
                 app:cardCornerRadius="15dp"
                 app:cardElevation="0dp"
-                app:strokeColor="#F3DDE5"
+                app:strokeColor="#F1D8E3"
                 app:strokeWidth="1dp">
-
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent">
@@ -228,23 +288,22 @@
                         android:layout_height="match_parent"
                         android:gravity="center"
                         android:orientation="vertical"
-                        android:padding="5dp">
-                        <TextView
-                            android:layout_width="38dp"
-                            android:layout_height="34dp"
-                            android:background="#FFE1EA"
-                            android:gravity="center"
-                            android:text="🔔"
-                            android:textSize="20sp" />
+                        android:padding="4dp">
+                        <ImageView
+                            android:id="@+id/imgQuickNotifications"
+                            android:layout_width="42dp"
+                            android:layout_height="40dp"
+                            android:contentDescription="الإشعارات"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/ic_notification" />
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="5dp"
                             android:gravity="center"
                             android:maxLines="1"
                             android:text="@string/chat_hub_notifications"
                             android:textColor="@color/text_primary"
-                            android:textSize="11sp"
+                            android:textSize="10sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                     <TextView
@@ -265,123 +324,21 @@
                         android:visibility="gone" />
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/btnQuickRequests"
-                android:layout_width="0dp"
-                android:layout_height="78dp"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="3dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#F0FAF5"
-                app:cardCornerRadius="15dp"
-                app:cardElevation="0dp"
-                app:strokeColor="#D9EEE4"
-                app:strokeWidth="1dp">
-
-                <FrameLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent">
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:gravity="center"
-                        android:orientation="vertical"
-                        android:padding="4dp">
-                        <TextView
-                            android:layout_width="38dp"
-                            android:layout_height="34dp"
-                            android:background="#DDF4E8"
-                            android:gravity="center"
-                            android:text="➕"
-                            android:textSize="20sp" />
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="5dp"
-                            android:gravity="center"
-                            android:maxLines="2"
-                            android:minHeight="24dp"
-                            android:text="@string/chat_hub_follow_requests"
-                            android:textColor="@color/text_primary"
-                            android:textSize="10sp"
-                            android:textStyle="bold" />
-                    </LinearLayout>
-                    <TextView
-                        android:id="@+id/tvQuickRequestBadge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="16dp"
-                        android:layout_gravity="top|end"
-                        android:layout_marginTop="4dp"
-                        android:layout_marginEnd="4dp"
-                        android:background="@drawable/bg_unread_badge"
-                        android:gravity="center"
-                        android:includeFontPadding="false"
-                        android:minWidth="16dp"
-                        android:paddingHorizontal="4dp"
-                        android:textColor="@color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
-                </FrameLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/btnQuickVisitors"
-                android:layout_width="0dp"
-                android:layout_height="78dp"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="3dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground"
-                app:cardBackgroundColor="#F4F7FF"
-                app:cardCornerRadius="15dp"
-                app:cardElevation="0dp"
-                app:strokeColor="#E0E7F6"
-                app:strokeWidth="1dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="5dp">
-                    <TextView
-                        android:layout_width="38dp"
-                        android:layout_height="34dp"
-                        android:background="#E4EBFF"
-                        android:gravity="center"
-                        android:text="👁"
-                        android:textSize="20sp" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="5dp"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="@string/chat_hub_visitors"
-                        android:textColor="@color/text_primary"
-                        android:textSize="11sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
         <include
             android:id="@+id/officialNewsCardMsg"
             layout="@layout/include_official_news_card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
-        <!-- Dedicated Super Admin inbox; intentionally below Official News. -->
         <include
             android:id="@+id/adminMessagesCardMsg"
             layout="@layout/include_admin_messages_card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/cardMyRoom"

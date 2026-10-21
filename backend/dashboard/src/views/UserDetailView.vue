@@ -63,6 +63,7 @@
               <div class="d-flex flex-wrap gap-2 align-items-center">
                 <StatusBadge :status="user.status || (user.isBanned ? 'banned' : 'active')" />
                 <span v-if="form.staffRole === 'super'" class="badge text-bg-warning">{{ t('users.roleSuper') }}</span>
+                <span v-else-if="form.staffRole === 'admin'" class="badge text-bg-primary">أدمن</span>
                 <span v-else-if="form.staffRole === 'manager'" class="badge text-bg-info">{{ t('users.roleManager') }}</span>
               </div>
 
@@ -353,6 +354,7 @@
 
                 <option value="none">{{ t('userDetail.roleNone') }}</option>
 
+                <option value="admin">أدمن</option>
                 <option value="manager">{{ t('userDetail.roleManager') }}</option>
 
                 <option value="super">{{ t('userDetail.roleSuper') }}</option>
@@ -549,8 +551,10 @@ watch(user, (u) => {
   form.genderVerified = !!u.genderVerified
 
   const roleRaw = String(u.staffRole || '').toLowerCase()
-  if (roleRaw === 'super' || roleRaw === 'super_admin' || u.isSuperAdmin || (u.isAdmin && roleRaw !== 'manager')) {
+  if (roleRaw === 'super' || roleRaw === 'super_admin' || u.isSuperAdmin || (u.isAdmin && roleRaw !== 'manager' && roleRaw !== 'admin')) {
     form.staffRole = 'super'
+  } else if (roleRaw === 'admin') {
+    form.staffRole = 'admin'
   } else if (roleRaw === 'manager' || u.isManager) {
     form.staffRole = 'manager'
   } else {

@@ -34,6 +34,7 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     private final List<ChatDtos.ConversationDto> items = new ArrayList<>();
     private final List<ChatDtos.ConversationDto> sourceItems = new ArrayList<>();
     private String searchQuery = "";
+    private boolean serverSearchResults;
     private final Listener listener;
 
     public ChatPreviewAdapter(Listener listener) {
@@ -41,16 +42,29 @@ public class ChatPreviewAdapter extends RecyclerView.Adapter<ChatPreviewAdapter.
     }
 
     public void submit(List<ChatDtos.ConversationDto> data) {
+        serverSearchResults = false;
         sourceItems.clear();
         if (data != null) sourceItems.addAll(data);
         applySearchFilter();
+    }
+
+    /** Results returned by the server include matches in any historical message. */
+    public void submitSearchResults(List<ChatDtos.ConversationDto> data, String query) {
+        serverSearchResults = true;
+        searchQuery = query != null ? query.trim() : "";
+        sourceItems.clear();
+        if (data != null) sourceItems.addAll(data);
+        items.clear();
+        items.addAll(sourceItems);
+        notifyDataSetChanged();
     }
 
     public void setSearchQuery(String query) {
         String next = query != null ? query.trim() : "";
         if (next.equalsIgnoreCase(searchQuery)) return;
         searchQuery = next;
-        applySearchFilter();
+        if (searchQuery.isEmpty()) serverSearchResults = false;
+        if (!serverSearchResults) applySearchFilter();
     }
 
     private void applySearchFilter() {

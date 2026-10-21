@@ -112,6 +112,42 @@ public final class RemoteNavIcons {
         }
     }
 
+    /** Bind a dashboard-managed icon for one of the chat inbox channels. */
+    public static void bindChannelIcon(@Nullable ImageView view, @Nullable String key, int fallbackRes) {
+        if (view == null) return;
+        MiscDtos.NavIconsDto cfg = cached;
+        String raw = cfg != null && cfg.channelIcons != null && key != null
+                ? cfg.channelIcons.get(key) : null;
+        if (raw == null || raw.trim().isEmpty()) {
+            view.setImageResource(fallbackRes);
+            return;
+        }
+        String url = MediaAssetSync.bust(AssetCatalog.absoluteUrl(raw.trim()));
+        view.clearColorFilter();
+        view.setImageTintList(null);
+        if (isSvgUrl(url)) {
+            loadRemoteSvg(view, url, null, null, false);
+            return;
+        }
+        Object previous = view.getTag(R.id.tag_image_url);
+        if (previous instanceof String && url.equals(previous) && view.getDrawable() != null) return;
+        view.setTag(R.id.tag_image_url, url);
+        try {
+            Glide.with(view).load(url).apply(MediaAssetSync.requestOptions())
+                    .dontAnimate().fitCenter().error(fallbackRes).into(view);
+        } catch (Exception ignored) {
+            view.setImageResource(fallbackRes);
+        }
+    }
+
+    public static boolean isChannelVerified(@Nullable String key) {
+        MiscDtos.NavIconsDto cfg = cached;
+        if (cfg == null) return true;
+        if ("officialNews".equals(key)) return cfg.officialNewsVerified == null || cfg.officialNewsVerified;
+        if ("adminMessages".equals(key)) return cfg.adminMessagesVerified == null || cfg.adminMessagesVerified;
+        return false;
+    }
+
     public static void bind(
             @Nullable ImageView view,
             @Nullable String tabKey,

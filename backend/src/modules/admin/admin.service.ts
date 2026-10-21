@@ -2657,7 +2657,8 @@ export class AdminService {
 
   private publicDashboardAdmin(admin: AdminUser) {
     const superAdmin = admin.staffRole === 'super' || admin.role === AdminRole.SUPER;
-    const permissions = superAdmin
+    const dashboardAdmin = !superAdmin && normalizeStaffRole({ staffRole: admin.staffRole }) === 'admin';
+    const permissions = superAdmin || dashboardAdmin
       ? fullPermissions()
       : normalizePermissions(admin.dashboardPermissions);
     return {
@@ -2668,7 +2669,7 @@ export class AdminService {
       name: admin.displayName,
       isAdmin: true,
       isSuperAdmin: superAdmin,
-      staffRole: superAdmin ? 'super' : 'operator',
+      staffRole: superAdmin ? 'super' : dashboardAdmin ? 'admin' : 'operator',
       status: admin.isActive ? 'active' : 'disabled',
       role: 'admin',
       permissions,
@@ -2725,7 +2726,7 @@ export class AdminService {
       .addSelect('u.passwordHash')
       .where(
         "LOWER(COALESCE(u.staffRole, '')) IN (:...roles) OR u.isAdmin = true",
-        { roles: ['super', 'operator'] },
+        { roles: ['super', 'admin', 'operator'] },
       )
       .getMany();
 
@@ -2756,8 +2757,8 @@ export class AdminService {
         displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
         passwordHash: legacy.passwordHash,
         role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
-        staffRole: staffRole === 'super' ? 'super' : 'operator',
-        dashboardPermissions: staffRole === 'super'
+        staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
+        dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
           ? fullPermissions() as Record<string, string>
           : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
         linkedUserId: legacy.id,
@@ -2795,7 +2796,10 @@ export class AdminService {
       let isSuperAdmin =
         admin.role === AdminRole.SUPER ||
         normalizeStaffRole({ staffRole: admin.staffRole }) === 'super';
-      let perms = normalizePermissions(admin.dashboardPermissions);
+      let staffRole = normalizeStaffRole({ staffRole: admin.staffRole });
+      let perms = staffRole === 'admin' || isSuperAdmin
+        ? fullPermissions()
+        : normalizePermissions(admin.dashboardPermissions);
       if (!isSuperAdmin && !hasAnyPermission(perms)) {
         const legacyQuery = this.usersRepo
           .createQueryBuilder('u')
@@ -2809,17 +2813,19 @@ export class AdminService {
           );
         }
         const legacy = await legacyQuery.getOne();
+        const legacyRole = normalizeStaffRole(legacy);
         if (
           legacy &&
           legacy.passwordHash &&
-          isDashboardSuper(legacy) &&
+          (legacyRole === 'super' || legacyRole === 'admin') &&
           (await bcrypt.compare(password, legacy.passwordHash))
         ) {
-          admin.role = AdminRole.SUPER;
-          admin.staffRole = 'super';
+          admin.role = legacyRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR;
+          admin.staffRole = legacyRole;
           admin.dashboardPermissions = fullPermissions() as Record<string, string>;
           await this.adminUsersRepo.save(admin);
-          isSuperAdmin = true;
+          isSuperAdmin = legacyRole === 'super';
+          staffRole = legacyRole;
           perms = normalizePermissions(admin.dashboardPermissions);
         }
       }
@@ -2860,8 +2866,8 @@ export class AdminService {
       displayName: String(legacy.displayName || legacy.username || 'Dashboard Admin').slice(0, 120),
       passwordHash: legacy.passwordHash,
       role: staffRole === 'super' ? AdminRole.SUPER : AdminRole.MODERATOR,
-      staffRole: staffRole === 'super' ? 'super' : 'operator',
-      dashboardPermissions: staffRole === 'super'
+      staffRole: staffRole === 'super' ? 'super' : staffRole === 'admin' ? 'admin' : 'operator',
+      dashboardPermissions: staffRole === 'super' || staffRole === 'admin'
         ? fullPermissions() as Record<string, string>
         : normalizePermissions(legacy.dashboardPermissions) as Record<string, string>,
       linkedUserId: legacy.id,

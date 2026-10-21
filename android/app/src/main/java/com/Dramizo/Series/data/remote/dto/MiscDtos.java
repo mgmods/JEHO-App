@@ -372,6 +372,9 @@ public final class MiscDtos {
         @SerializedName("chat") public NavIconPairDto chat;
         @SerializedName("me") public NavIconPairDto me;
         @SerializedName("profileActions") public Map<String, String> profileActions;
+        @SerializedName("channelIcons") public Map<String, String> channelIcons;
+        @SerializedName("officialNewsVerified") public Boolean officialNewsVerified;
+        @SerializedName("adminMessagesVerified") public Boolean adminMessagesVerified;
     }
 
     public static class NavIconPairDto {

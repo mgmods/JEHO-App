@@ -26,6 +26,16 @@ export class ChatController {
     return this.chatService.startOrGet(userId, dto);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search conversation names and message history for the current user' })
+  search(
+    @CurrentUser('sub') userId: string,
+    @Query('q') q: string,
+    @Query() query: PaginationDto,
+  ) {
+    return this.chatService.searchConversations(userId, q, query);
+  }
+
   @Get('conversations')
   list(@CurrentUser('sub') userId: string, @Query() query: PaginationDto) {
     return this.chatService.listConversations(userId, query);
