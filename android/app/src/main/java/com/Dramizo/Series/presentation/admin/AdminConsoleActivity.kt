@@ -956,7 +956,7 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
             if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
-            if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
+            if (!status.isNullOrBlank()) card.addView(statusChip(status))
             val detailKeys = when (type) {
                 "reports" -> listOf("reporterName", "reporterId", "targetName", "targetId", "targetType", "reason", "category", "createdAt")
                 "rooms" -> listOf("ownerName", "membersCount", "accessMode", "entryFeeCoins", "createdAt")
@@ -2148,6 +2148,45 @@ class AdminConsoleActivity : ThemedActivity() {
             return v.toString().takeIf { it.isNotBlank() && it != "null" }
         }
         return null
+    }
+
+    private fun statusChip(rawStatus: String): View {
+        val normalized = rawStatus.trim().lowercase(java.util.Locale.ROOT)
+        val label = when (normalized) {
+            "active", "enabled", "true", "approved", "resolved", "completed", "success" -> "نشط"
+            "inactive", "disabled", "false" -> "غير نشط"
+            "pending", "waiting", "open" -> "قيد المراجعة"
+            "rejected", "dismissed", "failed" -> "مرفوض"
+            "suspended", "banned", "blocked", "closed" -> "موقوف"
+            "live", "streaming" -> "مباشر"
+            "public" -> "عام"
+            "private" -> "خاص"
+            else -> rawStatus
+        }
+        val tone = when (normalized) {
+            "active", "enabled", "true", "approved", "resolved", "completed", "success", "live", "streaming" -> 0xFF16794B.toInt()
+            "pending", "waiting", "open" -> 0xFF996515.toInt()
+            "rejected", "dismissed", "failed", "suspended", "banned", "blocked", "closed", "inactive", "disabled", "false" -> 0xFFB42335.toInt()
+            else -> ACCENT
+        }
+        return TextView(this).apply {
+            text = label
+            textSize = 11f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(tone)
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            background = GradientDrawable().apply {
+                setColor(when (tone) {
+                    0xFF16794B.toInt() -> 0xFFE8F7EF.toInt()
+                    0xFF996515.toInt() -> 0xFFFFF4D8.toInt()
+                    0xFFB42335.toInt() -> 0xFFFFEBED.toInt()
+                    else -> 0xFFF0ECFB.toInt()
+                })
+                cornerRadius = dp(30).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5); bottomMargin = dp(4) }
+        }
     }
 
     private fun prettyKey(key: String): String = when (key) {
