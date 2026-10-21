@@ -396,7 +396,7 @@ public class MessagesFragment extends Fragment {
             int unread = 0;
             try {
                 Result<MiscDtos.ListResult<MiscDtos.NotificationDto>> r =
-                        ApiCall.execute(c.getNotificationsUseCase.execute(1));
+                        c.getNotificationsUseCase.execute(1);
                 if (r.success && r.data != null && r.data.items != null) {
                     for (MiscDtos.NotificationDto item : r.data.items) {
                         if (item != null && !item.isRead) unread++;
