@@ -246,6 +246,11 @@ export const economyApi = {
 }
 
 /** House odds / RTP for all coin games (Mikoo + BaiShun + casual). */
+export const gamesCatalogApi = {
+  get: () => safeRequest(() => api.get('/admin/games/catalog')),
+  save: (value) => safeRequest(() => api.patch('/admin/games/catalog', { value })),
+}
+
 export const gameOddsApi = {
   get: () => safeRequest(() => api.get('/admin/games/odds')),
   update: (patch) => safeRequest(() => api.patch('/admin/games/odds', patch)),
