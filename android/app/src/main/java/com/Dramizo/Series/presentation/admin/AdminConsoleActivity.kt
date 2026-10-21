@@ -689,23 +689,27 @@ class AdminConsoleActivity : ThemedActivity() {
             when (type) {
                 "users" -> if (!id.isNullOrBlank()) {
                     val banned = status?.contains("banned", true) == true
-                    card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
-                    card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
-                        confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
-                            load(if (banned) api.unbanUser(id) else api.banUser(id)) {
-                                toast(if (banned) "تم إرسال طلب إلغاء الحظر للخادم" else "تم إرسال طلب الحظر للخادم")
-                                openModule("users")
+                    if (currentRole == StaffRoleHelper.SUPER) {
+                        card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
+                        card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
+                            confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
+                                load(if (banned) api.unbanUser(id) else api.banUser(id)) {
+                                    toast(if (banned) "تم إرسال طلب إلغاء الحظر للخادم" else "تم إرسال طلب الحظر للخادم")
+                                    openModule("users")
+                                }
                             }
-                        }
-                    })
-                    card.addView(button("حذف الحساب") {
-                        confirm("سيُطلب حذف الحساب. تأكد من الهوية والضرورة قبل المتابعة.") {
-                            load(api.deleteUser(id)) {
-                                toast("استجاب الخادم لطلب حذف الحساب")
-                                openModule("users")
+                        })
+                        card.addView(button("حذف الحساب") {
+                            confirm("سيُطلب حذف الحساب. تأكد من الهوية والضرورة قبل المتابعة.") {
+                                load(api.deleteUser(id)) {
+                                    toast("استجاب الخادم لطلب حذف الحساب")
+                                    openModule("users")
+                                }
                             }
-                        }
-                    })
+                        })
+                    } else {
+                        addText(card, "إجراءات تغيير الرتبة والحظر والحذف متاحة للسوبر أدمن فقط.", 11f, false, MUTED)
+                    }
                 }
                 "rooms" -> if (!id.isNullOrBlank()) {
                     card.addView(button("تعديل إعدادات الروم") {
