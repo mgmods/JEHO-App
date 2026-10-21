@@ -631,6 +631,63 @@ class AdminConsoleActivity : ThemedActivity() {
         }
     }
 
+    private fun showTemporaryBanDialog(userId: String) {
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        val hoursInput = EditText(this).apply {
+            hint = "مدة الحظر بالساعات (1 إلى 24)"
+            setText("24")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val reasonInput = EditText(this).apply {
+            hint = "سبب الحظر (مطلوب)"
+            setSingleLine(false)
+            minLines = 2
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        form.addView(hoursInput, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(8) })
+        form.addView(reasonInput, LinearLayout.LayoutParams(-1, dp(88)))
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("حظر مؤقت للمستخدم")
+            .setMessage("يُرفع الحظر تلقائياً عند انتهاء المدة. الحد الأقصى للأدمن 24 ساعة.")
+            .setView(form)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("تأكيد الحظر", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val hours = hoursInput.text.toString().trim().toIntOrNull()
+                val reason = reasonInput.text.toString().trim()
+                if (hours == null || hours !in 1..24) {
+                    hoursInput.error = "أدخل مدة بين 1 و24 ساعة"
+                    return@setOnClickListener
+                }
+                if (reason.isBlank()) {
+                    reasonInput.error = "سبب الحظر مطلوب"
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                confirm("تأكيد حظر المستخدم لمدة $hours ساعة؟") {
+                    load(api.temporaryBanUser(userId, mapOf("hours" to hours, "reason" to reason))) {
+                        toast("تم تسجيل الحظر المؤقت؛ ينتهي خلال $hours ساعة")
+                        openModule("users")
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
     private fun loadUsers(search: String) {
         body.removeViews(1, (body.childCount - 1).coerceAtLeast(0))
         load(api.users(1, 40, search)) { renderItems(it, "users") }
@@ -689,6 +746,19 @@ class AdminConsoleActivity : ThemedActivity() {
             when (type) {
                 "users" -> if (!id.isNullOrBlank()) {
                     val banned = status?.contains("banned", true) == true
+                    if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                        card.addView(button("حظر مؤقت (حتى 24 ساعة)") {
+                            showTemporaryBanDialog(id)
+                        })
+                        card.addView(button("فك الحظر المؤقت") {
+                            confirm("سيُفك الحظر المؤقت الذي أصدرته أنت، أو أي حظر مؤقت عند السوبر أدمن. لن يُفك الحظر الدائم.") {
+                                load(api.temporaryUnbanUser(id)) {
+                                    toast("تم فك الحظر المؤقت")
+                                    openModule("users")
+                                }
+                            }
+                        })
+                    }
                     if (currentRole == StaffRoleHelper.SUPER) {
                         card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
                         card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
