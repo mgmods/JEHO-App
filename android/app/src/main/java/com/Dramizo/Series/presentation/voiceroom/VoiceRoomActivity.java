@@ -3717,7 +3717,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setClickable(false);
         layer.setFocusable(false);
         ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(
-                luckyCannonDp(68), luckyCannonDp(68));
+                luckyCannonDp(96), luckyCannonDp(96));
         // Default position: bottom-center of the room content, with room for the control bar.
         lp.startToStart = ConstraintLayout.LayoutParams.PARENT_ID;
         lp.endToEnd = ConstraintLayout.LayoutParams.PARENT_ID;
@@ -3736,14 +3736,34 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.addView(cannon, cannonLp);
         ImageView uploadedIcon = new ImageView(this);
         FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
-                luckyCannonDp(42), luckyCannonDp(42), Gravity.CENTER);
+                luckyCannonDp(52), luckyCannonDp(52), Gravity.CENTER);
         uploadedIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         uploadedIcon.setClickable(false);
         uploadedIcon.setFocusable(false);
         uploadedIcon.setVisibility(View.GONE);
         layer.addView(uploadedIcon, iconLp);
-        layer.setElevation(luckyCannonDp(42));
-        layer.setVisibility(View.GONE);
+        layer.setElevation(luckyCannonDp(80));
+        // INVISIBLE preserves measured bounds so the initial draggable position is stable.
+        layer.setVisibility(View.INVISIBLE);
+        // Place the launcher just above the existing gift button on first use.
+        // It remains hidden until a lucky gift is selected and armed.
+        root.post(() -> {
+            if (binding == null || binding.btnGift == null
+                    || root.getWidth() <= 0 || root.getHeight() <= 0) return;
+            int[] rootLoc = new int[2];
+            int[] giftLoc = new int[2];
+            root.getLocationOnScreen(rootLoc);
+            binding.btnGift.getLocationOnScreen(giftLoc);
+            float launcherWidth = luckyCannonDp(96);
+            float launcherHeight = luckyCannonDp(96);
+            float x = giftLoc[0] - rootLoc[0] + binding.btnGift.getWidth() / 2f
+                    - launcherWidth / 2f;
+            float y = giftLoc[1] - rootLoc[1] - launcherHeight - luckyCannonDp(18);
+            x = Math.max(0f, Math.min(x, root.getWidth() - launcherWidth));
+            y = Math.max(0f, Math.min(y, root.getHeight() - launcherHeight));
+            layer.setTranslationX(x - layer.getLeft());
+            layer.setTranslationY(y - layer.getTop());
+        });
         layer.setOnClickListener(v -> sendLuckyCannonGift());
         // Drag the floating control anywhere inside the room without firing on a drag.
         layer.setOnTouchListener(new View.OnTouchListener() {
@@ -10191,7 +10211,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             // An explicit dashboard value of false still disables it.
             boolean cannonEnabled = true;
             boolean cannonSound = true;
-            int cannonDuration = 2;
+            int cannonDuration = 5;
             if (result.success && result.data != null) {
                 Object value = result.data.get("selfGiftAllowed");
                 allowed = Boolean.TRUE.equals(value) || "true".equalsIgnoreCase(String.valueOf(value))
@@ -10205,7 +10225,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 Object cs = result.data.get("luckyCannonSoundEnabled");
                 cannonSound = cs == null || Boolean.TRUE.equals(cs) || "true".equalsIgnoreCase(String.valueOf(cs)) || "1".equals(String.valueOf(cs));
                 Object cd = result.data.get("luckyCannonDurationSeconds");
-                try { cannonDuration = Math.max(1, Math.min(10, Integer.parseInt(String.valueOf(cd)))); } catch (Exception ignored) { cannonDuration = 2; }
+                try { cannonDuration = Math.max(1, Math.min(10, Integer.parseInt(String.valueOf(cd)))); } catch (Exception ignored) { cannonDuration = 5; }
             }
             final boolean next = allowed;
             final boolean nextCannonEnabled = cannonEnabled;
