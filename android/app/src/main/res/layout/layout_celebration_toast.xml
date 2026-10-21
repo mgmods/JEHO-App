@@ -76,7 +76,7 @@
         android:id="@+id/wrapCelebrationTimes"
         android:layout_width="48dp"
         android:layout_height="44dp"
-        android:background="@drawable/bg_celebration_times_badge"
+        android:background="@drawable/bg_lucky_multiplier_badge"
         android:visibility="gone"
         tools:visibility="visible">
 
