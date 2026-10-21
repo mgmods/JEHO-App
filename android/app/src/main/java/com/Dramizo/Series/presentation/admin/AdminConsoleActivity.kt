@@ -109,6 +109,7 @@ class AdminConsoleActivity : ThemedActivity() {
         }
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(15), dp(16), dp(15))
             background = GradientDrawable(
@@ -119,6 +120,8 @@ class AdminConsoleActivity : ThemedActivity() {
         backButton = TextView(this).apply {
             text = "‹ رجوع"
             textSize = 14f
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            textDirection = View.TEXT_DIRECTION_RTL
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(10), dp(10), dp(10))
@@ -150,8 +153,15 @@ class AdminConsoleActivity : ThemedActivity() {
             indeterminateTintList = android.content.res.ColorStateList.valueOf(ACCENT)
         }
         root.addView(progress, LinearLayout.LayoutParams(-1, dp(3)))
-        val scroll = ScrollView(this).apply { clipToPadding = false; setPadding(dp(14), dp(12), dp(14), dp(24)) }
-        body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this).apply {
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            clipToPadding = false
+            setPadding(dp(14), dp(12), dp(14), dp(24))
+        }
+        body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
         scroll.addView(body)
         root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
@@ -2371,6 +2381,7 @@ class AdminConsoleActivity : ThemedActivity() {
     private fun formFields(labels: List<String>): Pair<LinearLayout, List<EditText>> {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
             setPadding(dp(20), dp(8), dp(20), dp(4))
         }
         val inputs = labels.map { label ->
@@ -2530,7 +2541,6 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        layoutDirection = View.LAYOUT_DIRECTION_RTL
         layoutDirection = View.LAYOUT_DIRECTION_RTL
         setPadding(dp(16), dp(15), dp(16), dp(15))
         background = GradientDrawable().apply {
