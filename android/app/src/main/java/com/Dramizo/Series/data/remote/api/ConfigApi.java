@@ -38,6 +38,10 @@ public interface ConfigApi {
     @GET("config/mysterious-man")
     Call<ApiResponse<MiscDtos.MysteriousManConfigDto>> mysteriousMan();
 
+    @Headers({"Cache-Control: no-cache, no-store, max-age=0", "Pragma: no-cache"})
+    @GET("config/toast-style")
+    Call<ApiResponse<Map<String, Object>>> toastStyle(@Query("_") long cacheBust);
+
     @GET("config/features")
     Call<ApiResponse<MiscDtos.FeaturesDto>> features();
 
