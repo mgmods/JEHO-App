@@ -22,6 +22,7 @@ import android.view.animation.Animation
 import android.view.animation.LinearInterpolator
 import android.view.animation.RotateAnimation
 import android.widget.ImageView
+import android.widget.HorizontalScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -581,13 +582,23 @@ class MainActivity : ThemedActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
         }
         val previewUrl = reward?.previewUrl ?: reward?.animationUrl
-        if (!previewUrl.isNullOrBlank()) {
-            Glide.with(this).load(previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(rewardImage)
+        if (reward?.type == "coins") {
+            rewardImage.visibility = View.GONE
+            rewardPanel.addView(TextView(this).apply {
+                text = "🪙"
+                textSize = 48f
+                gravity = Gravity.CENTER
+                contentDescription = "كوينزات"
+            })
         } else {
-            rewardImage.setImageResource(android.R.drawable.ic_menu_gallery)
-            rewardImage.contentDescription = if (reward?.type == "coins") "كوينزات" else "هدية يومية"
+            if (!previewUrl.isNullOrBlank()) {
+                Glide.with(this).load(previewUrl).placeholder(android.R.drawable.ic_menu_gallery).error(android.R.drawable.ic_menu_gallery).into(rewardImage)
+            } else {
+                rewardImage.setImageResource(android.R.drawable.ic_menu_gallery)
+                rewardImage.contentDescription = "هدية يومية"
+            }
+            rewardPanel.addView(rewardImage)
         }
-        rewardPanel.addView(rewardImage)
         rewardPanel.addView(TextView(this).apply {
             text = reward?.name ?: reward?.label ?: "مكافأة اليوم"
             textSize = 17f
