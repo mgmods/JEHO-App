@@ -3688,17 +3688,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         layer.setVisibility(View.GONE);
         cannon.setOnClickListener(v -> sendLuckyCannonGift());
         // Drag the floating control anywhere inside the room without firing on a drag.
-        layer.setOnTouchListener(new View.OnTouchListener() {
+        cannon.setOnTouchListener(new View.OnTouchListener() {
             private float downRawX, downRawY, startTx, startTy;
             private boolean dragging;
             private final int touchSlop = luckyCannonDp(6);
-            @Override public boolean onTouch(View view, MotionEvent event) {
+            @Override public boolean onTouch(View touchedView, MotionEvent event) {
                 switch (event.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
                         downRawX = event.getRawX();
                         downRawY = event.getRawY();
-                        startTx = view.getTranslationX();
-                        startTy = view.getTranslationY();
+                        startTx = layer.getTranslationX();
+                        startTy = layer.getTranslationY();
                         dragging = false;
                         return false;
                     case MotionEvent.ACTION_MOVE: {
@@ -3706,15 +3706,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         float dy = event.getRawY() - downRawY;
                         if (!dragging && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
                             dragging = true;
-                            view.getParent().requestDisallowInterceptTouchEvent(true);
+                            layer.getParent().requestDisallowInterceptTouchEvent(true);
                         }
                         if (dragging && root.getWidth() > 0 && root.getHeight() > 0) {
-                            float minX = -view.getLeft();
-                            float maxX = root.getWidth() - view.getRight();
-                            float minY = -view.getTop();
-                            float maxY = root.getHeight() - view.getBottom();
-                            view.setTranslationX(Math.max(minX, Math.min(maxX, startTx + dx)));
-                            view.setTranslationY(Math.max(minY, Math.min(maxY, startTy + dy)));
+                            float minX = -layer.getLeft();
+                            float maxX = root.getWidth() - layer.getRight();
+                            float minY = -layer.getTop();
+                            float maxY = root.getHeight() - layer.getBottom();
+                            layer.setTranslationX(Math.max(minX, Math.min(maxX, startTx + dx)));
+                            layer.setTranslationY(Math.max(minY, Math.min(maxY, startTy + dy)));
                             return true;
                         }
                         return false;
@@ -3722,7 +3722,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
                         if (dragging) {
-                            view.getParent().requestDisallowInterceptTouchEvent(false);
+                            layer.getParent().requestDisallowInterceptTouchEvent(false);
                             return true;
                         }
                         return false;
