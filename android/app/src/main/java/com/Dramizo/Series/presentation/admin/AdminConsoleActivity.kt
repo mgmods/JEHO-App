@@ -1127,25 +1127,62 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val form = formFields(listOf("الدور: super / admin / manager / none", "الحالة: active / suspended / banned"))
-        form.second[0].setText(currentRole ?: "none")
-        form.second[1].setText(currentStatus ?: "active")
-        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
-            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        fun addFieldLabel(label: String) {
+            panel.addView(TextView(this).apply {
+                text = label
+                textSize = 12f
+                setTextColor(MUTED)
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(0, dp(10), 0, dp(5))
+            })
+        }
+        fun addSelector(options: List<String>, selected: String): android.widget.Spinner {
+            val spinner = android.widget.Spinner(this).apply {
+                adapter = android.widget.ArrayAdapter(
+                    this@AdminConsoleActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    options
+                )
+                background = roundRect(Color.WHITE, 12)
+                setPadding(dp(10), dp(4), dp(10), dp(4))
+            }
+            val index = options.indexOf(selected).let { if (it >= 0) it else 0 }
+            spinner.setSelection(index)
+            panel.addView(spinner, LinearLayout.LayoutParams(-1, dp(50)))
+            return spinner
+        }
+        val roles = listOf("super", "admin", "manager", "none")
+        val statuses = listOf("active", "suspended", "banned")
+        addFieldLabel("الدور الإداري")
+        val roleSelector = addSelector(roles, currentRole?.lowercase() ?: "none")
+        addFieldLabel("حالة الحساب")
+        val statusSelector = addSelector(statuses, currentStatus?.lowercase() ?: "active")
+        panel.addView(TextView(this).apply {
+            text = "Super Admin: صلاحيات كاملة • Admin: إدارة عامة • Manager: الرومات والبث • None: مستخدم عادي"
+            textSize = 11f
+            setTextColor(MUTED)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(12), 0, dp(2))
+        })
+        AlertDialog.Builder(this)
+            .setTitle("إدارة الدور والصلاحيات")
+            .setView(panel)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("حفظ التغييرات", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val role = form.second[0].text.toString().trim().lowercase()
-                        val status = form.second[1].text.toString().trim().lowercase()
-                        if (role !in setOf("super", "admin", "manager", "none") ||
-                            status !in setOf("active", "suspended", "banned")) {
-                            toast("الدور: super أو admin أو manager أو none. الحالة: active أو suspended أو banned")
-                            return@setOnClickListener
-                        }
-                        confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
+                        val role = roleSelector.selectedItem?.toString()?.lowercase() ?: "none"
+                        val status = statusSelector.selectedItem?.toString()?.lowercase() ?: "active"
+                        confirm("سيتم تحديث دور الحساب وحالته. تأكد من منح الصلاحية المناسبة فقط. متابعة؟") {
                             load(api.updateUser(id, mapOf("staffRole" to role, "status" to status))) {
                                 dialog.dismiss()
-                                toast("تم تحديث صلاحيات المستخدم")
+                                toast("تم حفظ الدور والحالة")
                                 openModule("users")
                             }
                         }
