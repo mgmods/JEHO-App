@@ -3652,15 +3652,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Initial position: above the existing gift button with a comfortable gap.
         // The user can then drag it anywhere within the room bounds.
         root.post(() -> {
-            if (binding == null || binding.btnGift == null || layer.getWidth() <= 0 || layer.getHeight() <= 0) return;
+            if (binding == null || binding.btnGift == null || root.getWidth() <= 0 || root.getHeight() <= 0) return;
             int[] rootLoc = new int[2];
             int[] giftLoc = new int[2];
             root.getLocationOnScreen(rootLoc);
             binding.btnGift.getLocationOnScreen(giftLoc);
-            float x = giftLoc[0] - rootLoc[0] + binding.btnGift.getWidth() / 2f - layer.getWidth() / 2f;
-            float y = giftLoc[1] - rootLoc[1] - layer.getHeight() - luckyCannonDp(42);
-            layer.setX(Math.max(0f, Math.min(x, root.getWidth() - layer.getWidth())));
-            layer.setY(Math.max(0f, Math.min(y, root.getHeight() - layer.getHeight())));
+            float launcherWidth = layer.getWidth() > 0 ? layer.getWidth() : luckyCannonDp(96);
+            float launcherHeight = layer.getHeight() > 0 ? layer.getHeight() : luckyCannonDp(96);
+            float x = giftLoc[0] - rootLoc[0] + binding.btnGift.getWidth() / 2f - launcherWidth / 2f;
+            float y = giftLoc[1] - rootLoc[1] - launcherHeight - luckyCannonDp(42);
+            layer.setX(Math.max(0f, Math.min(x, root.getWidth() - launcherWidth)));
+            layer.setY(Math.max(0f, Math.min(y, root.getHeight() - launcherHeight)));
         });
 
         final float[] downRawX = new float[1];
