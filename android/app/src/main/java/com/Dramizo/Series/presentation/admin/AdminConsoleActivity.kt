@@ -64,6 +64,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة الطلبات وقبولها أو رفضها", "💳"),
         Module("rechargeAgents", "وكلاء الشحن", "إضافة الوكلاء وإدارة حالتهم", "💰"),
         Module("notifications", "الرسائل والإشعارات", "رسائل عامة أو خاصة بعنوان ومحتوى", "🔔"),
+        Module("toastManager", "التوستات والمؤثرات", "خلفيات التوستات واللمعة والمدة وزر المحظوظ", "✨"),
         Module("vanityIds", "الآي دي المميز", "إدارة الآيديات وإهداؤها بمدة محددة", "🔢"),
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
@@ -331,6 +332,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 body.addView(plansButton)
             }
+            "toastManager" -> showToastManager()
             "notifications" -> {
                 body.addView(button("＋ رسالة عامة أو خاصة + إشعار") { showNotificationDialog() })
                 body.addView(button("✉ رسالة دردشة مباشرة إلى ID محدد") { showDirectMessageDialog() })
@@ -338,6 +340,119 @@ class AdminConsoleActivity : ThemedActivity() {
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
             "staffIdentity" -> showStaffIdentityEditor()
+        }
+    }
+
+    private fun showToastManager() {
+        body.addView(button("↻ تحميل إعدادات التوستات") { openModule("toastManager") })
+        addText(body, "تُحفظ الإعدادات على الخادم وتُطبّق على أجهزة التطبيق. الحركة نفسها تعمل محلياً لتقليل ضغط Blitz.", 12f, false, MUTED)
+        load(api.toastManagerConfig()) { data ->
+            val config = data as? Map<*, *> ?: emptyMap<Any, Any>()
+            fun nested(key: String): MutableMap<String, Any?> {
+                val source = config[key] as? Map<*, *> ?: emptyMap<Any, Any>()
+                return source.entries.associate { it.key.toString() to it.value }.toMutableMap()
+            }
+            val gift = nested("giftSend")
+            val normal = nested("luckyWinNormal")
+            val high = nested("luckyWinHigh")
+            val luckyButton = nested("luckyButton")
+            fun field(parent: LinearLayout, label: String, value: String, hint: String = ""): EditText {
+                addText(parent, label, 13f, true, TEXT)
+                val input = EditText(this).apply {
+                    setSingleLine(true)
+                    textSize = 13f
+                    setTextColor(TEXT)
+                    setHintTextColor(MUTED)
+                    this.hint = hint
+                    background = roundRect(Color.WHITE, 12)
+                    setPadding(dp(12), dp(9), dp(12), dp(9))
+                    setText(value)
+                }
+                parent.addView(input, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+                return input
+            }
+            fun checked(parent: LinearLayout, label: String, value: Boolean): android.widget.CheckBox {
+                return android.widget.CheckBox(this).apply {
+                    text = label
+                    isChecked = value
+                    setTextColor(TEXT)
+                    textSize = 13f
+                    parent.addView(this)
+                }
+            }
+            fun value(map: Map<String, Any?>, key: String, fallback: String): String =
+                map[key]?.toString()?.takeIf { it.isNotBlank() } ?: fallback
+            fun bool(map: Map<String, Any?>, key: String, fallback: Boolean): Boolean =
+                map[key] as? Boolean ?: fallback
+
+            val giftCard = card()
+            addText(giftCard, "توست إرسال الهدايا والعداد X", 16f, true, TEXT)
+            val giftUrl = field(giftCard, "رابط الخلفية", value(gift, "backgroundUrl", ""), "https://…")
+            val giftDuration = field(giftCard, "مدة الظهور بالثواني (1–12)", value(gift, "durationSeconds", "3"))
+            val giftShine = checked(giftCard, "لمعة متحركة", bool(gift, "shineEnabled", true))
+            val giftGlow = checked(giftCard, "توهج الإطار", bool(gift, "frameGlowEnabled", true))
+            body.addView(giftCard)
+
+            val normalCard = card()
+            addText(normalCard, "توست الربح المحظوظ العادي", 16f, true, TEXT)
+            val normalUrl = field(normalCard, "رابط الخلفية", value(normal, "backgroundUrl", ""), "https://…")
+            val normalDuration = field(normalCard, "مدة الظهور بالثواني (1–12)", value(normal, "durationSeconds", "4"))
+            val normalShine = checked(normalCard, "لمعة متحركة", bool(normal, "shineEnabled", true))
+            val normalGlow = checked(normalCard, "توهج الإطار", bool(normal, "frameGlowEnabled", true))
+            body.addView(normalCard)
+
+            val highCard = card()
+            addText(highCard, "توست الربح العالي", 16f, true, TEXT)
+            val highUrl = field(highCard, "رابط الخلفية", value(high, "backgroundUrl", ""), "https://…")
+            val highDuration = field(highCard, "مدة الظهور بالثواني (1–12)", value(high, "durationSeconds", "5"))
+            val highShine = checked(highCard, "لمعة متحركة", bool(high, "shineEnabled", true))
+            val highGlow = checked(highCard, "توهج الإطار", bool(high, "frameGlowEnabled", true))
+            body.addView(highCard)
+
+            val buttonCard = card()
+            addText(buttonCard, "زر المحظوظ المنبثق", 16f, true, TEXT)
+            val buttonUrl = field(buttonCard, "رابط أيقونة الزر", value(luckyButton, "iconUrl", ""), "https://…")
+            val buttonDuration = field(buttonCard, "مدة ظهور الزر بالثواني (1–12)", value(luckyButton, "durationSeconds", "5"))
+            val buttonPulse = checked(buttonCard, "نبضة وحركة خفيفة للزر", bool(luckyButton, "pulseEnabled", true))
+            body.addView(buttonCard)
+
+            body.addView(button("حفظ وتطبيق الإعدادات") {
+                fun seconds(input: EditText, fallback: Int): Int =
+                    (input.text.toString().toIntOrNull() ?: fallback).coerceIn(1, 12)
+                val nextGift = gift.toMutableMap().apply {
+                    put("backgroundUrl", giftUrl.text.toString().trim())
+                    put("durationSeconds", seconds(giftDuration, 3))
+                    put("shineEnabled", giftShine.isChecked)
+                    put("frameGlowEnabled", giftGlow.isChecked)
+                }
+                val nextNormal = normal.toMutableMap().apply {
+                    put("backgroundUrl", normalUrl.text.toString().trim())
+                    put("durationSeconds", seconds(normalDuration, 4))
+                    put("shineEnabled", normalShine.isChecked)
+                    put("frameGlowEnabled", normalGlow.isChecked)
+                }
+                val nextHigh = high.toMutableMap().apply {
+                    put("backgroundUrl", highUrl.text.toString().trim())
+                    put("durationSeconds", seconds(highDuration, 5))
+                    put("shineEnabled", highShine.isChecked)
+                    put("frameGlowEnabled", highGlow.isChecked)
+                }
+                val nextButton = luckyButton.toMutableMap().apply {
+                    put("iconUrl", buttonUrl.text.toString().trim())
+                    put("durationSeconds", seconds(buttonDuration, 5))
+                    put("pulseEnabled", buttonPulse.isChecked)
+                }
+                val payload = linkedMapOf<String, Any>(
+                    "giftSend" to nextGift,
+                    "luckyWinNormal" to nextNormal,
+                    "luckyWinHigh" to nextHigh,
+                    "luckyButton" to nextButton
+                )
+                load(api.updateToastManagerConfig(payload)) {
+                    toast("تم حفظ إعدادات التوستات")
+                    openModule("toastManager")
+                }
+            })
         }
     }
 
