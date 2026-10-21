@@ -896,7 +896,8 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun loadUsers(search: String) {
         // Preserve the search controls and section introduction while replacing results.
-        val fixedViews = if (body.childCount >= 2) 2 else body.childCount
+        // Search row + section intro + role/access card stay in place while results refresh.
+        val fixedViews = if (body.childCount >= 3) 3 else body.childCount
         if (body.childCount > fixedViews) body.removeViews(fixedViews, body.childCount - fixedViews)
         load(api.users(1, 40, search)) { renderItems(it, "users") }
     }
