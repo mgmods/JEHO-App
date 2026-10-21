@@ -215,54 +215,152 @@ class AdminConsoleActivity : ThemedActivity() {
                 body.addView(card)
             }
         }
-        addText(body, "أدوات الإدارة", 18f, true, TEXT)
-        addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
         val visibleModules = when (currentRole) {
             StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
             StaffRoleHelper.ADMIN -> modules.filter { it.key !in listOf("operators", "staffIdentity") }
             else -> modules
         }
-        val rows = visibleModules.chunked(2)
-        rows.forEach { pair ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.TOP
-                layoutDirection = View.LAYOUT_DIRECTION_RTL
-            }
-            pair.forEachIndexed { index, module ->
-                val tile = card().apply {
-                    setPadding(dp(12), dp(13), dp(12), dp(13))
-                    isClickable = true
-                    isFocusable = true
-                    foreground = android.util.TypedValue().let {
-                        val out = android.util.TypedValue()
-                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
-                    }
-                    setOnClickListener { openModule(module.key) }
-                }
-                val icon = TextView(this).apply {
-                    text = module.icon
-                    textSize = 23f
-                    gravity = Gravity.CENTER
-                    setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
-                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
-                }
-                tile.addView(icon)
-                addText(tile, module.title, 14f, true, TEXT)
-                addText(tile, module.subtitle, 11f, false, MUTED)
-                addText(tile, "فتح الإدارة  ←", 11f, true, ACCENT)
-                val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
-                    bottomMargin = dp(10)
-                    if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
-                }
-                row.addView(tile, lp)
-            }
-            if (pair.size == 1) {
-                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
-            }
-            body.addView(row)
+
+        // Compact, categorized native control center: one clear action per row,
+        // with touch feedback and no embedded website/WebView.
+        val searchCard = card().apply {
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
         }
+        val searchInput = EditText(this).apply {
+            hint = "ابحث عن قسم أو إجراء..."
+            textSize = 14f
+            setSingleLine(true)
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = null
+            setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.ic_menu_search, 0)
+            setPadding(dp(4), dp(8), dp(4), dp(8))
+        }
+        searchCard.addView(searchInput, LinearLayout.LayoutParams(-1, -2))
+        body.addView(searchCard)
+
+        val moduleContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        body.addView(moduleContainer)
+
+        fun renderModuleGroups(queryText: String = "") {
+            moduleContainer.removeAllViews()
+            val query = queryText.trim()
+            val filtered = visibleModules.filter {
+                query.isEmpty() || it.title.contains(query, ignoreCase = true) ||
+                    it.subtitle.contains(query, ignoreCase = true) || it.key.contains(query, ignoreCase = true)
+            }
+            val groups = listOf(
+                "إدارة المجتمع" to listOf("users", "rooms", "streams", "logs"),
+                "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents"),
+                "التواصل والإشعارات" to listOf("notifications", "toastManager"),
+                "الهدايا والعضويات" to listOf("mysteriousMan", "luckyCannon", "supportChest", "vanityIds", "grantCosmetics", "vip"),
+                "التحديات والهوية" to listOf("roomPkSettings", "staffIdentity", "operators")
+            )
+            var rendered = 0
+            groups.forEach { (groupTitle, keys) ->
+                val groupItems = filtered.filter { it.key in keys }
+                if (groupItems.isNotEmpty()) {
+                    val sectionHeading = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        setPadding(dp(2), dp(6), dp(2), dp(8))
+                    }
+                    val headingText = TextView(this).apply {
+                        text = groupTitle
+                        textSize = 14f
+                        setTextColor(TEXT)
+                        setTypeface(typeface, Typeface.BOLD)
+                    }
+                    sectionHeading.addView(headingText, LinearLayout.LayoutParams(0, -2, 1f))
+                    val count = TextView(this).apply {
+                        text = groupItems.size.toString()
+                        textSize = 11f
+                        gravity = Gravity.CENTER
+                        setTextColor(ACCENT)
+                        background = roundRect(0xFFEDE8FC.toInt(), 20)
+                        setPadding(dp(9), dp(4), dp(9), dp(4))
+                    }
+                    sectionHeading.addView(count)
+                    moduleContainer.addView(sectionHeading)
+
+                    groupItems.forEach { module ->
+                        val tile = card().apply {
+                            setPadding(dp(12), dp(12), dp(12), dp(12))
+                            isClickable = true
+                            isFocusable = true
+                            foreground = android.util.TypedValue().let {
+                                val out = android.util.TypedValue()
+                                theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                                if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+                            }
+                            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(8) }
+                            setOnClickListener { openModule(module.key) }
+                        }
+                        val line = LinearLayout(this).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        }
+                        val icon = TextView(this).apply {
+                            text = module.icon
+                            textSize = 21f
+                            gravity = Gravity.CENTER
+                            setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
+                            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(12) }
+                        }
+                        line.addView(icon)
+                        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                        val title = TextView(this).apply {
+                            text = module.title
+                            textSize = 14f
+                            setTextColor(TEXT)
+                            setTypeface(typeface, Typeface.BOLD)
+                        }
+                        val subtitleText = TextView(this).apply {
+                            text = module.subtitle
+                            textSize = 11f
+                            setTextColor(MUTED)
+                            setPadding(0, dp(4), 0, 0)
+                            maxLines = 2
+                        }
+                        copy.addView(title)
+                        copy.addView(subtitleText)
+                        line.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+                        val arrow = TextView(this).apply {
+                            text = "‹"
+                            textSize = 26f
+                            setTextColor(ACCENT)
+                            gravity = Gravity.CENTER
+                            setPadding(dp(6), 0, dp(2), 0)
+                        }
+                        line.addView(arrow)
+                        tile.addView(line)
+                        moduleContainer.addView(tile)
+                    }
+                    rendered += groupItems.size
+                }
+            }
+            if (rendered == 0) {
+                val empty = card().apply { setPadding(dp(18), dp(18), dp(18), dp(18)) }
+                addText(empty, "ما لقينا قسم بهذا الاسم", 14f, true, TEXT)
+                addText(empty, "جرّب كلمة بحث أقصر أو اسم القسم.", 12f, false, MUTED)
+                moduleContainer.addView(empty)
+            }
+        }
+        searchInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderModuleGroups(s?.toString().orEmpty())
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
+        renderModuleGroups()
+
     }
 
     private fun openModule(key: String) {
@@ -1127,25 +1225,62 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val form = formFields(listOf("الدور: super أو manager أو none", "الحالة: active أو suspended أو banned"))
-        form.second[0].setText(currentRole ?: "none")
-        form.second[1].setText(currentStatus ?: "active")
-        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
-            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        fun addFieldLabel(label: String) {
+            panel.addView(TextView(this).apply {
+                text = label
+                textSize = 12f
+                setTextColor(MUTED)
+                setTypeface(typeface, Typeface.BOLD)
+                setPadding(0, dp(10), 0, dp(5))
+            })
+        }
+        fun addSelector(options: List<String>, selected: String): android.widget.Spinner {
+            val spinner = android.widget.Spinner(this).apply {
+                adapter = android.widget.ArrayAdapter(
+                    this@AdminConsoleActivity,
+                    android.R.layout.simple_spinner_dropdown_item,
+                    options
+                )
+                background = roundRect(Color.WHITE, 12)
+                setPadding(dp(10), dp(4), dp(10), dp(4))
+            }
+            val index = options.indexOf(selected).let { if (it >= 0) it else 0 }
+            spinner.setSelection(index)
+            panel.addView(spinner, LinearLayout.LayoutParams(-1, dp(50)))
+            return spinner
+        }
+        val roles = listOf("super", "admin", "manager", "none")
+        val statuses = listOf("active", "suspended", "banned")
+        addFieldLabel("الدور الإداري")
+        val roleSelector = addSelector(roles, currentRole?.lowercase() ?: "none")
+        addFieldLabel("حالة الحساب")
+        val statusSelector = addSelector(statuses, currentStatus?.lowercase() ?: "active")
+        panel.addView(TextView(this).apply {
+            text = "Super Admin: صلاحيات كاملة • Admin: إدارة عامة • Manager: الرومات والبث • None: مستخدم عادي"
+            textSize = 11f
+            setTextColor(MUTED)
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(12), 0, dp(2))
+        })
+        AlertDialog.Builder(this)
+            .setTitle("إدارة الدور والصلاحيات")
+            .setView(panel)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("حفظ التغييرات", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val role = form.second[0].text.toString().trim().lowercase()
-                        val status = form.second[1].text.toString().trim().lowercase()
-                        if (role !in setOf("super", "manager", "none") ||
-                            status !in setOf("active", "suspended", "banned")) {
-                            toast("القيم المسموحة: super/manager/none و active/suspended/banned")
-                            return@setOnClickListener
-                        }
-                        confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
+                        val role = roleSelector.selectedItem?.toString()?.lowercase() ?: "none"
+                        val status = statusSelector.selectedItem?.toString()?.lowercase() ?: "active"
+                        confirm("سيتم تحديث دور الحساب وحالته. تأكد من منح الصلاحية المناسبة فقط. متابعة؟") {
                             load(api.updateUser(id, mapOf("staffRole" to role, "status" to status))) {
                                 dialog.dismiss()
-                                toast("تم تحديث صلاحيات المستخدم")
+                                toast("تم حفظ الدور والحالة")
                                 openModule("users")
                             }
                         }
