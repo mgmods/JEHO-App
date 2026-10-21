@@ -8,122 +8,161 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:fillViewport="false">
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="8dp">
+            android:paddingHorizontal="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="18dp">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/agency_proposed_name">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAgencyName"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapWords"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:background="@drawable/bg_agency_hero"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="20dp">
+
+                <ImageView
+                    android:layout_width="54dp"
+                    android:layout_height="54dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_feat_agency"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:text="انطلق بوكالتك في JEHO"
+                    android:textColor="@color/text_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center"
+                    android:text="أدخل بياناتك الأساسية وسيراجع فريقنا طلبك"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="12dp"
+                android:text="بيانات طلب الوكالة"
                 android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_hint" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:textSize="16sp"
+                android:textStyle="bold" />
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/agency_business_plan">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAgencyDesc"
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.AuraLive.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textMultiLine"
-                android:maxLines="5"
-                android:minLines="3"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:hint="اسم الوكالة">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/country">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etCountry"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etAgencyName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="textCapWords"
+                    android:maxLength="128"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.AuraLive.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapWords"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_marginTop="14dp"
+                android:hint="الدولة">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/agency_contact_email">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etContactEmail"
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etCountry"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:cursorVisible="false"
+                    android:inputType="none"
+                    android:singleLine="true"
+                    android:drawableEnd="@drawable/ic_chevron_down"
+                    android:drawablePadding="8dp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.AuraLive.TextInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textEmailAddress"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_marginTop="14dp"
+                android:hint="رقم هاتف للتواصل">
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/agency_contact_phone">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etContactPhone"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="phone"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etContactPhone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="phone"
+                    android:maxLength="32"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/agency_experience">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etExperience"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="textMultiLine"
-                android:maxLines="4"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.textfield.TextInputLayout
-            style="@style/Widget.AuraLive.TextInput"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:hint="@string/agency_expected_hosts">
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etExpectedHostCount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
-                android:textColor="@color/text_primary" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/checkTerms"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/agency_terms_consent"
-            android:textColor="@color/text_primary" />
+            <!-- Legacy API fields are retained for compatibility, but are not shown in the form. -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etAgencyDesc"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etContactEmail"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etExperience"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/etExpectedHostCount"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp" />
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/checkTerms"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:visibility="gone" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -131,20 +170,20 @@
         android:id="@+id/btnSubmitAgency"
         style="@style/Widget.AuraLive.Button.Gold"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:layout_marginHorizontal="8dp"
-        android:layout_marginTop="10dp"
-        android:text="@string/agency_submit_application"
+        android:layout_height="54dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="8dp"
+        android:text="إرسال طلب الوكالة"
         android:textAllCaps="false" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnCancelAgency"
         style="@style/Widget.AuraLive.Button"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginHorizontal="8dp"
+        android:layout_height="46dp"
+        android:layout_marginHorizontal="16dp"
         android:layout_marginTop="6dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginBottom="10dp"
         android:text="@string/cancel"
         android:textAllCaps="false" />
 </LinearLayout>
