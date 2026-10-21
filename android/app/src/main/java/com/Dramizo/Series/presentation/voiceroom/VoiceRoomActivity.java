@@ -12433,7 +12433,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             lp.startToStart = R.id.tvRoomViewerCount;
             lp.endToEnd = R.id.tvRoomViewerCount;
             lp.setMargins(0, dp(6), 0, 0);
-            ((androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot()).addView(roomPkActionButton, lp);
+            binding.headerRoom.addView(roomPkActionButton, lp);
         }
         boolean canStart = isOwner && roomPkFeatureEnabled;
         roomPkActionButton.setVisibility(canStart && roomPkCurrentContestId == null ? View.VISIBLE : View.GONE);
@@ -12789,7 +12789,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     .setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
             dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE).setTextColor(0xFF687386);
         });
-        dialog.setOnCancelListener(d -> shownRoomPkInvites.remove(contest.id));
         dialog.show();
     }
 
