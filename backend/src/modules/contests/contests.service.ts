@@ -20,6 +20,8 @@ import {
   CurrencyType,
 } from '../../database/entities/wallet-transaction.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../database/entities/notification.entity';
 import { CosmeticsService } from '../cosmetics/cosmetics.service';
 import { bootCatalogSeedEnabled } from '../../common/db-authoritative';
 import { cacheRoomPkEnabled, readCachedRoomPkEnabled } from './room-pk-feature';
@@ -43,6 +45,7 @@ export class ContestsService implements OnModuleInit {
     private readonly txRepo: Repository<WalletTransaction>,
     private readonly dataSource: DataSource,
     private readonly cosmetics: CosmeticsService,
+    private readonly notifications: NotificationsService,
     @Optional() private readonly realtime?: RealtimeGateway,
   ) {}
 
