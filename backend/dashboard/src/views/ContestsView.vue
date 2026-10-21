@@ -157,7 +157,7 @@
           <textarea v-model="form.rulesText" rows="2" class="form-control form-control-sm" placeholder='{"minimumDiamonds":100}'></textarea>
         </div>
         <div class="col-md-12">
-          <div class="alert alert-info py-2 small mb-0">تحديات PK يتم إنشاؤها وإدارتها من داخل الروم، ويمكن إيقاف الميزة بالكامل من مفتاح التفعيل أعلاه.</div>
+          <div v-if="form.challengeType === 'room_vs_room'" class="alert alert-info py-2 small mb-0">تحديات PK يتم إنشاؤها وإدارتها من داخل الروم، ويمكن إيقاف الميزة بالكامل من مفتاح التفعيل أعلاه.</div>
         </div>
         <div v-if="form.challengeType === 'room_vs_room'" class="col-12 alert alert-info py-2 small mb-0">
           تحديات PK الجديدة وإعداداتها تتم من داخل الروم. الداشبورد مخصص لتفعيل الميزة أو إيقافها فقط.
