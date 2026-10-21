@@ -1127,7 +1127,7 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val form = formFields(listOf("الدور: super أو manager أو none", "الحالة: active أو suspended أو banned"))
+        val form = formFields(listOf("الدور: super / admin / manager / none", "الحالة: active / suspended / banned"))
         form.second[0].setText(currentRole ?: "none")
         form.second[1].setText(currentStatus ?: "active")
         AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
@@ -1137,9 +1137,9 @@ class AdminConsoleActivity : ThemedActivity() {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                         val role = form.second[0].text.toString().trim().lowercase()
                         val status = form.second[1].text.toString().trim().lowercase()
-                        if (role !in setOf("super", "manager", "none") ||
+                        if (role !in setOf("super", "admin", "manager", "none") ||
                             status !in setOf("active", "suspended", "banned")) {
-                            toast("القيم المسموحة: super/manager/none و active/suspended/banned")
+                            toast("الدور: super أو admin أو manager أو none. الحالة: active أو suspended أو banned")
                             return@setOnClickListener
                         }
                         confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
