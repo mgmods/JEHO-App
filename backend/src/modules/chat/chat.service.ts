@@ -358,7 +358,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
   async searchConversations(userId: string, rawQuery: string, query: PaginationDto) {
     const term = String(rawQuery || '').trim().slice(0, 120);
     if (term.length < 2) return paginate([], 0, query.page || 1, query.limit || 20);
-    const needle = `%${term.toLocaleLowerCase() .replace(/\\\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')}%`;
+    const needle = `%${term.toLocaleLowerCase()}%`;
     const qb = this.partRepo
       .createQueryBuilder('p')
       .innerJoinAndSelect('p.conversation', 'c')
@@ -373,7 +373,7 @@ export class ChatService implements OnModuleInit, OnModuleDestroy {
       .andWhere('p.isDeleted = false')
       .andWhere('p.isArchived = false')
       .andWhere(
-        "(LOWER(COALESCE(peer.username, '')) LIKE :needle ESCAPE '\\\\' OR LOWER(COALESCE(peerProfile.displayName, '')) LIKE :needle ESCAPE '\\\\' OR LOWER(CAST(peer.id AS text)) LIKE :needle ESCAPE '\\\\' OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle ESCAPE '\\\\')",
+        "(LOWER(COALESCE(c.title, '')) LIKE :needle OR LOWER(COALESCE(peer.username, '')) LIKE :needle OR LOWER(COALESCE(peerProfile.displayName, '')) LIKE :needle OR LOWER(CAST(peer.id AS text)) LIKE :needle OR LOWER(COALESCE(matchedMessage.content, '')) LIKE :needle)",
         { needle },
       )
       .distinct(true)
