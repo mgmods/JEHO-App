@@ -274,7 +274,7 @@ public class AuraLiveApp extends Application {
 
                     // Lucky wins use one compact global banner on whichever app section is visible,
                     // including Home while a voice room remains alive in the background.
-                    if ("lucky_hit".equalsIgnoreCase(kind)
+                    if ("lucky_hit".equalsIgnoreCase(kind) && appVisible
                             && activity != null && !activity.isFinishing()) {
                         activity.runOnUiThread(() ->
                                 com.Dramizo.Series.util.GlobalCelebrationToast.show(
