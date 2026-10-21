@@ -12824,6 +12824,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
                         if (!response.isSuccessful() || response.body() == null || response.body().data == null
                                 || response.body().data.items == null || isFinishing() || exiting) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null
+                                || response.body().data.roomPkEnabled;
+                        handler.post(VoiceRoomActivity.this::ensureRoomPkActionButton);
                         for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
                             if (contest == null || !"room_vs_room".equals(contest.challengeType)
                                     || !"active".equalsIgnoreCase(contest.status)
