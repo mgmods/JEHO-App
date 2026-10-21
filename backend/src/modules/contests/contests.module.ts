@@ -11,12 +11,14 @@ import { WalletTransaction } from '../../database/entities/wallet-transaction.en
 import { Room } from '../../database/entities/room.entity';
 import { RealtimeModule } from '../realtime/realtime.module';
 import { CosmeticsModule } from '../cosmetics/cosmetics.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contest, ContestEntry, Wallet, User, WalletTransaction, AppSetting, Room]),
     RealtimeModule,
     CosmeticsModule,
+    NotificationsModule,
   ],
   controllers: [ContestsController],
   providers: [ContestsService],
