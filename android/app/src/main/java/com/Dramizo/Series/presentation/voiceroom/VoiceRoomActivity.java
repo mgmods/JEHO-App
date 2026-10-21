@@ -3743,7 +3743,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         uploadedIcon.setVisibility(View.GONE);
         layer.addView(uploadedIcon, iconLp);
         layer.setElevation(luckyCannonDp(80));
-        layer.setVisibility(View.GONE);
+        // INVISIBLE preserves measured bounds so the initial draggable position is stable.
+        layer.setVisibility(View.INVISIBLE);
         // Place the launcher just above the existing gift button on first use.
         // It remains hidden until a lucky gift is selected and armed.
         root.post(() -> {
