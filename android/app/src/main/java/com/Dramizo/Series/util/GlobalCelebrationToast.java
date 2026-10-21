@@ -93,6 +93,45 @@ public final class GlobalCelebrationToast {
                 senderName, "gift_send", null);
     }
 
+    private static void applyRemoteStyleToActiveToast() {
+        View active = current.get();
+        if (active == null || !"gift_send".equals(active.getTag())) return;
+        Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+        ImageView background = active.findViewById(R.id.imgToastBackground);
+        String imageUrl = AssetCatalog.absoluteUrl(remoteBackgroundUrl);
+        if (background != null) {
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                background.setVisibility(View.VISIBLE);
+                try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(background); }
+                catch (Exception ignored) { background.setVisibility(View.GONE); }
+            } else background.setVisibility(View.GONE);
+        }
+        active.setElevation(dp(activity, remoteFrameGlowEnabled ? 20 : 14));
+        View sheen = active.findViewById(R.id.viewCelebrationSheen);
+        if (sheen != null && remoteShineEnabled) {
+            sheen.setVisibility(View.VISIBLE);
+            GradientDrawable shine = new GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    new int[] { 0x00FFFFFF, 0x66FFFFFF, 0x00FFFFFF });
+            sheen.setBackground(shine);
+            sheen.setRotation(12f);
+            sheen.setAlpha(0.78f);
+            active.post(() -> {
+                if (sheen.getParent() != active || active.getParent() == null) return;
+                ObjectAnimator sweep = ObjectAnimator.ofFloat(
+                        sheen, View.TRANSLATION_X, -dp(activity, 52), active.getWidth() + dp(activity, 52));
+                sweep.setDuration(1250L);
+                sweep.setRepeatCount(1);
+                sweep.setInterpolator(new LinearInterpolator());
+                sweep.start();
+            });
+        } else if (sheen != null) sheen.setVisibility(View.GONE);
+        if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
+        hideRunnable = () -> removeBanner(active);
+        MAIN.postDelayed(hideRunnable, Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L);
+    }
+
     private static void refreshToastStyle(Activity activity) {
         long now = System.currentTimeMillis();
         if (now - lastStyleFetchAt < 15_000L) return;
@@ -113,6 +152,7 @@ public final class GlobalCelebrationToast {
                         remoteDurationSeconds = Math.max(2, Math.min(8,
                                 (int) Math.round(Double.parseDouble(String.valueOf(cfg.get("durationSeconds"))))));
                     } catch (Exception ignored) { remoteDurationSeconds = 3; }
+                    MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
                     // Keep the last known style and native fallback while the free host sleeps.
@@ -267,6 +307,7 @@ public final class GlobalCelebrationToast {
         boolean gameOrLucky = kind != null && (
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
+        banner.setTag(giftSend ? "gift_send" : null);
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
