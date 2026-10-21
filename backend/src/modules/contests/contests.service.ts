@@ -202,7 +202,9 @@ export class ContestsService implements OnModuleInit {
     return {
       items: pending.filter((contest) => {
         const rules = (contest.rules || {}) as Record<string, unknown>;
-        return rules.invitationStatus === 'pending' && String(rules.targetRoomId || '') === room.id;
+        const createdAt = Date.parse(String(rules.createdAt || contest.createdAt || ''));
+        const fresh = Number.isFinite(createdAt) && Date.now() - createdAt < 60_000;
+        return rules.invitationStatus === 'pending' && fresh && String(rules.targetRoomId || '') === room.id;
       }),
     };
   }
@@ -227,9 +229,20 @@ export class ContestsService implements OnModuleInit {
       take: 500,
     });
     for (const contest of existing) {
-      const rules = (contest.rules || {}) as Record<string, unknown>;
+      const rules = { ...((contest.rules || {}) as Record<string, unknown>) };
+      const pending = rules.invitationStatus === 'pending';
+      const createdAt = Date.parse(String(rules.createdAt || contest.createdAt || ''));
+      if (pending && Number.isFinite(createdAt) && Date.now() - createdAt >= 60_000) {
+        rules.invitationStatus = 'expired';
+        rules.expiredAt = new Date().toISOString();
+        contest.rules = rules;
+        contest.status = 'ended';
+        contest.endAt = new Date();
+        await this.contestsRepo.save(contest);
+        continue;
+      }
       if (this.roomPkRoomIds(contest).some((id) => id === source.id || id === target.id)
-          && (contest.status === 'active' || rules.invitationStatus === 'pending')) {
+          && (contest.status === 'active' || pending)) {
         throw new ConflictException('أحد الرومين لديه تحدٍّ نشط أو دعوة معلّقة بالفعل');
       }
     }
