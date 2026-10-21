@@ -54,6 +54,7 @@ public final class GlobalCelebrationToast {
     private static volatile int remoteDurationSeconds = 3;
     private static volatile int remoteLuckyNormalDurationSeconds = 4;
     private static volatile int remoteLuckyHighDurationSeconds = 5;
+    private static volatile float remoteGiftAvatarX = 8f, remoteGiftAvatarY = 50f, remoteGiftTextX = 25f, remoteGiftTextY = 50f;
     private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 50f;
     private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 50f;
     private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 50f;
@@ -148,14 +149,14 @@ public final class GlobalCelebrationToast {
                 sweep.start();
             });
         } else if (sheen != null) sheen.setVisibility(View.GONE);
-        if (luckyHigh || luckyNormal) {
+        if (giftSend || luckyHigh || luckyNormal) {
             ImageView avatar = active.findViewById(R.id.imgCelebrationAvatar);
             TextView title = active.findViewById(R.id.tvCelebrationTitle);
             TextView body = active.findViewById(R.id.tvCelebrationBody);
-            final float avatarX = luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
             active.post(() -> {
                 if (active.getParent() == null) return;
                 positionViewPercent(avatar, active, avatarX, avatarY, true);
@@ -205,6 +206,10 @@ public final class GlobalCelebrationToast {
                     remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
                     remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
                     remoteDurationSeconds = intValue(gift.get("durationSeconds"), intValue(cfg.get("durationSeconds"), 3));
+                    remoteGiftAvatarX = floatValue(gift.get("avatarX"), 8f);
+                    remoteGiftAvatarY = floatValue(gift.get("avatarY"), 50f);
+                    remoteGiftTextX = floatValue(gift.get("textX"), 25f);
+                    remoteGiftTextY = floatValue(gift.get("textY"), 50f);
                     remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
                     remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
                     remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
@@ -556,11 +561,11 @@ public final class GlobalCelebrationToast {
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
                     .start();
         }
-        if (luckyWin) {
-            final float avatarX = luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
-            final float avatarY = luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
-            final float textX = luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
-            final float textY = luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+        if (customToastStyle) {
+            final float avatarX = giftSend ? remoteGiftAvatarX : luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = giftSend ? remoteGiftAvatarY : luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = giftSend ? remoteGiftTextX : luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
+            final float textY = giftSend ? remoteGiftTextY : luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
             banner.post(() -> {
                 if (banner.getParent() == null) return;
                 positionViewPercent(avatar, banner, avatarX, avatarY, true);
