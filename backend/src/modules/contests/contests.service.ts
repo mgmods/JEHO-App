@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   Optional,
@@ -683,7 +684,7 @@ export class ContestsService implements OnModuleInit {
     const title = String(dto.title || '').trim();
     if (!title) throw new BadRequestException('عنوان المسابقة مطلوب');
     // A room-vs-room challenge must be visible and score in both rooms; it is global by design.
-    const scope = dto.challengeType === 'room_vs_room' ? 'global' : (dto.scope || 'global');
+    const scope = dto.scope || 'global';
     if (scope === 'room' && !dto.roomId) {
       throw new BadRequestException('roomId مطلوب لمسابقات الروم');
     }
