@@ -60,6 +60,8 @@ export class AdminGuard implements CanActivate {
         /\/admin\/gifts\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path) ||
+        // Deleting rooms is destructive; keep it Super Admin only.
+        (method === 'DELETE' && /\\/admin\\/rooms\\/[^/]+(?:\\/|$)/.test(path)) ||
         // Granting account-bound benefits is Super Admin only; staff may
         // review catalogs but cannot mint VIP, cosmetics, or vanity IDs.
         /\/admin\/vip\/assign(?:\/|$)/.test(path) ||
