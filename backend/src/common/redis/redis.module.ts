@@ -43,6 +43,22 @@ export class RedisService implements OnModuleDestroy {
     try { await this.client.del(key); } catch {}
   }
 
+  /** Delete a key only if its current value still matches the value inspected. */
+  async deleteIfValueMatches(key: string, expectedValue: string): Promise<boolean> {
+    if (!this.enabled) return false;
+    try {
+      const result = await this.client.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        key,
+        expectedValue,
+      );
+      return Number(result) === 1;
+    } catch {
+      return false;
+    }
+  }
+
   async incr(key: string): Promise<number> {
     if (!this.enabled) return 1;
     try { return await this.client.incr(key); } catch { return 1; }
