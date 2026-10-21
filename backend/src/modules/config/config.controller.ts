@@ -151,7 +151,7 @@ export class ConfigController {
     const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
     const defaults = {
       backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, version: 1,
-      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3 },
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
       luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
       luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
       luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
@@ -176,6 +176,10 @@ export class ConfigController {
       shineEnabled: oldGift.shineEnabled !== false,
       frameGlowEnabled: oldGift.frameGlowEnabled !== false,
       durationSeconds: Math.max(1, Math.min(12, Math.round(Number(oldGift.durationSeconds) || 3))),
+      avatarX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarX)) ? Number(oldGift.avatarX) : 8))),
+      avatarY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.avatarY)) ? Number(oldGift.avatarY) : 50))),
+      textX: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textX)) ? Number(oldGift.textX) : 25))),
+      textY: Math.max(0, Math.min(100, Math.round(Number.isFinite(Number(oldGift.textY)) ? Number(oldGift.textY) : 50))),
     };
     const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
       const value = parsed[key] || {};
