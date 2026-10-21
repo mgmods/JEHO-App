@@ -30,6 +30,74 @@
       <a class="btn btn-outline-light btn-sm" href="#game-store">متجر الألعاب</a>
     </nav>
 
+    <div id="game-catalog" class="glass p-3">
+      <LoadingSpinner v-if="loading && !games.length" />
+      <div v-else-if="!games.length" class="empty-state p-5 text-center">
+        <i class="bi bi-controller fs-1 d-block mb-2"></i>
+        <strong class="d-block">قائمة الألعاب فارغة — استعد القائمة الأساسية</strong>
+        <p class="small text-muted mt-2 mb-3">استعادة القائمة لا تغيّر إعدادات نسب الفوز. بعد الاستعادة اضغط «حفظ إلى التطبيق» لتثبيت الألعاب في الخادم.</p>
+        <div class="d-flex justify-content-center flex-wrap gap-2">
+          <button class="btn btn-outline-light btn-sm" type="button" @click="load">إعادة تحميل البيانات</button>
+          <button class="btn btn-aurora btn-sm" type="button" @click="resetDefaults">استعادة الألعاب الأساسية</button>
+          <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="resetDefaults(); save()">استعادة وحفظ الألعاب</button>
+        </div>
+      </div>
+      <div v-else class="catalog-grid widget-grid">
+        <article
+          v-for="(g, idx) in games"
+          :key="g.id || idx"
+          class="catalog-card widget-card"
+          :class="{ 'is-off': g.enabled === false }"
+        >
+          <div class="catalog-card__art widget-card-media">
+            <img
+              v-if="g.coverUrl && !coverBroken[g.id]"
+              :src="g.coverUrl"
+              :alt="displayTitle(g)"
+              loading="lazy"
+              @error="markCoverBroken(g.id)"
+            />
+            <div v-else class="catalog-card__fallback">
+              <i class="bi bi-controller"></i>
+            </div>
+            <div v-if="g.enabled === false" class="catalog-card__veil">
+              <span>{{ t('games.hidden') }}</span>
+            </div>
+            <div class="catalog-card__toolbar">
+              <button
+                type="button"
+                class="tool-btn"
+                :title="t('common.edit')"
+                @click="openEdit(idx)"
+              >
+                <i class="bi bi-pencil-fill"></i>
+              </button>
+              <button
+                type="button"
+                class="tool-btn"
+                :title="g.enabled === false ? t('games.showInApp') : t('games.hideInApp')"
+                @click="toggleEnabled(idx)"
+              >
+                <i class="bi" :class="g.enabled === false ? 'bi-eye-slash-fill' : 'bi-eye-fill'"></i>
+              </button>
+              <button
+                type="button"
+                class="tool-btn tool-btn--danger"
+                :title="t('common.delete')"
+                @click="removeGame(idx)"
+              >
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>
+          </div>
+          <div class="catalog-card__meta">
+            <h4 class="catalog-card__title" :title="displayTitle(g)">{{ displayTitle(g) }}</h4>
+            <p class="catalog-card__sub">{{ g.titleEn && g.titleEn !== g.title ? g.titleEn : g.id }}</p>
+          </div>
+        </article>
+      </div>
+    </div>
+
     <div id="game-runtime-controls" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
         <div><h3 class="h6 mb-1">التحكم بتشغيل وإيقاف كل الألعاب</h3><p class="small text-muted mb-0">كل لعبة لها مفتاح مستقل. احفظ التغييرات لتطبيق حالة التشغيل من إعدادات الخادم.</p><div class="small text-muted mt-1">عدد الألعاب المتاحة للإدارة: {{ manageableGames.length }}</div></div>
@@ -118,73 +186,7 @@
       </div>
     </div>
 
-    <div id="game-catalog" class="glass p-3">
-      <LoadingSpinner v-if="loading && !games.length" />
-      <div v-else-if="!games.length" class="empty-state p-5 text-center">
-        <i class="bi bi-controller fs-1 d-block mb-2"></i>
-        <strong class="d-block">قائمة الألعاب فارغة — استعد القائمة الأساسية</strong>
-        <p class="small text-muted mt-2 mb-3">استعادة القائمة لا تغيّر إعدادات نسب الفوز. بعد الاستعادة اضغط «حفظ إلى التطبيق» لتثبيت الألعاب في الخادم.</p>
-        <div class="d-flex justify-content-center flex-wrap gap-2">
-          <button class="btn btn-outline-light btn-sm" type="button" @click="load">إعادة تحميل البيانات</button>
-          <button class="btn btn-aurora btn-sm" type="button" @click="resetDefaults">استعادة الألعاب الأساسية</button>
-          <button class="btn btn-aurora btn-sm" type="button" :disabled="saving" @click="resetDefaults(); save()">استعادة وحفظ الألعاب</button>
-        </div>
-      </div>
-      <div v-else class="catalog-grid widget-grid">
-        <article
-          v-for="(g, idx) in games"
-          :key="g.id || idx"
-          class="catalog-card widget-card"
-          :class="{ 'is-off': g.enabled === false }"
-        >
-          <div class="catalog-card__art widget-card-media">
-            <img
-              v-if="g.coverUrl && !coverBroken[g.id]"
-              :src="g.coverUrl"
-              :alt="displayTitle(g)"
-              loading="lazy"
-              @error="markCoverBroken(g.id)"
-            />
-            <div v-else class="catalog-card__fallback">
-              <i class="bi bi-controller"></i>
-            </div>
-            <div v-if="g.enabled === false" class="catalog-card__veil">
-              <span>{{ t('games.hidden') }}</span>
-            </div>
-            <div class="catalog-card__toolbar">
-              <button
-                type="button"
-                class="tool-btn"
-                :title="t('common.edit')"
-                @click="openEdit(idx)"
-              >
-                <i class="bi bi-pencil-fill"></i>
-              </button>
-              <button
-                type="button"
-                class="tool-btn"
-                :title="g.enabled === false ? t('games.showInApp') : t('games.hideInApp')"
-                @click="toggleEnabled(idx)"
-              >
-                <i class="bi" :class="g.enabled === false ? 'bi-eye-slash-fill' : 'bi-eye-fill'"></i>
-              </button>
-              <button
-                type="button"
-                class="tool-btn tool-btn--danger"
-                :title="t('common.delete')"
-                @click="removeGame(idx)"
-              >
-                <i class="bi bi-trash-fill"></i>
-              </button>
-            </div>
-          </div>
-          <div class="catalog-card__meta">
-            <h4 class="catalog-card__title" :title="displayTitle(g)">{{ displayTitle(g) }}</h4>
-            <p class="catalog-card__sub">{{ g.titleEn && g.titleEn !== g.title ? g.titleEn : g.id }}</p>
-          </div>
-        </article>
-      </div>
-    </div>
+
 
     <div id="game-win-rates" class="glass p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
@@ -631,6 +633,7 @@ function doRemoveGame() {
   pendingRemoveIdx.value = -1
   if (idx < 0) return
   games.value.splice(idx, 1)
+  if (!games.value.length) games.value = defaults.map(normalizeGame)
   if (editIdx.value === idx) closeEdit()
   else if (editIdx.value !== null && editIdx.value > idx) editIdx.value -= 1
 }
