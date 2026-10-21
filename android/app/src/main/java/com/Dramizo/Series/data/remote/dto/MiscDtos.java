@@ -373,8 +373,8 @@ public final class MiscDtos {
         @SerializedName("me") public NavIconPairDto me;
         @SerializedName("profileActions") public Map<String, String> profileActions;
         @SerializedName("channelIcons") public Map<String, String> channelIcons;
-        @SerializedName("officialNewsVerified") public boolean officialNewsVerified = true;
-        @SerializedName("adminMessagesVerified") public boolean adminMessagesVerified = true;
+        @SerializedName("officialNewsVerified") public Boolean officialNewsVerified;
+        @SerializedName("adminMessagesVerified") public Boolean adminMessagesVerified;
     }
 
     public static class NavIconPairDto {
