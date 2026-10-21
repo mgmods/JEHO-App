@@ -3245,14 +3245,27 @@ export class RoomsService implements OnModuleInit, OnModuleDestroy {
         'لا تملك صلاحية إنزال المستخدمين من المايك',
       );
     } catch (permissionError) {
-      // A moderator explicitly granted room-kick rights can also remove a user from the mic.
-      // Room owners/cohosts, platform staff and agency managers pass the first check above.
-      await this.assertModeratorPermission(
-        roomId,
-        actorId,
-        'canKick',
-        'لا تملك صلاحية إنزال المستخدمين من المايك',
-      );
+      try {
+        // Explicit room-kick permission also permits mic-only removal.
+        await this.assertModeratorPermission(
+          roomId,
+          actorId,
+          'canKick',
+          'لا تملك صلاحية إنزال المستخدمين من المايك',
+        );
+      } catch (kickPermissionError) {
+        // Support existing appointed room moderators whose older permission rows
+        // do not have canManageSeats synchronized, while still requiring an active room.
+        const room = await this.roomsRepo.findOne({ where: { id: roomId } });
+        if (!room) throw new NotFoundException('Room not found');
+        await this.assertAgencyRoomActive(room);
+        const appointedModerator = await this.modsRepo.findOne({ where: { roomId, userId: actorId } });
+        const staff = await this.platformStaffRole(actorId);
+        const privilegedHost = room.hostId === actorId || room.cohostId === actorId || room.activeHostId === actorId;
+        if (!appointedModerator && !privilegedHost && staff !== 'manager' && staff !== 'super') {
+          throw kickPermissionError;
+        }
+      }
     }
     // Removing someone from the microphone is not a room kick/ban.
     // Keep platform-staff hierarchy and self/room-owner protections, but do not
