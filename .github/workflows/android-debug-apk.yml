@@ -198,3 +198,43 @@ jobs:
           path: android/app/build/outputs/apk/release/app-universal-release.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Check Appetize preview token
+        id: appetize-config
+        env:
+          APPETIZE_API_TOKEN: ${{ secrets.APPETIZE_API_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -n "${APPETIZE_API_TOKEN:-}" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Appetize upload skipped: add APPETIZE_API_TOKEN in repository Actions secrets to enable phone preview."
+          fi
+
+      - name: Upload to Appetize preview
+        id: appetize-upload
+        if: steps.appetize-config.outputs.configured == 'true'
+        uses: appetizeio/github-action-appetize@v1.1.0
+        with:
+          apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
+          publicKey: ${{ secrets.APPETIZE_PUBLIC_KEY }}
+          appFile: android/app/build/outputs/apk/release/app-universal-release.apk
+          platform: android
+          note: JEHO CHAT MG-JEHO preview ${{ github.sha }}
+
+      - name: Publish Appetize preview link
+        if: steps.appetize-config.outputs.configured == 'true'
+        env:
+          APPETIZE_PUBLIC_KEY: ${{ steps.appetize-upload.outputs.publicKey }}
+        shell: bash
+        run: |
+          {
+            echo "## JEHO CHAT phone preview"
+            echo
+            echo "Open the Android preview in your browser: https://appetize.io/app/${APPETIZE_PUBLIC_KEY}"
+            echo
+            if [[ -z "${{ secrets.APPETIZE_PUBLIC_KEY }}" ]]; then
+              echo "First upload created an Appetize app. Save its public key as the repository Actions secret APPETIZE_PUBLIC_KEY before future builds, so they update the same preview."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
