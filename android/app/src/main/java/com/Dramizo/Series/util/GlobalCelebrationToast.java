@@ -125,6 +125,15 @@ public final class GlobalCelebrationToast {
         ImageView background = active.findViewById(R.id.imgToastBackground);
         String chosenBackground = giftSend ? remoteBackgroundUrl
                 : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+        int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+        int requestedWidthDp = giftSend ? remoteGiftWidthDp : luckyHigh ? remoteLuckyHighWidthDp : remoteLuckyNormalWidthDp;
+        int requestedHeightDp = giftSend ? remoteGiftHeightDp : luckyHigh ? remoteLuckyHighHeightDp : remoteLuckyNormalHeightDp;
+        ViewGroup.LayoutParams activeParams = active.getLayoutParams();
+        if (activeParams instanceof FrameLayout.LayoutParams) {
+            activeParams.width = Math.min(dp(activity, requestedWidthDp), Math.max(dp(activity, 220), screenWidth - dp(activity, 24)));
+            activeParams.height = dp(activity, requestedHeightDp);
+            active.setLayoutParams(activeParams);
+        }
         String imageUrl = AssetCatalog.absoluteUrl(chosenBackground);
         if (background != null) {
             if (imageUrl != null && !imageUrl.isEmpty()) {
