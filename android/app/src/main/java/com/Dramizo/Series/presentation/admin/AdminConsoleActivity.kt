@@ -1197,19 +1197,11 @@ class AdminConsoleActivity : ThemedActivity() {
                     })
                 }
                 "reports" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("حسم البلاغ") {
-                        confirm("تأكيد وضع البلاغ كمحلول؟") {
-                            load(api.resolveReport(id, mapOf("adminNote" to "تمت المراجعة من تطبيق JEHO"))) {
-                                toast("تم تحديث البلاغ"); openModule("reports")
-                            }
-                        }
+                    card.addView(button("مراجعة البلاغ واتخاذ إجراء") {
+                        showReportDecisionDialog(id, true)
                     })
                     card.addView(button("رفض البلاغ") {
-                        confirm("تأكيد رفض البلاغ؟") {
-                            load(api.dismissReport(id, mapOf("adminNote" to "تمت المراجعة ولا يلزم إجراء"))) {
-                                toast("تم تحديث البلاغ"); openModule("reports")
-                            }
-                        }
+                        showReportDecisionDialog(id, false)
                     })
                 }
                 "withdrawals" -> if (!id.isNullOrBlank()) {
@@ -1478,6 +1470,57 @@ class AdminConsoleActivity : ThemedActivity() {
                                 dialog.dismiss()
                                 toast("تم تحديث صلاحيات المدير")
                                 openModule("operators")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showReportDecisionDialog(reportId: String, resolve: Boolean) {
+        val noteInput = EditText(this).apply {
+            hint = "ملاحظة الإدارة (اختيارية)"
+            textSize = 14f
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            gravity = Gravity.TOP or Gravity.START
+            minLines = 3
+            maxLines = 5
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = roundRect(0xFFF5F4FA.toInt(), 12)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = if (resolve) "أضف ملاحظة توضح كيف تمت معالجة البلاغ. سيتم تسجيل القرار على الخادم." else "وضّح سبب رفض البلاغ ليسهل الرجوع إلى القرار لاحقاً."
+                textSize = 13f
+                setTextColor(MUTED)
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, 0, 0, dp(10))
+            })
+            addView(noteInput, LinearLayout.LayoutParams(-1, -2))
+        }
+        val title = if (resolve) "حسم البلاغ" else "رفض البلاغ"
+        AlertDialog.Builder(this).setTitle(title).setView(content)
+            .setNegativeButton("إلغاء", null).setPositiveButton("متابعة", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val note = noteInput.text.toString().trim()
+                        if (note.length > 300) {
+                            toast("اختصر الملاحظة إلى 300 حرف")
+                            return@setOnClickListener
+                        }
+                        val defaultNote = if (resolve) "تمت المراجعة من تطبيق JEHO" else "تمت المراجعة ولا يلزم إجراء"
+                        confirm(if (resolve) "تأكيد حسم البلاغ وتسجيل القرار؟" else "تأكيد رفض البلاغ وتسجيل القرار؟") {
+                            val payload = mapOf("adminNote" to note.ifBlank { defaultNote })
+                            load(if (resolve) api.resolveReport(reportId, payload) else api.dismissReport(reportId, payload)) {
+                                dialog.dismiss()
+                                toast(if (resolve) "تم حسم البلاغ" else "تم رفض البلاغ")
+                                openModule("reports")
                             }
                         }
                     }
