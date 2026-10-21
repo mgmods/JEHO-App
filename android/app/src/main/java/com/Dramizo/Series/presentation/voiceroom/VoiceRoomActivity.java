@@ -3872,6 +3872,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void sendLuckyCannonGift() {
         if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
+        // Tactile press feedback is local-only and does not affect the send request.
+        if (luckyCannonView != null) luckyCannonView.fire();
+        if (luckyCannonLayer != null) {
+            luckyCannonLayer.animate().cancel();
+            luckyCannonLayer.setScaleX(0.94f);
+            luckyCannonLayer.setScaleY(0.94f);
+            luckyCannonLayer.animate().scaleX(1.06f).scaleY(1.06f).setDuration(110L)
+                    .withEndAction(() -> {
+                        if (luckyCannonLayer != null) luckyCannonLayer.animate()
+                                .scaleX(1f).scaleY(1f).setDuration(180L).start();
+                    }).start();
+        }
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
