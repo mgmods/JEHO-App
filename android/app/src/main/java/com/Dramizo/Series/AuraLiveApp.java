@@ -270,12 +270,12 @@ public class AuraLiveApp extends Application {
                     long coinsValue = jsonLongAny(payload, 0L,
                             "coinsWon", "winCoins", "luckyCoinsWon", "wonCoins", "coins", "amount");
                     String gameTitleValue = jsonStringAny(payload, null, "gameTitle", "gameName");
-                    int multiplierValue = (int) Math.max(0L, jsonLongAny(payload, 0L,
+                    double multiplierValue = Math.max(0d, jsonDoubleAny(payload, 0d,
                             "multiplier", "luckyMultiplier", "winMultiplier", "times", "x", "count"));
                     if ("lucky_hit".equalsIgnoreCase(kindValue)) {
                         if (coinsValue <= 0L) coinsValue = jsonLongAny(payload, 0L, "rewardCoins", "winAmount");
-                        if (multiplierValue <= 0) multiplierValue = (int) Math.max(0L,
-                                jsonLongAny(payload, 0L, "luckyX", "multiplierX", "xCount"));
+                        if (multiplierValue <= 0d) multiplierValue = Math.max(0d,
+                                jsonDoubleAny(payload, 0d, "luckyX", "multiplierX", "xCount"));
                         if (bodyValue == null || bodyValue.trim().isEmpty()) {
                             bodyValue = coinsValue > 0L
                                     ? ("فاز بـ " + String.format(java.util.Locale.US, "%,d", coinsValue) + " كوينز")
@@ -293,7 +293,7 @@ public class AuraLiveApp extends Application {
                     final String dedupe = jsonStringAny(payload, body, "id", "eventId", "dedupeKey");
                     final long coinsFinal = coinsValue;
                     final String gameFinal = gameTitleValue;
-                    final int mulFinal = multiplierValue;
+                    final double mulFinal = multiplierValue;
                     final String roomFinal = roomId;
                     final boolean appVisible = isAppInForeground();
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
@@ -459,6 +459,39 @@ public class AuraLiveApp extends Application {
                 if (s != null && !s.isEmpty()) return Long.parseLong(s.trim());
             }
         } catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private static double jsonDouble(JsonObject object, String key, double fallback) {
+        try {
+            JsonElement value = object.get(key);
+            if (value != null && !value.isJsonNull() && value.isJsonPrimitive()) {
+                double parsed = value.getAsDouble();
+                if (Double.isFinite(parsed)) return parsed;
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private static double jsonDoubleAny(JsonObject object, double fallback, String... keys) {
+        if (object == null || keys == null) return fallback;
+        for (String key : keys) {
+            double value = jsonDouble(object, key, Double.NaN);
+            if (Double.isFinite(value) && value > 0d) return value;
+        }
+        for (String nestedKey : new String[] {"winner", "user", "sender", "reward", "result"}) {
+            try {
+                JsonElement nested = object.get(nestedKey);
+                if (nested == null || !nested.isJsonObject()) continue;
+                JsonObject nestedObject = nested.getAsJsonObject();
+                for (String key : keys) {
+                    double value = jsonDouble(nestedObject, key, Double.NaN);
+                    if (Double.isFinite(value) && value > 0d) return value;
+                }
+            } catch (Exception ignored) {
+            }
         }
         return fallback;
     }
