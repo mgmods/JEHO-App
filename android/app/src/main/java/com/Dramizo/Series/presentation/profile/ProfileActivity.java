@@ -1099,7 +1099,7 @@ public class ProfileActivity extends ThemedActivity {
             boolean loaded = false;
             try {
                 retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<java.util.List<com.Dramizo.Series.data.remote.dto.BadgeDto>>> response =
-                        container.getUserApi().badges(profileId).execute();
+                        container.getUserApi().earnedBadges(profileId).execute();
                 if (response.isSuccessful() && response.body() != null && response.body().data != null) {
                     loaded = true;
                     for (com.Dramizo.Series.data.remote.dto.BadgeDto badge : response.body().data) {
