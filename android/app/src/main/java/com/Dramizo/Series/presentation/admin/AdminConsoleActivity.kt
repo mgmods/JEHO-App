@@ -957,9 +957,56 @@ class AdminConsoleActivity : ThemedActivity() {
             addText(card, primary, 15f, true, TEXT)
             if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
             if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
-            val detail = listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
-                .mapNotNull { k -> value(item, k)?.let { "${prettyKey(k)}: $it" } }
-            if (detail.isNotEmpty()) addText(card, detail.take(3).joinToString("   •   "), 12f, false, MUTED)
+            val detailKeys = when (type) {
+                "reports" -> listOf("reporterName", "reporterId", "targetName", "targetId", "targetType", "reason", "category", "createdAt")
+                "rooms" -> listOf("ownerName", "membersCount", "accessMode", "entryFeeCoins", "createdAt")
+                "streams" -> listOf("hostName", "viewerCount", "startedAt", "createdAt")
+                "agencies" -> listOf("ownerName", "membersCount", "status", "createdAt")
+                "agencyApplications", "rechargeApplications", "genderVerifications" -> listOf("applicantName", "userName", "userId", "reason", "createdAt")
+                "withdrawals", "recharges" -> listOf("userName", "userId", "amount", "coins", "status", "createdAt")
+                "logs" -> listOf("actorName", "actorId", "action", "targetType", "targetId", "createdAt")
+                else -> listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
+            }
+            val detail = detailKeys.mapNotNull { k -> value(item, k)?.takeIf { it.isNotBlank() }?.let { "${prettyKey(k)}: $it" } }
+            if (detail.isNotEmpty()) {
+                val detailPanel = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    setPadding(dp(11), dp(9), dp(11), dp(9))
+                    background = GradientDrawable().apply {
+                        setColor(0xFFF7F7FC.toInt())
+                        cornerRadius = dp(12).toFloat()
+                    }
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(8) }
+                }
+                detail.take(if (type == "reports" || type == "logs") 6 else 4).forEach { line ->
+                    val lineView = TextView(this).apply {
+                        text = line
+                        textSize = 12f
+                        setTextColor(MUTED)
+                        setPadding(0, dp(3), 0, dp(3))
+                        maxLines = 2
+                    }
+                    detailPanel.addView(lineView)
+                }
+                card.addView(detailPanel)
+            }
+            if (type == "reports") {
+                val description = value(item, "description", "message", "details", "content", "reason")
+                if (!description.isNullOrBlank()) {
+                    addText(card, "تفاصيل البلاغ", 12f, true, TEXT)
+                    val reportBody = TextView(this).apply {
+                        text = description
+                        textSize = 13f
+                        setTextColor(TEXT)
+                        maxLines = 6
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        setLineSpacing(dp(3).toFloat(), 1f)
+                        setPadding(0, dp(4), 0, dp(8))
+                    }
+                    card.addView(reportBody)
+                }
+            }
 
             when (type) {
                 "users" -> if (!id.isNullOrBlank()) {
