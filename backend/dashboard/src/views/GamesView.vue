@@ -644,29 +644,42 @@ async function load() {
     games.value = defaults.map(normalizeGame)
     return
   }
-  const savedCatalog = String(data?.value || '')
-  if (savedCatalog) {
+  // Accept the current API response and the older settings-row response shape.
+  // A stale/empty stored value must never leave the game-management screen empty.
+  const payload = data?.data ?? data
+  const rowValue = Array.isArray(payload)
+    ? payload.find((row) => row?.key === 'app_games')?.value
+    : payload?.value
+  let saved = []
+  if (Array.isArray(rowValue)) {
+    saved = rowValue
+  } else if (typeof rowValue === 'string' && rowValue.trim()) {
     try {
-      const parsed = JSON.parse(savedCatalog)
-      const filtered = (Array.isArray(parsed) ? parsed : [])
-        .filter((g) => !isLegacyHtmlGame(g))
-        .map(normalizeGame)
-      if (filtered.length) {
-        const seen = new Set(filtered.map((g) => String(g.id || '').toLowerCase()))
-        const merged = [...filtered]
-        for (const d of defaults) {
-          const id = String(d.id || '').toLowerCase()
-          if (id && !seen.has(id)) {
-            merged.push(normalizeGame(d))
-            seen.add(id)
-          }
-        }
-        games.value = merged
-        return
-      }
-    } catch (_) { /* fallthrough */ }
+      const parsed = JSON.parse(rowValue)
+      if (Array.isArray(parsed)) saved = parsed
+    } catch (_) {
+      // Ignore malformed stored data and display the built-in catalog.
+    }
   }
-  games.value = defaults.map(normalizeGame)
+
+  const byId = new Map()
+  for (const item of saved) {
+    if (!item || typeof item !== 'object' || isLegacyHtmlGame(item)) continue
+    const game = normalizeGame(item)
+    const id = String(game.id || '').trim().toLowerCase()
+    if (id) byId.set(id, game)
+  }
+  // Merge known games on every load so stale or empty database data cannot
+  // remove the controls, and newly added upstream games remain manageable.
+  for (const item of defaults) {
+    const id = String(item.id || '').trim().toLowerCase()
+    if (id && !byId.has(id)) byId.set(id, normalizeGame(item))
+  }
+  games.value = [...byId.values()].sort((a, b) => {
+    const ao = Number(a.sortOrder) || 0
+    const bo = Number(b.sortOrder) || 0
+    return ao - bo || displayTitle(a).localeCompare(displayTitle(b))
+  })
   } catch (err) {
     error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تظهر القائمة الافتراضية مؤقتاً. ' + (err?.message || String(err))
     games.value = defaults.map(normalizeGame)
