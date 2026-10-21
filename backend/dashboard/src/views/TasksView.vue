@@ -54,7 +54,7 @@
               <th>{{ t('common.title') }}</th>
               <th>{{ t('tasks.points') }}</th>
               <th>{{ t('common.coins') }}</th>
-              <th>إطار</th>
+              <th>المكافأة التجميلية</th>
               <th>أيام</th>
               <th>VIP</th>
               <th>أيام VIP</th>
@@ -86,13 +86,39 @@
                   :disabled="!tasksEnabled"
                 />
               </td>
-              <td style="width:140px">
-                <input
-                  v-model="row.rewardCosmeticCode"
-                  class="form-control form-control-sm"
-                  placeholder="frame_…"
-                  :disabled="!tasksEnabled"
-                />
+              <td style="min-width:210px">
+                <div class="d-flex align-items-center gap-2">
+                  <img
+                    v-if="cosmeticByCode(row.rewardCosmeticCode)?.previewUrl"
+                    :src="cosmeticByCode(row.rewardCosmeticCode).previewUrl"
+                    :alt="cosmeticByCode(row.rewardCosmeticCode).name"
+                    class="task-cosmetic-thumb"
+                  />
+                  <div v-else class="task-cosmetic-thumb task-cosmetic-empty">
+                    <i class="bi bi-gift"></i>
+                  </div>
+                  <div class="min-w-0 flex-grow-1">
+                    <div class="small fw-semibold text-truncate">
+                      {{ cosmeticByCode(row.rewardCosmeticCode)?.name || 'بدون عنصر تجميلي' }}
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-info mt-1"
+                      :disabled="!tasksEnabled || cosmeticsLoading"
+                      @click="openCosmeticPicker(idx)"
+                    >
+                      <i class="bi bi-images me-1"></i>
+                      {{ row.rewardCosmeticCode ? 'تغيير العنصر' : 'اختيار من المتجر' }}
+                    </button>
+                    <button
+                      v-if="row.rewardCosmeticCode"
+                      type="button"
+                      class="btn btn-sm btn-link text-danger mt-1"
+                      :disabled="!tasksEnabled"
+                      @click="row.rewardCosmeticCode = ''"
+                    >إزالة</button>
+                  </div>
+                </div>
               </td>
               <td style="width:70px">
                 <input
@@ -162,6 +188,54 @@
       </div>
     </div>
 
+    <div v-if="cosmeticPickerOpen" class="modal fade show d-block task-cosmetic-modal" tabindex="-1" role="dialog" aria-modal="true">
+      <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content glass-modal">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title">اختيار مكافأة من المتجر</h5>
+              <div class="small text-muted mt-1">اختر العنصر من صورته ومعاينته؛ لا حاجة لكتابة أي كود.</div>
+            </div>
+            <button type="button" class="btn-close" aria-label="إغلاق" @click="cosmeticPickerOpen = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+              <div class="input-group" style="max-width:420px">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input v-model="cosmeticSearch" class="form-control" placeholder="ابحث باسم الإطار أو الدخولية…" />
+              </div>
+              <span class="small text-muted">{{ filteredCosmetics.length }} عنصر</span>
+            </div>
+            <LoadingSpinner v-if="cosmeticsLoading" />
+            <div v-else-if="!filteredCosmetics.length" class="text-center text-muted py-5">
+              لا توجد عناصر مطابقة. تأكد من إضافة العناصر في إدارة المتجر.
+            </div>
+            <div v-else class="task-cosmetic-grid">
+              <button
+                v-for="item in filteredCosmetics"
+                :key="item.id || item.code"
+                type="button"
+                class="task-cosmetic-option"
+                :class="{ 'is-current': selectedCosmeticCode === item.code }"
+                @click="selectCosmetic(item)"
+              >
+                <span class="task-cosmetic-preview">
+                  <img v-if="item.previewUrl || item.animationUrl" :src="item.previewUrl || item.animationUrl" :alt="item.name" loading="lazy" />
+                  <i v-else class="bi bi-image text-muted"></i>
+                </span>
+                <span class="task-cosmetic-name">{{ item.name || item.code }}</span>
+                <span class="task-cosmetic-type">{{ cosmeticTypeLabel(item.type) }}</span>
+                <span v-if="selectedCosmeticCode === item.code" class="task-cosmetic-selected"><i class="bi bi-check-circle-fill"></i> محدد</span>
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-ghost" @click="cosmeticPickerOpen = false">إلغاء</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <ConfirmDialog
       v-model="confirmOpen"
       :title="t('common.delete')"
@@ -172,14 +246,15 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { tasksApi } from '@/api'
+import { tasksApi, cosmeticsApi } from '@/api'
 import { toast } from '@/composables/useToast'
 import PageHeader from '@/components/PageHeader.vue'
 import AlertMessage from '@/components/AlertMessage.vue'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import './tasks-cosmetic-picker.css'
 
 const { t } = useI18n()
 
@@ -193,6 +268,68 @@ const success = ref('')
 const confirmOpen = ref(false)
 const confirmMsg = ref('')
 const pendingRemoveIdx = ref(-1)
+const cosmetics = ref([])
+const cosmeticsLoading = ref(false)
+const cosmeticPickerOpen = ref(false)
+const cosmeticTargetIdx = ref(-1)
+const selectedCosmeticCode = ref('')
+const cosmeticSearch = ref('')
+
+const filteredCosmetics = computed(() => {
+  const q = cosmeticSearch.value.trim().toLocaleLowerCase()
+  return cosmetics.value.filter((item) => {
+    if (item.isActive === false) return false
+    const searchable = [item.name, item.code, item.type, item.description].filter(Boolean).join(' ').toLocaleLowerCase()
+    return !q || searchable.includes(q)
+  })
+})
+
+function cosmeticByCode(code) {
+  if (!code) return null
+  return cosmetics.value.find((item) => item.code === code) || null
+}
+
+function cosmeticTypeLabel(type) {
+  const labels = {
+    frame: 'إطار',
+    entry_effect: 'دخوليّة',
+    entrance: 'دخوليّة',
+    avatar_frame: 'إطار صورة',
+    profile_frame: 'إطار ملف شخصي',
+    badge: 'شارة',
+    vip_badge: 'شارة VIP',
+    room_background: 'خلفية غرفة',
+  }
+  return labels[String(type || '').toLowerCase()] || 'عنصر تجميلي'
+}
+
+async function loadCosmetics() {
+  cosmeticsLoading.value = true
+  const { data, error: err } = await cosmeticsApi.adminList()
+  cosmeticsLoading.value = false
+  if (err) {
+    toast().danger('تعذر تحميل عناصر المتجر: ' + err.message)
+    return
+  }
+  const payload = data?.data ?? data
+  cosmetics.value = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : []
+}
+
+function openCosmeticPicker(idx) {
+  cosmeticTargetIdx.value = idx
+  selectedCosmeticCode.value = tasks.value[idx]?.rewardCosmeticCode || ''
+  cosmeticSearch.value = ''
+  cosmeticPickerOpen.value = true
+  if (!cosmetics.value.length) loadCosmetics()
+}
+
+function selectCosmetic(item) {
+  if (cosmeticTargetIdx.value < 0 || !item?.code) return
+  const row = tasks.value[cosmeticTargetIdx.value]
+  if (row) row.rewardCosmeticCode = item.code
+  selectedCosmeticCode.value = item.code
+  cosmeticPickerOpen.value = false
+}
 
 async function load() {
   loading.value = true
