@@ -1823,6 +1823,22 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Get('daily-login-rewards')
+  @ApiOperation({ summary: 'Get seven-day daily login reward configuration' })
+  getDailyLoginRewards() {
+    return this.tasksService.getDailyLoginConfig();
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Put('daily-login-rewards')
+  @ApiOperation({ summary: 'Save seven-day daily login reward configuration' })
+  saveDailyLoginRewards(@Body() body: Record<string, unknown>) {
+    return this.tasksService.saveDailyLoginConfig(body || {});
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Get('tasks')
   async adminTasks() {
     const [items, enabled] = await Promise.all([
