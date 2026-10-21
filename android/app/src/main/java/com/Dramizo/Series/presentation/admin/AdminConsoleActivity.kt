@@ -422,6 +422,7 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView.text = module?.title ?: "مركز إدارة JEHO"
         backButton.visibility = View.VISIBLE
         body.removeAllViews()
+        if (key != "users") module?.let { addSectionIntro(it) }
         when (key) {
             "users" -> {
                 val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -437,6 +438,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
                 searchRow.addView(button("بحث") { loadUsers(search.text.toString().trim()) })
                 body.addView(searchRow)
+                module?.let { addSectionIntro(it) }
                 loadUsers("")
             }
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
@@ -821,8 +823,51 @@ class AdminConsoleActivity : ThemedActivity() {
         dialog.show()
     }
 
+    private fun addSectionIntro(module: Module) {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFFF0ECFB.toInt(), 0xFFFFFFFF.toInt())
+            ).apply {
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xFFE5DFF7.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+                bottomMargin = dp(12)
+            }
+        }
+        val icon = TextView(this).apply {
+            text = module.icon
+            textSize = 25f
+            gravity = Gravity.CENTER
+            background = roundRect(Color.WHITE, 13)
+            layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { marginStart = dp(12) }
+        }
+        panel.addView(icon)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+        addText(copy, module.title, 15f, true, TEXT)
+        val description = TextView(this).apply {
+            text = module.subtitle
+            textSize = 12f
+            setTextColor(MUTED)
+            maxLines = 3
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(2), 0, 0)
+        }
+        copy.addView(description)
+        panel.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+        body.addView(panel)
+    }
+
     private fun loadUsers(search: String) {
-        body.removeViews(1, (body.childCount - 1).coerceAtLeast(0))
+        // Preserve the search controls and section introduction while replacing results.
+        val fixedViews = if (body.childCount >= 2) 2 else body.childCount
+        if (body.childCount > fixedViews) body.removeViews(fixedViews, body.childCount - fixedViews)
         load(api.users(1, 40, search)) { renderItems(it, "users") }
     }
 
