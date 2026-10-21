@@ -163,6 +163,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkScoreBanner;
     @Nullable private TextView roomPkActionButton;
     @Nullable private String roomPkCurrentContestId;
+    private boolean roomPkFeatureEnabled = true;
     private final Set<String> shownRoomPkInvites = new HashSet<>();
     private String roomPkBannerBaseText = "";
     private long roomPkEndsAtMs;
@@ -1111,6 +1112,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                     && (sameUser(myUserId, room.hostId)
                     || sameUser(myUserId, room.activeHostId));
             isOwner = myUserId != null && sameUser(myUserId, room.hostId);
+            handler.post(() -> { ensureRoomPkActionButton(); loadRoomPkInvitations(); });
             boolean fullStaff = isHost || (myUserId != null && sameUser(myUserId, room.cohostId));
             canManageMusic = fullStaff;
             canChangeFrames = fullStaff;
@@ -12492,6 +12494,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             retrofit2.Response<ApiResponse<com.Dramizo.Series.data.remote.dto.ContestDtos.ContestList>> response) {
                         if (!response.isSuccessful() || response.body() == null || !response.body().success
                                 || response.body().data == null || response.body().data.items == null) return;
+                        roomPkFeatureEnabled = response.body().data.roomPkEnabled == null || response.body().data.roomPkEnabled;
+                        ensureRoomPkActionButton();
                         for (com.Dramizo.Series.data.remote.dto.ContestDtos.ContestDto contest : response.body().data.items) {
                             if (contest == null || contest.id == null || !shownRoomPkInvites.add(contest.id)) continue;
                             handler.post(() -> showRoomPkInviteDialog(contest));
