@@ -264,6 +264,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private static final long JOIN_EFFECT_DEDUPE_MS = 8_000L;
     private final Map<String, Long> recentJoinEffects = new HashMap<>();
     private final Map<String, Long> recentGiftEffects = new HashMap<>();
+    @Nullable private android.animation.ValueAnimator giftCountUpAnimator;
     private boolean zegoLoggedIn;
     private boolean exiting;
     /** True when user minimized to Main — keep Zego/realtime, don't tear room down. */
@@ -11045,22 +11046,28 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             int quantity
     ) {
         final int target = Math.max(1, quantity);
-        if (target <= 1) {
-            showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
-                    1, 0, "أرسل هدية ×1");
-            return;
+        // A new send owns the counter; prevent an older batch from overwriting it.
+        if (giftCountUpAnimator != null) {
+            giftCountUpAnimator.cancel();
+            giftCountUpAnimator = null;
         }
-        // Create the toast once so it stays beside the screen while the number changes.
-        // Re-showing it every frame would restart its entrance/crawl animation.
         showGiftSendToast(senderName, giftName, senderAvatarUrl, giftIconUrl,
                 1, 0, "أرسل هدية");
+        if (target <= 1) {
+            if (binding != null && binding.comboGiftView != null) {
+                binding.comboGiftView.updateCountUp(1);
+            }
+            return;
+        }
         final android.animation.ValueAnimator animator =
                 android.animation.ValueAnimator.ofInt(1, target);
-        // Keep large batches very fast: X77 finishes in ~450 ms and X177 in ~600 ms.
-        long durationMs = target <= 7 ? 260L
-                : target <= 17 ? 330L
-                : target <= 77 ? 450L
-                : 600L;
+        giftCountUpAnimator = animator;
+        // Let the 900 ms entrance finish first so users can actually see X1, X2, X3…
+        // Keep larger batches fast but readable; the strip remains parked while counting.
+        long durationMs = target <= 7 ? 500L
+                : target <= 17 ? 700L
+                : target <= 77 ? 1200L
+                : 1800L;
         animator.setDuration(durationMs);
         animator.setInterpolator(new android.view.animation.LinearInterpolator());
         animator.addUpdateListener(a -> {
@@ -11072,7 +11079,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 binding.comboGiftView.updateCountUp((Integer) a.getAnimatedValue());
             }
         });
-        animator.start();
+        if (binding != null && binding.comboGiftView != null) {
+            binding.comboGiftView.postDelayed(() -> {
+                if (giftCountUpAnimator == animator && !isFinishing() && !isDestroyed()) {
+                    animator.start();
+                }
+            }, 850L);
+        } else {
+            animator.start();
+        }
     }
 
     /** Gift send toast — profile + gift icon + combo xN (Mikoo crawl strip). */
@@ -11169,7 +11184,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (effectQueue != null) effectQueue.notifyFinished();
             if (binding == null) return;
             if (isVideoGift) {
-                showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+                showGiftSendToastCountUp(senderName, giftName, senderAvatarUrl, iconUrl, comboCount);
             }
             if (binding.webVisualEffects != null
                     && binding.webVisualEffects.getChildCount() == 0) {
