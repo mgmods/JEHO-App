@@ -15,6 +15,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -1530,22 +1532,58 @@ class AdminConsoleActivity : ThemedActivity() {
     }
 
     private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val form = formFields(listOf("الدور: super أو manager أو none", "الحالة: active أو suspended أو banned"))
-        form.second[0].setText(currentRole ?: "none")
-        form.second[1].setText(currentStatus ?: "active")
-        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
-            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+        val roleValues = listOf("none", "manager", "super")
+        val roleLabels = listOf("بدون رتبة إدارية", "مانجر", "سوبر أدمن")
+        val statusValues = listOf("active", "suspended", "banned")
+        val statusLabels = listOf("نشط", "موقوف مؤقتاً", "محظور")
+        fun makeSpinner(labels: List<String>, selected: Int): Spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(this@AdminConsoleActivity, android.R.layout.simple_spinner_dropdown_item, labels).also {
+                it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            setSelection(selected.coerceIn(labels.indices))
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+        }
+        val roleSpinner = makeSpinner(roleLabels, roleValues.indexOf(currentRole?.lowercase()).let { if (it < 0) 0 else it })
+        val statusSpinner = makeSpinner(statusLabels, statusValues.indexOf(currentStatus?.lowercase()).let { if (it < 0) 0 else it })
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "الدور الإداري"
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(TEXT)
+                setPadding(0, 0, 0, dp(6))
+            })
+            addView(roleSpinner, LinearLayout.LayoutParams(-1, dp(50)))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "حالة الحساب"
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(TEXT)
+                setPadding(0, dp(14), 0, dp(6))
+            })
+            addView(statusSpinner, LinearLayout.LayoutParams(-1, dp(50)))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "تأكد من اختيار الدور والحالة الصحيحين. ستُطبّق التغييرات عبر الخادم وفق الصلاحيات المعتمدة."
+                textSize = 12f
+                setTextColor(MUTED)
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, dp(12), 0, 0)
+            })
+        }
+        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(content)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ التغييرات", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val role = form.second[0].text.toString().trim().lowercase()
-                        val status = form.second[1].text.toString().trim().lowercase()
-                        if (role !in setOf("super", "manager", "none") ||
-                            status !in setOf("active", "suspended", "banned")) {
-                            toast("القيم المسموحة: super/manager/none و active/suspended/banned")
-                            return@setOnClickListener
-                        }
-                        confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
+                        val role = roleValues[roleSpinner.selectedItemPosition]
+                        val status = statusValues[statusSpinner.selectedItemPosition]
+                        val roleLabel = roleLabels[roleSpinner.selectedItemPosition]
+                        val statusLabel = statusLabels[statusSpinner.selectedItemPosition]
+                        confirm("تأكيد تحديث الحساب إلى: $roleLabel، والحالة: $statusLabel؟") {
                             load(api.updateUser(id, mapOf("staffRole" to role, "status" to status))) {
                                 dialog.dismiss()
                                 toast("تم تحديث صلاحيات المستخدم")
