@@ -298,6 +298,10 @@ export class ContestsService implements OnModuleInit {
       status: 'pending',
     };
     this.emitRoomPkEvent([source.id, target.id], 'contest:pk-invite', payload);
+    this.notifications.notifyUser(target.hostId, NotificationType.ROOM, '⚔ دعوة تحدّي PK جديدة',
+      source.title + ' يتحدّى رومك لمدة ' + durationMinutes + ' دقيقة. افتح الروم لقبول الدعوة أو رفضها.',
+      { kind: 'room_pk_invitation', contestId: saved.id, roomId: target.id, sourceRoomId: source.id,
+        targetRoomId: target.id, sourceRoomName: source.title, targetRoomName: target.title, durationMinutes, scoringMode });
     return { contest: saved, message: 'تم إرسال دعوة تحدّي PK إلى الروم المنافس' };
   }
 
