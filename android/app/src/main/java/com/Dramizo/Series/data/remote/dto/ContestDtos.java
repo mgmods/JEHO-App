@@ -58,6 +58,7 @@ public final class ContestDtos {
 
     public static class ContestList {
         @SerializedName("items") public List<ContestDto> items;
+        @SerializedName("roomPkEnabled") public Boolean roomPkEnabled;
     }
 
     public static class LeaderRow {
