@@ -349,7 +349,7 @@ class AdminConsoleActivity : ThemedActivity() {
         val sectionSearch = EditText(this).apply {
             hint = "ابحث عن قسم الإدارة…"
             textSize = 14f
-            singleLine = true
+            setSingleLine(true)
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             textDirection = View.TEXT_DIRECTION_RTL
             gravity = Gravity.RIGHT or Gravity.CENTER_VERTICAL
