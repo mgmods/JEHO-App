@@ -168,6 +168,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private TextView roomPkTeamBScore;
     @Nullable private android.view.View roomPkProgressA;
     @Nullable private android.view.View roomPkProgressB;
+    @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
+    private boolean roomPkSeatSplitApplied;
     @Nullable private TextView roomPkActionButton;
     @Nullable private String roomPkCurrentContestId;
     private boolean roomPkFeatureEnabled = true;
@@ -207,6 +209,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         handler.removeCallbacks(updateRoomPkBannerClock);
         if (roomPkSplitContainer != null) roomPkSplitContainer.setVisibility(View.GONE);
         if (roomPkScoreBanner != null) roomPkScoreBanner.setVisibility(View.GONE);
+        hideRoomPkSeatSplit();
     };
     private VoiceRoomViewModel viewModel;
     private SeatAdapter seatAdapter;
@@ -13102,6 +13105,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             roomPkSplitContainer = panel;
         }
 
+        if (!ended) showRoomPkSeatSplit(nameA, nameB);
+        else hideRoomPkSeatSplit();
+
         roomPkBannerBaseText = label;
         roomPkTeamAName.setText("🔴 " + nameA);
         roomPkTeamAScore.setText(String.format(java.util.Locale.US, "%,d", scoreA));
@@ -13127,6 +13133,132 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         } else {
             updateRoomPkBannerClock.run();
         }
+    }
+
+
+    /**
+     * PK presentation only: the current room's real seats stay backed by the existing SeatAdapter.
+     * The rival side deliberately shows unoccupied placeholders until the backend provides a
+     * trustworthy rival-room seat roster; it never fabricates user identities or changes ZEGO.
+     */
+    private void showRoomPkSeatSplit(String nameA, String nameB) {
+        if (binding == null || !(binding.getRoot() instanceof androidx.constraintlayout.widget.ConstraintLayout)) return;
+        androidx.constraintlayout.widget.ConstraintLayout root =
+                (androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot();
+        if (roomPkOpponentSeatPanel == null) {
+            android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setOrientation(android.widget.LinearLayout.VERTICAL);
+            panel.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            panel.setPadding(dp(5), dp(7), dp(5), dp(7));
+            panel.setBackground(roundRoomPkDrawable(0xD8122A4A, 0xFF438EFF, 14));
+            panel.setContentDescription("مقاعد الروم المنافس في وضع PK");
+            panel.setClipChildren(false);
+            panel.setClipToPadding(false);
+
+            TextView title = new TextView(this);
+            title.setTextColor(Color.WHITE);
+            title.setTextSize(11f);
+            title.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+            title.setGravity(Gravity.CENTER);
+            title.setMaxLines(1);
+            title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            title.setTag("room_pk_opponent_title");
+            panel.addView(title, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(28)));
+
+            android.widget.GridLayout seats = new android.widget.GridLayout(this);
+            seats.setColumnCount(2);
+            seats.setUseDefaultMargins(false);
+            for (int i = 0; i < 10; i++) {
+                android.widget.LinearLayout slot = new android.widget.LinearLayout(this);
+                slot.setOrientation(android.widget.LinearLayout.VERTICAL);
+                slot.setGravity(Gravity.CENTER);
+                slot.setPadding(dp(2), dp(4), dp(2), dp(4));
+                slot.setBackground(roundRoomPkDrawable(0xAA18385F, 0xFF356BAA, 10));
+                android.widget.LinearLayout.LayoutParams slotLp = new android.widget.LinearLayout.LayoutParams(
+                        0, dp(62), 1f);
+                slotLp.setMargins(dp(2), dp(3), dp(2), dp(3));
+                android.widget.FrameLayout avatar = new android.widget.FrameLayout(this);
+                avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 22));
+                TextView seatNumber = new TextView(this);
+                seatNumber.setText(String.valueOf(i + 1));
+                seatNumber.setTextColor(0xFFEAF4FF);
+                seatNumber.setTextSize(11f);
+                seatNumber.setGravity(Gravity.CENTER);
+                avatar.addView(seatNumber, new android.widget.FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                slot.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(30), dp(30)));
+                TextView waiting = new TextView(this);
+                waiting.setText("فارغ");
+                waiting.setTextColor(0xFFB8D8FF);
+                waiting.setTextSize(9f);
+                waiting.setGravity(Gravity.CENTER);
+                waiting.setMaxLines(1);
+                slot.addView(waiting, new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(16)));
+                seats.addView(slot, slotLp);
+            }
+            panel.addView(seats, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            TextView note = new TextView(this);
+            note.setText("بانتظار بيانات مقاعد الخصم");
+            note.setTextColor(0xFFB8D8FF);
+            note.setTextSize(9f);
+            note.setGravity(Gravity.CENTER);
+            note.setPadding(0, dp(4), 0, 0);
+            panel.addView(note, new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams panelLp =
+                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(0,
+                            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.WRAP_CONTENT);
+            panelLp.startToEnd = binding.recyclerSeats.getId();
+            panelLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+            panelLp.topToTop = binding.recyclerSeats.getId();
+            panelLp.setMargins(dp(3), 0, dp(5), 0);
+            root.addView(panel, panelLp);
+            roomPkOpponentSeatPanel = panel;
+
+            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
+                    (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
+            localLp.endToStart = panel.getId();
+            localLp.endToEnd = -1;
+            localLp.width = 0;
+            localLp.setMargins(dp(4), dp(4), dp(3), 0);
+            binding.recyclerSeats.setLayoutParams(localLp);
+            binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, 2) {
+                @Override public boolean canScrollVertically() { return false; }
+            });
+            roomPkSeatSplitApplied = true;
+        }
+        View title = roomPkOpponentSeatPanel.findViewWithTag("room_pk_opponent_title");
+        if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(nameB, "الروم المنافس"));
+        roomPkOpponentSeatPanel.setVisibility(View.VISIBLE);
+        binding.recyclerSeats.setVisibility(View.VISIBLE);
+    }
+
+    private void hideRoomPkSeatSplit() {
+        if (!roomPkSeatSplitApplied || binding == null) {
+            if (roomPkOpponentSeatPanel != null) roomPkOpponentSeatPanel.setVisibility(View.GONE);
+            return;
+        }
+        if (roomPkOpponentSeatPanel != null) {
+            android.view.ViewParent parent = roomPkOpponentSeatPanel.getParent();
+            if (parent instanceof android.view.ViewGroup) ((android.view.ViewGroup) parent).removeView(roomPkOpponentSeatPanel);
+            roomPkOpponentSeatPanel = null;
+        }
+        androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
+                (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
+        localLp.startToStart = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        localLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
+        localLp.endToStart = -1;
+        localLp.width = 0;
+        localLp.setMargins(0, dp(4), 0, 0);
+        binding.recyclerSeats.setLayoutParams(localLp);
+        binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, MIKOO_SEAT_COLUMNS) {
+            @Override public boolean canScrollVertically() { return false; }
+        });
+        roomPkSeatSplitApplied = false;
     }
 
     private GradientDrawable roundRoomPkDrawable(int fill, int stroke, int radiusDp) {
