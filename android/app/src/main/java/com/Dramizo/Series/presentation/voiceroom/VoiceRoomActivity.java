@@ -439,6 +439,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private boolean musicPanelExpanded;
     /** Shared music gain (0..1), synchronized for everyone in the live room. */
     private float sharedMusicVolume = 1.0f;
+    private int sharedMusicVolumeRequestId;
     private ObjectAnimator musicDiscAnimator;
     private android.animation.AnimatorSet taskFloatPulseAnimator;
     private long roomMusicServerOffsetMs;
@@ -4453,29 +4454,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         seekBar.setProgress(Math.round(sharedMusicVolume * 100f));
                         return;
                     }
-                    JsonObject payload = new JsonObject();
-                    payload.addProperty("volume", sharedMusicVolume);
-                    boolean sent = RealtimeClient.getInstance().emitRoomEvent(
-                            roomId, "room:music_volume", payload, (ok, error, code) -> handler.post(() -> {
-                                if (isFinishing() || isDestroyed()) return;
-                                if (!ok) {
-                                    sharedMusicVolume = volumeBeforeSeek[0];
-                                    applySharedMusicVolume();
-                                    android.util.Log.w("VoiceRoom",
-                                            "Shared music slider update rejected: " + error);
-                                    Toast.makeText(VoiceRoomActivity.this,
-                                            error != null && !error.isEmpty()
-                                                    ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
-                                                    : "رفض الخادم مزامنة صوت الموسيقى",
-                                            Toast.LENGTH_LONG).show();
-                                }
-                            }));
-                    if (!sent) {
-                        sharedMusicVolume = volumeBeforeSeek[0];
-                        applySharedMusicVolume();
-                        Toast.makeText(VoiceRoomActivity.this,
-                                "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
-                    }
+                    broadcastSharedMusicVolume(sharedMusicVolume, volumeBeforeSeek[0]);
                 }
             });
         }
@@ -5005,6 +4984,69 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
     }
 
+    /**
+     * Send shared music gain only after the socket has joined the server-side room.
+     * Briefly retry during reconnects instead of surfacing "Join the realtime room first".
+     * This changes music gain only and never changes microphone gain.
+     */
+    private void broadcastSharedMusicVolume(float requestedVolume, float fallbackVolume) {
+        final int requestId = ++sharedMusicVolumeRequestId;
+        broadcastSharedMusicVolumeAttempt(requestId, requestedVolume, fallbackVolume, 0);
+    }
+
+    private void broadcastSharedMusicVolumeAttempt(
+            int requestId, float requestedVolume, float fallbackVolume, int attempt) {
+        if (isFinishing() || isDestroyed() || roomId == null || roomId.isEmpty()
+                || requestId != sharedMusicVolumeRequestId) return;
+
+        RealtimeClient rt = RealtimeClient.getInstance();
+        if (!rt.isConnected() || !rt.isJoinedRoom(roomId)) {
+            connectRealtimeRoom();
+            if (attempt < 12) {
+                handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                        requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+                return;
+            }
+            sharedMusicVolume = fallbackVolume;
+            applySharedMusicVolume();
+            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة، حاول مرة أخرى", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        JsonObject payload = new JsonObject();
+        payload.addProperty("volume", requestedVolume);
+        boolean sent = rt.emitRoomEvent(roomId, "room:music_volume", payload, (ok, error, code) ->
+                handler.post(() -> {
+                    if (isFinishing() || isDestroyed() || requestId != sharedMusicVolumeRequestId) return;
+                    if (!ok && error != null && error.toLowerCase(java.util.Locale.ROOT)
+                            .contains("join the realtime room") && attempt < 12) {
+                        connectRealtimeRoom();
+                        handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                                requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+                        return;
+                    }
+                    if (!ok) {
+                        sharedMusicVolume = fallbackVolume;
+                        applySharedMusicVolume();
+                        android.util.Log.w("VoiceRoom", "Shared music volume rejected: " + error);
+                        Toast.makeText(this,
+                                error != null && !error.isEmpty()
+                                        ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
+                                        : "رفض الخادم مزامنة صوت الموسيقى",
+                                Toast.LENGTH_LONG).show();
+                    }
+                }));
+        if (!sent && attempt < 12) {
+            connectRealtimeRoom();
+            handler.postDelayed(() -> broadcastSharedMusicVolumeAttempt(
+                    requestId, requestedVolume, fallbackVolume, attempt + 1), 650L);
+        } else if (!sent) {
+            sharedMusicVolume = fallbackVolume;
+            applySharedMusicVolume();
+            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     /** Host-authorized volume buttons update the shared room value for every listener. */
     private void adjustSharedMusicVolumeBy(float delta) {
         if (!canManageMusic || roomId == null || roomId.isEmpty()) {
@@ -5018,29 +5060,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         final float requestedVolume = Math.max(0f, Math.min(1f, previousVolume + delta));
         sharedMusicVolume = requestedVolume;
         applySharedMusicVolume();
-        JsonObject payload = new JsonObject();
-        payload.addProperty("volume", requestedVolume);
-        boolean sent = RealtimeClient.getInstance().emitRoomEvent(
-                roomId, "room:music_volume", payload, (ok, error, code) -> handler.post(() -> {
-                    if (isFinishing() || isDestroyed()) return;
-                    if (!ok) {
-                        // The server is authoritative. Do not leave a local-only volume change
-                        // when the room rejected the shared update.
-                        sharedMusicVolume = previousVolume;
-                        applySharedMusicVolume();
-                        android.util.Log.w("VoiceRoom", "Shared music volume rejected: " + error);
-                        Toast.makeText(this,
-                                error != null && !error.isEmpty()
-                                        ? "تعذر تعميم الصوت على أعضاء الغرفة: " + error
-                                        : "رفض الخادم مزامنة صوت الموسيقى",
-                                Toast.LENGTH_LONG).show();
-                    }
-                }));
-        if (!sent) {
-            sharedMusicVolume = previousVolume;
-            applySharedMusicVolume();
-            Toast.makeText(this, "تعذر الاتصال بمزامنة صوت الغرفة", Toast.LENGTH_SHORT).show();
-        }
+        broadcastSharedMusicVolume(requestedVolume, previousVolume);
     }
 
     /** Shared music gain; local room mute only affects this listener's playback. */
@@ -12517,14 +12537,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     }
 
     private void connectRealtimeRoom() {
-        if (roomId == null || realtimeJoined || realtimeJoinInFlight) return;
+        if (roomId == null || roomId.isEmpty()) return;
         RealtimeClient rt = RealtimeClient.getInstance();
-        // Already in the socket room from minimize — skip rejoin / "اتصال ضعيف".
+        // Trust actual server-room membership; Activity flags can be stale after reconnect.
         if (rt.isJoinedRoom(roomId)) {
             realtimeJoined = true;
             realtimeJoinAttempts = 0;
             return;
         }
+        realtimeJoined = false;
+        if (realtimeJoinInFlight) return;
         if (!rt.isConnected()) {
             // Socket still connecting — retry softly; never eject the user.
             scheduleRealtimeJoinRetry(1_800L);
