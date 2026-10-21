@@ -170,9 +170,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     @Nullable private android.view.View roomPkProgressA;
     @Nullable private android.view.View roomPkProgressB;
     @Nullable private android.widget.LinearLayout roomPkOpponentSeatPanel;
-    @Nullable private TextView roomPkMovingTicker;
-    @Nullable private TextView roomPkCenterVersusBadge;
-    @Nullable private android.graphics.drawable.Drawable roomPkOriginalSeatsBackground;
     private boolean roomPkSeatSplitApplied;
     private final Runnable roomPkRosterPoll = new Runnable() {
         @Override public void run() {
@@ -13329,68 +13326,16 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             panelLp.startToEnd = binding.recyclerSeats.getId();
             panelLp.endToEnd = androidx.constraintlayout.widget.ConstraintLayout.LayoutParams.PARENT_ID;
             panelLp.topToTop = binding.recyclerSeats.getId();
-            panelLp.setMargins(dp(3), dp(30), dp(5), 0);
+            panelLp.setMargins(dp(3), 0, dp(5), 0);
             root.addView(panel, panelLp);
             roomPkOpponentSeatPanel = panel;
-
-            // Red frame for our room, blue frame for the rival, with a light translucent VS emblem.
-            if (roomPkOriginalSeatsBackground == null) {
-                roomPkOriginalSeatsBackground = binding.recyclerSeats.getBackground();
-            }
-            binding.recyclerSeats.setBackground(roundRoomPkDrawable(0x182D080D, 0xFFFF405D, 14));
-
-            TextView ticker = new TextView(this);
-            ticker.setId(View.generateViewId());
-            ticker.setSingleLine(true);
-            ticker.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE);
-            ticker.setMarqueeRepeatLimit(-1);
-            ticker.setSelected(true);
-            ticker.setFocusable(true);
-            ticker.setFocusableInTouchMode(true);
-            ticker.setGravity(Gravity.CENTER_VERTICAL);
-            ticker.setTextColor(Color.WHITE);
-            ticker.setTextSize(11f);
-            ticker.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-            ticker.setPadding(dp(14), 0, dp(14), 0);
-            ticker.setText("⚔  تحدّي الرومات مباشر  •  🔴 فريقنا  VS  🔵 الفريق المنافس  •  ⚔");
-            ticker.setBackground(roundRoomPkDrawable(0xC91A1C2B, 0x99FFD36A, 12));
-            ticker.setElevation(dp(5));
-            ticker.setContentDescription("شريط متحرك لتحدي الرومات");
-            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams tickerLp =
-                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(0, dp(28));
-            tickerLp.startToStart = binding.recyclerSeats.getId();
-            tickerLp.endToEnd = panel.getId();
-            tickerLp.topToTop = binding.recyclerSeats.getId();
-            tickerLp.setMargins(dp(2), 0, dp(2), 0);
-            root.addView(ticker, tickerLp);
-            roomPkMovingTicker = ticker;
-
-            TextView versus = new TextView(this);
-            versus.setId(View.generateViewId());
-            versus.setText("⚔\nVS");
-            versus.setTextColor(0xFFFFE5A0);
-            versus.setTextSize(12f);
-            versus.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-            versus.setGravity(Gravity.CENTER);
-            versus.setIncludeFontPadding(false);
-            versus.setBackground(roundRoomPkDrawable(0xB8222638, 0xCCFFD36A, 24));
-            versus.setElevation(dp(12));
-            versus.setContentDescription("رمز المواجهة بين الرومين");
-            androidx.constraintlayout.widget.ConstraintLayout.LayoutParams versusLp =
-                    new androidx.constraintlayout.widget.ConstraintLayout.LayoutParams(dp(42), dp(48));
-            versusLp.startToEnd = binding.recyclerSeats.getId();
-            versusLp.endToStart = panel.getId();
-            versusLp.topToTop = binding.recyclerSeats.getId();
-            versusLp.topMargin = dp(76);
-            root.addView(versus, versusLp);
-            roomPkCenterVersusBadge = versus;
 
             androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
                     (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
             localLp.endToStart = panel.getId();
             localLp.endToEnd = -1;
             localLp.width = 0;
-            localLp.setMargins(dp(4), dp(34), dp(3), 0);
+            localLp.setMargins(dp(4), dp(4), dp(3), 0);
             binding.recyclerSeats.setLayoutParams(localLp);
             binding.recyclerSeats.setLayoutManager(new GridLayoutManager(this, 2) {
                 @Override public boolean canScrollVertically() { return false; }
@@ -13401,11 +13346,6 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         if (title instanceof TextView) ((TextView) title).setText("🔵 " + firstNonEmpty(nameB, "الروم المنافس"));
         roomPkOpponentSeatPanel.setVisibility(View.VISIBLE);
         binding.recyclerSeats.setVisibility(View.VISIBLE);
-        if (roomPkMovingTicker != null) {
-            roomPkMovingTicker.setVisibility(View.VISIBLE);
-            roomPkMovingTicker.setSelected(true);
-        }
-        if (roomPkCenterVersusBadge != null) roomPkCenterVersusBadge.setVisibility(View.VISIBLE);
     }
 
     private void hideRoomPkSeatSplit() {
@@ -13413,16 +13353,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             if (roomPkOpponentSeatPanel != null) roomPkOpponentSeatPanel.setVisibility(View.GONE);
             return;
         }
-        roomPkMovingTicker = null;
-        roomPkCenterVersusBadge = null;
         if (roomPkOpponentSeatPanel != null) {
             android.view.ViewParent parent = roomPkOpponentSeatPanel.getParent();
             if (parent instanceof android.view.ViewGroup) ((android.view.ViewGroup) parent).removeView(roomPkOpponentSeatPanel);
             roomPkOpponentSeatPanel = null;
-        }
-        if (roomPkOriginalSeatsBackground != null) {
-            binding.recyclerSeats.setBackground(roomPkOriginalSeatsBackground);
-            roomPkOriginalSeatsBackground = null;
         }
         androidx.constraintlayout.widget.ConstraintLayout.LayoutParams localLp =
                 (androidx.constraintlayout.widget.ConstraintLayout.LayoutParams) binding.recyclerSeats.getLayoutParams();
