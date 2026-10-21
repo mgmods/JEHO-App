@@ -323,6 +323,102 @@ export class AdminService {
     return next;
   }
 
+  async getToastManagerConfig() {
+    const row = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    const defaults = {
+      version: 1,
+      giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+      luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
+    };
+    if (!row?.value) return defaults;
+    try {
+      const parsed = JSON.parse(row.value);
+      const cleanStyle = (key: string, duration: number) => {
+        const raw = parsed?.[key] && typeof parsed[key] === 'object' ? parsed[key] : {};
+        return {
+          backgroundUrl: typeof raw.backgroundUrl === 'string' ? raw.backgroundUrl : '',
+          shineEnabled: raw.shineEnabled !== false,
+          frameGlowEnabled: raw.frameGlowEnabled !== false,
+          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
+          avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? 8))),
+          avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? 50))),
+          textX: Math.max(0, Math.min(100, Number(raw.textX ?? 25))),
+          textY: Math.max(0, Math.min(100, Number(raw.textY ?? 50))),
+        };
+      };
+      const button = parsed?.luckyButton && typeof parsed.luckyButton === 'object' ? parsed.luckyButton : {};
+      return {
+        version: Math.max(1, Math.floor(Number(parsed.version) || 1)),
+        giftSend: cleanStyle('giftSend', 3),
+        luckyWinNormal: cleanStyle('luckyWinNormal', 4),
+        luckyWinHigh: cleanStyle('luckyWinHigh', 5),
+        luckyButton: {
+          iconUrl: typeof button.iconUrl === 'string' ? button.iconUrl : '',
+          durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
+          pulseEnabled: button.pulseEnabled !== false,
+        },
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  async patchToastManagerConfig(input: Record<string, unknown>) {
+    const previous = await this.getToastManagerConfig();
+    const cleanUrl = (value: unknown, key: string) => {
+      const raw = typeof value === 'string' ? value.trim() : '';
+      if (!raw) return '';
+      if (raw.length > 2048) throw new BadRequestException(`Invalid ${key} URL`);
+      if (/^\\/uploads\\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
+      try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+      } catch {}
+      throw new BadRequestException(`Invalid ${key} URL`);
+    };
+    const cleanStyle = (key: string, duration: number) => {
+      const raw = input[key] && typeof input[key] === 'object' ? input[key] as Record<string, unknown> : {};
+      const old = previous[key as 'giftSend' | 'luckyWinNormal' | 'luckyWinHigh'];
+      return {
+        backgroundUrl: cleanUrl(raw.backgroundUrl, key),
+        shineEnabled: raw.shineEnabled !== false,
+        frameGlowEnabled: raw.frameGlowEnabled !== false,
+        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(raw.durationSeconds) || duration))),
+        avatarX: Math.max(0, Math.min(100, Number(raw.avatarX ?? old.avatarX))),
+        avatarY: Math.max(0, Math.min(100, Number(raw.avatarY ?? old.avatarY))),
+        textX: Math.max(0, Math.min(100, Number(raw.textX ?? old.textX))),
+        textY: Math.max(0, Math.min(100, Number(raw.textY ?? old.textY))),
+      };
+    };
+    const button = input.luckyButton && typeof input.luckyButton === 'object' ? input.luckyButton as Record<string, unknown> : {};
+    const current = {
+      version: previous.version + 1,
+      giftSend: cleanStyle('giftSend', 3),
+      luckyWinNormal: cleanStyle('luckyWinNormal', 4),
+      luckyWinHigh: cleanStyle('luckyWinHigh', 5),
+      luckyButton: {
+        iconUrl: cleanUrl(button.iconUrl, 'lucky button icon'),
+        durationSeconds: Math.max(1, Math.min(12, Math.floor(Number(button.durationSeconds) || 5))),
+        pulseEnabled: button.pulseEnabled !== false,
+      },
+    };
+    const existing = await this.settingsRepo.findOne({ where: { key: 'toast_manager_config' } });
+    if (existing) {
+      existing.value = JSON.stringify(current);
+      existing.description = 'Dashboard-managed global toast styles and lucky button';
+      await this.settingsRepo.save(existing);
+    } else {
+      await this.settingsRepo.save(this.settingsRepo.create({
+        key: 'toast_manager_config',
+        value: JSON.stringify(current),
+        description: 'Dashboard-managed global toast styles and lucky button',
+      }));
+    }
+    return current;
+  }
+
   async getMysteriousManConfig() {
     const row = await this.settingsRepo.findOne({ where: { key: 'mysterious_man_config' } });
     const defaults = { enabled: false, eligibleVipLevels: [], avatarUrl: '', entryMode: 'video', entryText: 'دخل الرجل الغامض', entryEffectUrl: '', messageEffectUrl: '' };
