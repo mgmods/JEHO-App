@@ -48,6 +48,10 @@ public class HomeViewModel extends ViewModel {
     private volatile boolean followingLoaded;
     private volatile long lastFollowingLoadAt;
     private static final long FOLLOWING_CACHE_MS = 30_000L;
+    // Avoid queuing the same two ranking requests on every quick tab/app return.
+    private volatile long lastHomeRankingsLoadAt;
+    private volatile boolean homeRankingsLoading;
+    private static final long HOME_RANKINGS_CACHE_MS = 60_000L;
 
     public HomeViewModel(AppContainer c) {
         this.c = c;
@@ -316,17 +320,30 @@ public class HomeViewModel extends ViewModel {
         });
     }
 
-    public void loadHomeRankings() {
+    public synchronized void loadHomeRankings() {
+        long now = System.currentTimeMillis();
+        if (homeRankingsLoading || (lastHomeRankingsLoadAt > 0L
+                && now - lastHomeRankingsLoadAt < HOME_RANKINGS_CACHE_MS)) {
+            return;
+        }
+        homeRankingsLoading = true;
+        lastHomeRankingsLoadAt = now;
         c.getIoExecutor().execute(() -> {
-            Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
-                    c.getRankingsUseCase.execute("weekly", "rich");
-            if (rich.success && rich.data != null && rich.data.items != null) {
-                richRanking.postValue(rich.data.items);
-            }
-            Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
-                    c.getRankingsUseCase.execute("weekly", "gifts");
-            if (gifts.success && gifts.data != null && gifts.data.items != null) {
-                billionRanking.postValue(gifts.data.items);
+            try {
+                Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> rich =
+                        c.getRankingsUseCase.execute("weekly", "rich");
+                if (rich.success && rich.data != null && rich.data.items != null) {
+                    richRanking.postValue(rich.data.items);
+                }
+                Result<MiscDtos.ListResult<MiscDtos.RankingEntryDto>> gifts =
+                        c.getRankingsUseCase.execute("weekly", "gifts");
+                if (gifts.success && gifts.data != null && gifts.data.items != null) {
+                    billionRanking.postValue(gifts.data.items);
+                }
+            } catch (Exception ignored) {
+                // Cached ranking data remains visible; room joins must not be affected by retry storms.
+            } finally {
+                homeRankingsLoading = false;
             }
         });
     }
