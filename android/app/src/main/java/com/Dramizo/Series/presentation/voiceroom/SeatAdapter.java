@@ -27,6 +27,7 @@ import com.Dramizo.Series.databinding.ItemSeatBinding;
 import com.Dramizo.Series.util.AvatarCosmetics;
 import com.Dramizo.Series.util.SeatReactionEmojis;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
 import com.bumptech.glide.Glide;
 
 import java.util.ArrayList;
@@ -1113,19 +1114,33 @@ public class SeatAdapter extends RecyclerView.Adapter<SeatAdapter.VH> {
         if (holder.b.tvStaffSeatBadge == null) return;
         if (user == null || !StaffRoleHelper.isStaff(user)) {
             holder.b.tvStaffSeatBadge.setVisibility(View.GONE);
+            holder.b.tvStaffSeatBadge.setTag(null);
             holder.b.tvStaffSeatBadge.setText("");
             return;
         }
         String role = StaffRoleHelper.normalize(user);
-        // Compact seat label
-        String label = StaffRoleHelper.SUPER.equals(role) ? "Super Admin"
-                : StaffRoleHelper.ADMIN.equals(role) ? "Admin" : "Manager";
+        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
+        String fallbackLabel = StaffRoleHelper.badgeAr(user);
         holder.b.tvStaffSeatBadge.setVisibility(View.VISIBLE);
-        holder.b.tvStaffSeatBadge.setText(label);
+        holder.b.tvStaffSeatBadge.setTag(role);
+        holder.b.tvStaffSeatBadge.setText(identity.label.isEmpty() ? fallbackLabel : identity.label);
         holder.b.tvStaffSeatBadge.setBackgroundResource(
                 StaffRoleHelper.SUPER.equals(role)
                         ? R.drawable.bg_chip_staff_super
                         : R.drawable.bg_chip_staff_manager);
+        StaffIdentityConfigCache.load(holder.itemView.getContext(), () -> {
+            if (holder.b.tvStaffSeatBadge == null
+                    || holder.b.tvStaffSeatBadge.getVisibility() != View.VISIBLE
+                    || !role.equals(holder.b.tvStaffSeatBadge.getTag())) return;
+            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+            holder.b.tvStaffSeatBadge.setText(latest.label.isEmpty() ? fallbackLabel : latest.label);
+            if (!latest.frameUrl.isEmpty()) {
+                try {
+                    Glide.with(holder.b.imgFrame).load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
+                            .into(holder.b.imgFrame);
+                } catch (Exception ignored) { }
+            }
+        });
     }
 
     private void bindSpeaking(VH holder, boolean speaking) {
