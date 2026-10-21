@@ -13147,6 +13147,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 (androidx.constraintlayout.widget.ConstraintLayout) binding.getRoot();
         if (roomPkOpponentSeatPanel == null) {
             android.widget.LinearLayout panel = new android.widget.LinearLayout(this);
+            panel.setId(View.generateViewId());
             panel.setOrientation(android.widget.LinearLayout.VERTICAL);
             panel.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
             panel.setPadding(dp(5), dp(7), dp(5), dp(7));
@@ -13166,36 +13167,43 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             panel.addView(title, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(28)));
 
-            android.widget.GridLayout seats = new android.widget.GridLayout(this);
-            seats.setColumnCount(2);
-            seats.setUseDefaultMargins(false);
-            for (int i = 0; i < 10; i++) {
-                android.widget.LinearLayout slot = new android.widget.LinearLayout(this);
-                slot.setOrientation(android.widget.LinearLayout.VERTICAL);
-                slot.setGravity(Gravity.CENTER);
-                slot.setPadding(dp(2), dp(4), dp(2), dp(4));
-                slot.setBackground(roundRoomPkDrawable(0xAA18385F, 0xFF356BAA, 10));
-                android.widget.LinearLayout.LayoutParams slotLp = new android.widget.LinearLayout.LayoutParams(
-                        0, dp(62), 1f);
-                slotLp.setMargins(dp(2), dp(3), dp(2), dp(3));
-                android.widget.FrameLayout avatar = new android.widget.FrameLayout(this);
-                avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 22));
-                TextView seatNumber = new TextView(this);
-                seatNumber.setText(String.valueOf(i + 1));
-                seatNumber.setTextColor(0xFFEAF4FF);
-                seatNumber.setTextSize(11f);
-                seatNumber.setGravity(Gravity.CENTER);
-                avatar.addView(seatNumber, new android.widget.FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
-                slot.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(30), dp(30)));
-                TextView waiting = new TextView(this);
-                waiting.setText("فارغ");
-                waiting.setTextColor(0xFFB8D8FF);
-                waiting.setTextSize(9f);
-                waiting.setGravity(Gravity.CENTER);
-                waiting.setMaxLines(1);
-                slot.addView(waiting, new android.widget.LinearLayout.LayoutParams(
-                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(16)));
-                seats.addView(slot, slotLp);
+            android.widget.LinearLayout seats = new android.widget.LinearLayout(this);
+            seats.setOrientation(android.widget.LinearLayout.VERTICAL);
+            for (int row = 0; row < 5; row++) {
+                android.widget.LinearLayout seatRow = new android.widget.LinearLayout(this);
+                seatRow.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                seatRow.setGravity(Gravity.CENTER);
+                for (int col = 0; col < 2; col++) {
+                    final int seatIndex = row * 2 + col + 1;
+                    android.widget.LinearLayout slot = new android.widget.LinearLayout(this);
+                    slot.setOrientation(android.widget.LinearLayout.VERTICAL);
+                    slot.setGravity(Gravity.CENTER);
+                    slot.setPadding(dp(2), dp(3), dp(2), dp(3));
+                    slot.setBackground(roundRoomPkDrawable(0xAA18385F, 0xFF356BAA, 10));
+                    android.widget.LinearLayout.LayoutParams slotLp = new android.widget.LinearLayout.LayoutParams(
+                            0, dp(62), 1f);
+                    slotLp.setMargins(dp(2), dp(3), dp(2), dp(3));
+                    android.widget.FrameLayout avatar = new android.widget.FrameLayout(this);
+                    avatar.setBackground(roundRoomPkDrawable(0xFF244A78, 0xFF65A9FF, 22));
+                    TextView seatNumber = new TextView(this);
+                    seatNumber.setText(String.valueOf(seatIndex));
+                    seatNumber.setTextColor(0xFFEAF4FF);
+                    seatNumber.setTextSize(11f);
+                    seatNumber.setGravity(Gravity.CENTER);
+                    avatar.addView(seatNumber, new android.widget.FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER));
+                    slot.addView(avatar, new android.widget.LinearLayout.LayoutParams(dp(30), dp(30)));
+                    TextView waiting = new TextView(this);
+                    waiting.setText("فارغ");
+                    waiting.setTextColor(0xFFB8D8FF);
+                    waiting.setTextSize(9f);
+                    waiting.setGravity(Gravity.CENTER);
+                    waiting.setMaxLines(1);
+                    slot.addView(waiting, new android.widget.LinearLayout.LayoutParams(
+                            android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(16)));
+                    seatRow.addView(slot, slotLp);
+                }
+                seats.addView(seatRow, new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(68)));
             }
             panel.addView(seats, new android.widget.LinearLayout.LayoutParams(
                     android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
