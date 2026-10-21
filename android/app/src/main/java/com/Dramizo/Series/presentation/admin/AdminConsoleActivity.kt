@@ -20,6 +20,9 @@ import android.widget.Spinner
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.text.Editable
+import android.text.TextWatcher
+import android.text.InputType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -327,7 +330,37 @@ class AdminConsoleActivity : ThemedActivity() {
         })
 
         addText(body, "أدوات الإدارة", 18f, true, TEXT)
-        addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
+        addText(body, "ابحث عن أي أداة إدارية أو افتح القسم المناسب مباشرة.", 12f, false, MUTED)
+
+        // Native in-app search: filter the actual role-visible module cards without
+        // leaving the activity or loading a web page.
+        val moduleSearch = EditText(this).apply {
+            hint = "بحث عن قسم أو إجراء..."
+            textSize = 14f
+            singleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            setPadding(dp(16), 0, dp(16), 0)
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(17).toFloat()
+                setStroke(dp(1), 0xFFE3E1F0.toInt())
+            }
+            elevation = dp(1).toFloat()
+            compoundDrawablePadding = dp(8)
+            layoutParams = LinearLayout.LayoutParams(-1, dp(52)).apply {
+                topMargin = dp(11)
+                bottomMargin = dp(7)
+            }
+        }
+        body.addView(moduleSearch)
+
+        val moduleTiles = linkedMapOf<String, View>()
+        val moduleRows = mutableListOf<Pair<View, List<Module>>>()
+        val groupHeaders = linkedMapOf<String, View>()
+        val groupModulesByTitle = linkedMapOf<String, List<Module>>()
         val groups = listOf(
             "إدارة المجتمع" to listOf("users", "rooms", "streams", "reports"),
             "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents"),
@@ -351,6 +384,8 @@ class AdminConsoleActivity : ThemedActivity() {
             groupHeader.addView(groupDot)
             addText(groupHeader, groupTitle, 15f, true, TEXT)
             body.addView(groupHeader)
+            groupHeaders[groupTitle] = groupHeader
+            groupModulesByTitle[groupTitle] = groupModules
 
             groupModules.chunked(2).forEach { pair ->
                 val row = LinearLayout(this).apply {
@@ -396,7 +431,8 @@ class AdminConsoleActivity : ThemedActivity() {
                         setPadding(0, dp(3), 0, dp(9))
                     }
                     tile.addView(description)
-                    addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                    addText(tile, "فتح القسم  ←", 12f, true, ACCENT)
+                    moduleTiles[module.key] = tile
                     row.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply {
                         bottomMargin = dp(9)
                         if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
@@ -404,8 +440,40 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
                 body.addView(row)
+                moduleRows.add(row to pair)
             }
         }
+
+        fun applyModuleSearch(rawQuery: String) {
+            val query = rawQuery.trim().lowercase(java.util.Locale.ROOT)
+            moduleTiles.forEach { (key, tile) ->
+                val module = visibleModules.firstOrNull { it.key == key }
+                val matches = query.isEmpty() || module?.let {
+                    it.title.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        it.subtitle.lowercase(java.util.Locale.ROOT).contains(query) ||
+                        it.key.lowercase(java.util.Locale.ROOT).contains(query)
+                } == true
+                tile.visibility = if (matches) View.VISIBLE else View.GONE
+            }
+            moduleRows.forEach { (row, rowModules) ->
+                row.visibility = if (rowModules.any { module ->
+                    moduleTiles[module.key]?.visibility == View.VISIBLE
+                }) View.VISIBLE else View.GONE
+            }
+            groupHeaders.forEach { (title, headerView) ->
+                val hasVisibleModule = groupModulesByTitle[title].orEmpty().any { module ->
+                    moduleTiles[module.key]?.visibility == View.VISIBLE
+                }
+                headerView.visibility = if (hasVisibleModule) View.VISIBLE else View.GONE
+            }
+        }
+        moduleSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                applyModuleSearch(s?.toString().orEmpty())
+            }
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
     }
 
     private fun openModule(key: String) {
