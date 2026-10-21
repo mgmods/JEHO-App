@@ -126,6 +126,14 @@ export class AdminController {
     private readonly giftsService: GiftsService,
   ) {}
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('staff-identity/public')
+  @ApiOperation({ summary: 'Read public staff role identity assets for profile and room rendering' })
+  getPublicStaffIdentityConfig() {
+    return this.adminService.getStaffIdentityConfig();
+  }
+
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @Get('staff-identity')
