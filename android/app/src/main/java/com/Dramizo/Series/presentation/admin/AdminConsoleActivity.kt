@@ -46,6 +46,9 @@ class AdminConsoleActivity : ThemedActivity() {
     private var notificationImageUrl: String? = null
     private var notificationImageStatus: TextView? = null
     private var notificationImageUploadInProgress = false
+    private val staffIdentityFields = mutableMapOf<String, EditText>()
+    private var pendingIdentityFieldKey: String? = null
+    private var staffIdentityUploadInProgress = false
     private val notificationImageRequestCode = 7042
 
     private data class Module(val key: String, val title: String, val subtitle: String, val icon: String)
@@ -65,6 +68,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("grantCosmetics", "الإطارات والدخوليات", "إهداء المميزات لمدة 7 أو 15 أو 30 يومًا أو دائمًا", "✨"),
         Module("vip", "عضويات VIP", "منح VIP وإدارة العضويات والخطط", "👑"),
         Module("logs", "سجل العمليات", "مراجعة سجل التغييرات الإدارية", "🧾"),
+        Module("staffIdentity", "هوية الرتب الإدارية", "تخصيص الشارة والإطار وبطاقة الاسم والدخولية لكل رتبة", "💎"),
         Module("operators", "إدارة صلاحيات الإدارة", "إدارة حسابات الإدارة المحدودة — للسوبر أدمن فقط", "🛡️")
     )
 
@@ -210,7 +214,7 @@ class AdminConsoleActivity : ThemedActivity() {
         addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
         val visibleModules = when (currentRole) {
             StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
-            StaffRoleHelper.ADMIN -> modules.filter { it.key != "operators" }
+            StaffRoleHelper.ADMIN -> modules.filter { it.key !in listOf("operators", "staffIdentity") }
             else -> modules
         }
         val rows = visibleModules.chunked(2)
@@ -258,8 +262,8 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun openModule(key: String) {
         if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams")) ||
-            (currentRole == StaffRoleHelper.ADMIN && key == "operators")) {
-            toast("صلاحية المانجر تقتصر على الرومات والبث المباشر")
+            (currentRole == StaffRoleHelper.ADMIN && key in listOf("operators", "staffIdentity"))) {
+            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر" else "هذا القسم مخصص للسوبر أدمن")
             return
         }
         currentSection = key
@@ -333,6 +337,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 load(api.notifications(1, 40)) { renderItems(it, "notifications") }
             }
             "logs" -> load(api.logs(1, 50)) { renderItems(it, "logs") }
+            "staffIdentity" -> showStaffIdentityEditor()
         }
     }
 
@@ -1299,9 +1304,10 @@ class AdminConsoleActivity : ThemedActivity() {
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != notificationImageRequestCode || resultCode != Activity.RESULT_OK) return
+        if (resultCode != Activity.RESULT_OK) return
         val uri = data?.data ?: return
-        uploadNotificationImage(uri)
+        if (requestCode == notificationImageRequestCode) uploadNotificationImage(uri)
+        else if (requestCode == staffIdentityUploadRequestCode) uploadStaffIdentityAsset(uri)
     }
 
     private fun uploadNotificationImage(uri: Uri) {
@@ -1340,6 +1346,129 @@ class AdminConsoleActivity : ThemedActivity() {
             notificationImageUrl = null
             notificationImageStatus?.text = "فشل تجهيز الصورة"
             toast(error.message ?: "تعذر تجهيز الصورة")
+        }
+    }
+
+    private fun showStaffIdentityEditor() {
+        staffIdentityFields.clear()
+        body.removeAllViews()
+        addText(body, "هوية الرتب الإدارية", 20f, true, TEXT)
+        addText(body, "ارفع الأصول من الجهاز أو أدخل رابط HTTPS. تُحفظ الإعدادات في قاعدة البيانات، والملفات تعتمد على تخزين Supabase الدائم إذا كان مفعّلًا على الخادم.", 13f, false, MUTED)
+        load(api.staffIdentity()) { raw ->
+            val root = raw as? Map<*, *> ?: emptyMap<Any, Any>()
+            val roles = listOf(
+                Triple("super", "السوبر أدمن", 0xFFD8B35B.toInt()),
+                Triple("admin", "الأدمن", 0xFF9AA8C7.toInt()),
+                Triple("manager", "المانجر", 0xFF37A889.toInt())
+            )
+            val assetFields = listOf(
+                "badgeUrl" to "رابط الشارة",
+                "frameUrl" to "رابط إطار الصورة",
+                "nameplateUrl" to "رابط بطاقة الاسم",
+                "entryEffectUrl" to "رابط الدخولية"
+            )
+            roles.forEach { (roleKey, roleTitle, color) ->
+                val roleData = root[roleKey] as? Map<*, *> ?: emptyMap<Any, Any>()
+                val panel = card()
+                val heading = TextView(this).apply {
+                    text = roleTitle
+                    textSize = 17f
+                    setTextColor(color)
+                    setTypeface(typeface, Typeface.BOLD)
+                    setPadding(0, 0, 0, dp(8))
+                }
+                panel.addView(heading)
+                val labelKey = "$roleKey.label"
+                val labelInput = identityInput("اسم الرتبة", roleData["label"]?.toString().orEmpty())
+                staffIdentityFields[labelKey] = labelInput
+                panel.addView(labelInput)
+                val colorKey = "$roleKey.accentColor"
+                val colorInput = identityInput("لون الهوية HEX مثال #D8B35B", roleData["accentColor"]?.toString().orEmpty())
+                staffIdentityFields[colorKey] = colorInput
+                panel.addView(colorInput)
+                assetFields.forEach { (assetKey, assetLabel) ->
+                    val fieldKey = "$roleKey.$assetKey"
+                    val input = identityInput(assetLabel, roleData[assetKey]?.toString().orEmpty())
+                    staffIdentityFields[fieldKey] = input
+                    val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+                    row.addView(input, LinearLayout.LayoutParams(0, dp(52), 1f))
+                    row.addView(button("رفع") {
+                        pendingIdentityFieldKey = fieldKey
+                        val pick = Intent(Intent.ACTION_GET_CONTENT).apply { type = if (assetKey == "entryEffectUrl") "*/*" else "image/*" }
+                        startActivityForResult(Intent.createChooser(pick, "اختيار $assetLabel"), staffIdentityUploadRequestCode)
+                    }, LinearLayout.LayoutParams(dp(76), dp(48)))
+                    panel.addView(row)
+                }
+                body.addView(panel)
+            }
+            body.addView(button("حفظ الهوية الإدارية") {
+                if (staffIdentityUploadInProgress) { toast("انتظر حتى ينتهي رفع الملف"); return@button }
+                val payload = mutableMapOf<String, Any>()
+                roles.forEach { (roleKey, _, _) ->
+                    val values = mutableMapOf<String, Any>()
+                    listOf("label", "accentColor", "badgeUrl", "frameUrl", "nameplateUrl", "entryEffectUrl").forEach { key ->
+                        values[key] = staffIdentityFields["$roleKey.$key"]?.text?.toString()?.trim().orEmpty()
+                    }
+                    payload[roleKey] = values
+                }
+                confirm("حفظ هويات السوبر أدمن والأدمن والمانجر؟") {
+                    load(api.updateStaffIdentity(payload)) {
+                        toast("تم حفظ إعدادات الهوية الإدارية")
+                        showStaffIdentityEditor()
+                    }
+                }
+            })
+        }
+    }
+
+    private fun identityInput(hintText: String, value: String): EditText = EditText(this).apply {
+        hint = hintText
+        setText(value)
+        textSize = 12f
+        setSingleLine(true)
+        setTextColor(TEXT)
+        setHintTextColor(MUTED)
+        background = roundRect(0xFFF5F4FA.toInt(), 10)
+        setPadding(dp(10), dp(8), dp(10), dp(8))
+        layoutParams = LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(5) }
+    }
+
+    private fun uploadStaffIdentityAsset(uri: Uri) {
+        val key = pendingIdentityFieldKey ?: return
+        staffIdentityUploadInProgress = true
+        try {
+            val mime = contentResolver.getType(uri) ?: "image/png"
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: throw IllegalStateException("تعذر قراءة الملف")
+            if (bytes.isEmpty() || bytes.size > 20 * 1024 * 1024) throw IllegalArgumentException("حجم الملف يجب ألا يتجاوز 20 ميغابايت")
+            val ext = when (mime.lowercase()) {
+                "image/png" -> ".png"
+                "image/webp" -> ".webp"
+                "image/gif" -> ".gif"
+                "video/mp4" -> ".mp4"
+                "application/octet-stream" -> ".svga"
+                else -> ".jpg"
+            }
+            val part = MultipartBody.Part.createFormData("file", "staff-identity-" + key.replace(".", "-") + ext, bytes.toRequestBody(mime.toMediaType()))
+            ContainerProvider.from(this).getUploadApi().upload(part).enqueue(object : Callback<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>> {
+                override fun onResponse(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, response: Response<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>) {
+                    staffIdentityUploadInProgress = false
+                    val result = response.body()?.data
+                    val input = staffIdentityFields[key]
+                    if (response.isSuccessful && response.body()?.success == true && !result?.url.isNullOrBlank() && input != null) {
+                        input.setText(result!!.url)
+                        toast("تم رفع الأصل؛ احفظ الإعدادات لاعتماد التغيير")
+                    } else {
+                        toast("تعذر رفع الأصل (HTTP " + response.code() + ")")
+                    }
+                }
+                override fun onFailure(call: Call<ApiResponse<com.Dramizo.Series.data.remote.api.UploadApi.UploadResult>>, error: Throwable) {
+                    staffIdentityUploadInProgress = false
+                    toast("تعذر رفع الأصل: " + (error.message ?: "خطأ اتصال"))
+                }
+            })
+        } catch (error: Exception) {
+            staffIdentityUploadInProgress = false
+            toast(error.message ?: "تعذر تجهيز الملف")
         }
     }
 
@@ -1464,5 +1593,6 @@ class AdminConsoleActivity : ThemedActivity() {
         private const val TEXT = 0xFF252744.toInt()
         private const val MUTED = 0xFF73758D.toInt()
         private const val ACCENT = 0xFF6B4CC2.toInt()
+        private const val staffIdentityUploadRequestCode = 7043
     }
 }
