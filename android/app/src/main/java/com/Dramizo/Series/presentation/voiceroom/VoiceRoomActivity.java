@@ -11281,9 +11281,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && binding.giftOverlay.getChildCount() == 0) {
             binding.giftOverlay.setVisibility(View.GONE);
         }
-        // Non-video: Mikoo toast immediately. Video: after stage ends (see onDone).
+        // Show the same visible X1/X7/X17/X77/X177 count-up for every gift type.
+        // Video gifts start counting after their stage finishes (see onDone); other gifts start now.
         if (!isVideoGift) {
-            showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+            showGiftSendToastCountUp(senderName, giftName, senderAvatarUrl, iconUrl, comboCount);
         }
 
         String me = senderName;
