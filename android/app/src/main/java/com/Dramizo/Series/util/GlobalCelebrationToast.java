@@ -148,6 +148,21 @@ public final class GlobalCelebrationToast {
                 sweep.start();
             });
         } else if (sheen != null) sheen.setVisibility(View.GONE);
+        if (luckyHigh || luckyNormal) {
+            ImageView avatar = active.findViewById(R.id.imgCelebrationAvatar);
+            TextView title = active.findViewById(R.id.tvCelebrationTitle);
+            TextView body = active.findViewById(R.id.tvCelebrationBody);
+            final float avatarX = luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
+            final float textY = luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            active.post(() -> {
+                if (active.getParent() == null) return;
+                positionViewPercent(avatar, active, avatarX, avatarY, true);
+                positionViewPercent(title, active, textX, textY, false);
+                positionViewPercent(body, active, textX, textY + 17f, false);
+            });
+        }
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
         hideRunnable = () -> removeBanner(active);
         int duration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : remoteLuckyNormalDurationSeconds;
