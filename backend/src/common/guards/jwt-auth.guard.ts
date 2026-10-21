@@ -73,13 +73,21 @@ export class JwtAuthGuard implements CanActivate {
       // Accept older signed dashboard sessions that predate tokenType, but only when
       // the token explicitly identifies itself as an admin session. The admin must
       // still exist in admin_users and be active; ordinary app-user tokens are not promoted.
-      if (
-        payload.tokenType === 'dashboard' ||
-        (payload.role === 'admin' && payload.isAdmin === true)
-      ) {
-        const admin = await this.dataSource.getRepository(AdminUser).findOne({
-          where: { id: payload.sub },
-        });
+      const explicitDashboardToken = payload.tokenType === 'dashboard';
+      const legacyDashboardCandidate =
+        payload.role === 'admin' && payload.isAdmin === true;
+      // Some app-user JWTs also carry role=admin/isAdmin=true after promotion.
+      // Resolve the ID before classifying a legacy token: only IDs that actually
+      // exist in admin_users are legacy dashboard sessions. Otherwise continue
+      // through the normal users table so promoted Super Admins aren't rejected.
+      const dashboardAdmin =
+        explicitDashboardToken || legacyDashboardCandidate
+          ? await this.dataSource.getRepository(AdminUser).findOne({
+              where: { id: payload.sub },
+            })
+          : null;
+      if (explicitDashboardToken || (legacyDashboardCandidate && dashboardAdmin)) {
+        const admin = dashboardAdmin;
         if (!admin || !admin.isActive) {
           if (required) throw new UnauthorizedException('Dashboard account is disabled or unavailable');
           return false;
