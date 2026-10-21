@@ -14,6 +14,8 @@ import com.Dramizo.Series.presentation.common.ContainerProvider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Starts HTTP room join as soon as the user taps a room — before VoiceRoomActivity
@@ -26,6 +28,13 @@ public final class RoomJoinPrefetch {
 
     private static final Object LOCK = new Object();
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    // Keep room joins from waiting behind background feed, ranking, badge, and media requests.
+    private static final ExecutorService JOIN_EXECUTOR = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "jeho-room-join");
+        thread.setPriority(Thread.NORM_PRIORITY);
+        thread.setDaemon(true);
+        return thread;
+    });
     private static String targetRoomId;
     @Nullable private static RoomDtos.JoinRoomResult result;
     @Nullable private static String error;
@@ -54,7 +63,7 @@ public final class RoomJoinPrefetch {
             waiters.clear();
         }
         AppContainer c = ContainerProvider.from(context.getApplicationContext());
-        c.getIoExecutor().execute(() -> {
+        JOIN_EXECUTOR.execute(() -> {
             Result<RoomDtos.JoinRoomResult> r;
             try {
                 r = c.joinRoomUseCase.execute(rid, pass);
