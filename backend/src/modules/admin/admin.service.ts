@@ -274,7 +274,7 @@ export class AdminService {
       const clean = (role: string) => {
         const source = parsed?.[role] && typeof parsed[role] === 'object' ? parsed[role] : {};
         const fallback = defaults[role as keyof typeof defaults];
-        const url = (key: string) => typeof source[key] === 'string' && /^(https:\/\/[^\s]+|\/uploads\/[A-Za-z0-9._-]+)$/.test(source[key]) ? source[key].slice(0, 2048) : '';
+      if (/^\/uploads\/[A-Za-z0-9._-]+$/i.test(raw)) return raw;
         const color = typeof source.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(source.accentColor) ? source.accentColor : fallback.accentColor;
         const label = typeof source.label === 'string' && source.label.trim() ? source.label.trim().slice(0, 32) : fallback.label;
         return { label, accentColor: color, badgeUrl: url('badgeUrl'), frameUrl: url('frameUrl'), nameplateUrl: url('nameplateUrl'), entryEffectUrl: url('entryEffectUrl') };
