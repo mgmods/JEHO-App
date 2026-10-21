@@ -344,6 +344,11 @@ export const tasksApi = {
     safeRequest(() => api.put('/admin/tasks/enabled', { enabled: !!enabled })),
 }
 
+export const dailyLoginRewardsApi = {
+  get: () => safeRequest(() => api.get('/admin/daily-login-rewards')),
+  save: (payload) => safeRequest(() => api.put('/admin/daily-login-rewards', payload)),
+}
+
 export const rankingApi = {
   board: (period, category, params) =>
     safeRequest(() => api.get(`/admin/ranking/${period}/${category}`, { params })),
