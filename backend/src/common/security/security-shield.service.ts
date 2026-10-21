@@ -2,6 +2,8 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  BadRequestException,
+  NotFoundException,
   Injectable,
   Logger,
   SetMetadata,
@@ -68,6 +70,65 @@ export class SecurityShieldService {
     await this.redis.set(`${BAN_USER_PREFIX}${userId}`, reason, ttlSeconds);
     await this.users.update({ id: userId }, { status: UserStatus.SUSPENDED });
     this.logger.warn(`User banned ${userId} (${ttlSeconds}s): ${reason}`);
+  }
+
+  /**
+   * Temporary staff ban: Redis TTL is the enforcement source. Do not mutate
+   * users.status, because BANNED/SUSPENDED is a durable account restriction.
+   */
+  async createStaffTemporaryBan(
+    userId: string,
+    hours: number,
+    reason: string,
+    actorId: string,
+  ) {
+    const user = await this.users.findOne({
+      where: { id: userId },
+      select: ['id', 'status'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.status === UserStatus.BANNED || user.status === UserStatus.SUSPENDED) {
+      throw new BadRequestException('This account has a durable restriction; only Super Admin can review it');
+    }
+    const safeHours = Math.max(1, Math.min(24, Math.floor(Number(hours) || 1)));
+    const expiresAt = new Date(Date.now() + safeHours * 60 * 60 * 1000).toISOString();
+    const value = JSON.stringify({
+      kind: 'staff-temporary-ban',
+      actorId,
+      reason: String(reason || 'admin temporary ban').slice(0, 500),
+      expiresAt,
+    });
+    const key = `${BAN_USER_PREFIX}${userId}`;
+    const created = await this.redis.setIfAbsent(key, value, safeHours * 3600);
+    if (!created) {
+      const existing = await this.redis.get(key);
+      if (existing) {
+        throw new BadRequestException('An active ban already exists for this account; Super Admin review is required');
+      }
+      throw new BadRequestException('Temporary-ban storage is unavailable; no ban was applied');
+    }
+    return { userId, hours: safeHours, expiresAt, actorId };
+  }
+
+  async removeStaffTemporaryBan(userId: string, actorId: string, isSuper: boolean) {
+    const key = `${BAN_USER_PREFIX}${userId}`;
+    const raw = await this.redis.get(key);
+    if (!raw) throw new NotFoundException('No active temporary ban was found');
+    let ban: { kind?: string; actorId?: string; expiresAt?: string };
+    try { ban = JSON.parse(raw); } catch {
+      throw new ForbiddenException('This is not a staff temporary ban; Super Admin review is required');
+    }
+    if (ban.kind !== 'staff-temporary-ban') {
+      throw new ForbiddenException('This is not a staff temporary ban; Super Admin review is required');
+    }
+    if (!isSuper && ban.actorId !== actorId) {
+      throw new ForbiddenException('You can only remove a temporary ban you issued');
+    }
+    const removed = await this.redis.deleteIfValueMatches(key, raw);
+    if (!removed) {
+      throw new BadRequestException('The temporary ban changed or expired; refresh the user and retry');
+    }
+    return { ok: true, userId, removedBy: actorId };
   }
 
   async recordAbuse(opts: {

@@ -27,9 +27,36 @@ export class RedisService implements OnModuleDestroy {
     } catch {}
   }
 
+  /** Atomically create an expiring key only when no value exists. */
+  async setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.enabled || !Number.isFinite(ttlSeconds) || ttlSeconds < 1) return false;
+    try {
+      const result = await this.client.set(key, value, 'EX', Math.floor(ttlSeconds), 'NX');
+      return result === 'OK';
+    } catch {
+      return false;
+    }
+  }
+
   async del(key: string): Promise<void> {
     if (!this.enabled) return;
     try { await this.client.del(key); } catch {}
+  }
+
+  /** Delete a key only if its current value still matches the value inspected. */
+  async deleteIfValueMatches(key: string, expectedValue: string): Promise<boolean> {
+    if (!this.enabled) return false;
+    try {
+      const result = await this.client.eval(
+        "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+        1,
+        key,
+        expectedValue,
+      );
+      return Number(result) === 1;
+    } catch {
+      return false;
+    }
   }
 
   async incr(key: string): Promise<number> {

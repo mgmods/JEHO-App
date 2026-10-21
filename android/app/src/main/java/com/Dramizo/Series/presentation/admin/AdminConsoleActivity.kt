@@ -15,6 +15,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -59,6 +61,7 @@ class AdminConsoleActivity : ThemedActivity() {
         Module("users", "المستخدمون", "بحث بالـ ID وتقييد الحساب أو حظره", "👥"),
         Module("rooms", "إدارة الرومات", "تعديل الرومات وإغلاقها", "🏠"),
         Module("streams", "البث المباشر", "متابعة البث وإنهاؤه عند الحاجة", "📡"),
+        Module("reports", "البلاغات والمراجعة", "مراجعة بلاغات المستخدمين وتصعيد الحالات", "🛡️"),
         Module("agencies", "الوكالات", "إدارة الوكالات وتعليقها أو حذفها", "🏢"),
         Module("agencyApplications", "طلبات الوكالات", "قبول الطلبات لتفعيل وكالة جديدة", "📨"),
         Module("rechargeApplications", "طلبات وكلاء الشحن", "مراجعة الطلبات وقبولها أو رفضها", "💳"),
@@ -83,11 +86,7 @@ class AdminConsoleActivity : ThemedActivity() {
         // Only leave the admin console when already on its home screen.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentSection != "home") {
-                    showHome()
-                } else {
-                    finish()
-                }
+                handleAdminBack()
             }
         })
         val user = try { ContainerProvider.from(this).sessionManager.user } catch (_: Exception) { null }
@@ -124,7 +123,7 @@ class AdminConsoleActivity : ThemedActivity() {
             gravity = Gravity.CENTER
             setPadding(dp(10), dp(10), dp(10), dp(10))
             visibility = View.GONE
-            setOnClickListener { showHome() }
+            setOnClickListener { handleAdminBack() }
         }
         val heading = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         titleView = TextView(this).apply {
@@ -163,112 +162,261 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView.text = "مركز إدارة JEHO"
         backButton.visibility = View.GONE
         body.removeAllViews()
+        body.layoutDirection = View.LAYOUT_DIRECTION_RTL
+
+        val roleLabel = when (currentRole) {
+            StaffRoleHelper.SUPER -> "السوبر أدمن"
+            StaffRoleHelper.ADMIN -> "الأدمن"
+            else -> "المانجر"
+        }
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutDirection = View.LAYOUT_DIRECTION_RTL
             setPadding(dp(20), dp(20), dp(20), dp(20))
             background = GradientDrawable(
-                GradientDrawable.Orientation.RIGHT_LEFT,
-                intArrayOf(0xFF20254F.toInt(), 0xFF5541A4.toInt(), 0xFF8062D5.toInt())
-            ).apply { cornerRadius = dp(22).toFloat() }
-            elevation = dp(3).toFloat()
-            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) }
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF171A3B.toInt(), 0xFF34266E.toInt(), 0xFF6849C8.toInt())
+            ).apply { cornerRadius = dp(24).toFloat() }
+            elevation = dp(4).toFloat()
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(18) }
         }
-        val heroEyebrow = TextView(this).apply {
-            text = "JEHO  •  " + when (currentRole) { StaffRoleHelper.SUPER -> "SUPER ADMIN"; StaffRoleHelper.ADMIN -> "ADMIN"; else -> "MANAGER" }
-            textSize = 10f
-            letterSpacing = 0.12f
-            setTextColor(0xFFDCD4FF.toInt())
-            setTypeface(typeface, Typeface.BOLD)
+        val brandRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
-        hero.addView(heroEyebrow)
-        val heroTitle = TextView(this).apply {
-            text = "مركز التحكم الرئيسي"
-            textSize = 23f
+        val brandMark = TextView(this).apply {
+            text = "J"
+            textSize = 22f
+            gravity = Gravity.CENTER
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, dp(7), 0, dp(5))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF9C83FF.toInt(), 0xFF6046C7.toInt())
+            ).apply { cornerRadius = dp(15).toFloat() }
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(12) }
         }
-        hero.addView(heroTitle)
-        val heroCopy = TextView(this).apply {
-            text = "إدارة المستخدمين والرومات والوكالات والرسائل والهدايا من مكان واحد."
-            textSize = 13f
-            setTextColor(0xFFF0EDFF.toInt())
-            setLineSpacing(dp(3).toFloat(), 1f)
-        }
-        hero.addView(heroCopy)
-        val secureLine = TextView(this).apply {
-            text = "●  متصل بالخادم  •  الصلاحيات تُتحقق على الخادم"
+        brandRow.addView(brandMark)
+        val brandCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        addText(brandCopy, "JEHO  •  ADMIN CENTER", 10f, true, 0xFFD9D0FF.toInt())
+        addText(brandCopy, "مساحة الإدارة والتحكم", 15f, true, Color.WHITE)
+        brandRow.addView(brandCopy, LinearLayout.LayoutParams(0, -2, 1f))
+        val rolePill = TextView(this).apply {
+            text = roleLabel
             textSize = 11f
-            setTextColor(0xFFD7F7E8.toInt())
-            setPadding(0, dp(13), 0, 0)
+            setTextColor(Color.WHITE)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp(11), dp(8), dp(11), dp(8))
+            background = GradientDrawable().apply {
+                setColor(0x33FFFFFF.toInt())
+                cornerRadius = dp(30).toFloat()
+                setStroke(dp(1), 0x66FFFFFF)
+            }
+        }
+        brandRow.addView(rolePill)
+        hero.addView(brandRow)
+
+        addText(hero, "كل أدواتك الإدارية في مكان واحد", 22f, true, Color.WHITE)
+        val intro = TextView(this).apply {
+            text = "تابع المستخدمين والرومات والعمليات المهمة من واجهة واحدة مصممة للموبايل."
+            textSize = 13f
+            setTextColor(0xFFE9E4FF.toInt())
+            setLineSpacing(dp(3).toFloat(), 1.05f)
+            setPadding(0, dp(5), 0, dp(13))
+        }
+        hero.addView(intro)
+        val secureLine = TextView(this).apply {
+            text = "●  اتصال الإدارة عبر الخادم  ·  صلاحيات محمية"
+            textSize = 11f
+            setTextColor(0xFFB9F6D5.toInt())
+            setPadding(0, dp(10), 0, 0)
         }
         hero.addView(secureLine)
         body.addView(hero)
+
+        addText(body, "نظرة عامة", 18f, true, TEXT)
+        addText(body, "ملخص البيانات المتاحة من الخادم", 12f, false, MUTED)
+        val metricsHost = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(9); bottomMargin = dp(10) }
+        }
+        body.addView(metricsHost)
         load(api.overview()) { data ->
             val stats = mapOfEntries(data)
-            if (stats.isNotEmpty()) {
-                val card = card()
-                addText(card, "نظرة عامة", 16f, true, TEXT)
-                val display = stats.entries.take(6).joinToString("\n") { (k, v) -> "${prettyKey(k)}: ${v ?: "—"}" }
-                addText(card, display, 13f, false, MUTED)
-                body.addView(card)
+            metricsHost.removeAllViews()
+            if (stats.isEmpty()) {
+                val empty = card()
+                addText(empty, "تعذر تحميل الإحصائيات الآن", 13f, true, MUTED)
+                addText(empty, "يمكنك متابعة الأقسام، ثم تحديث الشاشة لاحقًا.", 12f, false, MUTED)
+                metricsHost.addView(empty)
+            } else {
+                val metricSpecs = listOf(
+                    Triple("المستخدمون", listOf("users", "usersCount", "totalUsers"), "👥"),
+                    Triple("الرومات", listOf("rooms", "roomsCount", "totalRooms"), "🏠"),
+                    Triple("البث المباشر", listOf("activeStreams", "streamsCount", "liveStreams"), "📡"),
+                    Triple("الوكالات", listOf("agencies", "agenciesCount", "totalAgencies"), "🏢")
+                )
+                val known = metricSpecs.mapNotNull { spec ->
+                    val key = spec.second.firstOrNull { stats.containsKey(it) }
+                    if (key == null) null else Triple(spec.first, stats[key]?.toString() ?: "—", spec.third)
+                }
+                val displayMetrics = if (known.isNotEmpty()) known else stats.entries.take(4).map { Triple(prettyKey(it.key), it.value?.toString() ?: "—", "✦") }
+                displayMetrics.chunked(2).forEach { pair ->
+                    val metricRow = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    }
+                    pair.forEachIndexed { index, metric ->
+                        val metricCard = LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            layoutDirection = View.LAYOUT_DIRECTION_RTL
+                            setPadding(dp(14), dp(13), dp(14), dp(13))
+                            background = GradientDrawable().apply {
+                                setColor(Color.WHITE)
+                                cornerRadius = dp(18).toFloat()
+                                setStroke(dp(1), 0xFFE8E7F2.toInt())
+                            }
+                            elevation = dp(1).toFloat()
+                            layoutParams = LinearLayout.LayoutParams(0, -2, 1f).apply {
+                                bottomMargin = dp(9)
+                                if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
+                            }
+                        }
+                        val top = LinearLayout(this).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        }
+                        val metricIcon = TextView(this).apply {
+                            text = metric.third
+                            textSize = 20f
+                            gravity = Gravity.CENTER
+                            background = roundRect(0xFFF0ECFB.toInt(), 12)
+                            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginStart = dp(9) }
+                        }
+                        top.addView(metricIcon)
+                        addText(top, metric.first, 12f, true, MUTED)
+                        metricCard.addView(top)
+                        addText(metricCard, metric.second, 24f, true, TEXT)
+                        metricRow.addView(metricCard)
+                    }
+                    if (pair.size == 1) metricRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+                    metricsHost.addView(metricRow)
+                }
             }
         }
-        addText(body, "أدوات الإدارة", 18f, true, TEXT)
-        addText(body, "اختر الإجراء المطلوب — الأقسام مرتبة لتسهيل الوصول السريع.", 12f, false, MUTED)
+
+        // Keep privileged account-granting and global configuration tools out of
+        // Admin/Manager navigation. Backend authorization remains authoritative.
+        val superOnlyModules = listOf(
+            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
+            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
+            "vip", "logs", "staffIdentity", "operators"
+        )
         val visibleModules = when (currentRole) {
-            StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" }
-            StaffRoleHelper.ADMIN -> modules.filter { it.key !in listOf("operators", "staffIdentity") }
+            StaffRoleHelper.MANAGER -> modules.filter { it.key == "rooms" || it.key == "streams" || it.key == "reports" }
+            StaffRoleHelper.ADMIN -> modules.filter { it.key !in superOnlyModules }
             else -> modules
         }
-        val rows = visibleModules.chunked(2)
-        rows.forEach { pair ->
-            val row = LinearLayout(this).apply {
+
+        body.addView(button("↻ تحديث لوحة الإدارة والإحصائيات") { showHome() }.apply {
+            layoutParams = LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) }
+        })
+
+        addText(body, "أدوات الإدارة", 18f, true, TEXT)
+        addText(body, "أقسام مرتبة حسب طبيعة العمل لتصل إلى الإجراء المطلوب بسرعة.", 12f, false, MUTED)
+        val groups = listOf(
+            "إدارة المجتمع" to listOf("users", "rooms", "streams", "reports"),
+            "الوكالات والشحن" to listOf("agencies", "agencyApplications", "rechargeApplications", "rechargeAgents"),
+            "الرسائل وتجربة المستخدم" to listOf("notifications", "toastManager", "mysteriousMan", "luckyCannon", "supportChest", "roomPkSettings"),
+            "العضويات والمظهر" to listOf("vanityIds", "grantCosmetics", "vip", "staffIdentity"),
+            "الإدارة والأمان" to listOf("logs", "operators")
+        )
+        groups.forEach { (groupTitle, keys) ->
+            val groupModules = visibleModules.filter { it.key in keys }
+            if (groupModules.isEmpty()) return@forEach
+            val groupHeader = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.TOP
+                gravity = Gravity.CENTER_VERTICAL
                 layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(0, dp(12), 0, dp(9))
             }
-            pair.forEachIndexed { index, module ->
-                val tile = card().apply {
-                    setPadding(dp(12), dp(13), dp(12), dp(13))
-                    isClickable = true
-                    isFocusable = true
-                    foreground = android.util.TypedValue().let {
-                        val out = android.util.TypedValue()
-                        theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
-                        if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+            val groupDot = View(this).apply {
+                background = roundRect(ACCENT, 4)
+                layoutParams = LinearLayout.LayoutParams(dp(4), dp(21)).apply { marginStart = dp(9) }
+            }
+            groupHeader.addView(groupDot)
+            addText(groupHeader, groupTitle, 15f, true, TEXT)
+            body.addView(groupHeader)
+
+            groupModules.chunked(2).forEach { pair ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.TOP
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                }
+                pair.forEachIndexed { index, module ->
+                    val tile = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        layoutDirection = View.LAYOUT_DIRECTION_RTL
+                        setPadding(dp(14), dp(14), dp(14), dp(14))
+                        background = GradientDrawable().apply {
+                            setColor(Color.WHITE)
+                            cornerRadius = dp(18).toFloat()
+                            setStroke(dp(1), 0xFFE8E7F2.toInt())
+                        }
+                        elevation = dp(1).toFloat()
+                        isClickable = true
+                        isFocusable = true
+                        foreground = android.util.TypedValue().let {
+                            val out = android.util.TypedValue()
+                            theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true)
+                            if (out.resourceId != 0) androidx.core.content.ContextCompat.getDrawable(this@AdminConsoleActivity, out.resourceId) else null
+                        }
+                        setOnClickListener { openModule(module.key) }
                     }
-                    setOnClickListener { openModule(module.key) }
+                    val icon = TextView(this).apply {
+                        text = module.icon
+                        textSize = 25f
+                        gravity = Gravity.CENTER
+                        setBackground(roundRect(0xFFF0ECFB.toInt(), 13))
+                        layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { bottomMargin = dp(11) }
+                    }
+                    tile.addView(icon)
+                    addText(tile, module.title, 14f, true, TEXT)
+                    val description = TextView(this).apply {
+                        text = module.subtitle
+                        textSize = 11f
+                        setTextColor(MUTED)
+                        maxLines = 2
+                        setLineSpacing(dp(2).toFloat(), 1f)
+                        setPadding(0, dp(3), 0, dp(9))
+                    }
+                    tile.addView(description)
+                    addText(tile, "فتح القسم  ←", 11f, true, ACCENT)
+                    row.addView(tile, LinearLayout.LayoutParams(0, -2, 1f).apply {
+                        bottomMargin = dp(9)
+                        if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
+                    })
                 }
-                val icon = TextView(this).apply {
-                    text = module.icon
-                    textSize = 23f
-                    gravity = Gravity.CENTER
-                    setBackground(roundRect(0xFFF0ECFB.toInt(), 14))
-                    layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
-                }
-                tile.addView(icon)
-                addText(tile, module.title, 14f, true, TEXT)
-                addText(tile, module.subtitle, 11f, false, MUTED)
-                addText(tile, "فتح الإدارة  ←", 11f, true, ACCENT)
-                val lp = LinearLayout.LayoutParams(0, -2, 1f).apply {
-                    bottomMargin = dp(10)
-                    if (index == 0) marginEnd = dp(5) else marginStart = dp(5)
-                }
-                row.addView(tile, lp)
+                if (pair.size == 1) row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
+                body.addView(row)
             }
-            if (pair.size == 1) {
-                row.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f).apply { marginStart = dp(5) })
-            }
-            body.addView(row)
         }
     }
 
     private fun openModule(key: String) {
-        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams")) ||
-            (currentRole == StaffRoleHelper.ADMIN && key in listOf("operators", "staffIdentity"))) {
-            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر" else "هذا القسم مخصص للسوبر أدمن")
+        val superOnlyModules = listOf(
+            "notifications", "toastManager", "mysteriousMan", "luckyCannon",
+            "supportChest", "roomPkSettings", "vanityIds", "grantCosmetics",
+            "vip", "logs", "staffIdentity", "operators"
+        )
+        if ((currentRole == StaffRoleHelper.MANAGER && key !in listOf("rooms", "streams", "reports")) ||
+            (currentRole == StaffRoleHelper.ADMIN && key in superOnlyModules)) {
+            toast(if (currentRole == StaffRoleHelper.MANAGER) "صلاحية المانجر تقتصر على الرومات والبث المباشر والبلاغات" else "هذا القسم مخصص للسوبر أدمن")
             return
         }
         currentSection = key
@@ -276,6 +424,7 @@ class AdminConsoleActivity : ThemedActivity() {
         titleView.text = module?.title ?: "مركز إدارة JEHO"
         backButton.visibility = View.VISIBLE
         body.removeAllViews()
+        if (key != "users") module?.let { addSectionIntro(it) }
         when (key) {
             "users" -> {
                 val searchRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -291,6 +440,7 @@ class AdminConsoleActivity : ThemedActivity() {
                 searchRow.addView(search, LinearLayout.LayoutParams(0, dp(52), 1f))
                 searchRow.addView(button("بحث") { loadUsers(search.text.toString().trim()) })
                 body.addView(searchRow)
+                module?.let { addSectionIntro(it) }
                 loadUsers("")
             }
             "rooms" -> load(api.rooms(1, 40)) { renderItems(it, "rooms") }
@@ -618,8 +768,141 @@ class AdminConsoleActivity : ThemedActivity() {
         }
     }
 
+    private fun showTemporaryBanDialog(userId: String) {
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        val hoursInput = EditText(this).apply {
+            hint = "مدة الحظر بالساعات (1 إلى 24)"
+            setText("24")
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val reasonInput = EditText(this).apply {
+            hint = "سبب الحظر (مطلوب)"
+            setSingleLine(false)
+            minLines = 2
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        form.addView(hoursInput, LinearLayout.LayoutParams(-1, dp(52)).apply { bottomMargin = dp(8) })
+        form.addView(reasonInput, LinearLayout.LayoutParams(-1, dp(88)))
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("حظر مؤقت للمستخدم")
+            .setMessage("يُرفع الحظر تلقائياً عند انتهاء المدة. الحد الأقصى للأدمن 24 ساعة.")
+            .setView(form)
+            .setNegativeButton("إلغاء", null)
+            .setPositiveButton("تأكيد الحظر", null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val hours = hoursInput.text.toString().trim().toIntOrNull()
+                val reason = reasonInput.text.toString().trim()
+                if (hours == null || hours !in 1..24) {
+                    hoursInput.error = "أدخل مدة بين 1 و24 ساعة"
+                    return@setOnClickListener
+                }
+                if (reason.isBlank()) {
+                    reasonInput.error = "سبب الحظر مطلوب"
+                    return@setOnClickListener
+                }
+                dialog.dismiss()
+                confirm("تأكيد حظر المستخدم لمدة $hours ساعة؟") {
+                    load(api.temporaryBanUser(userId, mapOf("hours" to hours, "reason" to reason))) {
+                        toast("تم تسجيل الحظر المؤقت؛ ينتهي خلال $hours ساعة")
+                        openModule("users")
+                    }
+                }
+            }
+        }
+        dialog.show()
+    }
+
+    private fun addSectionIntro(module: Module) {
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = GradientDrawable(
+                GradientDrawable.Orientation.RIGHT_LEFT,
+                intArrayOf(0xFFF0ECFB.toInt(), 0xFFFFFFFF.toInt())
+            ).apply {
+                cornerRadius = dp(18).toFloat()
+                setStroke(dp(1), 0xFFE5DFF7.toInt())
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(10)
+                bottomMargin = dp(12)
+            }
+        }
+        val icon = TextView(this).apply {
+            text = module.icon
+            textSize = 25f
+            gravity = Gravity.CENTER
+            background = roundRect(Color.WHITE, 13)
+            layoutParams = LinearLayout.LayoutParams(dp(50), dp(50)).apply { marginStart = dp(12) }
+        }
+        panel.addView(icon)
+        val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+        addText(copy, module.title, 15f, true, TEXT)
+        val description = TextView(this).apply {
+            text = module.subtitle
+            textSize = 12f
+            setTextColor(MUTED)
+            maxLines = 3
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(0, dp(2), 0, 0)
+        }
+        copy.addView(description)
+        panel.addView(copy, LinearLayout.LayoutParams(0, -2, 1f))
+        body.addView(panel)
+
+        val accessCard = card().apply {
+            setPadding(dp(13), dp(11), dp(13), dp(11))
+        }
+        val accessTop = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+        val roleLabel = when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن"
+            StaffRoleHelper.ADMIN -> "أدمن"
+            else -> "مانجر"
+        }
+        val rolePill = TextView(this).apply {
+            text = "صلاحياتك · $roleLabel"
+            textSize = 11f
+            setTextColor(ACCENT)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(10), dp(7), dp(10), dp(7))
+            background = roundRect(0xFFF0ECFB.toInt(), 18)
+        }
+        accessTop.addView(rolePill, LinearLayout.LayoutParams(0, -2, 1f))
+        accessTop.addView(button("↻ تحديث") { openModule(module.key) })
+        accessCard.addView(accessTop)
+        val scopeText = when (currentRole) {
+            StaffRoleHelper.SUPER -> "صلاحيات الإدارة الكاملة المتاحة لهذا القسم، مع تأكيد العمليات الحساسة."
+            StaffRoleHelper.ADMIN -> "تظهر لك إجراءات الإشراف المسموحة لرتبتك؛ التحقق النهائي يتم على الخادم."
+            else -> "وصول إشرافي محدود حسب القسم؛ لا تتوفر أدوات السوبر أدمن أو تغيير الإعدادات العامة."
+        }
+        addText(accessCard, scopeText, 11f, false, MUTED)
+        body.addView(accessCard)
+    }
+
     private fun loadUsers(search: String) {
-        body.removeViews(1, (body.childCount - 1).coerceAtLeast(0))
+        // Preserve the search controls and section introduction while replacing results.
+        // Search row + section intro + role/access card stay in place while results refresh.
+        val fixedViews = if (body.childCount >= 3) 3 else body.childCount
+        if (body.childCount > fixedViews) body.removeViews(fixedViews, body.childCount - fixedViews)
         load(api.users(1, 40, search)) { renderItems(it, "users") }
     }
 
@@ -647,9 +930,72 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun renderItems(data: Any?, type: String) {
         val items = extractItems(data)
+        val countPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(13), dp(9), dp(13), dp(9))
+            background = GradientDrawable().apply {
+                setColor(0xFFF0ECFB.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+        }
+        addText(countPanel, "النتائج المعروضة", 12f, true, TEXT)
+        val count = TextView(this).apply {
+            text = items.size.toString()
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(ACCENT)
+            gravity = Gravity.CENTER
+            background = roundRect(Color.WHITE, 20)
+            setPadding(dp(11), dp(4), dp(11), dp(4))
+        }
+        countPanel.addView(count, LinearLayout.LayoutParams(-2, -2).apply { marginStart = dp(8) })
+        body.addView(countPanel)
         if (items.isEmpty()) {
-            val empty = card()
-            addText(empty, "لا توجد بيانات للعرض أو أن الخادم أعاد قائمة فارغة.", 14f, false, MUTED)
+            val empty = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(22), dp(25), dp(22), dp(25))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(20).toFloat()
+                    setStroke(dp(1), 0xFFE8E7F2.toInt())
+                }
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
+            }
+            val emptyIcon = TextView(this).apply {
+                text = when (type) {
+                    "users" -> "👥"
+                    "rooms" -> "🏠"
+                    "reports" -> "🛡️"
+                    "logs" -> "🧾"
+                    else -> "📂"
+                }
+                textSize = 28f
+                gravity = Gravity.CENTER
+                background = roundRect(0xFFF0ECFB.toInt(), 18)
+                layoutParams = LinearLayout.LayoutParams(dp(62), dp(62)).apply { bottomMargin = dp(12) }
+            }
+            empty.addView(emptyIcon)
+            addText(empty, when (type) {
+                "users" -> "لم يتم العثور على مستخدمين"
+                "rooms" -> "لا توجد رومات لعرضها"
+                "reports" -> "لا توجد بلاغات في القائمة الحالية"
+                "logs" -> "لا توجد عمليات مسجلة للعرض"
+                else -> "لا توجد عناصر حالياً"
+            }, 15f, true, TEXT)
+            val explanation = TextView(this).apply {
+                text = "قد تكون القائمة فارغة حالياً. يمكنك تحديث القسم أو تجربة بحث مختلف."
+                textSize = 12f
+                setTextColor(MUTED)
+                gravity = Gravity.CENTER
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, dp(5), 0, 0)
+            }
+            empty.addView(explanation)
             body.addView(empty)
             return
         }
@@ -667,42 +1013,85 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipLevel = value(item, "level") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
-            if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
-            if (!status.isNullOrBlank()) addText(card, "الحالة: $status", 12f, false, MUTED)
-            val detail = listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
-                .mapNotNull { k -> value(item, k)?.let { "${prettyKey(k)}: $it" } }
-            if (detail.isNotEmpty()) addText(card, detail.take(3).joinToString("   •   "), 12f, false, MUTED)
+            if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
+            if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
+                val publicIdRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+                addText(publicIdRow, "ID المستخدم: $publicId", 12f, true, ACCENT)
+                publicIdRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                publicIdRow.addView(button("نسخ ID") { copyToClipboard("ID المستخدم", publicId) }, LinearLayout.LayoutParams(-2, dp(40)))
+                card.addView(publicIdRow)
+            }
+            if (!status.isNullOrBlank()) card.addView(statusChip(status))
+            val detailKeys = when (type) {
+                "users" -> listOf("username", "role", "coins", "balance", "diamonds", "level", "vipExpiresAt", "createdAt", "lastSeenAt")
+                "reports" -> listOf("reporterName", "reporterId", "targetName", "targetId", "targetType", "reason", "category", "createdAt")
+                "rooms" -> listOf("ownerName", "membersCount", "accessMode", "entryFeeCoins", "createdAt")
+                "streams" -> listOf("hostName", "viewerCount", "startedAt", "createdAt")
+                "agencies" -> listOf("ownerName", "membersCount", "status", "createdAt")
+                "agencyApplications", "rechargeApplications", "genderVerifications" -> listOf("applicantName", "userName", "userId", "reason", "createdAt")
+                "withdrawals", "recharges" -> listOf("userName", "userId", "amount", "coins", "status", "createdAt")
+                "logs" -> listOf("actorName", "actorId", "action", "targetType", "targetId", "createdAt")
+                else -> listOf("createdAt", "role", "level", "membersCount", "ownerName", "coinPrice", "diamondValue")
+            }
+            val detail = detailKeys.mapNotNull { k -> value(item, k)?.takeIf { it.isNotBlank() }?.let { "${prettyKey(k)}: $it" } }
+            if (detail.isNotEmpty()) {
+                val detailPanel = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutDirection = View.LAYOUT_DIRECTION_RTL
+                    setPadding(dp(11), dp(9), dp(11), dp(9))
+                    background = GradientDrawable().apply {
+                        setColor(0xFFF7F7FC.toInt())
+                        cornerRadius = dp(12).toFloat()
+                    }
+                    layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(8) }
+                }
+                detail.take(if (type == "reports" || type == "logs") 6 else 4).forEach { line ->
+                    val lineView = TextView(this).apply {
+                        text = line
+                        textSize = 12f
+                        setTextColor(MUTED)
+                        setPadding(0, dp(3), 0, dp(3))
+                        maxLines = 2
+                    }
+                    detailPanel.addView(lineView)
+                }
+                card.addView(detailPanel)
+            }
+            if (type == "reports") {
+                val description = value(item, "description", "message", "details", "content", "reason")
+                if (!description.isNullOrBlank()) {
+                    addText(card, "تفاصيل البلاغ", 12f, true, TEXT)
+                    val reportBody = TextView(this).apply {
+                        text = description
+                        textSize = 13f
+                        setTextColor(TEXT)
+                        maxLines = 6
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                        setLineSpacing(dp(3).toFloat(), 1f)
+                        setPadding(0, dp(4), 0, dp(8))
+                    }
+                    card.addView(reportBody)
+                }
+            }
 
             when (type) {
-                "users" -> if (!id.isNullOrBlank()) {
-                    val banned = status?.contains("banned", true) == true
-                    card.addView(button("تعديل الدور والحالة") { showUserAccessDialog(id, role, status) })
-                    card.addView(button(if (banned) "إلغاء الحظر" else "حظر المستخدم") {
-                        confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
-                            load(if (banned) api.unbanUser(id) else api.banUser(id)) {
-                                toast(if (banned) "تم إرسال طلب إلغاء الحظر للخادم" else "تم إرسال طلب الحظر للخادم")
-                                openModule("users")
-                            }
+                "users", "rooms" -> if (!id.isNullOrBlank()) {
+                    card.addView(button("فتح تفاصيل ${if (type == "users") "المستخدم" else "الروم"} والإجراءات  ←") {
+                        showEntityDetailScreen(item, type)
+                    })
+                    addText(card, if (type == "users") {
+                        when (currentRole) {
+                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — صلاحيات إدارة الحساب الكاملة."
+                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إجراءات الإشراف والحظر المؤقت فقط."
+                            else -> "رتبتك: مانجر — لا تتوفر إدارة حسابات المستخدمين من هذه الصفحة."
                         }
-                    })
-                    card.addView(button("حذف الحساب") {
-                        confirm("سيُطلب حذف الحساب. تأكد من الهوية والضرورة قبل المتابعة.") {
-                            load(api.deleteUser(id)) {
-                                toast("استجاب الخادم لطلب حذف الحساب")
-                                openModule("users")
-                            }
+                    } else {
+                        when (currentRole) {
+                            StaffRoleHelper.SUPER -> "رتبتك: سوبر أدمن — إدارة الروم وإجراءاته."
+                            StaffRoleHelper.ADMIN -> "رتبتك: أدمن — إدارة الروم وفق صلاحيات الخادم."
+                            else -> "رتبتك: مانجر — إشراف الروم ضمن الصلاحيات الممنوحة."
                         }
-                    })
-                }
-                "rooms" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("تعديل إعدادات الروم") {
-                        showEditRoomDialog(id, roomTitle, accessMode, entryFee)
-                    })
-                    card.addView(button("إغلاق الروم") {
-                        confirm("سيتم إغلاق الروم على الخادم. هل تريد المتابعة؟") {
-                            load(api.closeRoom(id)) { toast("استجاب الخادم لطلب إغلاق الروم"); openModule("rooms") }
-                        }
-                    })
+                    }, 11f, false, MUTED)
                 }
                 "streams" -> if (!id.isNullOrBlank()) {
                     card.addView(button("إنهاء البث") {
@@ -837,19 +1226,11 @@ class AdminConsoleActivity : ThemedActivity() {
                     })
                 }
                 "reports" -> if (!id.isNullOrBlank()) {
-                    card.addView(button("حسم البلاغ") {
-                        confirm("تأكيد وضع البلاغ كمحلول؟") {
-                            load(api.resolveReport(id, mapOf("adminNote" to "تمت المراجعة من تطبيق JEHO"))) {
-                                toast("تم تحديث البلاغ"); openModule("reports")
-                            }
-                        }
+                    card.addView(button("مراجعة البلاغ واتخاذ إجراء") {
+                        showReportDecisionDialog(id, true)
                     })
                     card.addView(button("رفض البلاغ") {
-                        confirm("تأكيد رفض البلاغ؟") {
-                            load(api.dismissReport(id, mapOf("adminNote" to "تمت المراجعة ولا يلزم إجراء"))) {
-                                toast("تم تحديث البلاغ"); openModule("reports")
-                            }
-                        }
+                        showReportDecisionDialog(id, false)
                     })
                 }
                 "withdrawals" -> if (!id.isNullOrBlank()) {
@@ -971,6 +1352,154 @@ class AdminConsoleActivity : ThemedActivity() {
                 }
                 dialog.show()
             }
+    }
+
+    /**
+     * Native, grouped detail sheet for users and rooms. Mutations still use the existing
+     * AdminApi and are authorized by AdminGuard on the server.
+     */
+    private var detailReturnSection = "home"
+
+    private fun handleAdminBack() {
+        when (currentSection) {
+            "userDetail", "roomDetail" -> openModule(detailReturnSection)
+            "home" -> finish()
+            else -> showHome()
+        }
+    }
+
+    private fun showEntityDetailScreen(item: Any, type: String) {
+        val id = value(item, "id", "userId", "roomId") ?: return
+        val isUser = type == "users"
+        detailReturnSection = type
+        currentSection = if (isUser) "userDetail" else "roomDetail"
+        titleView.text = if (isUser) "تفاصيل المستخدم" else "تفاصيل الروم"
+        backButton.visibility = View.VISIBLE
+        body.removeAllViews()
+        val name = value(item, "displayName", "name", "title", "username", "email", "roomName")
+            ?: if (isUser) "مستخدم" else "روم"
+        val status = value(item, "status", "state", "isActive", "type") ?: "غير محدد"
+        val role = value(item, "staffRole", "role") ?: "بدون رتبة إدارية"
+        val publicId = value(item, "publicId")
+        val roomTitle = value(item, "title", "name", "roomName") ?: name
+        val accessMode = value(item, "accessMode") ?: "public"
+        val entryFee = value(item, "entryFeeCoins") ?: "0"
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(14), dp(6), dp(14), dp(8))
+        }
+        fun section(title: String, subtitle: String = ""): LinearLayout {
+            val panel = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutDirection = View.LAYOUT_DIRECTION_RTL
+                setPadding(dp(12), dp(11), dp(12), dp(11))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE)
+                    cornerRadius = dp(15).toFloat()
+                    setStroke(dp(1), 0xFFE8E7F2.toInt())
+                }
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) }
+            }
+            addText(panel, title, 14f, true, TEXT)
+            if (subtitle.isNotBlank()) addText(panel, subtitle, 11f, false, MUTED)
+            content.addView(panel)
+            return panel
+        }
+        val overview = section(if (isUser) "ملف المستخدم" else "ملف الروم", "المعلومات المعروضة من بيانات الخادم")
+        addText(overview, name, 16f, true, TEXT)
+        addText(overview, "معرّف السجل: $id", 12f, false, MUTED)
+        if (isUser && !publicId.isNullOrBlank()) {
+            addText(overview, "ID العام: $publicId", 12f, true, ACCENT)
+            overview.addView(button("نسخ ID العام") { copyToClipboard("ID المستخدم", publicId) })
+        }
+        addText(overview, "الحالة: $status", 12f, true, TEXT)
+        if (isUser) addText(overview, "الرتبة الإدارية: $role", 12f, false, MUTED)
+        val detailKeys = if (isUser) {
+            listOf("username", "email", "coins", "balance", "diamonds", "level", "vipLevel", "vipExpiresAt", "createdAt", "lastSeenAt", "country", "gender")
+        } else {
+            listOf("ownerName", "ownerId", "membersCount", "accessMode", "entryFeeCoins", "createdAt", "description", "isActive", "roomType")
+        }
+        val details = detailKeys.mapNotNull { key ->
+            value(item, key)?.takeIf { it.isNotBlank() }?.let { prettyKey(key) to it }
+        }
+        if (details.isNotEmpty()) {
+            val detailPanel = section("تفاصيل إضافية")
+            details.forEach { (label, value) -> addText(detailPanel, "$label: $value", 12f, false, MUTED) }
+        }
+        val permissions = section("الصلاحيات حسب رتبتك")
+        val permissionText = if (isUser) when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن: تعديل الرتبة والحالة، الحظر الدائم أو إلغاؤه، الحظر المؤقت، والحذف عند الضرورة."
+            StaffRoleHelper.ADMIN -> "أدمن: الحظر المؤقت حتى 24 ساعة وفك الحظر المؤقت الذي أصدرته أنت. لا يملك تغيير الرتب أو الحظر الدائم أو حذف الحساب."
+            else -> "مانجر: لا يملك أدوات تغيير الحسابات؛ يقتصر دوره على الرومات والبث والبلاغات حسب صلاحيات الخادم."
+        } else when (currentRole) {
+            StaffRoleHelper.SUPER -> "سوبر أدمن: إدارة إعدادات الروم وإغلاقه وفق صلاحيات الخادم."
+            StaffRoleHelper.ADMIN -> "أدمن: إجراءات الروم المتاحة له وفق صلاحيات الخادم."
+            else -> "مانجر: إشراف الروم وإجراءاته المحددة من الخادم."
+        }
+        addText(permissions, permissionText, 12f, false, MUTED)
+
+        if (isUser) {
+            val actions = section("إجراءات الحساب", "تظهر الإجراءات وفق رتبتك، ويظل الخادم المرجع النهائي للصلاحيات.")
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                actions.addView(button("حظر مؤقت حتى 24 ساعة") { showTemporaryBanDialog(id) })
+                actions.addView(button("فك الحظر المؤقت") {
+                    confirm("سيُفك الحظر المؤقت الذي أصدرته أنت، أو أي حظر مؤقت عند السوبر أدمن. لن يُفك الحظر الدائم.") {
+                        load(api.temporaryUnbanUser(id)) {
+                            toast("تم إرسال طلب فك الحظر المؤقت")
+                            openModule("users")
+                        }
+                    }
+                })
+            }
+            if (currentRole == StaffRoleHelper.SUPER) {
+                actions.addView(button("تعديل الرتبة والحالة") { showUserAccessDialog(id, role, status) })
+                val normalizedStatus = status.trim().lowercase()
+                val banned = normalizedStatus.contains("banned") || normalizedStatus.contains("blocked") ||
+                    normalizedStatus.contains("محظور") || normalizedStatus == "ban" || normalizedStatus == "1"
+                actions.addView(button(if (banned) "إلغاء الحظر الدائم" else "حظر المستخدم") {
+                    confirm(if (banned) "إلغاء حظر المستخدم؟" else "تأكيد حظر المستخدم؟") {
+                        load(if (banned) api.unbanUser(id) else api.banUser(id)) {
+                            toast("استجاب الخادم لطلب تحديث الحظر")
+                            openModule("users")
+                        }
+                    }
+                })
+                actions.addView(button("حذف الحساب") {
+                    confirm("تحذير: حذف الحساب إجراء حساس. تأكد من هوية الحساب وضرورة الحذف. متابعة؟") {
+                        load(api.deleteUser(id)) {
+                            toast("استجاب الخادم لطلب حذف الحساب")
+                            openModule("users")
+                        }
+                    }
+                })
+            } else {
+                addText(actions, "لا توجد إجراءات إضافية متاحة لرتبتك.", 12f, false, MUTED)
+            }
+        } else {
+            val actions = section("إجراءات الروم", "التغييرات تُرسل إلى الخادم ولا تغيّر منطق الصوت أو اتصال ZEGO.")
+            if (currentRole == StaffRoleHelper.SUPER || currentRole == StaffRoleHelper.ADMIN) {
+                actions.addView(button("تعديل إعدادات الروم") {
+                    showEditRoomDialog(id, roomTitle, accessMode, entryFee)
+                })
+            }
+            if (currentRole == StaffRoleHelper.SUPER) {
+                actions.addView(button("إغلاق الروم") {
+                    confirm("سيتم إغلاق الروم على الخادم. هذا الإجراء قد يؤثر على الموجودين فيه. هل تريد المتابعة؟") {
+                        load(api.closeRoom(id)) {
+                            toast("استجاب الخادم لطلب إغلاق الروم")
+                            openModule("rooms")
+                        }
+                    }
+                })
+            }
+            if (currentRole == StaffRoleHelper.MANAGER) {
+                addText(actions, "وضع إشرافي: لا تتوفر هنا إجراءات تعديل أو إغلاق الروم لهذه الرتبة.", 12f, false, MUTED)
+            }
+        }
+
+        body.addView(content)
     }
 
     private fun showEditRoomDialog(id: String, title: String, accessMode: String, entryFee: String) {
@@ -1126,23 +1655,110 @@ class AdminConsoleActivity : ThemedActivity() {
             }
     }
 
-    private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
-        val form = formFields(listOf("الدور: super أو manager أو none", "الحالة: active أو suspended أو banned"))
-        form.second[0].setText(currentRole ?: "none")
-        form.second[1].setText(currentStatus ?: "active")
-        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(form.first)
-            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null)
+    private fun showReportDecisionDialog(reportId: String, resolve: Boolean) {
+        val noteInput = EditText(this).apply {
+            hint = "ملاحظة الإدارة (اختيارية)"
+            textSize = 14f
+            setTextColor(TEXT)
+            setHintTextColor(MUTED)
+            gravity = Gravity.TOP or Gravity.START
+            minLines = 3
+            maxLines = 5
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            background = roundRect(0xFFF5F4FA.toInt(), 12)
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = if (resolve) "أضف ملاحظة توضح كيف تمت معالجة البلاغ. سيتم تسجيل القرار على الخادم." else "وضّح سبب رفض البلاغ ليسهل الرجوع إلى القرار لاحقاً."
+                textSize = 13f
+                setTextColor(MUTED)
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, 0, 0, dp(10))
+            })
+            addView(noteInput, LinearLayout.LayoutParams(-1, -2))
+        }
+        val title = if (resolve) "حسم البلاغ" else "رفض البلاغ"
+        AlertDialog.Builder(this).setTitle(title).setView(content)
+            .setNegativeButton("إلغاء", null).setPositiveButton("متابعة", null)
             .create().also { dialog ->
                 dialog.setOnShowListener {
                     dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                        val role = form.second[0].text.toString().trim().lowercase()
-                        val status = form.second[1].text.toString().trim().lowercase()
-                        if (role !in setOf("super", "manager", "none") ||
-                            status !in setOf("active", "suspended", "banned")) {
-                            toast("القيم المسموحة: super/manager/none و active/suspended/banned")
+                        val note = noteInput.text.toString().trim()
+                        if (note.length > 300) {
+                            toast("اختصر الملاحظة إلى 300 حرف")
                             return@setOnClickListener
                         }
-                        confirm("تغيير الدور أو الحالة قد يغيّر وصول المستخدم إلى أجزاء من النظام. تأكيد؟") {
+                        val defaultNote = if (resolve) "تمت المراجعة من تطبيق JEHO" else "تمت المراجعة ولا يلزم إجراء"
+                        confirm(if (resolve) "تأكيد حسم البلاغ وتسجيل القرار؟" else "تأكيد رفض البلاغ وتسجيل القرار؟") {
+                            val payload = mapOf("adminNote" to note.ifBlank { defaultNote })
+                            load(if (resolve) api.resolveReport(reportId, payload) else api.dismissReport(reportId, payload)) {
+                                dialog.dismiss()
+                                toast(if (resolve) "تم حسم البلاغ" else "تم رفض البلاغ")
+                                openModule("reports")
+                            }
+                        }
+                    }
+                }
+                dialog.show()
+            }
+    }
+
+    private fun showUserAccessDialog(id: String, currentRole: String?, currentStatus: String?) {
+        val roleValues = listOf("none", "manager", "super")
+        val roleLabels = listOf("بدون رتبة إدارية", "مانجر", "سوبر أدمن")
+        val statusValues = listOf("active", "suspended", "banned")
+        val statusLabels = listOf("نشط", "موقوف مؤقتاً", "محظور")
+        fun makeSpinner(labels: List<String>, selected: Int): Spinner = Spinner(this).apply {
+            adapter = ArrayAdapter(this@AdminConsoleActivity, android.R.layout.simple_spinner_dropdown_item, labels).also {
+                it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            }
+            setSelection(selected.coerceIn(labels.indices))
+            background = roundRect(0xFFF5F4FA.toInt(), 10)
+            setPadding(dp(10), dp(4), dp(10), dp(4))
+        }
+        val roleSpinner = makeSpinner(roleLabels, roleValues.indexOf(currentRole?.lowercase()).let { if (it < 0) 0 else it })
+        val statusSpinner = makeSpinner(statusLabels, statusValues.indexOf(currentStatus?.lowercase()).let { if (it < 0) 0 else it })
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "الدور الإداري"
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(TEXT)
+                setPadding(0, 0, 0, dp(6))
+            })
+            addView(roleSpinner, LinearLayout.LayoutParams(-1, dp(50)))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "حالة الحساب"
+                textSize = 13f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(TEXT)
+                setPadding(0, dp(14), 0, dp(6))
+            })
+            addView(statusSpinner, LinearLayout.LayoutParams(-1, dp(50)))
+            addView(TextView(this@AdminConsoleActivity).apply {
+                text = "تأكد من اختيار الدور والحالة الصحيحين. ستُطبّق التغييرات عبر الخادم وفق الصلاحيات المعتمدة."
+                textSize = 12f
+                setTextColor(MUTED)
+                setLineSpacing(dp(3).toFloat(), 1f)
+                setPadding(0, dp(12), 0, 0)
+            })
+        }
+        AlertDialog.Builder(this).setTitle("صلاحيات المستخدم").setView(content)
+            .setNegativeButton("إلغاء", null).setPositiveButton("حفظ التغييرات", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                        val role = roleValues[roleSpinner.selectedItemPosition]
+                        val status = statusValues[statusSpinner.selectedItemPosition]
+                        val roleLabel = roleLabels[roleSpinner.selectedItemPosition]
+                        val statusLabel = statusLabels[statusSpinner.selectedItemPosition]
+                        confirm("تأكيد تحديث الحساب إلى: $roleLabel، والحالة: $statusLabel؟") {
                             load(api.updateUser(id, mapOf("staffRole" to role, "status" to status))) {
                                 dialog.dismiss()
                                 toast("تم تحديث صلاحيات المستخدم")
@@ -1798,16 +2414,68 @@ class AdminConsoleActivity : ThemedActivity() {
         return null
     }
 
+    private fun statusChip(rawStatus: String): View {
+        val normalized = rawStatus.trim().lowercase(java.util.Locale.ROOT)
+        val label = when (normalized) {
+            "active", "enabled", "true", "approved", "resolved", "completed", "success" -> "نشط"
+            "inactive", "disabled", "false" -> "غير نشط"
+            "pending", "waiting", "open" -> "قيد المراجعة"
+            "rejected", "dismissed", "failed" -> "مرفوض"
+            "suspended", "banned", "blocked", "closed" -> "موقوف"
+            "live", "streaming" -> "مباشر"
+            "public" -> "عام"
+            "private" -> "خاص"
+            else -> rawStatus
+        }
+        val tone = when (normalized) {
+            "active", "enabled", "true", "approved", "resolved", "completed", "success", "live", "streaming" -> 0xFF16794B.toInt()
+            "pending", "waiting", "open" -> 0xFF996515.toInt()
+            "rejected", "dismissed", "failed", "suspended", "banned", "blocked", "closed", "inactive", "disabled", "false" -> 0xFFB42335.toInt()
+            else -> ACCENT
+        }
+        return TextView(this).apply {
+            text = label
+            textSize = 11f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(tone)
+            gravity = Gravity.CENTER
+            setPadding(dp(10), dp(5), dp(10), dp(5))
+            background = GradientDrawable().apply {
+                setColor(when (tone) {
+                    0xFF16794B.toInt() -> 0xFFE8F7EF.toInt()
+                    0xFF996515.toInt() -> 0xFFFFF4D8.toInt()
+                    0xFFB42335.toInt() -> 0xFFFFEBED.toInt()
+                    else -> 0xFFF0ECFB.toInt()
+                })
+                cornerRadius = dp(30).toFloat()
+            }
+            layoutParams = LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(5); bottomMargin = dp(4) }
+        }
+    }
+
     private fun prettyKey(key: String): String = when (key) {
         "users", "usersCount", "totalUsers" -> "المستخدمون"
         "rooms", "roomsCount", "totalRooms" -> "الرومات"
         "activeStreams", "streamsCount" -> "البث المباشر"
         "agencies", "agenciesCount" -> "الوكالات"
         "createdAt" -> "تاريخ الإنشاء"
+        "lastSeenAt" -> "آخر ظهور"
+        "vipExpiresAt" -> "انتهاء VIP"
         "membersCount" -> "عدد الأعضاء"
+        "username" -> "اسم المستخدم"
+        "role", "staffRole" -> "الدور"
+        "coins", "balance" -> "رصيد العملات"
+        "diamonds" -> "رصيد الألماس"
+        "level" -> "المستوى"
         "coinPrice" -> "السعر"
         "diamondValue" -> "قيمة الألماس"
         else -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+
+    private fun copyToClipboard(label: String, value: String) {
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
+        toast("تم نسخ $label")
     }
 
     private fun confirm(message: String, action: () -> Unit) {
@@ -1820,10 +2488,15 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun card(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(13), dp(14), dp(13))
-        background = roundRect(Color.WHITE, 18)
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+        setPadding(dp(16), dp(15), dp(16), dp(15))
+        background = GradientDrawable().apply {
+            setColor(Color.WHITE)
+            cornerRadius = dp(18).toFloat()
+            setStroke(dp(1), 0xFFE8E7F2.toInt())
+        }
         elevation = dp(1).toFloat()
-        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) }
+        layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(11) }
     }
 
     private fun addText(parent: LinearLayout, text: String, size: Float, bold: Boolean, color: Int) {
@@ -1839,11 +2512,15 @@ class AdminConsoleActivity : ThemedActivity() {
 
     private fun button(label: String, action: () -> Unit): Button = Button(this).apply {
         text = label
-        textSize = 12f
+        textSize = 13f
         isAllCaps = false
+        minHeight = dp(46)
+        minWidth = 0
         setTextColor(Color.WHITE)
-        background = roundRect(ACCENT, 12)
-        setPadding(dp(10), dp(2), dp(10), dp(2))
+        background = roundRect(ACCENT, 14)
+        backgroundTintList = null
+        elevation = dp(1).toFloat()
+        setPadding(dp(14), dp(4), dp(14), dp(4))
         setOnClickListener { action() }
     }
 

@@ -59,16 +59,48 @@ export class AdminGuard implements CanActivate {
         /\/admin\/economy\/renormalize-gifts(?:\/|$)/.test(path) ||
         /\/admin\/gifts\/(?:import-[^/]+|activate-all|rebuild-still-catalog)(?:\/|$)/.test(path) ||
         /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
-        /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path);
+        /\/admin\/rooms\/[^/]+\/platform-moderators(?:\/|$)/.test(path) ||
+        // Closing a room disrupts everyone in it; keep it Super Admin only,
+        // matching the native console's visible action policy.
+        (method === 'POST' && /\/admin\/rooms\/[^/]+\/close(?:\/|$)/.test(path)) ||
+        // Deleting rooms is destructive; keep it Super Admin only.
+        (method === 'DELETE' && /\/admin\/rooms\/[^/]+(?:\/|$)/.test(path)) ||
+        // Granting account-bound benefits is Super Admin only; staff may
+        // review catalogs but cannot mint VIP, cosmetics, or vanity IDs.
+        /\/admin\/vip\/assign(?:\/|$)/.test(path) ||
+        /\/admin\/cosmetics\/grant(?:\/|$)/.test(path) ||
+        /\/vanity-ids\/admin\/assign(?:\/|$)/.test(path) ||
+        /\/admin\/notifications\/send(?:\/|$)/.test(path) ||
+        /\/admin\/toast-manager(?:\/|$)/.test(path) ||
+        /\/admin\/mysterious-man(?:\/|$)/.test(path) ||
+        /\/admin\/lucky-gift-cannon(?:\/|$)/.test(path) ||
+        /\/admin\/support-chest(?:\/|$)/.test(path) ||
+        // Generic account edits and status changes remain Super Admin only.
+        // Dedicated temporary-ban endpoints stay available to Admin; ownership
+        // and expiry are enforced by SecurityShieldService.
+        ((method === 'PATCH' || method === 'DELETE') && /\/admin\/users\/[^/]+$/.test(path)) ||
+        (method === 'PATCH' && /\/admin\/users\/[^/]+\/status(?:\/|$)/.test(path)) ||
+        /\/admin\/users\/[^/]+\/(?:ban|unban)(?:\/|$)/.test(path) ||
+        /\/admin\/security\/ban-user(?:\/|$)/.test(path) ||
+        /\/admin\/settings(?:\/|$)/.test(path) ||
+        /\/admin\/(?:payment-settings|payments|binance-pay|fourthwall|sham-cash|zego|livekit|cp-settings)(?:\/|$)/.test(path) ||
+        /\/admin\/coin-packages(?:\/|$)/.test(path) ||
+        /\/admin\/bulk(?:\/|$)/.test(path);
       if (role === 'admin' && superOnlyPath) {
         throw new ForbiddenException('This action is reserved for Super Admin');
       }
       if (role === 'admin') return true;
       if (role === 'manager') {
-        if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams'].includes(resolved.module)) {
+        if (resolved.kind !== 'module' || !['dashboard', 'rooms', 'streams', 'reports'].includes(resolved.module)) {
           throw new ForbiddenException('Manager access is limited to rooms and live streams');
         }
-        if (/\/admin\/rooms\/platform(?:\/|$)/.test(path) || /platform-moderators/.test(path) || /\/force-end(?:\/|$)/.test(path)) {
+        if (
+          /\/admin\/rooms\/platform(?:\/|$)/.test(path) ||
+          /platform-moderators/.test(path) ||
+          /\/admin\/rooms\/[^/]+\/(?:close|customer-service)(?:\/|$)/.test(path) ||
+          (method !== 'GET' && /\/admin\/rooms\/[^/]+(?:\/|$)/.test(path)) ||
+          /\/force-end(?:\/|$)/.test(path)
+        ) {
           throw new ForbiddenException('This room operation requires Admin or Super Admin');
         }
         return true;

@@ -506,6 +506,68 @@ export class AdminController {
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
+  @Post('users/:id/temporary-ban')
+  @ApiOperation({ summary: 'Issue an owned temporary user ban (Admin: max 24 hours)' })
+  async temporaryBanUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+    @Body() body: { hours?: number; reason?: string },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new BadRequestException('Only Admin or Super Admin can issue a temporary global ban');
+    }
+    const requestedHours = Number(body?.hours);
+    if (!Number.isInteger(requestedHours) || requestedHours < 1 || requestedHours > 24) {
+      throw new BadRequestException('Temporary ban duration must be a whole number between 1 and 24 hours');
+    }
+    const reason = String(body?.reason || '').trim();
+    if (!reason) throw new BadRequestException('A reason is required for temporary bans');
+    const result = await this.shield.createStaffTemporaryBan(
+      id,
+      requestedHours,
+      reason,
+      actor.sub,
+    );
+    await this.shield.recordAbuse({
+      userId: actor.sub,
+      action: 'staff_temporary_ban',
+      severity: AbuseSeverity.HIGH,
+      targetType: 'user',
+      targetId: id,
+      details: JSON.stringify({ targetUserId: id, hours: result.hours, expiresAt: result.expiresAt, reason: reason.slice(0, 500) }),
+    });
+    return { ok: true, ...result };
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @Post('users/:id/temporary-unban')
+  @ApiOperation({ summary: 'Remove own temporary ban; Super Admin may remove any staff temporary ban' })
+  async temporaryUnbanUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: { sub: string; staffRole?: string; isSuperAdmin?: boolean },
+  ) {
+    const role = String(actor?.staffRole || '').toLowerCase();
+    const isSuper = !!actor?.isSuperAdmin || role === 'super';
+    if (!isSuper && role !== 'admin') {
+      throw new BadRequestException('Only Admin or Super Admin can remove a temporary global ban');
+    }
+    const result = await this.shield.removeStaffTemporaryBan(id, actor.sub, isSuper);
+    await this.shield.recordAbuse({
+      userId: actor.sub,
+      action: 'staff_temporary_unban',
+      severity: AbuseSeverity.MEDIUM,
+      targetType: 'user',
+      targetId: id,
+      details: JSON.stringify({ targetUserId: id }),
+    });
+    return result;
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @Post('security/ban-ip')
   @ApiOperation({ summary: 'Temporarily ban an IP (Redis shield)' })
   async banIp(
