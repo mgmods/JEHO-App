@@ -125,6 +125,12 @@ public interface AdminApi {
     @PATCH("admin/support-chest/config")
     Call<ApiResponse<Object>> updateSupportChestConfig(@Body Map<String, Object> body);
 
+    @GET("admin/settings")
+    Call<ApiResponse<Object>> adminSettings();
+
+    @PATCH("admin/settings")
+    Call<ApiResponse<Object>> updateAdminSettings(@Body Map<String, String> body);
+
     @GET("admin/toast-manager")
     Call<ApiResponse<Object>> toastManagerConfig();
 
