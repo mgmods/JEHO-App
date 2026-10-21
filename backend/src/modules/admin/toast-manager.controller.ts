@@ -12,9 +12,9 @@ const DEFAULT_TOAST_STYLE = {
   frameGlowEnabled: true,
   durationSeconds: 3,
   version: 1,
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
-  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50, bodyX: 25, bodyY: 67, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
+  luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 42, textX: 25, textY: 42, bodyX: 25, bodyY: 62, countX: 88, countY: 50, widthDp: 340, heightDp: 100, avatarSizeDp: 44 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
 };
 
@@ -52,6 +52,11 @@ export class ToastManagerController {
       avatarY: clampPercent(parsed.giftSend?.avatarY, 50),
       textX: clampPercent(parsed.giftSend?.textX, 25),
       textY: clampPercent(parsed.giftSend?.textY, 50),
+      bodyX: clampPercent(parsed.giftSend?.bodyX, 25), bodyY: clampPercent(parsed.giftSend?.bodyY, 67),
+      countX: clampPercent(parsed.giftSend?.countX, 88), countY: clampPercent(parsed.giftSend?.countY, 50),
+      widthDp: Math.max(220, Math.min(360, Math.round(Number(parsed.giftSend?.widthDp) || 340))),
+      heightDp: Math.max(60, Math.min(180, Math.round(Number(parsed.giftSend?.heightDp) || 100))),
+      avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(parsed.giftSend?.avatarSizeDp) || 44))),
     };
     const winDefaults = (source: any, fallback: any) => ({
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
@@ -62,6 +67,11 @@ export class ToastManagerController {
       avatarY: clampPercent(source?.avatarY, fallback.avatarY),
       textX: clampPercent(source?.textX, fallback.textX),
       textY: clampPercent(source?.textY, fallback.textY),
+      bodyX: clampPercent(source?.bodyX, fallback.bodyX ?? 25), bodyY: clampPercent(source?.bodyY, fallback.bodyY ?? 67),
+      countX: clampPercent(source?.countX, fallback.countX ?? 88), countY: clampPercent(source?.countY, fallback.countY ?? 50),
+      widthDp: Math.max(220, Math.min(360, Math.round(Number(source?.widthDp) || fallback.widthDp || 340))),
+      heightDp: Math.max(60, Math.min(180, Math.round(Number(source?.heightDp) || fallback.heightDp || 100))),
+      avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(source?.avatarSizeDp) || fallback.avatarSizeDp || 44))),
     });
     const luckyWinNormal = winDefaults(parsed.luckyWinNormal, DEFAULT_TOAST_STYLE.luckyWinNormal);
     const luckyWinHigh = winDefaults(parsed.luckyWinHigh, DEFAULT_TOAST_STYLE.luckyWinHigh);
@@ -88,6 +98,11 @@ export class ToastManagerController {
       avatarY: clampPercent(body?.giftSend?.avatarY, oldGift.avatarY ?? 50),
       textX: clampPercent(body?.giftSend?.textX, oldGift.textX ?? 25),
       textY: clampPercent(body?.giftSend?.textY, oldGift.textY ?? 50),
+      bodyX: clampPercent(body?.giftSend?.bodyX, oldGift.bodyX ?? 25), bodyY: clampPercent(body?.giftSend?.bodyY, oldGift.bodyY ?? 67),
+      countX: clampPercent(body?.giftSend?.countX, oldGift.countX ?? 88), countY: clampPercent(body?.giftSend?.countY, oldGift.countY ?? 50),
+      widthDp: Math.max(220, Math.min(360, Math.round(Number(body?.giftSend?.widthDp) || oldGift.widthDp || 340))),
+      heightDp: Math.max(60, Math.min(180, Math.round(Number(body?.giftSend?.heightDp) || oldGift.heightDp || 100))),
+      avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(body?.giftSend?.avatarSizeDp) || oldGift.avatarSizeDp || 44))),
     };
     const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
       const old = previous[key] || DEFAULT_TOAST_STYLE[key];
@@ -101,6 +116,11 @@ export class ToastManagerController {
         avatarY: clampPercent(input.avatarY, old.avatarY),
         textX: clampPercent(input.textX, old.textX),
         textY: clampPercent(input.textY, old.textY),
+        bodyX: clampPercent(input.bodyX, old.bodyX ?? 25), bodyY: clampPercent(input.bodyY, old.bodyY ?? 67),
+        countX: clampPercent(input.countX, old.countX ?? 88), countY: clampPercent(input.countY, old.countY ?? 50),
+        widthDp: Math.max(220, Math.min(360, Math.round(Number(input.widthDp) || old.widthDp || 340))),
+        heightDp: Math.max(60, Math.min(180, Math.round(Number(input.heightDp) || old.heightDp || 100))),
+        avatarSizeDp: Math.max(20, Math.min(76, Math.round(Number(input.avatarSizeDp) || old.avatarSizeDp || 44))),
       };
     };
     const luckyButton = {
