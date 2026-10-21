@@ -311,7 +311,11 @@ public class ProfileActivity extends ThemedActivity {
             binding.btnFollow.setEnabled(true);
             boolean ownProfile = myId != null && myId.equals(user.id);
             binding.btnCpRequest.setVisibility(ownProfile ? View.GONE : View.VISIBLE);
-            bindMysteriousMode(ownProfile);
+            // The mysterious-mode activation control belongs only in Me -> Profile.
+            // Never expose an activation/cancel switch from a public profile opened from a room.
+            if (binding.rowProfileMysteriousMode != null) {
+                binding.rowProfileMysteriousMode.setVisibility(View.GONE);
+            }
             loadPublicCpRelationship(user.id, user.avatarUrl, user.vipBadgeUrl,
                     user.vipLevel, user.vipTouUrl, user.hostBadgeUrl, user.hostBadgeMeta);
             int vip = Math.max(0, user.vipLevel);
