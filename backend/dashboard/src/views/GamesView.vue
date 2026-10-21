@@ -37,7 +37,7 @@
       </div>
       <div class="row g-2">
         <div v-for="game in manageableGames" :key="game.id" class="col-6 col-md-4 col-lg-3">
-          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input v-model="disabledGames" class="form-check-input" type="checkbox" :value="game.id" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
+          <label class="form-check form-switch border rounded p-2 ps-5 d-block h-100"><input class="form-check-input" type="checkbox" :checked="!disabledGames.includes(game.id)" @change="setGameEnabled(game.id, $event.target.checked)" /><span class="small">{{ game.label }}</span><span class="d-block small" :class="disabledGames.includes(game.id) ? 'text-danger' : 'text-success'">{{ disabledGames.includes(game.id) ? 'متوقفة' : 'مفعّلة' }}</span></label>
         </div>
       </div>
     </div>
@@ -406,6 +406,14 @@ async function loadOdds() {
   } catch (err) {
     error.value = 'تعذّر تحميل إعدادات التحكم بالألعاب: ' + (err?.message || String(err))
   }
+}
+
+function setGameEnabled(gameId, enabled) {
+  const id = String(gameId || '').trim().toLowerCase()
+  if (!id) return
+  disabledGames.value = enabled
+    ? disabledGames.value.filter((item) => item !== id)
+    : [...new Set([...disabledGames.value, id])]
 }
 
 function setAllGamesEnabled(enabled) {
