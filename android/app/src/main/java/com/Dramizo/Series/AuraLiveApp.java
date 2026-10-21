@@ -248,46 +248,52 @@ public class AuraLiveApp extends Application {
                     // Event payloads have existed in both generic and lucky-specific shapes.
                     // Normalize them here so the global toast always receives the winner portrait,
                     // name, coin amount and X multiplier instead of rendering an empty template.
-                    String kind = jsonStringAny(payload, null, "kind", "eventType", "type");
-                    if ("lucky:hit".equalsIgnoreCase(kind) || "lucky_hit_win".equalsIgnoreCase(kind)) {
-                        kind = "lucky_hit";
+                    String kindValue = jsonStringAny(payload, null, "kind", "eventType", "type");
+                    if ("lucky:hit".equalsIgnoreCase(kindValue) || "lucky_hit_win".equalsIgnoreCase(kindValue)) {
+                        kindValue = "lucky_hit";
                     }
-                    String displayName = jsonStringAny(payload, null,
+                    String displayNameValue = jsonStringAny(payload, null,
                             "displayName", "winnerName", "senderName", "username", "userName", "name");
-                    String title = jsonStringAny(payload, null, "title", "headline");
-                    if (title == null || title.trim().isEmpty()
-                            || "مبروك!".equals(title.trim()) || "مبروك".equals(title.trim())) {
-                        title = displayName != null ? displayName : "مبروك الفوز!";
+                    String titleValue = jsonStringAny(payload, null, "title", "headline");
+                    if (titleValue == null || titleValue.trim().isEmpty()
+                            || "مبروك!".equals(titleValue.trim()) || "مبروك".equals(titleValue.trim())) {
+                        titleValue = displayNameValue != null ? displayNameValue : "مبروك الفوز!";
                     }
-                    String body = jsonStringAny(payload, null, "body", "message", "description", "resultText");
-                    String avatar = jsonStringAny(payload, null,
+                    String bodyValue = jsonStringAny(payload, null, "body", "message", "description", "resultText");
+                    String avatarValue = jsonStringAny(payload, null,
                             "avatarUrl", "senderAvatarUrl", "winnerAvatarUrl", "profileImageUrl",
                             "profilePictureUrl", "avatar", "photoUrl", "imageUrl");
-                    String roomId = jsonStringAny(payload, null, "roomId", "targetRoomId");
+                    String roomIdValue = jsonStringAny(payload, null, "roomId", "targetRoomId");
                     String badgeCandidate = jsonStringAny(payload, null,
                             "giftIconUrl", "gameIconUrl", "gameCoverUrl", "giftImageUrl");
                     final String badge = badgeCandidate;
-                    String dedupe = jsonStringAny(payload, body, "id", "eventId", "dedupeKey");
-                    long coinsWon = jsonLongAny(payload, 0L,
+                    long coinsValue = jsonLongAny(payload, 0L,
                             "coinsWon", "winCoins", "luckyCoinsWon", "wonCoins", "coins", "amount");
-                    String gameTitle = jsonStringAny(payload, null, "gameTitle", "gameName");
-                    int multiplier = (int) Math.max(0L, jsonLongAny(payload, 0L,
+                    String gameTitleValue = jsonStringAny(payload, null, "gameTitle", "gameName");
+                    int multiplierValue = (int) Math.max(0L, jsonLongAny(payload, 0L,
                             "multiplier", "luckyMultiplier", "winMultiplier", "times", "x", "count"));
-                    if ("lucky_hit".equalsIgnoreCase(kind)) {
-                        if (coinsWon <= 0L) coinsWon = jsonLongAny(payload, 0L, "rewardCoins", "winAmount");
-                        if (multiplier <= 0) multiplier = (int) Math.max(0L,
+                    if ("lucky_hit".equalsIgnoreCase(kindValue)) {
+                        if (coinsValue <= 0L) coinsValue = jsonLongAny(payload, 0L, "rewardCoins", "winAmount");
+                        if (multiplierValue <= 0) multiplierValue = (int) Math.max(0L,
                                 jsonLongAny(payload, 0L, "luckyX", "multiplierX", "xCount"));
-                        if (body == null || body.trim().isEmpty()) {
-                            body = coinsWon > 0L
-                                    ? ("فاز بـ " + String.format(java.util.Locale.US, "%,d", coinsWon) + " كوينز")
+                        if (bodyValue == null || bodyValue.trim().isEmpty()) {
+                            bodyValue = coinsValue > 0L
+                                    ? ("فاز بـ " + String.format(java.util.Locale.US, "%,d", coinsValue) + " كوينز")
                                     : "مبروك الفوز بهدية الحظ";
                         }
-                    } else if (body == null) {
-                        body = "";
+                    } else if (bodyValue == null) {
+                        bodyValue = "";
                     }
-                    final long coinsFinal = coinsWon;
-                    final String gameFinal = gameTitle;
-                    final int mulFinal = multiplier;
+                    final String kind = kindValue;
+                    final String displayName = displayNameValue;
+                    final String title = titleValue;
+                    final String body = bodyValue;
+                    final String avatar = avatarValue;
+                    final String roomId = roomIdValue;
+                    final String dedupe = jsonStringAny(payload, body, "id", "eventId", "dedupeKey");
+                    final long coinsFinal = coinsValue;
+                    final String gameFinal = gameTitleValue;
+                    final int mulFinal = multiplierValue;
                     final String roomFinal = roomId;
                     final boolean appVisible = isAppInForeground();
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
