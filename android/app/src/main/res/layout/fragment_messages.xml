@@ -94,6 +94,65 @@
             android:layout_height="0.5dp"
             android:background="@color/divider_color" />
 
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/chatSearchContainer"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="2dp"
+            app:cardBackgroundColor="#F4F5F8"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#E4E6ED"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="13dp"
+                android:paddingEnd="12dp">
+
+                <ImageView
+                    android:layout_width="21dp"
+                    android:layout_height="21dp"
+                    android:contentDescription="@string/chat_search_hint"
+                    android:src="@drawable/ic_search_pro"
+                    android:tint="#777E8D" />
+
+                <EditText
+                    android:id="@+id/etChatSearch"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:hint="@string/chat_search_hint"
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="8dp"
+                    android:singleLine="true"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="#858B98"
+                    android:textSize="14sp" />
+
+                <ImageButton
+                    android:id="@+id/btnClearChatSearch"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/chat_search_clear"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_close_simple"
+                    android:tint="#777E8D"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
         <!-- Compact social hub: real destinations, badges only when there is unread work. -->
         <LinearLayout
             android:id="@+id/quickActionsRow"
