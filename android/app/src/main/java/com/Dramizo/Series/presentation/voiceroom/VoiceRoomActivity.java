@@ -279,8 +279,17 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private int luckyCannonGiftQuantity = 1;
     private final List<String> luckyCannonTargets = new ArrayList<>();
     private boolean luckyCannonSending;
-    /** Coalesce rapid taps into ordered single-send requests; never drop a valid press. */
+    /** Pending repeat sends are valid only while the user's finger is held down. */
     private int queuedLuckyCannonPresses;
+    private boolean luckyCannonHoldActive;
+    private static final long LUCKY_CANNON_REPEAT_MS = 280L;
+    private final Runnable luckyCannonRepeatRunnable = new Runnable() {
+        @Override public void run() {
+            if (!luckyCannonHoldActive || isFinishing() || isDestroyed()) return;
+            sendLuckyCannonGift(true);
+            handler.postDelayed(this, LUCKY_CANNON_REPEAT_MS);
+        }
+    };
     @Nullable private String luckyCannonRequestId;
     private SlotGameDtos.SessionDto slotSession;
     private MikooGameBridge mikooBridge;
@@ -3768,8 +3777,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
             layer.setTranslationX(x - layer.getLeft());
             layer.setTranslationY(y - layer.getTop());
         });
-        layer.setOnClickListener(v -> sendLuckyCannonGift());
-        // Drag the floating control anywhere inside the room without firing on a drag.
+        // Hold-to-fire: send once immediately, then repeat only while the finger remains down.
+        // Touch is consumed here so ACTION_UP cannot trigger a second click send.
         layer.setOnTouchListener(new View.OnTouchListener() {
             private float downRawX, downRawY, startTx, startTy;
             private boolean dragging;
@@ -3782,13 +3791,15 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                         startTx = layer.getTranslationX();
                         startTy = layer.getTranslationY();
                         dragging = false;
-                        return false;
+                        startLuckyCannonHold();
+                        return true;
                     case MotionEvent.ACTION_MOVE: {
                         float dx = event.getRawX() - downRawX;
                         float dy = event.getRawY() - downRawY;
                         if (!dragging && (Math.abs(dx) > touchSlop || Math.abs(dy) > touchSlop)) {
                             dragging = true;
-                            layer.getParent().requestDisallowInterceptTouchEvent(true);
+                            stopLuckyCannonHold();
+                            if (layer.getParent() != null) layer.getParent().requestDisallowInterceptTouchEvent(true);
                         }
                         if (dragging && root.getWidth() > 0 && root.getHeight() > 0) {
                             float minX = -layer.getLeft();
@@ -3797,19 +3808,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                             float maxY = root.getHeight() - layer.getBottom();
                             layer.setTranslationX(Math.max(minX, Math.min(maxX, startTx + dx)));
                             layer.setTranslationY(Math.max(minY, Math.min(maxY, startTy + dy)));
-                            return true;
                         }
-                        return false;
+                        return true;
                     }
                     case MotionEvent.ACTION_UP:
                     case MotionEvent.ACTION_CANCEL:
-                        if (dragging) {
+                        stopLuckyCannonHold();
+                        if (dragging && layer.getParent() != null) {
                             layer.getParent().requestDisallowInterceptTouchEvent(false);
-                            return true;
                         }
-                        return false;
+                        return true;
                     default:
-                        return dragging;
+                        return true;
                 }
             }
         });
@@ -3919,13 +3929,24 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
     }
 
-    private void sendLuckyCannonGift() {
+    private void startLuckyCannonHold() {
+        stopLuckyCannonHold();
+        if (!luckyCannonEnabled || luckyCannonGiftId == null || luckyCannonTargets.isEmpty()) return;
+        luckyCannonHoldActive = true;
         sendLuckyCannonGift(true);
+        handler.postDelayed(luckyCannonRepeatRunnable, LUCKY_CANNON_REPEAT_MS);
+    }
+
+    /** Stop immediately on finger-up and discard repeats that have not started a request. */
+    private void stopLuckyCannonHold() {
+        luckyCannonHoldActive = false;
+        handler.removeCallbacks(luckyCannonRepeatRunnable);
+        queuedLuckyCannonPresses = 0;
     }
 
     /**
-     * Give immediate local press feedback, then serialize economy requests. Fast repeated taps
-     * are queued locally; only one gift request reaches the server at a time.
+     * Each hold tick gives local feedback immediately. Economy calls stay sequential to avoid
+     * simultaneous charges; pending ticks are discarded as soon as the finger is released.
      */
     private void sendLuckyCannonGift(boolean animatePress) {
         if (!luckyCannonEnabled || luckyCannonGiftId == null
@@ -3947,7 +3968,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         // Never drop a tap because another send is in flight. The queue is client-side and
         // drained sequentially, preventing a burst of simultaneous requests against Blitz.
         if (luckyCannonSending) {
-            if (queuedLuckyCannonPresses < Integer.MAX_VALUE) queuedLuckyCannonPresses++;
+            // At most one pending repeat: don't flood Blitz while an economy request is in flight.
+            if (luckyCannonHoldActive) queuedLuckyCannonPresses = 1;
             return;
         }
         final AppContainer container;
@@ -3989,9 +4011,11 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 // Server emits the canonical room gift event; animation is rendered locally by
                 // every room member, with no extra animation/event polling requests.
                 showLuckyCannonAndScheduleHide();
-                if (queuedLuckyCannonPresses > 0) {
-                    queuedLuckyCannonPresses--;
-                    handler.post(() -> sendLuckyCannonGift(false));
+                if (luckyCannonHoldActive && queuedLuckyCannonPresses > 0) {
+                    queuedLuckyCannonPresses = 0;
+                    handler.post(() -> {
+                        if (luckyCannonHoldActive) sendLuckyCannonGift(false);
+                    });
                 }
             });
         });
