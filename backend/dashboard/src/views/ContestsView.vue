@@ -237,7 +237,7 @@
       <div class="widget-grid mb-4">
         <div v-if="!contests.length" class="glass p-4 empty-state text-center">{{ t('contests.empty') }}</div>
         <article v-for="c in contests" :key="c.id" class="widget-card position-relative" :class="{ 'is-selected': isSelected(c.id) }">
-          <BulkCheck :checked="isSelected(c.id)" @toggle="toggle(c.id)" />
+          <BulkCheck v-if="c.challengeType !== 'room_vs_room'" :checked="isSelected(c.id)" @toggle="toggle(c.id)" />
           <div class="widget-card-body">
           <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
             <h3 class="widget-card-title mb-0">{{ c.title }}</h3>
@@ -252,7 +252,7 @@
             <li>{{ t('contests.entrants') }}: {{ formatNumber(c.entrantsCount || 0) }}</li>
             <li>{{ t('contests.from') }} {{ fmtDate(c.startAt) }} → {{ fmtDate(c.endAt) }}</li>
           </ul>
-          <div class="action-btns">
+          <div v-if="c.challengeType !== 'room_vs_room'" class="action-btns">
             <button class="btn btn-sm btn-aurora" type="button" @click="openDetail(c)">{{ t('contests.ranking') }}</button>
             <button class="btn btn-sm btn-outline-light" type="button" @click="openEdit(c)">{{ t('contests.edit') }}</button>
             <button
@@ -267,6 +267,7 @@
               {{ t('contests.delete') }}
             </button>
           </div>
+          <p v-else class="small text-secondary mb-0">تحدّي PK يُدار من داخل الروم؛ يمكنك التحكم بتفعيل الميزة من مفتاح PK أعلى الصفحة.</p>
         </div>
       </article>
       </div>
