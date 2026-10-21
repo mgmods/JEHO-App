@@ -154,14 +154,14 @@ export class ConfigController {
     try { parsed = row?.value ? JSON.parse(row.value) : {}; } catch { parsed = {}; }
     const raw = typeof parsed.backgroundUrl === 'string' ? parsed.backgroundUrl.trim() : '';
     const apiBase = String(process.env.PUBLIC_API_URL || process.env.API_PUBLIC_URL || 'https://jeho-own-backend.mgs.blitz.cloud')
-      .trim().replace(/\\/+$/, '').replace(/\\/api\\/v\\d+$/i, '');
+      .trim().replace(/\/+$/, '').replace(/\/api\/v\d+$/i, '');
     let backgroundUrl = raw;
     if (raw.startsWith('/uploads/') && !raw.startsWith('//')) backgroundUrl = apiBase + raw;
-    else if (/^uploads\\//i.test(raw)) backgroundUrl = apiBase + '/' + raw;
-    if (backgroundUrl && /^https?:\\/\\//i.test(backgroundUrl)) {
+    else if (/^uploads\//i.test(raw)) backgroundUrl = apiBase + '/' + raw;
+    if (backgroundUrl && /^https?:\/\//i.test(backgroundUrl)) {
       const separator = backgroundUrl.includes('?') ? '&' : '?';
       backgroundUrl += separator + 'toast_v=' + Math.max(1, Number(parsed.version) || 1);
-    } else if (backgroundUrl && !/^https?:\\/\\//i.test(backgroundUrl)) {
+    } else if (backgroundUrl) {
       backgroundUrl = '';
     }
     return {
