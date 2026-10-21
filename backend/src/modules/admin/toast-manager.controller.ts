@@ -12,7 +12,7 @@ const DEFAULT_TOAST_STYLE = {
   frameGlowEnabled: true,
   durationSeconds: 3,
   version: 1,
-  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3 },
+  giftSend: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 3, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
   luckyWinNormal: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 4, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
   luckyWinHigh: { backgroundUrl: '', shineEnabled: true, frameGlowEnabled: true, durationSeconds: 5, avatarX: 8, avatarY: 50, textX: 25, textY: 50 },
   luckyButton: { iconUrl: '', durationSeconds: 5, pulseEnabled: true },
@@ -48,6 +48,10 @@ export class ToastManagerController {
       shineEnabled: parsed.giftSend?.shineEnabled !== false && parsed.shineEnabled !== false,
       frameGlowEnabled: parsed.giftSend?.frameGlowEnabled !== false && parsed.frameGlowEnabled !== false,
       durationSeconds: clampSeconds(parsed.giftSend?.durationSeconds, oldDuration),
+      avatarX: clampPercent(parsed.giftSend?.avatarX, 8),
+      avatarY: clampPercent(parsed.giftSend?.avatarY, 50),
+      textX: clampPercent(parsed.giftSend?.textX, 25),
+      textY: clampPercent(parsed.giftSend?.textY, 50),
     };
     const winDefaults = (source: any, fallback: any) => ({
       backgroundUrl: cleanUrl(source?.backgroundUrl, fallback.backgroundUrl),
@@ -80,6 +84,10 @@ export class ToastManagerController {
       shineEnabled: typeof body?.giftSend?.shineEnabled === 'boolean' ? body.giftSend.shineEnabled : (typeof body?.shineEnabled === 'boolean' ? body.shineEnabled : oldGift.shineEnabled),
       frameGlowEnabled: typeof body?.giftSend?.frameGlowEnabled === 'boolean' ? body.giftSend.frameGlowEnabled : (typeof body?.frameGlowEnabled === 'boolean' ? body.frameGlowEnabled : oldGift.frameGlowEnabled),
       durationSeconds: clampSeconds(body?.giftSend?.durationSeconds ?? body?.durationSeconds, oldGift.durationSeconds),
+      avatarX: clampPercent(body?.giftSend?.avatarX, oldGift.avatarX ?? 8),
+      avatarY: clampPercent(body?.giftSend?.avatarY, oldGift.avatarY ?? 50),
+      textX: clampPercent(body?.giftSend?.textX, oldGift.textX ?? 25),
+      textY: clampPercent(body?.giftSend?.textY, oldGift.textY ?? 50),
     };
     const win = (key: 'luckyWinNormal' | 'luckyWinHigh') => {
       const old = previous[key] || DEFAULT_TOAST_STYLE[key];
