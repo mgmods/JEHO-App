@@ -18,6 +18,7 @@ import com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity;
 import com.bumptech.glide.Glide;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
@@ -30,6 +31,38 @@ public final class GlobalCelebrationToast {
     private static Runnable hideRunnable;
     private static String lastDedupeKey;
     private static long lastShownAt;
+    private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
+    private static boolean showing;
+
+    private static final class ToastRequest {
+        final WeakReference<Activity> activity;
+        final String title;
+        final String body;
+        final String avatarUrl;
+        final String badgeUrl;
+        final int topMarginDp;
+        final int multiplier;
+        final long coinsWon;
+        final String displayName;
+        final String kind;
+        final String roomId;
+
+        ToastRequest(Activity activity, String title, String body, String avatarUrl,
+                     String badgeUrl, int topMarginDp, int multiplier, long coinsWon,
+                     String displayName, String kind, String roomId) {
+            this.activity = new WeakReference<>(activity);
+            this.title = title;
+            this.body = body;
+            this.avatarUrl = avatarUrl;
+            this.badgeUrl = badgeUrl;
+            this.topMarginDp = topMarginDp;
+            this.multiplier = multiplier;
+            this.coinsWon = coinsWon;
+            this.displayName = displayName;
+            this.kind = kind;
+            this.roomId = roomId;
+        }
+    }
 
     private GlobalCelebrationToast() {}
 
@@ -103,9 +136,27 @@ public final class GlobalCelebrationToast {
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
         final int margin = Math.max(8, topMarginDp);
-        MAIN.post(() -> showInternal(
-                activity, title, body, avatarUrl, badgeUrl, margin,
-                multiplier, coinsWon, displayName, kind, roomId));
+        ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
+                margin, multiplier, coinsWon, displayName, kind, roomId);
+        MAIN.post(() -> {
+            PENDING.addLast(request);
+            showNext();
+        });
+    }
+
+    private static void showNext() {
+        if (showing) return;
+        ToastRequest request = PENDING.pollFirst();
+        if (request == null) return;
+        Activity activity = request.activity.get();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            showNext();
+            return;
+        }
+        showing = true;
+        showInternal(activity, request.title, request.body, request.avatarUrl,
+                request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
+                request.displayName, request.kind, request.roomId);
     }
 
     private static void showInternal(
@@ -121,9 +172,17 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
-        if (activity.isFinishing() || activity.isDestroyed()) return;
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            showing = false;
+            showNext();
+            return;
+        }
         ViewGroup root = activity.findViewById(android.R.id.content);
-        if (!(root instanceof FrameLayout)) return;
+        if (!(root instanceof FrameLayout)) {
+            showing = false;
+            showNext();
+            return;
+        }
 
         View existing = current.get();
         if (existing != null && existing.getParent() instanceof ViewGroup) {
@@ -312,6 +371,8 @@ public final class GlobalCelebrationToast {
                         parent.removeView(banner);
                     }
                     if (current.get() == banner) current = new WeakReference<>(null);
+                    showing = false;
+                    showNext();
                 })
                 .start();
     }
