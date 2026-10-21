@@ -212,7 +212,7 @@ class AdminConsoleActivity : ThemedActivity() {
             gravity = Gravity.CENTER
             setPadding(dp(11), dp(8), dp(11), dp(8))
             background = GradientDrawable().apply {
-                setColor(0x332FFFFFF.toInt())
+                setColor(0x33FFFFFF.toInt())
                 cornerRadius = dp(30).toFloat()
                 setStroke(dp(1), 0x66FFFFFF)
             }
