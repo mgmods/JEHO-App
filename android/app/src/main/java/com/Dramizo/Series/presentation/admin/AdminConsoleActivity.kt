@@ -955,9 +955,17 @@ class AdminConsoleActivity : ThemedActivity() {
             val vipLevel = value(item, "level") ?: "1"
             val vipPrice = value(item, "coinPriceMonthly", "price") ?: "0"
             addText(card, primary, 15f, true, TEXT)
-            if (!id.isNullOrBlank()) addText(card, "المعرّف: $id", 11f, false, MUTED)
+            if (!id.isNullOrBlank()) addText(card, "معرّف السجل: $id", 11f, false, MUTED)
+            if (type == "users" && !publicId.isNullOrBlank() && publicId != id) {
+                val publicIdRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; layoutDirection = View.LAYOUT_DIRECTION_RTL }
+                addText(publicIdRow, "ID المستخدم: $publicId", 12f, true, ACCENT)
+                publicIdRow.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+                publicIdRow.addView(button("نسخ ID") { copyToClipboard("ID المستخدم", publicId) }, LinearLayout.LayoutParams(-2, dp(40)))
+                card.addView(publicIdRow)
+            }
             if (!status.isNullOrBlank()) card.addView(statusChip(status))
             val detailKeys = when (type) {
+                "users" -> listOf("username", "role", "coins", "balance", "diamonds", "level", "vipExpiresAt", "createdAt", "lastSeenAt")
                 "reports" -> listOf("reporterName", "reporterId", "targetName", "targetId", "targetType", "reason", "category", "createdAt")
                 "rooms" -> listOf("ownerName", "membersCount", "accessMode", "entryFeeCoins", "createdAt")
                 "streams" -> listOf("hostName", "viewerCount", "startedAt", "createdAt")
@@ -2195,10 +2203,23 @@ class AdminConsoleActivity : ThemedActivity() {
         "activeStreams", "streamsCount" -> "البث المباشر"
         "agencies", "agenciesCount" -> "الوكالات"
         "createdAt" -> "تاريخ الإنشاء"
+        "lastSeenAt" -> "آخر ظهور"
+        "vipExpiresAt" -> "انتهاء VIP"
         "membersCount" -> "عدد الأعضاء"
+        "username" -> "اسم المستخدم"
+        "role", "staffRole" -> "الدور"
+        "coins", "balance" -> "رصيد العملات"
+        "diamonds" -> "رصيد الألماس"
+        "level" -> "المستوى"
         "coinPrice" -> "السعر"
         "diamondValue" -> "قيمة الألماس"
         else -> key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+
+    private fun copyToClipboard(label: String, value: String) {
+        val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(label, value))
+        toast("تم نسخ $label")
     }
 
     private fun confirm(message: String, action: () -> Unit) {
