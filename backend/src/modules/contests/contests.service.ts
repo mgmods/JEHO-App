@@ -846,9 +846,9 @@ export class ContestsService implements OnModuleInit {
   /** End every non-ended contest (settle prizes where applicable). */
   async adminEndAll() {
     await this.refreshStatuses();
-    const open = await this.contestsRepo.find({
+    const open = (await this.contestsRepo.find({
       where: [{ status: 'active' }, { status: 'upcoming' }],
-    });
+    })).filter((contest) => contest.challengeType !== 'room_vs_room');
     const ended: Contest[] = [];
     for (const contest of open) {
       contest.status = 'ended';
@@ -867,6 +867,9 @@ export class ContestsService implements OnModuleInit {
   async adminDelete(id: string) {
     const contest = await this.contestsRepo.findOne({ where: { id } });
     if (!contest) throw new NotFoundException('المسابقة غير موجودة');
+    if (contest.challengeType === 'room_vs_room') {
+      throw new BadRequestException('تحديات PK تُدار من داخل الروم فقط؛ لا يمكن حذفها من الداشبورد');
+    }
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(ContestEntry, { contestId: id });
       await manager.delete(Contest, { id });
