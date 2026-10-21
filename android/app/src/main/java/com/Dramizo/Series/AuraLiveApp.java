@@ -272,6 +272,16 @@ public class AuraLiveApp extends Application {
                     VoiceRoomActivity aliveRoom = VoiceRoomActivity.getAliveInstance();
                     Activity activity = foregroundActivity;
 
+                    // Lucky wins use one compact global banner on whichever app section is visible,
+                    // including Home while a voice room remains alive in the background.
+                    if ("lucky_hit".equalsIgnoreCase(kind) && appVisible
+                            && activity != null && !activity.isFinishing()) {
+                        activity.runOnUiThread(() ->
+                                com.Dramizo.Series.util.GlobalCelebrationToast.show(
+                                        activity, title, body, avatar, badge, dedupe,
+                                        28, mulFinal, coinsFinal, displayName, kind, roomFinal));
+                    }
+
                     // Prefer live room (even when Home/minimized UI paused) so chat bubbles land.
                     if (aliveRoom != null) {
                         aliveRoom.runOnUiThread(() -> aliveRoom.onGlobalCelebration(

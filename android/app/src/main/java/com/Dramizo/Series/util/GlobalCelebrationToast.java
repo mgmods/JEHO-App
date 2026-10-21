@@ -18,6 +18,7 @@ import com.Dramizo.Series.presentation.voiceroom.RoomJoinGateActivity;
 import com.bumptech.glide.Glide;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayDeque;
 import java.util.Locale;
 
 /**
@@ -30,6 +31,38 @@ public final class GlobalCelebrationToast {
     private static Runnable hideRunnable;
     private static String lastDedupeKey;
     private static long lastShownAt;
+    private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
+    private static boolean showing;
+
+    private static final class ToastRequest {
+        final WeakReference<Activity> activity;
+        final String title;
+        final String body;
+        final String avatarUrl;
+        final String badgeUrl;
+        final int topMarginDp;
+        final int multiplier;
+        final long coinsWon;
+        final String displayName;
+        final String kind;
+        final String roomId;
+
+        ToastRequest(Activity activity, String title, String body, String avatarUrl,
+                     String badgeUrl, int topMarginDp, int multiplier, long coinsWon,
+                     String displayName, String kind, String roomId) {
+            this.activity = new WeakReference<>(activity);
+            this.title = title;
+            this.body = body;
+            this.avatarUrl = avatarUrl;
+            this.badgeUrl = badgeUrl;
+            this.topMarginDp = topMarginDp;
+            this.multiplier = multiplier;
+            this.coinsWon = coinsWon;
+            this.displayName = displayName;
+            this.kind = kind;
+            this.roomId = roomId;
+        }
+    }
 
     private GlobalCelebrationToast() {}
 
@@ -103,9 +136,30 @@ public final class GlobalCelebrationToast {
         lastDedupeKey = dedupeKey;
         lastShownAt = now;
         final int margin = Math.max(8, topMarginDp);
-        MAIN.post(() -> showInternal(
-                activity, title, body, avatarUrl, badgeUrl, margin,
-                multiplier, coinsWon, displayName, kind, roomId));
+        ToastRequest request = new ToastRequest(activity, title, body, avatarUrl, badgeUrl,
+                margin, multiplier, coinsWon, displayName, kind, roomId);
+        MAIN.post(() -> {
+            PENDING.addLast(request);
+            showNext();
+        });
+    }
+
+    private static void showNext() {
+        if (showing) return;
+        ToastRequest request = PENDING.pollFirst();
+        if (request == null) return;
+        Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            activity = request.activity.get();
+        }
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            showNext();
+            return;
+        }
+        showing = true;
+        showInternal(activity, request.title, request.body, request.avatarUrl,
+                request.badgeUrl, request.topMarginDp, request.multiplier, request.coinsWon,
+                request.displayName, request.kind, request.roomId);
     }
 
     private static void showInternal(
@@ -121,9 +175,17 @@ public final class GlobalCelebrationToast {
             @Nullable String kind,
             @Nullable String roomId
     ) {
-        if (activity.isFinishing() || activity.isDestroyed()) return;
+        if (activity.isFinishing() || activity.isDestroyed()) {
+            showing = false;
+            showNext();
+            return;
+        }
         ViewGroup root = activity.findViewById(android.R.id.content);
-        if (!(root instanceof FrameLayout)) return;
+        if (!(root instanceof FrameLayout)) {
+            showing = false;
+            showNext();
+            return;
+        }
 
         View existing = current.get();
         if (existing != null && existing.getParent() instanceof ViewGroup) {
@@ -148,19 +210,25 @@ public final class GlobalCelebrationToast {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
 
-        String line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
+        String winnerName = firstNonEmpty(displayName, title);
+        if (tvTitle != null) {
+            tvTitle.setVisibility(View.VISIBLE);
+            tvTitle.setText(winnerName != null ? winnerName : "مبروك الفوز!");
+            tvTitle.setSelected(true);
+        }
+        String line;
+        if (gameOrLucky && coinsWon > 0L) {
+            line = "🪙 ربح " + String.format(Locale.US, "%,d", coinsWon) + " كوينز";
+        } else {
+            line = buildMikooLine(kind, displayName, body, coinsWon, multiplier);
+        }
         if (tvBody != null) {
             tvBody.setText(line);
             tvBody.setSelected(true);
         }
-        if (tvTitle != null) {
-            tvTitle.setText(title != null && !title.isEmpty() ? title : "مبروك!");
-        }
 
-        // Game/luck home strip: game cover/gift icon only — never a personal portrait bubble.
-        String leftUrl = gameOrLucky
-                ? firstNonEmpty(badgeUrl, null)
-                : firstNonEmpty(avatarUrl, badgeUrl);
+        // Lucky/game wins prioritize the actual winner's portrait; use the gift/game icon only as fallback.
+        String leftUrl = firstNonEmpty(avatarUrl, badgeUrl);
         String absLeft = AssetCatalog.absoluteUrl(leftUrl);
         if (absLeft != null) {
             com.Dramizo.Series.util.CosmeticMedia.Kind badgeKind =
@@ -203,10 +271,12 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean showTimes = multiplier >= 2;
+        boolean showTimes = multiplier >= 1 && (gameOrLucky || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
-            tvTimes.setText(String.format(Locale.US, "%d\nمرات", multiplier));
+            wrapTimes.setScaleX(0.82f);
+            wrapTimes.setScaleY(0.82f);
+            tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
             if (badge != null) badge.setVisibility(View.GONE);
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
@@ -236,17 +306,26 @@ public final class GlobalCelebrationToast {
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
-        banner.setTranslationX(dp(activity, 80));
+        banner.setTranslationX(dp(activity, 140));
         root.addView(banner);
         current = new WeakReference<>(banner);
 
         banner.animate()
                 .alpha(1f)
                 .translationX(0f)
-                .setDuration(220)
+                .setDuration(420)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator())
                 .start();
+        if (wrapTimes != null && wrapTimes.getVisibility() == View.VISIBLE) {
+            wrapTimes.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(360)
+                    .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
+                    .start();
+        }
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6500L : 4800L);
+        MAIN.postDelayed(hideRunnable, canOpenRoom ? 6200L : 5200L);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
@@ -290,15 +369,23 @@ public final class GlobalCelebrationToast {
 
     private static void removeBanner(View banner) {
         if (banner == null) return;
+        if (hideRunnable != null) {
+            MAIN.removeCallbacks(hideRunnable);
+            hideRunnable = null;
+        }
         float out = -Math.max(banner.getWidth(), dp(banner, 280));
         banner.animate()
-                .alpha(0.85f)
+                .alpha(0f)
                 .translationX(out)
-                .setDuration(1600)
+                .setDuration(480)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
                 .withEndAction(() -> {
                     if (banner.getParent() instanceof ViewGroup parent) {
                         parent.removeView(banner);
                     }
+                    if (current.get() == banner) current = new WeakReference<>(null);
+                    showing = false;
+                    showNext();
                 })
                 .start();
     }
