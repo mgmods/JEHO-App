@@ -6,6 +6,8 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -52,6 +54,9 @@ public class MessagesFragment extends Fragment {
     private FragmentMessagesBinding binding;
     private MessagesViewModel viewModel;
     private ChatPreviewAdapter adapter;
+    private final Handler searchHandler = new Handler(Looper.getMainLooper());
+    private Runnable pendingGlobalSearch;
+    private int globalSearchSequence = 0;
     private final BroadcastReceiver officialNewsReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -113,15 +118,26 @@ public class MessagesFragment extends Fragment {
         binding.recycler.setNestedScrollingEnabled(true);
         binding.recycler.setOverScrollMode(View.OVER_SCROLL_NEVER);
 
-        // Local inbox search: filters the already-loaded conversation list without extra API calls.
+        // Search names and message history on the server; debounce typing to keep the app smooth.
         binding.etChatSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (binding == null || adapter == null) return;
                 String query = s != null ? s.toString().trim() : "";
                 binding.btnClearChatSearch.setVisibility(query.isEmpty() ? View.GONE : View.VISIBLE);
+                int sequence = ++globalSearchSequence;
+                if (pendingGlobalSearch != null) searchHandler.removeCallbacks(pendingGlobalSearch);
+                if (query.isEmpty()) {
+                    adapter.setSearchQuery("");
+                    viewModel.load(false);
+                    updateChatSearchEmptyState();
+                    return;
+                }
                 adapter.setSearchQuery(query);
                 updateChatSearchEmptyState();
+                if (query.length() < 2) return;
+                pendingGlobalSearch = () -> runGlobalSearch(query, sequence);
+                searchHandler.postDelayed(pendingGlobalSearch, 320L);
             }
             @Override public void afterTextChanged(Editable s) { }
         });
@@ -187,8 +203,10 @@ public class MessagesFragment extends Fragment {
         }
 
         viewModel.getConversations().observe(getViewLifecycleOwner(), list -> {
-            adapter.submit(list);
-            boolean empty = list == null || list.isEmpty();
+            String currentQuery = binding != null && binding.etChatSearch.getText() != null
+                    ? binding.etChatSearch.getText().toString().trim() : "";
+            if (currentQuery.isEmpty()) adapter.submit(list);
+            boolean empty = adapter.getItemCount() == 0;
             if (binding.tvEmpty != null) {
                 binding.tvEmpty.setText(R.string.msg_empty_chats);
                 binding.tvEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
@@ -203,6 +221,28 @@ public class MessagesFragment extends Fragment {
             if (isAdded()) AppLoadingOverlay.hide(requireActivity());
         });
         viewModel.load();
+    }
+
+    private void runGlobalSearch(String query, int sequence) {
+        if (!isAdded() || binding == null) return;
+        AppContainer c = ContainerProvider.from(requireActivity());
+        c.getIoExecutor().execute(() -> {
+            Result<com.Dramizo.Series.data.remote.dto.ChatDtos.ConversationList> result =
+                    ApiCall.execute(c.getChatApi().searchConversations(query, 1, 50));
+            if (!isAdded()) return;
+            requireActivity().runOnUiThread(() -> {
+                if (binding == null || sequence != globalSearchSequence) return;
+                String current = binding.etChatSearch.getText() != null
+                        ? binding.etChatSearch.getText().toString().trim() : "";
+                if (!query.equals(current)) return;
+                if (result.success && result.data != null) {
+                    adapter.submitSearchResults(result.data.items, query);
+                } else if (result.error != null) {
+                    Toast.makeText(requireContext(), result.error, Toast.LENGTH_SHORT).show();
+                }
+                updateChatSearchEmptyState();
+            });
+        });
     }
 
     private void updateChatSearchEmptyState() {
