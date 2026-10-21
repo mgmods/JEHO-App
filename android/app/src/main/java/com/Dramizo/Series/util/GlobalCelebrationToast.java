@@ -43,9 +43,21 @@ public final class GlobalCelebrationToast {
     private static final ArrayDeque<ToastRequest> PENDING = new ArrayDeque<>();
     private static boolean showing;
     private static volatile String remoteBackgroundUrl = "";
+    private static volatile String remoteLuckyNormalBackgroundUrl = "";
+    private static volatile String remoteLuckyHighBackgroundUrl = "";
     private static volatile boolean remoteShineEnabled = true;
     private static volatile boolean remoteFrameGlowEnabled = true;
+    private static volatile boolean remoteLuckyNormalShineEnabled = true;
+    private static volatile boolean remoteLuckyHighShineEnabled = true;
+    private static volatile boolean remoteLuckyNormalGlowEnabled = true;
+    private static volatile boolean remoteLuckyHighGlowEnabled = true;
     private static volatile int remoteDurationSeconds = 3;
+    private static volatile int remoteLuckyNormalDurationSeconds = 4;
+    private static volatile int remoteLuckyHighDurationSeconds = 5;
+    private static volatile float remoteLuckyNormalAvatarX = 8f, remoteLuckyNormalAvatarY = 50f;
+    private static volatile float remoteLuckyNormalTextX = 25f, remoteLuckyNormalTextY = 50f;
+    private static volatile float remoteLuckyHighAvatarX = 8f, remoteLuckyHighAvatarY = 50f;
+    private static volatile float remoteLuckyHighTextX = 25f, remoteLuckyHighTextY = 50f;
     private static long lastStyleFetchAt;
 
     private static final class ToastRequest {
@@ -95,11 +107,18 @@ public final class GlobalCelebrationToast {
 
     private static void applyRemoteStyleToActiveToast() {
         View active = current.get();
-        if (active == null || !"gift_send".equals(active.getTag())) return;
+        if (active == null || active.getTag() == null) return;
+        String activeKind = String.valueOf(active.getTag());
+        boolean giftSend = "gift_send".equals(activeKind);
+        boolean luckyHigh = "lucky_hit_high".equals(activeKind);
+        boolean luckyNormal = "lucky_hit_normal".equals(activeKind);
+        if (!giftSend && !luckyHigh && !luckyNormal) return;
         Activity activity = com.Dramizo.Series.AuraLiveApp.getForegroundActivity();
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
         ImageView background = active.findViewById(R.id.imgToastBackground);
-        String imageUrl = AssetCatalog.absoluteUrl(remoteBackgroundUrl);
+        String chosenBackground = giftSend ? remoteBackgroundUrl
+                : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+        String imageUrl = AssetCatalog.absoluteUrl(chosenBackground);
         if (background != null) {
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 background.setVisibility(View.VISIBLE);
@@ -107,9 +126,11 @@ public final class GlobalCelebrationToast {
                 catch (Exception ignored) { background.setVisibility(View.GONE); }
             } else background.setVisibility(View.GONE);
         }
-        active.setElevation(dp(activity, remoteFrameGlowEnabled ? 20 : 14));
+        boolean glow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
+        boolean shine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : remoteLuckyNormalShineEnabled;
+        active.setElevation(dp(activity, glow ? 20 : 14));
         View sheen = active.findViewById(R.id.viewCelebrationSheen);
-        if (sheen != null && remoteShineEnabled) {
+        if (sheen != null && shine) {
             sheen.setVisibility(View.VISIBLE);
             GradientDrawable shine = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
@@ -129,7 +150,25 @@ public final class GlobalCelebrationToast {
         } else if (sheen != null) sheen.setVisibility(View.GONE);
         if (hideRunnable != null) MAIN.removeCallbacks(hideRunnable);
         hideRunnable = () -> removeBanner(active);
-        MAIN.postDelayed(hideRunnable, Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L);
+        int duration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : remoteLuckyNormalDurationSeconds;
+        MAIN.postDelayed(hideRunnable, Math.max(1, Math.min(12, duration)) * 1000L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> nestedConfig(Map<String, Object> source, String key) {
+        Object value = source.get(key);
+        return value instanceof Map ? (Map<String, Object>) value : java.util.Collections.emptyMap();
+    }
+    private static String stringValue(Object value, String fallback) {
+        return value instanceof String ? ((String) value).trim() : fallback;
+    }
+    private static int intValue(Object value, int fallback) {
+        try { return Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(value))))); }
+        catch (Exception ignored) { return fallback; }
+    }
+    private static float floatValue(Object value, float fallback) {
+        try { return Math.max(0f, Math.min(100f, Float.parseFloat(String.valueOf(value)))); }
+        catch (Exception ignored) { return fallback; }
     }
 
     private static void refreshToastStyle(Activity activity) {
@@ -144,14 +183,29 @@ public final class GlobalCelebrationToast {
                                                   Response<ApiResponse<Map<String, Object>>> response) {
                     if (!response.isSuccessful() || response.body() == null || response.body().data == null) return;
                     Map<String, Object> cfg = response.body().data;
-                    Object bg = cfg.get("backgroundUrl");
-                    remoteBackgroundUrl = bg instanceof String ? ((String) bg).trim() : "";
-                    remoteShineEnabled = !Boolean.FALSE.equals(cfg.get("shineEnabled"));
-                    remoteFrameGlowEnabled = !Boolean.FALSE.equals(cfg.get("frameGlowEnabled"));
-                    try {
-                        remoteDurationSeconds = Math.max(2, Math.min(8,
-                                (int) Math.round(Double.parseDouble(String.valueOf(cfg.get("durationSeconds"))))));
-                    } catch (Exception ignored) { remoteDurationSeconds = 3; }
+                    Map<String, Object> gift = nestedConfig(cfg, "giftSend");
+                    Map<String, Object> normal = nestedConfig(cfg, "luckyWinNormal");
+                    Map<String, Object> high = nestedConfig(cfg, "luckyWinHigh");
+                    remoteBackgroundUrl = stringValue(gift.get("backgroundUrl"), stringValue(cfg.get("backgroundUrl"), ""));
+                    remoteShineEnabled = !Boolean.FALSE.equals(gift.getOrDefault("shineEnabled", cfg.get("shineEnabled")));
+                    remoteFrameGlowEnabled = !Boolean.FALSE.equals(gift.getOrDefault("frameGlowEnabled", cfg.get("frameGlowEnabled")));
+                    remoteDurationSeconds = intValue(gift.get("durationSeconds"), intValue(cfg.get("durationSeconds"), 3));
+                    remoteLuckyNormalBackgroundUrl = stringValue(normal.get("backgroundUrl"), "");
+                    remoteLuckyHighBackgroundUrl = stringValue(high.get("backgroundUrl"), "");
+                    remoteLuckyNormalShineEnabled = !Boolean.FALSE.equals(normal.get("shineEnabled"));
+                    remoteLuckyHighShineEnabled = !Boolean.FALSE.equals(high.get("shineEnabled"));
+                    remoteLuckyNormalGlowEnabled = !Boolean.FALSE.equals(normal.get("frameGlowEnabled"));
+                    remoteLuckyHighGlowEnabled = !Boolean.FALSE.equals(high.get("frameGlowEnabled"));
+                    remoteLuckyNormalDurationSeconds = intValue(normal.get("durationSeconds"), 4);
+                    remoteLuckyHighDurationSeconds = intValue(high.get("durationSeconds"), 5);
+                    remoteLuckyNormalAvatarX = floatValue(normal.get("avatarX"), 8f);
+                    remoteLuckyNormalAvatarY = floatValue(normal.get("avatarY"), 50f);
+                    remoteLuckyNormalTextX = floatValue(normal.get("textX"), 25f);
+                    remoteLuckyNormalTextY = floatValue(normal.get("textY"), 50f);
+                    remoteLuckyHighAvatarX = floatValue(high.get("avatarX"), 8f);
+                    remoteLuckyHighAvatarY = floatValue(high.get("avatarY"), 50f);
+                    remoteLuckyHighTextX = floatValue(high.get("textX"), 25f);
+                    remoteLuckyHighTextY = floatValue(high.get("textY"), 50f);
                     MAIN.post(GlobalCelebrationToast::applyRemoteStyleToActiveToast);
                 }
                 @Override public void onFailure(Call<ApiResponse<Map<String, Object>>> call, Throwable error) {
@@ -226,7 +280,7 @@ public final class GlobalCelebrationToast {
             }
         } catch (Exception ignored) {
         }
-        if ("gift_send".equalsIgnoreCase(kind)) refreshToastStyle(activity);
+        if ("gift_send".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind)) refreshToastStyle(activity);
         long now = System.currentTimeMillis();
         if (dedupeKey != null && dedupeKey.equals(lastDedupeKey) && now - lastShownAt < 8_000L) {
             return;
@@ -307,7 +361,14 @@ public final class GlobalCelebrationToast {
         boolean gameOrLucky = kind != null && (
                 "game_win".equalsIgnoreCase(kind) || "lucky_hit".equalsIgnoreCase(kind));
         boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
-        banner.setTag(giftSend ? "gift_send" : null);
+        boolean luckyWin = kind != null && "lucky_hit".equalsIgnoreCase(kind);
+        boolean luckyHigh = luckyWin && (multiplier >= 10 || coinsWon >= 1000L);
+        String toastKindTag = giftSend ? "gift_send" : luckyWin ? (luckyHigh ? "lucky_hit_high" : "lucky_hit_normal") : null;
+        banner.setTag(toastKindTag);
+        boolean customToastStyle = giftSend || luckyWin;
+        boolean remoteShine = giftSend ? remoteShineEnabled : luckyHigh ? remoteLuckyHighShineEnabled : remoteLuckyNormalShineEnabled;
+        boolean remoteGlow = giftSend ? remoteFrameGlowEnabled : luckyHigh ? remoteLuckyHighGlowEnabled : remoteLuckyNormalGlowEnabled;
+        int customDuration = giftSend ? remoteDurationSeconds : luckyHigh ? remoteLuckyHighDurationSeconds : remoteLuckyNormalDurationSeconds;
         if (planet) {
             banner.setBackgroundResource(R.drawable.bg_planet_go_banner);
         }
@@ -432,15 +493,16 @@ public final class GlobalCelebrationToast {
         banner.setScaleY(0.985f);
         banner.setTranslationX(dp(activity, 140));
         if (toastBackground != null) {
-            String imageUrl = giftSend ? AssetCatalog.absoluteUrl(remoteBackgroundUrl) : null;
+            String selectedBackground = giftSend ? remoteBackgroundUrl : luckyHigh ? remoteLuckyHighBackgroundUrl : remoteLuckyNormalBackgroundUrl;
+            String imageUrl = customToastStyle ? AssetCatalog.absoluteUrl(selectedBackground) : null;
             if (imageUrl != null && !imageUrl.isEmpty()) {
                 toastBackground.setVisibility(View.VISIBLE);
                 try { Glide.with(activity.getApplicationContext()).load(imageUrl).centerCrop().into(toastBackground); }
                 catch (Exception ignored) { toastBackground.setVisibility(View.GONE); }
             } else toastBackground.setVisibility(View.GONE);
         }
-        banner.setElevation(dp(activity, giftSend && remoteFrameGlowEnabled ? 20 : 14));
-        if (sheen != null && giftSend && remoteShineEnabled) {
+        banner.setElevation(dp(activity, customToastStyle && remoteGlow ? 20 : 14));
+        if (sheen != null && customToastStyle && remoteShine) {
             sheen.setVisibility(View.VISIBLE);
             GradientDrawable shine = new GradientDrawable(
                     GradientDrawable.Orientation.LEFT_RIGHT,
@@ -479,10 +541,32 @@ public final class GlobalCelebrationToast {
                     .setInterpolator(new android.view.animation.OvershootInterpolator(1.1f))
                     .start();
         }
+        if (luckyWin) {
+            final float avatarX = luckyHigh ? remoteLuckyHighAvatarX : remoteLuckyNormalAvatarX;
+            final float avatarY = luckyHigh ? remoteLuckyHighAvatarY : remoteLuckyNormalAvatarY;
+            final float textX = luckyHigh ? remoteLuckyHighTextX : remoteLuckyNormalTextX;
+            final float textY = luckyHigh ? remoteLuckyHighTextY : remoteLuckyNormalTextY;
+            banner.post(() -> {
+                if (banner.getParent() == null) return;
+                positionViewPercent(avatar, banner, avatarX, avatarY, true);
+                positionViewPercent(tvTitle, banner, textX, textY, false);
+                positionViewPercent(tvBody, banner, textX, textY + 17f, false);
+            });
+        }
         hideRunnable = () -> removeBanner(banner);
-        MAIN.postDelayed(hideRunnable, giftSend
-                ? Math.max(2, Math.min(8, remoteDurationSeconds)) * 1000L
+        MAIN.postDelayed(hideRunnable, customToastStyle
+                ? Math.max(1, Math.min(12, customDuration)) * 1000L
                 : (canOpenRoom ? 6200L : 5200L));
+    }
+
+    private static void positionViewPercent(View target, View container, float xPercent, float yPercent, boolean centerX) {
+        if (target == null || container == null || container.getWidth() <= 0 || container.getHeight() <= 0) return;
+        float desiredX = container.getWidth() * Math.max(0f, Math.min(100f, xPercent)) / 100f;
+        float desiredY = container.getHeight() * Math.max(0f, Math.min(100f, yPercent)) / 100f;
+        float currentX = target.getX() + (centerX ? target.getWidth() / 2f : 0f);
+        float currentY = target.getY() + target.getHeight() / 2f;
+        target.setTranslationX(desiredX - currentX);
+        target.setTranslationY(desiredY - currentY);
     }
 
     /** Home strip wording: مبروك … حصل على … (luck + games). */
