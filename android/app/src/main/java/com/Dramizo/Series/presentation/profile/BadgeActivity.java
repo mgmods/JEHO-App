@@ -130,7 +130,7 @@ public class BadgeActivity extends ThemedActivity {
             String failure = null;
             try {
                 Response<ApiResponse<List<BadgeDto>>> response =
-                        c.getUserApi().badges(userId).execute();
+                        c.getUserApi().earnedBadges(userId).execute();
                 if (response.isSuccessful() && response.body() != null
                         && response.body().data != null) {
                     // This screen is the earned-medals cabinet, not the admin catalogue.
