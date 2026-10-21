@@ -69,6 +69,21 @@ public final class GlobalCelebrationToast {
 
     private GlobalCelebrationToast() {}
 
+    /** Compact global gift-send toast with a visible X quantity badge. */
+    public static void showGiftCount(@Nullable Activity activity,
+                                     @Nullable String senderName,
+                                     @Nullable String giftName,
+                                     @Nullable String avatarUrl,
+                                     @Nullable String giftIconUrl,
+                                     int quantity) {
+        int count = Math.max(1, quantity);
+        String body = (giftName == null || giftName.trim().isEmpty() ? "هدية" : giftName.trim())
+                + " · تم الإرسال";
+        show(activity, senderName, body, avatarUrl, giftIconUrl,
+                "gift-send-" + System.currentTimeMillis(), 28, count, 0L,
+                senderName, "gift_send", null);
+    }
+
     public static void show(
             @Nullable Activity activity,
             @Nullable String title,
@@ -275,13 +290,14 @@ public final class GlobalCelebrationToast {
             banner.setClickable(false);
         }
 
-        boolean showTimes = multiplier >= 1 && (gameOrLucky || multiplier >= 2);
+        boolean giftSend = kind != null && "gift_send".equalsIgnoreCase(kind);
+        boolean showTimes = multiplier >= 1 && (gameOrLucky || giftSend || multiplier >= 2);
         if (wrapTimes != null && tvTimes != null && showTimes) {
             wrapTimes.setVisibility(View.VISIBLE);
             wrapTimes.setScaleX(0.82f);
             wrapTimes.setScaleY(0.82f);
             tvTimes.setText(String.format(Locale.US, "×%d", multiplier));
-            if (badge != null) badge.setVisibility(View.GONE);
+            if (badge != null) badge.setVisibility(giftSend ? View.VISIBLE : View.GONE);
         } else {
             if (wrapTimes != null) wrapTimes.setVisibility(View.GONE);
             // Game/luck already put badge on the left icon — hide trailing personal badge.
@@ -303,10 +319,13 @@ public final class GlobalCelebrationToast {
             }
         }
 
+        int screenWidth = activity.getResources().getDisplayMetrics().widthPixels;
+        int desiredWidth = dp(activity, 360);
+        int toastWidth = Math.min(desiredWidth, Math.max(dp(activity, 260), screenWidth - dp(activity, 24)));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
+                toastWidth,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.gravity = Gravity.TOP;
+        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         lp.topMargin = dp(activity, topMarginDp);
         banner.setLayoutParams(lp);
         banner.setAlpha(0f);
