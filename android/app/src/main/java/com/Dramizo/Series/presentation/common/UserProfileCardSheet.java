@@ -1,6 +1,7 @@
 package com.Dramizo.Series.presentation.common;
 
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
@@ -376,7 +377,31 @@ public final class UserProfileCardSheet {
                         }
                     }
                     String staffBadge = StaffRoleHelper.badgeAr(u);
-                    tvName.setText(staffBadge.isEmpty() ? displayName : displayName + "\n" + staffBadge);
+                    String staffRole = StaffRoleHelper.normalize(u);
+                    if (!staffBadge.isEmpty()) {
+                        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(staffRole);
+                        String roleLabel = identity.label.isEmpty() ? staffBadge : identity.label;
+                        tvName.setTag("staff:" + staffRole);
+                        tvName.setText(displayName + "\n" + roleLabel);
+                        StaffIdentityConfigCache.load(activity, () -> {
+                            if (!dialog.isShowing() || !("staff:" + staffRole).equals(tvName.getTag())) return;
+                            StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(staffRole);
+                            tvName.setText(displayName + "\n" + (latest.label.isEmpty() ? staffBadge : latest.label));
+                            if (!latest.nameplateUrl.isEmpty()) {
+                                try {
+                                    Glide.with(activity).load(AssetCatalog.absoluteUrl(latest.nameplateUrl)).into(new CustomTarget<Drawable>() {
+                                        @Override public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                                            if (dialog.isShowing() && ("staff:" + staffRole).equals(tvName.getTag())) tvName.setBackground(resource);
+                                        }
+                                        @Override public void onLoadCleared(@Nullable Drawable placeholder) { }
+                                    });
+                                } catch (Exception ignored) { }
+                            }
+                        });
+                    } else {
+                        tvName.setTag(null);
+                        tvName.setText(displayName);
+                    }
                     GenderVerifiedBadge.bind(tvName, null, u.genderVerified);
                 }
                 bindGenderIcon(imgGender, u.gender);
