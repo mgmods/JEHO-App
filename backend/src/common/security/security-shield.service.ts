@@ -124,7 +124,10 @@ export class SecurityShieldService {
     if (!isSuper && ban.actorId !== actorId) {
       throw new ForbiddenException('You can only remove a temporary ban you issued');
     }
-    await this.redis.del(key);
+    const removed = await this.redis.deleteIfValueMatches(key, raw);
+    if (!removed) {
+      throw new BadRequestException('The temporary ban changed or expired; refresh the user and retry');
+    }
     return { ok: true, userId, removedBy: actorId };
   }
 
