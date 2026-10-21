@@ -358,6 +358,7 @@ export class ContestsService implements OnModuleInit {
       joined = new Set(mine.map((e) => e.contestId));
     }
     return {
+      roomPkEnabled: await this.isRoomPkEnabled(true),
       items: items.map((c) => ({
         ...c,
         joined: joined.has(c.id),
