@@ -646,58 +646,60 @@ function resetDefaults() {
 async function load() {
   loading.value = true
   error.value = ''
+  // Keep the known catalog visible even if the API returns an empty/stale value.
+  // This prevents the Games dashboard from rendering an empty catalog after backend sleep
+  // or when the app_games setting has not been initialized yet.
+  const fallbackCatalog = () => defaults.map(normalizeGame)
+  if (!Array.isArray(games.value) || games.value.length === 0) {
+    games.value = fallbackCatalog()
+  }
   try {
-  const { data, error: err } = await gamesCatalogApi.get()
-  if (err) {
-    error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تظهر القائمة الافتراضية مؤقتاً. ' + err.message
-    games.value = defaults.map(normalizeGame)
-    return
-  }
-  // Accept the current API response and the older settings-row response shape.
-  // A stale/empty stored value must never leave the game-management screen empty.
-  const payload = data?.data ?? data
-  const rowValue = Array.isArray(payload)
-    ? payload.find((row) => row?.key === 'app_games')?.value
-    : payload?.value
-  let saved = []
-  if (Array.isArray(rowValue)) {
-    saved = rowValue
-  } else if (typeof rowValue === 'string' && rowValue.trim()) {
-    try {
-      const parsed = JSON.parse(rowValue)
-      if (Array.isArray(parsed)) saved = parsed
-    } catch (_) {
-      // Ignore malformed stored data and display the built-in catalog.
+    const response = await gamesCatalogApi.get()
+    if (response?.error) {
+      error.value = 'تعذّر تحميل قائمة الألعاب المحفوظة؛ تم عرض القائمة الأساسية مؤقتاً. ' + response.error.message
+      games.value = fallbackCatalog()
+      return
     }
-  }
 
-  const byId = new Map()
-  for (const item of saved) {
-    if (!item || typeof item !== 'object' || isLegacyHtmlGame(item)) continue
-    const game = normalizeGame(item)
-    const id = String(game.id || '').trim().toLowerCase()
-    if (id) byId.set(id, game)
-  }
-  // Merge known games on every load so stale or empty database data cannot
-  // remove the controls, and newly added upstream games remain manageable.
-  for (const item of defaults) {
-    const id = String(item.id || '').trim().toLowerCase()
-    if (id && !byId.has(id)) byId.set(id, normalizeGame(item))
-  }
-  games.value = [...byId.values()].sort((a, b) => {
-    const ao = Number(a.sortOrder) || 0
-    const bo = Number(b.sortOrder) || 0
-    return ao - bo || displayTitle(a).localeCompare(displayTitle(b))
-  })
-  } catch (err) {
-    error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تظهر القائمة الافتراضية مؤقتاً. ' + (err?.message || String(err))
-    games.value = defaults.map(normalizeGame)
-  } finally {
-    // Never leave the admin catalog blank if the stored setting is empty or malformed.
-    // Keep the built-in catalog visible and editable; saving explicitly persists it.
-    if (!Array.isArray(games.value) || games.value.length === 0) {
-      games.value = defaults.map(normalizeGame)
+    const payload = response?.data?.data ?? response?.data ?? {}
+    const rawCatalog = typeof payload === 'string'
+      ? payload
+      : (payload?.value ?? payload?.catalog ?? '')
+    let saved = []
+    if (Array.isArray(rawCatalog)) {
+      saved = rawCatalog
+    } else if (String(rawCatalog || '').trim()) {
+      try {
+        const parsed = JSON.parse(String(rawCatalog))
+        if (Array.isArray(parsed)) saved = parsed
+      } catch (_) {
+        error.value = 'قائمة الألعاب المحفوظة غير صالحة؛ تم عرض القائمة الأساسية مؤقتاً.'
+      }
     }
+
+    const merged = new Map()
+    // Add defaults first, then overlay saved values so missing/deleted rows cannot blank the page.
+    for (const game of defaults) {
+      const normalized = normalizeGame(game)
+      merged.set(String(normalized.id || '').toLowerCase(), normalized)
+    }
+    for (const game of saved.filter((item) => item && !isLegacyHtmlGame(item))) {
+      const normalized = normalizeGame(game)
+      const id = String(normalized.id || '').trim().toLowerCase()
+      if (!id) continue
+      merged.set(id, { ...(merged.get(id) || {}), ...normalized })
+    }
+
+    games.value = [...merged.values()].sort((a, b) => {
+      const ao = Number(a.sortOrder)
+      const bo = Number(b.sortOrder)
+      return (Number.isFinite(ao) ? ao : 9999) - (Number.isFinite(bo) ? bo : 9999)
+    })
+    if (!games.value.length) games.value = fallbackCatalog()
+  } catch (err) {
+    error.value = 'حدث خطأ أثناء تحميل الألعاب؛ تم عرض القائمة الأساسية مؤقتاً. ' + (err?.message || String(err))
+    games.value = fallbackCatalog()
+  } finally {
     loading.value = false
   }
 }
