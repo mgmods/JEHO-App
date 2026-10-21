@@ -48,6 +48,7 @@ import com.Dramizo.Series.util.GenderVerifiedBadge;
 import com.Dramizo.Series.util.ImagePlaceholder;
 import com.Dramizo.Series.util.ServerAssets;
 import com.Dramizo.Series.util.StaffRoleHelper;
+import com.Dramizo.Series.util.StaffIdentityConfigCache;
 import com.Dramizo.Series.presentation.admin.AdminConsoleActivity;
 import com.Dramizo.Series.util.VipStyle;
 import com.bumptech.glide.Glide;
@@ -510,12 +511,31 @@ public class ProfileActivity extends ThemedActivity {
         String label = StaffRoleHelper.isStaff(user)
                 ? StaffRoleHelper.badgeAr(user)
                 : (rechargeAgent ? "وكيل شحن" : "وكالة");
+        StaffIdentityConfigCache.RoleIdentity identity = StaffIdentityConfigCache.get(role);
+        if (StaffRoleHelper.isStaff(user) && !identity.label.isEmpty()) label = identity.label;
         binding.tvStaffBadge.setVisibility(View.VISIBLE);
+        binding.tvStaffBadge.setTag(StaffRoleHelper.isStaff(user) ? role : null);
         binding.tvStaffBadge.setText(label);
         binding.tvStaffBadge.setBackgroundResource(
                 StaffRoleHelper.SUPER.equals(role)
                         ? R.drawable.bg_chip_staff_super
                         : R.drawable.bg_chip_staff_manager);
+        if (StaffRoleHelper.isStaff(user)) {
+            final String fallbackLabel = StaffRoleHelper.badgeAr(user);
+            StaffIdentityConfigCache.load(this, () -> {
+                if (binding == null || binding.tvStaffBadge == null || !role.equals(binding.tvStaffBadge.getTag())) return;
+                StaffIdentityConfigCache.RoleIdentity latest = StaffIdentityConfigCache.get(role);
+                binding.tvStaffBadge.setText(latest.label.isEmpty() ? fallbackLabel : latest.label);
+                if (!latest.frameUrl.isEmpty() && binding.imgFrame != null) {
+                    try {
+                        binding.imgFrame.setVisibility(View.VISIBLE);
+                        com.bumptech.glide.Glide.with(this)
+                                .load(com.Dramizo.Series.util.AssetCatalog.absoluteUrl(latest.frameUrl))
+                                .into(binding.imgFrame);
+                    } catch (Exception ignored) { }
+                }
+            });
+        }
     }
 
     private void bindAgencyStrip(
