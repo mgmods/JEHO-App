@@ -99,6 +99,10 @@ export class SecurityShieldService {
       expiresAt,
     });
     const key = `${BAN_USER_PREFIX}${userId}`;
+    const existing = await this.redis.get(key);
+    if (existing) {
+      throw new BadRequestException('An active ban already exists for this account; Super Admin review is required');
+    }
     await this.redis.set(key, value, safeHours * 3600);
     const saved = await this.redis.get(key);
     if (!saved) {
