@@ -46,6 +46,30 @@ export class BadgesService {
     return this.catalog(user.id);
   }
 
+  /** Read the user's persisted ownership records directly, independent of catalogue visibility. */
+  async earnedForIdentifier(identifier: string) {
+    const value = (identifier || '').trim();
+    if (!value) throw new BadRequestException('User ID is required');
+    const user = await this.users.findOne({
+      where: [{ id: value }, { publicId: value }],
+      select: { id: true, publicId: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    const grants = await this.userBadges.find({
+      where: { userId: user.id },
+      relations: { badge: true },
+      order: { grantedAt: 'DESC' },
+    });
+    return grants
+      .filter((grant) => !!grant.badge)
+      .map((grant) => ({
+        ...grant.badge,
+        earned: true,
+        grantedAt: grant.grantedAt,
+        source: grant.source,
+      }));
+  }
+
   async catalog(userId: string) {
     // Reconcile configured achievement badges against the user's real, persisted metrics.
     // The unique user/badge index plus INSERT .. ON CONFLICT DO NOTHING makes this idempotent.
