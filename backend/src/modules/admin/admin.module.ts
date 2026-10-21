@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 import { AdminConversationsController } from './admin-conversations.controller';
+import { ToastManagerController } from './toast-manager.controller';
 import { AdminConversationsService } from './admin-conversations.service';
 import { User } from '../../database/entities/user.entity';
 import { ChatConversation } from '../../database/entities/chat-conversation.entity';
@@ -103,7 +104,7 @@ import { GiftsModule } from '../gifts/gifts.module';
       }),
     }),
   ],
-  controllers: [AdminController, AdminConversationsController],
+  controllers: [AdminController, AdminConversationsController, ToastManagerController],
   providers: [AdminService, AdminConversationsService],
   exports: [AdminService],
 })

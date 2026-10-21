@@ -150,6 +150,8 @@ import java.util.Set;
 @OptIn(markerClass = UnstableApi.class)
 public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSource {
     public static final String EXTRA_ROOM_ID = "room_id";
+    public static final String EXTRA_ROOM_DISPLAY_ID = "room_display_id";
+    public static final String EXTRA_ROOM_IS_AGENCY = "room_is_agency";
     /** True while any VoiceRoomActivity is started (for global invite routing). */
     private static volatile boolean sRoomUiVisible;
     /** Alive room activity (may be paused/minimized) — for world celebration delivery. */
@@ -256,9 +258,20 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private volatile boolean luckyCannonEnabled = true;
     private volatile boolean luckyCannonSoundEnabled = true;
     private volatile int luckyCannonDurationSeconds = 2;
+    private volatile boolean luckyCannonPulseEnabled = true;
     @Nullable private FrameLayout luckyCannonLayer;
     @Nullable private com.Dramizo.Series.util.LuckyCannonView luckyCannonView;
+    @Nullable private ImageView luckyCannonIconView;
+    @Nullable private String luckyCannonRemoteIconUrl;
     @Nullable private Runnable hideLuckyCannonRunnable;
+    /** Refresh dashboard button styling while the room is visible; animations remain device-local. */
+    private final Runnable luckyButtonStylePoll = new Runnable() {
+        @Override public void run() {
+            if (isFinishing() || isDestroyed() || !sRoomUiVisible) return;
+            refreshLuckyToastButtonStyle();
+            handler.postDelayed(this, 15_000L);
+        }
+    };
     @Nullable private String luckyCannonGiftId;
     @Nullable private String luckyCannonGiftIcon;
     @Nullable private String luckyCannonGiftName;
@@ -509,6 +522,14 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         viewModel = new ViewModelProvider(this, new ViewModelFactory(ContainerProvider.from(this)))
                 .get(VoiceRoomViewModel.class);
         roomId = getIntent().getStringExtra(EXTRA_ROOM_ID);
+        // The tapped room card already knows this ID, so show it on first paint instead of
+        // waiting for the network join response to carry the same value back.
+        String earlyDisplayId = getIntent().getStringExtra(EXTRA_ROOM_DISPLAY_ID);
+        if (earlyDisplayId != null && !earlyDisplayId.trim().isEmpty()) {
+            String earlyLabel = getIntent().getBooleanExtra(EXTRA_ROOM_IS_AGENCY, false)
+                    ? "GID:" : "ID:";
+            binding.tvRoomId.setText(earlyLabel + earlyDisplayId.trim());
+        }
         pendingSeatInviteDialog = getIntent().getBooleanExtra(EXTRA_PENDING_SEAT_INVITE, false);
         isHost = getIntent().getBooleanExtra(EXTRA_IS_HOST, false);
         myUserId = ContainerProvider.from(this).getSessionManager().getUserId();
@@ -1405,7 +1426,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         binding.getRoot().post(() -> {
             if (isFinishing() || isDestroyed() || exiting) return;
             if (joinRoomId == null || !joinRoomId.equals(roomId)) return;
-            showRoomJoinLoading();
+            // Keep the room shell interactive and visible while the join request completes.
+            // A full-screen modal here hid the seats and room ID for the entire network round-trip.
             // Prefetch finished before observers were attached — apply now.
             if (pendingPrefetchSession != null) {
                 RoomDtos.JoinRoomResult pre = pendingPrefetchSession;
@@ -3704,15 +3726,27 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         root.addView(layer, lp);
         com.Dramizo.Series.util.LuckyCannonView cannon =
                 new com.Dramizo.Series.util.LuckyCannonView(this);
+        // The enclosing layer owns touch/click so the uploaded icon overlay and drag gesture
+        // share one hit target without intercepting the existing gift send action.
+        cannon.setClickable(false);
+        cannon.setFocusable(false);
         FrameLayout.LayoutParams cannonLp = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         cannonLp.gravity = Gravity.CENTER;
         layer.addView(cannon, cannonLp);
+        ImageView uploadedIcon = new ImageView(this);
+        FrameLayout.LayoutParams iconLp = new FrameLayout.LayoutParams(
+                luckyCannonDp(42), luckyCannonDp(42), Gravity.CENTER);
+        uploadedIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        uploadedIcon.setClickable(false);
+        uploadedIcon.setFocusable(false);
+        uploadedIcon.setVisibility(View.GONE);
+        layer.addView(uploadedIcon, iconLp);
         layer.setElevation(luckyCannonDp(42));
         layer.setVisibility(View.GONE);
-        cannon.setOnClickListener(v -> sendLuckyCannonGift());
+        layer.setOnClickListener(v -> sendLuckyCannonGift());
         // Drag the floating control anywhere inside the room without firing on a drag.
-        cannon.setOnTouchListener(new View.OnTouchListener() {
+        layer.setOnTouchListener(new View.OnTouchListener() {
             private float downRawX, downRawY, startTx, startTy;
             private boolean dragging;
             private final int touchSlop = luckyCannonDp(6);
@@ -3757,6 +3791,64 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         });
         luckyCannonLayer = layer;
         luckyCannonView = cannon;
+        luckyCannonIconView = uploadedIcon;
+        refreshLuckyToastButtonStyle();
+    }
+
+    /** One lightweight config fetch per room setup; animation stays local on this device. */
+    @SuppressWarnings("unchecked")
+    private void refreshLuckyToastButtonStyle() {
+        try {
+            AppContainer container = ContainerProvider.from(this);
+            container.getConfigApi().toastStyle(System.currentTimeMillis()).enqueue(
+                    new retrofit2.Callback<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>>() {
+                @Override public void onResponse(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        retrofit2.Response<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> response) {
+                    if (!response.isSuccessful() || response.body() == null || response.body().data == null) return;
+                    Map<String, Object> config = response.body().data;
+                    Object buttonValue = config.get("luckyButton");
+                    if (!(buttonValue instanceof Map)) return;
+                    Map<String, Object> button = (Map<String, Object>) buttonValue;
+                    String iconUrl = button.get("iconUrl") instanceof String ? ((String) button.get("iconUrl")).trim() : "";
+                    int duration = luckyCannonDurationSeconds;
+                    try { duration = Math.max(1, Math.min(12, (int) Math.round(Double.parseDouble(String.valueOf(button.get("durationSeconds")))))); }
+                    catch (Exception ignored) { }
+                    final int nextDuration = duration;
+                    final String nextIconUrl = iconUrl;
+                    final boolean nextPulseEnabled = !Boolean.FALSE.equals(button.get("pulseEnabled"));
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        luckyCannonDurationSeconds = nextDuration;
+                        luckyCannonPulseEnabled = nextPulseEnabled;
+                        luckyCannonRemoteIconUrl = nextIconUrl;
+                        if (luckyCannonIconView == null) return;
+                        if (nextIconUrl.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        String absolute = com.Dramizo.Series.util.AssetCatalog.absoluteUrl(nextIconUrl);
+                        if (absolute == null || absolute.isEmpty()) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                            return;
+                        }
+                        try {
+                            com.bumptech.glide.Glide.with(getApplicationContext())
+                                    .load(absolute).override(128, 128).fitCenter().dontAnimate()
+                                    .into(luckyCannonIconView);
+                            luckyCannonIconView.setVisibility(View.VISIBLE);
+                        } catch (Exception ignored) {
+                            luckyCannonIconView.setVisibility(View.GONE);
+                        }
+                    });
+                }
+                @Override public void onFailure(
+                        retrofit2.Call<com.Dramizo.Series.data.remote.dto.ApiResponse<Map<String, Object>>> call,
+                        Throwable error) {
+                    // Keep the locally drawn gem and existing duration if the free host is asleep.
+                }
+            });
+        } catch (Exception ignored) { }
     }
 
     /** Called only after the existing gift endpoint confirms a successful lucky gift send. */
@@ -3806,6 +3898,18 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     private void sendLuckyCannonGift() {
         if (luckyCannonSending || !luckyCannonEnabled || luckyCannonGiftId == null
                 || luckyCannonTargets.isEmpty() || roomId == null || roomId.isEmpty()) return;
+        // Tactile press feedback is local-only and does not affect the send request.
+        if (luckyCannonPulseEnabled && luckyCannonView != null) luckyCannonView.fire();
+        if (luckyCannonPulseEnabled && luckyCannonLayer != null) {
+            luckyCannonLayer.animate().cancel();
+            luckyCannonLayer.setScaleX(0.94f);
+            luckyCannonLayer.setScaleY(0.94f);
+            luckyCannonLayer.animate().scaleX(1.06f).scaleY(1.06f).setDuration(110L)
+                    .withEndAction(() -> {
+                        if (luckyCannonLayer != null) luckyCannonLayer.animate()
+                                .scaleX(1f).scaleY(1f).setDuration(180L).start();
+                    }).start();
+        }
         final AppContainer container;
         try { container = ContainerProvider.from(this); } catch (Exception ignored) { return; }
         final String giftId = luckyCannonGiftId;
@@ -3859,7 +3963,9 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
         }
         boolean keepVisible = localSender && !luckyCannonTargets.isEmpty();
         if (!keepVisible) luckyCannonLayer.setVisibility(View.VISIBLE);
-        luckyCannonView.fire();
+        // The sender already received immediate local press feedback; other room members
+        // still animate when the shared launch event arrives.
+        if (!localSender && luckyCannonPulseEnabled) luckyCannonView.fire();
         if (luckyCannonSoundEnabled) GiftAudioFx.playLuckyCoins(this, 1);
         playLuckyCannonFlights(icon, targets, totalCoins, quantity, personCount);
         if (!keepVisible) {
@@ -11295,9 +11401,10 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
                 && binding.giftOverlay.getChildCount() == 0) {
             binding.giftOverlay.setVisibility(View.GONE);
         }
-        // Non-video: Mikoo toast immediately. Video: after stage ends (see onDone).
+        // Show the same visible X1/X7/X17/X77/X177 count-up for every gift type.
+        // Video gifts start counting after their stage finishes (see onDone); other gifts start now.
         if (!isVideoGift) {
-            showGiftSendToast(senderName, giftName, senderAvatarUrl, iconUrl, comboCount, 0);
+            showGiftSendToastCountUp(senderName, giftName, senderAvatarUrl, iconUrl, comboCount);
         }
 
         String me = senderName;
@@ -11457,6 +11564,7 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
 
     @Override
     protected void onStop() {
+        handler.removeCallbacks(luckyButtonStylePoll);
         handler.removeCallbacks(roomPkInvitationPoll);
         sRoomUiVisible = false;
         // Do NOT clear chat / gift queues — user expects session to continue while in WhatsApp.
@@ -11481,6 +11589,8 @@ public class VoiceRoomActivity extends ThemedActivity implements GiftRecipientSo
     protected void onResume() {
         super.onResume();
         sRoomUiVisible = true;
+        handler.removeCallbacks(luckyButtonStylePoll);
+        handler.postDelayed(luckyButtonStylePoll, 15_000L);
         handler.removeCallbacks(roomPkInvitationPoll);
         if (isOwner && roomId != null && !roomId.isEmpty()) handler.postDelayed(roomPkInvitationPoll, 900L);
         minimizing = false;

@@ -973,6 +973,12 @@ public class HomeFragment extends Fragment {
         com.Dramizo.Series.util.RoomJoinPrefetch.begin(requireContext(), room.id, pwd);
         Intent i = new Intent(requireContext(), VoiceRoomActivity.class);
         i.putExtra(VoiceRoomActivity.EXTRA_ROOM_ID, room.id);
+        // Paint the room's public ID immediately; don't wait for the join response to return it.
+        if (room.displayRoomId != null && !room.displayRoomId.trim().isEmpty()) {
+            i.putExtra(VoiceRoomActivity.EXTRA_ROOM_DISPLAY_ID, room.displayRoomId.trim());
+        }
+        i.putExtra(VoiceRoomActivity.EXTRA_ROOM_IS_AGENCY,
+                com.Dramizo.Series.util.RoomUiHelper.isAgencyRoom(room));
         if (pwd != null && !pwd.isEmpty()) {
             i.putExtra(VoiceRoomActivity.EXTRA_PASSWORD, pwd);
         }

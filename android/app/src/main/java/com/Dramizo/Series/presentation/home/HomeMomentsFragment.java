@@ -67,6 +67,7 @@ public class HomeMomentsFragment extends Fragment {
     private final List<Map<String, Object>> posts = new ArrayList<>();
     private final List<ObjectAnimator> frameAnimators = new ArrayList<>();
     private boolean busy;
+    private long lastLoadAtMs;
 
     public static HomeMomentsFragment newInstance() { return new HomeMomentsFragment(); }
     public static HomeMomentsFragment forProfile(String userId) {
@@ -237,12 +238,17 @@ public class HomeMomentsFragment extends Fragment {
         return host;
     }
 
-    @Override public void onResume() { super.onResume(); loadFeed(); }
+    @Override public void onResume() { super.onResume(); loadFeed(false); }
 
-    public void reloadFromHost() { loadFeed(); }
+    public void reloadFromHost() { loadFeed(true); }
 
-    private void loadFeed() {
+    private void loadFeed() { loadFeed(true); }
+
+    private void loadFeed(boolean force) {
         if (container == null || busy) return;
+        long now = System.currentTimeMillis();
+        if (!force && lastLoadAtMs > 0L && now - lastLoadAtMs < 15_000L) return;
+        lastLoadAtMs = now;
         busy = true;
         runIo(() -> {
             try {
@@ -259,7 +265,7 @@ public class HomeMomentsFragment extends Fragment {
                     renderFeed();
                     busy = false;
                 });
-            } catch (Exception e) { showError("تعذر تحميل اللحظات"); }
+            } catch (Exception e) { lastLoadAtMs = 0L; showError("تعذر تحميل اللحظات"); }
         });
     }
 

@@ -22,6 +22,12 @@ const routes = [
         meta: { titleKey: 'routes.dashboard' },
       },
       {
+        path: 'toast-manager',
+        name: 'toast-manager',
+        component: () => import('@/views/ToastManagerView.vue'),
+        meta: { title: 'إدارة توستات الهدايا', module: 'settings' },
+      },
+      {
         path: 'paid-messages',
         name: 'paid-messages',
         component: () => import('@/views/PaidMessagesView.vue'),

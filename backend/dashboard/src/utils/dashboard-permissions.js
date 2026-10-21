@@ -12,6 +12,7 @@ export const ROUTE_MODULE = {
   rooms: 'rooms',
   'support-chest': 'supportChest',
   gifts: 'gifts',
+  'toast-manager': 'settings',
   coins: 'coins',
   wallet: 'wallet',
   withdrawals: 'withdrawals',
